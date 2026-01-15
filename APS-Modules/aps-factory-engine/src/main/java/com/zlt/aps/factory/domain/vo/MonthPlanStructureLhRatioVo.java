@@ -18,9 +18,9 @@ public class MonthPlanStructureLhRatioVo implements Serializable {
      */
     private String structureName;
     /**
-     * 成型类型-品牌
+     * 成型机型
      */
-    private String cxMachineBrandCode;
+    private String cxMachineTypeCode;
     /**
      * 硫化机台配比值
      */

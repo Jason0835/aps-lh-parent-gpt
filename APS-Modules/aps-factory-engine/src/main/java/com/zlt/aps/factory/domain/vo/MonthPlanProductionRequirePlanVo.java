@@ -37,10 +37,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 有模具基础信息的模具数量(模具台账或是新模具到货计划)
      */
     private Integer baseMouldQty;
-    /**
-     * 产品状态？
-     */
-    private String productStatus;
+
     /**
      * 不可生产标志
      */
@@ -261,6 +258,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //施工配置
         MonthPlanProductConstructionInfoVo constructionInfo = setConstructionStage(constructionConfigurationList, getProductTypeCode());
         setEmbryoCode(constructionInfo.getEmbryoCode());
+        setProductStatus(constructionInfo.getProductStatus());
+        setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
         setMouldMethod(constructionInfo.getMouldMethod());
         setSpecCode(constructionInfo.getSpecCode());
         if (StringUtils.isBlank(constructionInfo.getIsZeroRack())) {

@@ -886,10 +886,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //机型为空值，表示所有机型匹配
         structureLhRatioList.forEach(singleRatio -> {
-            if (StringUtils.isNotBlank(singleRatio.getCxMachineBrandCode())) {
+            if (StringUtils.isNotBlank(singleRatio.getCxMachineTypeCode())) {
                 return;
             }
-            singleRatio.setCxMachineBrandCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
+            singleRatio.setCxMachineTypeCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
         });
         //周期结构硫化配比
         List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
