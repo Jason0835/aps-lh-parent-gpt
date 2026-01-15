@@ -255,4 +255,24 @@ public class FactoryConsoleUIController extends BaseController {
         }
         return AjaxResult.success();
     }
+
+    /**
+     * 查询对应年月+分厂的需求计划版本
+     */
+    @ResponseBody
+    @PostMapping("/versionList")
+    @ApiOperation("查询对应年月+分厂的需求计划版本")
+    public AjaxResult versionList(FactoryMonthPlanProductionFinalResult saleMonthPlanRequire) {
+        return factoryConsoleService.versionList(saleMonthPlanRequire);
+    }
+
+    /**
+     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     */
+    @ResponseBody
+    @PostMapping("/productionVersionList")
+    @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
+    public AjaxResult productionVersionList(FactoryMonthPlanProductionFinalResult query) {
+        return factoryConsoleService.productionVersionList(query);
+    }
 }

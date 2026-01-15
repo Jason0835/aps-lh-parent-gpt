@@ -7,6 +7,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
@@ -252,4 +253,30 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         return context;
     }
 
+    /**
+     * 查询对应年月+分厂的需求计划版本
+     *
+     * @param query
+     */
+    @Override
+    public List<String> versionList(FactoryMonthPlanProductionFinalResult query) {
+        if (query.getYear() == null || query.getMonth() == null || StringUtils.isBlank(query.getFactoryCode())) {
+            return Collections.emptyList();
+        }
+        return factoryProductionVersionMapper.versionList(query);
+    }
+
+    /**
+     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     *
+     * @param query 查询条件
+     * @return
+     */
+    @Override
+    public List<String> productionVersionList(FactoryMonthPlanProductionFinalResult query) {
+        if (query.getYear() == null || query.getMonth() == null || StringUtils.isBlank(query.getFactoryCode()) || StringUtils.isBlank(query.getMonthPlanVersion())) {
+            return Collections.emptyList();
+        }
+        return factoryProductionVersionMapper.productionVersionList(query);
+    }
 }

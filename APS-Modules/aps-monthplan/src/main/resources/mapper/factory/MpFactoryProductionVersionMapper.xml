@@ -108,4 +108,25 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
     </update>
+
+    <select id="versionList" resultType="java.lang.String">
+        select distinct MONTH_PLAN_VERSION
+        from T_MP_PROC_VERSION
+        where IFNULL(IS_DELETE, 0) = 0
+                  and YEAR = #{year}
+                  and MONTH = #{month}
+          and FACTORY_CODE = #{factoryCode}
+          and MONTH_PLAN_VERSION is not null
+    </select>
+
+    <select id="productionVersionList" resultType="java.lang.String">
+        select distinct PRODUCTION_VERSION
+        from T_MP_PROC_VERSION
+        where IFNULL(IS_DELETE, 0) = 0
+                  and YEAR = #{year}
+                  and MONTH = #{month}
+          and FACTORY_CODE = #{factoryCode}
+          and MONTH_PLAN_VERSION = #{monthPlanVersion}
+          and PRODUCTION_VERSION is not null
+    </select>
 </mapper>

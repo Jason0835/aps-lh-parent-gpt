@@ -342,4 +342,16 @@ public class FactoryConsoleController extends BaseController {
     public AjaxResult finalized(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
         return iFactoryMonthPlanProductionFinalResultService.finalized(factoryMonthPlanProdFinal);
     }
+
+    @ApiOperation("查询对应年月+分厂的需求计划版本")
+    @PostMapping("/versionList")
+    public AjaxResult versionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
+        return AjaxResult.success(factoryConsoleService.versionList(query));
+    }
+
+    @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
+    @PostMapping("/productionVersionList")
+    AjaxResult productionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
+        return AjaxResult.success(factoryConsoleService.productionVersionList(query));
+    }
 }
