@@ -221,4 +221,10 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @ApiModelProperty(value = "硫化示方书发行时间", name = "lhReleaseDate")
     @TableField(value = "LH_RELEASE_DATE")
     private Date lhReleaseDate;
+
+//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
 }
