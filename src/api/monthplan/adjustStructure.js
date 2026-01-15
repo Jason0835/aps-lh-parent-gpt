@@ -104,3 +104,22 @@ export function getStructureDetail(query) {
     data: query
   })
 }
+
+
+//获取结果列表
+export function listResult(query) {
+  return request({
+    url: '/monthplan/mpAdjustResult/list',
+    method: 'post',
+    data: query
+  })
+}
+
+//获取结果列表
+export function resultVersion(query) {
+  return request({
+    url: '/monthplan/mpAdjustResult/getVersionList',
+    method: 'post',
+    data: query
+  })
+}

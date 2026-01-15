@@ -48,15 +48,60 @@
           <el-tab-pane
             label="单结构调整"
             disabled
-            name="result"
+            name="singleResult"
             v-if="isShowResult"
           >
+            <el-form
+              :inline="true"
+              :model="formInline"
+              class="demo-form-inline"
+            >
+              <el-form-item label="机台">
+                <el-input
+                  v-model="formInline.cxMachineCode"
+                  placeholder="机台"
+                ></el-input>
+              </el-form-item>
+              <el-form-item label="产品结构">
+                <el-input
+                  v-model="formInline.structureName"
+                  placeholder="产品结构"
+                ></el-input>
+              </el-form-item>
+              <el-form-item label="开始日期">
+                <el-input
+                  v-model="formInline.beginDay"
+                  placeholder="开始日期"
+                ></el-input>
+              </el-form-item>
+              <el-form-item label="结束日期">
+                <el-input
+                  v-model="formInline.endDay"
+                  placeholder="结束日期"
+                ></el-input>
+              </el-form-item>
+              <el-form-item label="调整结束日期">
+                <el-date-picker
+                  v-model="formInline.overDate"
+                  type="date"
+                  value-format="yyyy-MM-dd"
+                  placeholder="选择日期"
+                >
+                </el-date-picker>
+              </el-form-item>
+              <el-form-item label="">
+                <el-checkbox v-model="formInline.isCheck">后续平移</el-checkbox>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="onSubmit">开始调整</el-button>
+              </el-form-item>
+            </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="调整结果" disabled name="three"> </el-tab-pane>
+          <el-tab-pane label="调整结果" name="three"> </el-tab-pane>
         </el-tabs>
       </template>
-      <template slot="footer" v-if="activeName == 'three'">
+      <template slot="footer" v-if="activeName == 'three' && !isTabChange">
         <div
           style="
             display: flex;
@@ -90,7 +135,7 @@
     <infoDialog ref="infoRef" @success="getList" />
 
     <special ref="specialRef"></special>
-    <addModal ref="addModalRef" @success="getList" />
+    <addModal ref="addModalRef" @success="addSuccessFun" />
   </basic-container>
 </template>
 <script>
@@ -111,6 +156,8 @@ import {
   versionAdjust,
   versionStructure,
   getStructureDetail,
+  listResult,
+  resultVersion,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -120,9 +167,6 @@ import infoDialog from "./components/infoDialog.vue";
 import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
-import r from "highlight.js/lib/languages/r";
-import { el } from "@fullcalendar/core/internal-common";
-
 export default {
   name: "MoldingClosingStageProgress",
   components: {
@@ -145,6 +189,8 @@ export default {
   },
   data() {
     return {
+      formInline: {},
+      isTabChange: true,
       versionList: [],
       isShowResult: false,
       getLoading: false,
@@ -167,6 +213,11 @@ export default {
       importDefaultValue: {},
       importRules: {},
       isEdit: true,
+      typeList: [
+        { label: "结构内", value: "01" },
+        { label: "结构调整", value: "02" },
+      ],
+      actionDate: {},
     };
   },
   computed: {
@@ -277,8 +328,8 @@ export default {
                       key={row.id}
                       type="number"
                       v-model={row.adjustPriorities}
-                      disabled={row.isAddSku != "1"}
-                      placeholder="请输入内容"
+                      disabled={row.isSkuAdd != "1"}
+                      placeholder="请输入"
                       min={1}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
@@ -350,10 +401,10 @@ export default {
               );
             },
           },
-          {
-            prop: "productionVersion",
-            label: this.$t("版本号"),
-          },
+          // {
+          //   prop: "productionVersion",
+          //   label: this.$t("版本号"),
+          // },
           {
             prop: "cxMachineCode",
             label: this.$t("成型机台"),
@@ -378,13 +429,13 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  <el-button
+                  {/* <el-button
                     class="minus"
                     type="primary"
                     onClick={() => this.handleRowClick(row)}
                   >
                     {row.id == this.expands[0] ? "收起" : "展开"}
-                  </el-button>
+                  </el-button> */}
                   <el-button
                     class="minus"
                     type="danger"
@@ -420,6 +471,11 @@ export default {
             prop: "cxMachineCode",
             label: this.$t("成型机台"),
             width: 120,
+          },
+          {
+            prop: "version",
+            label: this.$t("版本号"),
+            width: 180,
           },
           {
             prop: "structureName",
@@ -482,12 +538,14 @@ export default {
         }
         return list;
       }
-      if (this.activeName == "result") {
+      if (this.activeName == "singleResult") {
         return [
           {
             prop: "structureName",
             label: this.$t("产品结构"),
+            width: 120,
           },
+
           {
             prop: "scheduledMachines",
             label: this.$t("排产机台"),
@@ -600,7 +658,7 @@ export default {
       return [];
     },
     searchColumns() {
-      return [
+      let list = [
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
@@ -631,10 +689,10 @@ export default {
           label: this.$t("产品结构"),
         },
         {
-          prop: this.activeName == "first" ? "version" : "productionVersion",
+          prop: this.activeName == "second" ? "productionVersion" : "version",
           label: this.$t("版本号"),
           type: "select",
-          clearable: false,
+          clearable: this.activeName == "first" ? false : true,
           filterable: true,
           dictData: this.versionList,
         },
@@ -647,6 +705,15 @@ export default {
           label: this.$t("物料描述"),
         },
       ];
+      if (this.activeName == "three") {
+        list.push({
+          prop: "adjustType",
+          label: this.$t("类型"),
+          type: "select",
+          dictData: this.typeList,
+        });
+      }
+      return list;
     },
     subColumns() {
       let list = [
@@ -709,6 +776,16 @@ export default {
     },
   },
   methods: {
+    //单结构调整提交
+    onSubmit() {},
+
+    addSuccessFun() {
+      this.$set(this.page, "current", 1);
+      this.$set(this.search, "productionVersion", "");
+      this.$set(this.query, "productionVersion", "");
+
+      this.getList();
+    },
     handleRowClick(row) {
       if (this.expands.includes(row.id)) {
         this.expands = [];
@@ -760,17 +837,20 @@ export default {
         if (this.activeName == "second") {
           res = await versionStructure(this.formatParams());
         }
+        if (this.activeName == "three") {
+          res = await resultVersion(this.formatParams());
+        }
         let list = [];
         for (let i = 0; i < res.rows.length; i++) {
           let obj = {
             label:
-              this.activeName == "first"
-                ? res.rows[i].version
-                : res.rows[i].productionVersion,
+              this.activeName == "second"
+                ? res.rows[i].productionVersion
+                : res.rows[i].version,
             value:
-              this.activeName == "first"
-                ? res.rows[i].version
-                : res.rows[i].productionVersion,
+              this.activeName == "second"
+                ? res.rows[i].productionVersion
+                : res.rows[i].version,
           };
           list.push(obj);
         }
@@ -872,22 +952,22 @@ export default {
     },
     async getSubList(row) {
       this.subTableData = [];
-        try {
-          let params = {
-            ...this.query,
-            ...this.sort,
-          };
-          if (params.yearMonth) {
-            let arr = params.yearMonth.split("-");
-            params.year = arr[0];
-            params.month = arr[1];
-            params.yearMonth = "";
-          }
-          params.structureName = row.structureName;
-          params.productionVersion = row.productionVersion;
-          let res = await getStructureDetail(params);
-          this.subTableData = res.rows;
-        } catch (err) {}
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.year = arr[0];
+          params.month = arr[1];
+          params.yearMonth = "";
+        }
+        params.structureName = row.structureName;
+        params.productionVersion = row.productionVersion;
+        let res = await getStructureDetail(params);
+        this.subTableData = res.rows;
+      } catch (err) {}
     },
     async handleExpandChange(row, expandedRows) {
       this.expands = [];
@@ -924,9 +1004,18 @@ export default {
         this.$refs.addModalRef.show({ yearMonth: this.search.yearMonth });
       }
     },
+
+    //tab切换
     handleClick(tab, event) {
       // this.loading = true;
       this.show = false;
+      this.isShowResult = false;
+      if (this.activeName == "three") {
+        // this.getResultList();
+        this.getVersionList(true);
+        this.isTabChange = true;
+        return;
+      }
       if (this.activeName == "first") {
         this.adjustType = "01";
         this.isEdit = true;
@@ -943,6 +1032,20 @@ export default {
       // this.getList();
       this.getVersionList(true);
     },
+
+    //获取调整结果列表
+    async getResultList() {
+      try {
+        let res = await listResult(this.formatParams());
+        this.show = true;
+        this.data = res.rows;
+        console.log(res);
+      } catch (err) {
+        console.log(err);
+      }
+    },
+
+    //自动调整
     async handShowResult() {
       this.show = false;
       this.loading = true;
@@ -967,6 +1070,7 @@ export default {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
+        this.isTabChange = false;
         this.activeName = "three";
       } catch (err) {
         console.log(err);
@@ -980,10 +1084,48 @@ export default {
         this.$refs.specialRef.show();
       }
     },
+
+    //单选结构调整
     async handleAdd() {
-      // this.isShowResult=true
-      // this.activeName = "result";
-      this.loading = true;
+      this.formInline = this.selection[0];
+      this.actionDate = this.selection[0];
+      this.show = false;
+
+      if (this.selection[0].productionVersion) {
+        console.log("selection", this.selection[0]);
+        this.cxMachineCodeList(this.selection[0]);
+      } else {
+        console.log("没版本");
+      }
+      setTimeout(() => {
+        this.show = true;
+      }, 500);
+    },
+    async cxMachineCodeList(row) {
+      try {
+        let list = [];
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.year = arr[0];
+          params.month = arr[1];
+          params.yearMonth = "";
+        }
+        params.structureName = row.structureName;
+        params.productionVersion = row.productionVersion;
+        let res = await getStructureDetail(params);
+
+        for (let index = 0; index < res.rows.length; index++) {
+          list.push(res.rows[index].cxMachineCode);
+        }
+        let result = list.join(", ");
+        this.getOutList(result);
+      } catch (err) {}
+    },
+    async getOutList(result) {
       try {
         let params = {
           ...this.query,
@@ -995,20 +1137,17 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.scheduledMachines = this.selection[0].cxMachineCode;
-        params.structureName = this.selection[0].structureName;
+        params.scheduledMachines = result;
+        params.structureName = this.actionDate.structureName;
 
         params.adjustType = this.adjustType;
-        this.isEdit = true;
+        this.isEdit = false;
         let res = await getAdjustDetailList(params);
-        console.log(res);
-        if (this.$refs.infoRef) {
-          this.$refs.infoRef.show(res);
-        }
+        this.data = res.rows;
+        this.isShowResult = true;
+        this.activeName = "singleResult";
       } catch (err) {
         console.log(err);
-      }finally{
-        this.loading = false
       }
     },
 
@@ -1097,9 +1236,12 @@ export default {
         let data;
         if (this.activeName == "first") {
           data = await listInternalStructure(this.formatParams());
-        }
-        if (this.activeName == "second") {
+        } else if (this.activeName == "second") {
           data = await listOutsideStructure(this.formatParams());
+        } else if (this.activeName == "three") {
+          data = await listResult(this.formatParams());
+        } else {
+          return;
         }
         this.data = data.rows;
         if (this.activeName == "second") {

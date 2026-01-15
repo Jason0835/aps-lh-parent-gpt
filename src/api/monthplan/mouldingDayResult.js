@@ -11,7 +11,7 @@ export function listMouldingDayResult(query) {
 
 export function listProductionVersionList(query) {
   return request({
-    url: '/monthplan/mouldingDayResult/productionVersionList',
+    url: '/factory/console/getProductionVersionList',
     method: 'post',
     data: query
   })

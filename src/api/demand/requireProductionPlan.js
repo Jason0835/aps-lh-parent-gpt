@@ -23,7 +23,7 @@ export function saveRequireProductionPlan(query) {
 }
 export function getVersionList(query) {
   return request({
-    url: 'demand/requireProductionPlan/versionList',
+    url: 'factory/console/versionList',
     method: 'post',
     data: query
   })

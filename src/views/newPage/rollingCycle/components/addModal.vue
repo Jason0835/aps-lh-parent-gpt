@@ -37,13 +37,13 @@ import {
   confirmAdjust,
   addAdjust,
 } from "@/api/monthplan/adjustStructure";
-
+import structureSelect from "@/views/components/structureSelect.vue";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
 
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm, formingCapacitySelect },
+  components: { infoForm, formingCapacitySelect,structureSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -125,7 +125,7 @@ export default {
             return (
               <formingCapacitySelect
                 factoryCode={form.cxMachineCode}
-                key={form.cxMachineCode}
+                key='formCxMachineCode'
                 v-model={form.cxMachineCode}
               />
             );
@@ -135,6 +135,14 @@ export default {
         {
           prop: "structureName",
           label: this.$t("产品结构"),
+          render: (form) => {
+            return (
+              <structureSelect
+                key='formStructureName'
+                v-model={form.structureName}
+              />
+            );
+          },
         },
         {
           prop: "yearMonth",

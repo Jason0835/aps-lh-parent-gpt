@@ -301,7 +301,7 @@ export default {
 
     handleExport() {
       downloadLink(
-        "/monthplan/productionMonthPlanInit/export",
+        "/monthplan/mpStructureAllocation/export",
         this.formatParams(false)
       );
     },
