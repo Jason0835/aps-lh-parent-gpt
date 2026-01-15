@@ -177,6 +177,7 @@ public class MouldProductionResultHandler {
         logDetail.setProductStatus(planInfo.getProductStatus());
         logDetail.setBrand(planInfo.getBrand());
         logDetail.setMesMaterialCode(planInfo.getMesMaterialCode());
+        logDetail.setMainMaterialDesc(planInfo.getEmbryoCode());
         //硫化施工信息
         logDetail.setConstructionStage(planInfo.getConstructionStage());
         logDetail.setDayVulcanizationQty(planInfo.getDayVulcanizationQty());

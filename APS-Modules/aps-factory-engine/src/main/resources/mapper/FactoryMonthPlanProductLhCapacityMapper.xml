@@ -24,7 +24,7 @@
 
     <select id="getStructureLhRatioInfo" resultType="com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo">
         SELECT STRUCTURE_NAME,
-               CX_MACHINE_BRAND_CODE,
+               CX_MACHINE_TYPE_CODE,
                LH_MACHINE_MAX_QTY,
                MAX_EMBRYO_QTY
           FROM t_mdm_structure_lh_ratio
