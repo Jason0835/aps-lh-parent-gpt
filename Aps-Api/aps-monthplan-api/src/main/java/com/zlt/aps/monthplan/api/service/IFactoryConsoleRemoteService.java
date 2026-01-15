@@ -144,7 +144,7 @@ public interface IFactoryConsoleRemoteService {
     /**
      * 查询对应年月+分厂+需求计划版本的分厂月计划版本
      */
-    @PostMapping("/factoryConsole/productionVersionList")
+    @PostMapping("/factoryConsole/getProductionVersionList")
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
-    public AjaxResult productionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query);
+    public AjaxResult getProductionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query);
 }

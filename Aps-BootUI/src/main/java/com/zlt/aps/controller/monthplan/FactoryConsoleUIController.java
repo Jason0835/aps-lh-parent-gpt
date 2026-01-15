@@ -270,9 +270,9 @@ public class FactoryConsoleUIController extends BaseController {
      * 查询对应年月+分厂+需求计划版本的分厂月计划版本
      */
     @ResponseBody
-    @PostMapping("/productionVersionList")
+    @PostMapping("/getProductionVersionList")
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
-    public AjaxResult productionVersionList(FactoryMonthPlanProductionFinalResult query) {
-        return factoryConsoleService.productionVersionList(query);
+    public AjaxResult getProductionVersionList(FactoryMonthPlanProductionFinalResult query) {
+        return factoryConsoleService.getProductionVersionList(query);
     }
 }
