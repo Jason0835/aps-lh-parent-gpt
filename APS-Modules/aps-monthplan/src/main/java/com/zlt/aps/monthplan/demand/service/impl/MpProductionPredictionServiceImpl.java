@@ -133,7 +133,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             monthPlanProductionSchedulingService.general(context);
         }*/
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
-        List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
+        List<MpProductionPrediction> list = buildProductionPrediction(finalVersion,tMonthDemands,tPlus1MonthDemands,tPlus2MonthDemands,materialInfoMap);
         if(!CollectionUtils.isEmpty(list)) {
             this.baseDao.insertBatch(list);
         }
@@ -181,7 +181,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
 
-    private List<MpProductionPrediction> buildProductionPrediction(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
+    private List<MpProductionPrediction> buildProductionPrediction(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tMonthDemands,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
         List<FactoryMonthPlanProductionFinalResult> productionFinalResults =   this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
         if(CollectionUtils.isEmpty(productionFinalResults)) {
             return Collections.emptyList();
@@ -195,7 +195,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         Map<String,Integer> tPlus2MonthDemandQty = this.getMonthQty(productionFinalResultsTplus2Month);
         List<MpProductionPrediction> list = Lists.newArrayList();
         YearMonth yearMonth = YearMonth.now();
-        String predictionVersion = this.getPredictionVersion(finalVersion,tPlus1MonthDemands,tPlus2MonthDemands);
+        DpDemandPlan demandPlan = tMonthDemands.get(0);
         tMonthDemandQty.forEach((materialCode, productionQty) -> {
                 if(!materialInfoMap.containsKey(materialCode)) {
                     return;
@@ -209,7 +209,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setYear(yearMonth.getYear());
                 productionPrediction.setMonth(yearMonth.getMonthValue());
                 productionPrediction.setLocationType(materialInfo.getCommonType());
-                productionPrediction.setPredictionVersion(predictionVersion);
+                productionPrediction.setPredictionVersion(demandPlan.getMonthPlanVersion());
                 productionPrediction.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
                 productionPrediction.setProductionVersion(finalVersion.getProductionVersion());
                 productionPrediction.setMonth1(productionQty);
@@ -218,16 +218,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 list.add(productionPrediction);
         });
         return list;
-    }
-
-    private String getPredictionVersion(MpFactoryProductionVersion finalVersion,List<DpDemandPlan> tPlus1MonthDemands, List<DpDemandPlan> tPlus2MonthDemands) {
-        if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
-            return tPlus2MonthDemands.get(0).getMonthPlanVersion();
-        }
-        if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
-            return tPlus1MonthDemands.get(0).getMonthPlanVersion();
-        }
-        return finalVersion.getMonthPlanVersion();
     }
 
     private Map<String, Integer> getMonthQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
