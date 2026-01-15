@@ -570,6 +570,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         // 初始化通用
         initCommon(contextDTO);
+        // 特殊规则初始化
+        specialInit(contextDTO);
 
         // 获取线程池执行器
         ThreadPoolExecutor executor = ThreadPoolUtil.getThreadPool();
@@ -1000,6 +1002,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return new BusinessException(msg);
         });
     }
+
+    /**
+     * 特殊规则初始化（由子类实现）
+     *
+     * @param contextDTO
+     */
+    public abstract void specialInit(MpRollAdjustContextDTO contextDTO);
 
     /**
      * 特殊规则检查（由子类实现）
