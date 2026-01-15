@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -27,9 +28,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -83,9 +86,31 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
         BeanUtils.copyProperties(param, condition);
         TableDataInfo list = iFactoryMonthPlanProductionFinalResultService.list(condition);
+        // 将rows中的LinkedHashMap转换为实体类对象
+        List<FactoryMonthPlanProductionFinalResult> resultList = convertToEntityList(list.getRows());
         // SKU排产明细排序
-        sortSkuScheduleItem((List<FactoryMonthPlanProductionFinalResult>) list.getRows());
+        sortSkuScheduleItem(resultList);
+        list.setRows(resultList);
         return list;
+    }
+
+    private List<FactoryMonthPlanProductionFinalResult> convertToEntityList(List<?> rows) {
+        List<FactoryMonthPlanProductionFinalResult> entityList = new ArrayList<>();
+        if (PubUtil.isEmpty(rows)) {
+            return entityList;
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (Object obj : rows) {
+            if (obj instanceof FactoryMonthPlanProductionFinalResult) {
+                // 如果已经是实体类，直接添加
+                entityList.add((FactoryMonthPlanProductionFinalResult) obj);
+            } else if (obj instanceof Map) {
+                // 如果是LinkedHashMap，转换为实体类
+                FactoryMonthPlanProductionFinalResult entity = objectMapper.convertValue(obj, FactoryMonthPlanProductionFinalResult.class);
+                entityList.add(entity);
+            }
+        }
+        return entityList;
     }
 
 
