@@ -13,6 +13,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.ThreadPoolUtil;
@@ -1159,9 +1160,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
                 adjustDetailVo.setProductStatus(trialPlan.getTrialStatus());
             }
+            String constructionStage = ConstructionStageEnum.FORMAL_PRODUCTION.getStage();
+            if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+                constructionStage = trialPlan.getTrialStatus();
+            }
+            adjustDetailVo.setConstructionStage(constructionStage);
             adjustDetailVo.setProductionVersion(contextDTO.getProductionVersion());
             adjustDetailVo.setMonthPlanVersion(null);
-            adjustDetailVo.setConstructionStage(null);
             // TODO 型腔数量、活块数量
             adjustDetailVo.setMouldCavityQty(null);
             adjustDetailVo.setTypeBlockQty(null);
