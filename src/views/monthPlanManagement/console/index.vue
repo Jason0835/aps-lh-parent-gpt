@@ -572,6 +572,7 @@ export default {
           month: row.month,
           factoryCode: row.factoryCode,
           monthPlanVersion: row.monthPlanVersion,
+          productionVersion: row.productionVersion,
         }
       });
     },

@@ -491,7 +491,7 @@ export default {
       const params = {
         ...this.query,
         ...this.sort,
-        productionVersion: this.productionVersion,
+        // productionVersion: this.productionVersion,
       };
 
       if (hasPage) {
@@ -567,6 +567,7 @@ export default {
   },
   created() {
     if (this.$route.query) {
+      console.log(this.$route.query);
       let defaultParams = {
         ...this.$route.query,
       };

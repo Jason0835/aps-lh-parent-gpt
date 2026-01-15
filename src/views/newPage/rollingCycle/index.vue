@@ -38,9 +38,9 @@
             <el-button @click="handleAdd" :disabled="selection.length != 1">{{
               $t("单选结构调整")
             }}</el-button>
-            <el-button @click="handleShowSpecial">{{
+            <!-- <el-button @click="handleShowSpecial">{{
               $t("特殊材料生产情况")
-            }}</el-button>
+            }}</el-button> -->
             <el-button @click="handleAddSpecial">{{
               $t("新增结构")
             }}</el-button>
@@ -121,6 +121,7 @@ import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
 import r from "highlight.js/lib/languages/r";
+import { el } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "MoldingClosingStageProgress",
@@ -274,9 +275,9 @@ export default {
                   {this.isEdit && (
                     <el-input
                       key={row.id}
-                      type='number'
+                      type="number"
                       v-model={row.adjustPriorities}
-                      disabled={row.isAddSku!='1'}
+                      disabled={row.isAddSku != "1"}
                       placeholder="请输入内容"
                       min={1}
                       onBlur={(e) => {
@@ -285,7 +286,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-
                   )}
                   {!this.isEdit && <span>{row.adjustPriority}</span>}
                 </div>
@@ -338,7 +338,10 @@ export default {
                         <el-table-column
                           prop={item.prop}
                           label={item.label}
-                          minWidth={80}
+                          minWidth={item.width ? item.width : "100px"}
+                          scopedSlots={{
+                            default: item.render ? item.render : undefined,
+                          }}
                         />
                       );
                     })}
@@ -348,7 +351,7 @@ export default {
             },
           },
           {
-            prop: "version",
+            prop: "productionVersion",
             label: this.$t("版本号"),
           },
           {
@@ -375,6 +378,13 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
+                  <el-button
+                    class="minus"
+                    type="primary"
+                    onClick={() => this.handleRowClick(row)}
+                  >
+                    {row.id == this.expands[0] ? "收起" : "展开"}
+                  </el-button>
                   <el-button
                     class="minus"
                     type="danger"
@@ -405,7 +415,7 @@ export default {
         ];
       }
       if (this.activeName == "three") {
-        let list= [
+        let list = [
           {
             prop: "cxMachineCode",
             label: this.$t("成型机台"),
@@ -457,20 +467,19 @@ export default {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
           },
-
         ];
         const days = 31;
         for (let i = 0; i < days; i++) {
-            list.push({
-              label: `${i + 1}号`,
-              // label: this.$t("ui.data.column.mouldingDayResult.day", {
-              //   day: i + 1,
-              // }),
-              prop: `day${i + 1}`,
-              minWidth: "80px",
-              type: "number",
-            });
-          }
+          list.push({
+            label: `${i + 1}号`,
+            // label: this.$t("ui.data.column.mouldingDayResult.day", {
+            //   day: i + 1,
+            // }),
+            prop: `day${i + 1}`,
+            minWidth: "80px",
+            type: "number",
+          });
+        }
         return list;
       }
       if (this.activeName == "result") {
@@ -622,7 +631,7 @@ export default {
           label: this.$t("产品结构"),
         },
         {
-          prop: "version",
+          prop: this.activeName == "first" ? "version" : "productionVersion",
           label: this.$t("版本号"),
           type: "select",
           clearable: false,
@@ -640,54 +649,75 @@ export default {
       ];
     },
     subColumns() {
-      return [
+      let list = [
         {
           label: this.$t("成型机台"),
-          prop: "deviceCode",
+          prop: "cxMachineCode",
+          width: 120,
         },
         {
           label: this.$t("产品结构"),
-          prop: "deviceGroupDetailName",
+          prop: "structureName",
+          width: 120,
         },
         {
           label: this.$t("物料编码"),
-          prop: "planMonth",
+          prop: "materialCode",
+          width: 120,
         },
         {
           label: this.$t("物料描述"),
-          prop: "execByName",
+          prop: "materialDesc",
+          width: 320,
         },
         {
           label: this.$t("是否含物料"),
-          prop: "execMonth",
+          prop: "hasSpecialMateriaL",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
           label: this.$t("计划量"),
-          prop: "execMonth",
+          prop: "totalQty",
+          width: 120,
         },
         {
           label: this.$t("开始日期"),
-          prop: "execMonth",
+          prop: "beginDay",
+          width: 120,
         },
         {
           label: this.$t("结束日期"),
-          prop: "execMonth",
+          prop: "endDay",
+          width: 120,
         },
-        // {
-        //   label:this.$t("是否含物料"),
-        //   prop: "execMonth",
-        // },
-        // {
-        //   label: this.$t("计划量"),
-        //   prop: "status",
-        //   formatter: (row, column, cellValue) => {
-        //     return this.selectDictLabel(this.dict.type.task_type, cellValue);
-        //   },
-        // },
       ];
+      const days = 31;
+      for (let i = 0; i < days; i++) {
+        list.push({
+          label: `${i + 1}号`,
+          // label: this.$t("ui.data.column.mouldingDayResult.day", {
+          //   day: i + 1,
+          // }),
+          prop: `day${i + 1}`,
+          minWidth: "80px",
+          type: "number",
+        });
+      }
+      return list;
     },
   },
   methods: {
+    handleRowClick(row) {
+      if (this.expands.includes(row.id)) {
+        this.expands = [];
+      } else {
+        this.expands = []; //添加该代码实现手风琴模式，删除该代码取消手风琴模式
+        this.expands.push(row.id);
+        this.getSubList(row);
+      }
+    },
     async editAdjust(row) {
       try {
         let res = await saveAdjust(row);
@@ -733,26 +763,46 @@ export default {
         let list = [];
         for (let i = 0; i < res.rows.length; i++) {
           let obj = {
-            label: res.rows[i].version,
-            value: res.rows[i].version,
+            label:
+              this.activeName == "first"
+                ? res.rows[i].version
+                : res.rows[i].productionVersion,
+            value:
+              this.activeName == "first"
+                ? res.rows[i].version
+                : res.rows[i].productionVersion,
           };
           list.push(obj);
         }
 
         this.versionList = list;
-        console.log("versionList", res);
         if (list.length > 0) {
-          this.$set(this.search, "version", list[0].value);
+          if (this.activeName == "first") {
+            this.$set(this.search, "version", list[0].value);
+            this.$set(this.query, "version", list[0].value);
+          } else {
+            this.$set(this.search, "productionVersion", list[0].value);
+            this.$set(this.query, "productionVersion", list[0].value);
+          }
         } else {
-          this.$set(this.search, "version", "");
+          if (this.activeName == "first") {
+            this.$set(this.search, "version", "");
+            this.$set(this.query, "version", "");
+          } else {
+            this.$set(this.search, "productionVersion", "");
+            this.$set(this.query, "productionVersion", "");
+          }
         }
+        if (isGet) {
+          this.$nextTick(() => {
+            this.getList();
+          });
+        }
+      } catch (err) {
+      } finally {
         // if (isGet) {
         //   this.getList();
         // }
-      } catch (err) {}finally {
-        if (isGet) {
-          this.getList();
-        }
       }
     },
 
@@ -780,7 +830,7 @@ export default {
           params.yearMonth = "";
         }
         let res = await confirmAdjust(params);
-        this.show=false
+        this.show = false;
         this.$modal.msgSuccess(res.msg);
         this.backPlan();
         console.log(res);
@@ -820,11 +870,8 @@ export default {
         this.loading = false;
       }
     },
-    async handleExpandChange(row, expandedRows) {
-      this.expands = [];
-      //通过当前的行获取
-      if (expandedRows.length > 0) {
-        this.subTableData = [];
+    async getSubList(row) {
+      this.subTableData = [];
         try {
           let params = {
             ...this.query,
@@ -839,10 +886,33 @@ export default {
           params.structureName = row.structureName;
           params.productionVersion = row.productionVersion;
           let res = await getStructureDetail(params);
-          this.expands.push(row ? row.id : []);
           this.subTableData = res.rows;
         } catch (err) {}
+    },
+    async handleExpandChange(row, expandedRows) {
+      this.expands = [];
+      //通过当前的行获取
+      if (expandedRows.length > 0) {
+        this.subTableData = [];
+        // try {
+        //   let params = {
+        //     ...this.query,
+        //     ...this.sort,
+        //   };
+        //   if (params.yearMonth) {
+        //     let arr = params.yearMonth.split("-");
+        //     params.year = arr[0];
+        //     params.month = arr[1];
+        //     params.yearMonth = "";
+        //   }
+        //   params.structureName = row.structureName;
+        //   params.productionVersion = row.productionVersion;
+        //   let res = await getStructureDetail(params);
 
+        //   this.subTableData = res.rows;
+        // } catch (err) {}
+        this.getSubList(row);
+        this.expands.push(row ? row.id : []);
         console.log("展开");
         // this.getSubList(row.id);
       } else {
@@ -899,7 +969,7 @@ export default {
         this.autoLoading = false;
         this.activeName = "three";
       } catch (err) {
-        console.log(err)
+        console.log(err);
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
@@ -913,6 +983,7 @@ export default {
     async handleAdd() {
       // this.isShowResult=true
       // this.activeName = "result";
+      this.loading = true;
       try {
         let params = {
           ...this.query,
@@ -936,6 +1007,8 @@ export default {
         }
       } catch (err) {
         console.log(err);
+      }finally{
+        this.loading = false
       }
     },
 
@@ -1074,5 +1147,14 @@ export default {
 .more-btn {
   margin: 2px 0;
   width: 100%;
+}
+.expend-table {
+  padding: 5px 10px;
+  width: 100%;
+  position: relative;
+  z-index: 100;
+}
+:deep(.el-table__expand-icon) {
+  display: none;
 }
 </style>

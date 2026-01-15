@@ -69,6 +69,7 @@ export default {
       callback();
     };
     return {
+      constructionList:[],
       loading: false,
       visible: false,
       isEdit: false,
@@ -206,7 +207,7 @@ export default {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           type: "select",
-          dictData: this.parentDict.type.biz_construction_stage,
+          dictData: this.constructionList,
         },
         {
           prop: "trialQty",
@@ -309,6 +310,16 @@ export default {
 
     //utils
     show(data) {
+      let list=this.parentDict.type.biz_construction_stage
+      let distList=[]
+      for (let index = 0; index < list.length; index++) {
+        console.log(list[index].value)
+        if(list[index].value=="1" ||list[index].value=="2"){
+          distList.push(list[index])
+        }
+
+      }
+      this.constructionList=distList
       this.visible = true;
       if (data) {
         this.isEdit = true;

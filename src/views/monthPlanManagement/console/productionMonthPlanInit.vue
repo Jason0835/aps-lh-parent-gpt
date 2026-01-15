@@ -138,12 +138,12 @@ export default {
         {
           prop: "monthPlanVersion",
           label: this.$t("需求计划版本"),
-          width: 140,
+          width: 180,
         },
         {
           prop: "productionVersion",
           label: this.$t("排产版本号"),
-          width: 140,
+          width: 180,
         },
         {
           prop: "planType",
@@ -156,8 +156,8 @@ export default {
 
         {
           prop: "structureName",
-          with: 120,
           label: this.$t("产品结构"),
+          width: 220,
         },
         {
           prop: "cxMachineCode",
@@ -319,7 +319,6 @@ export default {
       const params = {
         ...this.query,
         ...this.sort,
-        productionVersion: this.version,
       };
 
       if (hasPage) {
@@ -351,6 +350,7 @@ export default {
     },
   },
   created() {
+    console.log(this.$route.query);
     if (this.$route.query) {
       let defaultParams = {
         ...this.$route.query,

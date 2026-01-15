@@ -58,7 +58,7 @@
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import { mapState ,mapGetters} from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -109,6 +109,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -215,6 +216,11 @@ export default {
           width:120,
         },
         {
+          prop: "monthPlanVersion",
+          label: this.$t("ui.data.column.finishStock.requireVersion"),
+          width:180,
+        },
+        {
           prop: "month1",
           label: 'T'+this.$t("ui.data.insertOrder.monthQty"),
         },
@@ -298,6 +304,9 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
         {
           prop: "productTypeCode",
@@ -310,8 +319,12 @@ export default {
           label: this.$t("ui.data.column.trialPlan.specifications"),
         },
         {
-          prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          prop: "pattern",
+          label: this.$t("ui.data.column.modelinfo.pattern"),
+        },
+        {
+          prop: "mainMaterialDesc",
+          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
         },
         {
           prop: "materialCode",
@@ -320,6 +333,13 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        },
+        {
+          prop: "brand",
+          label: this.$t("common.brand"),
+          type: "select",
+          dictData: this.dict.type.biz_brand_type,
+
         },
       ];
     },

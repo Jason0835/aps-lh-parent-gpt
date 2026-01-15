@@ -89,7 +89,7 @@ export function versionAdjust(query) {
 //结构外获取版本列表
 export function versionStructure(query) {
   return request({
-    url: '/monthplan/mpAdjustStructureOut/getVersionList',
+    url: '/monthplan/mpStructureAllocation/getVersionList',
     method: 'post',
     data: query
   })
