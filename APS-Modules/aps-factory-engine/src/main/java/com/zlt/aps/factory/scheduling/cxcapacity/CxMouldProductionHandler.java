@@ -92,11 +92,11 @@ public class CxMouldProductionHandler {
             log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoRatioLog(context, groupName, cxMachineCode));
             return;
         }
-        String brandCode = cxMachineInfo.getCxMachineBrandCode();
+        String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         MonthPlanStructureLhRatioVo cxLhRatio = productionPlanInfo.getLhRatio(cxMachineInfo);
         if (null == cxLhRatio) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, brandCode));
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, machineTypeCode));
             return;
         }
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());

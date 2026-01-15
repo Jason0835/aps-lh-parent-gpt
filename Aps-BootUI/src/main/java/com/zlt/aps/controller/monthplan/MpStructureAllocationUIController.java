@@ -147,6 +147,32 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     }
 
     /**
+     * 修改或新增
+     */
+    @ApiOperation("修改或新增")
+    @PostMapping("/save")
+    @ResponseBody
+    public AjaxResult save(MpStructureAllocation mpStructureAllocation) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpStructureAllocationService.checkUnique(mpStructureAllocation))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.checkUnique"));
+        }
+
+        return iMpStructureAllocationService.save(mpStructureAllocation);
+    }
+
+    /**
+     * 删除排产过程_结构排产
+     */
+    @ApiOperation("删除,id不为空")
+    @RequiresPermissions("monthplan:mpStructureAllocation:remove")
+    @PostMapping("/remove")
+    @ResponseBody
+    public AjaxResult remove(String ids) {
+        Long[] arr = Convert.toLongArray(ids);
+        return iMpStructureAllocationService.removeByIds(Arrays.asList(arr));
+    }
+
+    /**
      * 查询版本列表
      */
     @ApiOperation("查询版本列表")
@@ -155,5 +181,6 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     public TableDataInfo getVersionList(MpStructureAllocation queryVO) {
         return iMpStructureAllocationService.getVersionList(queryVO);
     }
+
 
 }

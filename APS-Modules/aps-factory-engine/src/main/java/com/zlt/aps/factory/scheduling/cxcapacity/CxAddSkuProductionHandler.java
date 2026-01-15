@@ -106,7 +106,7 @@ public class CxAddSkuProductionHandler {
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), lhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产 CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
@@ -174,7 +174,8 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //判断选择的Sku，能否进行上机排产-此时判断胎胚种类数
-        CxLhProductionHelper newLh = cxMachineInfo.getCorrectProductionDateRange(context, needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue()), cxLhGroup);
+        MonthPlanProductionRequirePlanVo addSkuInfo = needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue());
+        CxLhProductionHelper newLh = cxMachineInfo.getCorrectProductionDateRange(context, addSkuInfo, cxLhGroup, endDay, doubleMouldList);
         if (null == newLh) {
             log.info(TbrMouldProductionLogRecorder.addContinueLhGroupSkuEmbryoLimitLog(context, groupName, cxMachineCode, materialDesc));
             retrieveNextSku(context, needProductionInfo, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);

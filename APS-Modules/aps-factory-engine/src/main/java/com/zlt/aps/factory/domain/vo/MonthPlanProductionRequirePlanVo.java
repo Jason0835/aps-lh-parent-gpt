@@ -107,7 +107,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         Integer heightLossQty = getHeightLossQty() - getHeightQty();
         Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
         Integer sumLossQty = heightLossQty + noHeightLossQty;
-        cxCapacityRequireQty = getFactProdReqQty() + sumLossQty;
+        cxCapacityRequireQty = getNetQty() + sumLossQty;
         heightProductionQty = getHeightLossQty();
         productionQty = cxCapacityRequireQty;
     }
