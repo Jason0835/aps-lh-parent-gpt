@@ -11,7 +11,6 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
@@ -452,10 +451,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 if (StringUtils.isBlank(mouldCode)) {
                     return;
                 }
-                MouldRelationTypeEnum relationType = MouldRelationTypeEnum.getInstance(associationInfo.getRelationType());
                 ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
                 if (null == productionMouldInfo) {
-                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mouldCode, associationInfo.getMouldStatus(), relationType);
+                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(associationInfo);
                     if (null == productionMouldInfo) {
                         return;
                     }
@@ -539,6 +537,15 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         for (MouldShellBaseInfoVo mouldShell : mouldShellList) {
             mouldShellMap.put(mouldShell.getMouldSetCode(), mouldShell);
         }
+        Set<Integer> productionDaySet = context.getProductionDay();
+        mouldShellMap.forEach((mouldSetCode, shellBaseInfo) -> {
+            Map<Integer, MouldShellDayInfoHelper> dayLimitInfoMap = new HashMap<>();
+            productionDaySet.forEach(productionDay -> {
+                MouldShellDayInfoHelper dayLimitInfo = MouldShellDayInfoHelper.buildInit(mouldSetCode, productionDay, shellBaseInfo.getTotalQty());
+                dayLimitInfoMap.put(productionDay, dayLimitInfo);
+            });
+            shellBaseInfo.setDayLimitInfoMap(dayLimitInfoMap);
+        });
         return mouldShellMap;
     }
 
@@ -765,6 +772,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 singleMouldInfo.setDayProductionInfo(new HashMap<>());
             });
         }
+        //清除模壳使用量
+        productionContext.clearAllMouldShellUsed();
     }
 
     /**

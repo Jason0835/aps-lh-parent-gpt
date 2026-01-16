@@ -3,10 +3,7 @@ package com.zlt.aps.factory.scheduling;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.factory.domain.vo.*;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -101,6 +98,48 @@ public class TbrProductionContext extends Context {
         addQtyHandler(materialDesc, wastageQty, skuWastageQtyMap);
         //重新计算库销比
         resetCalculateInventorySalesRatio(materialDesc);
+    }
+
+    /**
+     * 根据模壳型号，获取模壳信息
+     *
+     * @param mouldSetCode 模壳型号
+     * @return
+     */
+    public MouldShellBaseInfoVo getMouldShellInfo(String mouldSetCode) {
+        if (StringUtils.isBlank(mouldSetCode)) {
+            return null;
+        }
+        Map<String, MouldShellBaseInfoVo> allMouldShellMap = baseDataContainer.getMouldShellMap();
+        if (CollectionUtils.isEmpty(allMouldShellMap)) {
+            return null;
+        }
+        return allMouldShellMap.get(mouldSetCode);
+    }
+
+    /**
+     * 获取模壳可放两副模具的日期集合
+     *
+     * @param mouldSetCode 模壳型号
+     * @return
+     */
+    public Set<Integer> getMouldShellRange(String mouldSetCode) {
+        MouldShellBaseInfoVo mouldShellInfo = getMouldShellInfo(mouldSetCode);
+        if (null == mouldShellInfo) {
+            return Collections.emptySet();
+        }
+        return mouldShellInfo.getEnableDoubleMouldProductionRange();
+    }
+
+    /**
+     * 清空所有模壳的使用量
+     */
+    public void clearAllMouldShellUsed() {
+        Map<String, MouldShellBaseInfoVo> allMouldShellMap = baseDataContainer.getMouldShellMap();
+        if (CollectionUtils.isEmpty(allMouldShellMap)) {
+            return;
+        }
+        allMouldShellMap.forEach((mouldSetCode, mouldShellInfo) -> mouldShellInfo.clearDayUsed());
     }
 
     /**

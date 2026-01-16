@@ -127,7 +127,8 @@
         SELECT FACTORY_CODE,
                MOULD_SET_CODE,
                MACHINE_QTY,
-               ON_HAND_QTY
+               ON_HAND_QTY,
+               TOTAL_QTY
           FROM t_mdm_mould_shell_info
          WHERE IFNULL(IS_DELETE, 0) = 0
            AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
