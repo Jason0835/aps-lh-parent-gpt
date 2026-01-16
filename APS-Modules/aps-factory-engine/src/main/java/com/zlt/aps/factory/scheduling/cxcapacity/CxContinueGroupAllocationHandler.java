@@ -400,7 +400,7 @@ public class CxContinueGroupAllocationHandler {
         List<GroupDayProductionSummaryHelper> summaryList = groupPlanInfo.getGroupProductionSummary();
         Integer maxEmbryoCount = groupContinueInfo.getDeductionCountLimitValue(deductionMachineCount, CxMachineLimitTypeEnum.MAX_EMBRYO_SIZE);
         Integer maxLhGroupCount = groupContinueInfo.getDeductionCountLimitValue(deductionMachineCount, CxMachineLimitTypeEnum.MAX_LH_COUNT);
-        //提取胎胚种类数，模具数都符合的的记录
+        //提取胎胚种类数，硫化机台数都符合的的记录
         List<GroupDayProductionSummaryHelper> canDeductionList = summaryList.stream().filter(summary -> summary.isMatchDeductionMachine(maxEmbryoCount, maxLhGroupCount)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(canDeductionList)) {
             return null;
