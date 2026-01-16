@@ -589,6 +589,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         CompletableFuture<Void> skuLhCapacityFuture = CompletableFuture.runAsync(() -> initSkuLhCapacity(contextDTO), executor);
         // 初始化SKU与施工（示方书）关系
         CompletableFuture<Void> skuConstructionRefFuture = CompletableFuture.runAsync(() -> initSkuConstructionRef(contextDTO), executor);
+        // 初始化sku与结构关系
+        CompletableFuture<Void> skuStructureRefFuture = CompletableFuture.runAsync(() -> initSkuStructureRef(contextDTO), executor);
         // 初始化物料信息
         CompletableFuture<Void> materialInfoFuture = CompletableFuture.runAsync(() -> initMaterialInfo(contextDTO), executor);
 //        // 初始化月底计划余量
@@ -613,6 +615,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     planMonitorFuture,
                     skuLhCapacityFuture,
                     skuConstructionRefFuture,
+                    skuStructureRefFuture,
                     materialInfoFuture
             ).join();
 
