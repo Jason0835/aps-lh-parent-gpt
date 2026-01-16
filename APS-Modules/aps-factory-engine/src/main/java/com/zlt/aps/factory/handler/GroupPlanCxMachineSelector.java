@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.handler;
 
-import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
@@ -64,18 +63,19 @@ public class GroupPlanCxMachineSelector {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return Collections.emptyList();
         }
-        //如果结构有固定机台，则只能从固定中选择
-        Set<String> fixedCxMachineSet = addNewGroupPlan.getFixedCxMachineSet();
-        if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
-            return enableCxMachineList;
-        }
-        String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
-        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedCxMachineLog(context, structureName, fixedMachineInfo));
-        List<CxMachineBaseInfoVo> finalResult = enableCxMachineList.stream().filter(baseSelectedMachine -> fixedCxMachineSet.contains(baseSelectedMachine.getCxMachineCode())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(finalResult)) {
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, fixedMachineInfo));
-        }
-        return finalResult;
+        return enableCxMachineList;
+//        //如果结构有固定机台，则只能从固定中选择
+//        Set<String> fixedCxMachineSet = addNewGroupPlan.getFixedCxMachineSet();
+//        if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
+//            return enableCxMachineList;
+//        }
+//        String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
+//        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedCxMachineLog(context, structureName, fixedMachineInfo));
+//        List<CxMachineBaseInfoVo> finalResult = enableCxMachineList.stream().filter(baseSelectedMachine -> fixedCxMachineSet.contains(baseSelectedMachine.getCxMachineCode())).collect(Collectors.toList());
+//        if (CollectionUtils.isEmpty(finalResult)) {
+//            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, fixedMachineInfo));
+//        }
+//        return finalResult;
     }
 
     /**

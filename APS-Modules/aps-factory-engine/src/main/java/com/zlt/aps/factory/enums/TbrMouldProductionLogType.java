@@ -174,6 +174,10 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP("20-14-01-04", "在机分组使用在产机台没有待排硫化组"),
     /**
+     * 20-25 结构提前收尾业务
+     */
+    GROUP_BEFORE_CONCLUSION("20-25", "结构提前收尾业务"),
+    /**
      * 20-14-01-05 在机分组使用在产机台排产硫化组
      */
     CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE("20-14-01-05", "在机分组使用在产机台排产硫化组"),

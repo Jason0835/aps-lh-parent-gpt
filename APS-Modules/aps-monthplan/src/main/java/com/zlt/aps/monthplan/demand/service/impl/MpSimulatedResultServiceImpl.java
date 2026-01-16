@@ -104,8 +104,9 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
 
     @Override
     public AjaxResult createVmMonthPrediction(MpSimulatedResult createCondition) {
+        YearMonth yearMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
-        MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges();
+        MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(yearMonth);
         // 3、检查是否已有T月月度计划(定稿)
         //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
         List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(monthRange.getTMonth());
