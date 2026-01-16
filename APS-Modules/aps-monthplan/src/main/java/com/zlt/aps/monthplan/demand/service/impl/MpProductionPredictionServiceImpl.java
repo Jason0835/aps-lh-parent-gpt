@@ -174,7 +174,15 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
-        wrapper.inSql(MpProductionPrediction::getId, "(" + subQuery.getSqlSegment() + ")");
+        wrapper.inSql(MpProductionPrediction::getId,
+            "SELECT id FROM (" +
+                "   SELECT " +
+                "       id," +
+                "       ROW_NUMBER() OVER (PARTITION BY MONTH_PLAN_VERSION " +
+                "                          ORDER BY CREATE_TIME DESC) as rn " +
+                "   FROM T_MP_PRODUCTION_PREDICTION" +
+                ") t WHERE t.rn = 1"
+        );
         wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
         List<MpProductionPrediction> list =  this.mpProductionPredictionEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){
