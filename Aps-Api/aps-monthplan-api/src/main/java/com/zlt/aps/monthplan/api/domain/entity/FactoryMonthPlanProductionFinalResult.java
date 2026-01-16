@@ -75,7 +75,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 销售生产需求计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.monthPlanVersion")
-    @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
+    @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
@@ -91,7 +91,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 排产计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionVersion")
-    @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
+    @ApiModelProperty(value = "月度生产计划版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
@@ -360,7 +360,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 生产需求计划
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.prodReqPlan")
-    @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
+    @ApiModelProperty(value = "净需求", name = "prodReqPlan")
     @TableField(value = "PROD_REQ_PLAN")
     private Integer prodReqPlan;
 
