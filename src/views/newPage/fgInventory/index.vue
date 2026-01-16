@@ -160,20 +160,20 @@ export default {
           label: this.$t("ui.data.column.monthplan.weekYear"),
         },
 
-        {
-          prop: "isDynamicBalance",
-          label: this.$t("ui.data.column.monthplan.dynamicBalance"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
-        {
-          prop: "isUniformity",
-          label: this.$t("ui.data.column.monthplan.uniformity"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
+        // {
+        //   prop: "isDynamicBalance",
+        //   label: this.$t("ui.data.column.monthplan.dynamicBalance"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
+        // {
+        //   prop: "isUniformity",
+        //   label: this.$t("ui.data.column.monthplan.uniformity"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
         {
           prop: "isExceedTire",
           label: this.$t("ui.data.column.finishStock.isExceedMonth"),

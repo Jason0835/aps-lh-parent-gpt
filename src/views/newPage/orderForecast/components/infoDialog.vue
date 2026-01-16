@@ -2,11 +2,10 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="800px"
+    width="600px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
-    :append-to-body="true"
   >
     <info-form
       class="form-item-height"
@@ -15,7 +14,7 @@
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="160px"
+      label-width="150px"
       v-loading="loading"
     >
     </info-form>
@@ -29,17 +28,13 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
-
-// import { editCxSpecifyMachine } from "@/api/cx/cxSpecifyMachine";
-import { editProductMoldingLimit } from "@/api/mdm/productMoldingLimit";
-
-import {
-  listSimulateResult,
-  createVmMonthPrediction,
-} from "@/api/monthplan/insertOrder";
 import infoForm from "@/views/components/infoForm.vue";
-
+import { genenrDemandPlan, getVersion } from "@/api/monthplan/demandPlan";
+import {
+  listOrderForecast,
+  createOrderForecast,
+  getOrderForecastVersion,
+} from "@/api/monthplan/orderForecast";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -48,8 +43,9 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
-      form: {},
+      form: {
+        classShift: "2",
+      },
       rules: {
         factoryCode: [
           {
@@ -65,47 +61,16 @@ export default {
             trigger: "change",
           },
         ],
-        embryoCode: [
+        monthPlanVersion: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
-        machineCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
-        lineType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        jobType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
       },
-    };
-  },
-  computed: {
-    ...mapState({
-      moldingMachines: (state) => state.molding.machines,
-    }),
-    title: function () {
-      return this.$t("ui.data.insertOrder.creater")
-    },
-    columns() {
-      return [
-      {
+      columns: [
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
@@ -118,12 +83,23 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
         },
-      ];
+        // {
+        //   prop: "monthPlanVersion",
+        //   label: this.$t("ui.data.demandPlan.monthPlanVersion"),
+        //   maxlength:20,
+        // },
+      ],
+    };
+  },
+  computed: {
+    title: function () {
+      return this.$t("common.button.generate");
     },
   },
   methods: {
     // api
     async save(params) {
+      // console.log(params);
       try {
         this.loading = true;
         if (params.yearMonth) {
@@ -131,41 +107,42 @@ export default {
           params.year = year;
           params.month = month;
         }
-        const res = await createVmMonthPrediction(params);
-        this.$modal.msgSuccess(res.msg);
+
+        const data = await createOrderForecast(params);
+        this.$modal.msgSuccess(data.msg);
         this.$emit("success");
         this.hide();
-
-        this.loading = false;
       } catch (error) {
         console.log(error);
+      } finally {
         this.loading = false;
       }
     },
 
     //utils
-    show(data) {
+    async show(data) {
       this.visible = true;
-      if (data) {
-        this.isEdit = true;
-        this.form = {
+
+      this.form = {
           ...data,
         };
-      } else {
-        this.form = {
-          factoryCode: "",
-        };
-      }
     },
     hide() {
-      this.form = {};
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
     },
+
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+      // this.$refs.form.validate((valid) => {
+      //   if (valid) {
+      //     this.save({
+      //       ...this.form,
+      //     });
+      //   }
+      // });
     },
   },
 };

@@ -193,7 +193,7 @@ export default {
                   </text-button>
                   <text-button
                     onClick={() => {
-                      downloadLink("/demand/requireProductionPlan/export", {
+                      downloadLink("/monthplan/demandPlan/export", {
                         year: row.year,
                         month: row.month,
                         monthPlanVersion: row.monthPlanVersion,
@@ -329,7 +329,7 @@ export default {
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
                 </text-button>
-                <text-button onClick={() => this.handleReport(row)}>报表</text-button>
+                {/* <text-button onClick={() => this.handleReport(row)}>报表</text-button> */}
               </div>
             );
           },

@@ -250,32 +250,32 @@ export default {
           label: this.$t("ui.data.column.monthplan.weekYear"),
           width:120
         },
-        {
-          prop: "isDynamicBalance",
-          label: this.$t("ui.data.column.monthplan.dynamicBalance"),
-          render: ({ row }) => {
-            return (
-              <div>
-                {row.isDynamicBalance == 1
-                  ? this.$t("common.yes")
-                  : this.$t("common.no")}
-              </div>
-            );
-          },
-        },
-        {
-          prop: "isUniformity",
-          label: this.$t("ui.data.column.monthplan.uniformity"),
-          render: ({ row }) => {
-            return (
-              <div>
-                {row.isUniformity == 1
-                  ? this.$t("common.yes")
-                  : this.$t("common.no")}
-              </div>
-            );
-          },
-        },
+        // {
+        //   prop: "isDynamicBalance",
+        //   label: this.$t("ui.data.column.monthplan.dynamicBalance"),
+        //   render: ({ row }) => {
+        //     return (
+        //       <div>
+        //         {row.isDynamicBalance == 1
+        //           ? this.$t("common.yes")
+        //           : this.$t("common.no")}
+        //       </div>
+        //     );
+        //   },
+        // },
+        // {
+        //   prop: "isUniformity",
+        //   label: this.$t("ui.data.column.monthplan.uniformity"),
+        //   render: ({ row }) => {
+        //     return (
+        //       <div>
+        //         {row.isUniformity == 1
+        //           ? this.$t("common.yes")
+        //           : this.$t("common.no")}
+        //       </div>
+        //     );
+        //   },
+        // },
         {
           prop: "isEudr",
           label: this.$t("EUDR"),

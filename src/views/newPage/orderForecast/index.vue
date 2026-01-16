@@ -24,7 +24,7 @@
           type="primary"
           :loading="createLoading"
           plain
-          @click="generPlan"
+          @click="genPlan"
           v-hasPermi="['monthplan:productionPrediction:createMonthPrediction']"
           >{{ $t("common.button.generate") }}
         </el-button>
@@ -35,13 +35,16 @@
         >
       </template>
       <template slot="headerRight"> </template>
+
     </page-table>
+    <infoDialog ref="infoRef" @success="getListResize" />
   </basic-container>
 </template>
 <script>
 //lib
 import moment from "moment";
 import Big from "big.js";
+import infoDialog from "./components/infoDialog.vue";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
@@ -56,6 +59,7 @@ export default {
   name: "OrderForecast",
   components: {
     // tltUpload,
+    infoDialog,
   },
   dicts: [
     "biz_factory_name",
@@ -63,6 +67,11 @@ export default {
     "biz_brand_type",
     "biz_stor_type",
   ],
+  provide() {
+    return {
+      parentDict: this.dict,
+    };
+  },
   data() {
     return {
       versionList: [],
@@ -265,21 +274,28 @@ export default {
           };
           list.push(obj);
         }
-        this.versionList=list
-
+        this.versionList = list;
       } catch (err) {}
     },
-    async generPlan() {
-      try {
-        this.createLoading = true;
-        let res = await createOrderForecast(this.formatParams());
-        this.$modal.msgSuccess(res.msg);
-        this.getList();
-        this.getVersionList();
-        this.createLoading = false;
-      } catch (err) {
-        this.createLoading = false;
+    getListResize() {
+      this.getList();
+      this.getVersionList();
+    },
+    async genPlan() {
+      console.log("generPlan", this.$refs.infoRef);
+      if (this.$refs.infoRef) {
+        this.$refs.infoRef.show(this.query);
       }
+      // try {
+      //   this.createLoading = true;
+      //   let res = await createOrderForecast(this.formatParams());
+      //   this.$modal.msgSuccess(res.msg);
+      //   this.getList();
+      //   this.getVersionList();
+      //   this.createLoading = false;
+      // } catch (err) {
+      //   this.createLoading = false;
+      // }
     },
     handleSearch(data) {
       this.query = data;
@@ -439,7 +455,7 @@ export default {
       ...defaultParams,
     };
     this.getList();
-    this.getVersionList()
+    this.getVersionList();
   },
   activated() {},
 };

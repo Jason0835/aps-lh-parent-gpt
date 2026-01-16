@@ -346,6 +346,8 @@ export default {
   },
   methods: {
     async createVersion() {
+      this.handleAdd()
+      return
 
       try {
         this.createLoading=true

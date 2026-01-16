@@ -94,7 +94,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.console.factoryCode"),
+          label: this.$t("common.factory"),
           disabled: true,
         },
         {
