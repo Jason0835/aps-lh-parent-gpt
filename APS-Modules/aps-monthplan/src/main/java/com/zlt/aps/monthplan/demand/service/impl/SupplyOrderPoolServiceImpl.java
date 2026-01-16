@@ -111,39 +111,12 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             String notUniqueMsg =  com.ruoyi.common.utils.StringUtils.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
             throw new BusinessException(notUniqueMsg);
         }
-        unique = this.checkUniqueByOrderType(docEntityVO);
-        if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String notUniqueMsg =  com.ruoyi.common.utils.StringUtils.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
-            throw new BusinessException(notUniqueMsg);
-        }
         return unique;
-    }
-
-    private String checkUniqueByOrderType(SupplyOrderPool param) {
-        if(null != param.getId()){
-           return UserConstants.UNIQUE;
-        }
-        SupplyOrderPool supplyOrderPool = this.validateExistSupplyOrderPool(param);
-        return supplyOrderPool == null ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
-    }
-
-    private SupplyOrderPool validateExistSupplyOrderPool(SupplyOrderPool param) {
-        LambdaQueryWrapper<SupplyOrderPool> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(SupplyOrderPool::getFactoryCode,param.getFactoryCode());
-        wrapper.eq(SupplyOrderPool::getOrderType,param.getOrderType());
-        wrapper.eq(SupplyOrderPool::getYear,param.getYear());
-        wrapper.eq(SupplyOrderPool::getMonth,param.getMonth());
-        wrapper.eq(SupplyOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
-        List<SupplyOrderPool> list = this.supplyOrderPoolEntityMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(list)){
-            return null;
-        }
-        return list.get(0);
     }
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Lists.newArrayList("factoryCode","year","month","orderType","materialCode");
+        return Lists.newArrayList("factoryCode","year","month","materialCode");
     }
 
     @Override
