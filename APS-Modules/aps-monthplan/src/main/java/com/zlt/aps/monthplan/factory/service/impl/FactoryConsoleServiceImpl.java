@@ -7,11 +7,10 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.monthplan.factory.mapper.FactoryConsoleMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
@@ -19,6 +18,7 @@ import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -283,5 +283,49 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
             return Collections.emptyList();
         }
         return factoryProductionVersionMapper.productionVersionList(query);
+    }
+
+    /**
+     * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产
+     *
+     * @param query 参数
+     * @return 结果
+     */
+    @Override
+    public FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query) {
+        FactoryMonthPlanTypeVo type = new FactoryMonthPlanTypeVo();
+        FactoryMonthPlanFinalVersionInfoVo finalVersion = getFinalVersionInfo(query.getFactoryCode(), query.getYear(), query.getMonth());
+        if (null == finalVersion) {
+            return type;
+        }
+        String productionVersion = finalVersion.getProductionVersion();
+        if (StringUtils.isBlank(productionVersion)) {
+            return type;
+        }
+        if (YesOrNoEnum.YES.getValue().equals(finalVersion.getIsNaturalMonth())) {
+            return type;
+        }
+        type.setProductionStartDate(finalVersion.getProductionStartDate());
+        return type;
+    }
+
+    @Override
+    public FactoryMonthPlanFinalVersionInfoVo getFinalVersionInfo(String factoryCode, Integer year, Integer month) {
+        if (com.ruoyi.common.utils.StringUtils.isBlank(factoryCode) || null == year || null == month) {
+            return null;
+        }
+        QueryWrapper<MpFactoryProductionVersion> queryVersion = new QueryWrapper<>();
+        queryVersion.eq("FACTORY_CODE", factoryCode);
+        queryVersion.eq("YEAR", year);
+        queryVersion.eq("MONTH", month);
+        queryVersion.eq("IS_FINAL", YesOrNoEnum.YES.getValue());
+        queryVersion.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        MpFactoryProductionVersion result = factoryProductionVersionMapper.selectOne(queryVersion);
+        if (null == result) {
+            return null;
+        }
+        FactoryMonthPlanFinalVersionInfoVo info = new FactoryMonthPlanFinalVersionInfoVo();
+        BeanUtils.copyProperties(result, info);
+        return info;
     }
 }
