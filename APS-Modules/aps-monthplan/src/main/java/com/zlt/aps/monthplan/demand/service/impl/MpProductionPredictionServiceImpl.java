@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -167,7 +168,15 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
-        wrapper.groupBy(MpProductionPrediction::getMonthPlanVersion);
+        wrapper.inSql(MpProductionPrediction::getPredictionVersion,
+            "SELECT MAX(PREDICTION_VERSION) FROM T_MP_PRODUCTION_PREDICTION " +
+                "WHERE (MONTH_PLAN_VERSION, PREDICTION_VERSION) IN (" +
+                "   SELECT MONTH_PLAN_VERSION, MAX(PREDICTION_VERSION) " +
+                "   FROM T_MP_PRODUCTION_PREDICTION " +
+                "   GROUP BY MONTH_PLAN_VERSION" +
+                ") " +
+                "GROUP BY MONTH_PLAN_VERSION, PREDICTION_VERSION"
+        );
         wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
         List<MpProductionPrediction> list =  this.mpProductionPredictionEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){

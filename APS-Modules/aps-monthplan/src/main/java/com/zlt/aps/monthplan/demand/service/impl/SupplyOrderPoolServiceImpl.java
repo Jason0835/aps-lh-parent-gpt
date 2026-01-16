@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
@@ -116,7 +115,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Lists.newArrayList("factoryCode","year","month","materialCode");
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode","year","month"));
     }
 
     @Override
