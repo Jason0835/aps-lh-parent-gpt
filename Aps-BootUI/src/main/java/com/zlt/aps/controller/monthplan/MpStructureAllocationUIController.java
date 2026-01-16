@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.collection.CollUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -29,8 +30,10 @@ import org.apache.commons.io.IOUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -83,9 +86,38 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @ApiOperation("根据条件查询结构排产信息")
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
         TableDataInfo list = iMpStructureAllocationService.list(mpStructureAllocation);
+        // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+        List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
         // 查询SKU明细并设置成型机编码（多个以,分隔）
-        setCxMachineCode(list, mpStructureAllocation);
-        return list;
+        setCxMachineCode(resultList, mpStructureAllocation);
+        return getTableDataInfo(resultList);
+    }
+
+    private TableDataInfo getTableDataInfo(List<?> list) {
+        TableDataInfo rspData = new TableDataInfo();
+        rspData.setCode(200);
+        rspData.setRows(list);
+        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
+        rspData.setTotal(CollUtil.size(list));
+        return rspData;
+    }
+
+    // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+    private List<MpStructureAllocation> convertToEntityList(List<?> rows) {
+        List<MpStructureAllocation> entityList = new ArrayList<>();
+        if (PubUtil.isEmpty(rows)) {
+            return entityList;
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (Object obj : rows) {
+            if (obj instanceof MpStructureAllocation) {
+                entityList.add((MpStructureAllocation) obj);
+            } else if (obj instanceof Map) {
+                MpStructureAllocation entity = objectMapper.convertValue(obj, MpStructureAllocation.class);
+                entityList.add(entity);
+            }
+        }
+        return entityList;
     }
 
 
@@ -94,8 +126,8 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * @param list
      * @param mpStructureAllocation
      */
-    private void setCxMachineCode(TableDataInfo list, MpStructureAllocation mpStructureAllocation) {
-        if (PubUtil.isEmpty(list.getRows())) {
+    private void setCxMachineCode(List<MpStructureAllocation> list, MpStructureAllocation mpStructureAllocation) {
+        if (PubUtil.isEmpty(list)) {
             return;
         }
         if (StringUtils.isEmpty(mpStructureAllocation.getFactoryCode()) || mpStructureAllocation.getYear() == null ||
@@ -114,21 +146,32 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
-        // 将List中的LinkedHashMap转换为FactoryMonthPlanProductionFinalResult实体类
-        monthPlanList = convertToMonthPlanList(monthPlanList);
-        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = monthPlanList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName));
+        monthPlanList = cn.hutool.core.convert.Convert.toList(FactoryMonthPlanProductionFinalResult.class, monthPlanList);
+        log.debug("最终排产计划定稿列表大小：{}", monthPlanList.size());
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
+        for (FactoryMonthPlanProductionFinalResult monthPlan : monthPlanList) {
+            String structureName = monthPlan.getStructureName();
+            if (!monthPlanMap.containsKey(structureName)) {
+                monthPlanMap.put(structureName, new ArrayList<>());
+            }
+            List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = monthPlanMap.get(structureName);
+            monthPlanResultList.add(monthPlan);
+        }
 
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
-        List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
-        for (MpStructureAllocation structureAllocation : structureAllocationList) {
+        log.debug("结构排产列表大小：{}", list.size());
+        Iterator<MpStructureAllocation> iterator = list.iterator();
+        while (iterator.hasNext()) {
             cxMachineCodeSet.clear();
+            MpStructureAllocation structureAllocation = iterator.next();
             if (StringUtils.isEmpty(structureAllocation.getStructureName())) {
                 continue;
             }
+            String structureName = structureAllocation.getStructureName();
             // 匹配月度生产计划
-            List<FactoryMonthPlanProductionFinalResult> matchMonthPlanList = MapUtils.getObject(monthPlanMap, structureAllocation.getStructureName(), new ArrayList<>());
+            List<FactoryMonthPlanProductionFinalResult> matchMonthPlanList = MapUtils.getObject(monthPlanMap, structureName, new ArrayList<>());
+            log.debug("匹配最终排产计划定稿列表 结构:{},大小：{}", structureName, matchMonthPlanList.size());
             cxMachineCodeSet = matchMonthPlanList.stream()
                     .filter(s -> StringUtils.isNotEmpty(s.getCxMachineCode()))
                     .map(FactoryMonthPlanProductionFinalResult::getCxMachineCode)
@@ -137,27 +180,13 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             if (PubUtil.isEmpty(cxMachineCodeSet)) {
                 continue;
             }
-            structureAllocation.setCxMachineCode(String.join(",", cxMachineCodeSet));
+            // 排序
+            List<String> sortedList = new ArrayList<>(cxMachineCodeSet);
+            Collections.sort(sortedList);
+            log.debug("匹配最终结果,结构:{},机台列表:{}", structureName, sortedList);
+            structureAllocation.setCxMachineCode(String.join(",", sortedList));
         }
     }
-
-    private List<FactoryMonthPlanProductionFinalResult> convertToMonthPlanList(List<?> rows) {
-        List<FactoryMonthPlanProductionFinalResult> entityList = new ArrayList<>();
-        if (PubUtil.isEmpty(rows)) {
-            return entityList;
-        }
-        ObjectMapper objectMapper = new ObjectMapper();
-        for (Object obj : rows) {
-            if (obj instanceof FactoryMonthPlanProductionFinalResult) {
-                entityList.add((FactoryMonthPlanProductionFinalResult) obj);
-            } else if (obj instanceof Map) {
-                FactoryMonthPlanProductionFinalResult entity = objectMapper.convertValue(obj, FactoryMonthPlanProductionFinalResult.class);
-                entityList.add(entity);
-            }
-        }
-        return entityList;
-    }
-
 
 
     /**
