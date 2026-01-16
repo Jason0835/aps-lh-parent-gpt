@@ -8,6 +8,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
@@ -140,7 +141,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      */
     private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth,Set<String> skus) {
         // 3.1 清理旧数据
-        deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
+        deleteSupplyOrderPool(createCondition,yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
         // 3.2 准备计算所需数据
         CalculationData calculationData = prepareCalculationData(yearMonth);
 
@@ -332,7 +333,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth, Set<String> eligibleSkus, PrecedentStockUpContext context) {
         List<SupplyOrderPool> supplyOrderPools = calculateAndBuildOrders(createCondition,yearMonth,eligibleSkus, context);
         // 3.1 清理旧数据
-        deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
+        deleteSupplyOrderPool(createCondition,yearMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
         if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
             this.baseDao.insertBatch(supplyOrderPools);
         }
@@ -750,14 +751,17 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      *  删除
      */
-    private void deleteSupplyOrderPool(YearMonth yearMonth,String orderType) {
-        SupplyOrderPool param = new SupplyOrderPool();
-        param.setOrderType(orderType);
+    private void deleteSupplyOrderPool(DpDemandPlan createCondition,YearMonth yearMonth,String orderType) {
         LambdaQueryWrapper<SupplyOrderPool> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(SupplyOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.eq(SupplyOrderPool::getYear, yearMonth.getYear());
         wrapper.eq(SupplyOrderPool::getMonth, yearMonth.getMonthValue());
         wrapper.eq(SupplyOrderPool::getOrderType, orderType);
+        if(null != createCondition) {
+            wrapper.eq(SupplyOrderPool::getSourceType, createCondition.getPlanType());
+        }else{
+            wrapper.eq(SupplyOrderPool::getSourceType, ProductionPlanType.NORMAL.getPlanType());
+        }
         this.supplyOrderPoolEntityMapper.delete(wrapper);
     }
 

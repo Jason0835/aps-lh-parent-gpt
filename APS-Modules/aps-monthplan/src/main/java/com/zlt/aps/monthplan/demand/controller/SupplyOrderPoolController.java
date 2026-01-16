@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
@@ -283,6 +284,7 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("nightOverdueStockQty")), "NIGHT_OVERDUE_STOCK_QTY", queryVO.getFieldValueByFieldName("nightOverdueStockQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("twelveOverdueStockQty")), "TWELVE_OVERDUE_STOCK_QTY", queryVO.getFieldValueByFieldName("twelveOverdueStockQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stockLimit")), "STOCK_LIMIT", queryVO.getFieldValueByFieldName("stockLimit"));
+        queryWrapper.eq("SOURCE_TYPE", ProductionPlanType.NORMAL.getPlanType());
     }
 
 
