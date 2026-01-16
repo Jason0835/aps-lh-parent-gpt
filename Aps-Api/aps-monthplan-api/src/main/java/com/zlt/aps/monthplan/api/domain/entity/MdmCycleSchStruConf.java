@@ -12,7 +12,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmCycleSchStruConf.java
- * 描    述：周期排产结构配置对象 t_mdm_cycle_sch_stru_conf
+ * 描    述：周期排产结构配置对象 T_DP_CYCLE_SCH_STRU_CONF
  *
  * @author zlt
  * @version 1.0
@@ -25,7 +25,7 @@ import lombok.Data;
  */
 @ApiModel(value = "周期排产结构配置对象", description = "周期排产结构配置对象 ")
 @Data
-@TableName(value = "T_MDM_CYCLE_SCH_STRU_CONF")
+@TableName(value = "T_DP_CYCLE_SCH_STRU_CONF")
 public class MdmCycleSchStruConf extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
