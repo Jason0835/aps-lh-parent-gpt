@@ -27,7 +27,7 @@ import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
@@ -301,7 +301,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
+        List<FactoryMonthPlanMouldDayResult> productionFinalResults;
+        if(YesOrNoEnum.YES.getCode().equals(finalVersion.getIsFinal())) {
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findFinalProductionResult(finalVersion);
+        }else{
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
+        }
         List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
         List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),cycleStockOrders,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(netDemands)){

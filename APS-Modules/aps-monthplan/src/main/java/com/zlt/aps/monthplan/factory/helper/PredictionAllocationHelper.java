@@ -2,7 +2,7 @@ package com.zlt.aps.monthplan.factory.helper;
 
 
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +32,7 @@ public class PredictionAllocationHelper {
   public static List<DpOrderOffsetDetail> calculateSaleOrder(
       List<DpOrderOffsetDetail> netDemands,
       List<SupplyOrderPool> cycleStockOrders,
-      List<FactoryMonthPlanProductionFinalResult> productionFinalResults,
+      List<FactoryMonthPlanMouldDayResult> productionFinalResults,
       List<MpMonthPlanMonitor>  mpMonthPlanMonitors) {
     List<DpOrderOffsetDetail> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(netDemands)) {
@@ -86,7 +86,7 @@ public class PredictionAllocationHelper {
       ) {
          // 9、从7步骤中的订单数据，按SKU扣减T月月度计划对应实单已排产量(销售订单)+ T月已生产量，得到销售订单剩余还未排产量
          int netDemand = saleOrders.stream().mapToInt(DpOrderOffsetDetail::getProduceQtyDue).sum();
-         if(BigDecimal.ZERO.intValue() == netDemand) {
+         if(BigDecimal.ZERO.intValue() == netDemand || !productionQtyMap.containsKey(groupKey)) {
            return null;
          }
           // T月实单未排产量：	300	(高优先级净需求+中优先级+暂缓订单-T月实单排产量+T月实单已完成量)
@@ -101,7 +101,7 @@ public class PredictionAllocationHelper {
          return saleOrder;
   }
 
-  private static Map<String,Integer> calculateProductionQty(List<FactoryMonthPlanProductionFinalResult> productionFinalResults) {
+  private static Map<String,Integer> calculateProductionQty(List<FactoryMonthPlanMouldDayResult> productionFinalResults) {
     if(CollectionUtils.isEmpty(productionFinalResults)) {
       return Collections.emptyMap();
     }
@@ -109,8 +109,8 @@ public class PredictionAllocationHelper {
         .filter(Objects::nonNull)
         .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) && null != productionFinalResult.getTotalQty())
         .collect(Collectors.groupingBy(
-            FactoryMonthPlanProductionFinalResult::getMaterialCode,
-            Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getTotalQty)
+            FactoryMonthPlanMouldDayResult::getMaterialCode,
+            Collectors.summingInt(FactoryMonthPlanMouldDayResult::getTotalQty)
         ));
   }
 

@@ -77,7 +77,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @param finalVersion
      * @return
      */
-    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
+    List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
     /**
      * 查询最终排产结果
      * @param monthPlanVersions
@@ -93,4 +93,11 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      */
     @Transactional(rollbackFor = Exception.class)
     AjaxResult finalized(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
+
+    /**
+     * 获取定稿排产结果
+     * @param finalVersion
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResult> findFinalProductionResult(MpFactoryProductionVersion finalVersion);
 }
