@@ -198,6 +198,8 @@
                   and MONTH = #{month}
           and FACTORY_CODE = #{factoryCode}
           and MONTH_PLAN_VERSION is not null
+          and IS_SELECTED_DEMAND = 1
+          and PLAN_TYPE = '01'
     </select>
 
     <select id="productionVersionList" resultType="java.lang.String">
