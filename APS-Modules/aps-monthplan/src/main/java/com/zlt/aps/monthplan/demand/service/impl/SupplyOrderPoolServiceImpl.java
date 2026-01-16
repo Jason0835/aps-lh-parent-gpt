@@ -132,20 +132,20 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
 
         // 3. 清理旧数据并批量创建新数据
-        recreateSupplyOrderPools(nextMonth,eligibleSkus);
+        recreateSupplyOrderPools(null,nextMonth,eligibleSkus);
     }
 
     /**
      * 重新创建供应链订单池
      */
-    private List<SupplyOrderPool> recreateSupplyOrderPools(YearMonth yearMonth,Set<String> skus) {
+    private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth,Set<String> skus) {
         // 3.1 清理旧数据
         deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
         // 3.2 准备计算所需数据
         CalculationData calculationData = prepareCalculationData(yearMonth);
 
         // 3.3 批量构建并插入订单池数据
-        List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPoolsInParallel(yearMonth,
+        List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPoolsInParallel(createCondition,yearMonth,
             skus, calculationData);
         if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
             this.baseDao.insertBatch(supplyOrderPools);
@@ -156,11 +156,11 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 并行构建供应链订单池
      */
-    private List<SupplyOrderPool> buildSupplyOrderPoolsInParallel(YearMonth yearMonth,
+    private List<SupplyOrderPool> buildSupplyOrderPoolsInParallel(DpDemandPlan createCondition,YearMonth yearMonth,
         Set<String> skus, CalculationData data) {
 
         return skus.stream()
-            .map(sku -> buildSupplyOrderPool(yearMonth,
+            .map(sku -> buildSupplyOrderPool(createCondition,yearMonth,
                 sku,
                 data))
             .collect(Collectors.toList());
@@ -321,7 +321,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                 throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
             }
             // 3. 清理旧数据并批量创建新数据
-            recreateSupplyOrderPools(nextMonth,eligibleSkus, context);
+            recreateSupplyOrderPools(null,nextMonth,eligibleSkus, context);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -329,8 +329,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
     }
 
-    private List<SupplyOrderPool> recreateSupplyOrderPools(YearMonth yearMonth, Set<String> eligibleSkus, PrecedentStockUpContext context) {
-        List<SupplyOrderPool> supplyOrderPools = calculateAndBuildOrders(yearMonth,eligibleSkus, context);
+    private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth, Set<String> eligibleSkus, PrecedentStockUpContext context) {
+        List<SupplyOrderPool> supplyOrderPools = calculateAndBuildOrders(createCondition,yearMonth,eligibleSkus, context);
         // 3.1 清理旧数据
         deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
         if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
@@ -340,7 +340,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return supplyOrderPools;
     }
 
-    private List<SupplyOrderPool> calculateAndBuildOrders(YearMonth yearMonth,
+    private List<SupplyOrderPool> calculateAndBuildOrders(DpDemandPlan createCondition,YearMonth yearMonth,
         Set<String> eligibleSkus, PrecedentStockUpContext context) {
         // 4、计算常规储备SKU的排产量： (周转天数/30) * 月均销量 - 无订单库存 无订单库存 = 成品库存 - 销售订单池提报量(需结合年周号、动平衡、均匀性)；
         List<MpMonthlySaleQty> monthlySaleQtyList =   monthlySaleQtyService.findCurrentMonthlySaleQty();
@@ -351,7 +351,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         Map<String,List<MdmProductStock>> stockMap = this.getProductStockMapGroupByMaterialCode(finishedProductStocks);
         Map<String,Integer> structureFrequency = this.factoryMonthPlanProductionFinalResultService.calculateStructureFrequency();
         return eligibleSkus.parallelStream()
-            .map(sku -> calculateOrderForSku(yearMonth,sku, context, monthlySaleQtyMap,stockMap, stockWithoutOrderMap, structureFrequency))
+            .map(sku -> calculateOrderForSku(createCondition,yearMonth,sku, context, monthlySaleQtyMap,stockMap, stockWithoutOrderMap, structureFrequency))
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
     }
@@ -402,6 +402,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
 
     private SupplyOrderPool calculateOrderForSku(
+        DpDemandPlan createCondition,
         YearMonth yearMonth,
         String materialCode,
         PrecedentStockUpContext context,
@@ -471,6 +472,10 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         entity.setSaleArea(saleArea);
         // 8、12个月结构上机频次 = 从月度排产计划，获取近12个月的已排产的月份个数
         entity.setStructureFrequency(productionCountMap.getOrDefault(materialCode,0));
+        if(null != createCondition) {
+            entity.setSourceType(createCondition.getPlanType());
+            entity.setPredictionVersion(createCondition.getMonthPlanVersion());
+        }
         return entity;
     }
 
@@ -685,7 +690,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     }
 
     @Override
-    public List<SupplyOrderPool> createCycleStockUp(YearMonth yearMonth) {
+    public List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition,YearMonth yearMonth) {
         // 1.1 验证周期性排产结构配置
         List<MdmMonCycleSchStruConf> cycleSchStruConfs =
             this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
@@ -702,17 +707,17 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         // 2. 获取需要处理的SKU集合
         Set<String> eligibleSkus = getEligibleSkus(yearMonth);
         // 3. 清理旧数据并批量创建新数据
-        return  recreateSupplyOrderPools(yearMonth,eligibleSkus);
+        return  recreateSupplyOrderPools(createCondition,yearMonth,eligibleSkus);
     }
 
     @Override
-    public List<SupplyOrderPool> createPrecedentStockUp(YearMonth yearMonth) {
+    public List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth) {
         PrecedentStockUpContext context = buildContext(yearMonth);
         Set<String> eligibleSkus = findEligibleSkus(context);
         if (eligibleSkus.isEmpty()) {
             return Collections.emptyList();
         }
-        return recreateSupplyOrderPools(yearMonth,  eligibleSkus,context);
+        return recreateSupplyOrderPools(createCondition,yearMonth,  eligibleSkus,context);
     }
 
     @Override
@@ -771,10 +776,10 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             ));
     }
 
-    private SupplyOrderPool buildSupplyOrderPool(YearMonth yearMonth,String materialCode,CalculationData data) {
+    private SupplyOrderPool buildSupplyOrderPool(DpDemandPlan createCondition,YearMonth yearMonth,String materialCode,CalculationData data) {
 
         // 2. 构建基础订单信息
-        SupplyOrderPool order = buildBaseOrderInfo(yearMonth,materialCode,data);
+        SupplyOrderPool order = buildBaseOrderInfo(createCondition,yearMonth,materialCode,data);
         // 3. 计算销售相关数据
         calculateSalesMetrics(order, data);
 
@@ -880,7 +885,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 构建基础订单信息
      */
-    private SupplyOrderPool buildBaseOrderInfo(YearMonth yearMonth,String materialCode,CalculationData data) {
+    private SupplyOrderPool buildBaseOrderInfo(DpDemandPlan createCondition,YearMonth yearMonth,String materialCode,CalculationData data) {
         SupplyOrderPool supplyOrderPool =  new SupplyOrderPool();
         supplyOrderPool.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         supplyOrderPool.setOrderType(SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
@@ -897,6 +902,10 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             supplyOrderPool.setProductCategory(materialInfo.getProductCategory());
             supplyOrderPool.setProductTypeCode(materialInfo.getProductTypeCode());
             supplyOrderPool.setLocationType(materialInfo.getCommonType());
+        }
+        if(null != createCondition) {
+            supplyOrderPool.setSourceType(createCondition.getPlanType());
+            supplyOrderPool.setPredictionVersion(createCondition.getMonthPlanVersion());
         }
         return supplyOrderPool;
     }
