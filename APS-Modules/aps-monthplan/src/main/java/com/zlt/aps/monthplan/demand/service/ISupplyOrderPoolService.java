@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.demand.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,11 +58,11 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
   /**
    * 生成周期排产储备
    */
-  List<SupplyOrderPool> createCycleStockUp(YearMonth yearMonth);
+  List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition, YearMonth yearMonth);
   /**
    * 生成周期排产储备
    */
-  List<SupplyOrderPool> createPrecedentStockUp(YearMonth yearMonth);
+  List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth);
   /**
    *  超期校验
    * @param supplyOrderPool

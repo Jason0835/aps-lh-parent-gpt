@@ -170,6 +170,14 @@ public class SupplyOrderPool extends BaseEntity {
     @TableField("REMARK")
     private String remark;
 
+    @ApiModelProperty("订单来源：01：正常 02：产量预测：03：实单模拟")
+    @TableField("SOURCE_TYPE")
+    private String sourceType;
+
+    @ApiModelProperty("预测版本号")
+    @TableField("PREDICTION_VERSION")
+    private String predictionVersion;
+
     /**
      * 月均销量
      */

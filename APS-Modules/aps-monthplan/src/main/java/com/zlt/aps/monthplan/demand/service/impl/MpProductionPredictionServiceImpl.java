@@ -21,6 +21,7 @@ import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
+import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
@@ -68,6 +69,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final IDpDemandPlanService dpDemandPlanService;
     // 排产
     private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
+    // 预测明细
+    private final IMpPredictionDetailService mpPredictionDetailService;
 
 
     @Override
@@ -127,8 +130,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
         // 排产汇总
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
-           /* Context context = buildContext(tPlus1MonthDemands);
-            monthPlanProductionSchedulingService.general(context);*/
+            Context context = buildContext(tPlus1MonthDemands);
+            monthPlanProductionSchedulingService.general(context);
             MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
             productionVersions.put(monthRangeResult.getTPlus1Month(),finalVersionByTplus1Month);
             tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month,predictionContext);
@@ -136,8 +139,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             MpFactoryProductionVersion finalVersionByTplus2Month = createProductionVersion(tPlus2MonthDemands);
             productionVersions.put(monthRangeResult.getTPlus2Month(),finalVersionByTplus2Month);
-            /*Context context = buildContext(tPlus2MonthDemands);
-            monthPlanProductionSchedulingService.general(context);*/
+            Context context = buildContext(tPlus2MonthDemands);
+            monthPlanProductionSchedulingService.general(context);
         }
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
         List<MpProductionPrediction> list = buildProductionPrediction(monthRangeResult,tMonthDemands,productionVersions,materialInfoMap);
@@ -227,6 +230,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setMonth3(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTPlus2Month()));
                 result.add(productionPrediction);
         });
+        this.mpPredictionDetailService.batchInsert(demandPlan,productionVersions,list);
         return result;
     }
 

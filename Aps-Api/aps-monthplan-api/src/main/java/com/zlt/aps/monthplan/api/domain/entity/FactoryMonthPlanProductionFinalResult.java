@@ -75,7 +75,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 销售生产需求计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.monthPlanVersion")
-    @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
+    @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
@@ -91,7 +91,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 排产计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionVersion")
-    @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
+    @ApiModelProperty(value = "月度生产计划版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
@@ -182,10 +182,10 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
 
 
     /**
-     * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
+     * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage")
-    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
     /**
@@ -223,7 +223,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.brand")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -360,7 +360,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 生产需求计划
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.prodReqPlan")
-    @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
+    @ApiModelProperty(value = "净需求", name = "prodReqPlan")
     @TableField(value = "PROD_REQ_PLAN")
     private Integer prodReqPlan;
 

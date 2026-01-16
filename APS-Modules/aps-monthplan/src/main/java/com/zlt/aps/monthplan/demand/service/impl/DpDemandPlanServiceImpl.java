@@ -309,7 +309,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             return Collections.emptyList();
         }
         predictionContext.getAllocationResult().setNetDemands(netDemands);
-        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(tPlus1Month);
+        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
         predictionContext.setSupplyOrderPools(supplyOrderPools);
         predictionContext.setPostponeOrders(null);
         // 6. 处理需求计划生成
@@ -567,13 +567,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey, Collectors.summingInt(DpDemandPlan::getPostponeNetQty)));
     }
 
-    private List<SupplyOrderPool> createSupplyOrder(YearMonth yearMonth) {
+    private List<SupplyOrderPool> createSupplyOrder(DpDemandPlan createCondition,YearMonth yearMonth) {
         // 8、按【生成周期排产】、【生成储备排产】的逻辑得到T+1月的周期排产储备和常规储备数据(此时T月的月度计划已有，故而结构最新排产月份会有变化)
         // 13、按【生成周期排产】、【生成储备排产】的逻辑得到T+2月的周期排产储备和常规储备数据(此时T+1月的月度计划已预测，故而结构最新排产月份会有变化)
         // 生成周期排产储备
-        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(yearMonth);
+        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(createCondition,yearMonth);
         // 生成常规储备
-        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(yearMonth);
+        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(createCondition,yearMonth);
         List<SupplyOrderPool> allStockUpOrders = Lists.newArrayList();
         if(!CollectionUtils.isEmpty(cycleStockUpOrders)){
             allStockUpOrders.addAll(cycleStockUpOrders);
