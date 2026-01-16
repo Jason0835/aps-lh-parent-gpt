@@ -203,6 +203,21 @@ public class TbrBeforeProductionGroupLogRecorder {
     }
 
     /**
+     * 增加Sku与模具关系数据为空日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到可用模具关系为空====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addEnableMouldRelationEmptyLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到可用模具关系为空====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_RELATION_INFO_EMPTY, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加新模具到货数据为空日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具到货计划为空====
      *

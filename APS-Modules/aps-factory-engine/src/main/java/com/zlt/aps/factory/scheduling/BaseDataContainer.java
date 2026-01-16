@@ -67,6 +67,12 @@ public class BaseDataContainer implements Serializable {
     List<MonthPlanStructureLhRatioVo> structureLhRatioList;
 
     /**
+     * 所有模具信息--用于记录模具日志
+     * key=型腔模号 : value=模具信息
+     */
+    Map<String, ProductionMouldInfoVo> allMouldInfoMap;
+
+    /**
      * 判断同结构下前后两个Sku是否共用模具
      *
      * @param beforeSku 前Sku

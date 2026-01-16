@@ -108,6 +108,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //2、初始排产需要的基础数据，成型、模具关系、成型硫化配比、计划初始库销比
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
         initProductionBaseData(productionContext, requirePlanList);
+        saveMouldUsedLog(productionContext);
         //结构模具分配配比
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
@@ -344,7 +345,17 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
-        return allMouldRelationInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
+        //构建所有模具关系的模具信息
+        Map<String, List<MonthPlanProductMouldInfoVo>> skuModuleMap = allMouldRelationInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
+        Map<String, ProductionMouldInfoVo> allMouldInfo = createProductionMouldInfo(productionContext, skuModuleMap);
+        productionContext.getBaseDataContainer().setAllMouldInfoMap(allMouldInfo);
+        //取状态可用的模具
+        List<MonthPlanProductMouldInfoVo> enableMouldRelationInfoList = allMouldRelationInfoList.stream().filter(singleRelationInfo -> YesOrNoEnum.YES.getCode().equals(singleRelationInfo.getMouldStatus())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(enableMouldRelationInfoList)) {
+            log.info(TbrBeforeProductionGroupLogRecorder.addEnableMouldRelationEmptyLog(productionContext));
+            return Collections.emptyMap();
+        }
+        return enableMouldRelationInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
     }
 
     /**
@@ -444,7 +455,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 MouldRelationTypeEnum relationType = MouldRelationTypeEnum.getInstance(associationInfo.getRelationType());
                 ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
                 if (null == productionMouldInfo) {
-                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mouldCode, relationType);
+                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mouldCode, associationInfo.getMouldStatus(), relationType);
                     if (null == productionMouldInfo) {
                         return;
                     }
@@ -659,6 +670,46 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //下一新增结构
         addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+    }
+
+    /**
+     * 保存模具的历史
+     *
+     * @param productionContext
+     */
+    private void saveMouldUsedLog(TbrProductionContext productionContext) {
+        Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getAllMouldInfoMap();
+        if (CollectionUtils.isEmpty(allMouldInfoMap)) {
+            return;
+        }
+        List<MpMouldUsedStatusLog> usedLogList = new ArrayList<>();
+        allMouldInfoMap.forEach((mouldCode, detailInfo) -> {
+            MpMouldUsedStatusLog usedLog = new MpMouldUsedStatusLog();
+            usedLogList.add(usedLog);
+            usedLog.setMouldCode(mouldCode);
+            usedLog.setMouldStatus(detailInfo.getMouldStatus());
+            usedLog.setFactoryCode(productionContext.getFactoryCode());
+            usedLog.setYear(productionContext.getYear());
+            usedLog.setMonth(productionContext.getMonth());
+            usedLog.setMonthPlanVersion(productionContext.getMonthPlanVersion());
+            usedLog.setProductionVersion(productionContext.getProductionVersion());
+            usedLog.setPlanType(productionContext.getPlanType());
+            usedLog.setOwerFactoryCode(productionContext.getFactoryCode());
+            usedLog.setRelationType(detailInfo.getRelationType().getRelationType());
+            if (!YesOrNoEnum.YES.getCode().equals(detailInfo.getMouldStatus())) {
+                usedLog.setUsedDays(BigDecimal.ZERO.intValue());
+                return;
+            }
+            if (CollectionUtils.isEmpty(detailInfo.getProductionDaySet())) {
+                usedLog.setUsedDays(BigDecimal.ZERO.intValue());
+                return;
+            }
+            usedLog.setUsedDays(detailInfo.getProductionDaySet().size());
+        });
+        if (CollectionUtils.isEmpty(usedLogList)) {
+            return;
+        }
+        getDataService().saveMouldUsedLog(usedLogList);
     }
 
     /**

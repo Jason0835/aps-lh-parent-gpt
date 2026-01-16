@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Getter;
 
@@ -62,6 +63,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * 实际排产规格计划
      */
     private List<MonthPlanProductionRequirePlanVo> realProductionPlanList;
+    /**
+     * 备注说明
+     */
+    private String remark;
 
     /**
      * 构造函数
@@ -118,6 +123,8 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     public void beforeConclusion(Integer conclusionDay, Integer deductionDay) {
         endDay = conclusionDay;
+        String tisFormat = I18nUtil.getMessage("alg.data.groupCapacity.beforeConclusion");
+        remark = String.format(tisFormat, conclusionDay);
         if (allocationDay <= deductionDay) {
             allocationDay = BigDecimal.ZERO.intValue();
             return;
