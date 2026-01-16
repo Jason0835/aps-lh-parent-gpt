@@ -7,6 +7,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.monthplan.api.service.IMpAdjustStructureOutRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
