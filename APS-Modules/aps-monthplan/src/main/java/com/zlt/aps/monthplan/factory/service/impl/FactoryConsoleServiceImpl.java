@@ -157,7 +157,12 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (isFinalVersion) {
             return AjaxResult.error(I18nUtil.getMessage("ui.check.monthPlan.isFinalVersion"));
         }
-        factoryProductionVersionMapper.deletedByProductionVersion(factoryProductionParam);
+        int count = factoryProductionVersionMapper.selectCountByProductionVersion(factoryProductionParam);
+        if (count <= 1) {
+            factoryProductionVersionMapper.deletedLastVersionByProductionVersion(factoryProductionParam);
+        } else {
+            factoryProductionVersionMapper.deletedByProductionVersion(factoryProductionParam);
+        }
         return AjaxResult.success();
     }
 
