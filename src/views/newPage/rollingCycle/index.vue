@@ -121,7 +121,7 @@
           >
           <el-button
             type="primary"
-            @click="confirmResult"
+            @click="confirmResult "
             :loading="loading"
             :disabled="data.length == 0"
           >
@@ -1000,6 +1000,9 @@ export default {
     },
     //确认调整结果
     async confirmResult() {
+      if(this.activeName=='singleResult'){
+        return this.handOutResult()
+      }
       try {
         this.show = false;
         this.loading = true;
@@ -1015,10 +1018,10 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        if (this.adjustType == "02") {
-          params.adjustEndDay = this.formInline.adjustEndDay;
-          params.isMove = this.formInline.isMove;
-        }
+        // if (this.adjustType == "02") {
+        //   params.adjustEndDay = this.formInline.adjustEndDay;
+        //   params.isMove = this.formInline.isMove;
+        // }
         let res = await confirmAdjust(params);
         this.show = false;
         this.$modal.msgSuccess(res.msg);
@@ -1197,6 +1200,47 @@ export default {
         this.autoLoading = false;
       }
     },
+
+
+    //结构外自动调整
+    async handOutResult() {
+
+      this.show = false;
+      this.loading = true;
+      this.autoLoading = true;
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+          adjustType: this.adjustType,
+          version: this.data[0]?.version,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        let res = await autoAdjust(params);
+        console.log(res);
+        // this.data = res;
+        // // this.data=res.rows
+        // this.show = true;
+        // this.loading = false;
+        // this.autoLoading = false;
+        // this.isTabChange = false;
+        // this.isShowFoot = true;
+        // this.activeName = "three";
+      } catch (err) {
+        console.log(err);
+        this.show = true;
+        this.loading = false;
+        this.autoLoading = false;
+      }
+    },
+
+
+
     handleShowSpecial() {
       if (this.$refs.specialRef) {
         this.$refs.specialRef.show();
