@@ -6,7 +6,7 @@
       ref="tableRef"
       :calcHeight="true"
       v-loading="loading"
-      element-loading-text="正在获取调整订单，请稍候!"
+      element-loading-text="正在获取数据，请稍候!"
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
@@ -722,11 +722,11 @@ export default {
           prop: "cxMachineCode",
           width: 120,
         },
-        {
-          label: this.$t("产品结构"),
-          prop: "structureName",
-          width: 120,
-        },
+        // {
+        //   label: this.$t("产品结构"),
+        //   prop: "structureName",
+        //   width: 120,
+        // },
         {
           label: this.$t("物料编码"),
           prop: "materialCode",
@@ -737,13 +737,13 @@ export default {
           prop: "materialDesc",
           width: 320,
         },
-        {
-          label: this.$t("是否含物料"),
-          prop: "hasSpecialMateriaL",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
+        // {
+        //   label: this.$t("是否含物料"),
+        //   prop: "hasSpecialMateriaL",
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
         {
           label: this.$t("计划量"),
           prop: "totalQty",
