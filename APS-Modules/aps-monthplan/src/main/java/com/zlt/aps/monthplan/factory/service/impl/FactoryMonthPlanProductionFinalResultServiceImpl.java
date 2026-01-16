@@ -291,7 +291,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 result.add(entity);
             });
         }
-        if(CollectionUtils.isEmpty(monthPlanVersions)) {
+        if(!CollectionUtils.isEmpty(monthPlanVersions)) {
             final int batchSize = 1000;
             List<String> versionList = new ArrayList<>(monthPlanVersions);
             for (int i = 0; i < versionList.size(); i += batchSize) {
