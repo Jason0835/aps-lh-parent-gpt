@@ -73,7 +73,7 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
         wrapper.eq(MpMonthPlanMonitor::getFactoryCode, finalVersion.getFactoryCode());
         wrapper.eq(MpMonthPlanMonitor::getYear, finalVersion.getYear());
         wrapper.eq(MpMonthPlanMonitor::getMonth, finalVersion.getMonth());
-        wrapper.eq(MpMonthPlanMonitor::getMonthPlanVersion, finalVersion.getMonthPlanVersion());
+        /*wrapper.eq(MpMonthPlanMonitor::getMonthPlanVersion, finalVersion.getMonthPlanVersion());*/
         wrapper.eq(MpMonthPlanMonitor::getIsDelete, YesOrNoEnum.NO.getValue());
         return this.mpMonthPlanMonitorEntityMapper.selectList(wrapper);
     }
