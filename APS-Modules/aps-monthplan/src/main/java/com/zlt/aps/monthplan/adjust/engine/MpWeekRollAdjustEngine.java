@@ -116,7 +116,7 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
-     * 结构调整-结构缩短
+     * 结构调整-结构缩短/延长
      * @param contextDTO 周程滚动调整上下文
      * @param mpAdjustStructureOutList 结构调整记录列表
      * @param mpProdFinalList 月计划定稿表列表
@@ -699,7 +699,7 @@ public class MpWeekRollAdjustEngine {
                 continue;
             }
             //2.1、敲定在机SKU新的上机日期
-            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, mpFinalVo);
+            newOnLineDay = getNewOnLineDayForStructOut(contextDTO, lockNextDay, mpFinalVo);
             if (newOnLineDay == null){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
                 continue;
@@ -752,6 +752,18 @@ public class MpWeekRollAdjustEngine {
             endDay = mpFinalVo.getBeginDay();
         }
 
+        return new MpAdjustDailyCapacityLimit().getNewOnLineDay(lockNextDay, endDay, contextDTO.getDailyCapacityLimitVoMap());
+    }
+
+    /**
+     * 获取新上机日 for 结构间调整
+     * @param contextDTO 周程滚动上下文
+     * @param lockNextDay 开始日
+     * @param mpFinalVo 定稿Vo
+     * @return 新上机日
+     */
+    private Integer getNewOnLineDayForStructOut(MpRollAdjustContextDTO contextDTO, int lockNextDay, FactoryMonthPlanFinalAdjustVo mpFinalVo) {
+        int endDay = contextDTO.getStructureDeadLine();
         return new MpAdjustDailyCapacityLimit().getNewOnLineDay(lockNextDay, endDay, contextDTO.getDailyCapacityLimitVoMap());
     }
 
@@ -1155,7 +1167,7 @@ public class MpWeekRollAdjustEngine {
             iOrder += 1;
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
             //2.1、敲定在机SKU新的上机日期
-            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, null);
+            newOnLineDay = getNewOnLineDayForStructOut(contextDTO, lockNextDay, null);
             if (newOnLineDay == null){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
                 continue;
