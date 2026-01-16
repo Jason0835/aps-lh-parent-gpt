@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -85,8 +86,8 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
         TableDataInfo list = iMpStructureAllocationService.list(mpStructureAllocation);
         // 查询SKU明细并设置成型机编码（多个以,分隔）
-        List<MpStructureAllocation> resultList = setCxMachineCode(list, mpStructureAllocation);
-        return getDataTable(resultList);
+        setCxMachineCode(list, mpStructureAllocation);
+        return list;
     }
 
 
@@ -95,14 +96,14 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * @param list
      * @param mpStructureAllocation
      */
-    private List<MpStructureAllocation> setCxMachineCode(TableDataInfo list, MpStructureAllocation mpStructureAllocation) {
+    private void setCxMachineCode(TableDataInfo list, MpStructureAllocation mpStructureAllocation) {
         List<MpStructureAllocation> resultList = new ArrayList<>();
         if (PubUtil.isEmpty(list.getRows())) {
-            return resultList;
+            return;
         }
         if (StringUtils.isEmpty(mpStructureAllocation.getFactoryCode()) || mpStructureAllocation.getYear() == null ||
                 mpStructureAllocation.getMonth() == null || StringUtils.isEmpty(mpStructureAllocation.getProductionVersion())) {
-            return resultList;
+            return;
         }
         // 查询SKU明细
         FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
@@ -112,7 +113,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         condition.setProductionVersion(mpStructureAllocation.getProductionVersion());
         TableDataInfo tableDataInfo = iFactoryMonthPlanProductionFinalResultService.list(condition);
         if (PubUtil.isEmpty(tableDataInfo.getRows())) {
-            return resultList;
+            return;
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
@@ -131,10 +132,11 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
         List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
-        resultList = cn.hutool.core.convert.Convert.toList(MpStructureAllocation.class, structureAllocationList);
-        log.debug("结构排产列表大小：{}", resultList.size());
-        for (MpStructureAllocation structureAllocation : resultList) {
+        log.debug("结构排产列表大小：{}", structureAllocationList.size());
+        Iterator<MpStructureAllocation> iterator = structureAllocationList.iterator();
+        while (iterator.hasNext()) {
             cxMachineCodeSet.clear();
+            MpStructureAllocation structureAllocation = iterator.next();
             if (StringUtils.isEmpty(structureAllocation.getStructureName())) {
                 continue;
             }
@@ -156,7 +158,6 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             log.debug("匹配最终结果,结构:{},机台列表:{}", structureName, sortedList);
             structureAllocation.setCxMachineCode(String.join(",", sortedList));
         }
-        return resultList;
     }
 
 
