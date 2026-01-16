@@ -125,7 +125,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 动平衡
      */
-    @Excel(name = "ui.data.column.productStock.isDynamicBalance", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.productStock.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
@@ -133,7 +133,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 均匀性
      */
-    @Excel(name = "ui.data.column.productStock.isUniformity", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.productStock.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
