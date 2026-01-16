@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.domain.dto;
 
-import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.enums.CxMachineLimitTypeEnum;
@@ -74,7 +73,10 @@ public class CxContinueInfoHelper implements Serializable {
     }
 
     /**
-     * 扣除最大配比的机台数后的最大胎胚种类数
+     * 扣除最大配比的机台数后的
+     * 最大胎胚种类数
+     * 最大硫化配比数
+     * 最低硫化配比数
      *
      * @param deductionCount 扣减的数量
      * @param type           类型
@@ -99,13 +101,13 @@ public class CxContinueInfoHelper implements Serializable {
         if (CxMachineLimitTypeEnum.MAX_EMBRYO_SIZE == type) {
             return getMaxEmbryoSize(leftOver);
         }
-        //最大硫化机台数-模具数
+        //最大硫化机台数
         if (CxMachineLimitTypeEnum.MAX_LH_COUNT == type) {
-            return getMaxMouldNumber(leftOver);
+            return getMaxLhCount(leftOver);
         }
-        //最低硫化机台数-模具数
+        //最低硫化机台数
         if (CxMachineLimitTypeEnum.MIN_LH_COUNT == type) {
-            return getMinMouldNumber(leftOver);
+            return getMinLhCount(leftOver);
         }
         return BigDecimal.ZERO.intValue();
     }
@@ -256,7 +258,7 @@ public class CxContinueInfoHelper implements Serializable {
      * @param cxCapacityInfoList 成型硫化配比信息
      * @return
      */
-    private Integer getMaxMouldNumber(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
+    private Integer getMaxLhCount(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
         if (CollectionUtils.isEmpty(cxCapacityInfoList)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -264,7 +266,7 @@ public class CxContinueInfoHelper implements Serializable {
         for (ProductGroupCxCapacityInfo cxCapacityInfo : cxCapacityInfoList) {
             max = max + cxCapacityInfo.getMaxLhMachineCount();
         }
-        return max * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        return max;
     }
 
     /**
@@ -273,7 +275,7 @@ public class CxContinueInfoHelper implements Serializable {
      * @param cxCapacityInfoList 成型硫化配比信息
      * @return
      */
-    private Integer getMinMouldNumber(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
+    private Integer getMinLhCount(List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
         if (CollectionUtils.isEmpty(cxCapacityInfoList)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -281,7 +283,7 @@ public class CxContinueInfoHelper implements Serializable {
         for (ProductGroupCxCapacityInfo cxCapacityInfo : cxCapacityInfoList) {
             min = min + cxCapacityInfo.getMinLhMachineCount();
         }
-        return min * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        return min;
     }
 
     /**
