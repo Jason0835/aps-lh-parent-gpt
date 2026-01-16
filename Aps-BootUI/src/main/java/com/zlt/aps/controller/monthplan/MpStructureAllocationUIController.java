@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -113,8 +114,10 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
+        // 将List中的LinkedHashMap转换为FactoryMonthPlanProductionFinalResult实体类
+        monthPlanList = convertToMonthPlanList(monthPlanList);
         Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = monthPlanList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName, LinkedHashMap::new, Collectors.toList()));
+                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName));
 
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
@@ -136,6 +139,23 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             }
             structureAllocation.setCxMachineCode(String.join(",", cxMachineCodeSet));
         }
+    }
+
+    private List<FactoryMonthPlanProductionFinalResult> convertToMonthPlanList(List<?> rows) {
+        List<FactoryMonthPlanProductionFinalResult> entityList = new ArrayList<>();
+        if (PubUtil.isEmpty(rows)) {
+            return entityList;
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (Object obj : rows) {
+            if (obj instanceof FactoryMonthPlanProductionFinalResult) {
+                entityList.add((FactoryMonthPlanProductionFinalResult) obj);
+            } else if (obj instanceof Map) {
+                FactoryMonthPlanProductionFinalResult entity = objectMapper.convertValue(obj, FactoryMonthPlanProductionFinalResult.class);
+                entityList.add(entity);
+            }
+        }
+        return entityList;
     }
 
 
