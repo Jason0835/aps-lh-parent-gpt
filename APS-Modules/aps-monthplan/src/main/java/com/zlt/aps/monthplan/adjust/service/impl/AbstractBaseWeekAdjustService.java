@@ -935,7 +935,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
-        contextDTO.setProductionVersion(queryVO.getProductionVersion());
+        contextDTO.setProductionVersion(factoryProductionVersion.getProductionVersion());
+        contextDTO.setMonthPlanVersion(factoryProductionVersion.getMonthPlanVersion());
     }
 
 
@@ -1118,14 +1119,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MpAdjustDetailVo adjustDetailVo = new MpAdjustDetailVo();
         // 基础通用字段赋值
         adjustDetailVo.setFactoryCode(contextDTO.getFactoryCode());
+        adjustDetailVo.setYear(contextDTO.getMpYear());
+        adjustDetailVo.setMonth(contextDTO.getMpMonth());
+        adjustDetailVo.setVersion(contextDTO.getVersion());
+
+        adjustDetailVo.setProductionVersion(contextDTO.getProductionVersion());
+        adjustDetailVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
         adjustDetailVo.setOrdQty(ordQty);
         adjustDetailVo.setMaterialCode(materialCode);
         adjustDetailVo.setIsTrial(isTrial);
         // TODO 是否特殊材料
         adjustDetailVo.setHasSpecialMaterial("0");
-        adjustDetailVo.setYear(contextDTO.getMpYear());
-        adjustDetailVo.setMonth(contextDTO.getMpMonth());
-        adjustDetailVo.setVersion(contextDTO.getVersion());
         return adjustDetailVo;
     }
 
@@ -1143,17 +1147,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             Map<String, MdmMaterialInfo> mdmMaterialInfoMap = convertToMaterialInfoMap(contextDTO.getMdmMaterialInfoList());
             // SKU与施工（示方书）关系
             Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = convertToSkuConstructionRefMap(contextDTO.getMdmSkuConstructionRefList());
+            // SKU与结构关系列表
+            Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = convertToSkuStructureRefMap(contextDTO.getMdmSkuStructureRefList());
             // 试制量试计划
             Map<String, MpTrialPlan> mpTrialPlanMap = convertToTrialPlanMap(contextDTO.getMpTrialPlanList());
 
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
             MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
             MdmSkuConstructionRef skuConstructionRef = MapUtils.getObject(mdmSkuConstructionRefMap, materialCode, new MdmSkuConstructionRef());
+            MdmSkuStructureRef skuStructureRef = MapUtils.getObject(mdmSkuStructureRefMap, materialCode, new MdmSkuStructureRef());
             MpTrialPlan trialPlan = MapUtils.getObject(mpTrialPlanMap, materialCode, new MpTrialPlan());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
-            adjustDetailVo.setStructureName(materialInfo.getStructureName());
+            adjustDetailVo.setStructureName(skuStructureRef.getStructureName());
             adjustDetailVo.setMaterialDesc(materialInfo.getMaterialDesc());
             adjustDetailVo.setProductTypeCode(materialInfo.getProductTypeCode());
             adjustDetailVo.setBrand(materialInfo.getBrand());
@@ -1174,18 +1181,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 constructionStage = trialPlan.getTrialStatus();
             }
             adjustDetailVo.setConstructionStage(constructionStage);
-            adjustDetailVo.setProductionVersion(contextDTO.getProductionVersion());
-            adjustDetailVo.setMonthPlanVersion(null);
             // TODO 型腔数量、活块数量
-            adjustDetailVo.setMouldCavityQty(null);
-            adjustDetailVo.setTypeBlockQty(null);
+            adjustDetailVo.setMouldCavityQty(0);
+            adjustDetailVo.setTypeBlockQty(0);
             return;
         }
         // 有月度生产计划时，赋值关联字段
         adjustDetailVo.setIsSkuAdd(ApsConstant.FALSE);
         adjustDetailVo.setScheduledMachines(monthPlan.getCxMachineCode());
-        adjustDetailVo.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
-        adjustDetailVo.setProductionVersion(monthPlan.getProductionVersion());
         adjustDetailVo.setStructureName(monthPlan.getStructureName());
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
