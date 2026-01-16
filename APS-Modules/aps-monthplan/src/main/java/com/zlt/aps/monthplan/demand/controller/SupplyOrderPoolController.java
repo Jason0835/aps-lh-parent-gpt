@@ -1,21 +1,14 @@
 package com.zlt.aps.monthplan.demand.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.google.common.collect.Sets;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
-import com.zlt.aps.monthplan.api.domain.entity.DpArea;
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.AreaConvertVo;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
@@ -62,10 +55,6 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
 
     @Autowired
     private SupplyOrderPoolEntityMapper entityMapper;
-
-    @Autowired
-    private DpAreaEntityMapper dpAreaEntityMapper;
-
     /**
      * 查询供应链订单池列表
      */
