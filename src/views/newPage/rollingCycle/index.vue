@@ -59,30 +59,34 @@
               <el-form-item label="机台">
                 <el-input
                   v-model="formInline.cxMachineCode"
+                  disabled
                   placeholder="机台"
                 ></el-input>
               </el-form-item>
               <el-form-item label="产品结构">
                 <el-input
                   v-model="formInline.structureName"
+                  disabled
                   placeholder="产品结构"
                 ></el-input>
               </el-form-item>
               <el-form-item label="开始日期">
                 <el-input
+                  disabled
                   v-model="formInline.beginDay"
                   placeholder="开始日期"
                 ></el-input>
               </el-form-item>
               <el-form-item label="结束日期">
                 <el-input
+                  disabled
                   v-model="formInline.endDay"
                   placeholder="结束日期"
                 ></el-input>
               </el-form-item>
               <el-form-item label="调整结束日期">
                 <el-date-picker
-                  v-model="formInline.overDate"
+                  v-model="formInline.adjustEndDay"
                   type="date"
                   value-format="yyyy-MM-dd"
                   placeholder="选择日期"
@@ -90,10 +94,12 @@
                 </el-date-picker>
               </el-form-item>
               <el-form-item label="">
-                <el-checkbox v-model="formInline.isCheck">后续平移</el-checkbox>
+                <el-checkbox v-model="formInline.isMove">后续平移</el-checkbox>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" @click="onSubmit">开始调整</el-button>
+                <el-button type="primary" @click="getOutList"
+                  >开始调整</el-button
+                >
               </el-form-item>
             </el-form>
           </el-tab-pane>
@@ -101,7 +107,7 @@
           <el-tab-pane label="调整结果" name="three"> </el-tab-pane>
         </el-tabs>
       </template>
-      <template slot="footer" v-if="activeName == 'three' && !isTabChange">
+      <template slot="footer" v-if="isShowFoot">
         <div
           style="
             display: flex;
@@ -158,6 +164,9 @@ import {
   getStructureDetail,
   listResult,
   resultVersion,
+  listOutHistory,
+  editOutHistory,
+  removeOutHistory,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -189,6 +198,9 @@ export default {
   },
   data() {
     return {
+      testResult: "", //暂时的机台数据
+
+      isShowFoot: false,
       formInline: {},
       isTabChange: true,
       versionList: [],
@@ -300,45 +312,39 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
-                    <el-input
-                      key={row.id}
-                      v-model={row.confirmAdjustQty}
-                      placeholder="请输入内容"
-                      onBlur={(e) => {
-                        e.preventDefault(); // 如果需要阻止默认行为
-                        this.editAdjust(row);
-                      }}
-                      size="mini"
-                    ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.confirmAdjustQty}</span>}
+                  <el-input
+                    key={row.id}
+                    v-model={row.confirmAdjustQty}
+                    placeholder="请输入内容"
+                    onBlur={(e) => {
+                      e.preventDefault(); // 如果需要阻止默认行为
+                      this.editAdjust(row);
+                    }}
+                    size="mini"
+                  ></el-input>
                 </div>
               );
             },
           },
           {
-            prop: "adjustPriorities",
+            prop: "adjustPriority",
             label: this.$t("调整优先级"),
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
-                    <el-input
-                      key={row.id}
-                      type="number"
-                      v-model={row.adjustPriorities}
-                      disabled={row.isSkuAdd != "1"}
-                      placeholder="请输入"
-                      min={1}
-                      onBlur={(e) => {
-                        e.preventDefault(); // 如果需要阻止默认行为
-                        this.editAdjust(row);
-                      }}
-                      size="mini"
-                    ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.adjustPriority}</span>}
+                  <el-input
+                    key={row.id}
+                    type="number"
+                    v-model={row.adjustPriority}
+                    disabled={row.isSkuAdd != "1"}
+                    placeholder="请输入"
+                    min={1}
+                    onBlur={(e) => {
+                      e.preventDefault(); // 如果需要阻止默认行为
+                      this.editAdjust(row);
+                    }}
+                    size="mini"
+                  ></el-input>
                 </div>
               );
             },
@@ -597,8 +603,13 @@ export default {
                 <div>
                   {this.isEdit && (
                     <el-input
+                      key={row.id}
                       v-model={row.confirmAdjustQty}
                       placeholder="请输入内容"
+                      onBlur={(e) => {
+                        e.preventDefault(); // 如果需要阻止默认行为
+                        this.editOutAdjust(row);
+                      }}
                       size="mini"
                     ></el-input>
                   )}
@@ -608,19 +619,27 @@ export default {
             },
           },
           {
-            prop: "adjustPriorities",
+            prop: "adjustPriority",
             label: this.$t("调整优先级"),
             render: ({ row }) => {
               return (
                 <div>
                   {this.isEdit && (
-                    <el-select v-model={row.adjustPriorities} size="mini">
-                      <el-option label="1" value="1" key="1" />
-                      <el-option label="2" value="2" key="2" />
-                      <el-option label="3" value="3" key="3" />
-                    </el-select>
+                    <el-input
+                      key={row.id}
+                      type="number"
+                      v-model={row.adjustPriority}
+                      disabled={row.isSkuAdd != "1"}
+                      placeholder="请输入"
+                      min={1}
+                      onBlur={(e) => {
+                        e.preventDefault(); // 如果需要阻止默认行为
+                        this.editOutAdjust(row);
+                      }}
+                      size="mini"
+                    ></el-input>
                   )}
-                  {!this.isEdit && <span>{row.adjustPriorities}</span>}
+                  {!this.isEdit && <span>{row.adjustPriority}</span>}
                 </div>
               );
             },
@@ -644,7 +663,7 @@ export default {
                     v-hasPermi={["monthplan:ProductMoldingLimit:remove"]}
                     class="minus"
                     type="danger"
-                    onClick={() => this.handleDelete(row)}
+                    onClick={() => this.handleOutDelete(row)}
                   >
                     {this.$t("ui.frame.btn.delete")}
                   </el-button>
@@ -802,6 +821,13 @@ export default {
         this.getList();
       } catch (err) {}
     },
+    async editOutAdjust(row) {
+      try {
+        let res = await editOutHistory(row);
+        this.$modal.msgSuccess(res.msg);
+        // this.getList();
+      } catch (err) {}
+    },
     fouceInout(row) {
       console.log("row", row);
     },
@@ -891,12 +917,21 @@ export default {
         this.activeName = "first";
       } else {
         this.activeName = "second";
+        this.page = {
+          current: 1,
+          pageSize: 20,
+          total: 0,
+        };
       }
+      this.isShowFoot=false
+
       this.getList();
     },
     //确认调整结果
     async confirmResult() {
       try {
+        this.show=false
+        this.loading= true;
         let params = {
           ...this.query,
           ...this.sort,
@@ -909,12 +944,20 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
+        if(this.adjustType=='02'){
+          params.adjustEndDay=this.formInline.adjustEndDay
+          params.isMove=this.formInline.isMove
+
+        }
         let res = await confirmAdjust(params);
         this.show = false;
         this.$modal.msgSuccess(res.msg);
         this.backPlan();
         console.log(res);
-      } catch (err) {}
+      } catch (err) {
+        this.loading= false
+        this.show=true
+      }
     },
     //获取调整订单
     async adjustOrder() {
@@ -1010,24 +1053,28 @@ export default {
       // this.loading = true;
       this.show = false;
       this.isShowResult = false;
+      this.isShowFoot = false;
       if (this.activeName == "three") {
         // this.getResultList();
+        this.page = {
+          current: 1,
+          pageSize: 20,
+          total: 0,
+        };
         this.getVersionList(true);
         this.isTabChange = true;
         return;
       }
-      if (this.activeName == "first") {
-        this.adjustType = "01";
-        this.isEdit = true;
-        this.page = null;
-      } else {
+      if (this.activeName == "second") {
         this.page = {
           current: 1,
           pageSize: 20,
           total: 0,
         };
         this.adjustType = "02";
-        this.isEdit = false;
+      } else {
+        this.adjustType = "01";
+        this.page = null;
       }
       // this.getList();
       this.getVersionList(true);
@@ -1071,6 +1118,7 @@ export default {
         this.loading = false;
         this.autoLoading = false;
         this.isTabChange = false;
+        this.isShowFoot = true;
         this.activeName = "three";
       } catch (err) {
         console.log(err);
@@ -1090,16 +1138,20 @@ export default {
       this.formInline = this.selection[0];
       this.actionDate = this.selection[0];
       this.show = false;
+      this.loading = true;
+      this.isEdit = false;
 
       if (this.selection[0].productionVersion) {
         console.log("selection", this.selection[0]);
         this.cxMachineCodeList(this.selection[0]);
       } else {
         console.log("没版本");
+        this.page = null;
+        setTimeout(() => {
+          this.show = true;
+          this.loading = false;
+        }, 500);
       }
-      setTimeout(() => {
-        this.show = true;
-      }, 500);
     },
     async cxMachineCodeList(row) {
       try {
@@ -1121,11 +1173,44 @@ export default {
         for (let index = 0; index < res.rows.length; index++) {
           list.push(res.rows[index].cxMachineCode);
         }
-        let result = list.join(", ");
-        this.getOutList(result);
-      } catch (err) {}
+        const uniqueArr = [...new Set(list)];
+        let result = uniqueArr.join(", ");
+        this.testResult = result;
+        this.getOutHistoryList(result);
+      } catch (err) {
+        this.loading = false;
+      }
     },
-    async getOutList(result) {
+    //刷新结构外调整历史列表
+    async resizeOutHistoryList(result) {
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        params.scheduledMachines = result;
+        params.structureName = this.actionDate.structureName;
+
+        params.adjustType = this.adjustType;
+     let res = await listOutHistory(params);
+        this.page = null;
+        this.data = res.rows;
+
+      } catch (err) {
+        console.log(err);
+      } finally {
+        this.loading = false;
+        this.show = true;
+      }
+    },
+    //获取结构外调整历史列表
+    async getOutHistoryList(result) {
       try {
         let params = {
           ...this.query,
@@ -1142,12 +1227,44 @@ export default {
 
         params.adjustType = this.adjustType;
         this.isEdit = false;
-        let res = await getAdjustDetailList(params);
+        let res = await listOutHistory(params);
+        this.page = null;
         this.data = res.rows;
         this.isShowResult = true;
         this.activeName = "singleResult";
       } catch (err) {
         console.log(err);
+      } finally {
+        this.loading = false;
+        this.show = true;
+      }
+    },
+    //结构外开始调整
+    async getOutList() {
+      this.loading = true;
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        params.scheduledMachines = this.testResult;
+        params.structureName = this.actionDate.structureName;
+
+        params.adjustType = this.adjustType;
+        this.isEdit = true;
+        let res = await getAdjustDetailList(params);
+        this.data = res.rows;
+        this.isShowFoot = true;
+      } catch (err) {
+        console.log(err);
+      } finally {
+        this.loading = false;
       }
     },
 
@@ -1159,6 +1276,17 @@ export default {
         removeAdjust({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.getList();
+        });
+      });
+    },
+    handleOutDelete(row){
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const ids = row.id;
+        removeOutHistory({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.resizeOutHistoryList(this.testResult);
         });
       });
     },
@@ -1216,7 +1344,8 @@ export default {
         ...this.sort,
       };
 
-      if (this.activeName == "second") {
+      if (this.activeName == "second" || this.activeName == "three") {
+        console.log("this.page", this.page);
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
@@ -1239,12 +1368,15 @@ export default {
         } else if (this.activeName == "second") {
           data = await listOutsideStructure(this.formatParams());
         } else if (this.activeName == "three") {
+          if (!this.isTabChange) {
+            return;
+          }
           data = await listResult(this.formatParams());
         } else {
           return;
         }
         this.data = data.rows;
-        if (this.activeName == "second") {
+        if (this.activeName == "second" || this.activeName == "three") {
           this.page.total = data.total;
         }
 

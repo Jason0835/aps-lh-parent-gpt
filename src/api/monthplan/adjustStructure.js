@@ -7,7 +7,7 @@ export function listInternalStructure(query) {
     data: query
   })
 }
-//结构内获取调整订单  结构外单选结构调整
+//结构内获取调整订单  结构外单选结构开始调整
 export function getAdjustDetailList(query) {
   return request({
     url: '/monthplan/mpWeekRollAdjust/getAdjustDetailList',
@@ -119,6 +119,32 @@ export function listResult(query) {
 export function resultVersion(query) {
   return request({
     url: '/monthplan/mpAdjustResult/getVersionList',
+    method: 'post',
+    data: query
+  })
+}
+
+//单选结构查询列表
+export function listOutHistory(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureOut/list',
+    method: 'post',
+    data: query
+  })
+}
+
+//单选结构查询列表修改
+export function editOutHistory(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureOut/save',
+    method: 'post',
+    data: query
+  })
+}
+//单选结构查询列表删除
+export function removeOutHistory(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureOut/remove',
     method: 'post',
     data: query
   })
