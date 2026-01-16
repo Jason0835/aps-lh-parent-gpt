@@ -120,15 +120,17 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     @Override
     public void createCycleStockUp(SupplyOrderPool supplyOrderPool) {
+        YearMonth nextMonth = YearMonth.now().plusMonths(1);
         // 1. 验证前置条件
-        validatePrerequisites();
+        validatePrerequisites(nextMonth);
+
         // 2. 获取需要处理的SKU集合
-        Set<String> eligibleSkus = getEligibleSkus();
+        Set<String> eligibleSkus = getEligibleSkus(nextMonth);
         if (CollectionUtils.isEmpty(eligibleSkus)) {
             throw new BusinessException(I18nUtil.getMessage(
                 "ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
         }
-        YearMonth nextMonth = YearMonth.now().plusMonths(1);
+
         // 3. 清理旧数据并批量创建新数据
         recreateSupplyOrderPools(nextMonth,eligibleSkus);
     }
@@ -140,7 +142,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         // 3.1 清理旧数据
         deleteSupplyOrderPool(yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
         // 3.2 准备计算所需数据
-        CalculationData calculationData = prepareCalculationData();
+        CalculationData calculationData = prepareCalculationData(yearMonth);
 
         // 3.3 批量构建并插入订单池数据
         List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPoolsInParallel(yearMonth,
@@ -167,7 +169,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 准备计算所需的所有数据
      */
-    private CalculationData prepareCalculationData() {
+    private CalculationData prepareCalculationData(YearMonth yearMonth) {
         // 并行获取所有必要数据
         CompletableFuture<List<MpMonthlySaleQty>> monthlySaleQtyFuture =
             CompletableFuture.supplyAsync(monthlySaleQtyService::findCurrentMonthlySaleQty);
@@ -175,7 +177,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         CompletableFuture<List<MdmMaterialInfo>> materialsFuture =
             CompletableFuture.supplyAsync(this::getAllActiveMaterials);
         CompletableFuture<List<MdmMonCycleSchStruConf>> cycleSchStruConfFuture =
-            CompletableFuture.supplyAsync(mdmMonCycleSchStruConfService::findCurrentCycleSchStruConf);
+            CompletableFuture.supplyAsync(() -> mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth));
 
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(mdmProductStockService::findCurrentFinishStock);
@@ -225,7 +227,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 获取符合条件的SKU集合
      */
-    private Set<String> getEligibleSkus() {
+    private Set<String> getEligibleSkus(YearMonth yearMonth) {
         // 2.1 获取所有有效物料
         List<MdmMaterialInfo> materialInfos = getAllActiveMaterials();
         if (CollectionUtils.isEmpty(materialInfos)) {
@@ -233,7 +235,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
 
         // 2.2 根据结构筛选SKU
-        Set<String> structureSkus = filterSkusByStructure(materialInfos);
+        Set<String> structureSkus = filterSkusByStructure(materialInfos,yearMonth);
         if (CollectionUtils.isEmpty(structureSkus)) {
             return Collections.emptySet();
         }
@@ -258,9 +260,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 根据结构筛选SKU
      */
-    private Set<String> filterSkusByStructure(List<MdmMaterialInfo> materialInfos) {
+    private Set<String> filterSkusByStructure(List<MdmMaterialInfo> materialInfos,YearMonth yearMonth) {
         List<MdmMonCycleSchStruConf> cycleSchStruConfs =
-            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
+            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
         // 获取有效的结构名称集合
         Set<String> validStructures = cycleSchStruConfs
             .stream()
@@ -287,10 +289,10 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 验证所有必要的前置条件
      */
-    private void validatePrerequisites() {
+    private void validatePrerequisites(YearMonth yearMonth) {
         // 1.1 验证周期性排产结构配置
         List<MdmMonCycleSchStruConf> cycleSchStruConfs =
-            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
+            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
 
         if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
             throw new BusinessException(I18nUtil.getMessage(
@@ -312,7 +314,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     public void createPrecedentStockUp(SupplyOrderPool supplyOrderPool) {
         try {
             YearMonth nextMonth = YearMonth.now().plusMonths(1);
-            PrecedentStockUpContext context = buildContext();
+            PrecedentStockUpContext context = buildContext(nextMonth);
             Set<String> eligibleSkus = findEligibleSkus(context);
             if (eligibleSkus.isEmpty()) {
                 log.warn("No eligible SKUs found for precedent stock up");
@@ -525,9 +527,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private PrecedentStockUpContext buildContext() {
+    private PrecedentStockUpContext buildContext(YearMonth yearMonth) {
         List<MdmMaterialInfo> materialInfos = findAllActive();
-        List<MdmMonCycleSchStruConf> cycleSchStruConfs = this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs = this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
 
         return PrecedentStockUpContext.builder()
             .materialInfos(materialInfos)
@@ -686,7 +688,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     public List<SupplyOrderPool> createCycleStockUp(YearMonth yearMonth) {
         // 1.1 验证周期性排产结构配置
         List<MdmMonCycleSchStruConf> cycleSchStruConfs =
-            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
+            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
         if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
            return Collections.emptyList();
         }
@@ -698,14 +700,14 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             return Collections.emptyList();
         }
         // 2. 获取需要处理的SKU集合
-        Set<String> eligibleSkus = getEligibleSkus();
+        Set<String> eligibleSkus = getEligibleSkus(yearMonth);
         // 3. 清理旧数据并批量创建新数据
         return  recreateSupplyOrderPools(yearMonth,eligibleSkus);
     }
 
     @Override
     public List<SupplyOrderPool> createPrecedentStockUp(YearMonth yearMonth) {
-        PrecedentStockUpContext context = buildContext();
+        PrecedentStockUpContext context = buildContext(yearMonth);
         Set<String> eligibleSkus = findEligibleSkus(context);
         if (eligibleSkus.isEmpty()) {
             return Collections.emptyList();

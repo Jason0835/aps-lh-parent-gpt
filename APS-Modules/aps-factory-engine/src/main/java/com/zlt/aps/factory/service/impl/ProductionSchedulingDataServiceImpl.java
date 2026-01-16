@@ -89,6 +89,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final IPlanOrderSortConfigurationService sortConfigurationService;
 
+    private final IFactoryMouldUsedStatusLogService factoryMouldUsedStatusLogService;
+
     private final IFactoryProductionMonthPlanInitService factoryProductionMonthPlanInitService;
 
     private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
@@ -564,6 +566,14 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return;
         }
         baseDao.insert(productionLog);
+    }
+
+    @Override
+    public void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList) {
+        if (CollectionUtils.isEmpty(usedLogList)) {
+            return;
+        }
+        factoryMouldUsedStatusLogService.saveBatch(usedLogList);
     }
 
     @Override

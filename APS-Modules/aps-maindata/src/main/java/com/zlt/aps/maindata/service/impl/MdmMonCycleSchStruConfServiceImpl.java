@@ -8,7 +8,6 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -70,8 +69,10 @@ public class MdmMonCycleSchStruConfServiceImpl extends AbstractDocService<MdmMon
     }
 
     @Override
-    public List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf() {
+    public List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf(YearMonth yearMonth) {
         LambdaQueryWrapper<MdmMonCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMonCycleSchStruConf::getYear, yearMonth.getYear());
+        wrapper.eq(MdmMonCycleSchStruConf::getMonth, yearMonth.getMonthValue());
         wrapper.eq(MdmMonCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmMonCycleSchStruConfEntityMapper.selectList(wrapper);
     }

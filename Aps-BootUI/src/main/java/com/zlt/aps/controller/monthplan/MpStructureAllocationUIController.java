@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -28,8 +29,8 @@ import org.apache.commons.io.IOUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -113,19 +114,32 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
-        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = monthPlanList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName, LinkedHashMap::new, Collectors.toList()));
+        monthPlanList = cn.hutool.core.convert.Convert.toList(FactoryMonthPlanProductionFinalResult.class, monthPlanList);
+        log.debug("最终排产计划定稿列表大小：{}", monthPlanList.size());
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
+        for (FactoryMonthPlanProductionFinalResult monthPlan : monthPlanList) {
+            String structureName = monthPlan.getStructureName();
+            if (!monthPlanMap.containsKey(structureName)) {
+                monthPlanMap.put(structureName, new ArrayList<>());
+            }
+            List<FactoryMonthPlanProductionFinalResult> resultList = monthPlanMap.get(structureName);
+            resultList.add(monthPlan);
+        }
 
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
         List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
+        structureAllocationList = cn.hutool.core.convert.Convert.toList(MpStructureAllocation.class, structureAllocationList);
+        log.debug("结构排产列表大小：{}", structureAllocationList.size());
         for (MpStructureAllocation structureAllocation : structureAllocationList) {
             cxMachineCodeSet.clear();
             if (StringUtils.isEmpty(structureAllocation.getStructureName())) {
                 continue;
             }
+            String structureName = structureAllocation.getStructureName();
             // 匹配月度生产计划
-            List<FactoryMonthPlanProductionFinalResult> matchMonthPlanList = MapUtils.getObject(monthPlanMap, structureAllocation.getStructureName(), new ArrayList<>());
+            List<FactoryMonthPlanProductionFinalResult> matchMonthPlanList = MapUtils.getObject(monthPlanMap, structureName, new ArrayList<>());
+            log.debug("匹配最终排产计划定稿列表 结构:{},大小：{}", structureName, matchMonthPlanList.size());
             cxMachineCodeSet = matchMonthPlanList.stream()
                     .filter(s -> StringUtils.isNotEmpty(s.getCxMachineCode()))
                     .map(FactoryMonthPlanProductionFinalResult::getCxMachineCode)
@@ -134,10 +148,10 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             if (PubUtil.isEmpty(cxMachineCodeSet)) {
                 continue;
             }
+            log.debug("匹配最终结果,结构:{},机台列表:{}", structureName, cxMachineCodeSet);
             structureAllocation.setCxMachineCode(String.join(",", cxMachineCodeSet));
         }
     }
-
 
 
     /**

@@ -34,6 +34,10 @@ public class ProductionMouldInfoVo implements Serializable {
      */
     private String mouldCode;
     /**
+     * 模具状态
+     */
+    private String mouldStatus;
+    /**
      * 关系类型 01 sku与模具关系 02 新模具到货计划
      */
     private MouldRelationTypeEnum relationType;
@@ -59,15 +63,17 @@ public class ProductionMouldInfoVo implements Serializable {
      * 只包含型腔模号及relationType类型
      *
      * @param mouldCode    型腔模号
+     * @param mouldStatus  模具状态
      * @param relationType 关系类型
      * @return
      */
-    public static ProductionMouldInfoVo createEmptyProductionMouldInfo(String mouldCode, MouldRelationTypeEnum relationType) {
+    public static ProductionMouldInfoVo createEmptyProductionMouldInfo(String mouldCode, String mouldStatus, MouldRelationTypeEnum relationType) {
         if (StringUtils.isBlank(mouldCode)) {
             return null;
         }
         ProductionMouldInfoVo productionMouldInfo = new ProductionMouldInfoVo();
         productionMouldInfo.setMouldCode(mouldCode);
+        productionMouldInfo.setMouldStatus(mouldStatus);
         if (null == relationType) {
             productionMouldInfo.setRelationType(MouldRelationTypeEnum.SKU_RELATION_CONFIGURATION);
         } else {

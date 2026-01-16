@@ -759,7 +759,7 @@ public class MatchingProductionHandler {
                 ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
                 if (productionMouldInfo == null) {
                     MouldRelationTypeEnum relationType = MouldRelationTypeEnum.getInstance(mould.getRelationType());
-                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mouldCode, relationType);
+                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mouldCode, mould.getMouldStatus(), relationType);
                     productionMouldInfo.setProductionDayInfo(productionContext,
                             productionContext.getProductionStartDate()); // 上机时间
                     mouldInfoMap.put(mouldCode, productionMouldInfo);
