@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
@@ -52,7 +51,6 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
     /**
      * 查询版本库存列表
      */
-    @RequiresPermissions("monthplan:dpStockVersion:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -69,7 +67,6 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
      * 保存
      */
     @Log(title = "ui.data.column.dpStockVersion.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:dpStockVersion:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -81,7 +78,6 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
      * 删除
      */
     @Log(title = "ui.data.column.dpStockVersion.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:dpStockVersion:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +89,6 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
     /**
      * 获取版本库存详细信息
      */
-    @RequiresPermissions("monthplan:dpStockVersion:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -109,7 +104,6 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:dpStockVersion:import")
     @Log(title = "ui.data.column.dpStockVersion.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -121,7 +115,6 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:dpStockVersion:export")
     @Log(title = "版本库存", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
