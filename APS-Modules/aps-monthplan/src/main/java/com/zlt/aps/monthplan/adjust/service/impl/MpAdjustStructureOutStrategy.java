@@ -131,6 +131,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //结构内，按结构分别调整
         contextDTO.setStructureName(contextDTO.getStructureName());
         List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
+        //更新结构转产表对应成型机台的调整开始日、结束日
+        updateStructureAdjustDayByMachine(structureAllocationList,contextDTO);
         contextDTO.setOneStructureAllocationList(structureAllocationList);
         //初始锁定日
         contextDTO.setLockEndDay(getLockEndDay(contextDTO));
@@ -146,6 +148,25 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
         //保存调整日志
         saveMpAdjustLog(contextDTO);
+    }
+
+    /**
+     * 更新结构转产表对应成型机台的调整开始日、结束日
+     * @param structureAllocationList
+     * @param contextDTO
+     */
+    private void updateStructureAdjustDayByMachine(List<MpStructureAllocation> structureAllocationList,MpRollAdjustContextDTO contextDTO){
+        if (PubUtil.isEmpty(structureAllocationList)){
+            return;
+        }
+        for (MpStructureAllocation structureAllocation:structureAllocationList){
+            if (structureAllocation.getCxMachineCode().equals(contextDTO.getScheduledMachines())){
+                //更新结构转产表对应成型机台的调整开始日、结束日
+                structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+                structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+                return;
+            }
+        }
     }
 
     @Override
