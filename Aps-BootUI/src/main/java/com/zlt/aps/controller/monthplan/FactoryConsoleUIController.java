@@ -282,7 +282,7 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     @PostMapping("/getProductionMonthType")
     @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
-    public AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdResultDto param) {
+    public AjaxResult getProductionMonthType(FactoryMonthPlanProdResultDto param) {
         if (checkParamEmpty(param)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
         }
