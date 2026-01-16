@@ -13,9 +13,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
-import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -37,8 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.aspectj.weaver.loadtime.Aj;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,7 +44,6 @@ import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -71,8 +66,6 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPool>  implements ISupplyOrderPoolService {
     private static final int DAYS_PER_MONTH = 30;
-
-    private final DpAreaEntityMapper dpAreaEntityMapper;
 
     private final SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
 
@@ -118,7 +111,34 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             String notUniqueMsg =  com.ruoyi.common.utils.StringUtils.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
             throw new BusinessException(notUniqueMsg);
         }
+        unique = this.checkUniqueByOrderType(docEntityVO);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            String notUniqueMsg =  com.ruoyi.common.utils.StringUtils.format(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.notUnique"),docEntityVO.getMaterialCode());
+            throw new BusinessException(notUniqueMsg);
+        }
         return unique;
+    }
+
+    private String checkUniqueByOrderType(SupplyOrderPool param) {
+        if(null != param.getId()){
+           return UserConstants.UNIQUE;
+        }
+        SupplyOrderPool supplyOrderPool = this.validateExistSupplyOrderPool(param);
+        return supplyOrderPool == null ? UserConstants.UNIQUE : UserConstants.NOT_UNIQUE;
+    }
+
+    private SupplyOrderPool validateExistSupplyOrderPool(SupplyOrderPool param) {
+        LambdaQueryWrapper<SupplyOrderPool> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(SupplyOrderPool::getFactoryCode,param.getFactoryCode());
+        wrapper.eq(SupplyOrderPool::getOrderType,param.getOrderType());
+        wrapper.eq(SupplyOrderPool::getYear,param.getYear());
+        wrapper.eq(SupplyOrderPool::getMonth,param.getMonth());
+        wrapper.eq(SupplyOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<SupplyOrderPool> list = this.supplyOrderPoolEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return null;
+        }
+        return list.get(0);
     }
 
     @Override
@@ -381,6 +401,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
      * @param supplyOrderPool 入参
      */
+    @Override
     public AjaxResult calculateStockMsg(SupplyOrderPool supplyOrderPool) {
 
         String yearMonth = String.format("%s%02d", supplyOrderPool.getYear(), supplyOrderPool.getMonth());
@@ -403,71 +424,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return AjaxResult.success(msg.toString());
     }
 
-
-    private Map<String, MdmProductStock> calculateStockQtyMap(List<MdmProductStock> finishedProductStocks) {
-        if(CollectionUtils.isEmpty(finishedProductStocks)){
-            return Collections.emptyMap();
-        }
-        return finishedProductStocks.parallelStream()
-            .collect(Collectors.toMap(
-                MdmProductStock::getStockWithoutOrderGroupKey,
-                Function.identity(),
-                this::mergeProductStocks,
-                ConcurrentHashMap::new
-            ));
-    }
-
-
-    /**
-     * 合并具有相同键的SalesOrderPool对象
-     * 主要合并ordQty，其他字段取第一个出现的值
-     */
-    private MdmProductStock mergeProductStocks(MdmProductStock existing, MdmProductStock incoming) {
-        int existOrdQty = null == existing.getStockQty()?BigDecimal.ZERO.intValue():existing.getStockQty();
-        int incomingQty = null == incoming.getStockQty()?BigDecimal.ZERO.intValue():incoming.getStockQty();
-        // 累加数量
-        int totalQty = existOrdQty + incomingQty;
-        // 创建新的合并对象（避免修改原对象）
-        MdmProductStock merged = new MdmProductStock();
-        merged.setWeekYear(existing.getWeekYear());
-        merged.setIsUniformity(existing.getIsUniformity());
-        merged.setIsDynamicBalance(existing.getIsDynamicBalance());
-        merged.setMaterialCode(existing.getMaterialCode());
-        merged.setStockQty(totalQty);
-        return merged;
-    }
-
-    private Map<String, SalesOrderPool> calculateOrderQtyMap(List<SalesOrderPool> salesOrderPools) {
-        if(CollectionUtils.isEmpty(salesOrderPools)){
-            return Collections.emptyMap();
-        }
-        return salesOrderPools.parallelStream()
-            .collect(Collectors.toMap(
-                SalesOrderPool::getStockWithoutOrderGroupKey,
-                Function.identity(),
-                this::mergeSalesOrderPools,
-                ConcurrentHashMap::new
-            ));
-    }
-
-    /**
-     * 合并具有相同键的SalesOrderPool对象
-     * 主要合并ordQty，其他字段取第一个出现的值
-     */
-    private SalesOrderPool mergeSalesOrderPools(SalesOrderPool existing, SalesOrderPool incoming) {
-        BigDecimal existOrdQty = null == existing.getOrdQty()?BigDecimal.ZERO:existing.getOrdQty();
-        BigDecimal incomingQty = null == incoming.getOrdQty()?BigDecimal.ZERO:incoming.getOrdQty();
-        // 累加数量
-        BigDecimal totalQty = existOrdQty.add(incomingQty);
-        // 创建新的合并对象（避免修改原对象）
-        SalesOrderPool merged = new SalesOrderPool();
-        merged.setWeekYear(existing.getWeekYear());
-        merged.setIsUniformity(existing.getIsUniformity());
-        merged.setIsDynamicBalance(existing.getIsDynamicBalance());
-        merged.setOriMaterialCode(existing.getOriMaterialCode());
-        merged.setOrdQty(totalQty);
-        return merged;
-    }
 
     private SupplyOrderPool calculateOrderForSku(
         YearMonth yearMonth,
