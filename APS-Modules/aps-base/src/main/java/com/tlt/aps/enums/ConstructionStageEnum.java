@@ -12,19 +12,19 @@ public enum ConstructionStageEnum {
     /**
      * 0 无施工
      */
-    NO_CONSTRUCTION("0", "无施工"),
+    NO_CONSTRUCTION("00", "无施工"),
     /**
      * 1 试制
      */
-    MEASUREMENT("1", "试制"),
+    MEASUREMENT("01", "试制"),
     /**
      * 2 量试
      */
-    TRIAL_PRODUCTION("2", "量试"),
+    TRIAL_PRODUCTION("02", "量试"),
     /**
      * 3 正式
      */
-    FORMAL_PRODUCTION("3", "正式");
+    FORMAL_PRODUCTION("03", "正式");
     /**
      * T 量试标记
      */
