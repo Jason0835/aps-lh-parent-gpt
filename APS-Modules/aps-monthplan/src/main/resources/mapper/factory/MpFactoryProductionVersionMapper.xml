@@ -73,7 +73,8 @@
             IS_NATURAL_MONTH        = NULL,
             PRODUCTION_START_DATE   = NULL,
             PRODUCTION_END_DATE     = NULL
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        WHERE IS_DELETE = 0
+                  AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                   AND YEAR = #{year,jdbcType=DECIMAL}
                   AND MONTH = #{month,jdbcType=DECIMAL}
           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
@@ -125,7 +126,8 @@
     <select id="selectCountByProductionVersion" resultType="java.lang.Integer">
         SELECT COUNT(1)
         FROM t_mp_proc_version
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        WHERE IS_DELETE = 0
+                  AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                   AND YEAR = #{year,jdbcType=DECIMAL}
                   AND MONTH = #{month,jdbcType=DECIMAL}
           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
