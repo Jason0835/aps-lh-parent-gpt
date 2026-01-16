@@ -121,6 +121,12 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
+    /**
+     * 结构类型
+     */
+    @ApiModelProperty(value = "结构类型", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
 
     /**
      * 主花纹
