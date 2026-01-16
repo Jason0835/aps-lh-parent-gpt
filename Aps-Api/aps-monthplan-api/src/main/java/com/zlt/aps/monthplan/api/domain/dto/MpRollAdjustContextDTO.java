@@ -69,6 +69,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "结构内调整记录")
     private List<MpAdjustStructureIn> mpAdjustStructureInList;
 
+    @ApiModelProperty(value = "结构调整记录")
+    private List<MpAdjustStructureOut> mpAdjustStructureOutList;
+
     @ApiModelProperty(value = "月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList;
 
