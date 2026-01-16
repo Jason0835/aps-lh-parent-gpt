@@ -52,6 +52,7 @@ import {
   createOrderForecast,
   getOrderForecastVersion,
 } from "@/api/monthplan/orderForecast";
+import { el } from "@fullcalendar/core/internal-common";
 //components
 
 export default {
@@ -276,10 +277,17 @@ export default {
         this.versionList = list;
         if (list.length != 0) {
           this.$set(this.search, "predictionVersion", list[0].value);
+          this.$set(this.query, "predictionVersion", list[0].value);
+        }else{
+          this.$set(this.search, "predictionVersion", '');
+          this.$set(this.query, "predictionVersion", '');
         }
-        if(isGet){
+        this.$nextTick(() => {
+          if(isGet){
           this.getList()
         }
+        });
+
       } catch (err) {}
     },
     getListResize() {

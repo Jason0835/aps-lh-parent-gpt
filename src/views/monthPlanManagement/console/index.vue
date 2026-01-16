@@ -142,6 +142,7 @@ export default {
     "biz_yes_no",
     "biz_channel_type",
     "biz_brand_type",
+    "biz_product_type"
   ],
   provide() {
     return {
@@ -397,6 +398,8 @@ export default {
         {
           label: this.$t("产品品类"),
           prop: "productTypeCode",
+          type: "select",
+          dictData: this.dict.type.biz_product_type,
         },
         {
           label: this.$t("需求计划版本"),

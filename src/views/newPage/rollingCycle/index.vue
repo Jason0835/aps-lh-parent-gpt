@@ -342,7 +342,7 @@ export default {
                     min={1}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
-                      this.editAdjust(row);
+                      this.editAdjust(row, "adjustPriority");
                     }}
                     size="mini"
                   ></el-input>
@@ -650,7 +650,7 @@ export default {
                       min={1}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
-                        this.editOutAdjust(row);
+                        this.editOutAdjust(row,'adjustPriority');
                       }}
                       size="mini"
                     ></el-input>
@@ -832,7 +832,13 @@ export default {
         this.getSubList(row);
       }
     },
-    async editAdjust(row) {
+    isPositiveInteger(num) {
+      return /^[1-9]\d*$/.test(num);
+    },
+    async editAdjust(row,type) {
+      if(!this.isPositiveInteger(row.adjustPriority)){
+          return this.$modal.msgWarning('请输入大于0的整数');
+        }
       try {
         let res = await saveAdjust(row);
         this.$modal.msgSuccess(res.msg);
@@ -840,6 +846,12 @@ export default {
       } catch (err) {}
     },
     async editOutAdjust(row) {
+      if(type=='adjustPriority'){
+        if(!this.isPositiveInteger(row.adjustPriority)){
+          return this.$modal.msgWarning('请输入大于0的整数');
+        }
+
+      }
       try {
         let res = await editOutHistory(row);
         this.$modal.msgSuccess(res.msg);
@@ -1204,11 +1216,12 @@ export default {
         // this.cxMachineCodeList(this.selection[0]);
         this.getOutVersionList(true);
       } else {
-        console.log("没版本");
         this.page = null;
         setTimeout(() => {
           this.show = true;
           this.loading = false;
+          this.isShowResult = true;
+          this.activeName = "singleResult";
         }, 500);
       }
     },
