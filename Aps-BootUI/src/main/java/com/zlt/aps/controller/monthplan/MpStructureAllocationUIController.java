@@ -91,7 +91,16 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
         // 排序
         sortStructureAllocation(resultList);
-        return getDataTable(resultList);
+        return getTableDataInfo(resultList);
+    }
+
+    private TableDataInfo getTableDataInfo(List<?> list) {
+        TableDataInfo rspData = new TableDataInfo();
+        rspData.setCode(200);
+        rspData.setRows(list);
+        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
+        rspData.setTotal(CollUtil.size(list));
+        return rspData;
     }
 
     private void sortStructureAllocation(List<MpStructureAllocation> list) {
