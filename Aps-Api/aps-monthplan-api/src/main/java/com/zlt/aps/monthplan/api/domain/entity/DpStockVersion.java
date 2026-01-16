@@ -126,7 +126,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 动平衡，字典：biz_yes_no，1 是 0 否
      */
-    @Excel(name = "ui.data.column.mdmFinishStock.isDynamicBalance", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.mdmFinishStock.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡，字典：biz_yes_no，1 是 0 否", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
@@ -134,7 +134,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 均匀性，字典：biz_yes_no，1 是 0 否
      */
-    @Excel(name = "ui.data.column.mdmFinishStock.isUniformity", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.mdmFinishStock.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性，字典：biz_yes_no，1 是 0 否", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
