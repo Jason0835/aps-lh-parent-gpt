@@ -207,16 +207,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
     }
 
-    private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion) {
+    private void saveFactoryProductionVersion(DpDemandPlan createCondition,YearMonth yearMonth, String monthPlanVersion) {
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         version.setYear(yearMonth.getYear());
         version.setMonth(yearMonth.getMonthValue());
         version.setMonthPlanVersion(monthPlanVersion);
-        version.setPlanType(ProductionPlanType.NORMAL.getPlanType());
+        version.setPlanType(createCondition.getPlanType());
         version.setIsFinal(YesOrNoEnum.NO.getCode());
         version.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         factoryProductionVersionMapper.insert(version);
@@ -280,7 +280,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
         return adjustRequirePlans;
     }
 
@@ -323,7 +323,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition,null, supplyOrderPools);
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tPlus1Month,predictionVersion);
+        saveFactoryProductionVersion(createCondition, tPlus1Month,predictionVersion);
         return mergedDemandPlans;
     }
 
@@ -472,7 +472,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext);
         }
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,predictionVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,predictionVersion);
         predictionContext.setAllocationResult(allocationResult);
         return mergedDemandPlans;
     }
