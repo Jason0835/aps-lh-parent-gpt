@@ -95,6 +95,7 @@ export default {
     "biz_trial_type",
     "biz_construction_stage",
     "biz_urgency_type",
+    "trial_construction_stage"
   ],
   provide() {
     return {
@@ -206,7 +207,7 @@ export default {
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(
-              this.dict.type.biz_construction_stage,
+              this.dict.type.trial_construction_stage,
               value
             );
           },
@@ -364,7 +365,7 @@ export default {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           type: "select",
-          dictData: this.dict.type.biz_construction_stage,
+          dictData: this.dict.type.trial_construction_stage,
         },
         {
           prop: "urgencyType",

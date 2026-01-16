@@ -167,6 +167,7 @@ import {
   listOutHistory,
   editOutHistory,
   removeOutHistory,
+  versionOutHistory,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -549,20 +550,28 @@ export default {
           {
             prop: "structureName",
             label: this.$t("产品结构"),
-            width: 120,
+            width: 180,
+          },
+          {
+            prop: "version",
+            label: this.$t("版本号"),
+            width: 180,
           },
 
           {
             prop: "scheduledMachines",
             label: this.$t("排产机台"),
+            width: 120,
           },
           {
             prop: "materialCode",
-            label: this.$t("NC物料编码"),
+            label: this.$t("物料编码"),
+            width: 120,
           },
           {
             prop: "materialDesc",
             label: this.$t("物料描述"),
+            width: 320,
           },
           {
             prop: "hasSpecialMaterial",
@@ -570,30 +579,37 @@ export default {
             formatter: (row, column, value) => {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
+            width: 120,
           },
           {
             prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),
+            width: 120,
           },
           {
             prop: "currentNetQty",
             label: this.$t("当前净需求量"),
+            width: 120,
           },
           {
             prop: "netQtyChange",
             label: this.$t("净需求变动"),
+            width: 120,
           },
           {
             prop: "monthScheduledQty",
             label: this.$t("月计划已排产量"),
+            width: 120,
           },
           {
             prop: "productionQty",
             label: this.$t("月计划已生产量"),
+            width: 120,
           },
           {
             prop: "pendingQty",
             label: this.$t("待调整量（降序）"),
+            width: 120,
           },
           {
             prop: "confirmAdjustQty",
@@ -647,10 +663,12 @@ export default {
           {
             prop: "actualAdjustment",
             label: this.$t("实际调整"),
+            width: 120,
           },
           {
             prop: "adjustmentReason",
             label: this.$t("调整原因"),
+            width: 120,
           },
           {
             align: "center",
@@ -866,6 +884,7 @@ export default {
         if (this.activeName == "three") {
           res = await resultVersion(this.formatParams());
         }
+
         let list = [];
         for (let i = 0; i < res.rows.length; i++) {
           let obj = {
@@ -912,6 +931,46 @@ export default {
       }
     },
 
+    //获取单选历史列表的版本号
+    async getOutVersionList(isGet) {
+      try {
+        const params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.year = arr[0];
+          params.month = arr[1];
+        }
+        let res = await versionOutHistory(params);
+        let list = [];
+        for (let i = 0; i < res.rows.length; i++) {
+          let obj = {
+            label: res.rows[i].version,
+            value: res.rows[i].version,
+          };
+          list.push(obj);
+        }
+
+        this.versionList = list;
+        if (list.length > 0) {
+          this.$set(this.search, "version", list[0].value);
+          this.$set(this.query, "version", list[0].value);
+        } else {
+          this.$set(this.search, "version", "");
+          this.$set(this.query, "version", "");
+        }
+        if (isGet) {
+          this.$nextTick(() => {
+            this.getOutHistoryList();
+          });
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    },
+
     backPlan() {
       if (this.adjustType == "01") {
         this.activeName = "first";
@@ -923,15 +982,15 @@ export default {
           total: 0,
         };
       }
-      this.isShowFoot=false
+      this.isShowFoot = false;
 
-      this.getList();
+      this.getVersionList(true);
     },
     //确认调整结果
     async confirmResult() {
       try {
-        this.show=false
-        this.loading= true;
+        this.show = false;
+        this.loading = true;
         let params = {
           ...this.query,
           ...this.sort,
@@ -944,10 +1003,9 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        if(this.adjustType=='02'){
-          params.adjustEndDay=this.formInline.adjustEndDay
-          params.isMove=this.formInline.isMove
-
+        if (this.adjustType == "02") {
+          params.adjustEndDay = this.formInline.adjustEndDay;
+          params.isMove = this.formInline.isMove;
         }
         let res = await confirmAdjust(params);
         this.show = false;
@@ -955,8 +1013,8 @@ export default {
         this.backPlan();
         console.log(res);
       } catch (err) {
-        this.loading= false
-        this.show=true
+        this.loading = false;
+        this.show = true;
       }
     },
     //获取调整订单
@@ -1143,7 +1201,8 @@ export default {
 
       if (this.selection[0].productionVersion) {
         console.log("selection", this.selection[0]);
-        this.cxMachineCodeList(this.selection[0]);
+        // this.cxMachineCodeList(this.selection[0]);
+        this.getOutVersionList(true);
       } else {
         console.log("没版本");
         this.page = null;
@@ -1181,36 +1240,8 @@ export default {
         this.loading = false;
       }
     },
-    //刷新结构外调整历史列表
-    async resizeOutHistoryList(result) {
-      try {
-        let params = {
-          ...this.query,
-          ...this.sort,
-        };
-        if (params.yearMonth) {
-          let arr = params.yearMonth.split("-");
-          params.mpYear = arr[0];
-          params.mpMonth = arr[1];
-          params.yearMonth = "";
-        }
-        params.scheduledMachines = result;
-        params.structureName = this.actionDate.structureName;
-
-        params.adjustType = this.adjustType;
-     let res = await listOutHistory(params);
-        this.page = null;
-        this.data = res.rows;
-
-      } catch (err) {
-        console.log(err);
-      } finally {
-        this.loading = false;
-        this.show = true;
-      }
-    },
     //获取结构外调整历史列表
-    async getOutHistoryList(result) {
+    async getOutHistoryList() {
       try {
         let params = {
           ...this.query,
@@ -1222,8 +1253,8 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.scheduledMachines = result;
-        params.structureName = this.actionDate.structureName;
+        // params.scheduledMachines = this.actionDate.cxMachineCode;
+        // params.structureName = this.actionDate.structureName;
 
         params.adjustType = this.adjustType;
         this.isEdit = false;
@@ -1239,6 +1270,35 @@ export default {
         this.show = true;
       }
     },
+    //刷新结构外调整历史列表
+    async resizeOutHistoryList() {
+      this.loading = true;
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        // params.scheduledMachines = this.actionDate.cxMachineCode;
+        // params.structureName = this.actionDate.structureName;
+
+        params.adjustType = this.adjustType;
+        let res = await listOutHistory(params);
+        this.page = null;
+        this.data = res.rows;
+      } catch (err) {
+        console.log(err);
+      } finally {
+        this.loading = false;
+        this.show = true;
+      }
+    },
+
     //结构外开始调整
     async getOutList() {
       this.loading = true;
@@ -1253,7 +1313,7 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.scheduledMachines = this.testResult;
+        params.scheduledMachines = this.actionDate.cxMachineCode;
         params.structureName = this.actionDate.structureName;
 
         params.adjustType = this.adjustType;
@@ -1261,6 +1321,7 @@ export default {
         let res = await getAdjustDetailList(params);
         this.data = res.rows;
         this.isShowFoot = true;
+        this.getOutVersionList();
       } catch (err) {
         console.log(err);
       } finally {
@@ -1279,14 +1340,14 @@ export default {
         });
       });
     },
-    handleOutDelete(row){
+    handleOutDelete(row) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
         const ids = row.id;
         removeOutHistory({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
-          this.resizeOutHistoryList(this.testResult);
+          this.resizeOutHistoryList();
         });
       });
     },
@@ -1306,6 +1367,10 @@ export default {
       this.query = data;
       if (this.activeName == "second") {
         this.$set(this.page, "current", 1);
+      }
+      if (this.activeName == "singleResult") {
+        this.resizeOutHistoryList();
+        return;
       }
 
       this.getList();
@@ -1345,7 +1410,6 @@ export default {
       };
 
       if (this.activeName == "second" || this.activeName == "three") {
-        console.log("this.page", this.page);
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
@@ -1383,6 +1447,7 @@ export default {
         this.show = true;
       } catch (error) {
         console.error(error);
+        this.data = [];
       } finally {
         this.loading = false;
         this.show = true;

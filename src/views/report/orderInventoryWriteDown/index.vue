@@ -124,8 +124,8 @@ export default {
           // },
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
+          prop: "物料编码",
+          label: this.$t("物料编码"),
           // align: "right",
           // formatter: (row, column, value) => {
           //   return value
@@ -151,6 +151,10 @@ export default {
         {
           prop: "库存分配量",
           label: this.$t("库存分配量"),
+        },
+        {
+          prop: "生产分配量",
+          label: this.$t("生产分配量"),
         },
         {
           prop: "月底计划余量分配量",
@@ -196,10 +200,10 @@ export default {
           clearable: false,
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
-          // dictData: this.dict.type.biz_factory_name,
+          dictData: this.dict.type.biz_factory_name,
         },
         {
           label: this.$t("需求版本号"),
@@ -225,7 +229,7 @@ export default {
           prop: "productDesc",
         },
         {
-          label: this.$t("NC物料编码"),
+          label: this.$t("物料编码"),
           prop: "productDesc",
         },
         {
@@ -608,8 +612,7 @@ export default {
             EUDR:'29878',
           },
         ];
-        this.data = list;
-        this.page.total = 4;
+
         // const res = await listProSizeSummary(this.formatParams());
         // // console.log()
 

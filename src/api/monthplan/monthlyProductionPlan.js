@@ -8,3 +8,18 @@ export function listProductionPlan(query) {
   })
 }
 
+
+export function listProduction(query) {
+  return request({
+    url: '/monthplan/factoryMonthPlanFinalResult/list',
+    method: 'post',
+    data: query
+  })
+}
+export function getProductionMonthType(query) {
+  return request({
+    url: '/factory/console/getProductionMonthType',
+    method: 'post',
+    data: query
+  })
+}

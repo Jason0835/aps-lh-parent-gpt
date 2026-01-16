@@ -35,7 +35,6 @@
         >
       </template>
       <template slot="headerRight"> </template>
-
     </page-table>
     <infoDialog ref="infoRef" @success="getListResize" />
   </basic-container>
@@ -262,7 +261,7 @@ export default {
       this.getVersionList();
     },
     //获取版本列表
-    async getVersionList() {
+    async getVersionList(isGet) {
       try {
         let res = await getOrderForecastVersion(this.formatParams());
         console.log("versionList", res);
@@ -275,6 +274,12 @@ export default {
           list.push(obj);
         }
         this.versionList = list;
+        if (list.length != 0) {
+          this.$set(this.search, "predictionVersion", list[0].value);
+        }
+        if(isGet){
+          this.getList()
+        }
       } catch (err) {}
     },
     getListResize() {
@@ -282,20 +287,20 @@ export default {
       this.getVersionList();
     },
     async genPlan() {
-      console.log("generPlan", this.$refs.infoRef);
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(this.query);
-      }
-      // try {
-      //   this.createLoading = true;
-      //   let res = await createOrderForecast(this.formatParams());
-      //   this.$modal.msgSuccess(res.msg);
-      //   this.getList();
-      //   this.getVersionList();
-      //   this.createLoading = false;
-      // } catch (err) {
-      //   this.createLoading = false;
+      // console.log("generPlan", this.$refs.infoRef);
+      // if (this.$refs.infoRef) {
+      //   this.$refs.infoRef.show(this.query);
       // }
+      try {
+        this.createLoading = true;
+        let res = await createOrderForecast(this.formatParams());
+        this.$modal.msgSuccess(res.msg);
+        // this.getList();
+        this.getVersionList(true);
+        this.createLoading = false;
+      } catch (err) {
+        this.createLoading = false;
+      }
     },
     handleSearch(data) {
       this.query = data;
@@ -454,8 +459,8 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
-    this.getVersionList();
+    // this.getList();
+    this.getVersionList(true);
   },
   activated() {},
 };

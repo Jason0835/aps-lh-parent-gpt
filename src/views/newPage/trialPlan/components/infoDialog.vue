@@ -207,7 +207,7 @@ export default {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           type: "select",
-          dictData: this.constructionList,
+          dictData: this.parentDict.type.trial_construction_stage,
         },
         {
           prop: "trialQty",

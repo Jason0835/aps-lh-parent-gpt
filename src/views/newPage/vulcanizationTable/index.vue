@@ -111,62 +111,90 @@ export default {
     }),
     columns() {
       let columns = [
-        { type: "selection", fixed: "left" },
+        // { type: "selection", fixed: "left" },
+
         {
           prop: "产品结构",
           label: this.$t("产品结构"),
+          width:120,
+        },
+
+        {
+          prop: "硫化机台",
+          label: this.$t("硫化机台"),
+          width:120,
         },
         {
-          prop: "NC物料编码",
-          label: this.$t("NC物料编码"),
+          prop: "成型机台",
+          label: this.$t("成型机台"),
+          width:120,
+        },
+        {
+          prop: "物料编码",
+          label: this.$t("物料编码"),
+          width:120,
+        },
+
+        {
+          prop: "物料描述",
+          label: this.$t("物料描述"),
+          width:320,
         },
         {
           prop: "主物料",
           label: this.$t("主物料"),
+          width:120,
         },
-        {
-          prop: "主物料",
-          label: this.$t("主物料"),
-        },
+
         {
           prop: "模具数",
           label: this.$t("模具数"),
+          width:120,
         },
         {
           prop: "净需求量",
           label: this.$t("净需求量"),
+          width:120,
         },
         {
           prop: "上机日期",
           label: this.$t("上机日期"),
+          width:120,
         },
         {
-          prop: "不合格数据量",
-          label: this.$t("不合格数据量"),
+          prop: "不合格数量",
+          label: this.$t("不合格数量"),
+          width:120,
         },
         {
           prop: "累计生产量",
-          label: this.$t("累计生产量"),
+          label: this.$t("累计生产量(合格品)"),
+          width:120,
         },
         {
           prop: "硫化余量",
           label: this.$t("硫化余量"),
+          width:120,
         },
         {
           prop: "预计收尾天数",
           label: this.$t("预计收尾天数"),
+          width:120,
         },
         {
           prop: "预计收尾时间",
           label: this.$t("预计收尾时间"),
+          width:120,
         },
         {
           prop: "计划收尾时间",
           label: this.$t("计划收尾时间"),
+          width:120,
         },
         {
           prop: "差异天数",
           label: this.$t("差异天数"),
+          width:120,
         },
       ];
 
@@ -174,49 +202,33 @@ export default {
     },
     searchColumns() {
       return [
-        // {
-        //   prop: "工厂",
-        //   label: this.$t("工厂"),
-        //   type: "select",
-        // },
-        // {
-        //   prop: "型腔模号",
-        //   label: this.$t("型腔模号"),
-        //   type: "select",
-        // },
-        // {
-        //   prop: "规格",
-        //   label: this.$t("规格"),
-        //   type: "select",
-        // },
-        // {
-        //   prop: "物流状态",
-        //   label: this.$t("物流状态"),
-        // },
-        // {
-        //   prop: "主花纹",
-        //   label: this.$t("主花纹"),
-        // },
-        // {
-        //   prop: "模具类型",
-        //   label: this.$t("模具类型"),
-        //   type: "select",
-        // },
-        // {
-        //   prop: "花纹代号",
-        //   label: this.$t("花纹代号"),
-        //   type: "select",
-        // },
-        // {
-        //   prop: "模壳标准",
-        //   label: this.$t("模壳标准"),
-        //   type: "select",
-        // },
-        // {
-        //   prop: "可用状态",
-        //   label: this.$t("模套型号"),
-        //   type: "select",
-        // },
+        {
+          prop: "产品结构",
+          label: this.$t("产品结构"),
+          type: "select",
+        },
+        {
+          prop: "成型机台",
+          label: this.$t("成型机台"),
+        },
+        {
+          prop: "硫化机台",
+          label: this.$t("硫化机台"),
+        },
+        {
+          prop: "物料编码",
+          label: this.$t("物料编码"),
+        },
+        {
+          prop: "物料描述",
+          label: this.$t("物料描述"),
+        },
+        {
+          prop: "主物料",
+          label: this.$t("主物料"),
+          type: "select",
+        },
+
       ];
     },
   },
@@ -605,8 +617,7 @@ export default {
             差异天数:'0',
           },
         ];
-        this.data = list;
-        this.page.total = 4;
+
         // const data = await listProductMoldingLimit(this.formatParams());
         // this.data = data.rows;
         // this.page.total = data.total;
@@ -618,9 +629,7 @@ export default {
     },
   },
   created() {
-    if (this.moldingMachines.length === 0) {
-      this.$store.dispatch("molding/getMachineList");
-    }
+
     this.getList();
   },
   activated() {

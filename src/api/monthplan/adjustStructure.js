@@ -149,3 +149,12 @@ export function removeOutHistory(query) {
     data: query
   })
 }
+
+//单选结构版本查询列表
+export function versionOutHistory(query) {
+  return request({
+    url: '/monthplan/mpAdjustStructureOut/getVersionList',
+    method: 'post',
+    data: query
+  })
+}

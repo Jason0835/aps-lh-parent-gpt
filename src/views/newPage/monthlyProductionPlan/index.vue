@@ -39,7 +39,8 @@ import Big from "big.js";
 import { downloadLink } from "@/utils/request";
 //interface
 import {
-  listProductionPlan
+  listProduction,
+  getProductionMonthType
 } from "@/api/monthplan/monthlyProductionPlan";
 //components
 
@@ -52,6 +53,7 @@ export default {
   data() {
     return {
       createLoading: false,
+      productionStartDate:'',
       loading: false,
       data: [],
       selection: [],
@@ -155,23 +157,76 @@ export default {
           width: 120,
         },
       ];
-      const days = 31;
 
-      for (let i = 0; i < days; i++) {
-        columns.push({
-          label: `${i + 1}号`,
-          // label: this.$t("ui.data.column.mouldingDayResult.day", {
-          //   day: i + 1,
-          // }),
-          prop: `day${i + 1}`,
-          minWidth: "80px",
-          type: "number",
-        });
-      }
+      if (this.productionStartDate) {
+          let start = moment(this.productionStartDate);
+          let end = moment(this.productionStartDate).add(1, "M");
+          let list = [];
+
+          while (start.isBefore(end)) {
+            list.push(start.format("DD"));
+            start.add(1, "d");
+          }
+          // console.log(list);
+          for (let i = 0; i < list.length; i++) {
+            let dayNumStr = list[i];
+            columns.push({
+              label: `${i + 1}号`,
+
+              prop: `day${i + 1}`,
+              minWidth: "80px",
+              type: "number",
+            });
+          }
+        } else {
+          //显示每日数据
+          const date = moment(this.query.yearMonth);
+          const days = date.daysInMonth();
+
+          for (let i = 0; i < days; i++) {
+            columns.push({
+              label: `${i + 1}号`,
+
+              prop: `day${i + 1}`,
+              minWidth: "80px",
+              type: "number",
+            });
+          }
+        }
+      // const days = 31;
+
+      // for (let i = 0; i < days; i++) {
+      //   columns.push({
+      //     label: `${i + 1}号`,
+      //     // label: this.$t("ui.data.column.mouldingDayResult.day", {
+      //     //   day: i + 1,
+      //     // }),
+      //     prop: `day${i + 1}`,
+      //     minWidth: "80px",
+      //     type: "number",
+      //   });
+      // }
       return columns;
     },
     searchColumns() {
       return [
+      {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          clearable: false,
+
+        },
+        {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
+
+        },
         {
           label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
@@ -226,7 +281,7 @@ export default {
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
-      this.getList();
+      this.updateList();
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);
@@ -348,11 +403,23 @@ export default {
 
       return params;
     },
+    async getProductionMonthType() {
+      try {
+        const res = await getProductionMonthType(this.formatParams(false));
+        if (res.productionStartDate) {
+          this.productionStartDate = res.productionStartDate;
+        } else {
+          this.productionStartDate = null;
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    },
     // api
     async getList() {
       try {
         this.loading = true;
-        const res = await listProductionPlan(this.formatParams());
+        const res = await listProduction(this.formatParams());
         this.data = res.rows;
         this.page.total = res.total;
       } catch (error) {
@@ -360,6 +427,11 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    async updateList() {
+      this.loading = true;
+      await this.getProductionMonthType();
+      await this.getList();
     },
   },
   created() {
@@ -376,7 +448,9 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    // this.getProductionMonthType()
+    // this.getList();
+    this.updateList();
   },
   activated() {},
 };
