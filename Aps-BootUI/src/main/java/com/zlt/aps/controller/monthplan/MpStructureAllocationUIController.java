@@ -29,6 +29,7 @@ import org.apache.commons.io.IOUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -84,8 +85,8 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
         TableDataInfo list = iMpStructureAllocationService.list(mpStructureAllocation);
         // 查询SKU明细并设置成型机编码（多个以,分隔）
-        setCxMachineCode(list, mpStructureAllocation);
-        return list;
+        List<MpStructureAllocation> resultList = setCxMachineCode(list, mpStructureAllocation);
+        return getDataTable(resultList);
     }
 
 
@@ -94,13 +95,14 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * @param list
      * @param mpStructureAllocation
      */
-    private void setCxMachineCode(TableDataInfo list, MpStructureAllocation mpStructureAllocation) {
+    private List<MpStructureAllocation> setCxMachineCode(TableDataInfo list, MpStructureAllocation mpStructureAllocation) {
+        List<MpStructureAllocation> resultList = new ArrayList<>();
         if (PubUtil.isEmpty(list.getRows())) {
-            return;
+            return resultList;
         }
         if (StringUtils.isEmpty(mpStructureAllocation.getFactoryCode()) || mpStructureAllocation.getYear() == null ||
                 mpStructureAllocation.getMonth() == null || StringUtils.isEmpty(mpStructureAllocation.getProductionVersion())) {
-            return;
+            return resultList;
         }
         // 查询SKU明细
         FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
@@ -110,7 +112,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         condition.setProductionVersion(mpStructureAllocation.getProductionVersion());
         TableDataInfo tableDataInfo = iFactoryMonthPlanProductionFinalResultService.list(condition);
         if (PubUtil.isEmpty(tableDataInfo.getRows())) {
-            return;
+            return resultList;
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
@@ -122,16 +124,16 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             if (!monthPlanMap.containsKey(structureName)) {
                 monthPlanMap.put(structureName, new ArrayList<>());
             }
-            List<FactoryMonthPlanProductionFinalResult> resultList = monthPlanMap.get(structureName);
-            resultList.add(monthPlan);
+            List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = monthPlanMap.get(structureName);
+            monthPlanResultList.add(monthPlan);
         }
 
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
         List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
-        structureAllocationList = cn.hutool.core.convert.Convert.toList(MpStructureAllocation.class, structureAllocationList);
-        log.debug("结构排产列表大小：{}", structureAllocationList.size());
-        for (MpStructureAllocation structureAllocation : structureAllocationList) {
+        resultList = cn.hutool.core.convert.Convert.toList(MpStructureAllocation.class, structureAllocationList);
+        log.debug("结构排产列表大小：{}", resultList.size());
+        for (MpStructureAllocation structureAllocation : resultList) {
             cxMachineCodeSet.clear();
             if (StringUtils.isEmpty(structureAllocation.getStructureName())) {
                 continue;
@@ -148,9 +150,13 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             if (PubUtil.isEmpty(cxMachineCodeSet)) {
                 continue;
             }
-            log.debug("匹配最终结果,结构:{},机台列表:{}", structureName, cxMachineCodeSet);
-            structureAllocation.setCxMachineCode(String.join(",", cxMachineCodeSet));
+            // 排序
+            List<String> sortedList = new ArrayList<>(cxMachineCodeSet);
+            Collections.sort(sortedList);
+            log.debug("匹配最终结果,结构:{},机台列表:{}", structureName, sortedList);
+            structureAllocation.setCxMachineCode(String.join(",", sortedList));
         }
+        return resultList;
     }
 
 
