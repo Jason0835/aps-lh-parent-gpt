@@ -131,7 +131,6 @@
                   AND YEAR = #{year,jdbcType=DECIMAL}
                   AND MONTH = #{month,jdbcType=DECIMAL}
           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
     </select>
 
     <update id="deletedProductionVersionAndUpdateLastFlag" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
