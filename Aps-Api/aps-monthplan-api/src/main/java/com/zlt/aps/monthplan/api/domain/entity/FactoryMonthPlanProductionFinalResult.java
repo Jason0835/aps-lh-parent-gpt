@@ -43,7 +43,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 工厂编码
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.factoryCode")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -67,7 +67,6 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 年月:YYYYMM
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
     @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
@@ -76,7 +75,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 销售生产需求计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.monthPlanVersion")
-    @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
+    @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
@@ -92,14 +91,14 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 排产计划版本
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionVersion")
-    @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
+    @ApiModelProperty(value = "月度生产计划版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
     /**
      * 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -168,7 +167,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 排产分类
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productionType", dictType = "biz_schedule_type")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
@@ -183,16 +182,16 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
 
 
     /**
-     * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
+     * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage")
-    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
     /**
      * 是否零度材料
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isZeroRack")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isZeroRack", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
@@ -224,7 +223,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.brand")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -336,7 +335,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isImport", readConverterExp = "0=：默认不是，1：是")
+//    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
@@ -344,7 +343,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 排产顺序
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionSequence")
+//    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionSequence")
     @ApiModelProperty(value = "排产顺序", name = "productionSequence")
     @TableField(value = "PRODUCTION_SEQUENCE")
     private Long productionSequence;
@@ -361,7 +360,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
      * 生产需求计划
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.prodReqPlan")
-    @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
+    @ApiModelProperty(value = "净需求", name = "prodReqPlan")
     @TableField(value = "PROD_REQ_PLAN")
     private Integer prodReqPlan;
 
@@ -748,7 +747,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 显示顺序
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.displaySeq")
+//    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.displaySeq")
     @ApiModelProperty(value = "显示顺序", name = "displaySeq")
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
@@ -756,7 +755,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE
      */
-    @Excel(name = "schedule.glueScheduleResult.releaseStatus")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isRelease", dictType = "IS_RELEASE")
     @ApiModelProperty(value = "发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE", name = "isRelease")
     @TableField(value = "IS_RELEASE")
     private String isRelease;

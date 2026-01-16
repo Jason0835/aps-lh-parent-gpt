@@ -6,6 +6,8 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
+import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdResultDto;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
@@ -15,6 +17,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -274,5 +277,36 @@ public class FactoryConsoleUIController extends BaseController {
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
     public AjaxResult getProductionVersionList(FactoryMonthPlanProductionFinalResult query) {
         return factoryConsoleService.getProductionVersionList(query);
+    }
+
+    @ResponseBody
+    @PostMapping("/getProductionMonthType")
+    @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
+    public AjaxResult getProductionMonthType(FactoryMonthPlanProdResultDto param) {
+        if (checkParamEmpty(param)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
+        }
+        FactoryMonthPlanProdFinal prodFinal = new FactoryMonthPlanProdFinal();
+        BeanUtils.copyProperties(param, prodFinal);
+        return factoryConsoleService.getProductionMonthType(prodFinal);
+    }
+
+    /**
+     * 校验分厂、年、月份不可为空
+     *
+     * @param param 参数
+     * @return 结果
+     */
+    private boolean checkParamEmpty(FactoryMonthPlanProdResultDto param) {
+        if (null == param) {
+            return true;
+        }
+        if (null == param.getMonth()) {
+            return true;
+        }
+        if (null == param.getYear()) {
+            return true;
+        }
+        return StringUtils.isBlank(param.getFactoryCode());
     }
 }

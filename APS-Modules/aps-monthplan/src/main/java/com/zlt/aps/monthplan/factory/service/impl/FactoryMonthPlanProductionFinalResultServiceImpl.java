@@ -6,7 +6,6 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.core.utils.SecurityUtils;
@@ -31,6 +30,7 @@ import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanMouldDayResultEntity
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
@@ -65,7 +65,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
-public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImpl<FactoryMonthPlanProductionFinalResultEntityMapper, FactoryMonthPlanProductionFinalResult> implements IFactoryMonthPlanProductionFinalResultService {
+public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDocService<FactoryMonthPlanProductionFinalResult> implements IFactoryMonthPlanProductionFinalResultService {
     private final BaseDao baseDao;
 
     @Autowired
@@ -80,10 +80,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
     private EventPublisher eventPublisher;
 
     @Override
+    protected String getDocTypeCode() {
+        return "";
+    }
+
+    @Override
     public List<FactoryMonthPlanProductionFinalResult> getDataList(FactoryMonthPlanProductionFinalResult condition) {
         QueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, condition);
-        List<FactoryMonthPlanProductionFinalResult> dataList = this.baseMapper.selectList(queryWrapper);
+        List<FactoryMonthPlanProductionFinalResult> dataList = this.finalMapper.selectList(queryWrapper);
         dealList(dataList);
         return dataList;
     }
@@ -97,7 +102,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<FactoryMonthPlanProductionFinalResult> list = this.list(queryWrapper);
+        List<FactoryMonthPlanProductionFinalResult> list = finalMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(list)) {
             return Collections.emptyMap();
         }
@@ -120,7 +125,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
                 .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<FactoryMonthPlanProductionFinalResult> list = this.list(queryWrapper);
+        List<FactoryMonthPlanProductionFinalResult> list = finalMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(list)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -151,7 +156,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
+        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = finalMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();
         }
@@ -210,7 +215,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
 
-        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = this.list(queryWrapper);
+        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinals = finalMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(factoryMonthPlanProdFinals)) {
             return Collections.emptyMap();
         }
@@ -265,7 +270,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, finalVersion.getMonth())
                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        return this.list(queryWrapper);
+        return finalMapper.selectList(queryWrapper);
     }
 
     @Override
@@ -283,7 +288,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                     .in(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, batchVersions)
                     .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-            result.addAll(this.list(queryWrapper));
+            result.addAll(finalMapper.selectList(queryWrapper));
         }
         return result;
     }

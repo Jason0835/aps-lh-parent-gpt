@@ -9,6 +9,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.redissonLock.annotation.DistributedLock;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
@@ -353,5 +354,17 @@ public class FactoryConsoleController extends BaseController {
     @PostMapping("/getProductionVersionList")
     public AjaxResult getProductionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
         return AjaxResult.success(factoryConsoleService.productionVersionList(query));
+    }
+
+    /**
+     * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产
+     */
+    @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
+    @PostMapping("/getProductionMonthType")
+    public AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdFinal query) {
+        if (null == query) {
+            return AjaxResult.success(new FactoryMonthPlanTypeVo());
+        }
+        return AjaxResult.success(factoryConsoleService.getProductionMonthType(query));
     }
 }
