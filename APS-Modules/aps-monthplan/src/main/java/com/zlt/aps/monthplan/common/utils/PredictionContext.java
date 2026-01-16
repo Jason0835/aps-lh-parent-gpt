@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.common.utils;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -29,6 +30,7 @@ public class PredictionContext {
   private  Map<String, Integer>  monthlySaleQty;
   private  Integer  minProductionQty;
   private  Map<String, MdmMaterialInfo> materialInfoMap;
+  private  List<MdmCycleSchStruConf> cycleSchStruConfs;
   private  OrderAllocationResult allocationResult;
 
   public PredictionContext(
@@ -42,7 +44,8 @@ public class PredictionContext {
       Map<String, Integer> monthSurplusMap,
       Map<String, Integer>  monthlySaleQty,
       Integer  minProductionQty,
-      Map<String, MdmMaterialInfo> materialInfoMap) {
+      Map<String, MdmMaterialInfo> materialInfoMap,
+      List<MdmCycleSchStruConf> cycleSchStruConfs) {
     this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
     this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
     this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
@@ -54,6 +57,7 @@ public class PredictionContext {
     this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
     this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
     this.materialInfoMap = materialInfoMap != null ? materialInfoMap : new HashMap<>();
+    this.cycleSchStruConfs = cycleSchStruConfs != null ? cycleSchStruConfs : Collections.emptyList();
   }
 
   /**

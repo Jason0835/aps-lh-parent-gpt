@@ -10,6 +10,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -18,6 +19,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
+import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
@@ -29,6 +31,7 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalRe
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -131,6 +134,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IMonthPlanSurplusService monthPlanSurplusService;
     // 月度硫化监控
     private final IMpMonthPlanMonitorService monthPlanMonitorService;
+    // 周期结构配置
+    private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
 
     @Override
     protected String getDocTypeCode() {
@@ -388,9 +393,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
             CompletableFuture.supplyAsync(this::fetchMaterialInfo);
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
+            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
         // 等待所有任务完成
         CompletableFuture.allOf(
-            salesOrdersFuture, stocksFuture,productionTypeFuture,minProductionQtyFuture,fetchMaterialInfoFuture,monthlySaleQtyFuture
+            salesOrdersFuture, stocksFuture,productionTypeFuture,minProductionQtyFuture,fetchMaterialInfoFuture,monthlySaleQtyFuture,
+            cycleSchStruConfFuture
         ).join();
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
@@ -399,6 +407,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
+            List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
             if(!CollectionUtils.isEmpty(finishedProductStocks)){
                 finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
             }
@@ -423,7 +432,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 null,
                 monthlySaleQty,
                 minProductionQty,
-                materialInfoMap
+                materialInfoMap,
+                cycleSchStruConfs
             );
 
         } catch (Exception e) {
@@ -635,7 +645,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
             createCondition,
             demandPlans, data.getMinProductionQty(), data.getMaterialInfoMap(),
-            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap(),data.getMonthlySaleQty());
+            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),
+            data.getProductionTypeMap(),
+            data.getMonthlySaleQty(),
+            data.getCycleSchStruConfs());
         if (!CollectionUtils.isEmpty(mergedPlans)) {
             this.baseDao.insertBatch(mergedPlans);
         }
@@ -681,11 +694,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
             CompletableFuture.supplyAsync(this::fetchMaterialInfo);
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
+            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
 
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,
-            supplyOrdersFuture, monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture
+            supplyOrdersFuture, monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture,
+            cycleSchStruConfFuture
         ).join();
 
         try {
@@ -696,6 +712,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
+            List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
 
             if(!CollectionUtils.isEmpty(finishedProductStocks)){
                 finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
@@ -722,7 +739,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 monthSurplusMap,
                 monthlySaleQty,
                 minProductionQty,
-                materialInfoMap
+                materialInfoMap,
+                cycleSchStruConf
             );
 
         } catch (Exception e) {
@@ -876,7 +894,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty) {
+    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty,List<MdmCycleSchStruConf> cycleSchStruConfs) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -901,7 +919,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
-                productionTypeMap,monthlySaleQty));
+                productionTypeMap,
+                monthlySaleQty,
+                cycleSchStruConfs));
         });
         log.info("groupKeys:{}",groupMap.keySet());
         return list;
@@ -915,11 +935,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, List<MdmProductStock>> finishedProductStockMap,
             Map<String, Integer> mdmMonthSurplusMap,
             Map<String, String> productionTypeMap,
-            Map<String, Integer> monthlySaleQty) {
+            Map<String, Integer> monthlySaleQty,
+            List<MdmCycleSchStruConf> cycleSchStruConfs) {
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置物料信息（使用computeIfAbsent优化Map访问）
-        setMaterialInfo(mergedPlan, skuMap);
+        setMaterialInfo(mergedPlan, skuMap,cycleSchStruConfs);
         // 设置库存和计划盈余
         setStockAndSurplusInfo(mergedPlan, finishedProductStockMap, mdmMonthSurplusMap);
         // 设置排产分类
@@ -957,7 +978,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 设置物料信息
      */
-    private void setMaterialInfo(DpDemandPlan demandPlan, Map<String, MdmMaterialInfo> skuMap) {
+    private void setMaterialInfo(DpDemandPlan demandPlan, Map<String, MdmMaterialInfo> skuMap,List<MdmCycleSchStruConf> cycleSchStruConfs) {
         Optional.ofNullable(skuMap.get(demandPlan.getMaterialCode()))
             .ifPresent(materialInfo -> {
                 demandPlan.setMaterialDesc(materialInfo.getMaterialDesc());
@@ -972,7 +993,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 demandPlan.setPattern(materialInfo.getPattern());
                 demandPlan.setHierarchy(materialInfo.getHierarchy());
                 demandPlan.setProSize(materialInfo.getProSize());
+                demandPlan.setStructureType(this.setStructureType(demandPlan.getStructureName(),cycleSchStruConfs));
             });
+    }
+
+    private String setStructureType(String structureName, List<MdmCycleSchStruConf> cycleSchStruConfs) {
+        if(StringUtils.isBlank(structureName) || CollectionUtils.isEmpty(cycleSchStruConfs)) {
+            return ProductionGroupTypeEnum.CONVENTION.getGroupType();
+        }
+        long count = cycleSchStruConfs.stream().filter(item -> structureName.equals(item.getStructureName())).count();
+        return count > 0?ProductionGroupTypeEnum.CYCLE.getGroupType():ProductionGroupTypeEnum.CONVENTION.getGroupType();
     }
 
     /**
