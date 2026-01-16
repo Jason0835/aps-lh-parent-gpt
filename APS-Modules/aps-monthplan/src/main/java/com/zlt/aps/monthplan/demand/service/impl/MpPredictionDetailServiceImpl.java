@@ -77,6 +77,7 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
             predictionDetail.setProductionVersion(productionVersion.getProductionVersion());
             predictionDetail.setPredictionProductionVersion(predictionDetail.getProductionVersion());
             predictionDetail.setYear(yearMonth.getYear());
+            predictionDetail.setMonth(yearMonth.getMonthValue());
             predictionDetail.setPlanType(tMonthDemandPlan.getPlanType());
             predictionDetail.setFactoryCode(tMonthDemandPlan.getFactoryCode());
             predictionDetail.setBaseVale(null);
