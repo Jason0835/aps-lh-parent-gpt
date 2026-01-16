@@ -128,6 +128,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
         List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
+        structureAllocationList = cn.hutool.core.convert.Convert.toList(MpStructureAllocation.class, structureAllocationList);
         for (MpStructureAllocation structureAllocation : structureAllocationList) {
             cxMachineCodeSet.clear();
             if (StringUtils.isEmpty(structureAllocation.getStructureName())) {
