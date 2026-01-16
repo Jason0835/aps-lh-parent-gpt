@@ -132,15 +132,16 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             Context context = buildContext(tPlus1MonthDemands);
             monthPlanProductionSchedulingService.general(context);
-            MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(tPlus1MonthDemands);
+            MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(context,tPlus1MonthDemands);
+
             productionVersions.put(monthRangeResult.getTPlus1Month(),finalVersionByTplus1Month);
             tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month,predictionContext);
         }
         if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
-            MpFactoryProductionVersion finalVersionByTplus2Month = createProductionVersion(tPlus2MonthDemands);
-            productionVersions.put(monthRangeResult.getTPlus2Month(),finalVersionByTplus2Month);
             Context context = buildContext(tPlus2MonthDemands);
             monthPlanProductionSchedulingService.general(context);
+            MpFactoryProductionVersion finalVersionByTplus2Month = createProductionVersion(context,tPlus2MonthDemands);
+            productionVersions.put(monthRangeResult.getTPlus2Month(),finalVersionByTplus2Month);
         }
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
         List<MpProductionPrediction> list = buildProductionPrediction(monthRangeResult,tMonthDemands,productionVersions,materialInfoMap);
@@ -178,7 +179,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return list.stream().map(MpProductionPrediction::getPredictionVersion).distinct().collect(Collectors.toList());
     }
 
-    private MpFactoryProductionVersion createProductionVersion(List<DpDemandPlan> tPlus1MonthDemands) {
+    private MpFactoryProductionVersion createProductionVersion(Context context,List<DpDemandPlan> tPlus1MonthDemands) {
         if(CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             return null;
         }
@@ -187,6 +188,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         productionVersion.setYear(tPlus1MonthDemands.get(0).getYear());
         productionVersion.setMonth(tPlus1MonthDemands.get(0).getMonth());
         productionVersion.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
+        productionVersion.setProductionVersion(context.getProductionVersion());
         return productionVersion;
     }
 
@@ -230,7 +232,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setMonth3(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTPlus2Month()));
                 result.add(productionPrediction);
         });
-        this.mpPredictionDetailService.batchInsert(demandPlan,productionVersions,list);
+        this.mpPredictionDetailService.batchInsert(demandPlan,productionVersions);
         return result;
     }
 
