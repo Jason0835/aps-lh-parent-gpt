@@ -358,7 +358,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
         // 5、写入月度硫化监控表
         // t_mp_month_plan_monitor
         // 上机日期 = 排产周期的开始日 +  (startDay -1 )
-//        this.publishFinalizedEvent(param, finalList);
+        this.publishFinalizedEvent(param, finalList);
         return AjaxResult.success();
     }
 

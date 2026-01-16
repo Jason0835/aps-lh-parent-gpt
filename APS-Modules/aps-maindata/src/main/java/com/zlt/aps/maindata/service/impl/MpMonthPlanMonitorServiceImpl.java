@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
@@ -14,11 +15,12 @@ import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang.time.DateUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -84,10 +86,24 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
      * @param param     参数
      * @param finalList 定稿数据
      */
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public void insertMonitorByFinalList(FactoryMonthPlanProductionFinalResult param, List<FactoryMonthPlanProductionFinalResult> finalList) {
         // 查询版本表，取排产周期起始日
-
+        Map<String, Object> versionMap = new HashMap<>(16);
+        versionMap.put("year", param.getYear());
+        versionMap.put("month", param.getMonth());
+        versionMap.put("factory_code", param.getFactoryCode());
+        versionMap.put("month_plan_version", param.getMonthPlanVersion());
+        versionMap.put("production_version", param.getProductionVersion());
+        List<MpFactoryProductionVersion> productionVersionList = baseDao.selectByMap(MpFactoryProductionVersion.class, versionMap);
+        if (CollectionUtils.isEmpty(productionVersionList)) {
+            log.error("未找到对应的版本数据！，参数：{}", JSON.toJSONString(versionMap));
+            throw new RuntimeException("未找到对应的版本数据！，参数：" + JSON.toJSONString(versionMap));
+        }
+        MpFactoryProductionVersion productionVersion = productionVersionList.get(0);
+        Date productionStartDate = productionVersion.getProductionStartDate();
+        List<MpMonthPlanMonitor> list = new ArrayList<>();
         for (FactoryMonthPlanProductionFinalResult finalResult : finalList) {
             MpMonthPlanMonitor monitor = new MpMonthPlanMonitor();
             monitor.setFactoryCode(finalResult.getFactoryCode());
@@ -108,17 +124,20 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
             monitor.setSpecifications(finalResult.getSpecifications());
             monitor.setMainPattern(finalResult.getMainPattern());
             monitor.setPattern(finalResult.getPattern());
+            Integer beginDay = finalResult.getBeginDay();
+            Date onboardDate = DateUtils.addDays(productionStartDate, beginDay - 1);
+            monitor.setOnboardDate(onboardDate);
+            monitor.setUnqualifiedQty(finalResult.getUniformityQty());
 //            monitor.setMouldQty(finalResult.getMouldQty());
 //            monitor.setNetDemandQty(finalResult.getNetDemandQty());
-//            monitor.setOnboardDate(finalResult.getdate());
-            monitor.setUnqualifiedQty(finalResult.getUniformityQty());
 //            monitor.setProductionQty(finalResult.getProductionQty());
 //            monitor.setLhMargin(finalResult.getLhMargin());
 //            monitor.setExpectedCloseDay();
 //            monitor.setExpectedCloseDate();
 //            monitor.setPlanCloseDate();
 //            monitor.setDiffDay();
-
+            list.add(monitor);
         }
+        baseDao.insertBatch(list);
     }
 }

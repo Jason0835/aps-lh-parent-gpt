@@ -53,6 +53,7 @@
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_mould_lh_log
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -65,18 +66,27 @@
     <update id="deletedProductionVersionAndUpdateLastFlag" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
         UPDATE t_mp_proc_version
            SET PRODUCTION_INIT_VERSION = NULL,
-               PRODUCTION_VERSION = NULL
+               PRODUCTION_VERSION = NULL,
+               PRODUCTION_ST_VERSION = NULL,
+               IS_SELECTED_DEMAND = NULL
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_proc_version
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION != #{productionVersion,jdbcType=VARCHAR};
+        <choose>
+            <when test="productionVersion != null and productionVersion != ''">
+                AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+                DELETE FROM t_mp_proc_version
+                WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                AND YEAR = #{year,jdbcType=DECIMAL}
+                AND MONTH = #{month,jdbcType=DECIMAL}
+                AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                AND PRODUCTION_VERSION != #{productionVersion,jdbcType=VARCHAR};
+            </when>
+            <otherwise>
+                AND PRODUCTION_VERSION IS NULL;
+            </otherwise>
+        </choose>
         DELETE FROM t_mp_proc_month_plan_init
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
