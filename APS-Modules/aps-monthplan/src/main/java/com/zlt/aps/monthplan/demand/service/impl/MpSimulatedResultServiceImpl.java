@@ -23,6 +23,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
+import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
@@ -74,6 +75,8 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     private final IDpDemandPlanService dpDemandPlanService;
     // 排产
     private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
+
+    private final IMpPredictionDetailService mpPredictionDetailService;
 
     @Override
     protected String getDocTypeCode() {
@@ -160,8 +163,8 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
               currentMonthDemands =  dpDemandPlanService.createPredictionRequire(param,currentFinalVersion,predictionContext);
               // 排产汇总
               if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
-                /*  Context context = buildContext(currentMonthDemands);
-                  monthPlanProductionSchedulingService.general(context);*/
+                  Context context = buildContext(currentMonthDemands);
+                  monthPlanProductionSchedulingService.general(context);
                   currentFinalVersion = createProductionVersion(currentMonthDemands);
                   productionVersions.put(currentMonth,currentFinalVersion);
               }
@@ -252,6 +255,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             productionPrediction.setMonth24(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus23Month()));
             result.add(productionPrediction);
         });
+        this.mpPredictionDetailService.batchInsert(tMonthDemandPlan,productionVersions,list);
         return result;
     }
 

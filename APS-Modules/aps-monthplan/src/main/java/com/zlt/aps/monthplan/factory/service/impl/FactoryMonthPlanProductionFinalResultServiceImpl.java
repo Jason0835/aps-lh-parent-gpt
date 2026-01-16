@@ -263,7 +263,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends ServiceImp
                 .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, finalVersion.getFactoryCode())
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, finalVersion.getYear())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, finalVersion.getMonth())
-              /*  .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())*/
+               .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         return this.list(queryWrapper);
     }

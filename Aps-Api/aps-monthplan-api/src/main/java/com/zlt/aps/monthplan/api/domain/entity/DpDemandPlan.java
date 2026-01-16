@@ -469,4 +469,14 @@ public class DpDemandPlan extends BaseEntity {
         String keyFormat = "%d|*|%d|*|%s|*|%s|*|%s|*|%s";
         return String.format(keyFormat, this.year, this.month, this.factoryCode, this.productTypeCode, this.monthPlanVersion,this.materialDesc);
     }
+
+    /**
+     * 是否替换规则
+     * @return
+     */
+    public String getAlternateMaterialKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, brand, isDynamicBalance, isUniformity, yearWeek);
+    }
+
 }
