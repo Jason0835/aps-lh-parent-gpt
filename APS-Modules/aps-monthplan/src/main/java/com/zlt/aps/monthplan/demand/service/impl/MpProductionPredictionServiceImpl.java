@@ -160,19 +160,20 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
 
     @Override
-    public Set<String> findPredictionVersion(MpProductionPrediction queryCondition) {
+    public List<String> findPredictionVersion(MpProductionPrediction queryCondition) {
         LambdaQueryWrapper<MpProductionPrediction> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MpProductionPrediction::getFactoryCode, queryCondition.getFactoryCode());
         wrapper.eq(MpProductionPrediction::getYear, queryCondition.getYear());
         wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
+        wrapper.groupBy(MpProductionPrediction::getMonthPlanVersion);
         wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
         List<MpProductionPrediction> list =  this.mpProductionPredictionEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){
-            return Collections.emptySet();
+            return Collections.emptyList();
         }
-        return list.stream().map(MpProductionPrediction::getPredictionVersion).collect(Collectors.toSet());
+        return list.stream().map(MpProductionPrediction::getPredictionVersion).distinct().collect(Collectors.toList());
     }
 
     private MpFactoryProductionVersion createProductionVersion(List<DpDemandPlan> tPlus1MonthDemands) {
