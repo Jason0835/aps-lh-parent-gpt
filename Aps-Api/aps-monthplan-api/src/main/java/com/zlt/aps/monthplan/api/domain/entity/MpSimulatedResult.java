@@ -281,6 +281,18 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "第24个月排产量", name = "month24")
     @TableField(value = "MONTH_24")
     private Integer month24;
+
+    @Excel(name = "ui.data.column.simulatedResult.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+    /** 更新时间，用于导出展示 */
+    @Excel(name = "ui.data.column.simulatedResult.updateDate")
+    @TableField(exist = false)
+    private String updateDate;
+
+
+
     /** 模拟排产计划版本 = 模拟排产需求版本号 */
     @ApiModelProperty(value = "模拟排产计划版本 = 模拟排产需求版本号", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
