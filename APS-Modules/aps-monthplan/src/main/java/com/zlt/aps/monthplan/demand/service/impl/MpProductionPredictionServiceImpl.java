@@ -168,8 +168,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
-        wrapper.inSql(MpProductionPrediction::getId,
-            "SELECT MAX(id) FROM T_MP_PRODUCTION_PREDICTION " +
+        wrapper.inSql(MpProductionPrediction::getPredictionVersion,
+            "SELECT MAX(PREDICTION_VERSION) FROM T_MP_PRODUCTION_PREDICTION " +
                 "WHERE (MONTH_PLAN_VERSION, PREDICTION_VERSION) IN (" +
                 "   SELECT MONTH_PLAN_VERSION, MAX(PREDICTION_VERSION) " +
                 "   FROM T_MP_PRODUCTION_PREDICTION " +
