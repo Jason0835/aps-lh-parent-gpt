@@ -162,26 +162,20 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
     @Override
     public List<String> findPredictionVersion(MpProductionPrediction queryCondition) {
-        // 1. 首先获取每个版本的最新记录ID
-        QueryWrapper<MpProductionPrediction> subQuery = new QueryWrapper<>();
-        // 或 MAX(id) 根据你的业务逻辑
-        subQuery.select("MAX(id) as id")
-            .groupBy("MONTH_PLAN_VERSION");
-
         LambdaQueryWrapper<MpProductionPrediction> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MpProductionPrediction::getFactoryCode, queryCondition.getFactoryCode());
         wrapper.eq(MpProductionPrediction::getYear, queryCondition.getYear());
         wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
         wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
-        wrapper.inSql(MpProductionPrediction::getMonthPlanVersion,
-            "SELECT MONTH_PLAN_VERSION FROM (" +
-                "   SELECT " +
-                "       MONTH_PLAN_VERSION," +
-                "       ROW_NUMBER() OVER (PARTITION BY MONTH_PLAN_VERSION " +
-                "                          ORDER BY CREATE_TIME DESC) as rn " +
-                "   FROM T_MP_PRODUCTION_PREDICTION" +
-                ") t WHERE t.rn = 1"
+        wrapper.inSql(MpProductionPrediction::getId,
+            "SELECT MAX(id) FROM T_MP_PRODUCTION_PREDICTION " +
+                "WHERE (MONTH_PLAN_VERSION, PREDICTION_VERSION) IN (" +
+                "   SELECT MONTH_PLAN_VERSION, MAX(PREDICTION_VERSION) " +
+                "   FROM T_MP_PRODUCTION_PREDICTION " +
+                "   GROUP BY MONTH_PLAN_VERSION" +
+                ") " +
+                "GROUP BY MONTH_PLAN_VERSION, PREDICTION_VERSION"
         );
         wrapper.orderByDesc(MpProductionPrediction::getPredictionVersion);
         List<MpProductionPrediction> list =  this.mpProductionPredictionEntityMapper.selectList(wrapper);
