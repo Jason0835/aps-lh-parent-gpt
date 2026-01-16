@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.common.utils;
 
 import lombok.Getter;
 
-import java.time.LocalDate;
 import java.time.YearMonth;
 
 /**
@@ -25,10 +24,7 @@ public class MonthCalculator {
   /**
    * 计算月份范围
    */
-  public static MonthRangeResult calculateMonthRanges() {
-    // 获取操作日所在月份
-    YearMonth currentMonth = YearMonth.from(LocalDate.now());
-
+  public static MonthRangeResult calculateMonthRanges(YearMonth currentMonth) {
     // T月 = 当月 + 1个月
     YearMonth tMonth = currentMonth.plusMonths(1);
 
