@@ -43,7 +43,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 工厂编码
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.factoryCode")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -67,7 +67,6 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 年月:YYYYMM
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
     @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
@@ -99,7 +98,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
@@ -168,7 +167,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 排产分类
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.productionType", dictType = "biz_schedule_type")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
@@ -192,7 +191,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 是否零度材料
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isZeroRack")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isZeroRack", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否零度材料", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
@@ -336,7 +335,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isImport", readConverterExp = "0=：默认不是，1：是")
+//    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
@@ -344,7 +343,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 排产顺序
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionSequence")
+//    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionSequence")
     @ApiModelProperty(value = "排产顺序", name = "productionSequence")
     @TableField(value = "PRODUCTION_SEQUENCE")
     private Long productionSequence;
@@ -748,7 +747,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 显示顺序
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.displaySeq")
+//    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.displaySeq")
     @ApiModelProperty(value = "显示顺序", name = "displaySeq")
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
@@ -756,7 +755,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE
      */
-    @Excel(name = "schedule.glueScheduleResult.releaseStatus")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.isRelease", dictType = "IS_RELEASE")
     @ApiModelProperty(value = "发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE", name = "isRelease")
     @TableField(value = "IS_RELEASE")
     private String isRelease;

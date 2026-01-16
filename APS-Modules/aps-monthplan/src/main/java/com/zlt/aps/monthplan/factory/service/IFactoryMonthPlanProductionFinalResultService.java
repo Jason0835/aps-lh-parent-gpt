@@ -1,11 +1,11 @@
 package com.zlt.aps.monthplan.factory.service;
 
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,7 +26,7 @@ import java.util.Set;
  * 修改内容：...
  * @date 2025-12-23
  */
-public interface IFactoryMonthPlanProductionFinalResultService extends IService<FactoryMonthPlanProductionFinalResult> {
+public interface IFactoryMonthPlanProductionFinalResultService extends IDocService<FactoryMonthPlanProductionFinalResult> {
 
     /**
      * 根据条件，列表查询
