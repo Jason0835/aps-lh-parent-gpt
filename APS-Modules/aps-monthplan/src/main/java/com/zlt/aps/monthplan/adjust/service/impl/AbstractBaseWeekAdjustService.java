@@ -860,7 +860,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(MpTrialPlan::getYear, queryVO.getYear());
         queryWrapper.eq(MpTrialPlan::getMonth, queryVO.getMonth());
         queryWrapper.eq(MpTrialPlan::getIsDelete, YesOrNoEnum.NO.getValue());
-        queryWrapper.eq(MpTrialPlan::getProductionDate, null);
+        queryWrapper.isNull(MpTrialPlan::getProductionDate);
     }
 
     /**
@@ -1053,8 +1053,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanFinalAdjustVo> monthPlanProdList = contextDTO.getFactoryMonthPlanProdFinalList();
         // 结果集初始化
         List<MpAdjustDetailVo> resultList = new ArrayList<>();
-        // 任一列表为空则直接返回空结果
-        if (PubUtil.isEmpty(salesOrderPoolList) || PubUtil.isEmpty(monthPlanProdList)) {
+        // 列表为空则直接返回空结果
+        if (PubUtil.isEmpty(salesOrderPoolList)) {
             return resultList;
         }
         // 按物料编码分组，合并同分组下的成型机编码（逗号分隔）

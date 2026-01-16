@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 结构外调整策略
@@ -73,9 +74,13 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         if (PubUtil.isEmpty(adjustDetailList)) {
             return Collections.emptyList();
         }
+
+        Set<String> machineSet = Stream.of(contextDTO.getScheduledMachines().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA))
+                .collect(Collectors.toSet());
+
         return adjustDetailList.stream()
                 .filter(vo -> StringUtils.equals(vo.getStructureName(), contextDTO.getStructureName())
-                        && StringUtils.equals(vo.getScheduledMachines(), contextDTO.getScheduledMachines()))
+                        && machineSet.contains(vo.getScheduledMachines()))
                 .collect(Collectors.toList());
     }
 

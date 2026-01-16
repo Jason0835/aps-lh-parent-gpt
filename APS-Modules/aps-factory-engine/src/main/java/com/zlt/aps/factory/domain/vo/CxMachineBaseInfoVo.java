@@ -348,6 +348,29 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 获取成型机台当前最后一个分配信息的排产日集合，构建其对应的排产日集合信息
+     *
+     * @return
+     */
+    public Set<Integer> getLastProductionDayInfo() {
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return Collections.emptySet();
+        }
+        int lastIndex = allocationList.size() - BigDecimal.ONE.intValue();
+        CxMachineAllocationPlanHelper lastInfo = allocationList.get(lastIndex);
+        Integer startDay = lastInfo.getStartDay();
+        Integer endDay = lastInfo.getEndDay();
+        Set<Integer> productionSet = new HashSet<>();
+        for (Integer day = startDay; day <= endDay; day++) {
+            if (stopDayInfo.contains(day)) {
+                continue;
+            }
+            productionSet.add(day);
+        }
+        return productionSet;
+    }
+
+    /**
      * 获取成型机台下，最早收尾的硫化机台组
      *
      * @return

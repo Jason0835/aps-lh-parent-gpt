@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
@@ -73,4 +74,17 @@ public interface IFactoryConsoleService {
      * @return
      */
     AjaxResult deleteMonthPlanProductionVersion(FactoryProductionParamVo factoryProductionParam);
+
+    /**
+     * 查询对应年月+分厂的需求计划版本
+     */
+    List<String> versionList(FactoryMonthPlanProductionFinalResult query);
+
+    /**
+     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     *
+     * @param query 查询条件
+     * @return
+     */
+    List<String> productionVersionList(FactoryMonthPlanProductionFinalResult query);
 }

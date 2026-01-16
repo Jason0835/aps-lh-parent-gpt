@@ -2,9 +2,11 @@ package com.zlt.aps.monthplan.factory.service;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -81,4 +83,13 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      * @return
      */
     List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(Set<String> monthPlanVersions);
+
+    /**
+     * 定稿
+     *
+     * @param factoryMonthPlanProdFinal 分厂年月
+     * @return 结果
+     */
+    @Transactional(rollbackFor = Exception.class)
+    AjaxResult finalized(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
 }

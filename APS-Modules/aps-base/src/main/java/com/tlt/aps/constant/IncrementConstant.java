@@ -13,7 +13,7 @@ public interface IncrementConstant {
     /**
      * 定稿单号前缀
      */
-    String MONTH_FINAL = "SO";
+    String MONTH_FINAL = "MP";
     /**
      * SKU-定稿
      */

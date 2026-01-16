@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -292,7 +291,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.inventorySalesRatio")
     @ApiModelProperty(value = "库销比", name = "inventorySalesRatio")
     @TableField(value = "INVENTORY_SALES_RATIO")
-    private Integer inventorySalesRatio;
+    private BigDecimal inventorySalesRatio;
 
     /**
      * 日硫化量
@@ -332,7 +331,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.uniformityQty")
     @ApiModelProperty(value = "均匀性数量", name = "uniformityQty")
     @TableField(value = "UNIFORMITY_QTY")
-    private String uniformityQty;
+    private Integer uniformityQty;
 
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
@@ -348,7 +347,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionSequence")
     @ApiModelProperty(value = "排产顺序", name = "productionSequence")
     @TableField(value = "PRODUCTION_SEQUENCE")
-    private Integer productionSequence;
+    private Long productionSequence;
 
     /**
      * 单条硫化时间(包含增加间隔)-调整时使用

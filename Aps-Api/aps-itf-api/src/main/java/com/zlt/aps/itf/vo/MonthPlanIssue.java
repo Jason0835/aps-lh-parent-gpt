@@ -8,6 +8,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -148,7 +149,7 @@ public class MonthPlanIssue implements Serializable {
     @Excel(name = "ui.data.column.monthPlanIssue.stockSaleRatio")
     @ApiModelProperty(value = "库销比", name = "stockSaleRatio")
     @TableField(value = "STOCK_SALE_RATIO")
-    private Integer stockSaleRatio;
+    private BigDecimal stockSaleRatio;
 
     /**
      * 日硫化量
