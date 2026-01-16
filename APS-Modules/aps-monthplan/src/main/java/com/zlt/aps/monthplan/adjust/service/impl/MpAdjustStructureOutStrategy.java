@@ -4,17 +4,26 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -29,6 +38,9 @@ import java.util.stream.Stream;
 @Service
 @WeekAdjustType(adjustType = WeekAdjustTypeEnum.STRUCTURE_OUT)
 public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService {
+
+    @Autowired
+    private IMpAdjustStructureOutService mpAdjustStructureOutService;
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -99,12 +111,43 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         });
     }
 
-
-
-
     @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
+        //结构外调整记录
+        contextDTO.setMpAdjustStructureOutList(mpAdjustStructureOutService.selectMpAdjustStructureOutList(contextDTO));
+        //1.结构外订单调整记录空检查
+        if (PubUtil.isEmpty(contextDTO.getMpAdjustStructureOutList())){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
+                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
+        }
+        //2.月计划定稿数据空检查
+        if (PubUtil.isEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
+                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
+        }
 
+        //4.按结构序列化分组
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
+        Date startTime,endTime;
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        //结构内，按结构分别调整
+        contextDTO.setStructureName(contextDTO.getStructureName());
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
+        contextDTO.setOneStructureAllocationList(structureAllocationList);
+        //初始锁定日
+        contextDTO.setLockEndDay(getLockEndDay(contextDTO));
+        //初始结构收尾日
+        contextDTO.setStructureDeadLine(getStructureDeadline(contextDTO));
+        //初始化日志
+        contextDTO.setLogDetail(new StringBuilder());
+        //规格挑选可用机台
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
+        weekRollAdjustEngine.structureOutAdjustForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), MapUtils.getObject(mpProdFinalMap, contextDTO.getStructureName(), new ArrayList<>()));
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+        //保存调整日志
+        saveMpAdjustLog(contextDTO);
     }
 
     @Override
@@ -134,4 +177,13 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setAdjustDetailList(resultList);
     }
 
+    @Override
+    protected Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO) {
+        //若结构收尾日小于锁定日，提示
+        if (contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.adjustDayLtLockEndDay"),
+                    contextDTO.getStructureDeadLine(),contextDTO.getLockEndDay()));
+        }
+        return contextDTO.getStructureDeadLine();
+    }
 }

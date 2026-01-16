@@ -7,9 +7,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.collect.Maps;
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -28,10 +26,10 @@ import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
-import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustResultService;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureLogService;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -138,6 +136,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IMpAdjustStructureLogService mpAdjustLogService;
+
+    @Autowired
+    protected IMpAdjustStructureInService mpAdjustStructureInService;
 
     @Autowired
     protected BaseDao baseDao;
@@ -1604,4 +1605,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         return new ArrayList<>(sumMap.values());
     }
 
+    /**
+     * 初始锁定日
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    protected Integer getLockEndDay(MpRollAdjustContextDTO contextDTO){
+        return mpAdjustStructureInService.getLockEndDay(contextDTO);
+    }
+
+    /**
+     * 获取结构收尾日
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    protected Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO){
+        return mpAdjustStructureInService.getStructureDeadline(contextDTO);
+    }
 }

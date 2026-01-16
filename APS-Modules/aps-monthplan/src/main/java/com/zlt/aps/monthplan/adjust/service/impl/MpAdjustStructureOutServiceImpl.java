@@ -1,13 +1,18 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureOutEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.sysdef.domain.SysDocType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
-import java.util.ArrayList;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -32,6 +37,21 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpAdjustStructureOutServiceImpl extends AbstractDocService<MpAdjustStructureOut>  implements IMpAdjustStructureOutService {
+
+    @Autowired
+    private MpAdjustStructureOutEntityMapper structureOutEntityMapper;
+
+
+    @Override
+    public List<MpAdjustStructureOut> selectMpAdjustStructureOutList(MpRollAdjustContextDTO contextDTO) {
+        QueryWrapper<MpAdjustStructureOut> structureOutQueryWrapper = new QueryWrapper<>();
+        structureOutQueryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
+        structureOutQueryWrapper.eq("YEAR", contextDTO.getMpYear());
+        structureOutQueryWrapper.eq("MONTH", contextDTO.getMpMonth());
+        structureOutQueryWrapper.eq("VERSION", contextDTO.getVersion());
+        return structureOutEntityMapper.selectList(structureOutQueryWrapper);
+    }
+
     @Override
     protected String getDocTypeCode() {
         return "MP0806";

@@ -1,6 +1,5 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
-import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
@@ -16,7 +15,6 @@ import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
@@ -106,9 +104,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
             contextDTO.setOneStructureAllocationList(structureAllocationList);
             //初始锁定日
-            contextDTO.setLockEndDay(mpAdjustStructureInService.getLockEndDay(contextDTO));
+            contextDTO.setLockEndDay(getLockEndDay(contextDTO));
             //初始结构收尾日
-            contextDTO.setStructureDeadLine(mpAdjustStructureInService.getStructureDeadline(contextDTO));
+            contextDTO.setStructureDeadLine(getStructureDeadline(contextDTO));
             //初始化日志
             contextDTO.setLogDetail(new StringBuilder());
             //规格挑选可用机台
