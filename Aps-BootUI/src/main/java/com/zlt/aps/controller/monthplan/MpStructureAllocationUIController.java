@@ -85,9 +85,29 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @ApiOperation("根据条件查询结构排产信息")
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
         TableDataInfo list = iMpStructureAllocationService.list(mpStructureAllocation);
+        // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+        List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
         // 查询SKU明细并设置成型机编码（多个以,分隔）
-        setCxMachineCode(list, mpStructureAllocation);
-        return list;
+        setCxMachineCode(resultList, mpStructureAllocation);
+        return getDataTable(resultList);
+    }
+
+    // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+    private List<MpStructureAllocation> convertToEntityList(List<?> rows) {
+        List<MpStructureAllocation> entityList = new ArrayList<>();
+        if (PubUtil.isEmpty(rows)) {
+            return entityList;
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (Object obj : rows) {
+            if (obj instanceof MpStructureAllocation) {
+                entityList.add((MpStructureAllocation) obj);
+            } else if (obj instanceof Map) {
+                MpStructureAllocation entity = objectMapper.convertValue(obj, MpStructureAllocation.class);
+                entityList.add(entity);
+            }
+        }
+        return entityList;
     }
 
 
@@ -96,9 +116,8 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * @param list
      * @param mpStructureAllocation
      */
-    private void setCxMachineCode(TableDataInfo list, MpStructureAllocation mpStructureAllocation) {
-        List<MpStructureAllocation> resultList = new ArrayList<>();
-        if (PubUtil.isEmpty(list.getRows())) {
+    private void setCxMachineCode(List<MpStructureAllocation> list, MpStructureAllocation mpStructureAllocation) {
+        if (PubUtil.isEmpty(list)) {
             return;
         }
         if (StringUtils.isEmpty(mpStructureAllocation.getFactoryCode()) || mpStructureAllocation.getYear() == null ||
@@ -131,9 +150,8 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
 
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
-        List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
-        log.debug("结构排产列表大小：{}", structureAllocationList.size());
-        Iterator<MpStructureAllocation> iterator = structureAllocationList.iterator();
+        log.debug("结构排产列表大小：{}", list.size());
+        Iterator<MpStructureAllocation> iterator = list.iterator();
         while (iterator.hasNext()) {
             cxMachineCodeSet.clear();
             MpStructureAllocation structureAllocation = iterator.next();
