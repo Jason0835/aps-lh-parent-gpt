@@ -114,6 +114,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
+        monthPlanList = cn.hutool.core.convert.Convert.toList(FactoryMonthPlanProductionFinalResult.class, monthPlanList);
         Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
         for (FactoryMonthPlanProductionFinalResult monthPlan : monthPlanList) {
             String structureName = monthPlan.getStructureName();
