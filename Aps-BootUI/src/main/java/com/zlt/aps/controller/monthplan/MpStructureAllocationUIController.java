@@ -29,6 +29,7 @@ import org.apache.commons.io.IOUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -113,7 +114,8 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
         Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = monthPlanList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName));
+                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName, LinkedHashMap::new, Collectors.toList()));
+
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
         List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();

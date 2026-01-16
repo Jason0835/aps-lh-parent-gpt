@@ -68,7 +68,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     private final SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
 
-    private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
+    private final IMdmMonCycleSchStruConfService mdmMonCycleSchStruConfService;
     // 物料信息
     private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     // 超期SKU
@@ -174,8 +174,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
         CompletableFuture<List<MdmMaterialInfo>> materialsFuture =
             CompletableFuture.supplyAsync(this::getAllActiveMaterials);
-        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
-            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
+        CompletableFuture<List<MdmMonCycleSchStruConf>> cycleSchStruConfFuture =
+            CompletableFuture.supplyAsync(mdmMonCycleSchStruConfService::findCurrentCycleSchStruConf);
 
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(mdmProductStockService::findCurrentFinishStock);
@@ -195,7 +195,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
                 try {
                     List<MpMonthlySaleQty> monthlySaleQties =  monthlySaleQtyFuture.get();
                     List<MdmMaterialInfo> materials = materialsFuture.get();
-                    List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
+                    List<MdmMonCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
                     List<MdmProductStock> productStocks = stocksFuture.get();
                     List<SalesOrderPool> salesOrderPools = salesOrderFuture.get();
                     Map<String,Integer> structureFrequency = calculateStructureFrequencyFuture.get();
@@ -259,10 +259,12 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      * 根据结构筛选SKU
      */
     private Set<String> filterSkusByStructure(List<MdmMaterialInfo> materialInfos) {
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs =
+            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
         // 获取有效的结构名称集合
-        Set<String> validStructures = mdmCycleSchStruConfService.findCycleSchStruConf()
+        Set<String> validStructures = cycleSchStruConfs
             .stream()
-            .map(MdmCycleSchStruConf::getStructureName)
+            .map(MdmMonCycleSchStruConf::getStructureName)
             .filter(StringUtils::isNotBlank)
             .collect(Collectors.toSet());
 
@@ -287,8 +289,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      */
     private void validatePrerequisites() {
         // 1.1 验证周期性排产结构配置
-        List<MdmCycleSchStruConf> cycleSchStruConfs =
-            mdmCycleSchStruConfService.findCycleSchStruConf();
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs =
+            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
 
         if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
             throw new BusinessException(I18nUtil.getMessage(
@@ -296,7 +298,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
 
         Set<String> validStructures = cycleSchStruConfs.stream()
-            .map(MdmCycleSchStruConf::getStructureName)
+            .map(MdmMonCycleSchStruConf::getStructureName)
             .filter(StringUtils::isNotBlank)
             .collect(Collectors.toSet());
 
@@ -525,7 +527,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     private PrecedentStockUpContext buildContext() {
         List<MdmMaterialInfo> materialInfos = findAllActive();
-        List<MdmCycleSchStruConf> cycleSchStruConfs = mdmCycleSchStruConfService.findCycleSchStruConf();
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs = this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
 
         return PrecedentStockUpContext.builder()
             .materialInfos(materialInfos)
@@ -545,12 +547,12 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             ));
     }
 
-    private Set<String> extractStructureNames(List<MdmCycleSchStruConf> cycleSchStruConfs) {
+    private Set<String> extractStructureNames(List<MdmMonCycleSchStruConf> cycleSchStruConfs) {
         if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
             return Collections.emptySet();
         }
         return cycleSchStruConfs.stream()
-            .map(MdmCycleSchStruConf::getStructureName)
+            .map(MdmMonCycleSchStruConf::getStructureName)
             .collect(Collectors.toSet());
     }
 
@@ -683,13 +685,13 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     @Override
     public List<SupplyOrderPool> createCycleStockUp(YearMonth yearMonth) {
         // 1.1 验证周期性排产结构配置
-        List<MdmCycleSchStruConf> cycleSchStruConfs =
-            mdmCycleSchStruConfService.findCycleSchStruConf();
+        List<MdmMonCycleSchStruConf> cycleSchStruConfs =
+            this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf();
         if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
            return Collections.emptyList();
         }
         Set<String> validStructures = cycleSchStruConfs.stream()
-            .map(MdmCycleSchStruConf::getStructureName)
+            .map(MdmMonCycleSchStruConf::getStructureName)
             .filter(StringUtils::isNotBlank)
             .collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(validStructures)) {
@@ -911,7 +913,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             ));
     }
 
-    public Map<String, Integer> structure2TurnoverMonth(List<MdmCycleSchStruConf> cycleSchStruConfs) {
+    public Map<String, Integer> structure2TurnoverMonth(List<MdmMonCycleSchStruConf> cycleSchStruConfs) {
         if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
             return Collections.emptyMap();
         }
@@ -919,8 +921,8 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             .filter(Objects::nonNull)
             .filter(cycleSchStruConf -> StringUtils.isNotBlank(cycleSchStruConf.getStructureName()))
             .collect(Collectors.toMap(
-                MdmCycleSchStruConf::getStructureName,
-                MdmCycleSchStruConf::getTurnoverMonth,
+                MdmMonCycleSchStruConf::getStructureName,
+                MdmMonCycleSchStruConf::getTurnoverMonth,
                 (existing, replacement) -> existing
             ));
     }
@@ -945,7 +947,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     @Builder
     private static  class PrecedentStockUpContext {
         private List<MdmMaterialInfo> materialInfos;
-        private List<MdmCycleSchStruConf> cycleSchStruConfs;
+        private List<MdmMonCycleSchStruConf> cycleSchStruConfs;
         private Set<String> structureNames;
         private Map<String, MdmMaterialInfo> materialCodeToInfoMap;
         private BigDecimal turnOverDays;
