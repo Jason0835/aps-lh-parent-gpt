@@ -29,8 +29,8 @@ import org.apache.commons.io.IOUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -114,10 +114,15 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         }
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
-        // 将List中的LinkedHashMap转换为FactoryMonthPlanProductionFinalResult实体类
-        monthPlanList = convertToMonthPlanList(monthPlanList);
-        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = monthPlanList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getStructureName));
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
+        for (FactoryMonthPlanProductionFinalResult monthPlan : monthPlanList) {
+            String structureName = monthPlan.getStructureName();
+            if (!monthPlanMap.containsKey(structureName)) {
+                monthPlanMap.put(structureName, new ArrayList<>());
+            }
+            List<FactoryMonthPlanProductionFinalResult> resultList = monthPlanMap.get(structureName);
+            resultList.add(monthPlan);
+        }
 
         // 设置成型机编码
         Set<String> cxMachineCodeSet = new HashSet<>();
@@ -140,24 +145,6 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             structureAllocation.setCxMachineCode(String.join(",", cxMachineCodeSet));
         }
     }
-
-    private List<FactoryMonthPlanProductionFinalResult> convertToMonthPlanList(List<?> rows) {
-        List<FactoryMonthPlanProductionFinalResult> entityList = new ArrayList<>();
-        if (PubUtil.isEmpty(rows)) {
-            return entityList;
-        }
-        ObjectMapper objectMapper = new ObjectMapper();
-        for (Object obj : rows) {
-            if (obj instanceof FactoryMonthPlanProductionFinalResult) {
-                entityList.add((FactoryMonthPlanProductionFinalResult) obj);
-            } else if (obj instanceof Map) {
-                FactoryMonthPlanProductionFinalResult entity = objectMapper.convertValue(obj, FactoryMonthPlanProductionFinalResult.class);
-                entityList.add(entity);
-            }
-        }
-        return entityList;
-    }
-
 
 
     /**
