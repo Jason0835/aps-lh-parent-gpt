@@ -189,15 +189,6 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("heightQty")), "HEIGHT_QTY", queryVO.getFieldValueByFieldName("heightQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionQty")), "PRODUCTION_QTY", queryVO.getFieldValueByFieldName("productionQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType")), "PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
-        queryWrapper.inSql("PREDICTION_VERSION",
-            "SELECT MAX(PREDICTION_VERSION) FROM T_MP_PRODUCTION_PREDICTION " +
-                "WHERE (MONTH_PLAN_VERSION, PREDICTION_VERSION) IN (" +
-                "   SELECT MONTH_PLAN_VERSION, MAX(PREDICTION_VERSION) " +
-                "   FROM T_MP_PRODUCTION_PREDICTION " +
-                "   GROUP BY MONTH_PLAN_VERSION" +
-                ") " +
-                "GROUP BY MONTH_PLAN_VERSION, PREDICTION_VERSION"
-        );
     }
 
     @ApiOperation("生成订单预测")

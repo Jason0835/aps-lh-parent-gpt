@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.collection.CollUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -89,7 +90,16 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
         // 查询SKU明细并设置成型机编码（多个以,分隔）
         setCxMachineCode(resultList, mpStructureAllocation);
-        return getDataTable(resultList);
+        return getTableDataInfo(resultList);
+    }
+
+    private TableDataInfo getTableDataInfo(List<?> list) {
+        TableDataInfo rspData = new TableDataInfo();
+        rspData.setCode(200);
+        rspData.setRows(list);
+        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
+        rspData.setTotal(CollUtil.size(list));
+        return rspData;
     }
 
     // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
