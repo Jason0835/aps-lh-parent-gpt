@@ -2,13 +2,11 @@ package com.zlt.aps.monthplan.demand.service;
 
 
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.bill.common.service.IDocService;
 
 import java.time.YearMonth;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,10 +24,9 @@ import java.util.Map;
  */
 public interface IMpPredictionDetailService  extends IDocService<MpPredictionDetail>{
   /**
-   * 批量插入预测明细
+   *  批量插入预测明细
    * @param tMonthDemandPlan
    * @param productionVersions
-   * @param list
    */
-  void batchInsert(DpDemandPlan tMonthDemandPlan,Map<YearMonth, MpFactoryProductionVersion> productionVersions, List<FactoryMonthPlanProductionFinalResult> list);
+  void batchInsert(DpDemandPlan tMonthDemandPlan,Map<YearMonth, MpFactoryProductionVersion> productionVersions);
 }

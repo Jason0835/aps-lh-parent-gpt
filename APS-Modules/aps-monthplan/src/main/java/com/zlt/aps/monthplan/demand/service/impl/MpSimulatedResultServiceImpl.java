@@ -165,7 +165,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
               if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
                   Context context = buildContext(currentMonthDemands);
                   monthPlanProductionSchedulingService.general(context);
-                  currentFinalVersion = createProductionVersion(currentMonthDemands);
+                  currentFinalVersion = createProductionVersion(context,currentMonthDemands);
                   productionVersions.put(currentMonth,currentFinalVersion);
               }
           }
@@ -255,7 +255,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             productionPrediction.setMonth24(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus23Month()));
             result.add(productionPrediction);
         });
-        this.mpPredictionDetailService.batchInsert(tMonthDemandPlan,productionVersions,list);
+        this.mpPredictionDetailService.batchInsert(tMonthDemandPlan,productionVersions);
         return result;
     }
 
@@ -301,7 +301,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTotalQty).sum();
     }
 
-    private MpFactoryProductionVersion createProductionVersion(List<DpDemandPlan> tPlus1MonthDemands) {
+    private MpFactoryProductionVersion createProductionVersion(Context context,List<DpDemandPlan> tPlus1MonthDemands) {
         if(CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             return null;
         }
@@ -310,6 +310,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         productionVersion.setYear(tPlus1MonthDemands.get(0).getYear());
         productionVersion.setMonth(tPlus1MonthDemands.get(0).getMonth());
         productionVersion.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
+        productionVersion.setProductionVersion(context.getProductionVersion());
         return productionVersion;
     }
 

@@ -4,7 +4,6 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
@@ -17,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,14 +68,13 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
     }
 
     @Override
-    public void batchInsert(DpDemandPlan tMonthDemandPlan, Map<YearMonth, MpFactoryProductionVersion> productionVersions, List<FactoryMonthPlanProductionFinalResult> list) {
+    public void batchInsert(DpDemandPlan tMonthDemandPlan, Map<YearMonth, MpFactoryProductionVersion> productionVersions) {
         List<MpPredictionDetail> result = new ArrayList<>();
-        Map<String,String> productionVersionMap = this.getProductionVersionMap(list);
         productionVersions.forEach((yearMonth, productionVersion) -> {
             MpPredictionDetail predictionDetail = new MpPredictionDetail();
             predictionDetail.setPredictionVersion(productionVersion.getMonthPlanVersion());
             predictionDetail.setMonthPlanVersion(productionVersion.getMonthPlanVersion());
-            predictionDetail.setProductionVersion(productionVersionMap.getOrDefault(predictionDetail.getMonthPlanVersion(), null));
+            predictionDetail.setProductionVersion(productionVersion.getProductionVersion());
             predictionDetail.setPredictionProductionVersion(predictionDetail.getProductionVersion());
             predictionDetail.setYear(yearMonth.getYear());
             predictionDetail.setPlanType(tMonthDemandPlan.getPlanType());
@@ -92,16 +89,4 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
         }
     }
 
-    private Map<String, String> getProductionVersionMap(List<FactoryMonthPlanProductionFinalResult> list) {
-        if(CollectionUtils.isEmpty(list)){
-            return Collections.emptyMap();
-        }
-        return list.stream()
-            .filter(item -> item.getMonthPlanVersion() != null)  // 过滤key为null的
-            .collect(Collectors.toMap(
-                FactoryMonthPlanProductionFinalResult::getMonthPlanVersion,
-                FactoryMonthPlanProductionFinalResult::getProductionVersion,
-                (oldValue, newValue) -> newValue  // 重复key时，取新的覆盖旧的
-            ));
-    }
 }
