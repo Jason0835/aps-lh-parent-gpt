@@ -57,8 +57,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             return new BusinessException(msg);
         });
         // 4、按照结构、物料编码维度进行分组，并汇总订单量
-        sumByStructureAndMaterial(matchAdjustList);
-        contextDTO.setAdjustDetailList(matchAdjustList);
+        List<MpAdjustDetailVo> resultList = sumByStructureAndMaterial(matchAdjustList);
+        contextDTO.setAdjustDetailList(resultList);
         // 5、设置净需求
         setCurrentNetQty(contextDTO);
         // 6、设置计划剩余排产量、计划已排产量、已生产量
@@ -87,12 +87,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             return Collections.emptyList();
         }
 
-        Set<String> machineSet = Stream.of(contextDTO.getScheduledMachines().split(BusiConstant.WeekRollAdjust.SPLIT_COMMA))
-                .collect(Collectors.toSet());
-
         return adjustDetailList.stream()
                 .filter(vo -> StringUtils.equals(vo.getStructureName(), contextDTO.getStructureName())
-                        && machineSet.contains(vo.getScheduledMachines()))
+                        && (StringUtils.isEmpty(vo.getScheduledMachines())
+                        || StringUtils.contains(vo.getScheduledMachines(), contextDTO.getScheduledMachines())))
                 .collect(Collectors.toList());
     }
 
