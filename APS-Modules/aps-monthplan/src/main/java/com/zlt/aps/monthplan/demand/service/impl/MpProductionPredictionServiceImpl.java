@@ -194,22 +194,23 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
 
     private List<MpProductionPrediction> buildProductionPrediction(MonthCalculator.MonthRangeResult monthRangeResult,List<DpDemandPlan> tMonthDemands,Map<YearMonth,MpFactoryProductionVersion> productionVersions, Map<String, MdmMaterialInfo> materialInfoMap) {
-        Set<String> monthPlanVersions = productionVersions.values().stream().map(MpFactoryProductionVersion::getMonthPlanVersion).collect(Collectors.toSet());
-        List<FactoryMonthPlanProductionFinalResult> list = this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(monthPlanVersions);
+        MpFactoryProductionVersion currentFinalVersion = productionVersions.get(monthRangeResult.getTMonth());
+        Set<String> monthPlanVersions = productionVersions.values().stream().map(MpFactoryProductionVersion::getMonthPlanVersion).filter(monthPlanVersion -> !currentFinalVersion.getMonthPlanVersion().equals(monthPlanVersion)).collect(Collectors.toSet());
+        List<FactoryMonthPlanMouldDayResult> list = this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(currentFinalVersion,monthPlanVersions);
         if(CollectionUtils.isEmpty(list)) {
             return Collections.emptyList();
         }
-        Map<String,List<FactoryMonthPlanProductionFinalResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+        Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
 
         List<MpProductionPrediction> result = Lists.newArrayList();
         YearMonth yearMonth = YearMonth.now();
         DpDemandPlan demandPlan = tMonthDemands.get(0);
-        MpFactoryProductionVersion currentFinalVersion = productionVersions.get(monthRangeResult.getTMonth());
+
         map.forEach((materialCode, value) -> {
                 if(!materialInfoMap.containsKey(materialCode)) {
                     return;
                 }
-                List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode = map.get(materialCode);
+                List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode = map.get(materialCode);
                 MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
                 MpProductionPrediction productionPrediction = new MpProductionPrediction();
                 BeanUtils.copyProperties(materialInfo,productionPrediction);
@@ -236,46 +237,46 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return result;
     }
 
-    private int calculateProductionQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+    private int calculateProductionQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getTotalQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTotalQty).sum();
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getTotalQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTotalQty).sum();
     }
 
-    private int calculateHeightQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+    private int calculateHeightQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getHeightQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getHeightQty).sum();
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getHeightQty()).mapToInt(FactoryMonthPlanMouldDayResult::getHeightQty).sum();
     }
 
-    private int calculateNetQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+    private int calculateNetQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getProdReqPlan()).mapToInt(FactoryMonthPlanProductionFinalResult::getProdReqPlan).sum();
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getProdReqPlan()).mapToInt(FactoryMonthPlanMouldDayResult::getProdReqPlan).sum();
     }
 
-    private int calculateTypeBlockQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+    private int calculateTypeBlockQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getTypeBlockQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTypeBlockQty).sum();
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getTypeBlockQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTypeBlockQty).sum();
     }
 
-    private int calculateMouldQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode) {
+    private int calculateMouldQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getMouldCavityQty).sum();
+        return listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).mapToInt(FactoryMonthPlanMouldDayResult::getMouldCavityQty).sum();
     }
 
-    private int calculateProductionQty(List<FactoryMonthPlanProductionFinalResult> listGroupByMaterialCode, YearMonth yearMonth) {
+    private int calculateProductionQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode, YearMonth yearMonth) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanProductionFinalResult::getTotalQty).sum();
+        return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTotalQty).sum();
     }
 
 

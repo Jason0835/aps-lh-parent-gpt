@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.factory.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -82,7 +83,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @param monthPlanVersions
      * @return
      */
-    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(Set<String> monthPlanVersions);
+    List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion currentFinalVersion, Set<String> monthPlanVersions);
 
     /**
      * 定稿
