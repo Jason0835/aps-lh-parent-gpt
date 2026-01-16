@@ -115,6 +115,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         // 按照结构分组
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = (List<FactoryMonthPlanProductionFinalResult>) tableDataInfo.getRows();
         monthPlanList = cn.hutool.core.convert.Convert.toList(FactoryMonthPlanProductionFinalResult.class, monthPlanList);
+        log.debug("最终排产计划定稿列表大小：{}", monthPlanList.size());
         Map<String, List<FactoryMonthPlanProductionFinalResult>> monthPlanMap = new HashMap<>();
         for (FactoryMonthPlanProductionFinalResult monthPlan : monthPlanList) {
             String structureName = monthPlan.getStructureName();
@@ -129,13 +130,16 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         Set<String> cxMachineCodeSet = new HashSet<>();
         List<MpStructureAllocation> structureAllocationList = (List<MpStructureAllocation>) list.getRows();
         structureAllocationList = cn.hutool.core.convert.Convert.toList(MpStructureAllocation.class, structureAllocationList);
+        log.debug("结构排产列表大小：{}", structureAllocationList.size());
         for (MpStructureAllocation structureAllocation : structureAllocationList) {
             cxMachineCodeSet.clear();
             if (StringUtils.isEmpty(structureAllocation.getStructureName())) {
                 continue;
             }
+            String structureName = structureAllocation.getStructureName();
             // 匹配月度生产计划
-            List<FactoryMonthPlanProductionFinalResult> matchMonthPlanList = MapUtils.getObject(monthPlanMap, structureAllocation.getStructureName(), new ArrayList<>());
+            List<FactoryMonthPlanProductionFinalResult> matchMonthPlanList = MapUtils.getObject(monthPlanMap, structureName, new ArrayList<>());
+            log.debug("匹配最终排产计划定稿列表 结构:{},大小：{}", structureName, matchMonthPlanList.size());
             cxMachineCodeSet = matchMonthPlanList.stream()
                     .filter(s -> StringUtils.isNotEmpty(s.getCxMachineCode()))
                     .map(FactoryMonthPlanProductionFinalResult::getCxMachineCode)
@@ -144,6 +148,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             if (PubUtil.isEmpty(cxMachineCodeSet)) {
                 continue;
             }
+            log.debug("匹配最终结果,结构:{},机台列表:{}", structureName, cxMachineCodeSet);
             structureAllocation.setCxMachineCode(String.join(",", cxMachineCodeSet));
         }
     }
