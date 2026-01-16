@@ -106,7 +106,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     }
 
     @Override
-    public AjaxResult createVmMonthPrediction(MpSimulatedResult createCondition) {
+    public AjaxResult createVmMonthPrediction(MpSimulatedResult createCondition) throws InterruptedException {
         YearMonth yearMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
         MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(yearMonth);

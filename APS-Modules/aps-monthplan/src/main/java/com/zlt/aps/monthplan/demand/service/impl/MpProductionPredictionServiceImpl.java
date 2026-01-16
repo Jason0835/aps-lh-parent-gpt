@@ -101,7 +101,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
     @Override
-    public AjaxResult createMonthPrediction(MpProductionPrediction createCondition) {
+    public AjaxResult createMonthPrediction(MpProductionPrediction createCondition) throws InterruptedException {
         // 获取操作日所在月份
         YearMonth currentMonth = YearMonth.from(LocalDate.now());
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月

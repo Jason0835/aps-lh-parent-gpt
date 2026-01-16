@@ -202,7 +202,7 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         leaseTime = 300
     )
     @PostMapping("/createCycleStockUp")
-    public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool){
+    public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool) throws InterruptedException {
         supplyOrderPoolService.createCycleStockUp(supplyOrderPool);
         return AjaxResult.success();
     }

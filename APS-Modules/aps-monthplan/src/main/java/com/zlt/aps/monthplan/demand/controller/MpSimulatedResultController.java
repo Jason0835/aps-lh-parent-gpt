@@ -149,7 +149,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
         leaseTime = 300
     )
     @PostMapping("/createVmMonthPrediction")
-    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition){
+    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws InterruptedException {
         return this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
     }
 

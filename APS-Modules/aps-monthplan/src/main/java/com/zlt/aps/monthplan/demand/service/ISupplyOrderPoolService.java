@@ -30,7 +30,7 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
    * @param supplyOrderPool
    */
   @Transactional
-  void createCycleStockUp(SupplyOrderPool supplyOrderPool);
+  void createCycleStockUp(SupplyOrderPool supplyOrderPool) throws InterruptedException;
   /**
    *  生产常规储备
    * @param supplyOrderPool
@@ -58,11 +58,11 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
   /**
    * 生成周期排产储备
    */
-  List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition, YearMonth yearMonth);
+  List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition, YearMonth yearMonth) throws InterruptedException;
   /**
    * 生成周期排产储备
    */
-  List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth);
+  List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException;
   /**
    *  超期校验
    * @param supplyOrderPool

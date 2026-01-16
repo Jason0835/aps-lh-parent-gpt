@@ -26,7 +26,7 @@ public interface IMpProductionPredictionService  extends IDocService<MpProductio
    * @param createCondition 参数
    * @return 结果
    */
-  AjaxResult createMonthPrediction(MpProductionPrediction createCondition);
+  AjaxResult createMonthPrediction(MpProductionPrediction createCondition) throws InterruptedException;
   /**
    *  获取预测版本号列表
    * @param queryCondition 查询条件

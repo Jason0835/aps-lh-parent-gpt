@@ -120,7 +120,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     }
 
     @Override
-    public void createCycleStockUp(SupplyOrderPool supplyOrderPool) {
+    public void createCycleStockUp(SupplyOrderPool supplyOrderPool) throws InterruptedException {
         YearMonth nextMonth = YearMonth.now().plusMonths(1);
         // 1. 验证前置条件
         validatePrerequisites(nextMonth);
@@ -139,9 +139,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     /**
      * 重新创建供应链订单池
      */
-    private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth,Set<String> skus) {
+    private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth,Set<String> skus) throws InterruptedException {
         // 3.1 清理旧数据
-        deleteSupplyOrderPool(createCondition,yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
+        safeDeleteByCondition(createCondition,yearMonth,SupplyOrderTypeEnum.CYCLE_PRODUCTION_STOCK.getCode());
         // 3.2 准备计算所需数据
         CalculationData calculationData = prepareCalculationData(yearMonth);
 
@@ -330,10 +330,10 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
     }
 
-    private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth, Set<String> eligibleSkus, PrecedentStockUpContext context) {
+    private List<SupplyOrderPool> recreateSupplyOrderPools(DpDemandPlan createCondition,YearMonth yearMonth, Set<String> eligibleSkus, PrecedentStockUpContext context) throws InterruptedException {
         List<SupplyOrderPool> supplyOrderPools = calculateAndBuildOrders(createCondition,yearMonth,eligibleSkus, context);
         // 3.1 清理旧数据
-        deleteSupplyOrderPool(createCondition,yearMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
+        safeDeleteByCondition(createCondition,yearMonth,SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode());
         if (CollectionUtils.isNotEmpty(supplyOrderPools)) {
             this.baseDao.insertBatch(supplyOrderPools);
         }
@@ -691,7 +691,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     }
 
     @Override
-    public List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition,YearMonth yearMonth) {
+    public List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException {
         // 1.1 验证周期性排产结构配置
         List<MdmMonCycleSchStruConf> cycleSchStruConfs =
             this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
@@ -712,7 +712,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     }
 
     @Override
-    public List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth) {
+    public List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException {
         PrecedentStockUpContext context = buildContext(yearMonth);
         Set<String> eligibleSkus = findEligibleSkus(context);
         if (eligibleSkus.isEmpty()) {
@@ -748,21 +748,85 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return BigDecimalUtils.valueOf(paramValue);
     }
 
+
+
     /**
-     *  删除
+     * Google内部标准：安全的批量删除方法
+     * 每次删除1000条，避免锁等待超时
      */
-    private void deleteSupplyOrderPool(DpDemandPlan createCondition,YearMonth yearMonth,String orderType) {
-        LambdaQueryWrapper<SupplyOrderPool> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(SupplyOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.eq(SupplyOrderPool::getYear, yearMonth.getYear());
-        wrapper.eq(SupplyOrderPool::getMonth, yearMonth.getMonthValue());
-        wrapper.eq(SupplyOrderPool::getOrderType, orderType);
-        if(null != createCondition) {
-            wrapper.eq(SupplyOrderPool::getSourceType, createCondition.getPlanType());
-        }else{
-            wrapper.eq(SupplyOrderPool::getSourceType, ProductionPlanType.NORMAL.getPlanType());
+    @Transactional(rollbackFor = Exception.class, timeout = 30)
+    public int safeDeleteByCondition(DpDemandPlan createCondition,YearMonth yearMonth,String orderType) throws InterruptedException {
+        int totalDeleted = 0;
+        int batchSize = 1000;
+        boolean hasMore = true;
+
+        while (hasMore) {
+            // 1. 先查询要删除的ID（使用索引避免锁表）
+            List<Long> idsToDelete = queryIdsForDeletion(yearMonth, orderType, createCondition, batchSize);
+
+            if (idsToDelete.isEmpty()) {
+                hasMore = false;
+                break;
+            }
+
+            // 2. 使用主键批量删除（效率高，锁粒度小）
+            int deleted = batchDeleteByIds(idsToDelete);
+            totalDeleted += deleted;
+
+            // 3. 记录日志并短暂休眠，释放锁
+            log.info("已删除 {} 条记录，累计 {}", deleted, totalDeleted);
+
+            if (deleted < batchSize) {
+                hasMore = false;
+            } else {
+                // 短暂休眠，让其他事务有机会执行
+                Thread.sleep(50);
+            }
         }
-        this.supplyOrderPoolEntityMapper.delete(wrapper);
+
+        return totalDeleted;
+    }
+
+    /**
+     * 查询要删除的ID（使用覆盖索引，避免锁等待）
+     */
+    private List<Long> queryIdsForDeletion(YearMonth yearMonth, String orderType,
+                                           DpDemandPlan createCondition, int limit) {
+        LambdaQueryWrapper<SupplyOrderPool> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.select(SupplyOrderPool::getId)
+            .eq(SupplyOrderPool::getIsDelete, YesOrNoEnum.NO.getValue())
+            .eq(SupplyOrderPool::getYear, yearMonth.getYear())
+            .eq(SupplyOrderPool::getMonth, yearMonth.getMonthValue())
+            .eq(SupplyOrderPool::getOrderType, orderType);
+
+        if (createCondition != null) {
+            queryWrapper.eq(SupplyOrderPool::getSourceType, createCondition.getPlanType());
+        } else {
+            queryWrapper.eq(SupplyOrderPool::getSourceType, ProductionPlanType.NORMAL.getPlanType());
+        }
+        // 按ID排序，避免死锁
+        queryWrapper.orderByAsc(SupplyOrderPool::getId)
+            .last("LIMIT " + limit);
+
+        return this.supplyOrderPoolEntityMapper.selectList(queryWrapper)
+            .stream()
+            .map(SupplyOrderPool::getId)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * 批量删除方法（使用IN查询，但限制数量）
+     */
+    private int batchDeleteByIds(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return 0;
+        }
+
+        // 方法1：使用MyBatis-Plus的deleteBatchIds
+        return this.baseDao.deleteByIds(SupplyOrderPool.class, ids);
+
+        // 方法2：或者使用自定义SQL（性能更好）
+        // return mapper.deleteByIds(ids);
     }
 
 
