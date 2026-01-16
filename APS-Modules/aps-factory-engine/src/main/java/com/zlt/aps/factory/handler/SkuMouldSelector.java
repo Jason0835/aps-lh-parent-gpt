@@ -4,6 +4,7 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
@@ -74,6 +75,11 @@ public class SkuMouldSelector {
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
+        //20260116 得到模壳标准：理论只有一个模壳标准
+        String mouldSetCode = effectiveList.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
+        MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(mouldSetCode);
+        Integer leftOverUsedQty = mouldShellInfo.getLeftOverUsedQtyByContinueSku();
+        max = Math.min(max, leftOverUsedQty);
         effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
                 .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
                 .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));

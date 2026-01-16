@@ -466,6 +466,7 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
             return;
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         String productionEmbryoCode = addSkuInfo.getEmbryoCode();
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
@@ -474,17 +475,32 @@ public class ProductionPlanGroupInfo {
             preSelected.updateProductionDateRange(null, null);
             return;
         }
+        //取得与胎胚种类数范围的交集
         Set<Integer> effectiveDaySet = getEffectiveDay(context, preSelected, hasAddSkuList);
         if (CollectionUtils.isEmpty(effectiveDaySet)) {
             preSelected.updateProductionDateRange(null, null);
             return;
         }
+        //取得与模具排产范围的交集
         Set<Integer> effectiveMouldSet = getEffectiveDay(effectiveDaySet, selectedMould);
         if (CollectionUtils.isEmpty(effectiveMouldSet)) {
             preSelected.updateProductionDateRange(null, null);
             return;
         }
-        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(effectiveMouldSet, context.getStopDays());
+        //取得模壳排产范围
+        String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
+        Set<Integer> mouldShellSet = productionContext.getMouldShellRange(mouldSetCode);
+        if (CollectionUtils.isEmpty(mouldShellSet)) {
+            preSelected.updateProductionDateRange(null, null);
+            return;
+        }
+        //20260116 取得与模壳排产范围的交集
+        Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            preSelected.updateProductionDateRange(null, null);
+            return;
+        }
+        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(intersectionSet, context.getStopDays());
         List<Integer> sortList = new ArrayList<>(resultSet);
         Collections.sort(sortList);
         int size = sortList.size();

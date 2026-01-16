@@ -10,6 +10,7 @@ import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -405,6 +406,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
             return null;
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         String productionEmbryoCode = addSkuInfo.getEmbryoCode();
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
@@ -412,12 +414,25 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
+        //取得与胎胚种类数范围的交集
         Set<Integer> productionDaySet = getEffectiveDay(context, selectedLhGroup.getProductionDay(), endDay, hasAddSkuList);
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
+        //取得与模具排产范围的交集
         Set<Integer> effectiveMouldSet = getEffectiveDay(productionDaySet, selectedMould);
         if (CollectionUtils.isEmpty(effectiveMouldSet)) {
+            return null;
+        }
+        //取得模壳排产范围
+        String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
+        Set<Integer> mouldShellSet = productionContext.getMouldShellRange(mouldSetCode);
+        if (CollectionUtils.isEmpty(mouldShellSet)) {
+            return null;
+        }
+        //20260116 取得与模壳排产范围的交集
+        Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
             return null;
         }
         //拷贝，否则数据丢失
