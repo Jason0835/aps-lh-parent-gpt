@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
@@ -11,7 +10,6 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -163,12 +161,10 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 制造示方书发行时间
      */
-    @ImportExcelValidated(date = true)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss", sort = 70)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.embryoReleaseDate", width = 30, sort = 70)
     @ApiModelProperty(value = "制造示方书发行时间", name = "embryoReleaseDate")
     @TableField(value = "EMBRYO_RELEASE_DATE")
-    private Date embryoReleaseDate;
+    private String embryoReleaseDate;
 
     /**
      * 文字示方书号
@@ -189,12 +185,10 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 文字示方书发行时间
      */
-    @ImportExcelValidated(date = true)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss", sort = 85)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.textReleaseDate", width = 30, sort = 85)
     @ApiModelProperty(value = "文字示方书发行时间", name = "textReleaseDate")
     @TableField(value = "TEXT_RELEASE_DATE")
-    private Date textReleaseDate;
+    private String textReleaseDate;
 
     /**
      * 硫化示方书号
@@ -215,12 +209,10 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 硫化示方书发行时间
      */
-    @ImportExcelValidated(date = true)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhReleaseDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss", sort = 100)
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.lhReleaseDate", width = 30, sort = 100)
     @ApiModelProperty(value = "硫化示方书发行时间", name = "lhReleaseDate")
     @TableField(value = "LH_RELEASE_DATE")
-    private Date lhReleaseDate;
+    private String lhReleaseDate;
 
 //    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mainMaterialDesc")
     @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
