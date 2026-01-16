@@ -1,12 +1,10 @@
 package com.zlt.aps.monthplan.adjust.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.exception.BusinessException;
@@ -17,21 +15,16 @@ import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.adjust.service.impl.MpWeekAdjustFactory;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.dto.MpWeekRollAdjustDTO;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
-import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProdFinalService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**

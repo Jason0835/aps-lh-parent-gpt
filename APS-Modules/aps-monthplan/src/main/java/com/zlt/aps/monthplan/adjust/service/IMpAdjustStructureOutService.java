@@ -1,8 +1,13 @@
 package com.zlt.aps.monthplan.adjust.service;
 
 
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpAdjustStructureOutService.java
@@ -17,5 +22,12 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface IMpAdjustStructureOutService  extends IDocService<MpAdjustStructureOut>{
+
+    /**
+     * 查询结构列表
+     * @param contextDTO
+     * @return
+     */
+    List<MpAdjustStructureOut> selectMpAdjustStructureOutList(MpRollAdjustContextDTO contextDTO);
 
 }
