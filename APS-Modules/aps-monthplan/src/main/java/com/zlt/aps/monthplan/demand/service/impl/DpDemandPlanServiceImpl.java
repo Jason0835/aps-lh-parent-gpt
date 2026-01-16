@@ -289,6 +289,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(CollectionUtils.isEmpty(predictionContext.getAllocationResult().getNetDemands())) {
             return Collections.emptyList();
         }
+        List<FactoryMonthPlanMouldDayResult> productionFinalResults;
+        if(YesOrNoEnum.YES.getCode().equals(finalVersion.getIsFinal())) {
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findFinalProductionResult(finalVersion);
+        }else{
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
+        }
+        if(CollectionUtils.isEmpty(productionFinalResults)) {
+            return Collections.emptyList();
+        }
         YearMonth tMonth = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
         // 		11、计算T+1月的需求量	  = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量  + 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
         YearMonth tPlus1Month =   tMonth.plusMonths(1);
@@ -301,12 +310,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-        List<FactoryMonthPlanMouldDayResult> productionFinalResults;
-        if(YesOrNoEnum.YES.getCode().equals(finalVersion.getIsFinal())) {
-            productionFinalResults = factoryMonthPlanProductionFinalResultService.findFinalProductionResult(finalVersion);
-        }else{
-            productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        }
+
         List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
         List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),cycleStockOrders,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(netDemands)){
