@@ -155,21 +155,21 @@ export default {
           prop: "weekYear",
           label: this.$t("ui.data.column.monthplan.weekYear"),
         },
-        {
-          prop: "dynamicBalance",
-          label: this.$t("ui.data.column.monthplan.dynamicBalance"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
+        // {
+        //   prop: "dynamicBalance",
+        //   label: this.$t("ui.data.column.monthplan.dynamicBalance"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
 
-        {
-          prop: "uniformity",
-          label: this.$t("ui.data.column.monthplan.uniformity"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
+        // {
+        //   prop: "uniformity",
+        //   label: this.$t("ui.data.column.monthplan.uniformity"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
 
         {
           prop: "isExceedSixMonth",

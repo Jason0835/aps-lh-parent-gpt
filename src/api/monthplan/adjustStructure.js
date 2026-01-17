@@ -115,7 +115,7 @@ export function listResult(query) {
   })
 }
 
-//获取结果列表
+//获取结果版本列表
 export function resultVersion(query) {
   return request({
     url: '/monthplan/mpAdjustResult/getVersionList',
@@ -154,6 +154,15 @@ export function removeOutHistory(query) {
 export function versionOutHistory(query) {
   return request({
     url: '/monthplan/mpAdjustStructureOut/getVersionList',
+    method: 'post',
+    data: query
+  })
+}
+
+//结构外一个结构
+export function outNextStructure(query) {
+  return request({
+    url: '/monthplan/mpStructureAllocation/getNextStructure',
     method: 'post',
     data: query
   })

@@ -4,7 +4,7 @@
       tableRef="cxFixedMachineMainTable"
       key="cxFixedMachineMainTable"
       ref="tableRef"
-      :calcHeight="true"
+      :calcHeight="this.activeName == 'singleResult' ? false : true"
       v-loading="loading"
       element-loading-text="正在获取数据，请稍候!"
       :columns="columns"
@@ -74,32 +74,54 @@
                 <el-input
                   disabled
                   v-model="formInline.beginDay"
+                  style="width: 50px"
                   placeholder="开始日期"
                 ></el-input>
               </el-form-item>
               <el-form-item label="结束日期">
                 <el-input
                   disabled
+                  style="width: 50px"
                   v-model="formInline.endDay"
                   placeholder="结束日期"
                 ></el-input>
               </el-form-item>
-              <el-form-item label="调整结束日期">
-                <el-date-picker
-                  v-model="formInline.adjustEndDay"
-                  type="date"
-                  value-format="yyyy-MM-dd"
-                  placeholder="选择日期"
+              <el-form-item label="调整开始日期">
+                <el-select
+                  v-model="formInline.adjustStartDay"
+                  style="width: 100px"
                 >
-                </el-date-picker>
+                  <el-option
+                    v-for="item in dayList"
+                    :key="item"
+                    :label="item"
+                    :value="item"
+                  >
+                  </el-option>
+                </el-select>
               </el-form-item>
-              <el-form-item label="">
-                <el-checkbox v-model="formInline.isMove">后续平移</el-checkbox>
+              <el-form-item label="调整结束日期">
+                <el-select
+                  v-model="formInline.adjustEndDay"
+                  style="width: 100px"
+                >
+                  <el-option
+                    v-for="item in dayList"
+                    :key="item"
+                    :label="item"
+                    :value="item"
+                  >
+                  </el-option>
+                </el-select>
               </el-form-item>
+
               <el-form-item>
                 <el-button type="primary" @click="getOutList"
-                  >开始调整</el-button
+                  >获取调整订单</el-button
                 >
+              </el-form-item>
+              <el-form-item v-if="showOutResult">
+                <el-button type="primary" @click="nextStructure">下一个</el-button>
               </el-form-item>
             </el-form>
           </el-tab-pane>
@@ -113,7 +135,7 @@
             display: flex;
             flex-direction: row;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: center;
           "
         >
           <el-button @click="backPlan">
@@ -121,7 +143,17 @@
           >
           <el-button
             type="primary"
-            @click="confirmResult "
+            @click="confirmResult"
+            v-if="activeName != 'singleResult'"
+            :loading="loading"
+            :disabled="data.length == 0"
+          >
+            {{ this.$t("common.button.confirm") }}</el-button
+          >
+          <el-button
+            type="primary"
+            @click="handOutResult"
+            v-if="activeName == 'singleResult'"
             :loading="loading"
             :disabled="data.length == 0"
           >
@@ -130,7 +162,12 @@
         </div>
       </template>
     </page-table>
-
+    <div v-if="showOutResult">
+      <el-table :data="outResultData" border stripe style="width: 100%" max-height="300">
+        <el-table-column v-for="item in outResultColumns" :key="item.prop"  :prop="item.prop" :label="item.label" :width="item.width" >
+        </el-table-column>
+      </el-table>
+    </div>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
@@ -168,6 +205,7 @@ import {
   editOutHistory,
   removeOutHistory,
   versionOutHistory,
+  outNextStructure
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -199,7 +237,11 @@ export default {
   },
   data() {
     return {
-      testResult: "", //暂时的机台数据
+      //结构外调整结果列表
+      outResultData: [],
+      outResultVersion:'',
+      showOutResult:false,
+
 
       isShowFoot: false,
       formInline: {},
@@ -231,6 +273,8 @@ export default {
         { label: "结构调整", value: "02" },
       ],
       actionDate: {},
+
+      dayList: 31,
     };
   },
   computed: {
@@ -650,7 +694,7 @@ export default {
                       min={1}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
-                        this.editOutAdjust(row,'adjustPriority');
+                        this.editOutAdjust(row, "adjustPriority");
                       }}
                       size="mini"
                     ></el-input>
@@ -811,6 +855,79 @@ export default {
       }
       return list;
     },
+    outResultColumns() {
+      let list = [
+          {
+            prop: "cxMachineCode",
+            label: this.$t("成型机台"),
+            width: 120,
+          },
+          {
+            prop: "version",
+            label: this.$t("版本号"),
+            width: 180,
+          },
+          {
+            prop: "structureName",
+            label: this.$t("产品结构"),
+            width: 180,
+          },
+          {
+            prop: "materialCode",
+            label: this.$t("物料编码"),
+            width: 120,
+          },
+          {
+            prop: "materialDesc",
+            label: this.$t("物料描述"),
+            width: 320,
+          },
+          {
+            prop: "hasSpecialMaterial",
+            label: this.$t("是否含特殊材料"),
+            width: 120,
+            formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            },
+          },
+          {
+            prop: "totalPlanQty",
+            label: this.$t("计划量"),
+            width: 120,
+          },
+          {
+            prop: "startDate",
+            label: this.$t("开始日期"),
+            width: 120,
+          },
+          {
+            prop: "endDate",
+            label: this.$t("结束日期"),
+            width: 120,
+          },
+          {
+            prop: "adjustEndDate",
+            width: 120,
+            label: this.$t("锁定上机日期"),
+            formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            },
+          },
+        ];
+        const days = 31;
+        for (let i = 0; i < days; i++) {
+          list.push({
+            label: `${i + 1}号`,
+            // label: this.$t("ui.data.column.mouldingDayResult.day", {
+            //   day: i + 1,
+            // }),
+            prop: `day${i + 1}`,
+            minWidth: "80px",
+            type: "number",
+          });
+        }
+        return list;
+    },
   },
   methods: {
     //单结构调整提交
@@ -835,10 +952,10 @@ export default {
     isPositiveInteger(num) {
       return /^[1-9]\d*$/.test(num);
     },
-    async editAdjust(row,type) {
-      if(!this.isPositiveInteger(row.adjustPriority)){
-          return this.$modal.msgWarning('请输入大于0的整数');
-        }
+    async editAdjust(row, type) {
+      if (!this.isPositiveInteger(row.adjustPriority)) {
+        return this.$modal.msgWarning("请输入大于0的整数");
+      }
       try {
         let res = await saveAdjust(row);
         this.$modal.msgSuccess(res.msg);
@@ -846,11 +963,10 @@ export default {
       } catch (err) {}
     },
     async editOutAdjust(row) {
-      if(type=='adjustPriority'){
-        if(!this.isPositiveInteger(row.adjustPriority)){
-          return this.$modal.msgWarning('请输入大于0的整数');
+      if (type == "adjustPriority") {
+        if (!this.isPositiveInteger(row.adjustPriority)) {
+          return this.$modal.msgWarning("请输入大于0的整数");
         }
-
       }
       try {
         let res = await editOutHistory(row);
@@ -995,14 +1111,12 @@ export default {
         };
       }
       this.isShowFoot = false;
+       this.showOutResult=false;
 
       this.getVersionList(true);
     },
     //确认调整结果
     async confirmResult() {
-      if(this.activeName=='singleResult'){
-        return this.handOutResult()
-      }
       try {
         this.show = false;
         this.loading = true;
@@ -1127,6 +1241,7 @@ export default {
       this.show = false;
       this.isShowResult = false;
       this.isShowFoot = false;
+      this.showOutResult=false;
       if (this.activeName == "three") {
         // this.getResultList();
         this.page = {
@@ -1201,10 +1316,8 @@ export default {
       }
     },
 
-
     //结构外自动调整
     async handOutResult() {
-
       this.show = false;
       this.loading = true;
       this.autoLoading = true;
@@ -1212,6 +1325,7 @@ export default {
         let params = {
           ...this.query,
           ...this.sort,
+          ...this.formInline,
           adjustType: this.adjustType,
           version: this.data[0]?.version,
         };
@@ -1223,6 +1337,7 @@ export default {
         }
         let res = await autoAdjust(params);
         console.log(res);
+
         // this.data = res;
         // // this.data=res.rows
         // this.show = true;
@@ -1238,8 +1353,6 @@ export default {
         this.autoLoading = false;
       }
     },
-
-
 
     handleShowSpecial() {
       if (this.$refs.specialRef) {
@@ -1291,7 +1404,6 @@ export default {
         }
         const uniqueArr = [...new Set(list)];
         let result = uniqueArr.join(", ");
-        this.testResult = result;
         this.getOutHistoryList(result);
       } catch (err) {
         this.loading = false;
@@ -1356,7 +1468,7 @@ export default {
       }
     },
 
-    //结构外开始调整
+    //结构外获取调整订单
     async getOutList() {
       this.loading = true;
       try {
@@ -1377,13 +1489,39 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
         this.data = res.rows;
+        this.getOutResultList(res.rows[0].version);
         this.isShowFoot = true;
+        this.showOutResult=true;
         this.getOutVersionList();
       } catch (err) {
         console.log(err);
       } finally {
         this.loading = false;
       }
+    },
+
+    //结构外初始化结构列表
+    async getOutResultList(version) {
+      try {
+        let params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.year = arr[0];
+          params.month = arr[1];
+          params.yearMonth = "";
+        }
+        params.version =version
+        params.adjustType = this.adjustType;
+        let res = await listResult(params);
+       console.log('初始化')
+        console.log(res);
+      } catch (err) {
+        console.log(err);
+      }
+
     },
 
     handleDelete(row) {
@@ -1508,6 +1646,28 @@ export default {
       } finally {
         this.loading = false;
         this.show = true;
+      }
+    },
+
+
+    //结构外下一个结构
+    async nextStructure(){
+      try{
+        let params = {
+          ...this.query,
+          ...this.sort,
+          ...this.formInline,
+        };
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        let res = await outNextStructure(params);
+        console.log('下一个结构',res)
+      }catch(err){
+        console.log(err);
       }
     },
   },
