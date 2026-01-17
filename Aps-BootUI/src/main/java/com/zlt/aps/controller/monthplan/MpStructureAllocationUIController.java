@@ -331,8 +331,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @ResponseBody
     public AjaxResult getNextStructure(MpStructureAllocation queryVO) {
         if (StringUtils.isEmpty(queryVO.getFactoryCode()) || queryVO.getYear() == null || queryVO.getMonth() == null
-                || StringUtils.isEmpty(queryVO.getCxMachineCode()) || queryVO.getBeginDay() == null || queryVO.getEndDay() == null
-                || queryVO.getAdjustEndDay() == null) {
+                || StringUtils.isEmpty(queryVO.getCxMachineCode()) || queryVO.getBeginDay() == null || queryVO.getEndDay() == null) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.notQueryCondition"));
         }
         MpStructureAllocation mpStructureAllocation = iMpStructureAllocationService.getNextStructure(queryVO);

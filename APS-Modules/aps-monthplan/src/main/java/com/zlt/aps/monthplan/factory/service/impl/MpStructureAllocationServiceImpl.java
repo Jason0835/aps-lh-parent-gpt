@@ -118,7 +118,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 结束日期
         Integer endDay = param.getEndDay();
         // 调整结束日期
-        Integer adjustEndDay = param.getAdjustEndDay();
+        Integer adjustEndDay = param.getAdjustEndDay() == null ? endDay : param.getAdjustEndDay();
         // 排序（按开始日期升序，开始日期相同则按结束日期升序排序）
         structureAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay,
                 Comparator.nullsLast(Integer::compareTo))
