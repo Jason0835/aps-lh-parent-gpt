@@ -91,6 +91,8 @@ public class TbrBeforeProductionGroupLogRecorder {
     /**
      * 增加获取排产参数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取排产参数====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取排产参数====
      *
      * @param context            排程上下文
      * @param paramConfiguration 排产参数配置
@@ -113,6 +115,8 @@ public class TbrBeforeProductionGroupLogRecorder {
     /**
      * 增加获读取特殊原材料日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取特殊原材料信息为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到特殊原材料数据====
      *
      * @param context             排程上下文
      * @param specialMaterialInfo 特殊原材料清单
@@ -135,6 +139,8 @@ public class TbrBeforeProductionGroupLogRecorder {
     /**
      * 增加获读取特殊原材料库存日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取特殊原材料库存为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到特殊原材料库存数据====
      *
      * @param context                  排程上下文
      * @param specialMaterialStockInfo 特殊原材料库存信息
@@ -181,12 +187,21 @@ public class TbrBeforeProductionGroupLogRecorder {
     /**
      * 增加没有停工日日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有停工日====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到有停工日设置===="
      *
-     * @param context 排程上下文
+     * @param context  排程上下文
+     * @param stopDays 停产信息
      * @return
      */
-    public static String addNoStopCalendarLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有停工日====",
+    public static String addStopCalendarLog(Context context, List<ProductionDayInfoVo> stopDays) {
+        String logContentFormat;
+        if (CollectionUtils.isEmpty(stopDays)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有停工日====";
+        } else {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到有停工日设置====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);

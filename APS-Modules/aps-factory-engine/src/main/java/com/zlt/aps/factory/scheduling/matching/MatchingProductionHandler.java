@@ -1326,8 +1326,8 @@ public class MatchingProductionHandler {
         List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream()
                 .filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag()))
                 .collect(Collectors.toList());
+        log.info(TbrBeforeProductionGroupLogRecorder.addStopCalendarLog(context, stopDays));
         if (CollectionUtils.isEmpty(stopDays)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addNoStopCalendarLog(context));
             context.setStopDays(Collections.emptySet());
             return;
         }
