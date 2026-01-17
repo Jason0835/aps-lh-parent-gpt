@@ -86,7 +86,7 @@ public class PredictionAllocationHelper {
       ) {
          // 9、从7步骤中的订单数据，按SKU扣减T月月度计划对应实单已排产量(销售订单)+ T月已生产量，得到销售订单剩余还未排产量
          int netDemand = saleOrders.stream().mapToInt(DpOrderOffsetDetail::getProduceQtyDue).sum();
-         if(BigDecimal.ZERO.intValue() == netDemand || !productionQtyMap.containsKey(groupKey)) {
+         if(BigDecimal.ZERO.intValue() == netDemand || (productionQtyMap.containsKey(groupKey) &&  Objects.equals(0,productionQtyMap.get(groupKey)))) {
            return null;
          }
           // T月实单未排产量：	300	(高优先级净需求+中优先级+暂缓订单-T月实单排产量+T月实单已完成量)
