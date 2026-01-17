@@ -4,7 +4,7 @@
       tableRef="cxFixedMachineMainTable"
       key="cxFixedMachineMainTable"
       ref="tableRef"
-      :calcHeight="this.activeName == 'singleResult' ? false : true"
+      :calcHeight="showOutResult ? false : true"
       v-loading="loading"
       element-loading-text="正在获取数据，请稍候!"
       :columns="columns"
@@ -121,7 +121,12 @@
                 >
               </el-form-item>
               <el-form-item v-if="showOutResult">
-                <el-button type="primary" @click="nextStructure">下一个</el-button>
+                <el-button
+                  type="primary"
+                  @click="nextStructure"
+                  :loading="nextLoading"
+                  >下一个</el-button
+                >
               </el-form-item>
             </el-form>
           </el-tab-pane>
@@ -163,10 +168,43 @@
       </template>
     </page-table>
     <div v-if="showOutResult">
-      <el-table :data="outResultData" border stripe style="width: 100%" max-height="300">
-        <el-table-column v-for="item in outResultColumns" :key="item.prop"  :prop="item.prop" :label="item.label" :width="item.width" >
+      <el-table
+        :data="outResultData"
+        border
+        stripe
+        style="width: 100%"
+        max-height="300"
+      >
+        <el-table-column
+          v-for="item in outResultColumns"
+          :key="item.prop"
+          :prop="item.prop"
+          :label="item.label"
+          :width="item.width"
+          :fixed="item.fixed ? true : false"
+        >
         </el-table-column>
       </el-table>
+      <div
+        style="
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+        "
+      >
+        <el-button @click="backPlan">
+          {{ this.$t("common.button.cancel") }}</el-button
+        >
+        <el-button
+          type="primary"
+          @click="confirmResult"
+          :loading="loading"
+          :disabled="data.length == 0"
+        >
+          {{ this.$t("common.button.confirm") }}</el-button
+        >
+      </div>
     </div>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
@@ -205,7 +243,7 @@ import {
   editOutHistory,
   removeOutHistory,
   versionOutHistory,
-  outNextStructure
+  outNextStructure,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -239,9 +277,9 @@ export default {
     return {
       //结构外调整结果列表
       outResultData: [],
-      outResultVersion:'',
-      showOutResult:false,
-
+      outResultVersion: "",
+      showOutResult: false,
+      nextLoading: false,
 
       isShowFoot: false,
       formInline: {},
@@ -592,13 +630,26 @@ export default {
       if (this.activeName == "singleResult") {
         return [
           {
-            prop: "structureName",
-            label: this.$t("产品结构"),
-            width: 180,
+            prop: "materialCode",
+            label: this.$t("物料编码"),
+            width: 120,
+            fixed: "left",
+          },
+          {
+            prop: "materialDesc",
+            label: this.$t("物料描述"),
+            width: 320,
+            fixed: "left",
           },
           {
             prop: "version",
             label: this.$t("版本号"),
+            width: 180,
+            fixed: "left",
+          },
+          {
+            prop: "structureName",
+            label: this.$t("产品结构"),
             width: 180,
           },
 
@@ -607,16 +658,7 @@ export default {
             label: this.$t("排产机台"),
             width: 120,
           },
-          {
-            prop: "materialCode",
-            label: this.$t("物料编码"),
-            width: 120,
-          },
-          {
-            prop: "materialDesc",
-            label: this.$t("物料描述"),
-            width: 320,
-          },
+
           {
             prop: "hasSpecialMaterial",
             label: this.$t("是否含特殊材料"),
@@ -857,76 +899,81 @@ export default {
     },
     outResultColumns() {
       let list = [
-          {
-            prop: "cxMachineCode",
-            label: this.$t("成型机台"),
-            width: 120,
+        {
+          prop: "materialCode",
+          label: this.$t("物料编码"),
+          fixed: "flex",
+          width: 120,
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("物料描述"),
+          width: 320,
+          fixed: "flex",
+        },
+        {
+          prop: "version",
+          label: this.$t("版本号"),
+          width: 180,
+          fixed: "flex",
+        },
+        {
+          prop: "cxMachineCode",
+          label: this.$t("成型机台"),
+          width: 120,
+        },
+
+        {
+          prop: "structureName",
+          label: this.$t("产品结构"),
+          width: 180,
+        },
+
+        {
+          prop: "hasSpecialMaterial",
+          label: this.$t("是否含特殊材料"),
+          width: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
-          {
-            prop: "version",
-            label: this.$t("版本号"),
-            width: 180,
+        },
+        {
+          prop: "totalPlanQty",
+          label: this.$t("计划量"),
+          width: 120,
+        },
+        {
+          prop: "startDate",
+          label: this.$t("开始日期"),
+          width: 120,
+        },
+        {
+          prop: "endDate",
+          label: this.$t("结束日期"),
+          width: 120,
+        },
+        {
+          prop: "adjustEndDate",
+          width: 120,
+          label: this.$t("锁定上机日期"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
-          {
-            prop: "structureName",
-            label: this.$t("产品结构"),
-            width: 180,
-          },
-          {
-            prop: "materialCode",
-            label: this.$t("物料编码"),
-            width: 120,
-          },
-          {
-            prop: "materialDesc",
-            label: this.$t("物料描述"),
-            width: 320,
-          },
-          {
-            prop: "hasSpecialMaterial",
-            label: this.$t("是否含特殊材料"),
-            width: 120,
-            formatter: (row, column, value) => {
-              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-            },
-          },
-          {
-            prop: "totalPlanQty",
-            label: this.$t("计划量"),
-            width: 120,
-          },
-          {
-            prop: "startDate",
-            label: this.$t("开始日期"),
-            width: 120,
-          },
-          {
-            prop: "endDate",
-            label: this.$t("结束日期"),
-            width: 120,
-          },
-          {
-            prop: "adjustEndDate",
-            width: 120,
-            label: this.$t("锁定上机日期"),
-            formatter: (row, column, value) => {
-              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-            },
-          },
-        ];
-        const days = 31;
-        for (let i = 0; i < days; i++) {
-          list.push({
-            label: `${i + 1}号`,
-            // label: this.$t("ui.data.column.mouldingDayResult.day", {
-            //   day: i + 1,
-            // }),
-            prop: `day${i + 1}`,
-            minWidth: "80px",
-            type: "number",
-          });
-        }
-        return list;
+        },
+      ];
+      const days = 31;
+      for (let i = 0; i < days; i++) {
+        list.push({
+          label: `${i + 1}号`,
+          // label: this.$t("ui.data.column.mouldingDayResult.day", {
+          //   day: i + 1,
+          // }),
+          prop: `day${i + 1}`,
+          minWidth: "80px",
+          type: "number",
+        });
+      }
+      return list;
     },
   },
   methods: {
@@ -1082,24 +1129,34 @@ export default {
         }
 
         this.versionList = list;
-        if (list.length > 0) {
-          this.$set(this.search, "version", list[0].value);
-          this.$set(this.query, "version", list[0].value);
-        } else {
-          this.$set(this.search, "version", "");
-          this.$set(this.query, "version", "");
-        }
+        // if (list.length > 0) {
+        //   this.$set(this.search, "version", list[0].value);
+        //   this.$set(this.query, "version", list[0].value);
+        // } else {
+        //   this.$set(this.search, "version", "");
+        //   this.$set(this.query, "version", "");
+        // }
         if (isGet) {
           this.$nextTick(() => {
             this.getOutHistoryList();
           });
+        } else {
+          this.$set(this.search, "version", "");
+          this.$set(this.query, "version", "");
         }
       } catch (err) {
         console.log(err);
+      } finally {
+        this.page=null
+        this.show = true;
+        this.loading = false;
+        this.isShowResult = true;
+        this.activeName = "singleResult";
       }
     },
 
     backPlan() {
+      this.show=false
       if (this.adjustType == "01") {
         this.activeName = "first";
       } else {
@@ -1111,7 +1168,8 @@ export default {
         };
       }
       this.isShowFoot = false;
-       this.showOutResult=false;
+      this.isShowResult = false;
+      this.showOutResult=false
 
       this.getVersionList(true);
     },
@@ -1124,7 +1182,10 @@ export default {
           ...this.query,
           ...this.sort,
           adjustType: this.adjustType,
-          version: this.data[0]?.version,
+          version:
+            this.adjustType == "01"
+              ? this.data[0]?.version
+              : this.outResultData[0]?.version,
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
@@ -1241,7 +1302,7 @@ export default {
       this.show = false;
       this.isShowResult = false;
       this.isShowFoot = false;
-      this.showOutResult=false;
+      this.showOutResult = false;
       if (this.activeName == "three") {
         // this.getResultList();
         this.page = {
@@ -1337,6 +1398,7 @@ export default {
         }
         let res = await autoAdjust(params);
         console.log(res);
+        this.outResultData = res.rows;
 
         // this.data = res;
         // // this.data=res.rows
@@ -1367,14 +1429,16 @@ export default {
       this.show = false;
       this.loading = true;
       this.isEdit = false;
-
+      this.data = [];
       if (this.selection[0].productionVersion) {
         console.log("selection", this.selection[0]);
         // this.cxMachineCodeList(this.selection[0]);
-        this.getOutVersionList(true);
+        this.getOutVersionList();
       } else {
         this.page = null;
         setTimeout(() => {
+          this.page=null
+          this.data = [];
           this.show = true;
           this.loading = false;
           this.isShowResult = true;
@@ -1460,6 +1524,9 @@ export default {
         let res = await listOutHistory(params);
         this.page = null;
         this.data = res.rows;
+        this.isEdit = false;
+        this.showOutResult = false;
+        this, (isShowFoot = fa);
       } catch (err) {
         console.log(err);
       } finally {
@@ -1491,7 +1558,8 @@ export default {
         this.data = res.rows;
         this.getOutResultList(res.rows[0].version);
         this.isShowFoot = true;
-        this.showOutResult=true;
+        this.showOutResult = true;
+
         this.getOutVersionList();
       } catch (err) {
         console.log(err);
@@ -1513,15 +1581,14 @@ export default {
           params.month = arr[1];
           params.yearMonth = "";
         }
-        params.version =version
+        params.version = version;
         params.adjustType = this.adjustType;
         let res = await listResult(params);
-       console.log('初始化')
+        console.log("初始化");
         console.log(res);
       } catch (err) {
         console.log(err);
       }
-
     },
 
     handleDelete(row) {
@@ -1649,10 +1716,10 @@ export default {
       }
     },
 
-
     //结构外下一个结构
-    async nextStructure(){
-      try{
+    async nextStructure() {
+      this.nextLoading = true;
+      try {
         let params = {
           ...this.query,
           ...this.sort,
@@ -1665,9 +1732,19 @@ export default {
           params.yearMonth = "";
         }
         let res = await outNextStructure(params);
-        console.log('下一个结构',res)
-      }catch(err){
+        console.log("下一个结构", res);
+        if (res.id) {
+          this.showOutResult = false;
+          this.isShowFoot = false;
+          this.isEdit = false;
+          this.formInline = res;
+        } else {
+          this.$modal.msgWarning("已经是最后一个结构");
+        }
+      } catch (err) {
         console.log(err);
+      } finally {
+        this.nextLoading = false;
       }
     },
   },
