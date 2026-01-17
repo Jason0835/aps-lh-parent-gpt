@@ -145,13 +145,23 @@ public class TbrProductionContext extends Context {
         if (StringUtils.isBlank(controlDimensionKey)) {
             return null;
         }
-        Map<String, MouldAllocationInfoVo> allMouldAllocationInfoMap = baseDataContainer.getGroupMainPatternAllocationMap();
+        Map<String, MouldAllocationInfoVo> allMouldAllocationInfoMap = baseDataContainer.getGroupMainPatternAllocationLimitMap();
         if (CollectionUtils.isEmpty(allMouldAllocationInfoMap)) {
             return null;
         }
         return allMouldAllocationInfoMap.get(controlDimensionKey);
     }
 
+    /**
+     * 清空所有模具分配比例使用量
+     */
+    public void clearAllMouldAllocationUsed() {
+        Map<String, MouldAllocationInfoVo> allMouldAllocationLimitMap = baseDataContainer.getGroupMainPatternAllocationLimitMap();
+        if (CollectionUtils.isEmpty(allMouldAllocationLimitMap)) {
+            return;
+        }
+        allMouldAllocationLimitMap.forEach((controlDimensionKey, limit) -> limit.clearDayUsed());
+    }
     /**
      * 获取模壳可放两副模具的日期集合
      *
