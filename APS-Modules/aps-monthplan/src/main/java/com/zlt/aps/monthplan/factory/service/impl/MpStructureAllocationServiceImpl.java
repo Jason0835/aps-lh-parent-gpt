@@ -126,7 +126,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         Comparator.nullsLast(Integer::compareTo)));
         // 从集合中找出日期最接近目标开始日期和结束日期的数据
         MpStructureAllocation structureAllocation = getClosestStructureAllocation(structureAllocationList, param.getId(), beginDay, endDay);
-        structureAllocation.setBeginDay(adjustEndDay);
+        if (structureAllocation != null) {
+            structureAllocation.setBeginDay(adjustEndDay);
+        }
         return structureAllocation;
     }
 
