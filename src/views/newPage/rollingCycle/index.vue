@@ -643,15 +643,15 @@ export default {
             width: 320,
             fixed: "left",
           },
-          {
-            prop: "version",
-            label: this.$t("版本号"),
-            width: 180,
-            fixed: "left",
-          },
+
           {
             prop: "structureName",
             label: this.$t("产品结构"),
+            width: 180,
+          },
+          {
+            prop: "version",
+            label: this.$t("版本号"),
             width: 180,
           },
 
@@ -913,12 +913,7 @@ export default {
           width: 320,
           fixed: "flex",
         },
-        {
-          prop: "version",
-          label: this.$t("版本号"),
-          width: 180,
-          fixed: "flex",
-        },
+
         {
           prop: "cxMachineCode",
           label: this.$t("成型机台"),
@@ -928,6 +923,11 @@ export default {
         {
           prop: "structureName",
           label: this.$t("产品结构"),
+          width: 180,
+        },
+        {
+          prop: "version",
+          label: this.$t("版本号"),
           width: 180,
         },
 
