@@ -186,6 +186,8 @@ public class GroupPlanBeforeConclusionHandler {
      */
     private static void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer beforeConclusionDay, Integer deductionDay, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
         //标记结构分配完成
+//        groupPlanInfo.setLeftOverNeedAllocationDays();
+
         groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //更新成型剩余天数
         Integer remainingDays = cxMachineInfo.getRemainingDays();

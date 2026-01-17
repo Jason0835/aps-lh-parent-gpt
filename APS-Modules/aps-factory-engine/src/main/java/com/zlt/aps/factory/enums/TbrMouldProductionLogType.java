@@ -74,53 +74,17 @@ public enum TbrMouldProductionLogType {
      */
     END_GET_VERSION_DATA("20-02", "获取排产版本计划数据"),
     /**
-     * 20-02-01 排产前计划初始数据设置
+     * 20-03 排产前计划初始数据设置
      */
-    PLAN_INIT_DATA("20-02-01", "排产前计划初始数据设置"),
+    PLAN_INIT_DATA("20-03", "排产前计划初始数据设置"),
     /**
-     * 20-03-00 开始排产前数据加载
+     * 20-04 开始排产前数据加载
      */
-    START_BEFORE_PRODUCTION_DATA("20-03-00", "开始排产前数据加载"),
+    START_BEFORE_PRODUCTION_DATA("20-04", "开始排产前数据加载"),
     /**
-     * 20-03 读取排产参数配置
+     * 20-05 排产前基础配置数据加载
      */
-    END_READER_PARAM_DATA("20-03", "读取排产参数配置"),
-    /**
-     * 20-04 特殊原材料配置为空
-     */
-    SPECIAL_MATERIAL_EMPTY("20-04", "特殊原材料配置为空"),
-    /**
-     * 20-05 特殊原材料库存为空
-     */
-    SPECIAL_MATERIAL_STOCK_EMPTY("20-05", "特殊原材料库存为空"),
-    /**
-     * 20-06 年月生产日历为空
-     */
-    PRODUCTION_CALENDAR_EMPTY("20-06", "年月生产日历为空"),
-    /**
-     * 20-07 年月没有停工日
-     */
-    STOP_DAY_EMPTY("20-07", "年月没有停工日"),
-    /**
-     * 20-08 成型机基础信息为空
-     */
-    CX_MACHINE_BASE_EMPTY("20-08", "成型机基础信息为空"),
-    /**
-     * 20-09 成型机维修信息为空
-     */
-    CX_MACHINE_MAINTENANCE_EMPTY("20-09", "成型机维修信息为空"),
-    /**
-     * 20-10 模具关系配置为空
-     */
-    MOULD_RELATION_INFO_EMPTY("20-10", "模具关系配置为空"),
-    /**
-     * 20-11 新模具到货配置为空
-     */
-    MOULD_DELIVERY_INFO_EMPTY("20-11", "新模具到货配置为空"),
-    /**
-     * 20-12 成型硫化配比配置为空
-     */
-    CX_GROUP_LH_RATIO_EMPTY("20-12", "成型硫化配比配置为空"),
+    BEFORE_PRODUCTION_DATA_LOADING("20-05", "排产前基础配置数据加载"),
     /**
      * 20-13-00 开始分组粗算成型机台数
      */
@@ -145,10 +109,6 @@ public enum TbrMouldProductionLogType {
      * 20-13 分组没有成型硫化配比配置
      */
     SINGLE_GROUP_LH_RATIO_EMPTY("20-13", "分组没有成型硫化配比配置"),
-    /**
-     * 20-14-01 没有获取到续作Sku信息
-     */
-    CONTINUE_SKU_DATA_EMPTY("20-14-01", "没有获取到续作Sku信息"),
     /**
      * 20-14-00 分组计划为非在机分组(TBR结构)
      */

@@ -142,12 +142,12 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
      * 实单模拟排产
      */
     @ApiOperation("实单模拟排产")
-    @RedissonLockAnno(uniqueMark = "redissonLock:simulatedResult:createVmMonthPrediction:",
-        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-        msgKey = "ui.data.alert.createVmMonthPrediction.run",
-        waitTime = 5,
-        leaseTime = 300
-    )
+//    @RedissonLockAnno(uniqueMark = "redissonLock:simulatedResult:createVmMonthPrediction:",
+//        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
+//        msgKey = "ui.data.alert.createVmMonthPrediction.run",
+//        waitTime = 5,
+//        leaseTime = 300
+//    )
     @PostMapping("/createVmMonthPrediction")
     public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws InterruptedException {
         return this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
