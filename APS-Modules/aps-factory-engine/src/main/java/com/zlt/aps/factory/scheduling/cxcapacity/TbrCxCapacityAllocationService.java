@@ -197,7 +197,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.getBaseDataContainer().setSkuMouldRelationMap(mouldRelationMap);
         //结构模具分配配比
         Map<String, MouldAllocationInfoVo> mouldAllocationMap = getGroupMainPatternAllocationInfo(productionContext);
-        productionContext.getBaseDataContainer().setGroupMainPatternAllocationMap(mouldAllocationMap);
+        productionContext.getBaseDataContainer().setGroupMainPatternAllocationLimitMap(mouldAllocationMap);
         //获取模壳配置信息
         Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
         productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
@@ -531,8 +531,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private Map<String, MouldAllocationInfoVo> getGroupMainPatternAllocationInfo(Context context) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
+        log.info(TbrBeforeProductionGroupLogRecorder.addMouldAllocationLog(context, mouldAllocationInfoList));
         if (CollectionUtils.isEmpty(mouldAllocationInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addMouldAllocationEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, MouldAllocationInfoVo> groupMainPatternMap = mouldAllocationInfoList.stream().collect(Collectors.toMap(MouldAllocationInfoVo::getDuplicateKey, Function.identity(), (before, after) -> after));
@@ -803,6 +803,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //清除模壳使用量
         productionContext.clearAllMouldShellUsed();
+        //清除模具分配使用量
+        productionContext.clearAllMouldAllocationUsed();
     }
 
     /**

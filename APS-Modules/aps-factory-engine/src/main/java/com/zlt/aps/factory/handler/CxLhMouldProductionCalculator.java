@@ -5,10 +5,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
@@ -561,18 +558,25 @@ public class CxLhMouldProductionCalculator {
             MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
             doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineInfo));
         });
-        //模壳的使用量更新
+        //模壳的使用量 更新
         doubleMouldList.forEach(singleMould -> {
             String mouldSetCode = singleMould.getMouldSetCode();
             if (StringUtils.isBlank(mouldSetCode)) {
                 return;
             }
-            MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(mouldSetCode);
+            MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(singleMould);
             if (null == mouldShellInfo) {
                 return;
             }
-            mouldShellInfo.addUsedCount(productionDay);
+            mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
         });
+        //模具分配使用量更新
+        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
+        if (null == mouldAllocationControlInfo) {
+            return;
+        }
+        doubleMouldList.forEach(singleMould -> mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode()));
     }
 
     /**

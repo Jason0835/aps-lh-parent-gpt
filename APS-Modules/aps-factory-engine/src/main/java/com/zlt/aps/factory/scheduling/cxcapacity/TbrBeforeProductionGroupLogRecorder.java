@@ -50,7 +50,6 @@ public class TbrBeforeProductionGroupLogRecorder {
         return logContent;
     }
 
-
     /**
      * 增加获取排产计划数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，物料：%s 计划Id：%s 设置初始的排产数据====
@@ -327,14 +326,21 @@ public class TbrBeforeProductionGroupLogRecorder {
     }
 
     /**
-     * 增加模具分配配比数据为空日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具分配比例配置为空====
+     * 增加模具分配配比数据日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具分配比例配置数据为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到模具分配比例配置数据====
      *
-     * @param context 排程上下文
+     * @param context             排程上下文
+     * @param mouldAllocationInfo 模具分配比例信息
      * @return
      */
-    public static String addMouldAllocationEmptyLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具分配比例配置为空====",
+    public static String addMouldAllocationLog(Context context, List<MouldAllocationInfoVo> mouldAllocationInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到模具分配比例配置数据为空====";
+        if (!CollectionUtils.isEmpty(mouldAllocationInfo)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到模具分配比例配置数据====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);

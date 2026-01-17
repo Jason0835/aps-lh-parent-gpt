@@ -12,6 +12,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 开始正式排产，按结构进行排产
@@ -95,6 +96,11 @@ public class FormalProductionHandler {
         ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(groupName);
         if (null == groupPlan) {
             log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoGroupPlanLog(context, groupName, type));
+            return;
+        }
+        Set<String> allocationCxMachineCodeSet = groupPlan.getAllocationCxMachineCodeSet();
+        if (CollectionUtils.isEmpty(allocationCxMachineCodeSet)) {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoAllocationCxMachineLog(context, groupName, type));
             return;
         }
         Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap = cxContinueInfo.getContinueSkuMouldNumberMap();

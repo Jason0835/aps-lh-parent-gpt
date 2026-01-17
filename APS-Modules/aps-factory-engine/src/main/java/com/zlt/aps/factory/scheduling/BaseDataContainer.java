@@ -50,7 +50,7 @@ public class BaseDataContainer implements Serializable {
      * 结构+主花纹的模具配比配置
      * key=group+主花纹 ：value=配比配置，同时需转化成每天的量信息
      */
-    Map<String, MouldAllocationInfoVo> groupMainPatternAllocationMap;
+    Map<String, MouldAllocationInfoVo> groupMainPatternAllocationLimitMap;
     /**
      * 模壳总数信息
      * key=模块标准 : value=模块标准数量

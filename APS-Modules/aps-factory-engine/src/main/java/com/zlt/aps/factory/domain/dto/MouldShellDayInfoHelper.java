@@ -1,9 +1,12 @@
 package com.zlt.aps.factory.domain.dto;
 
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * 模壳的日信息对象
@@ -31,6 +34,10 @@ public class MouldShellDayInfoHelper implements Serializable {
      * 已使用量
      */
     private Integer usedQty;
+    /**
+     * 已使用模具
+     */
+    private Set<String> usedMouldSet;
 
     /**
      * 创建初始化对象
@@ -62,8 +69,17 @@ public class MouldShellDayInfoHelper implements Serializable {
 
     /**
      * 模壳使用量 + 1
+     *
+     * @param mouldCode 型腔模号
      */
-    public void addUsedCount() {
+    public void addUsedCount(String mouldCode) {
+        if (StringUtils.isBlank(mouldCode)) {
+            return;
+        }
+        if (usedMouldSet.contains(mouldCode)) {
+            return;
+        }
+        usedMouldSet.add(mouldCode);
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             existUsedQty = BigDecimal.ZERO.intValue();
@@ -89,6 +105,7 @@ public class MouldShellDayInfoHelper implements Serializable {
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();
+        usedMouldSet = new HashSet<>();
     }
 
     /**
@@ -103,6 +120,7 @@ public class MouldShellDayInfoHelper implements Serializable {
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();
+        this.usedMouldSet = new HashSet<>();
     }
 
 }
