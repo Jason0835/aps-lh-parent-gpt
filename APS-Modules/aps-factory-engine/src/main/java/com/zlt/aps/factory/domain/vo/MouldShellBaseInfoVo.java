@@ -112,8 +112,9 @@ public class MouldShellBaseInfoVo implements Serializable {
      * 在productionDay天，模壳使用量+1
      *
      * @param productionDay 排产日
+     * @param mouldCode 型腔模号
      */
-    public void addUsedCount(Integer productionDay) {
+    public void addUsedCount(Integer productionDay, String mouldCode) {
         if (CollectionUtils.isEmpty(dayLimitInfoMap)) {
             return;
         }
@@ -121,6 +122,6 @@ public class MouldShellBaseInfoVo implements Serializable {
         if (null == dayLimit) {
             return;
         }
-        dayLimit.addUsedCount();
+        dayLimit.addUsedCount(mouldCode);
     }
 }

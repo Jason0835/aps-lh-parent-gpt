@@ -572,12 +572,4 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @TableField(value = "NO_PRODUCTION_REASON")
     private String noProductionReason;
 
-    /**
-     * todo 后续要删除
-     *
-     * @return
-     */
-    public String getProductCode() {
-        return "";
-    }
 }

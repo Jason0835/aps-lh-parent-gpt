@@ -86,29 +86,25 @@ public enum TbrMouldProductionLogType {
      */
     BEFORE_PRODUCTION_DATA_LOADING("20-05", "排产前基础配置数据加载"),
     /**
-     * 20-13-00 开始分组粗算成型机台数
+     * 20-06-00 开始分组粗算成型机台数
      */
-    START_GROUP_CAPACITY_CALCULATE("20-13-00", "开始分组粗算成型机台数"),
+    START_GROUP_CAPACITY_CALCULATE("20-06-00", "开始分组粗算成型机台数"),
     /**
-     * 20-13-01 分组主花纹产能预算
+     * 20-06-01 分组主花纹产能预算
      */
-    GROUP_MAIN_PATTERN_CAPACITY_INFO("20-13-01", "分组主花纹产能预算"),
+    GROUP_MAIN_PATTERN_CAPACITY_INFO("20-06-01", "分组主花纹产能预算"),
     /**
-     * 20-13-02 分组总产能预算
+     * 20-06-02 分组总产能预算
      */
-    GROUP_SUM_CAPACITY_INFO("20-13-02", "分组总产能预算"),
+    GROUP_SUM_CAPACITY_INFO("20-06-02", "分组总产能预算"),
     /**
-     * 20-13-04 汇总
+     * 20-06-03 分组预算机台数
      */
-    SUMMARY_INFO_SUM("20-13-04", "汇总"),
+    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-06-03", "分组预算机台数"),
     /**
-     * 20-13-03 分组预算机台数
+     * 20-06-04 汇总
      */
-    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-13-03", "分组预算机台数"),
-    /**
-     * 20-13 分组没有成型硫化配比配置
-     */
-    SINGLE_GROUP_LH_RATIO_EMPTY("20-13", "分组没有成型硫化配比配置"),
+    SUMMARY_INFO_SUM("20-06-04", "汇总"),
     /**
      * 20-14-00 分组计划为非在机分组(TBR结构)
      */

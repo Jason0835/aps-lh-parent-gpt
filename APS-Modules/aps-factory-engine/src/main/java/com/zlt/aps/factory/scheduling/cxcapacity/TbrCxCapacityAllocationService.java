@@ -531,8 +531,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private Map<String, MouldAllocationInfoVo> getGroupMainPatternAllocationInfo(Context context) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
+        log.info(TbrBeforeProductionGroupLogRecorder.addMouldAllocationLog(context, mouldAllocationInfoList));
         if (CollectionUtils.isEmpty(mouldAllocationInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addMouldAllocationEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, MouldAllocationInfoVo> groupMainPatternMap = mouldAllocationInfoList.stream().collect(Collectors.toMap(MouldAllocationInfoVo::getDuplicateKey, Function.identity(), (before, after) -> after));
