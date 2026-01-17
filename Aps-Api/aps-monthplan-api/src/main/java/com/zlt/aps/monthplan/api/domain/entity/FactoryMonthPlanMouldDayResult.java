@@ -336,7 +336,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 排产顺序
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionSequence")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionSequence")
     @ApiModelProperty(value = "排产顺序", name = "productionSequence")
     @TableField(value = "PRODUCTION_SEQUENCE")
     private Long productionSequence;
@@ -704,7 +704,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 显示顺序
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.displaySeq")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.displaySeq")
     @ApiModelProperty(value = "显示顺序", name = "displaySeq")
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
