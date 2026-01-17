@@ -821,7 +821,7 @@ public class MatchingProductionHandler {
         container.setSkuMouldRelationMap(this.getProductionMouldInfo(productionContext)); // 模具施工关系
         container.setCxMachineBaseInfo(this.getDataService().getCxMachineBaseInfo(productionContext)); // 已排结构排程
         container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, planList, requirePlanMap)); // 已排模具计划（净需求）
-        container.setGroupMainPatternAllocationMap(this.getGroupMainPatternAllocationInfo(productionContext)); // 结构模具分配配比
+        container.setGroupMainPatternAllocationLimitMap(this.getGroupMainPatternAllocationInfo(productionContext)); // 结构模具分配配比
         this.buildCxLhRatioMap(productionContext, container.getMouldInfoMap()); // 构建成型硫化组
         this.overSixMonthStockHandler(productionContext); // 超6个成品库存信息
 
