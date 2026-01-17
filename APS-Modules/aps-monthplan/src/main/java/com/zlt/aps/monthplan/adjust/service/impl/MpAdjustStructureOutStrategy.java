@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
@@ -50,15 +51,15 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         // 2、构建结构外调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、通过排产机台、结构筛选结构外调整明细
-        List<MpAdjustDetailVo> matchAdjustList = filterAdjustDetailList(contextDTO,adjustDetailList);
+        filterAdjustDetailList(contextDTO,adjustDetailList);
         // 未获取到调整记录，抛出异常
-        Assert.isFalse(PubUtil.isEmpty(matchAdjustList), () -> {
+        Assert.isFalse(PubUtil.isEmpty(adjustDetailList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
         // 4、按照结构、物料编码维度进行分组，并汇总订单量
-        List<MpAdjustDetailVo> resultList = sumByStructureAndMaterial(matchAdjustList);
+        List<MpAdjustDetailVo> resultList = sumByStructureAndMaterial(adjustDetailList);
         contextDTO.setAdjustDetailList(resultList);
         // 5、设置净需求
         setCurrentNetQty(contextDTO);
@@ -82,17 +83,16 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      * @param adjustDetailList
      * @return
      */
-    private List<MpAdjustDetailVo> filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
+    @Override
+    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
                                                                      List<MpAdjustDetailVo> adjustDetailList) {
         if (PubUtil.isEmpty(adjustDetailList)) {
-            return Collections.emptyList();
+            return;
         }
 
-        return adjustDetailList.stream()
-                .filter(vo -> StringUtils.equals(vo.getStructureName(), contextDTO.getStructureName())
-                        && (StringUtils.isEmpty(vo.getScheduledMachines())
-                        || StringUtils.contains(vo.getScheduledMachines(), contextDTO.getScheduledMachines())))
-                .collect(Collectors.toList());
+        CollUtil.filter(adjustDetailList, item -> StringUtils.equals(item.getStructureName(), contextDTO.getStructureName())
+                && (StringUtils.isEmpty(item.getScheduledMachines())
+                || StringUtils.contains(item.getScheduledMachines(), contextDTO.getScheduledMachines())));
     }
 
     /**

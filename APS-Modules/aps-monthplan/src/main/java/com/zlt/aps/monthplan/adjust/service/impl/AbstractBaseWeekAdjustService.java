@@ -46,6 +46,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureLog;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -56,6 +57,7 @@ import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
+import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
@@ -127,6 +129,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected MpAdjustStructureInEntityMapper mpAdjustStructureInEntityMapper;
+
+    @Autowired
+    protected MpStructureAllocationEntityMapper mpStructureAllocationEntityMapper;
 
     @Autowired
     protected IDpDemandPlanService dpDemandPlanService;
@@ -669,12 +674,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         CompletableFuture<Void> skuConstructionRefFuture = CompletableFuture.runAsync(() -> initSkuConstructionRef(contextDTO), executor);
         // 初始化sku与结构关系
         CompletableFuture<Void> skuStructureRefFuture = CompletableFuture.runAsync(() -> initSkuStructureRef(contextDTO), executor);
+        // 初始化月计划结构转产
+        CompletableFuture<Void> structureAllocationFuture = CompletableFuture.runAsync(() -> initStructureAllocation(contextDTO), executor);
+        // 初始化月度硫化监控
+        CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
         // 初始化物料信息
         CompletableFuture<Void> materialInfoFuture = CompletableFuture.runAsync(() -> initMaterialInfo(contextDTO), executor);
 //        // 初始化月底计划余量
 //        CompletableFuture<Void> monthSurplusFuture = CompletableFuture.runAsync(() -> initMonthSurplus(contextDTO), executor);
-        // 初始化月度硫化监控
-        CompletableFuture<Void> planMonitorFuture = CompletableFuture.runAsync(() -> initPlanMonitor(contextDTO), executor);
 //        // 初始化成品实时库存
 //        CompletableFuture<Void> productStockFuture = CompletableFuture.runAsync(
 //                // 解决父子上下文传递问题
@@ -694,6 +701,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     skuLhCapacityFuture,
                     skuConstructionRefFuture,
                     skuStructureRefFuture,
+                    structureAllocationFuture,
                     materialInfoFuture
             ).join();
 
@@ -724,6 +732,39 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 年月
             contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + String.format("%02d",contextDTO.getMpMonth())));
         }
+    }
+
+
+    /**
+     * 初始化月计划结构转产
+     *
+     * @param contextDTO
+     */
+    private void initStructureAllocation(MpRollAdjustContextDTO contextDTO) {
+        MpStructureAllocation queryVO = new MpStructureAllocation();
+        queryVO.setFactoryCode(contextDTO.getFactoryCode());
+        queryVO.setYear(contextDTO.getMpYear());
+        queryVO.setMonth(contextDTO.getMpMonth());
+        queryVO.setProductionVersion(contextDTO.getProductionVersion());
+
+        LambdaQueryWrapper<MpStructureAllocation> queryWrapper = new LambdaQueryWrapper<>();
+        buildStructureAllocationCondition(queryWrapper, queryVO);
+        List<MpStructureAllocation> structureAllocationList = mpStructureAllocationEntityMapper.selectList(queryWrapper);
+        contextDTO.setStructureAllocationList(structureAllocationList);
+    }
+
+    /**
+     * 构建月计划结构转产条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildStructureAllocationCondition(LambdaQueryWrapper<MpStructureAllocation> queryWrapper, MpStructureAllocation queryVO) {
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getFactoryCode()), MpStructureAllocation::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MpStructureAllocation::getYear, queryVO.getYear());
+        queryWrapper.eq(MpStructureAllocation::getMonth, queryVO.getMonth());
+        queryWrapper.eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), MpStructureAllocation::getProductionVersion, queryVO.getProductionVersion());
     }
 
     /**
@@ -1370,13 +1411,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     protected void setCurrentNetQty(MpRollAdjustContextDTO contextDTO) {
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
         try {
             // 生成调整需求计划
             createAdjustRequire(contextDTO);
         } catch (Exception e) {
             log.error("生成调整需求计划失败! 原因:{}", e.getMessage(), e);
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.createAdjustRequireFail"));
+        } finally {
+            watch.stop();
         }
+        log.info("生成调整需求计划完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
+
         // 需求计划列表
         List<DpDemandPlan> dpDemandPlanList = contextDTO.getDpDemandPlanList();
         log.warn("设置净需求 ==> 需求计划列表大小：{}", CollUtil.size(dpDemandPlanList));
@@ -1408,6 +1456,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 adjust.setCurrentNetQty(Convert.toInt(netQtySum,0));
             }
         }
+    }
+
+    /**
+     * 过滤调整明细
+     * @param contextDTO
+     * @param adjustDetailList
+     * @return
+     */
+    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
+                                                          List<MpAdjustDetailVo> adjustDetailList) {
     }
 
     /**
