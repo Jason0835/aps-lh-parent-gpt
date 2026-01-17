@@ -186,6 +186,7 @@
         </el-table-column>
       </el-table>
       <div
+      v-if="showConfirmResult"
         style="
           display: flex;
           flex-direction: row;
@@ -280,6 +281,7 @@ export default {
       outResultVersion: "",
       showOutResult: false,
       nextLoading: false,
+      showConfirmResult:false,
 
       isShowFoot: false,
       formInline: {},
@@ -1157,6 +1159,7 @@ export default {
 
     backPlan() {
       this.show=false
+      this.showConfirmResult=false
       if (this.adjustType == "01") {
         this.activeName = "first";
       } else {
@@ -1299,6 +1302,7 @@ export default {
     //tab切换
     handleClick(tab, event) {
       // this.loading = true;
+      this.showConfirmResult=false
       this.show = false;
       this.isShowResult = false;
       this.isShowFoot = false;
@@ -1396,10 +1400,13 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
+        console.log("params", params);
+        params.startDay=params.beginDay
+        params.scheduledMachines=params.cxMachineCode
         let res = await autoAdjust(params);
         console.log(res);
         this.outResultData = res.rows;
-
+        this.showConfirmResult = true;
         // this.data = res;
         // // this.data=res.rows
         // this.show = true;
@@ -1413,6 +1420,8 @@ export default {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
+      }finally{
+        this.loading = false;
       }
     },
 
