@@ -164,12 +164,24 @@ public class ProductionPlanGroupInfo {
     /**
      * 更新设置整个分组计划不排产
      */
-    public void setNoProductionNoReachMinProductionDays() {
+    public void setNoProductionNoReachMinProductionDays(Integer minProductionDays) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return;
         }
-        String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME);
+        String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
+    }
+
+    /**
+     * 更新设置整个分组计划不排产
+     * 因提前收尾导致不满足最低排产天数
+     */
+    public void setNoProductionLowMinLhMachineNoReachMinProductionDays(Integer minLhMachineCount, Integer minProductionDays) {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        String lowMinLhMachineNoReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME, minLhMachineCount, minProductionDays);
+        groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(lowMinLhMachineNoReachMinProductionDaysReason));
     }
 
     /**
@@ -215,7 +227,7 @@ public class ProductionPlanGroupInfo {
             Integer theoryDays = groupInfo.getTheoryDays();
             //分配天数为零，或是小于最小要求天数，则设置不排产
             if (groupInfo.isBelowMinProductionDays(minProductionDays)) {
-                groupInfo.setNoProductionNoReachMinProductionDays();
+                groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
                 return;
             }
             Integer realTheoryDays = Math.max(theoryDays, minAllocationDays);
@@ -281,10 +293,12 @@ public class ProductionPlanGroupInfo {
         }
         if (leftOverNeedAllocationDays <= allocationDays) {
             leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        } else {
+            leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
         }
-        leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
         if (leftOverNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
             isAllocationFinish = YesOrNoEnum.YES.getValue();
+            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
         }
     }
 
