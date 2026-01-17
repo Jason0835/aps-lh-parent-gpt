@@ -38,6 +38,10 @@ public interface BusiConstant {
          * 分隔符：逗号
          */
         String SPLIT_COMMA = ",";
+        /**
+         * 分隔符：换行
+         */
+        String SPLIT_NEW_LINE = "\n";
     }
 
 

@@ -168,10 +168,82 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 后置处理
      */
     private void postProcess(MpRollAdjustContextDTO contextDTO) {
+        // 后置检查
+        postCheck(contextDTO);
         // 排序调整明细
         sortAdjustDetailList(contextDTO);
         // 保存调整明细
         saveAdjustDetailList(contextDTO);
+    }
+
+
+    /**
+     * 后置检查
+     * @param contextDTO
+     */
+    protected void postCheck(MpRollAdjustContextDTO contextDTO) {
+        // 检查调整明细列表中的必填字段是否为空
+        List<String> errorMsgList = checkEmptyFields(contextDTO.getAdjustDetailList());
+        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+            return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, errorMsgList));
+        });
+    }
+
+    /**
+     * 检查调整明细列表中的必填字段是否为空
+     * @param adjustDetailList 调整明细列表
+     * @return 错误信息列表
+     */
+    protected List<String> checkEmptyFields(List<MpAdjustDetailVo> adjustDetailList) {
+        // 获取检查为空的字段
+        Map<String, String> checkFieldMap = getCheckEmptyFieldMap();
+        // 错误信息列表
+        List<String> errorMsgList = new ArrayList<>();
+        if (PubUtil.isEmpty(adjustDetailList) || PubUtil.isEmpty(checkFieldMap)) {
+            return errorMsgList;
+        }
+        for (MpAdjustDetailVo detail : adjustDetailList) {
+            String materialCode = detail.getMaterialCode();
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            // 遍历需要检查的字段
+            for (Map.Entry<String, String> entry : checkFieldMap.entrySet()) {
+                // 字段英文名称
+                String fieldEnName = entry.getKey();
+                // 字段中文名称
+                String fieldCnName = entry.getValue();
+                try {
+                    Object fieldValue = detail.getFieldValueByFieldName(fieldEnName);
+                    // 判断字段值是否为空
+                    boolean isEmpty = false;
+                    if (fieldValue == null) {
+                        isEmpty = true;
+                    } else if (fieldValue instanceof String) {
+                        String strValue = (String) fieldValue;
+                        isEmpty = StringUtils.isBlank(strValue);
+                    }
+                    // 字段为空添加错误信息
+                    if (isEmpty) {
+                        String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkEmptyFields"),
+                                materialCode, fieldCnName);
+                        errorMsgList.add(errorMsg);
+                    }
+                } catch (Exception e) {
+                    log.error("物料编码: {} 检查字段【{}】失败：{}", materialCode, fieldCnName, e.getMessage());
+                    continue;
+                }
+            }
+        }
+        return errorMsgList;
+    }
+
+    /**
+     * 获取检查为空的字段
+     * @return
+     */
+    protected Map<String, String> getCheckEmptyFieldMap() {
+        return Collections.emptyMap();
     }
 
     /**
