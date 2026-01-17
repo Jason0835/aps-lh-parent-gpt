@@ -233,7 +233,7 @@ public class MpWeekRollAdjustEngine {
         int secStartDay;
         List<FactoryMonthPlanFinalAdjustVo> canMoveFinalList;
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        //从锁定次日到月底次日，依次遍历
+        //从锁定次日到结构收尾日，依次遍历
         for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
             adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, contextDTO.getDailyCapacityLimitVoMap().get(i), null);
             contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),i,contextDTO.getDailyCapacityLimitVoMap().get(i).toString())).append(ApsConstant.DIVISION);

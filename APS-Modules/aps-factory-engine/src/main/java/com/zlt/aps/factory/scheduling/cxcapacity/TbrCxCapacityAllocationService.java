@@ -333,16 +333,14 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = new ArrayList<>();
         //已有模具的配置关系
         List<MonthPlanProductMouldInfoVo> productMouldInfoList = getDataService().getEnableProductionMouldInfo(productionContext);
-        if (CollectionUtils.isEmpty(productMouldInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addMouldRelationEmptyLog(productionContext));
-        } else {
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldRelationLog(productionContext, productMouldInfoList));
+        if (!CollectionUtils.isEmpty(productMouldInfoList)) {
             allMouldRelationInfoList.addAll(productMouldInfoList);
         }
         //新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
-        if (CollectionUtils.isEmpty(mouldDeliveryList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addMouldDeliveryEmptyLog(productionContext));
-        } else {
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldDeliveryLog(productionContext, mouldDeliveryList));
+        if (!CollectionUtils.isEmpty(mouldDeliveryList)) {
             allMouldRelationInfoList.addAll(mouldDeliveryList);
         }
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
@@ -354,8 +352,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.getBaseDataContainer().setAllMouldInfoMap(allMouldInfo);
         //取状态可用的模具
         List<MonthPlanProductMouldInfoVo> enableMouldRelationInfoList = allMouldRelationInfoList.stream().filter(singleRelationInfo -> YesOrNoEnum.YES.getCode().equals(singleRelationInfo.getMouldStatus())).collect(Collectors.toList());
+        log.info(TbrBeforeProductionGroupLogRecorder.addEnableMouldRelationLog(productionContext, enableMouldRelationInfoList));
         if (CollectionUtils.isEmpty(enableMouldRelationInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addEnableMouldRelationEmptyLog(productionContext));
             return Collections.emptyMap();
         }
         return enableMouldRelationInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
@@ -903,7 +901,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      */
     private void setMonthProductionDays(Context context) {
         List<ProductionDayInfoVo> productionDayInfoList = getDataService().getProductCalendar(context);
-        log.info(TbrBeforeProductionGroupLogRecorder.addProductionCalendarLog(context, productionDayInfoList));
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
             context.setStopDays(Collections.emptySet());
             return;
@@ -923,8 +921,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         context.setCapacityRatioMap(startProductionRatioMap);
         //停产设置
         List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderStopCalendarLog(context, stopDays));
         if (CollectionUtils.isEmpty(stopDays)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addNoStopCalendarLog(context));
             context.setStopDays(Collections.emptySet());
             return;
         }
@@ -974,8 +972,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Set<String> structureNameMap = requirePlanList.stream().map(MonthPlanProductionRequirePlanVo::getStructureName).collect(Collectors.toSet());
         List<String> structureNameList = new ArrayList<>(structureNameMap);
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getDataService().getLhRatioInfo(context, structureNameList);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxLhGroupRatioLog(context, structureLhRatioList));
         if (CollectionUtils.isEmpty(structureLhRatioList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addCxLhGroupRatioEmptyLog(context));
             return Collections.emptyList();
         }
         //机型为空值，表示所有机型匹配
