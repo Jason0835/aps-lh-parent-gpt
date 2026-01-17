@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.constant.UserConstants;
@@ -19,7 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -96,4 +100,99 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 唯一校验字段
         return Arrays.asList("factoryCode","year","month","structureName");
     }
+
+
+    /**
+     * 获取日期最接近的下一个结构
+     * @param param
+     * @return
+     */
+    @Override
+    public MpStructureAllocation getNextStructure(MpStructureAllocation param) {
+        // 通过工厂、年月、成型机编码获取结构排产列表
+        QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+        builderCondition(queryWrapper, param);
+        List<MpStructureAllocation> structureAllocationList = entityMapper.selectList(queryWrapper);
+        // 开始日期
+        Integer beginDay = param.getBeginDay();
+        // 结束日期
+        Integer endDay = param.getEndDay();
+        // 调整结束日期
+        Integer adjustEndDay = param.getAdjustEndDay();
+        // 排序（按开始日期升序，开始日期相同则按结束日期升序排序）
+        structureAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay,
+                Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(MpStructureAllocation::getEndDay,
+                        Comparator.nullsLast(Integer::compareTo)));
+        // 从集合中找出日期最接近目标开始日期和结束日期的数据
+        MpStructureAllocation structureAllocation = getClosestStructureAllocation(structureAllocationList, param.getId(), beginDay, endDay);
+        structureAllocation.setBeginDay(adjustEndDay);
+        return structureAllocation;
+    }
+
+
+    /**
+     * 从集合中找出日期最接近目标开始日期和结束日期的数据
+     * @param list
+     * @param excludeId
+     * @param targetBeginDay
+     * @param targetEndDay
+     * @return
+     */
+    private MpStructureAllocation getClosestStructureAllocation(List<MpStructureAllocation> list,
+                                                                         Long excludeId, Integer targetBeginDay,
+                                                                         Integer targetEndDay) {
+        if (PubUtil.isEmpty(list) || targetBeginDay == null || targetEndDay == null || excludeId == null) {
+            return null;
+        }
+        Optional<MpStructureAllocation> result = list.stream()
+                .filter(e -> !excludeId.equals(e.getId()))
+                .filter(e -> isNextElement(e, targetBeginDay, targetEndDay))
+                // 按日期接近度排序（差值绝对值之和越小越接近）
+                .min((a1, a2) -> {
+                    int distance1 = calculateDistance(a1.getBeginDay(), a1.getEndDay(),
+                            targetBeginDay, targetEndDay);
+                    int distance2 = calculateDistance(a2.getBeginDay(), a2.getEndDay(),
+                            targetBeginDay, targetEndDay);
+                    return Integer.compare(distance1, distance2);
+                });
+        log.info("获取日期最接近的下一个结构 ==> 目标id[{}] 目标开始时间[{}] 目标结束时间[{}] 结构[{}]", excludeId, targetBeginDay, targetEndDay,
+                JSONObject.toJSONString(result.orElse(null)));
+        return result.orElse(null);
+    }
+
+    /**
+     * 计算beginDay差值绝对值 + endDay差值绝对值
+     * 距离越小，说明和目标日期越接近
+     */
+    private int calculateDistance(Integer begin, Integer end, Integer targetBegin, Integer targetEnd) {
+        int beginDiff = begin == null ? Math.abs(targetBegin) : Math.abs(begin - targetBegin);
+        int endDiff = end == null ? Math.abs(targetEnd) : Math.abs(end - targetEnd);
+        return beginDiff + endDiff;
+    }
+
+    /**
+     * 判断当前数据是否比目标日期大
+     */
+    private boolean isNextElement(MpStructureAllocation allocation,
+                                         Integer targetBegin, Integer targetEnd) {
+        Integer begin = allocation.getBeginDay();
+        Integer end = allocation.getEndDay();
+        if (begin == null || end == null) {
+            return Boolean.FALSE;
+        }
+        if (begin > targetBegin) {
+            return Boolean.TRUE;
+        } else if (begin.equals(targetBegin)) {
+            return end > targetEnd;
+        } else {
+            return  Boolean.FALSE;
+        }
+    }
+
+
+
+
+
+
 }
