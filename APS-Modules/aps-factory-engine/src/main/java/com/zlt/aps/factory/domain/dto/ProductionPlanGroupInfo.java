@@ -1225,6 +1225,7 @@ public class ProductionPlanGroupInfo {
         //按结构+主花纹分组模具信息
         Map<String, List<MonthPlanProductMouldInfoVo>> structureMainPatternGroup = allMouldRelation.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getStructureNameAndMainPattern));
         Map<String, Integer> structureAndMainPatternMap = new HashMap<>();
+        Map<String, MouldAllocationInfoVo> structureMainPatternAllocation = productionContext.getBaseDataContainer().getGroupMainPatternAllocationMap();
         structureMainPatternGroup.forEach((structureAndMainPattern, mouldRelationList) -> {
             Integer maxMouldNumber = BigDecimal.ZERO.intValue();
             if (CollectionUtils.isEmpty(mouldRelationList)) {
@@ -1235,6 +1236,14 @@ public class ProductionPlanGroupInfo {
             List<Long> mouldNumberList = new ArrayList<>(materialGroup.values());
             mouldNumberList.sort(Comparator.comparing(Long::valueOf, Comparator.reverseOrder()));
             maxMouldNumber = mouldNumberList.get(BigDecimal.ZERO.intValue()).intValue();
+            //增加与分配比例的比较
+            if (!structureMainPatternAllocation.containsKey(structureAndMainPattern)) {
+                structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
+                return;
+            }
+            //分配比例与最大数，二者取最小
+            Integer limitNumber = structureMainPatternAllocation.get(structureAndMainPattern).getAllocationQty();
+            maxMouldNumber = Math.min(maxMouldNumber, limitNumber);
             structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
         });
         return structureAndMainPatternMap;
