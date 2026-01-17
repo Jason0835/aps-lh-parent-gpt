@@ -111,6 +111,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         List<String> paramCodeList = new ArrayList<>();
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MULTI_CX_MACHINE_LOCK_DAYS.getCode());
+        paramCodeList.add(MonthPlanEnums.TRIAL_SKU_SINGLE_DAY_QTY_UP_LIMIT.getCode());
+        paramCodeList.add(MonthPlanEnums.TRIAL_SKU_STRUCT_START_DAY_IS_PRODUCTION.getCode());
+        paramCodeList.add(MonthPlanEnums.TRIAL_SKU_SUNDAY_IS_PRODUCTION.getCode());
         return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
