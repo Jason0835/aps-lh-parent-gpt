@@ -81,6 +81,7 @@
         DATA_VERSION,
         COMPANY_CODE,
         FACTORY_CODE,
+        BRAND,
         CONCAT(ISNULL(SPECIFICATIONS, ''), ISNULL(PATTERN, '')) AS structureName
         FROM MES_BAS_MATERIAL
         WHERE 1 = 1
