@@ -60,7 +60,9 @@ public class MpWeekRollAdjustEngine {
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
             if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustStructureIn.getConstructionStage())){
-                trialAdjustList.add(adjustStructureIn);
+                if (adjustStructureIn.getConfirmAdjustQty() > 0){
+                    trialAdjustList.add(adjustStructureIn);
+                }
                 continue;
             }
             if (adjustStructureIn.getConfirmAdjustQty() < 0){
@@ -126,7 +128,11 @@ public class MpWeekRollAdjustEngine {
         //8.试制
         //1）试制不受胎胚种类数\机台数的限制；
         //2）试制是紧急的，可以在锁定期内插单；普通的，在锁定期外1天插单；
+        startTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         structureInAdjustWithTrial(contextDTO,trialAdjustList,mpProdFinalList);
+        endTime = new Date();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
 
     /**
@@ -156,6 +162,7 @@ public class MpWeekRollAdjustEngine {
                 newOnlineDay = getTrialNewOnlineDay(contextDTO,contextDTO.getLockEndDay()+1,contextDTO.getStructureDeadLine(),mpProdFinalList);
             }
             if (newOnlineDay == null){
+                contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,没有获取到可上机日,可能是日限制量或周日或结构起产日的约束!",contextDTO.getStructureName(), structureIn.getMaterialCode())).append(ApsConstant.DIVISION);
                 continue;
             }
             // 设置 试制计划量
@@ -163,6 +170,7 @@ public class MpWeekRollAdjustEngine {
             dayField = FactoryConstant.DAY_FIELD + newOnlineDay;
             mpFinalVo.setFieldValueByFieldName(dayField,structureIn.getConfirmAdjustQty());
             mpProdFinalList.add(mpFinalVo);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,排产上机日:%s,排产量:%s!",contextDTO.getStructureName(), structureIn.getMaterialCode(), newOnlineDay,structureIn.getConfirmAdjustQty())).append(ApsConstant.DIVISION);
         }
     }
 
@@ -641,7 +649,7 @@ public class MpWeekRollAdjustEngine {
         for (DailyScheduleVo scheduleVo:schedules){
             dayField = FactoryConstant.DAY_FIELD+iDay;
             prodFinal.setFieldValueByFieldName(dayField,scheduleVo.getSkuQuantity());
-            sb.append(scheduleVo.getSkuQuantity());
+            sb.append(scheduleVo.getSkuQuantity()).append(",");
             iDay +=1;
         }
         contextDTO.getLogDetail().append(String.format("结构:%s,【降模排产】,物料编码:%s,降模前的计划量:%s,降模开始日:%s,降模每日计划量:%s",contextDTO.getStructureName(),prodFinal.getMaterialCode(),dayQty,deductMouldVo.getStartDate(),sb.toString())).append(ApsConstant.DIVISION);
