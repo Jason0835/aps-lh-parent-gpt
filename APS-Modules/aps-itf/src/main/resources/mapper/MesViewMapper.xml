@@ -9,17 +9,16 @@
         MES_MATERIAL_CODE,
         STOCK_NUM AS STOCK_QTY,
         WEEK_YEAR,
-        IS_UNIFORMITY,
-        IS_DYNAMIC_BALANCE,
-        CONVERT(DATE, STOCK_END_TIME, 23) AS STOCK_END_TIME,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
+        -- IS_UNIFORMITY,
+        -- IS_DYNAMIC_BALANCE,
+        -- CONVERT(DATE, STOCK_END_TIME, 23) AS STOCK_END_TIME,
+        -- DATA_VERSION,
+        -- COMPANY_CODE,
+        '116' AS FACTORY_CODE
         FROM mes_product_stock
         WHERE 1 = 1
         <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="params != null">
             <if test="params.materialCodeList != null and params.materialCodeList.size() > 0">
                 AND MATERIAL_CODE IN
@@ -35,14 +34,13 @@
         MATERIAL_CODE,
         MES_MATERIAL_CODE,
         STOCK_NUM AS STOCK_QTY,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
+        -- DATA_VERSION,
+        -- COMPANY_CODE,
+        '116' AS FACTORY_CODE
         FROM mes_unqualified_stock
         WHERE 1 = 1
         <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
     </select>
 
     <select id="selectRawSpecialMaterialStock"
@@ -51,13 +49,12 @@
         SPEC_MATERIAL_CODE AS MATERIAL_CODE,
         STANDARD_CODE AS STANDARD_LENGTH,
         STOCK_NUM AS STOCK,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
+        -- DATA_VERSION,
+        -- COMPANY_CODE,
+        '116' AS FACTORY_CODE
         FROM SPEC_STOCK_SYNC
         WHERE 1 = 1
         <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
     </select>
 </mapper>
