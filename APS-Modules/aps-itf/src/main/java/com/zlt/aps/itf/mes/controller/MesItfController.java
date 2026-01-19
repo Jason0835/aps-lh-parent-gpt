@@ -7,6 +7,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
@@ -250,5 +251,16 @@ public class MesItfController {
     @PostMapping("/issueMonthPlan")
     public AjaxResult issueMonthPlan(@RequestBody List<FactoryMonthPlanProductionFinalResult> finalResultList) {
         return iMonthPlanIssueService.issueMonthPlan(finalResultList);
+    }
+
+    /**
+     * 查询MES品牌字典
+     *
+     * @return 结果
+     */
+    @ApiOperation("查询MES品牌字典")
+    @PostMapping("/selectMesBrandDict")
+    public List<MesBrandDict> selectMesBrandDict() {
+        return mesItfService.selectMesBrandDict();
     }
 }

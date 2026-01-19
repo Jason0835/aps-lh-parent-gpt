@@ -1,32 +1,24 @@
 package com.zlt.aps.controller.maindata;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.exception.ServiceException;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryParamVo;
 import com.zlt.aps.monthplan.api.service.IFactoryParamRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.Arrays;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -91,5 +83,19 @@ public class FactoryParamUIController extends BaseUIController<FactoryParam> {
     @ResponseBody
     public AjaxResult copy(FactoryParamVo vo) {
         return iFactoryParamService.copy(vo);
+    }
+
+    @Autowired
+    private IMesItfService iMesItfService;
+
+    /**
+     * 查询MES品牌字典
+     *
+     * @return 结果
+     */
+    @ApiOperation("查询MES品牌字典")
+    @PostMapping("/selectMesBrandDict")
+    public List<MesBrandDict> selectMesBrandDict() {
+        return iMesItfService.selectMesBrandDict();
     }
 }

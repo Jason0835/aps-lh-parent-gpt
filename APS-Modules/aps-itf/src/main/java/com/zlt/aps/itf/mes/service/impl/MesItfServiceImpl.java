@@ -12,6 +12,7 @@ import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -677,5 +678,15 @@ public class MesItfServiceImpl implements MesItfService {
      */
     private List<MdmMouldShellInfo> getMoldShellList(AuxReqSyncDataLogs syncDataLogs) {
         return mesItfMapper.selectMoldShellList(syncDataLogs);
+    }
+
+    /**
+     * 查询品牌信息
+     *
+     * @return 结果
+     */
+    @Override
+    public List<MesBrandDict> selectMesBrandDict() {
+        return mesViewMapper.selectMesBrandDict();
     }
 }
