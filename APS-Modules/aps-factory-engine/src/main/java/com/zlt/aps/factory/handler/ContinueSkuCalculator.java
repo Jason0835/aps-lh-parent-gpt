@@ -49,6 +49,8 @@ public class ContinueSkuCalculator {
             log.info(TbrProductionGroupLogRecorder.addContinueGroupNoContinueSkuLog(context, groupName));
             return;
         }
+        //20260119 初始设置：续作在产机台信息，可能续作本身没有计划(高优先级没有量或是计划没有量)
+        continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> cxContinueSkuInfo.setOnLineCxMachineSet(groupContinueInfo.getCxMachineCodeSet()));
         //提取续作Sku计划
         Set<String> skuMaterialDescSet = continueSkuMouldNumberMap.keySet();
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = groupPlanList.stream().filter(groupPlan -> groupPlan.hasProduction() && skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
@@ -65,7 +67,6 @@ public class ContinueSkuCalculator {
             Integer planDemandQty = getContinueSkuSummaryQty(planList);
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
-            cxContinueSkuInfo.setOnLineCxMachineSet(groupContinueInfo.getCxMachineCodeSet());
             if (CollectionUtils.isEmpty(planList)) {
                 log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc));
                 return;
