@@ -203,17 +203,22 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      */
     @Override
     protected void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
+        int beginDay = FactoryConstant.MONTH_MAX_DAY;
         int endDay = 0;
         List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
         if (PubUtil.isNotEmpty(structureAllocationList)){
             // 取最大的成型机收尾日作为结构的收尾日
             for (MpStructureAllocation allocation:structureAllocationList){
+                if (beginDay > allocation.getBeginDay()){
+                    beginDay = allocation.getBeginDay();
+                }
                 if (endDay < allocation.getEndDay()){
                     endDay = allocation.getEndDay();
                 }
             }
         }
 
+        contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
         //若结构收尾日小于锁定日，提示
         if (contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){

@@ -75,6 +75,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "排产机台")
     private String scheduledMachines;
 
+    @ApiModelProperty(value = "结构起产日")
+    private Integer structureStartDay;
+
     @ApiModelProperty(value = "结构收尾日")
     private Integer structureDeadLine;
 
