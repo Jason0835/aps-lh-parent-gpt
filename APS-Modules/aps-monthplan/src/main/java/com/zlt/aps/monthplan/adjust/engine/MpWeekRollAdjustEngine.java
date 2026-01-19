@@ -1314,22 +1314,19 @@ public class MpWeekRollAdjustEngine {
             mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
             productionQty -= adjustStructInVo.getPostponeQty();
         }
-
         if (adjustStructInVo.getHeightQty()>=0 && productionQty >=0){
             //有高优先级需求
             mpFinalVo.setHeightProductionQty(adjustStructInVo.getHeightQty());
             productionQty -= adjustStructInVo.getHeightQty();
-        }else {
-            if (adjustStructInVo.getCycleReserveQty()>=0 && productionQty >=0){
-                //有周期性需求
-                mpFinalVo.setCycleProductionQty(adjustStructInVo.getCycleReserveQty());
-                productionQty -= adjustStructInVo.getCycleReserveQty();
-            }else{
-                //其他全归到 中优先级需求
-                if (productionQty >=0){
-                    mpFinalVo.setMidProductionQty(productionQty);
-                }
-            }
+        }
+        if (adjustStructInVo.getCycleReserveQty()>=0 && productionQty >=0){
+            //有周期性需求
+            mpFinalVo.setCycleProductionQty(adjustStructInVo.getCycleReserveQty());
+            productionQty -= adjustStructInVo.getCycleReserveQty();
+        }
+        //其他全归到 中优先级需求
+        if (productionQty >=0){
+            mpFinalVo.setMidProductionQty(productionQty);
         }
     }
 
