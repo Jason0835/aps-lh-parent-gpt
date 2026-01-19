@@ -16,10 +16,7 @@ import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.service.*;
-import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
-import com.zlt.aps.maindata.mapper.ProductMinConfigurationMapper;
+import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
 import com.zlt.aps.maindata.service.IProductALevelService;
@@ -56,6 +53,10 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final MonthPlanRequireMapper monthPlanRequireMapper;
 
     private final MdmInterestRateEntityMapper interestRateMapper;
+
+    private final MdmWorkWearInfoEntityMapper workWearInfoEntityMapper;
+
+    private final MdmCapsuleChuckEntityMapper capsuleChuckEntityMapper;
 
     private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
 
@@ -266,6 +267,28 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         Map<String, CxDevicePlanShutInfoHelper> cxStopInfo = getCxMachineStopInfo(context);
         cxMachineInfoMap.forEach((cxMachineCode, cxMachineInfo) -> setCxMachineDayInfo(cxStopInfo, context, cxMachineInfo));
         return cxMachineInfoMap;
+    }
+
+    @Override
+    public List<MdmWorkWearInfo> getWorkWearInfo(Context context) {
+        if (isEmptyFactoryCode(context)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<MdmWorkWearInfo> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return workWearInfoEntityMapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<MdmCapsuleChuck> getCapsuleChuck(Context context) {
+        if (isEmptyFactoryCode(context)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<MdmCapsuleChuck> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return capsuleChuckEntityMapper.selectList(queryWrapper);
     }
 
     @Override

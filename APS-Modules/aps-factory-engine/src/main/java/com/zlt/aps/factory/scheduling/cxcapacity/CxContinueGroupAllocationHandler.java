@@ -98,6 +98,10 @@ public class CxContinueGroupAllocationHandler {
         //粗算得到的机台
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
         Integer productionCount = productionCxMachineCodeSet.size();
+//        //20260119 修正在产机台数：成型鼓数量
+//        String proSize = groupPlanInfo.getProSizeInfo();
+//        Integer maxCount = productionContext.getBaseDataContainer().getLeftOverQtyByProSizeAndContinueGroupPlan(proSize);
+//        productionCount = Math.min(maxCount, productionCount);
         //1、排产续作部分（续作Sku高优先级排产、同规格同花纹高优级排产、同生胎同模具高优级排产）
         productionContinue(productionContext, groupPlanInfo, groupContinueInfo, mouldShellMap);
         /**

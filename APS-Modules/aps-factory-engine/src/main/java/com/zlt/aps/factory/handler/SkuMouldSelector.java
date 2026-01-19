@@ -78,12 +78,15 @@ public class SkuMouldSelector {
         }
         //20260116 得到模壳标准：理论只有一个模壳标准
         MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(effectiveList.get(BigDecimal.ZERO.intValue()));
-        Integer leftOverUsedQty = mouldShellInfo.getLeftOverUsedQtyByContinueSku();
-        max = Math.min(max, leftOverUsedQty);
-        //20260117 获取模具分配比例：理论最大
+        Integer mouldShellLimitQty = mouldShellInfo.getLeftOverUsedQtyByContinueSku();
+        max = Math.min(max, mouldShellLimitQty);
+        //20260117 获取模具分配比例
         MonthPlanProductionRequirePlanVo productionPlan = productionContext.getAllSkuProductionPlan().get(materialDesc).get(BigDecimal.ZERO.intValue());
-        Integer limitQty = productionContext.getMouldAllocationLimitQty(productionPlan);
-        max = Math.min(max, limitQty);
+        Integer mouldAllocationLimitQty = productionContext.getMouldAllocationLimitQty(productionPlan);
+        max = Math.min(max, mouldAllocationLimitQty);
+        //20260119 获取胶囊卡盘的数量
+        Integer capsuleChuckLimitQty = productionContext.getCapsuleChuckLimitQty(productionPlan);
+        max = Math.min(max, capsuleChuckLimitQty);
         effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
                 .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
                 .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));

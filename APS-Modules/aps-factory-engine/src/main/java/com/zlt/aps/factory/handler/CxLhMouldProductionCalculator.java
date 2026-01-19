@@ -558,25 +558,38 @@ public class CxLhMouldProductionCalculator {
             MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
             doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineInfo));
         });
-        //模壳的使用量 更新
-        doubleMouldList.forEach(singleMould -> {
-            String mouldSetCode = singleMould.getMouldSetCode();
-            if (StringUtils.isBlank(mouldSetCode)) {
-                return;
-            }
-            MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(singleMould);
-            if (null == mouldShellInfo) {
-                return;
-            }
-            mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
-        });
-        //模具分配使用量更新
         MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        //模具分配比例控制对象
         MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
-        if (null == mouldAllocationControlInfo) {
-            return;
-        }
-        doubleMouldList.forEach(singleMould -> mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode()));
+        //胶囊卡盘数量控制对象
+        CapsuleChuckInfoVo capsuleChuckInfo = productionContext.getCapsuleChuckInfo(productionPlan);
+        doubleMouldList.forEach(singleMould -> {
+            //模壳标准使用量
+            updateMouldShellInfoByMould(productionContext, productionDay, singleMould);
+            //模具分配比例使用量
+            updateMouldAllocationRatioInfoByMould(mouldAllocationControlInfo, productionDay, singleMould);
+            //胶囊卡盘使用量
+            updateCapsuleChuckInfoByMould(capsuleChuckInfo, productionDay, singleMould);
+        });
+
+
+//        //模壳的使用量 更新
+//        doubleMouldList.forEach(singleMould -> {
+//            String mouldSetCode = singleMould.getMouldSetCode();
+//            if (StringUtils.isBlank(mouldSetCode)) {
+//                return;
+//            }
+//            MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(singleMould);
+//            if (null == mouldShellInfo) {
+//                return;
+//            }
+//            mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+//        });
+//        //模具分配使用量更新
+//        if (null == mouldAllocationControlInfo) {
+//            return;
+//        }
+//        doubleMouldList.forEach(singleMould -> mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode()));
     }
 
     /**
@@ -612,6 +625,65 @@ public class CxLhMouldProductionCalculator {
         dayLimit.getProductionEmbryoCodeSet().add(productionSkuInfo.getEmbryoCode());
         dayLimit.getProductionMouldSet().addAll(usedMouldSet);
     }
+
+    /**
+     * 更新模壳使用量
+     *
+     * @param productionContext 排产上下文
+     * @param productionDay     排产日
+     * @param singleMould       单副模具
+     */
+    private static void updateMouldShellInfoByMould(TbrProductionContext productionContext, Integer productionDay, ProductionMouldInfoVo singleMould) {
+        //模具使用的模壳标准
+        String mouldSetCode = singleMould.getMouldSetCode();
+        if (StringUtils.isBlank(mouldSetCode)) {
+            return;
+        }
+        //取得模壳标准控制信息对象
+        MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(singleMould);
+        if (null == mouldShellInfo) {
+            return;
+        }
+        //使用数+1
+        mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+    }
+
+    /**
+     * 更新模具分配比例的使用
+     * 数量 + 1
+     *
+     * @param mouldAllocationControlInfo 模具分配比例对象
+     * @param productionDay              排产日
+     * @param singleMould                单副模具
+     */
+    private static void updateMouldAllocationRatioInfoByMould(MouldAllocationInfoVo mouldAllocationControlInfo, Integer productionDay, ProductionMouldInfoVo singleMould) {
+        if (null == mouldAllocationControlInfo) {
+            return;
+        }
+        if (null == singleMould || StringUtils.isBlank(singleMould.getMouldCode())) {
+            return;
+        }
+        mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+    }
+
+    /**
+     * 更新模具胶囊卡盘使用
+     * 数量 + 1
+     *
+     * @param capsuleChuckInfo 模具胶囊卡盘对象
+     * @param productionDay    排产日
+     * @param singleMould      单副模具
+     */
+    private static void updateCapsuleChuckInfoByMould(CapsuleChuckInfoVo capsuleChuckInfo, Integer productionDay, ProductionMouldInfoVo singleMould) {
+        if (null == capsuleChuckInfo) {
+            return;
+        }
+        if (null == singleMould || StringUtils.isBlank(singleMould.getMouldCode())) {
+            return;
+        }
+        capsuleChuckInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+    }
+
 
     private CxLhMouldProductionCalculator() {
 
