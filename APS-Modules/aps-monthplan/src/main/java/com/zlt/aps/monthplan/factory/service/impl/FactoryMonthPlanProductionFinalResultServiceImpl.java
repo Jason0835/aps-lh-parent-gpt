@@ -348,10 +348,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
          */
         queryWrapper.like(PubUtil.isNotEmpty(condition.getMaterialCode()), "MATERIAL_CODE", condition.getMaterialCode());
         queryWrapper.like(PubUtil.isNotEmpty(condition.getMaterialDesc()), "MATERIAL_DESC", condition.getMaterialDesc());
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getMainMaterialDesc()), "MAIN_MATERIAL_DESC", condition.getMainMaterialDesc());
         queryWrapper.eq(PubUtil.isNotEmpty(condition.getConstructionStage()), "CONSTRUCTION_STAGE", condition.getConstructionStage());
         queryWrapper.eq(PubUtil.isNotEmpty(condition.getBrand()), "BRAND", condition.getBrand());
         queryWrapper.eq(PubUtil.isNotEmpty(condition.getProSize()), "PRO_SIZE", condition.getProSize());
         queryWrapper.like(PubUtil.isNotEmpty(condition.getSpecifications()), "SPECIFICATIONS", condition.getSpecifications());
+        queryWrapper.like(PubUtil.isNotEmpty(condition.getMainPattern()), "MAIN_PATTERN", condition.getMainPattern());
         queryWrapper.like(PubUtil.isNotEmpty(condition.getPattern()), "PATTERN", condition.getPattern());
         queryWrapper.like(PubUtil.isNotEmpty(condition.getStructureName()), "STRUCTURE_NAME", condition.getStructureName());
 
