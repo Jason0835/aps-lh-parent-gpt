@@ -688,7 +688,7 @@ public class MpWeekRollAdjustEngine {
             }
             sb.append(prodFinal.getFieldValueByFieldName(matchDayField)).append(",");
             if (totalMatchQty == 0){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,收尾->开始的每日搭配量:%s",contextDTO.getStructureName(), oriTotalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,物料编码:%s,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,收尾->开始的每日搭配量:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),oriTotalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
                 //剩余搭配量=0,退出
                 break;
             }
@@ -1308,6 +1308,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setHeightProductionQty(mpFinalVo.getHeightProductionQty() == null ? 0:mpFinalVo.getHeightProductionQty());
         mpFinalVo.setCycleProductionQty(mpFinalVo.getCycleProductionQty() == null ? 0:mpFinalVo.getCycleProductionQty());
         mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
+        mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
 
         if (adjustStructInVo.getPostponeQty()>=0 && productionQty >=0){
             //有暂缓需求
