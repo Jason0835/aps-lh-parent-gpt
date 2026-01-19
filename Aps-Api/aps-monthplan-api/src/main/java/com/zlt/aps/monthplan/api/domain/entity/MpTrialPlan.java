@@ -116,6 +116,7 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 产品状态 数据字典 biz_construction_stage 01=试制,02=量试
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mpTrialPlan.trialStatus", dictType = "trial_construction_stage")
     @ApiModelProperty(value = "产品状态 数据字典 biz_construction_stage 01=试制,02=量试", name = "trialStatus")
     @TableField(value = "TRIAL_STATUS")
