@@ -134,9 +134,11 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
                 importDocEntity.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                importDocEntity.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
+                importDocEntity.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
                 importDocEntity.setTextNo(mdmSkuConstructionRef.getTextNo());
+                importDocEntity.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
                 importDocEntity.setLhNo(mdmSkuConstructionRef.getLhNo());
+                importDocEntity.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
             }
         }
         if (serviceCheckParams.containsKey("materialInfoMap")) {

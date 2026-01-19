@@ -103,9 +103,11 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
                 billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                billVO.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
+                billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
                 billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
+                billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
                 billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
+                billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
             }
         }
         return super.save(billVO);
