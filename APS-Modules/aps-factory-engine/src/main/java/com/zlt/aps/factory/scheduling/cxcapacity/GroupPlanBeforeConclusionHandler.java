@@ -8,6 +8,7 @@ import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
+import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.Getter;
@@ -178,15 +179,13 @@ public class GroupPlanBeforeConclusionHandler {
      * 3、分配信息更新调整分配信息
      * 4、是否需要清除排产信息？
      *
-     * @param productionContext   排产上下文
-     * @param minLhMachineCount   最低硫化配比
-     * @param beforeConclusionDay 提前收尾日
-     * @param deductionDay        提前收尾的天数
-     * @param deductionDaySet     需要提前收尾的天集合
-     * @param groupPlanInfo       分组计划
-     * @param cxMachineInfo       成型机台
-     * @param allocationInfo      成型机台分配详情
-     * @param isSingleMachine     是否单机台
+     * @param productionContext    排产上下文
+     * @param minLhMachineCount    最低硫化配比
+     * @param beforeConclusionInfo 提前收尾信息对象
+     * @param groupPlanInfo        分组计划
+     * @param cxMachineInfo        成型机台
+     * @param allocationInfo       成型机台分配详情
+     * @param isSingleMachine      是否单机台
      */
     private static void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
         //重新计算(分组)分配的天数: 需要排产天数 - 还需排产天数 - 收尾天数
@@ -222,6 +221,8 @@ public class GroupPlanBeforeConclusionHandler {
         if (CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
+        //20260119 释放，成型工装
+        cxMachineInfo.handlerBeforeConclusion(productionContext, deductionDaySet, groupPlanInfo);
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
         //已排产的模具信息？
         if (isSingleMachine) {
@@ -252,6 +253,8 @@ public class GroupPlanBeforeConclusionHandler {
                     if (CollectionUtils.isEmpty(dayProductionList)) {
                         return;
                     }
+                    //20260119 释放，模具分配比例、模壳标准、胶囊卡盘
+                    CxLhMouldProductionCalculator.handlerBeforeConclusion(productionContext, groupPlanInfo, singleDeductionDay, mouldInfo, materialDesc);
                     List<CxMouldDayProductionHelper> reserveList = new ArrayList<>();
                     dayProductionList.forEach(singleProduction -> {
                         if (!materialDesc.equals(singleProduction.getMaterialDesc())) {
