@@ -143,14 +143,16 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
         // 查询成型机台
         List<String> machineCodeList = list.stream().map(MdmCxMachineFixed::getCxMachineCode).collect(Collectors.toList());
-        LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(MdmMoldingMachine::getCxMachineCode, machineCodeList);
-        List<MdmMoldingMachine> moldingMachineList = mdmMoldingMachineEntityMapper.selectList(wrapper);
-        Map<String, MdmMoldingMachine> mdmMoldingMachineMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(moldingMachineList)) {
-            mdmMoldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getCxMachineCode()), Function.identity(), (v1, v2) -> v1));
+        if (CollectionUtils.isNotEmpty(machineCodeList)) {
+            LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmMoldingMachine::getCxMachineCode, machineCodeList);
+            List<MdmMoldingMachine> moldingMachineList = mdmMoldingMachineEntityMapper.selectList(wrapper);
+            Map<String, MdmMoldingMachine> mdmMoldingMachineMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(moldingMachineList)) {
+                mdmMoldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getCxMachineCode()), Function.identity(), (v1, v2) -> v1));
+            }
+            serviceCheckParams.put("moldingMachineMap", mdmMoldingMachineMap);
         }
-        serviceCheckParams.put("moldingMachineMap", mdmMoldingMachineMap);
         return serviceCheckParams;
     }
 
