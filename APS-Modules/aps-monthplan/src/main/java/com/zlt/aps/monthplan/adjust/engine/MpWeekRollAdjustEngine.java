@@ -144,13 +144,25 @@ public class MpWeekRollAdjustEngine {
         }
         //1、排序：按紧急程度/普通程度
         trialAdjustList = trialAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
-        int newOnlineDay = 0;
+        Integer newOnlineDay;
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
+        String dayField;
         for (MpAdjustStructureIn structureIn:trialAdjustList){
             if (UrgencyTypeEnum.URGENCY.getValue().equals(structureIn.getUrgencyType())){
-                //紧急
+                //紧急,可以从调整日开始
                 newOnlineDay = getTrialNewOnlineDay(contextDTO,contextDTO.getAdjustDay(),contextDTO.getStructureDeadLine(),mpProdFinalList);
+            }else {
+                //紧急,可以从锁定次日工始
+                newOnlineDay = getTrialNewOnlineDay(contextDTO,contextDTO.getLockEndDay()+1,contextDTO.getStructureDeadLine(),mpProdFinalList);
             }
-
+            if (newOnlineDay == null){
+                continue;
+            }
+            // 设置 试制计划量
+            mpFinalVo = createMpFinalAdjustVo(contextDTO, structureIn);
+            dayField = FactoryConstant.DAY_FIELD + newOnlineDay;
+            mpFinalVo.setFieldValueByFieldName(dayField,structureIn.getConfirmAdjustQty());
+            mpProdFinalList.add(mpFinalVo);
         }
     }
 
@@ -171,7 +183,7 @@ public class MpWeekRollAdjustEngine {
         String isStartDayStr = (String)contextDTO.getParamMap().get(MonthPlanEnums.TRIAL_SKU_STRUCT_START_DAY_IS_PRODUCTION.getCode());
         //试制、量试SKU在周日是否允许排产
         String isSunDayStr = (String)contextDTO.getParamMap().get(MonthPlanEnums.TRIAL_SKU_SUNDAY_IS_PRODUCTION.getCode());
-        for (int i = startDay; i<endDay; i++){
+        for (int i = startDay; i <= endDay; i++){
             if (!FactoryConstant.YES_VALUE.equals(isStartDayStr) && contextDTO.getStructureStartDay() == i){
                 //1、若试制、量试SKU在结构起产日不允许排产，则需排除
                 continue;
@@ -1034,6 +1046,8 @@ public class MpWeekRollAdjustEngine {
                 }
                 dayField = FactoryConstant.DAY_FIELD + i;
                 dayValue = mpFinalVo.getFieldValueByFieldName(dayField) == null ? 0 : (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+                //若剩余计划量 < 日硫化量，则按剩余计划量累加
+                dayVulcanizationQty = newPlanQty < dayVulcanizationQty ? newPlanQty : dayVulcanizationQty;
                 dayValue += dayVulcanizationQty;
                 mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
                 adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), mpFinalVo.getMainPattern());
