@@ -3,5 +3,52 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper">
-
+    <select id="listReport" resultType="com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor">
+        SELECT v.STRUCTURE_NAME,
+		       v.MATERIAL_CODE,
+		       v.MATERIAL_DESC,
+		       v.MAIN_MATERIAL_DESC,
+		       v.MOULD_QTY, 
+		       v.NET_DEMAND_QTY,
+		       v.SCHEDULE_QTY,
+		       v.ONBOARD_DATE,
+		       v.UNQUALIFIED_QTY,
+		       v.PRODUCTION_QTY,
+		       v.LH_MARGIN,
+		       v.EXPECTED_CLOSE_DAY,
+		       r.CX_MACHINE_CODE AS CX_MACHINE,
+		       GROUP_CONCAT(distinct LH_MACHINE_CODE) AS LH_MACHINE
+		  FROM t_mp_month_plan_monitor v
+		    LEFT join T_MP_MOULDING_DAY_RESULT r
+		      ON r.PRODUCTION_VERSION = v.PRODUCTION_VERSION
+		     AND r.MATERIAL_CODE = v.MATERIAL_CODE
+		     AND r.IS_DELETE = 0
+		    LEFT join t_lh_schedule_result lh
+		      ON lh.MONTH_PLAN_NO = v.PRODUCTION_VERSION
+		     AND lh.PRODUCT_CODE = v.MATERIAL_CODE
+		     AND lh.IS_DELETE = 0
+		 WHERE v.year = #{year}
+		   AND v.month = #{month}
+		   AND v.factory_code = #{factoryCode}
+		   <if test="materialCode != null and materialCode != ''">
+		   AND v.MATERIAL_CODE like concat('%', #{materialCode}, '%')
+		   </if>
+           <if test="materialDesc != null and materialDesc != ''">
+		   AND v.MATERIAL_DESC like concat('%', #{materialDesc}, '%')
+           </if>
+		   AND v.IS_DELETE = 0
+		 GROUP BY v.STRUCTURE_NAME,
+		       v.MATERIAL_CODE,
+		       v.MATERIAL_DESC,
+		       v.MAIN_MATERIAL_DESC,
+		       v.MOULD_QTY, 
+		       v.NET_DEMAND_QTY,
+		       v.SCHEDULE_QTY,
+		       v.ONBOARD_DATE,
+		       v.UNQUALIFIED_QTY,
+		       v.PRODUCTION_QTY,
+		       v.LH_MARGIN,
+		       v.EXPECTED_CLOSE_DAY,
+		       r.CX_MACHINE_CODE
+    </select>
 </mapper>

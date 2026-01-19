@@ -9,6 +9,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -100,7 +102,11 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Override
     public List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO) {
-        return factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
+        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
+        if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+            mpFinalAdjustList = mpFinalAdjustList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
+        }
+        return mpFinalAdjustList;
     }
 
     @Override

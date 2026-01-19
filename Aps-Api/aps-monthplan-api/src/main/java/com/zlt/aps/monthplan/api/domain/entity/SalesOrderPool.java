@@ -119,13 +119,13 @@ public class SalesOrderPool extends BaseEntity{
     private String weekYear;
 
     /** 均匀性，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.isUniformity", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.SalesOrderPool.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性，1 是 0 否", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
 
     /** 动平衡，1 是 0 否 */
-    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.SalesOrderPool.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡，1 是 0 否", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
