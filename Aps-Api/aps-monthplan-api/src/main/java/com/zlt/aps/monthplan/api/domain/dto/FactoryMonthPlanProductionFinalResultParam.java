@@ -5,7 +5,6 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 
 /**
  * 工厂月度计划排产结果查询条件对象
@@ -97,4 +96,34 @@ public class FactoryMonthPlanProductionFinalResultParam implements Serializable 
      */
     @ApiModelProperty(value = "排产版本号", name = "productionVersion")
     private String productionVersion;
+
+    /**
+     * 销售生产需求计划版本
+     */
+    @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
+    private String monthPlanVersion;
+
+    /**
+     * 主物料(胎胚号)
+     */
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    private String mainMaterialDesc;
+
+    /**
+     * 主花纹
+     */
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    private String mainPattern;
+
+    /**
+     * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
+     */
+    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
+    private String constructionStage;
+
+    /**
+     * 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢
+     */
+    @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")
+    private String productTypeCode;
 }
