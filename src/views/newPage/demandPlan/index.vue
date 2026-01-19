@@ -307,7 +307,7 @@ export default {
         },
         {
           prop: "stockQty",
-          label: this.$t("总库存"),
+          label: this.$t("ui.data.demandPlan.stockQtyTotal"),
           width: 120,
         },
         {

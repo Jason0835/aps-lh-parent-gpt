@@ -81,7 +81,7 @@ export default {
       let columns = [
         {
           prop: "productionNo",
-          label: this.$t("工单号"),
+          label: this.$t("ui.data.monthlyProductionPlan.productionNo"),
           width: 120,
         },
         {
@@ -109,12 +109,12 @@ export default {
         },
         {
           prop: "lastMonthPlanVersion",
-          label: this.$t("最新需求计划版本"),
+          label: this.$t("ui.data.monthlyProductionPlan.lastMonthPlanVersion"),
           width: 120,
         },
         {
           prop: "productionVersion",
-          label: this.$t("月度生产计划版本"),
+          label: this.$t("ui.data.monthlyProductionPlan.productionVersion"),
           width: 120,
         },
         {
@@ -232,17 +232,17 @@ export default {
         },
         {
           prop: "mouldCavityQty",
-          label: this.$t("型腔数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.mouldCavityQtyNum"),
           width: 120,
         },
         {
           prop: "typeBlockQty",
-          label: this.$t("活块数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.typeBlockQtyNum"),
           width: 120,
         },
         {
           prop: "heightQty",
-          label: this.$t("高优先级数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.heightQty"),
           width: 120,
         },
         {
@@ -262,27 +262,27 @@ export default {
         },
         {
           prop: "cxMachineCode",
-          label: this.$t("成型机编码"),
+          label: this.$t("ui.data.monthlyProductionPlan.cxMachineCode"),
           width: 120,
         },
         {
           prop: "mouldChangeInfo",
-          label: this.$t("模具使用变化信息"),
+          label: this.$t("ui.data.monthlyProductionPlan.mouldChangeInfo"),
           width: 120,
         },
         {
           prop: "dynamicBalanceQty",
-          label: this.$t("动平衡数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.dynamicBalanceQty"),
           width: 120,
         },
         {
           prop: "uniformityQty",
-          label: this.$t("均匀性数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.uniformityQty"),
           width: 120,
         },
         {
           prop: "curingTime",
-          label: this.$t("单条硫化时间"),
+          label: this.$t("ui.data.monthlyProductionPlan.curingTime"),
           width: 120,
         },
         {
@@ -292,17 +292,17 @@ export default {
         },
         {
           prop: "trialQty",
-          label: this.$t("试制量试计划需求数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.trialQty"),
           width: 120,
         },
         {
           prop: "heightProductionQty",
-          label: this.$t("高优先级排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.heightProductionQty"),
           width: 120,
         },
         {
           prop: "factProdReqQty",
-          label: this.$t("实际生产需求(含损耗)"),
+          label: this.$t("ui.data.monthlyProductionPlan.factProdReqQty"),
           width: 120,
         },
         {
@@ -312,27 +312,27 @@ export default {
         },
         {
           prop: "midProductionQty",
-          label: this.$t("中优先级排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.midProductionQty"),
           width: 120,
         },
         {
           prop: "cycleProductionQty",
-          label: this.$t("周期排产储备排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.cycleProductionQty"),
           width: 120,
         },
         {
           prop: "conventionProductionQty",
-          label: this.$t("常规储备排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.conventionProductionQty"),
           width: 120,
         },
         {
           prop: "postponeProductionQty",
-          label: this.$t("暂缓订单排产数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.postponeProductionQty"),
           width: 120,
         },
         {
           prop: "trialProductionQty",
-          label: this.$t("试制量试排产数量"),
+          label: this.$t("ui.data.monthlyProductionPlan.trialProductionQty"),
           width: 120,
         },
         {
@@ -342,7 +342,7 @@ export default {
         },
         {
           prop: "reason",
-          label: this.$t("未排产原因"),
+          label: this.$t("ui.data.monthlyProductionPlan.reason"),
           width: 120,
         },
         {
@@ -356,72 +356,6 @@ export default {
           width: 120,
         },
 
-
-        // {
-        //   label: this.$t("ui.data.monthlyProductionPlan.planType"),
-        //   prop: "planType",
-        //   formatter: (row, column, value) => {
-        //     return this.selectDictLabel(this.dict.type.biz_plan_type, value);
-        //   },
-        //   width: 120,
-        // },
-        // {
-        //   label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
-        //   prop: "constructionStage",
-        //   formatter: (row, column, value) => {
-        //     return this.selectDictLabel(
-        //       this.dict.type.biz_construction_stage,
-        //       value
-        //     );
-        //   },
-        //   width: 120,
-        // },
-
-        // {
-        //   prop: "materialDesc",
-        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        //   width: 300,
-        // },
-        // {
-        //   prop: "mainPattern",
-        //   label: this.$t("ui.data.column.confMinProd.pattern"),
-        //   width: 120,
-        // },
-
-        // {
-        //   prop: "mouldCavityQty",
-        //   label: this.$t("ui.data.monthlyProductionPlan.mouldCavityQty"),
-        // },
-        // {
-        //   prop: "typeBlockQty",
-        //   label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "prodReqPlan",
-        //   label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "heightQty",
-        //   label: this.$t("ui.data.DemandPlan.heightQty"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "averageQty",
-        //   label: this.$t("ui.data.column.mpMonthlySaleQty.averageSaleQty"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "inventorySalesRatio",
-        //   label: this.$t("ui.data.monthlyProductionPlan.inventorySalesRatio"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "dayVulcanizationQty",
-        //   label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
-        //   width: 120,
-        // },
       ];
 
       if (this.productionStartDate) {

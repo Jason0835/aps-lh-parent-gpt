@@ -61,7 +61,7 @@ export default {
 
       if (![0, 2, 4, 6, 8].includes(lastDigit)) {
         return callback(
-          new Error(this.$t("必须为双数"))
+          new Error(this.$t("common.rule.double"))
         );
       }
 

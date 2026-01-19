@@ -177,7 +177,7 @@ export default {
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.insertOrder.mainMaterialDesc"),
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
           width:120,
         },
         {

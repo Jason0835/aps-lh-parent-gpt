@@ -92,7 +92,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "molding_method", "biz_personnel_type"],
+  dicts: ["biz_factory_name", "molding_method", "biz_personnel_type",'biz_product_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -133,6 +133,9 @@ export default {
         {
           prop: "productTypeCode",
           label: this.$t("产品品类"),
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
         },
         {
           prop: "paramCode",

@@ -268,23 +268,23 @@ export default {
         },
         {
           prop: "heightProductionQty",
-          label: this.$t("高优先级排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.heightProductionQty"),
           width: 120,
         },
         {
           prop: "midProductionQty",
-          label: this.$t("中优先级排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.midProductionQty"),
           width: 120,
         },
 
         {
           prop: "cycleProductionQty",
-          label: this.$t("周期排产储备排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.cycleProductionQty"),
           width: 120,
         },
         {
           prop: "conventionProductionQty",
-          label: this.$t("常规储备排产数量"),
+          label: this.$t("ui.data.mouldingDayResult.conventionProductionQty"),
           width: 120,
         },
         {

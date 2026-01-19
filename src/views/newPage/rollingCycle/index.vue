@@ -1596,6 +1596,9 @@ export default {
         this.getOutResultList(res.rows[0].version);
         this.isShowFoot = true;
         this.showOutResult = true;
+        this.formInline.adjustStartDay=this.formInline.beginDay
+        this.formInline.adjustEndDay=this.formInline.endDay
+
 
         this.getOutVersionList();
       } catch (err) {

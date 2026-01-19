@@ -235,7 +235,7 @@ export default {
           render: ({ row }) => {
             return (
               <div>
-                <div>TBR</div>
+                <div>{this.selectDictLabel(this.dict.type.biz_product_type, row.productTypeCode)}</div>
                 <div>
                   <text-button
                     onClick={() => {
