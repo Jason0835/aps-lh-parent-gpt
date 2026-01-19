@@ -122,7 +122,7 @@ public class MpSimulatedResult extends BaseEntity {
 
     /** 高优先级数量 */
     @Excel(name = "ui.data.column.simulatedResult.heightQty", cellType = Excel.ColumnType.NUMERIC)
-    @ApiModelProperty(value = "高优先级数量", name = "heightQty")
+    @ApiModelProperty(value = "高优先级订单净需求", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
 
