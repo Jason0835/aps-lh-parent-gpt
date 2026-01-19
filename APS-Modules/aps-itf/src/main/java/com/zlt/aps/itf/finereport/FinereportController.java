@@ -1,20 +1,18 @@
 package com.zlt.aps.itf.finereport;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.itf.util.PostMethodUtils;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 帆软报表接口
@@ -34,6 +32,14 @@ public class FinereportController {
 	private String FINEREPORT_PASSWORD;
 	@Value("${finereport.url.inventoryAgeAnalysis}")
 	private String INVENTORY_AGE_ANALYSIS_URL;
+    @Value("${finereport.url.singleTireTotalWeight}")
+    private String SINGLE_TIRE_TOTAL_WEIGHT_URL;
+    @Value("${finereport.url.factoryMoldingMachine}")
+    private String FACTORY_MOLDING_MACHINE_URL;
+    @Value("${finereport.url.factoryVulcanizingMachine}")
+    private String FACTORY_VULCANIZING_MACHINE_URL;
+    @Value("${finereport.url.productionStructure}")
+    private String PRODUCTION_STRUCTURE_URL;
 
 	@ApiOperation("库龄分析报表")
 	@GetMapping("/inventoryAgeAnalysis")
@@ -51,9 +57,89 @@ public class FinereportController {
 		return AjaxResult.success(realUrl);
 	}
 
+    /**
+     * 查询单胎总重报表
+     *
+     * @return 结果集合
+     */
+    @ApiOperation("查询单胎总重报表")
+    @GetMapping("/singleTireTotalWeight")
+    public AjaxResult singleTireTotalWeight() {
+        String rptUrl = SINGLE_TIRE_TOTAL_WEIGHT_URL;
+        // 模拟登录帆软服务，获取token
+        AjaxResult loginResult = this.loginFinereport();
+        if (AjaxResultUtils.checkAjaxError(loginResult)) {
+            return loginResult;
+        }
+        // 拼接报表url
+        String token = String.valueOf(loginResult.get(AjaxResult.DATA_TAG));
+        Object realUrl = StringUtils.join(rptUrl, "?preview=true&fine_auth_token=", token); // 拼接url，需要使用Object接收，ajaxResult才会放到data里
+        return AjaxResult.success(realUrl);
+    }
+
+    /**
+     * 越南工厂成型机数据报表
+     *
+     * @return 结果集合
+     */
+    @ApiOperation("越南工厂成型机数据报表")
+    @GetMapping("/factoryMoldingMachine")
+    public AjaxResult factoryMoldingMachine() {
+        String rptUrl = FACTORY_MOLDING_MACHINE_URL;
+        // 模拟登录帆软服务，获取token
+        AjaxResult loginResult = this.loginFinereport();
+        if (AjaxResultUtils.checkAjaxError(loginResult)) {
+            return loginResult;
+        }
+        // 拼接报表url
+        String token = String.valueOf(loginResult.get(AjaxResult.DATA_TAG));
+        Object realUrl = StringUtils.join(rptUrl, "?preview=true&fine_auth_token=", token); // 拼接url，需要使用Object接收，ajaxResult才会放到data里
+        return AjaxResult.success(realUrl);
+    }
+
+    /**
+     * 越南工厂硫化机数据报表
+     *
+     * @return 结果集合
+     */
+    @ApiOperation("越南工厂硫化机数据报表")
+    @GetMapping("/factoryVulcanizingMachine")
+    public AjaxResult factoryVulcanizingMachine() {
+        String rptUrl = FACTORY_VULCANIZING_MACHINE_URL;
+        // 模拟登录帆软服务，获取token
+        AjaxResult loginResult = this.loginFinereport();
+        if (AjaxResultUtils.checkAjaxError(loginResult)) {
+            return loginResult;
+        }
+        // 拼接报表url
+        String token = String.valueOf(loginResult.get(AjaxResult.DATA_TAG));
+        Object realUrl = StringUtils.join(rptUrl, "?preview=true&fine_auth_token=", token); // 拼接url，需要使用Object接收，ajaxResult才会放到data里
+        return AjaxResult.success(realUrl);
+    }
+
+    /**
+     * 越南工厂结构在机数据报表
+     *
+     * @return 结果集合
+     */
+    @ApiOperation("越南工厂结构在机数据报表")
+    @GetMapping("/productionStructure")
+    public AjaxResult productionStructure() {
+        String rptUrl = PRODUCTION_STRUCTURE_URL;
+        // 模拟登录帆软服务，获取token
+        AjaxResult loginResult = this.loginFinereport();
+        if (AjaxResultUtils.checkAjaxError(loginResult)) {
+            return loginResult;
+        }
+        // 拼接报表url
+        String token = String.valueOf(loginResult.get(AjaxResult.DATA_TAG));
+        Object realUrl = StringUtils.join(rptUrl, "?preview=true&fine_auth_token=", token); // 拼接url，需要使用Object接收，ajaxResult才会放到data里
+        return AjaxResult.success(realUrl);
+    }
+
 	/**
 	 * 登录帆软服务器获取token
-	 * 
+	 *
 	 * @return
 	 */
 	private AjaxResult loginFinereport() {
