@@ -20,6 +20,7 @@ export default {
   data() {
     return {
       form: {},
+      filteredDictData: new Map(),
     };
   },
 
@@ -86,8 +87,15 @@ export default {
     },
     renderSelect(item) {
       if (item.dictData) {
-        let label = item.labelKey? item.labelKey : "label"
-        let value = item.valueKey? item.valueKey : "value"
+        let label = item.labelKey ? item.labelKey : "label";
+        let value = item.valueKey ? item.valueKey : "value";
+
+        // 获取或初始化过滤后的数据
+        if (!this.filteredDictData.has(item.prop)) {
+          this.filteredDictData.set(item.prop, item.dictData);
+        }
+
+        const currentFilteredData = this.filteredDictData.get(item.prop);
         return (
           <el-select
             style="width:100%;"
@@ -97,8 +105,26 @@ export default {
             placeholder={this.$t("common.rule.select")}
             filterable={item.filterable}
             on={item.listeners}
+            filter-method={(query) => {
+            // 移除空格
+            const cleanQuery = query ? query.replace(/\s+/g, '') : ''
+
+            if (!cleanQuery) {
+              this.filteredDictData.set(item.prop, item.dictData)
+            } else {
+              const filtered = item.dictData.filter(row => {
+                const rowLabel = row[label] || ''
+                const cleanLabel = rowLabel.replace(/\s+/g, '')
+                return cleanLabel.toLowerCase().includes(cleanQuery.toLowerCase())
+              })
+              this.filteredDictData.set(item.prop, filtered)
+            }
+
+            // 触发重新渲染
+            this.$forceUpdate()
+          }}
           >
-            {item.dictData.map((row) => {
+            {currentFilteredData.map((row) => {
               return (
                 <el-option
                   key={row[value]}
@@ -192,7 +218,11 @@ export default {
           >
             {this.$t("common.button.query")}
           </el-button>
-          <el-button icon="el-icon-refresh" class="search-button" onClick={this.handleReset}>
+          <el-button
+            icon="el-icon-refresh"
+            class="search-button"
+            onClick={this.handleReset}
+          >
             {this.$t("common.button.reset")}
           </el-button>
         </div>
@@ -213,18 +243,18 @@ export default {
       <el-form labelPosition="right" labelWidth="auto" inline={true}>
         {this.batchSearchColumns ? this.renderBranchSearch() : ""}
 
-          {this.columns.map((item) => {
-            return (
-                <el-form-item label={item.label} prop={item.prop} >
-                  <div style="width:200px">
-                  {item.render
-                    ? item.render(this.form, item)
-                    : this.renderSearchItem(item)}
-                  </div>
-                </el-form-item>
-            );
-          })}
-          {this.renderSearchButton()}
+        {this.columns.map((item) => {
+          return (
+            <el-form-item label={item.label} prop={item.prop}>
+              <div style="width:200px">
+                {item.render
+                  ? item.render(this.form, item)
+                  : this.renderSearchItem(item)}
+              </div>
+            </el-form-item>
+          );
+        })}
+        {this.renderSearchButton()}
         <el-input style="display:none" />
       </el-form>
     );
@@ -241,7 +271,7 @@ export default {
   align-items: center;
   justify-content: center;
 }
-.search-div{
+.search-div {
   display: inline-flex;
   min-width: 200px;
   text-align: center;

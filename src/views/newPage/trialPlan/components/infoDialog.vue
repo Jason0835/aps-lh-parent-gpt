@@ -245,7 +245,7 @@ export default {
           maxlength:50
         },
         {
-          prop: "embryoNo",
+          prop: "embryoReleaseDate",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
           disabled:true,
         },
@@ -260,7 +260,7 @@ export default {
         //   disabled:true,
         // },
         {
-          prop: "textNo",
+          prop: "textReleaseDate",
           label: this.$t("ui.data.column.trialPlan.textNo"),
           disabled:true,
         },
@@ -275,7 +275,7 @@ export default {
         //   disabled:true,
         // },
         {
-          prop: "lhNo",
+          prop: "lhReleaseDate",
           label: this.$t("ui.data.column.trialPlan.lhNo"),
           disabled:true,
         },

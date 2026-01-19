@@ -239,7 +239,7 @@ export default {
           width: 120,
         },
         {
-          prop: "embryoNo",
+          prop: "embryoReleaseDate",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
           width: 180,
         },
@@ -252,7 +252,7 @@ export default {
         //   label: this.$t("ui.data.column.trialPlan.embryoReleaseDate"),
         // },
         {
-          prop: "textNo",
+          prop: "textReleaseDate",
           label: this.$t("ui.data.column.trialPlan.textNo"),
           width: 180,
         },
@@ -265,7 +265,7 @@ export default {
         //   label: this.$t("ui.data.column.trialPlan.textReleaseDate"),
         // },
         {
-          prop: "lhNo",
+          prop: "lhReleaseDate",
           label: this.$t("ui.data.column.trialPlan.lhNo"),
           width: 180,
         },
