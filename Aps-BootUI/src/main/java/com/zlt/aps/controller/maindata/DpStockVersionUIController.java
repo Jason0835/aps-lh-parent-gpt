@@ -98,7 +98,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
     @ResponseBody
     public AjaxResult save(DpStockVersion dpStockVersion) {
         if (UserConstants.NOT_UNIQUE.equals(iMdmFinishStockService.checkUnique(dpStockVersion))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmFinishStock.notUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.dpStockVersion.notUnique"));
         }
 
         return iMdmFinishStockService.save(dpStockVersion);
@@ -155,7 +155,7 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.mdmFinishStock.modelName");
+        return I18nUtil.getMessage("ui.data.column.dpStockVersion.modelName");
     }
 
     /**
