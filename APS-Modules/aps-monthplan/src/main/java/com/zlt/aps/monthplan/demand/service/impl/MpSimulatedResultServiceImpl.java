@@ -213,6 +213,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             productionPrediction.setYear(yearMonth.getYear());
             productionPrediction.setMonth(yearMonth.getMonthValue());
             productionPrediction.setMonthPlanVersion(tMonthDemandPlan.getMonthPlanVersion());
+            productionPrediction.setMainMaterialDesc(listGroupByMaterialCode.get(0).getMainMaterialDesc());
             productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
             productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
             productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));

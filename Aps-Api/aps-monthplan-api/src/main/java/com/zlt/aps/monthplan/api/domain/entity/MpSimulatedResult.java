@@ -83,9 +83,9 @@ public class MpSimulatedResult extends BaseEntity {
     @TableField(value = "BRAND")
     private String brand;
 
-    /** 主物料 */
+    /** 胎胚描述 */
     @Excel(name = "ui.data.column.simulatedResult.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 
