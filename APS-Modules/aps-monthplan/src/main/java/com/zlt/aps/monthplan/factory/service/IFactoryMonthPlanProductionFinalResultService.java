@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.factory.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -76,13 +77,13 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @param finalVersion
      * @return
      */
-    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
+    List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
     /**
      * 查询最终排产结果
      * @param monthPlanVersions
      * @return
      */
-    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(Set<String> monthPlanVersions);
+    List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion currentFinalVersion, Set<String> monthPlanVersions);
 
     /**
      * 定稿
@@ -92,4 +93,11 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      */
     @Transactional(rollbackFor = Exception.class)
     AjaxResult finalized(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
+
+    /**
+     * 获取定稿排产结果
+     * @param finalVersion
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResult> findFinalProductionResult(MpFactoryProductionVersion finalVersion);
 }

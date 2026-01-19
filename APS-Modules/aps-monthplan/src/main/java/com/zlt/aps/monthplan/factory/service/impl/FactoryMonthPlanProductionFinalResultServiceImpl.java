@@ -16,6 +16,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.IncrementConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.utils.BeanCopyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -260,35 +261,48 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
 
     @Override
-    public List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion) {
+    public List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion) {
         if (null == finalVersion) {
             return Collections.emptyList();
         }
-        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, finalVersion.getFactoryCode())
-                .eq(FactoryMonthPlanProductionFinalResult::getYear, finalVersion.getYear())
-                .eq(FactoryMonthPlanProductionFinalResult::getMonth, finalVersion.getMonth())
-              /*  .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())*/
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        return finalMapper.selectList(queryWrapper);
+        LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
+                .eq(FactoryMonthPlanMouldDayResult::getFactoryCode, finalVersion.getFactoryCode())
+                .eq(FactoryMonthPlanMouldDayResult::getYear, finalVersion.getYear())
+                .eq(FactoryMonthPlanMouldDayResult::getMonth, finalVersion.getMonth())
+               .eq(FactoryMonthPlanMouldDayResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
+                .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        return resultMapper.selectList(queryWrapper);
     }
 
     @Override
-    public List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(Set<String> monthPlanVersions) {
-        if (CollectionUtils.isEmpty(monthPlanVersions)) {
+    public List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion currentFinalVersion,Set<String> monthPlanVersions) {
+        if (null == currentFinalVersion) {
             return Collections.emptyList();
         }
-        final int batchSize = 1000;
-        List<FactoryMonthPlanProductionFinalResult> result = new ArrayList<>();
-        List<String> versionList = new ArrayList<>(monthPlanVersions);
-        for (int i = 0; i < versionList.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, versionList.size());
-            List<String> batchVersions = versionList.subList(i, end);
-            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper =
-                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                    .in(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, batchVersions)
-                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-            result.addAll(finalMapper.selectList(queryWrapper));
+        List<FactoryMonthPlanMouldDayResult> result = new ArrayList<>();
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper =
+            Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, currentFinalVersion.getMonthPlanVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        List<FactoryMonthPlanProductionFinalResult> list = this.finalMapper.selectList(queryWrapper);
+        if(!CollectionUtils.isEmpty(list)) {
+            list.forEach(item -> {
+                FactoryMonthPlanMouldDayResult entity = BeanCopyUtils.copyBean(item, FactoryMonthPlanMouldDayResult.class);
+                result.add(entity);
+            });
+        }
+        if(!CollectionUtils.isEmpty(monthPlanVersions)) {
+            final int batchSize = 1000;
+            List<String> versionList = new ArrayList<>(monthPlanVersions);
+            for (int i = 0; i < versionList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, versionList.size());
+                List<String> batchVersions = versionList.subList(i, end);
+                LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> wrapper =
+                    Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
+                        .in(FactoryMonthPlanMouldDayResult::getMonthPlanVersion, batchVersions)
+                        .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+                result.addAll(resultMapper.selectList(wrapper));
+            }
         }
         return result;
     }
@@ -365,6 +379,23 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 上机日期 = 排产周期的开始日 +  (startDay -1 )
         this.publishFinalizedEvent(param, finalList);
         return AjaxResult.success();
+    }
+
+    @Override
+    public List<FactoryMonthPlanMouldDayResult> findFinalProductionResult(MpFactoryProductionVersion finalVersion) {
+        List<FactoryMonthPlanMouldDayResult> result = new ArrayList<>();
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper =
+            Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        List<FactoryMonthPlanProductionFinalResult> list = this.finalMapper.selectList(queryWrapper);
+        if(!CollectionUtils.isEmpty(list)) {
+            list.forEach(item -> {
+                FactoryMonthPlanMouldDayResult entity = BeanCopyUtils.copyBean(item, FactoryMonthPlanMouldDayResult.class);
+                result.add(entity);
+            });
+        }
+        return result;
     }
 
     /**

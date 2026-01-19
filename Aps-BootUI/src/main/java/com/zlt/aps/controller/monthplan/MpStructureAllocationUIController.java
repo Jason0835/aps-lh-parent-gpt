@@ -11,6 +11,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.common.utils.PubUtil;
@@ -31,6 +32,7 @@ import org.apache.commons.io.IOUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -86,10 +88,10 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @ApiOperation("根据条件查询结构排产信息")
     public TableDataInfo list(MpStructureAllocation mpStructureAllocation) {
         TableDataInfo list = iMpStructureAllocationService.list(mpStructureAllocation);
-        // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+        // 实体转换
         List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
-        // 查询SKU明细并设置成型机编码（多个以,分隔）
-        setCxMachineCode(resultList, mpStructureAllocation);
+        // 排序
+        sortStructureAllocation(resultList);
         return getTableDataInfo(resultList);
     }
 
@@ -102,7 +104,27 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         return rspData;
     }
 
-    // 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+    private void sortStructureAllocation(List<MpStructureAllocation> list) {
+        if (PubUtil.isEmpty(list)) {
+            return;
+        }
+        Collections.sort(list, getStructureAllocationComparator());
+    }
+
+    private Comparator<MpStructureAllocation> getStructureAllocationComparator() {
+        return Comparator
+                .comparing(MpStructureAllocation::getStructureName,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(MpStructureAllocation::getCxMachineCode,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+
+    /**
+     * 将List中的LinkedHashMap转换为MpStructureAllocation实体类
+     * @param rows
+     * @return
+     */
     private List<MpStructureAllocation> convertToEntityList(List<?> rows) {
         List<MpStructureAllocation> entityList = new ArrayList<>();
         if (PubUtil.isEmpty(rows)) {
@@ -301,5 +323,19 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         return iMpStructureAllocationService.getVersionList(queryVO);
     }
 
+    /**
+     * 获取日期最接近的下一个结构
+     */
+    @ApiOperation("获取日期最接近的下一个结构")
+    @PostMapping("/getNextStructure")
+    @ResponseBody
+    public AjaxResult getNextStructure(MpStructureAllocation queryVO) {
+        if (StringUtils.isEmpty(queryVO.getFactoryCode()) || queryVO.getYear() == null || queryVO.getMonth() == null
+                || StringUtils.isEmpty(queryVO.getCxMachineCode()) || queryVO.getBeginDay() == null || queryVO.getEndDay() == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.notQueryCondition"));
+        }
+        MpStructureAllocation mpStructureAllocation = iMpStructureAllocationService.getNextStructure(queryVO);
+        return AjaxResult.success(mpStructureAllocation);
+    }
 
 }

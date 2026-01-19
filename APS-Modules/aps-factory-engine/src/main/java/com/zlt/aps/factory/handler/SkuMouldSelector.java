@@ -4,6 +4,8 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
@@ -74,6 +76,14 @@ public class SkuMouldSelector {
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
+        //20260116 得到模壳标准：理论只有一个模壳标准
+        MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(effectiveList.get(BigDecimal.ZERO.intValue()));
+        Integer leftOverUsedQty = mouldShellInfo.getLeftOverUsedQtyByContinueSku();
+        max = Math.min(max, leftOverUsedQty);
+        //20260117 获取模具分配比例：理论最大
+        MonthPlanProductionRequirePlanVo productionPlan = productionContext.getAllSkuProductionPlan().get(materialDesc).get(BigDecimal.ZERO.intValue());
+        Integer limitQty = productionContext.getMouldAllocationLimitQty(productionPlan);
+        max = Math.min(max, limitQty);
         effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
                 .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
                 .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));

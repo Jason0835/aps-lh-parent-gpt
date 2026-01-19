@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
@@ -52,27 +53,29 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         List<MpAdjustDetailVo> resultList = new ArrayList<>();
         resultList.addAll(adjustDetailByTrialList);
         resultList.addAll(adjustDetailList);
+        // 4、通过结构过滤调整明细
+        filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
         Assert.isFalse(PubUtil.isEmpty(resultList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 4、按照结构、物料编码维度进行分组，并汇总订单量
+        // 5、按照结构、物料编码维度进行分组，并汇总订单量
         resultList = sumByStructureAndMaterial(resultList);
         contextDTO.setAdjustDetailList(resultList);
-        // 5、设置净需求
+        // 6、设置净需求
         setCurrentNetQty(contextDTO);
-        // 6、设置计划剩余排产量、计划已排产量、已生产量
+        // 7、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
-        // 7、筛选：|净需求 - 计划剩余排产量| > 0的数据
+        // 8、筛选：|净需求 - 计划剩余排产量| > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 8、设置其他字段
+        // 9、设置其他字段
         setOtherField(contextDTO);
     }
 
@@ -92,32 +95,64 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
 
-        //规格挑选可用机台
         //4.按结构序列化分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Date startTime,endTime;
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
-            //结构内，按结构分别调整
+            //4.1 初始结构上下文
+            //1）结构内，按结构分别调整
             contextDTO.setStructureName(entry.getKey());
             List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
             contextDTO.setOneStructureAllocationList(structureAllocationList);
-            //初始锁定日
+            //2）初始锁定日
             contextDTO.setLockEndDay(getLockEndDay(contextDTO));
-            //初始结构收尾日
-            contextDTO.setStructureDeadLine(getStructureDeadline(contextDTO));
-            //初始化日志
+            //3）初始结构开始日、收尾日
+            initStructureStartAndEndDay(contextDTO);
+            //4）初始化日志
             contextDTO.setLogDetail(new StringBuilder());
-            //规格挑选可用机台
+            //4.2 执行结构内调整
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
             weekRollAdjustEngine.structureInAdjustForOne(contextDTO,entry.getValue(), MapUtils.getObject(mpProdFinalMap, entry.getKey(), new ArrayList<>()));
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
-            //保存调整日志
+            //4.3 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
+    }
+
+    /**
+     * 获取检查为空的字段
+     * @return
+     */
+    @Override
+    protected Map<String, String> getCheckEmptyFieldMap() {
+        Map<String, String> checkFieldMap = new HashMap<>();
+        checkFieldMap.put("structureName", "结构名称");
+        checkFieldMap.put("productTypeCode", "产品分类");
+        checkFieldMap.put("dayVulcanizationQty", "日硫化量");
+        return Collections.unmodifiableMap(checkFieldMap);
+    }
+
+    /**
+     * 通过结构过滤调整明细
+     * @param contextDTO
+     * @param adjustDetailList
+     * @return
+     */
+    @Override
+    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
+                                                            List<MpAdjustDetailVo> adjustDetailList) {
+        if (PubUtil.isEmpty(adjustDetailList) || PubUtil.isEmpty(contextDTO.getStructureAllocationList())) {
+            return;
+        }
+        Set<String> structureNameSet = contextDTO.getStructureAllocationList().stream()
+                .map(MpStructureAllocation::getStructureName)
+                .collect(Collectors.toSet());
+
+        CollUtil.filter(adjustDetailList, item -> structureNameSet.contains(item.getStructureName()));
     }
 
     @Override

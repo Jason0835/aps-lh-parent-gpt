@@ -57,7 +57,7 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @param finalVersion
      * @return
      */
-    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext);
+    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException;
     /**
      *  列表查询数据
      * @param queryWrapper

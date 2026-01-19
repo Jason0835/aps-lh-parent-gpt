@@ -258,8 +258,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyMap();
         }
         List<CxMachineBaseInfoVo> cxMachineInfoList = factoryMonthPlanCxInfoMapper.getMachineBaseInfo(factoryCode);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxMachineInfoLog(context, cxMachineInfoList));
         if (CollectionUtils.isEmpty(cxMachineInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addCxMachineInfoEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
@@ -629,8 +629,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         }
         //获取月计划-成型维修停机信息
         List<CxDevicePlanShutInfoVo> cxStopList = factoryMonthPlanCxInfoMapper.getDevicePlanShutInfo(factoryCode, productionStartDate, productionEndDate);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReadCxMachineMaintenanceInfoLog(context, cxStopList));
         if (CollectionUtils.isEmpty(cxStopList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addCxMachineMaintenanceInfoEmptyLog(context));
             return Collections.emptyMap();
         }
         //按成型机分组

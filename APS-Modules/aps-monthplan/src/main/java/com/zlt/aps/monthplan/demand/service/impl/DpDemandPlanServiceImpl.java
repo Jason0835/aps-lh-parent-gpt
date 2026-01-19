@@ -27,7 +27,7 @@ import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
@@ -207,16 +207,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
     }
 
-    private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion) {
+    private void saveFactoryProductionVersion(DpDemandPlan createCondition,YearMonth yearMonth, String monthPlanVersion) {
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         version.setYear(yearMonth.getYear());
         version.setMonth(yearMonth.getMonthValue());
         version.setMonthPlanVersion(monthPlanVersion);
-        version.setPlanType(ProductionPlanType.NORMAL.getPlanType());
+        version.setPlanType(createCondition.getPlanType());
         version.setIsFinal(YesOrNoEnum.NO.getCode());
         version.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         factoryProductionVersionMapper.insert(version);
@@ -280,13 +280,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
         return adjustRequirePlans;
     }
 
     @Override
-    public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) {
+    public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
         if(CollectionUtils.isEmpty(predictionContext.getAllocationResult().getNetDemands())) {
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanMouldDayResult> productionFinalResults;
+        if(YesOrNoEnum.YES.getCode().equals(finalVersion.getIsFinal())) {
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findFinalProductionResult(finalVersion);
+        }else{
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
+        }
+        if(CollectionUtils.isEmpty(productionFinalResults)) {
             return Collections.emptyList();
         }
         YearMonth tMonth = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
@@ -301,7 +310,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
+
         List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
         List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),cycleStockOrders,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(netDemands)){
@@ -309,7 +318,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             return Collections.emptyList();
         }
         predictionContext.getAllocationResult().setNetDemands(netDemands);
-        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(tPlus1Month);
+        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
         predictionContext.setSupplyOrderPools(supplyOrderPools);
         predictionContext.setPostponeOrders(null);
         // 6. 处理需求计划生成
@@ -323,7 +332,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition,null, supplyOrderPools);
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tPlus1Month,predictionVersion);
+        saveFactoryProductionVersion(createCondition, tPlus1Month,predictionVersion);
         return mergedDemandPlans;
     }
 
@@ -472,7 +481,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext);
         }
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,predictionVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,predictionVersion);
         predictionContext.setAllocationResult(allocationResult);
         return mergedDemandPlans;
     }
@@ -567,13 +576,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey, Collectors.summingInt(DpDemandPlan::getPostponeNetQty)));
     }
 
-    private List<SupplyOrderPool> createSupplyOrder(YearMonth yearMonth) {
+    private List<SupplyOrderPool> createSupplyOrder(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException {
         // 8、按【生成周期排产】、【生成储备排产】的逻辑得到T+1月的周期排产储备和常规储备数据(此时T月的月度计划已有，故而结构最新排产月份会有变化)
         // 13、按【生成周期排产】、【生成储备排产】的逻辑得到T+2月的周期排产储备和常规储备数据(此时T+1月的月度计划已预测，故而结构最新排产月份会有变化)
         // 生成周期排产储备
-        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(yearMonth);
+        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(createCondition,yearMonth);
         // 生成常规储备
-        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(yearMonth);
+        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(createCondition,yearMonth);
         List<SupplyOrderPool> allStockUpOrders = Lists.newArrayList();
         if(!CollectionUtils.isEmpty(cycleStockUpOrders)){
             allStockUpOrders.addAll(cycleStockUpOrders);

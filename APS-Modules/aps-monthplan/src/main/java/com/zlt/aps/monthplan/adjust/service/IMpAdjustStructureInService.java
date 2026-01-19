@@ -59,8 +59,8 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
     Integer getLockEndDay(MpRollAdjustContextDTO contextDTO);
 
     /**
-     * 获取结构收尾日
+     * 初始结构开始日\收尾日
      * @param contextDTO 周程滚动调整上下文对象
      */
-    Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO);
+    void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO);
 }

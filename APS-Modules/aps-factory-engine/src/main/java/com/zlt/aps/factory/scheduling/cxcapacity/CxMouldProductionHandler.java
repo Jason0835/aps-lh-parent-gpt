@@ -135,6 +135,10 @@ public class CxMouldProductionHandler {
         //按日构建限制
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> newLimit = new HashMap<>();
         for (Integer day = startDay; day <= productionPlan.getEndDay(); day++) {
+            //停产日跳过
+            if (cxMachineInfo.getStopDayInfo().contains(day)) {
+                continue;
+            }
             GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByCxMachineAllocation(context, cxMachineInfo, day, productionPlan);
             newLimit.put(day, dayLimit);
         }

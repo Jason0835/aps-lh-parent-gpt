@@ -484,8 +484,8 @@ public class ApsConstant {
 
 
     /**
-     * 结构内调整-自动调整
+     * 结构调整-自动调整
      */
-    public static final String REDIS_ADJUST_STRUCT_IN_AUTO = "APS:STRUCT:IN:AUTO:";
+    public static final String REDIS_ADJUST_STRUCT_AUTO = "APS:STRUCT:AUTO:";
 
 }

@@ -48,6 +48,18 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "调整日")
     private Integer adjustDay;
 
+    @ApiModelProperty(value = "开始日期")
+    private Integer startDay;
+
+    @ApiModelProperty(value = "结束日期")
+    private Integer endDay;
+
+    @ApiModelProperty(value = "调整开始日期")
+    private Integer adjustStartDay;
+
+    @ApiModelProperty(value = "调整结束日期")
+    private Integer adjustEndDay;
+
     @ApiModelProperty(value = "锁定截止日")
     private Integer lockEndDay;
 
@@ -60,14 +72,11 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "产品结构")
     private String structureName;
 
-    @ApiModelProperty(value = "结构收尾日")
-    private Integer structureDeadLine;
-
-    /**
-     * 排产机台,多个机台用逗号分隔
-     */
     @ApiModelProperty(value = "排产机台")
     private String scheduledMachines;
+
+    @ApiModelProperty(value = "结构收尾日")
+    private Integer structureDeadLine;
 
     @ApiModelProperty(value = "结构内调整记录")
     private List<MpAdjustStructureIn> mpAdjustStructureInList;

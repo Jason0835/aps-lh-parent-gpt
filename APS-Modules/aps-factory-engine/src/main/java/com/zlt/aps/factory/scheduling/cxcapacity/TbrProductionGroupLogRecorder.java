@@ -40,6 +40,27 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加结构主花纹下使用的模具最大信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构+主花纹：%s 下理论最大模具数：%s 分配模具数：%s 最终最大可使用模具数 %s
+     *
+     * @param context          排程上下文
+     * @param controlDimension 控制维度
+     * @param maxMouldNumber   理论最大模具数
+     * @param allocationNumber 模具分配数
+     * @return
+     */
+    public static String addGroupMainPatternMaxMouldNumberLog(Context context, String controlDimension, Integer allocationNumber, Integer maxMouldNumber) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构+主花纹：%s 下理论最大模具数：%s 分配模具数：%s 最终最大可使用模具数 %s";
+        Integer result = Math.min(allocationNumber, maxMouldNumber);
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                controlDimension, maxMouldNumber, allocationNumber, result);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MAIN_PATTERN_CAPACITY_INFO, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加开始结构粗算成型机台数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行分组计划粗算成型机台数====
      *
@@ -112,7 +133,7 @@ public class TbrProductionGroupLogRecorder {
     public static String addGroupLhRatioEmptyLog(Context context, String groupName) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s没有得到成型硫化配比====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SINGLE_GROUP_LH_RATIO_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SUM_CAPACITY_CX_MACHINE_INFO, logContent);
         return logContent;
     }
 

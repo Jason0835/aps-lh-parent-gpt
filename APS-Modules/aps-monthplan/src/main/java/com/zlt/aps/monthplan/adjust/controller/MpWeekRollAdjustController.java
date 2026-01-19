@@ -19,6 +19,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -91,25 +92,27 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("自动调整")
     @PostMapping("/autoAdjust")
     public AjaxResult autoAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
-        String key = ApsConstant.REDIS_ADJUST_STRUCT_IN_AUTO + weekRollAdjustDTO.getFactoryCode();
+        String key = ApsConstant.REDIS_ADJUST_STRUCT_AUTO + weekRollAdjustDTO.getFactoryCode()+weekRollAdjustDTO.getAdjustType();
+        if (!StringUtil.isEmptyWithTrim(weekRollAdjustDTO.getScheduledMachines())){
+            key = key+weekRollAdjustDTO.getScheduledMachines();
+        }
         if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
         }
         redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         try{
             // 获取周程滚动调整策略
-            //IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
             IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
             if (weekAdjustStrategy == null) {
                 throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
             }
             // 构建上下文对象
             MpRollAdjustContextDTO contextDTO = buildAutoAdjustContext(weekRollAdjustDTO);
-            log.info("自动调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode("01").getName(),
+            log.info("自动调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
                     contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
             // 执行周程滚动调整策略（自动调整）
             weekAdjustStrategy.autoAdjust(contextDTO);
-            log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode("01").getName(),
+            log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
                     contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
             return AjaxResult.success(contextDTO.getFactoryMonthPlanProdFinalList());
         }finally {

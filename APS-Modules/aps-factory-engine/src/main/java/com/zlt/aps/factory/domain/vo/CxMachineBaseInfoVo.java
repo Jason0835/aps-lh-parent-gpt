@@ -9,7 +9,8 @@ import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.factory.handler.LhGroupProductionRangeCalculator;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -405,26 +406,43 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
             return null;
         }
-        String productionEmbryoCode = addSkuInfo.getEmbryoCode();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
-        //说明达到胎胚种类数限制
-        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+        Integer preClosingDay = selectedLhGroup.getProductionDay();
+        Integer preEndDay = endDay;
+        Set<Integer> effectiveRangeSet = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo);
+        if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             return null;
         }
-        Set<Integer> productionDaySet = getEffectiveDay(context, selectedLhGroup.getProductionDay(), endDay, hasAddSkuList);
-        if (CollectionUtils.isEmpty(productionDaySet)) {
-            return null;
-        }
-        Set<Integer> effectiveMouldSet = getEffectiveDay(productionDaySet, selectedMould);
-        if (CollectionUtils.isEmpty(effectiveMouldSet)) {
-            return null;
-        }
+//        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
+//        //说明达到胎胚种类数限制
+//        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+//            return null;
+//        }
+//        //取得与胎胚种类数范围的交集
+//        Set<Integer> productionDaySet = getEffectiveDay(context, selectedLhGroup.getProductionDay(), endDay, hasAddSkuList);
+//        if (CollectionUtils.isEmpty(productionDaySet)) {
+//            return null;
+//        }
+//        //取得与模具排产范围的交集
+//        Set<Integer> effectiveMouldSet = getEffectiveDay(productionDaySet, selectedMould);
+//        if (CollectionUtils.isEmpty(effectiveMouldSet)) {
+//            return null;
+//        }
+//        //取得模壳排产范围
+//        Set<Integer> mouldShellSet = productionContext.getMouldShellRange(selectedMould.get(BigDecimal.ZERO.intValue()));
+//        if (CollectionUtils.isEmpty(mouldShellSet)) {
+//            return null;
+//        }
+//        //20260116 取得与模壳排产范围的交集
+//        Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
+//        if (CollectionUtils.isEmpty(intersectionSet)) {
+//            return null;
+//        }
         //拷贝，否则数据丢失
         CxLhProductionHelper newLhGroup = new CxLhProductionHelper();
         BeanUtils.copyProperties(selectedLhGroup, newLhGroup);
-        Set<Integer> resultSet = ContinuousProductionDayHandler.getEarliestContinuousRange(effectiveMouldSet, context.getStopDays());
-        List<Integer> sortList = new ArrayList<>(resultSet);
+        List<Integer> sortList = new ArrayList<>(effectiveRangeSet);
         Collections.sort(sortList);
         int size = sortList.size();
         newLhGroup.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
