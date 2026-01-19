@@ -649,8 +649,8 @@ export default {
       };
 
       if (hasPage) {
-        // params.pageSize = this.page.pageSize;
-        // params.pageNum = this.page.current;
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
       }
       if (params.yearMonth) {
         let arr = params.yearMonth.split("-");

@@ -282,7 +282,11 @@
 
 
   "ui.data.demandPlan.stockQtyTotal": "总库存",
-  "common.rule.double":"必须为双数"
+  "common.rule.double":"必须为双数",
+  "ui.data.mouldingDayResult.heightProductionQty":"高优先级排产数量",
+  "ui.data.mouldingDayResult.midProductionQty":"中优先级排产数量",
+  "ui.data.mouldingDayResult.cycleProductionQty":"周期排产储备排产数量",
+  "ui.data.mouldingDayResult.conventionProductionQty":"常规储备排产数量"
 
 
 }

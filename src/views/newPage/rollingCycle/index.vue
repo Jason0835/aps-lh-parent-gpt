@@ -186,7 +186,7 @@
         </el-table-column>
       </el-table>
       <div
-      v-if="showConfirmResult"
+        v-if="showConfirmResult"
         style="
           display: flex;
           flex-direction: row;
@@ -281,7 +281,7 @@ export default {
       outResultVersion: "",
       showOutResult: false,
       nextLoading: false,
-      showConfirmResult:false,
+      showConfirmResult: false,
 
       isShowFoot: false,
       formInline: {},
@@ -401,6 +401,7 @@ export default {
                     key={row.id}
                     v-model={row.confirmAdjustQty}
                     placeholder="请输入内容"
+                    type="number"
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
                       this.editAdjust(row);
@@ -422,8 +423,9 @@ export default {
                     type="number"
                     v-model={row.adjustPriority}
                     disabled={row.isSkuAdd != "1"}
+                    type="number"
                     placeholder="请输入"
-                    min={1}
+                    min={0}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
                       this.editAdjust(row, "adjustPriority");
@@ -979,6 +981,18 @@ export default {
     },
   },
   methods: {
+    filterDot(row, value) {
+      // 过滤小数点
+
+      const filteredValue = value.replace(/\./g, "");
+      if (value !== filteredValue) {
+        console.log("value", value);
+        row.confirmAdjustQty = filteredValue;
+        // 如果需要响应式更新
+        // this.$forceUpdate();
+      }
+    },
+
     //单结构调整提交
     onSubmit() {},
 
@@ -998,23 +1012,37 @@ export default {
         this.getSubList(row);
       }
     },
+    isNoPositiveInteger(num) {
+      return /^\d+$/.test(num);
+    },
     isPositiveInteger(num) {
-      return /^[1-9]\d*$/.test(num);
+      return /^(0|[1-9]\d*)$/.test(num);
     },
     async editAdjust(row, type) {
-      if (!this.isPositiveInteger(row.adjustPriority)) {
-        return this.$modal.msgWarning("请输入大于0的整数");
+      if (!type) {
+        if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
+          return this.$modal.msgWarning("不能有小数点");
+        }
+      } else {
+        if (!this.isPositiveInteger(row.adjustPriority)) {
+          return this.$modal.msgWarning("请输入正整数");
+        }
       }
+
       try {
         let res = await saveAdjust(row);
         this.$modal.msgSuccess(res.msg);
         this.getList();
       } catch (err) {}
     },
-    async editOutAdjust(row) {
-      if (type == "adjustPriority") {
+    async editOutAdjust(row,type) {
+      if (!type) {
+        if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
+          return this.$modal.msgWarning("不能有小数点");
+        }
+      } else {
         if (!this.isPositiveInteger(row.adjustPriority)) {
-          return this.$modal.msgWarning("请输入大于0的整数");
+          return this.$modal.msgWarning("请输入正整数");
         }
       }
       try {
@@ -1023,9 +1051,7 @@ export default {
         // this.getList();
       } catch (err) {}
     },
-    fouceInout(row) {
-      console.log("row", row);
-    },
+
     handleYearMonthChange(val) {
       this.search = {
         ...this.search,
@@ -1149,7 +1175,7 @@ export default {
       } catch (err) {
         console.log(err);
       } finally {
-        this.page=null
+        this.page = null;
         this.show = true;
         this.loading = false;
         this.isShowResult = true;
@@ -1158,8 +1184,8 @@ export default {
     },
 
     backPlan() {
-      this.show=false
-      this.showConfirmResult=false
+      this.show = false;
+      this.showConfirmResult = false;
       if (this.adjustType == "01") {
         this.activeName = "first";
       } else {
@@ -1172,7 +1198,7 @@ export default {
       }
       this.isShowFoot = false;
       this.isShowResult = false;
-      this.showOutResult=false
+      this.showOutResult = false;
 
       this.getVersionList(true);
     },
@@ -1302,7 +1328,7 @@ export default {
     //tab切换
     handleClick(tab, event) {
       // this.loading = true;
-      this.showConfirmResult=false
+      this.showConfirmResult = false;
       this.show = false;
       this.isShowResult = false;
       this.isShowFoot = false;
@@ -1383,7 +1409,9 @@ export default {
 
     //结构外自动调整
     async handOutResult() {
-      this.show = false;
+      if(this.formInline.adjustEndDay==null || this.formInline.adjustEndDay==""){
+        return this.$modal.msgWarning("请选择调整结束日期")
+      }
       this.loading = true;
       this.autoLoading = true;
       try {
@@ -1401,11 +1429,11 @@ export default {
           params.yearMonth = "";
         }
         console.log("params", params);
-        params.startDay=params.beginDay
-        params.scheduledMachines=params.cxMachineCode
+        params.startDay = params.beginDay;
+        params.scheduledMachines = params.cxMachineCode;
         let res = await autoAdjust(params);
         console.log(res);
-        this.outResultData = res.rows;
+        this.outResultData = res;
         this.showConfirmResult = true;
         // this.data = res;
         // // this.data=res.rows
@@ -1420,7 +1448,7 @@ export default {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
-      }finally{
+      } finally {
         this.loading = false;
       }
     },
@@ -1446,7 +1474,7 @@ export default {
       } else {
         this.page = null;
         setTimeout(() => {
-          this.page=null
+          this.page = null;
           this.data = [];
           this.show = true;
           this.loading = false;
@@ -1740,8 +1768,8 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
+        params.structureName=''
         let res = await outNextStructure(params);
-        console.log("下一个结构", res);
         if (res.id) {
           this.showOutResult = false;
           this.isShowFoot = false;
