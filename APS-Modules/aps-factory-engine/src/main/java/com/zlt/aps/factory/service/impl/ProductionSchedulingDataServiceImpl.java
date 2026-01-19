@@ -284,7 +284,9 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());
-        queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
+        if (StringUtils.isNotBlank(context.getMonthPlanVersion())) {
+            queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
+        }
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         return monthPlanRequireMapper.selectList(queryWrapper);
     }

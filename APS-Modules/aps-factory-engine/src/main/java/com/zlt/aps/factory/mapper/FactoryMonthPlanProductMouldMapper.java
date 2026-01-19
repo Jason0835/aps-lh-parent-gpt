@@ -3,6 +3,7 @@ package com.zlt.aps.factory.mapper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MouldAllocationInfoVo;
 import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
+import com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -69,6 +70,43 @@ public interface FactoryMonthPlanProductMouldMapper {
                                                                    @Param("month") Integer month,
                                                                    @Param("monthPlanVersion") String monthPlanVersion,
                                                                    @Param("productionVersion") String productionVersion);
+
+    /**
+     * 根据净需求信息结果，获取对应的需求模具配置信息
+     * 其包含的信息为物料配置的模具及对应模具的基础信息(状态、模壳标准、主花纹)
+     * 有效的模具信息(排除不排的计划)
+     *
+     * @param factoryCode       工厂编码
+     * @param year              年份
+     * @param month             月份
+     * @param monthPlanVersion  需求计划版本
+     * @return list
+     */
+    List<MoldCavityInsertMaxValueCalculatorVo> getEnableProductionMouldInfoByNetDemand(@Param("factoryCode") String factoryCode,
+                                                                                       @Param("year") Integer year,
+                                                                                       @Param("month") Integer month,
+                                                                                       @Param("monthPlanVersion") String monthPlanVersion);
+
+    /**
+     * 根据净需求信息获取在排产周期范围内可到货的新物料模具关系信息
+     * 1、上机日期在排产周期范围 [productionStartDate,productionEndDate]
+     * 2、新模具到货中的物料在本次需求范围内
+     * 有效的模具信息(排除不排的计划)
+     *
+     * @param factoryCode         工厂编码
+     * @param year                年份
+     * @param month               月份
+     * @param monthPlanVersion    需求计划版本
+     * @param productionStartDate 排产周期开始日
+     * @param productionEndDate   排产周期结束日
+     * @return list
+     */
+    List<MoldCavityInsertMaxValueCalculatorVo> getEnableMouldDeliveryInfoByNetDemand(@Param("factoryCode") String factoryCode,
+                                                                 @Param("year") Integer year,
+                                                                 @Param("month") Integer month,
+                                                                 @Param("monthPlanVersion") String monthPlanVersion,
+                                                                 @Param("productionStartDate") Date productionStartDate,
+                                                                 @Param("productionEndDate") Date productionEndDate);
 
     /**
      * 根据排产初始化获取在排产周期范围内可到货的新物料模具关系信息
