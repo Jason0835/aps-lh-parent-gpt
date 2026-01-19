@@ -91,13 +91,16 @@ public class MouldAllocationDayInfoHelper implements Serializable {
     /**
      * 使用量 - 1
      */
-    public void deductionUsedCount() {
+    public void deductionUsedCount(String mouldCode) {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
         }
-        existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
-        usedQty = existUsedQty;
+        if(usedMouldSet.contains(mouldCode)){
+            usedMouldSet.remove(mouldCode);
+            existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
+            usedQty = existUsedQty;
+        }
     }
 
     /**

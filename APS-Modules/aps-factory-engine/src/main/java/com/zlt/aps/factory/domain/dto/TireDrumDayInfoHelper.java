@@ -91,10 +91,13 @@ public class TireDrumDayInfoHelper implements Serializable {
     /**
      * 鼓使用量 - 1
      */
-    public void deductionUsedCount() {
+    public void deductionUsedCount(String cxMachineCode) {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
+        }
+        if (usedCxMachineSet.contains(cxMachineCode)) {
+            usedCxMachineSet.remove(cxMachineCode);
         }
         existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
         usedQty = existUsedQty;

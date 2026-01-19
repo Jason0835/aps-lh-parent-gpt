@@ -39,7 +39,7 @@ public class MdmCapsuleChuck extends BaseEntity {
     private String factoryCode;
 
     /** TBR卡盘英寸 多个以,分隔 */
-    @ImportExcelValidated(required = true, maxLength = 1024)
+    @ImportExcelValidated(maxLength = 1024)
     @Excel(name = "ui.data.column.mdmCapsuleChuck.proSize", width = 25, sort = 3)
     @ApiModelProperty(value = "TBR卡盘英寸 多个以,分隔", name = "proSize")
     @TableField(value = "PRO_SIZE")

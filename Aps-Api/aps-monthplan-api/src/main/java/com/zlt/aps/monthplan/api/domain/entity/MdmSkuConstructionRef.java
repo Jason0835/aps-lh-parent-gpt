@@ -214,7 +214,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @TableField(value = "LH_RELEASE_DATE")
     private String lhReleaseDate;
 
-//    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mainMaterialDesc")
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mainMaterialDesc", width = 30, sort = 46)
     @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;

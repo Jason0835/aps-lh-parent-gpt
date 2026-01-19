@@ -198,8 +198,8 @@
                   and MONTH = #{month}
           and FACTORY_CODE = #{factoryCode}
           and MONTH_PLAN_VERSION is not null
-          and IS_SELECTED_DEMAND = 1
-          and PLAN_TYPE = '01'
+        <if test="isSelectedDemand != null and isSelectedDemand != ''">and IS_SELECTED_DEMAND = #{isSelectedDemand}</if>
+        <if test="planType != null and planType != ''">and PLAN_TYPE = #{planType}</if>
     </select>
 
     <select id="productionVersionList" resultType="java.lang.String">

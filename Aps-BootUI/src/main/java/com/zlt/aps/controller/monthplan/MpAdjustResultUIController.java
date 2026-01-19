@@ -91,7 +91,6 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mpAdjustResult:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MpAdjustResult mpAdjustResult) {
@@ -102,7 +101,6 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mpAdjustResult:edit")
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(MpAdjustResult mpAdjustResult) {
@@ -117,7 +115,6 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
      * 删除调整-调整结果记录
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mpAdjustResult:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
@@ -178,7 +175,6 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mpAdjustResult:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
@@ -192,7 +188,6 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
         response.flushBuffer();
     }
 
-    @RequiresPermissions("monthplan:mpAdjustResult:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

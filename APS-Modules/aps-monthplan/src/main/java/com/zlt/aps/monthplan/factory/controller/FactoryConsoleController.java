@@ -346,13 +346,13 @@ public class FactoryConsoleController extends BaseController {
 
     @ApiOperation("查询对应年月+分厂的需求计划版本")
     @PostMapping("/versionList")
-    public AjaxResult versionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
+    public AjaxResult versionList(@RequestBody MpFactoryProductionVersion query) {
         return AjaxResult.success(factoryConsoleService.versionList(query));
     }
 
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
     @PostMapping("/getProductionVersionList")
-    public AjaxResult getProductionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
+    public AjaxResult getProductionVersionList(@RequestBody MpFactoryProductionVersion query) {
         return AjaxResult.success(factoryConsoleService.productionVersionList(query));
     }
 

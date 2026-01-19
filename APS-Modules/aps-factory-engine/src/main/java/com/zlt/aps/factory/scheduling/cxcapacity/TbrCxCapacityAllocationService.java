@@ -454,7 +454,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         Integer startDay = selectedCxMachine.getAllocationStartDay();
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
-        selectedCxMachine.addAllocationPlanInfo(addHelper);
+        selectedCxMachine.addAllocationPlanInfo(context, addHelper);
         //对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
         if (needAllocationDays <= remainingDays) {
