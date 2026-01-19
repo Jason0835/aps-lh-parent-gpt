@@ -284,7 +284,13 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("nightOverdueStockQty")), "NIGHT_OVERDUE_STOCK_QTY", queryVO.getFieldValueByFieldName("nightOverdueStockQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("twelveOverdueStockQty")), "TWELVE_OVERDUE_STOCK_QTY", queryVO.getFieldValueByFieldName("twelveOverdueStockQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stockLimit")), "STOCK_LIMIT", queryVO.getFieldValueByFieldName("stockLimit"));
-        queryWrapper.eq("SOURCE_TYPE", ProductionPlanType.NORMAL.getPlanType());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("predictionVersion")), "PREDICTION_VERSION", queryVO.getFieldValueByFieldName("predictionVersion"));
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("sourceType"))) {
+            queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("sourceType")), "SOURCE_TYPE", queryVO.getFieldValueByFieldName("sourceType"));
+        }else{
+            queryWrapper.eq("SOURCE_TYPE", ProductionPlanType.NORMAL.getPlanType());
+        }
+
     }
 
 
