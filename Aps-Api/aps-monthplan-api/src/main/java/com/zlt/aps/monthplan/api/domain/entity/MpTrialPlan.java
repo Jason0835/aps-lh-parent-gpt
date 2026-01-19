@@ -182,9 +182,9 @@ public class MpTrialPlan extends BaseEntity {
      */
     @ImportExcelValidated(maxLength = 30)
     @Excel(name = "ui.data.column.mpTrialPlan.madeInfo", type = Excel.Type.EXPORT)
-    @ApiModelProperty(value = "制造示方", name = "madeInfo")
-    @TableField(value = "MADE_INFO")
-    private String madeInfo;
+    @ApiModelProperty(value = "制造示方书发行时间", name = "embryoReleaseDate")
+    @TableField(value = "EMBRYO_RELEASE_DATE")
+    private String embryoReleaseDate;
 
     /**
      * 文字示方
@@ -195,6 +195,12 @@ public class MpTrialPlan extends BaseEntity {
     @TableField(value = "TEXT_NO")
     private String textNo;
 
+    @ImportExcelValidated(maxLength = 30)
+    @Excel(name = "ui.data.column.mpTrialPlan.moldingInfo", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "文字示方书发行时间", name = "textReleaseDate")
+    @TableField(value = "TEXT_RELEASE_DATE")
+    private String textReleaseDate;
+
     /**
      * 硫化示方
      */
@@ -203,6 +209,14 @@ public class MpTrialPlan extends BaseEntity {
     @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
     @TableField(value = "LH_NO")
     private String lhNo;
+
+    /**
+     * 硫化示方书发行时间
+     */
+    @Excel(name = "ui.data.column.mpTrialPlan.vulcanizationInfo", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "硫化示方书发行时间", name = "lhReleaseDate")
+    @TableField(value = "LH_RELEASE_DATE")
+    private String lhReleaseDate;
 
     /**
      * 导入时间

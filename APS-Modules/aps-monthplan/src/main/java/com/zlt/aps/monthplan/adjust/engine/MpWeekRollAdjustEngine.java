@@ -1118,7 +1118,7 @@ public class MpWeekRollAdjustEngine {
             mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
             iOrder += 1;
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
-            //2.1、敲定在机SKU新的上机日期
+            //2.1、敲定SKU新的上机日期
             newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, null);
             if (newOnLineDay == null){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
