@@ -309,18 +309,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setMonthPlanVersion(predictionVersion);
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-
-        List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
-        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),cycleStockOrders,productionFinalResults,mpMonthPlanMonitors);
+        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),productionFinalResults);
         if(CollectionUtils.isEmpty(netDemands)){
             predictionContext.getAllocationResult().setNetDemands(Collections.emptyList());
             return Collections.emptyList();
         }
         predictionContext.getAllocationResult().setNetDemands(netDemands);
         List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
-        predictionContext.setSupplyOrderPools(supplyOrderPools);
+        List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
+        if(!CollectionUtils.isEmpty(cycleStockOrders)){
+            supplyOrderPools.addAll(cycleStockOrders);
+        }
+        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
+        List<SupplyOrderPool> leftSupplyOrders = PredictionAllocationHelper.calculateSupplyOrder(supplyOrderPools,productionFinalResults,mpMonthPlanMonitors);
+        predictionContext.setSupplyOrderPools(leftSupplyOrders);
         predictionContext.setPostponeOrders(null);
+
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
             createCondition,netDemands, predictionContext);
