@@ -150,6 +150,20 @@ public enum MonthPlanEnums {
     MULTI_CX_MACHINE_LOCK_DAYS("SYS0206002", "多台成型机的月度生产计划锁定期天数"),
 
     /**
+     * SYS0206003 试制、量试SKU单日上限的数量
+     */
+    TRIAL_SKU_SINGLE_DAY_QTY_UP_LIMIT("SYS0206003", "试制、量试SKU单日上限的数量"),
+
+    /**
+     * SYS0206004 试制、量试SKU在结构起产日是否允许排产
+     */
+    TRIAL_SKU_STRUCT_START_DAY_IS_PRODUCTION("SYS0206004", "试制、量试SKU在结构起产日是否允许排产"),
+
+    /**
+     * SYS0206005 试制、量试SKU在周日是否允许排产
+     */
+    TRIAL_SKU_SUNDAY_IS_PRODUCTION("SYS0206005", "试制、量试SKU在周日是否允许排产"),
+    /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
     DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001","单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),

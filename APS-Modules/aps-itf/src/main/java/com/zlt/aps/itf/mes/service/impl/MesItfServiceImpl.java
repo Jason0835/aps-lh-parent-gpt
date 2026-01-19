@@ -12,6 +12,7 @@ import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -234,6 +235,7 @@ public class MesItfServiceImpl implements MesItfService {
                 String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
+                    stock.setStockDate(mdmProductStock.getStockDate());
                     stock.setMaterialDesc(materialInfo.getMaterialDesc());
                     stock.setStructureName(materialInfo.getStructureName());
                     stock.setBrand(materialInfo.getBrand());
@@ -388,7 +390,7 @@ public class MesItfServiceImpl implements MesItfService {
     private void deleteMdmProductStock(String factoryCode, Date stockDate) {
         Map<String, Object> map = new HashMap<>();
         map.put("FACTORY_CODE", factoryCode);
-        map.put("STOCK_DATE", stockDate);
+//        map.put("STOCK_DATE", stockDate);
         baseDao.deleteByMap(MdmProductStock.class, map);
     }
 
@@ -413,7 +415,7 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncUnqualifiedStock(MdmUnqualifiedStock mdmUnqualifiedStock) throws ParseException {
         List<MdmUnqualifiedStock> unqualifiedStock = this.getUnqualifiedStock(mdmUnqualifiedStock);
-        // 先删后增，日期
+        // 先删后增
         try {
             // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
@@ -431,12 +433,8 @@ public class MesItfServiceImpl implements MesItfService {
             }
 
             if (CollectionUtils.isNotEmpty(saveList)) {
-                Date stockDate = mdmUnqualifiedStock.getStockDate();
-                if (stockDate == null) {
-                    stockDate = DateUtils.getNowDate("yyyy-MM-dd");
-                }
                 Map<String, Object> map = new HashMap<>();
-                map.put("STOCK_DATE", stockDate);
+                map.put("FACTORY_CODE", mdmUnqualifiedStock.getFactoryCode());
                 baseDao.deleteByMap(ProductStockMonth.class, map);
                 List<List<MdmUnqualifiedStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
                 for (List<MdmUnqualifiedStock> importList : splitList) {
@@ -482,7 +480,7 @@ public class MesItfServiceImpl implements MesItfService {
                     stockDate = DateUtils.getNowDate("yyyy-MM-dd");
                 }
                 Map<String, Object> map = new HashMap<>();
-                map.put("STOCK_DATE", stockDate);
+                map.put("FACTORY_CODE", rawSpecialMaterialStock.getFactoryCode());
                 baseDao.deleteByMap(RawSpecialMaterialStock.class, map);
                 List<List<RawSpecialMaterialStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
                 for (List<RawSpecialMaterialStock> importList : splitList) {
@@ -680,5 +678,15 @@ public class MesItfServiceImpl implements MesItfService {
      */
     private List<MdmMouldShellInfo> getMoldShellList(AuxReqSyncDataLogs syncDataLogs) {
         return mesItfMapper.selectMoldShellList(syncDataLogs);
+    }
+
+    /**
+     * 查询品牌信息
+     *
+     * @return 结果
+     */
+    @Override
+    public List<MesBrandDict> selectMesBrandDict() {
+        return mesViewMapper.selectMesBrandDict();
     }
 }

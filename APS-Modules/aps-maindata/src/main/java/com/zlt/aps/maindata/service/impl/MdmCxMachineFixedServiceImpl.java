@@ -6,9 +6,11 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
 import com.zlt.aps.maindata.service.IMdmCxMachineFixedService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCxMachineFixed;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -46,6 +48,9 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
 
     @Autowired
     private MdmMoldingMachineEntityMapper mdmMoldingMachineEntityMapper;
+
+    @Autowired
+    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -142,20 +147,75 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
     protected Map<Object, Object> getServiceCheckParams(List<MdmCxMachineFixed> list, List<MdmCxMachineFixed> importList) {
         Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
         // 查询成型机台
-        List<String> machineCodeList = list.stream().map(MdmCxMachineFixed::getCxMachineCode).collect(Collectors.toList());
-        LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(MdmMoldingMachine::getCxMachineCode, machineCodeList);
-        List<MdmMoldingMachine> moldingMachineList = mdmMoldingMachineEntityMapper.selectList(wrapper);
-        Map<String, MdmMoldingMachine> mdmMoldingMachineMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(moldingMachineList)) {
-            mdmMoldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getCxMachineCode()), Function.identity(), (v1, v2) -> v1));
+        List<String> machineCodeList = new ArrayList<>();
+        List<String> materialDescList = new ArrayList<>();
+        for (MdmCxMachineFixed machineFixed : list) {
+            String cxMachineCode = machineFixed.getCxMachineCode();
+            machineCodeList.add(cxMachineCode);
+
+            List<String> fixedMaterialCodeList = machineFixed.getSplitFixedMaterialCode();
+            List<String> disableMaterialCodeList = machineFixed.getSplitDisableFixedMaterialCode();
+
+            materialDescList.addAll(fixedMaterialCodeList);
+            materialDescList.addAll(disableMaterialCodeList);
         }
-        serviceCheckParams.put("moldingMachineMap", mdmMoldingMachineMap);
+        if (CollectionUtils.isNotEmpty(machineCodeList)) {
+            LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmMoldingMachine::getCxMachineCode, machineCodeList);
+            List<MdmMoldingMachine> moldingMachineList = mdmMoldingMachineEntityMapper.selectList(wrapper);
+            Map<String, MdmMoldingMachine> mdmMoldingMachineMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(moldingMachineList)) {
+                mdmMoldingMachineMap = moldingMachineList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getCxMachineCode()), Function.identity(), (v1, v2) -> v1));
+            }
+            serviceCheckParams.put("moldingMachineMap", mdmMoldingMachineMap);
+        }
+        // 因为固定SKU可能会填写物料描述，查询物料信息，转成对应SKU，找不到对应的SKU则保持原有数据不变
+        if (CollectionUtils.isNotEmpty(materialDescList)) {
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmMaterialInfo::getMaterialDesc, materialDescList);
+            List<MdmMaterialInfo> materialInfoList = materialInfoEntityMapper.selectList(wrapper);
+            Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(materialInfoList)) {
+                materialInfoMap = materialInfoList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialDesc()), Function.identity(), (v1, v2) -> v1));
+            }
+            serviceCheckParams.put("materialInfoMap", materialInfoMap);
+        }
         return serviceCheckParams;
     }
 
     @Override
     protected Boolean serviceCheckAndDataHandle(MdmCxMachineFixed importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        // 将物料描述转成物料编号，找不到对应的SKU则保持原有数据不变
+        if (serviceCheckParams.containsKey("materialInfoMap")) {
+            Map<String, MdmMaterialInfo> materialInfoMap = (Map<String, MdmMaterialInfo>) serviceCheckParams.get("materialInfoMap");
+
+            List<String> splitFixedMaterialCode = importDocEntity.getSplitFixedMaterialCode();
+            List<String> splitDisableFixedMaterialCode = importDocEntity.getSplitDisableFixedMaterialCode();
+
+            List<String> fixedMaterialCodeList = new ArrayList<>();
+            for (String materialDesc : splitFixedMaterialCode) {
+                String key = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), materialDesc);
+                if (materialInfoMap.containsKey(key)) {
+                    fixedMaterialCodeList.add(materialInfoMap.get(key).getMaterialCode());
+                } else {
+                    // 找不到对应的SKU则保持原有数据不变
+                    fixedMaterialCodeList.add(materialDesc);
+                }
+            }
+            importDocEntity.setFixedMaterialCode(StringUtils.join(fixedMaterialCodeList, ","));
+
+            List<String> disableFixedMaterialCodeList = new ArrayList<>();
+            for (String materialDesc : splitDisableFixedMaterialCode) {
+                String key = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), materialDesc);
+                if (materialInfoMap.containsKey(key)) {
+                    disableFixedMaterialCodeList.add(materialInfoMap.get(key).getMaterialCode());
+                } else {
+                    // 找不到对应的SKU则保持原有数据不变
+                    disableFixedMaterialCodeList.add(materialDesc);
+                }
+            }
+            importDocEntity.setDisableMaterialCode(StringUtils.join(disableFixedMaterialCodeList, ","));
+        }
         // 校验成型机台是否存在
         if (serviceCheckParams.containsKey("moldingMachineMap")) {
             Map<String, MdmMoldingMachine> moldingMachineMap = (Map<String, MdmMoldingMachine>) serviceCheckParams.get("moldingMachineMap");

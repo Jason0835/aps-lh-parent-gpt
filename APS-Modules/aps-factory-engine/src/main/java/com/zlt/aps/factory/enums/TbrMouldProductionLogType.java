@@ -74,81 +74,37 @@ public enum TbrMouldProductionLogType {
      */
     END_GET_VERSION_DATA("20-02", "获取排产版本计划数据"),
     /**
-     * 20-02-01 排产前计划初始数据设置
+     * 20-03 排产前计划初始数据设置
      */
-    PLAN_INIT_DATA("20-02-01", "排产前计划初始数据设置"),
+    PLAN_INIT_DATA("20-03", "排产前计划初始数据设置"),
     /**
-     * 20-03-00 开始排产前数据加载
+     * 20-04 开始排产前数据加载
      */
-    START_BEFORE_PRODUCTION_DATA("20-03-00", "开始排产前数据加载"),
+    START_BEFORE_PRODUCTION_DATA("20-04", "开始排产前数据加载"),
     /**
-     * 20-03 读取排产参数配置
+     * 20-05 排产前基础配置数据加载
      */
-    END_READER_PARAM_DATA("20-03", "读取排产参数配置"),
+    BEFORE_PRODUCTION_DATA_LOADING("20-05", "排产前基础配置数据加载"),
     /**
-     * 20-04 特殊原材料配置为空
+     * 20-06-00 开始分组粗算成型机台数
      */
-    SPECIAL_MATERIAL_EMPTY("20-04", "特殊原材料配置为空"),
+    START_GROUP_CAPACITY_CALCULATE("20-06-00", "开始分组粗算成型机台数"),
     /**
-     * 20-05 特殊原材料库存为空
+     * 20-06-01 分组主花纹产能预算
      */
-    SPECIAL_MATERIAL_STOCK_EMPTY("20-05", "特殊原材料库存为空"),
+    GROUP_MAIN_PATTERN_CAPACITY_INFO("20-06-01", "分组主花纹产能预算"),
     /**
-     * 20-06 年月生产日历为空
+     * 20-06-02 分组总产能预算
      */
-    PRODUCTION_CALENDAR_EMPTY("20-06", "年月生产日历为空"),
+    GROUP_SUM_CAPACITY_INFO("20-06-02", "分组总产能预算"),
     /**
-     * 20-07 年月没有停工日
+     * 20-06-03 分组预算机台数
      */
-    STOP_DAY_EMPTY("20-07", "年月没有停工日"),
+    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-06-03", "分组预算机台数"),
     /**
-     * 20-08 成型机基础信息为空
+     * 20-06-04 汇总
      */
-    CX_MACHINE_BASE_EMPTY("20-08", "成型机基础信息为空"),
-    /**
-     * 20-09 成型机维修信息为空
-     */
-    CX_MACHINE_MAINTENANCE_EMPTY("20-09", "成型机维修信息为空"),
-    /**
-     * 20-10 模具关系配置为空
-     */
-    MOULD_RELATION_INFO_EMPTY("20-10", "模具关系配置为空"),
-    /**
-     * 20-11 新模具到货配置为空
-     */
-    MOULD_DELIVERY_INFO_EMPTY("20-11", "新模具到货配置为空"),
-    /**
-     * 20-12 成型硫化配比配置为空
-     */
-    CX_GROUP_LH_RATIO_EMPTY("20-12", "成型硫化配比配置为空"),
-    /**
-     * 20-13-00 开始分组粗算成型机台数
-     */
-    START_GROUP_CAPACITY_CALCULATE("20-13-00", "开始分组粗算成型机台数"),
-    /**
-     * 20-13-01 分组主花纹产能预算
-     */
-    GROUP_MAIN_PATTERN_CAPACITY_INFO("20-13-01", "分组主花纹产能预算"),
-    /**
-     * 20-13-02 分组总产能预算
-     */
-    GROUP_SUM_CAPACITY_INFO("20-13-02", "分组总产能预算"),
-    /**
-     * 20-13-04 汇总
-     */
-    SUMMARY_INFO_SUM("20-13-04", "汇总"),
-    /**
-     * 20-13-03 分组预算机台数
-     */
-    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-13-03", "分组预算机台数"),
-    /**
-     * 20-13 分组没有成型硫化配比配置
-     */
-    SINGLE_GROUP_LH_RATIO_EMPTY("20-13", "分组没有成型硫化配比配置"),
-    /**
-     * 20-14-01 没有获取到续作Sku信息
-     */
-    CONTINUE_SKU_DATA_EMPTY("20-14-01", "没有获取到续作Sku信息"),
+    SUMMARY_INFO_SUM("20-06-04", "汇总"),
     /**
      * 20-14-00 分组计划为非在机分组(TBR结构)
      */
@@ -173,6 +129,10 @@ public enum TbrMouldProductionLogType {
      * 20-14-01-04 在机分组使用在产机台没有待排硫化组
      */
     CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP("20-14-01-04", "在机分组使用在产机台没有待排硫化组"),
+    /**
+     * 20-25 结构提前收尾业务
+     */
+    GROUP_BEFORE_CONCLUSION("20-25", "结构提前收尾业务"),
     /**
      * 20-14-01-05 在机分组使用在产机台排产硫化组
      */

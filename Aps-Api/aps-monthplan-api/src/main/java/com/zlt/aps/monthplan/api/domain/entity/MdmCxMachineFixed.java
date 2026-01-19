@@ -9,6 +9,11 @@ import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -102,5 +107,15 @@ public class MdmCxMachineFixed extends BaseEntity {
     @ApiModelProperty(value = "不可作业SKU  多个以,分隔拼接", name = "disableMaterialCode")
     @TableField(value = "DISABLE_MATERIAL_CODE", updateStrategy = FieldStrategy.IGNORED)
     private String disableMaterialCode;
+
+    public List<String> getSplitFixedMaterialCode() {
+        String fixedMaterialCode = StringUtils.defaultIfBlank(this.fixedMaterialCode, "");
+        return Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitDisableFixedMaterialCode() {
+        String disableMaterialCode = StringUtils.defaultIfBlank(this.disableMaterialCode, "");
+        return Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+    }
 
 }

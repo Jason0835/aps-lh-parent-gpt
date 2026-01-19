@@ -38,49 +38,41 @@ public class MpMonthPlanMonitor extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂编号 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.factoryCode")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
 
     /** 年月:YYYYMM */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
     @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
 
     /** 需求计划版本 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.monthPlanVersion")
     @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
 
     /** 排产版本号 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.productionVersion")
     @ApiModelProperty(value = "排产版本号", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
 
     /** 产品品类 数据字典：biz_product_type  全钢 PCR 半钢 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.productTypeCode")
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type  全钢 PCR 半钢", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 产品状态 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.productStatus")
     @ApiModelProperty(value = "产品状态", name = "productStatus")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
@@ -91,14 +83,19 @@ public class MpMonthPlanMonitor extends BaseEntity {
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
-    /** 主物料(胎胚号) */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
-    @TableField(value = "MAIN_MATERIAL_DESC")
-    private String mainMaterialDesc;
+    /** 成型机台 */
+    @Excel(name = "ui.data.column.mpMonthPlanMonitor.cxMachine")
+    @ApiModelProperty(value = "成型机台", name = "cxMachine")
+    @TableField(exist = false)
+    private String cxMachine;
+
+    /** 硫化机台 */
+    @Excel(name = "ui.data.column.mpMonthPlanMonitor.lhMachine")
+    @ApiModelProperty(value = "硫化机台", name = "lhMachine")
+    @TableField(exist = false)
+    private String lhMachine;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
@@ -115,39 +112,40 @@ public class MpMonthPlanMonitor extends BaseEntity {
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
+    /** 主物料(胎胚号) */
+    @Excel(name = "ui.data.column.mpMonthPlanMonitor.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
     /** 品牌 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.brand")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
 
     /** 英寸 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.proSize")
     @ApiModelProperty(value = "英寸", name = "proSize")
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
     /** 规格 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(value = "SPECIFICATIONS")
     private String specifications;
 
     /** 主花纹 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;
 
     /** 花纹 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.pattern")
     @ApiModelProperty(value = "花纹", name = "pattern")
     @TableField(value = "PATTERN")
     private String pattern;
 
     /** 模具数格式：2-0 */
     @Excel(name = "ui.data.column.mpMonthPlanMonitor.mouldQty")
-    @ApiModelProperty(value = "模具数格式：2-0", name = "mouldQty")
+    @ApiModelProperty(value = "模具数", name = "mouldQty")
     @TableField(value = "MOULD_QTY")
     private String mouldQty;
 
@@ -189,27 +187,23 @@ public class MpMonthPlanMonitor extends BaseEntity {
     private Integer lhMargin;
 
     /** 预计收尾天数 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.expectedCloseDay")
     @ApiModelProperty(value = "预计收尾天数", name = "expectedCloseDay")
     @TableField(value = "EXPECTED_CLOSE_DAY")
     private Integer expectedCloseDay;
 
     /** 预计收尾时间 */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.expectedCloseDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "预计收尾时间", name = "expectedCloseDate")
     @TableField(value = "EXPECTED_CLOSE_DATE")
     private Date expectedCloseDate;
 
     /** 计划收尾时间 */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.planCloseDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "计划收尾时间", name = "planCloseDate")
     @TableField(value = "PLAN_CLOSE_DATE")
     private Date planCloseDate;
 
     /** 差异天数 */
-    @Excel(name = "ui.data.column.mpMonthPlanMonitor.diffDay")
     @ApiModelProperty(value = "差异天数", name = "diffDay")
     @TableField(value = "DIFF_DAY")
     private Integer diffDay;

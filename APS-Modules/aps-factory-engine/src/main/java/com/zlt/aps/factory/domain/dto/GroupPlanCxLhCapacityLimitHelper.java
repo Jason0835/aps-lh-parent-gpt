@@ -188,9 +188,30 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 reductionSkuList.add(materialDesc);
             }
         });
+        if (CollectionUtils.isEmpty(reductionSkuList)) {
+            return null;
+        }
         reductionSkuList.sort(Comparator.naturalOrder());
-        String selected = reductionSkuList.get(releaseLhMachineCount - BigDecimal.ONE.intValue());
-        return previousLimit.getProductionSkuQtyInfo().get(selected);
+        int selectedIndex = releaseLhMachineCount - BigDecimal.ONE.intValue();
+        if (selectedIndex >= reductionSkuList.size()) {
+            return null;
+        }
+        String selected = reductionSkuList.get(selectedIndex);
+        return getProductionSkuQtyInfo().get(selected);
+    }
+
+    /**
+     * 判断使用模具数是否低于要求的模具数
+     * 最低硫化配比使用
+     *
+     * @param minMouldNumber 最低硫化配比的模具数
+     * @return
+     */
+    public boolean isLowMinMouldNumber(int minMouldNumber) {
+        if (CollectionUtils.isEmpty(productionMouldSet)) {
+            return true;
+        }
+        return productionMouldSet.size() < minMouldNumber;
     }
 
     /**
@@ -249,13 +270,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer currentLhMachineCount = getProductionLhMachineCountByMouldNumber();
         //结构排产首日
         if (null == previousDayLimitInfo) {
-//            if (currentLhMachineCount >= maxLhMachineCount) {
-//                return true;
-//            }
-//            if (currentEmbryoCodeCount >= maxEmbryoCodeCount) {
-//                return true;
-//            }
-//            return false;
             return currentLhMachineCount >= maxLhMachineCount;
         }
         //当日没有硫化组信息
@@ -289,11 +303,28 @@ public class GroupPlanCxLhCapacityLimitHelper {
             Integer add = addSkuMap.values().stream().mapToInt(Integer::intValue).sum();
             realUsedLhMachineCount = realUsedLhMachineCount + add;
         }
-//        if (realUsedLhMachineCount >= maxLhMachineCount) {
-//            return true;
-//        }
-//        return false;
         return realUsedLhMachineCount >= maxLhMachineCount;
+    }
+
+    /**
+     * 根据后一天的排产信息，获取可释放的机台信息
+     *
+     * @param nextDayInfo 后一天排产信息
+     * @return
+     */
+    public Integer getReleaseLhMachineCount(GroupPlanCxLhCapacityLimitHelper nextDayInfo) {
+        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayInfo.getSkuUsedDetailInfoByQty();
+        Map<String, Integer> changeMap = new HashMap<>();
+        previousDaySkuLhMachineDetailMap.forEach((materialDesc, previousUsedMachineDetail) -> {
+            SkuUsedLhMachineInfo currentDetail = nextDaySkuLhMachineDetailMap.get(materialDesc);
+            changeMap.put(materialDesc, previousUsedMachineDetail.getChangeMachineCount(currentDetail));
+        });
+        if (CollectionUtils.isEmpty(changeMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer reduction = changeMap.values().stream().mapToInt(Integer::intValue).sum();
+        return Math.abs(reduction);
     }
 
     /**
@@ -637,6 +668,7 @@ class SkuUsedLhMachineInfo {
      * 获取整数机台变化数
      * 如果nextDayInfo 没有，则表示整数台+余量台都减
      * 否则看整数台的值变化量
+     * 得到后一天的机台数变化
      *
      * @param nextDayInfo 后一天的排产明细
      * @return
@@ -644,8 +676,8 @@ class SkuUsedLhMachineInfo {
     public Integer getChangeMachineCount(SkuUsedLhMachineInfo nextDayInfo) {
         Integer allMachineCount = getWholeMachineCount() + getLeftOverMachineCount();
         if (null == nextDayInfo) {
-            return allMachineCount;
+            return BigDecimal.ZERO.intValue() - allMachineCount;
         }
-        return getWholeMachineCount() - nextDayInfo.getWholeMachineCount();
+        return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
     }
 }

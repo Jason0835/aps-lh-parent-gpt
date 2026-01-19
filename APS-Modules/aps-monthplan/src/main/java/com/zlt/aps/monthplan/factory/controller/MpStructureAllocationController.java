@@ -1,20 +1,23 @@
 package com.zlt.aps.monthplan.factory.controller;
 
 import com.ruoyi.common.core.utils.PageUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
-import com.zlt.common.controller.BusiController;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -36,9 +39,10 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/mpStructureAllocation")
-public class MpStructureAllocationController extends BusiController<MpStructureAllocation> {
+public class MpStructureAllocationController extends AbstractDocBizController<MpStructureAllocation> {
 
     private final IMpStructureAllocationService mpStructureAllocationService;
+
     private final MpStructureAllocationEntityMapper entityMapper;
 
     /**
@@ -48,6 +52,7 @@ public class MpStructureAllocationController extends BusiController<MpStructureA
      */
     @ApiOperation("查询列表")
     @PostMapping("/list")
+    @Override
     public TableDataInfo list(@RequestBody MpStructureAllocation queryCondition) {
         try {
             startPage();
@@ -57,6 +62,53 @@ public class MpStructureAllocationController extends BusiController<MpStructureA
             PageUtils.clearPage();
         }
     }
+
+    @Override
+    protected List<MpStructureAllocation> listExportData(MpStructureAllocation condition) {
+        if (null == condition) {
+            return Collections.emptyList();
+        }
+        if (null == condition.getYear() || null == condition.getMonth() || StringUtils.isBlank(condition.getFactoryCode())) {
+            return Collections.emptyList();
+        }
+        if (StringUtils.isBlank(condition.getMonthPlanVersion()) || StringUtils.isBlank(condition.getProductionVersion())) {
+            return Collections.emptyList();
+        }
+        return mpStructureAllocationService.getDataList(condition);
+    }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.mpStructureAllocation.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody MpStructureAllocation billVO) {
+        return super.save(billVO);
+    }
+
+    /**
+     * 删除
+     */
+    @Log(title = "ui.data.column.mpStructureAllocation.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return mpStructureAllocationService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "MDM0408";
+    }
+
 
     /**
      * 查询版本列表
@@ -69,4 +121,16 @@ public class MpStructureAllocationController extends BusiController<MpStructureA
         this.clearPage();
         return this.getDataTable(list);
     }
+
+    /**
+     * 获取日期最接近的下一个结构
+     * @param queryCondition 查询条件
+     */
+    @ApiOperation("获取日期最接近的下一个结构")
+    @PostMapping("/getNextStructure")
+    public MpStructureAllocation getNextStructure(@RequestBody MpStructureAllocation queryCondition) {
+        return mpStructureAllocationService.getNextStructure(queryCondition);
+    }
+
+
 }

@@ -37,10 +37,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 有模具基础信息的模具数量(模具台账或是新模具到货计划)
      */
     private Integer baseMouldQty;
-    /**
-     * 产品状态？
-     */
-    private String productStatus;
+
     /**
      * 不可生产标志
      */
@@ -107,7 +104,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         Integer heightLossQty = getHeightLossQty() - getHeightQty();
         Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
         Integer sumLossQty = heightLossQty + noHeightLossQty;
-        cxCapacityRequireQty = getFactProdReqQty() + sumLossQty;
+        cxCapacityRequireQty = getNetQty() + sumLossQty;
         heightProductionQty = getHeightLossQty();
         productionQty = cxCapacityRequireQty;
     }
@@ -261,6 +258,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //施工配置
         MonthPlanProductConstructionInfoVo constructionInfo = setConstructionStage(constructionConfigurationList, getProductTypeCode());
         setEmbryoCode(constructionInfo.getEmbryoCode());
+        setProductStatus(constructionInfo.getProductStatus());
+        setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
         setMouldMethod(constructionInfo.getMouldMethod());
         setSpecCode(constructionInfo.getSpecCode());
         if (StringUtils.isBlank(constructionInfo.getIsZeroRack())) {
@@ -477,6 +476,17 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         }
         setIsProduction(YesOrNoEnum.NO.getCode());
         addNoProductionReason(addNoProductionReason);
+    }
+
+    /**
+     * 获取模具分配比例控制key
+     * 结构+主花纹
+     *
+     * @return
+     */
+    public String getMouldAllocationControlDimensionKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, getStructureName(), getMainPattern());
     }
 
     /**

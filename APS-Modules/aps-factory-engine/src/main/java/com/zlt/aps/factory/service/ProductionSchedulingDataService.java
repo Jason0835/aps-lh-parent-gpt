@@ -53,6 +53,7 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     MpFactoryProductionVersion getFirstFactoryMonthPlanVersion(Context context);
+
     /**
      * 根据工厂编码、年份、月份获取对应的定稿版本信息
      *
@@ -378,6 +379,13 @@ public interface ProductionSchedulingDataService {
      * @param productionLog 日志信息
      */
     void saveMouldProductionLog(MouldProductionLog productionLog);
+
+    /**
+     * 保存模具状态日志
+     *
+     * @param usedLogList
+     */
+    void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList);
 
     /**
      * 保存分组计划的成型转产结果

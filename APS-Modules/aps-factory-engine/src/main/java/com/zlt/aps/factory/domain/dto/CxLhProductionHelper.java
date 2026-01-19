@@ -36,7 +36,10 @@ public class CxLhProductionHelper implements Serializable {
      * 物料描述
      */
     private String materialDesc;
-
+    /**
+     * 胎胚号
+     */
+    private String embryoCode;
     /**
      * 当天排产量
      */

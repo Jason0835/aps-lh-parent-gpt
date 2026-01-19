@@ -1,55 +1,43 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
-
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-
-import com.ruoyi.common.log.annotation.Log;
-import com.ruoyi.common.log.enums.BusinessType;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
-
 /**
-* Copyright (c) 2022, All rights reserved。
-* 文件名称：MpSimulatedResultController.java
-* 描    述：S2-1004.实单模拟排产 控制层类：....
-*@author yelq
-*@date 2025-12-31
-*@version 1.0
-*
- *  修改记录：
-*     修改时间：...
-*     修 改 人：yelq
-*     修改内容：...
-*/
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MpSimulatedResultController.java
+ * 描    述：S2-1004.实单模拟排产 控制层类：....
+ *
+ * @author yelq
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：yelq
+ * 修改内容：...
+ * @date 2025-12-31
+ */
 @Slf4j
 @Api(tags = "S2-1004.实单模拟排产")
 @RestController
@@ -84,7 +72,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody MpSimulatedResult billVO){
+    public AjaxResult save(@RequestBody MpSimulatedResult billVO) {
         return super.save(billVO);
     }
 
@@ -95,7 +83,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
-    public AjaxResult removeByIds(@RequestBody List<Long> ids){
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
 
@@ -113,6 +101,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
 
     /**
      * 根据集合导入S2-1004.实单模拟排产数据
+     *
      * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
@@ -122,7 +111,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
+        return super.importData(importContext, updateSupport);
     }
 
     /**
@@ -142,13 +131,13 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
      */
     @ApiOperation("实单模拟排产")
     @RedissonLockAnno(uniqueMark = "redissonLock:simulatedResult:createVmMonthPrediction:",
-        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-        msgKey = "ui.data.alert.createVmMonthPrediction.run",
-        waitTime = 5,
-        leaseTime = 300
+            expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
+            msgKey = "ui.data.alert.createVmMonthPrediction.run",
+            waitTime = 5,
+            leaseTime = 300
     )
     @PostMapping("/createVmMonthPrediction")
-    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition){
+    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws InterruptedException {
         return this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
     }
 
@@ -156,11 +145,23 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     protected List<MpSimulatedResult> listExportData(MpSimulatedResult obj) {
         QueryWrapper<MpSimulatedResult> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        return translationList(entityMapper.selectList(wrapper));
+    }
+
+    /**
+     * 翻译列表
+     *
+     * @param resultList
+     */
+    private List<MpSimulatedResult> translationList(List<MpSimulatedResult> resultList) {
+        for (MpSimulatedResult item : resultList) {
+            item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
+        }
+        return resultList;
     }
 
     @Override
-    protected IDocService getDocService(){
+    protected IDocService getDocService() {
         return mpSimulatedResultService;
     }
 
@@ -179,15 +180,15 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainMaterialDesc")), "MAIN_MATERIAL_DESC", queryVO.getFieldValueByFieldName("mainMaterialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldQty")), "MOULD_QTY", queryVO.getFieldValueByFieldName("mouldQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("typeBlockQty")), "TYPE_BLOCK_QTY", queryVO.getFieldValueByFieldName("typeBlockQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("netQty")), "NET_QTY", queryVO.getFieldValueByFieldName("netQty"));
@@ -221,7 +222,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
 
 
     @Override
-    protected String getTypeCode(){
+    protected String getTypeCode() {
         return "2025123114";
     }
 

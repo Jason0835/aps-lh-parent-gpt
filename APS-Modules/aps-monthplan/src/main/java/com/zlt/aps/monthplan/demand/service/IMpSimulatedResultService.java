@@ -23,5 +23,5 @@ public interface IMpSimulatedResultService  extends IDocService<MpSimulatedResul
    * @param createCondition
    * @return
    */
-  AjaxResult createVmMonthPrediction(MpSimulatedResult createCondition);
+  AjaxResult createVmMonthPrediction(MpSimulatedResult createCondition) throws InterruptedException;
 }

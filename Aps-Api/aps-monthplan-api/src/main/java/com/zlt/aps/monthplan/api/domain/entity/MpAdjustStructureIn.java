@@ -280,6 +280,12 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
 
+    /** 是否SKU新增 */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.isSkuAdd", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否SKU新增")
+    @TableField(value = "IS_SKU_ADD")
+    private String isSkuAdd;
+
     /**
      * 获取分组key
      * @return

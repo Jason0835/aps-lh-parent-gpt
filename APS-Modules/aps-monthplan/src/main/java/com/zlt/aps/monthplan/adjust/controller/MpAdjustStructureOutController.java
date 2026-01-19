@@ -1,7 +1,6 @@
 package com.zlt.aps.monthplan.adjust.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureOutEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
@@ -9,13 +8,11 @@ import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
@@ -148,15 +145,24 @@ public class MpAdjustStructureOutController extends AbstractDocBizController<MpA
      */
     @Override
     protected void builderCondition(QueryWrapper<MpAdjustStructureOut> queryWrapper, MpAdjustStructureOut queryVO) {
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", queryVO.getFieldValueByFieldName("cxMachineCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("version")), "VERSION", queryVO.getFieldValueByFieldName("version"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("beforePlanQty")), "BEFORE_PLAN_QTY", queryVO.getFieldValueByFieldName("beforePlanQty"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("beforeStartDate")), "BEFORE_START_DATE", queryVO.getFieldValueByFieldName("beforeStartDate"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("beforeEndDate")), "BEFORE_END_DATE", queryVO.getFieldValueByFieldName("beforeEndDate"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("afterPlanQty")), "AFTER_PLAN_QTY", queryVO.getFieldValueByFieldName("afterPlanQty"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("afterStartDate")), "AFTER_START_DATE", queryVO.getFieldValueByFieldName("afterStartDate"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("afterEndDate")), "AFTER_END_DATE", queryVO.getFieldValueByFieldName("afterEndDate"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustDirection")), "ADJUST_DIRECTION", queryVO.getFieldValueByFieldName("adjustDirection"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduledMachines")), "SCHEDULED_MACHINES", queryVO.getFieldValueByFieldName("scheduledMachines"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hasSpecialMaterial")), "HAS_SPECIAL_MATERIAL", queryVO.getFieldValueByFieldName("hasSpecialMaterial"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("previousNetQty")), "PREVIOUS_NET_QTY", queryVO.getFieldValueByFieldName("previousNetQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("currentNetQty")), "CURRENT_NET_QTY", queryVO.getFieldValueByFieldName("currentNetQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("netQtyChange")), "NET_QTY_CHANGE", queryVO.getFieldValueByFieldName("netQtyChange"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthScheduledQty")), "MONTH_SCHEDULED_QTY", queryVO.getFieldValueByFieldName("monthScheduledQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pendingQty")), "PENDING_QTY", queryVO.getFieldValueByFieldName("pendingQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("confirmAdjustQty")), "CONFIRM_ADJUST_QTY", queryVO.getFieldValueByFieldName("confirmAdjustQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustPriority")), "ADJUST_PRIORITY", queryVO.getFieldValueByFieldName("adjustPriority"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("actualAdjustQty")), "ACTUAL_ADJUST_QTY", queryVO.getFieldValueByFieldName("actualAdjustQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustReason")), "ADJUST_REASON", queryVO.getFieldValueByFieldName("adjustReason"));
     }
 
 

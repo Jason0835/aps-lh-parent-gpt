@@ -3,20 +3,21 @@ package com.zlt.aps.monthplan.factory.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
-import com.zlt.common.controller.BusiController;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -37,7 +38,7 @@ import java.util.List;
 @Api(tags = "工厂月生产计划-最终排产计划定稿")
 @RestController
 @RequestMapping("/factoryMonthPlanFinalResult")
-public class FactoryMonthPlanProductionFinalResultController extends BusiController<FactoryMonthPlanProductionFinalResult> {
+public class FactoryMonthPlanProductionFinalResultController extends AbstractDocBizController<FactoryMonthPlanProductionFinalResult> {
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
@@ -45,7 +46,7 @@ public class FactoryMonthPlanProductionFinalResultController extends BusiControl
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
      */
-    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:list")
+    @Override
     @ApiOperation("查询列表")
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
@@ -64,6 +65,7 @@ public class FactoryMonthPlanProductionFinalResultController extends BusiControl
      * @param queryWrapper
      * @param queryVO
      */
+    @Override
     protected void builderCondition(QueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper, FactoryMonthPlanProductionFinalResult queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionNo")), "PRODUCTION_NO", queryVO.getFieldValueByFieldName("productionNo"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
@@ -108,4 +110,30 @@ public class FactoryMonthPlanProductionFinalResultController extends BusiControl
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("reason")), "REASON", queryVO.getFieldValueByFieldName("reason"));
     }
 
+    @Override
+    protected IDocService getDocService() {
+        return factoryMonthPlanProductionFinalResultService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "FIN0001";
+    }
+
+    /**
+     * 导出列表
+     */
+    @Log(title = "月计划定稿", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody FactoryMonthPlanProductionFinalResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<FactoryMonthPlanProductionFinalResult> listExportData(FactoryMonthPlanProductionFinalResult obj) {
+        return factoryMonthPlanProductionFinalResultService.getDataList(obj);
+    }
 }

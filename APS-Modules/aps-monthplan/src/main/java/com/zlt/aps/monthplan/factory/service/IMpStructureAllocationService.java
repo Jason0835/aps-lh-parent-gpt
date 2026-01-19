@@ -1,8 +1,7 @@
 package com.zlt.aps.monthplan.factory.service;
 
-
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
 
@@ -20,7 +19,7 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-12-29
  */
-public interface IMpStructureAllocationService extends IService<MpStructureAllocation> {
+public interface IMpStructureAllocationService extends IDocService<MpStructureAllocation> {
     /**
      * 根据查询条件，获取结构排产信息
      *
@@ -28,4 +27,11 @@ public interface IMpStructureAllocationService extends IService<MpStructureAlloc
      * @return
      */
     List<MpStructureAllocation> getDataList(MpStructureAllocation param);
+
+    /**
+     * 获取日期最接近的下一个结构
+     * @param param
+     * @return
+     */
+    MpStructureAllocation getNextStructure(MpStructureAllocation param);
 }

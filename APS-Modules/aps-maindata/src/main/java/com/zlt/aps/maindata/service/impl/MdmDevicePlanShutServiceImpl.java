@@ -94,7 +94,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
                 long dbEndTime = mdmDevicePlanShut.getEndDate().getTime();
                 long beginTime = beginDate.getTime();
                 long endTime = endDate.getTime();
-                if (beginTime <= dbEndTime || endTime >= dbBeginTime) {
+                if (!(beginTime >= dbEndTime || endTime <= dbBeginTime)) {
                     throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmDevicePlanShut.notUnique"));
                 }
             }
@@ -105,7 +105,7 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "machineType", "machineCode", "beginDate", "endDate"));
+        return Collections.emptyList();
     }
 
     @Override
@@ -136,8 +136,8 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
                         long dbEndTime = mdmDevicePlanShut.getEndDate().getTime();
                         long beginTime = importDocEntity.getBeginDate().getTime();
                         long endTime = importDocEntity.getEndDate().getTime();
-                        if (beginTime <= dbEndTime || endTime >= dbBeginTime) {
-                            String message = I18nUtil.getMessage("import.validated.repeat");
+                        if (!(beginTime >= dbEndTime || endTime <= dbBeginTime)) {
+                            String message = I18nUtil.getMessage("ui.data.alert.mdmDevicePlanShut.excel.notUnique");
                             String errorMsg = String.format(message, errorRowNum, Integer.parseInt(searchValue) + 2);
                             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, errorMsg, importErrorLogs);
                             return Boolean.FALSE;
@@ -151,8 +151,8 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
                 unique = checkUnique(importDocEntity);
             } catch (Exception e) {
                 logger.error("设备计划停机数据唯一性校验异常", e);
-                String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, String.format(uniqueMsg, errorRowNum), importErrorLogs);
+//                String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, e.getMessage(), importErrorLogs);
                 return Boolean.FALSE;
             }
         }

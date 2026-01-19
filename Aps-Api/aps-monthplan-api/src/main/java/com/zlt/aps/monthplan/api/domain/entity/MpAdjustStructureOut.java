@@ -1,12 +1,12 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.util.Date;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import com.zlt.common.annotation.EntityMapping;
+import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zlt.common.domain.CommonBusiEntity;
@@ -25,6 +25,7 @@ import com.zlt.common.domain.CommonBusiEntity;
  *     修改内容：...
  */
 
+
 @ApiModel(value = "调整-结构调整记录对象", description = "调整-结构调整记录对象 ")
 @Data
 @TableName(value = "T_MP_ADJUST_STRUCTURE_OUT")
@@ -32,11 +33,45 @@ public class MpAdjustStructureOut extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-     /** 成型机台 */
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.cxMachineCode")
-    @ApiModelProperty(value = "成型机台", name = "cxMachineCode")
-    @TableField(value = "CX_MACHINE_CODE")
-    private String cxMachineCode;
+    /** 分厂编号 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "分厂编号，字典：biz_factory_name", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /** 年份 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.year")
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /** 月份 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.month")
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
+
+    /** 版本规则：ADJ+年月日+3位流水号； */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.version")
+    @ApiModelProperty(value = "版本规则：ADJ+年月日+3位流水号；", name = "version")
+    @TableField(value = "VERSION")
+    private String version;
+
+    /**
+     * 销售生产需求计划版本
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.monthPlanVersion")
+    @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
+    @TableField(value = "MONTH_PLAN_VERSION")
+    private String monthPlanVersion;
+
+    /**
+     * 排产计划版本
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionVersion")
+    @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
+    @TableField(value = "PRODUCTION_VERSION")
+    private String productionVersion;
 
     /** 产品结构 */
     @Excel(name = "ui.data.column.mpAdjustStructureOut.structureName")
@@ -44,51 +79,222 @@ public class MpAdjustStructureOut extends BaseEntity {
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
-    /** 调整前计划量 */
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.beforePlanQty")
-    @ApiModelProperty(value = "调整前计划量", name = "beforePlanQty")
-    @TableField(value = "BEFORE_PLAN_QTY")
-    private Integer beforePlanQty;
+    /** 排产机台,多个机台用逗号分隔 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.scheduledMachines")
+    @ApiModelProperty(value = "排产机台,多个机台用逗号分隔", name = "scheduledMachines")
+    @TableField(value = "SCHEDULED_MACHINES")
+    private String scheduledMachines;
 
-    /** 调整前开始日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.beforeStartDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "调整前开始日期", name = "beforeStartDate")
-    @TableField(value = "BEFORE_START_DATE")
-    private Date beforeStartDate;
+    /** MES物料编码 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
-    /** 调整前结束日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.beforeEndDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "调整前结束日期", name = "beforeEndDate")
-    @TableField(value = "BEFORE_END_DATE")
-    private Date beforeEndDate;
+    /** 物料编码 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
-    /** 调整后计划量 */
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.afterPlanQty")
-    @ApiModelProperty(value = "调整后计划量", name = "afterPlanQty")
-    @TableField(value = "AFTER_PLAN_QTY")
-    private Integer afterPlanQty;
+    /** 物料描述 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
-    /** 调整后开始日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.afterStartDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "调整后开始日期", name = "afterStartDate")
-    @TableField(value = "AFTER_START_DATE")
-    private Date afterStartDate;
+    /** 是否含特殊材料            2、0-否，1-是 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.hasSpecialMaterial")
+    @ApiModelProperty(value = "是否含特殊材料            2、0-否，1-是", name = "hasSpecialMaterial")
+    @TableField(value = "HAS_SPECIAL_MATERIAL")
+    private String hasSpecialMaterial;
 
-    /** 调整后结束日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.afterEndDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "调整后结束日期", name = "afterEndDate")
-    @TableField(value = "AFTER_END_DATE")
-    private Date afterEndDate;
+    /**
+     * 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode")
+    @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
 
-    /** 调整方向 */
-    @Excel(name = "ui.data.column.mpAdjustStructureOut.adjustDirection")
-    @ApiModelProperty(value = "调整方向", name = "adjustDirection")
-    @TableField(value = "ADJUST_DIRECTION")
-    private String adjustDirection;
+    /**
+     * 英寸
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
+    @TableField(value = "PRO_SIZE")
+    private String proSize;
+
+    /**
+     * 产品分类
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productCategory", dictType = "product_category")
+    @ApiModelProperty(value = "产品分类", name = "productCategory")
+    @TableField(value = "PRODUCT_CATEGORY")
+    private String productCategory;
+    /**
+     * 产品状态
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productStatus")
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
+    /**
+     * 主物料(胎胚号)
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
+
+    /**
+     * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage")
+    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @TableField(value = "CONSTRUCTION_STAGE")
+    private String constructionStage;
+
+    /**
+     * 品牌
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.brand")
+    @ApiModelProperty(value = "品牌", name = "brand")
+    @TableField(value = "BRAND")
+    private String brand;
+
+    /**
+     * 规格
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.specifications")
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(value = "SPECIFICATIONS")
+    private String specifications;
+
+    /**
+     * 主花纹
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mainPattern")
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
+
+    /**
+     * 花纹
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.pattern")
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(value = "PATTERN")
+    private String pattern;
+
+    /**
+     * 型腔数量(同主花纹的模具数量)
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mouldCavityQty")
+    @ApiModelProperty(value = "型腔数量(同主花纹的模具数量)", name = "mouldCavityQty")
+    @TableField(value = "MOULD_CAVITY_QTY")
+    private Integer mouldCavityQty;
+
+    /**
+     * 活块数量(同主花纹的物料模具数量)
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.typeBlockQty")
+    @ApiModelProperty(value = "活块数量(同主花纹的物料模具数量)", name = "typeBlockQty")
+    @TableField(value = "TYPE_BLOCK_QTY")
+    private Integer typeBlockQty;
+
+    /**
+     * 日硫化量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dayVulcanizationQty")
+    @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
+    @TableField(value = "DAY_VULCANIZATION_QTY")
+    private Integer dayVulcanizationQty;
+
+    /**
+     * 单条硫化时间(包含增加间隔)-调整时使用
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.curingTime")
+    @ApiModelProperty(value = "单条硫化时间(包含增加间隔)-调整时使用", name = "curingTime")
+    @TableField(value = "CURING_TIME")
+    private Integer curingTime;
+
+    /** 调整前净需求量（上周） */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.previousNetQty", readConverterExp = "上=周")
+    @ApiModelProperty(value = "调整前净需求量", name = "previousNetQty")
+    @TableField(value = "PREVIOUS_NET_QTY")
+    private Integer previousNetQty;
+
+    /** 当前净需求量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.currentNetQty")
+    @ApiModelProperty(value = "当前净需求量", name = "currentNetQty")
+    @TableField(value = "CURRENT_NET_QTY")
+    private Integer currentNetQty;
+
+    /** 净需求变动 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.netQtyChange")
+    @ApiModelProperty(value = "净需求变动", name = "netQtyChange")
+    @TableField(value = "NET_QTY_CHANGE")
+    private Integer netQtyChange;
+
+    /** 月计划已排产量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.monthScheduledQty")
+    @ApiModelProperty(value = "月计划已排产量", name = "monthScheduledQty")
+    @TableField(value = "MONTH_SCHEDULED_QTY")
+    private Integer monthScheduledQty;
+
+    /** 待调整量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.pendingQty")
+    @ApiModelProperty(value = "待调整量", name = "pendingQty")
+    @TableField(value = "PENDING_QTY")
+    private Integer pendingQty;
+
+    /** 确认调整量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.confirmAdjustQty")
+    @ApiModelProperty(value = "确认调整量", name = "confirmAdjustQty")
+    @TableField(value = "CONFIRM_ADJUST_QTY")
+    private Integer confirmAdjustQty;
+
+    /** 调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑； */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.adjustPriority", dictType = "adjust_priority")
+    @ApiModelProperty(value = "调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑；", name = "adjustPriority")
+    @TableField(value = "ADJUST_PRIORITY")
+    private Integer adjustPriority;
+
+    /** 实际调整 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.actualAdjustQty")
+    @ApiModelProperty(value = "实际调整", name = "actualAdjustQty")
+    @TableField(value = "ACTUAL_ADJUST_QTY")
+    private Integer actualAdjustQty;
+
+    /** 调整原因 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.adjustReason")
+    @ApiModelProperty(value = "调整原因", name = "adjustReason")
+    @TableField(value = "ADJUST_REASON")
+    private String adjustReason;
+
+    /** 已生产量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.productionQty")
+    @ApiModelProperty(value = "已生产量", name = "productionQty")
+    @TableField(value = "PRODUCTION_QTY")
+    private Integer productionQty;
+
+    /** 是否SKU新增 */
+    @Excel(name = "ui.data.column.mpAdjustStructureOut.isSkuAdd", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否SKU新增")
+    @TableField(value = "IS_SKU_ADD")
+    private String isSkuAdd;
+
+    /**
+     * 获取分组key
+     * @return
+     */
+    public String getGroupKey() {
+        String groupKeyFormat = "%s|*|%s";
+        return String.format(groupKeyFormat, structureName, materialCode);
+    }
 
 
 }

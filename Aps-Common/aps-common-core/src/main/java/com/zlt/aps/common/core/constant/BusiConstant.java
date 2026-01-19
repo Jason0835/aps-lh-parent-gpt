@@ -34,6 +34,14 @@ public interface BusiConstant {
          * 月最大天数
          */
         int MAX_DAY_OF_MONTH = 31;
+        /**
+         * 分隔符：逗号
+         */
+        String SPLIT_COMMA = ",";
+        /**
+         * 分隔符：换行
+         */
+        String SPLIT_NEW_LINE = "\n";
     }
 
 

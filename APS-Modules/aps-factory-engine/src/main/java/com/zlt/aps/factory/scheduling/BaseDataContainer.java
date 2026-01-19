@@ -4,11 +4,15 @@ import com.zlt.aps.factory.domain.dto.DayCapacityLimitHelper;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 基础配置信息数据缓存容器
@@ -43,6 +47,11 @@ public class BaseDataContainer implements Serializable {
      */
     Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap;
     /**
+     * 结构+主花纹的模具配比配置
+     * key=group+主花纹 ：value=配比配置，同时需转化成每天的量信息
+     */
+    Map<String, MouldAllocationInfoVo> groupMainPatternAllocationLimitMap;
+    /**
      * 模壳总数信息
      * key=模块标准 : value=模块标准数量
      */
@@ -61,4 +70,38 @@ public class BaseDataContainer implements Serializable {
      * 分组(结构)成型硫化配比
      */
     List<MonthPlanStructureLhRatioVo> structureLhRatioList;
+
+    /**
+     * 所有模具信息--用于记录模具日志
+     * key=型腔模号 : value=模具信息
+     */
+    Map<String, ProductionMouldInfoVo> allMouldInfoMap;
+
+    /**
+     * 判断同结构下前后两个Sku是否共用模具
+     *
+     * @param beforeSku 前Sku
+     * @param afterSku  后Sku
+     * @return
+     */
+    public boolean isShareMouldSameGroup(String beforeSku, String afterSku) {
+        if (StringUtils.isBlank(beforeSku) || StringUtils.isBlank(afterSku)) {
+            return false;
+        }
+        if (beforeSku.equals(afterSku)) {
+            return true;
+        }
+        List<MonthPlanProductMouldInfoVo> beforeMouldList = skuMouldRelationMap.get(beforeSku);
+        List<MonthPlanProductMouldInfoVo> afterMouldList = skuMouldRelationMap.get(afterSku);
+        if (CollectionUtils.isEmpty(beforeMouldList) || CollectionUtils.isEmpty(afterMouldList)) {
+            return false;
+        }
+        Set<String> beforeMouldSet = beforeMouldList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        Set<String> afterMouldSet = afterMouldList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        Set<String> intersectionSet = beforeMouldSet.stream().filter(afterMouldSet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            return false;
+        }
+        return true;
+    }
 }

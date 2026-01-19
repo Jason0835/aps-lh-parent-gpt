@@ -7,6 +7,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
@@ -105,7 +106,19 @@ public class MesItfController {
      */
     @ApiOperation("获取实时成品库存")
     @PostMapping("/getProductStock")
-    public List<MdmProductStock> getProductStock(@RequestBody MdmProductStock mdmProductStock) {
+    public List<MdmProductStock> getProductStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException {
+        String factoryCode = mdmProductStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmProductStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = mdmProductStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            mdmProductStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
+        String productTypeCode = mdmProductStock.getProductTypeCode();
+        if (StringUtils.isBlank(productTypeCode)) {
+            mdmProductStock.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        }
         return mesItfService.getProductStock(mdmProductStock);
     }
 
@@ -118,6 +131,14 @@ public class MesItfController {
     @ApiOperation("同步不合格库存")
     @PostMapping("/syncUnqualifiedStock")
     public AjaxResult syncUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) throws ParseException {
+        String factoryCode = mdmUnqualifiedStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmUnqualifiedStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = mdmUnqualifiedStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            mdmUnqualifiedStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
         return mesItfService.syncUnqualifiedStock(mdmUnqualifiedStock);
     }
 
@@ -129,7 +150,15 @@ public class MesItfController {
      */
     @ApiOperation("获取实时不合格库存")
     @PostMapping("/getUnqualifiedStock")
-    public List<MdmUnqualifiedStock> getUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) {
+    public List<MdmUnqualifiedStock> getUnqualifiedStock(@RequestBody MdmUnqualifiedStock mdmUnqualifiedStock) throws ParseException {
+        String factoryCode = mdmUnqualifiedStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmUnqualifiedStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = mdmUnqualifiedStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            mdmUnqualifiedStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
         return mesItfService.getUnqualifiedStock(mdmUnqualifiedStock);
     }
 
@@ -142,6 +171,14 @@ public class MesItfController {
     @ApiOperation("同步特殊材料库存")
     @PostMapping("/syncRawSpecialMaterialStock")
     public AjaxResult syncRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
+        String factoryCode = rawSpecialMaterialStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            rawSpecialMaterialStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = rawSpecialMaterialStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            rawSpecialMaterialStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
         return mesItfService.syncRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
@@ -153,7 +190,15 @@ public class MesItfController {
      */
     @ApiOperation("获取实时特殊材料库存")
     @PostMapping("/getRawSpecialMaterialStock")
-    public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) {
+    public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(@RequestBody RawSpecialMaterialStock rawSpecialMaterialStock) throws ParseException {
+        String factoryCode = rawSpecialMaterialStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            rawSpecialMaterialStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = rawSpecialMaterialStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            rawSpecialMaterialStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
         return mesItfService.getRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
@@ -206,5 +251,16 @@ public class MesItfController {
     @PostMapping("/issueMonthPlan")
     public AjaxResult issueMonthPlan(@RequestBody List<FactoryMonthPlanProductionFinalResult> finalResultList) {
         return iMonthPlanIssueService.issueMonthPlan(finalResultList);
+    }
+
+    /**
+     * 查询MES品牌字典
+     *
+     * @return 结果
+     */
+    @ApiOperation("查询MES品牌字典")
+    @PostMapping("/selectMesBrandDict")
+    public List<MesBrandDict> selectMesBrandDict() {
+        return mesItfService.selectMesBrandDict();
     }
 }

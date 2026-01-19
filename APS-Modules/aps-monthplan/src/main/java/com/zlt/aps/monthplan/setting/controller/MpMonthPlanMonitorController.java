@@ -8,15 +8,14 @@ import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
+
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
@@ -24,7 +23,6 @@ import java.io.IOException;
 import java.util.List;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
-
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService ;
 
@@ -53,7 +51,6 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
     @Autowired
     private MpMonthPlanMonitorEntityMapper entityMapper;
 
-
     /**
      * 查询月度硫化监控列表
      */
@@ -62,12 +59,16 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanMonitor queryVO) {
-        return super.list(queryVO);
+        startPage(getOrderBy(queryVO));
+        List<MpMonthPlanMonitor> list = entityMapper.listReport(queryVO);
+        clearPage();
+        return getDataTable(list);
+    
     }
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "onboard_date desc";
     }
 
     /**
@@ -137,9 +138,7 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
 
     @Override
     protected List<MpMonthPlanMonitor> listExportData(MpMonthPlanMonitor obj) {
-        QueryWrapper<MpMonthPlanMonitor> wrapper = new QueryWrapper<>();
-        this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        return entityMapper.listReport(obj);
     }
 
     @Override
@@ -191,6 +190,4 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
     protected String getTypeCode(){
         return "MONTH0612";
     }
-
-
 }

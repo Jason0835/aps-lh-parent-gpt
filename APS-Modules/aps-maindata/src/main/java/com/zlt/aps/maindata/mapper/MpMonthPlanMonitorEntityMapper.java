@@ -1,8 +1,11 @@
 package com.zlt.aps.maindata.mapper;
 
+import java.util.List;
+
+import org.apache.ibatis.annotations.Mapper;
+
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
-import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,5 +22,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MpMonthPlanMonitorEntityMapper extends CommBaseMapper<MpMonthPlanMonitor> {
-
+    /**
+     * 月度硫化监控报表
+     * @param dto
+     * @return
+     */
+    List<MpMonthPlanMonitor> listReport(MpMonthPlanMonitor queryVo);
 }

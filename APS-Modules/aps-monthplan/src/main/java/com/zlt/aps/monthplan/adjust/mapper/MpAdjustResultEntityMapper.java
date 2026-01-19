@@ -5,6 +5,8 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpAdjustResultMapper.java
@@ -33,5 +35,12 @@ public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResul
                                             @Param("year") String year,
                                             @Param("month") String month,
                                             @Param("version") String version);
+
+    /**
+     * 查询版本列表
+     * @param queryVO 查询参数
+     * @return 结果
+     */
+    List<MpAdjustResult> getVersionList(MpAdjustResult queryVO);
 
 }

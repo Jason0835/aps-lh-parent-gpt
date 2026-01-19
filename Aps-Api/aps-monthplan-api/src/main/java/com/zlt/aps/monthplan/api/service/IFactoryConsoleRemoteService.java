@@ -4,10 +4,11 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -123,4 +124,38 @@ public interface IFactoryConsoleRemoteService {
     @ApiOperation("按工厂 + 年月 + 排产版本的方式删除排产计划版本")
     @PostMapping("/factoryConsole/deleteMonthPlanProductionVersion")
     AjaxResult deleteMonthPlanProductionVersion(@RequestBody FactoryProductionParamVo factoryProductionParam);
+
+    /**
+     * 定稿
+     *
+     * @param factoryMonthPlanProdFinal
+     * @return
+     */
+    @ApiOperation("定稿 - 年月+分厂+需求计划版本+分厂月计划版本")
+    @PostMapping("/factoryConsole/finalized")
+    AjaxResult finalized(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
+
+    /**
+     * 查询对应年月+分厂的需求计划版本
+     */
+    @PostMapping("/factoryConsole/versionList")
+    @ApiOperation("查询对应年月+分厂的需求计划版本")
+    public AjaxResult versionList(@RequestBody FactoryMonthPlanProductionFinalResult query);
+
+    /**
+     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     */
+    @PostMapping("/factoryConsole/getProductionVersionList")
+    @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
+    public AjaxResult getProductionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query);
+
+    /**
+     * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产
+     *
+     * @param condition 查询条件
+     * @return 结果
+     */
+    @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
+    @PostMapping("/factoryConsole/getProductionMonthType")
+    AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdFinal condition);
 }

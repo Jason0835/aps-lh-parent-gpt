@@ -7,17 +7,22 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.redissonLock.annotation.DistributedLock;
+import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.monthplan.factory.service.IFactoryConsoleService;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.monthplan.factory.service.IFactoryProductionVersionService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,6 +45,9 @@ public class FactoryConsoleController extends BaseController {
     private final IFactoryConsoleService factoryConsoleService;
 
     private final IFactoryProductionVersionService factoryProductionVersionService;
+
+    @Autowired
+    private IFactoryMonthPlanProductionFinalResultService iFactoryMonthPlanProductionFinalResultService;
 
     /**
      * 查询分厂的月份排产计划
@@ -322,5 +330,41 @@ public class FactoryConsoleController extends BaseController {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.requireVersionNoEmpty"));
         }
         return AjaxResult.success();
+    }
+
+    @ApiOperation("定稿 - 年月+分厂+需求计划版本+分厂月计划版本")
+    @PostMapping("/finalized")
+    @RedissonLockAnno(uniqueMark = "redissonLock:factoryMonthPlanProdFinal:finalized:",
+            expressions = {"#factoryMonthPlanProdFinal.factoryCode", "#factoryMonthPlanProdFinal.year", "#factoryMonthPlanProdFinal.month"},
+            msgKey = "ui.data.alert.finalized.run",
+            waitTime = 5,
+            leaseTime = 600
+    )
+    public AjaxResult finalized(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
+        return iFactoryMonthPlanProductionFinalResultService.finalized(factoryMonthPlanProdFinal);
+    }
+
+    @ApiOperation("查询对应年月+分厂的需求计划版本")
+    @PostMapping("/versionList")
+    public AjaxResult versionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
+        return AjaxResult.success(factoryConsoleService.versionList(query));
+    }
+
+    @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
+    @PostMapping("/getProductionVersionList")
+    public AjaxResult getProductionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query) {
+        return AjaxResult.success(factoryConsoleService.productionVersionList(query));
+    }
+
+    /**
+     * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产
+     */
+    @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
+    @PostMapping("/getProductionMonthType")
+    public AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdFinal query) {
+        if (null == query) {
+            return AjaxResult.success(new FactoryMonthPlanTypeVo());
+        }
+        return AjaxResult.success(factoryConsoleService.getProductionMonthType(query));
     }
 }

@@ -3,10 +3,7 @@ package com.zlt.aps.factory.scheduling;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.factory.domain.vo.*;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -101,6 +98,114 @@ public class TbrProductionContext extends Context {
         addQtyHandler(materialDesc, wastageQty, skuWastageQtyMap);
         //重新计算库销比
         resetCalculateInventorySalesRatio(materialDesc);
+    }
+
+
+    /**
+     * 根据排产计划，获取其可用的最大模具量
+     * 模具分配比例(不同结构间)
+     *
+     * @param productionPlan 排产计划
+     * @return
+     */
+    public Integer getMouldAllocationLimitQty(MonthPlanProductionRequirePlanVo productionPlan) {
+        MouldAllocationInfoVo limitInfo = getMouldAllocationInfo(productionPlan);
+        if (null == limitInfo) {
+            return Integer.MAX_VALUE;
+        }
+        return limitInfo.getLeftOverUsedQtyByContinueSku();
+    }
+
+    /**
+     * 根据排产计划，获取满足模具分配比例的排产日范围
+     *
+     * @param productionPlan
+     * @return
+     */
+    public Set<Integer> getMouldAllocationRange(MonthPlanProductionRequirePlanVo productionPlan) {
+        MouldAllocationInfoVo limitInfo = getMouldAllocationInfo(productionPlan);
+        if (null == limitInfo) {
+            return getProductionDay();
+        }
+        return limitInfo.getEnableDoubleMouldProductionRange();
+    }
+
+    /**
+     * 根据排产计划，获取其模具分配控制对象实例信息
+     * 模具分配比例(不同结构间)
+     *
+     * @param productionPlan 排产计划
+     * @return
+     */
+    public MouldAllocationInfoVo getMouldAllocationInfo(MonthPlanProductionRequirePlanVo productionPlan) {
+        if (null == productionPlan) {
+            return null;
+        }
+        String controlDimensionKey = productionPlan.getMouldAllocationControlDimensionKey();
+        if (StringUtils.isBlank(controlDimensionKey)) {
+            return null;
+        }
+        Map<String, MouldAllocationInfoVo> allMouldAllocationInfoMap = baseDataContainer.getGroupMainPatternAllocationLimitMap();
+        if (CollectionUtils.isEmpty(allMouldAllocationInfoMap)) {
+            return null;
+        }
+        return allMouldAllocationInfoMap.get(controlDimensionKey);
+    }
+
+    /**
+     * 清空所有模具分配比例使用量
+     */
+    public void clearAllMouldAllocationUsed() {
+        Map<String, MouldAllocationInfoVo> allMouldAllocationLimitMap = baseDataContainer.getGroupMainPatternAllocationLimitMap();
+        if (CollectionUtils.isEmpty(allMouldAllocationLimitMap)) {
+            return;
+        }
+        allMouldAllocationLimitMap.forEach((controlDimensionKey, limit) -> limit.clearDayUsed());
+    }
+    /**
+     * 获取模壳可放两副模具的日期集合
+     *
+     * @param selectedMould 模具
+     * @return
+     */
+    public Set<Integer> getMouldShellRange(ProductionMouldInfoVo selectedMould) {
+        MouldShellBaseInfoVo mouldShellInfo = getMouldShellInfo(selectedMould);
+        if (null == mouldShellInfo) {
+            return Collections.emptySet();
+        }
+        return mouldShellInfo.getEnableDoubleMouldProductionRange();
+    }
+
+    /**
+     * 根据排产模具，获取模壳信息
+     *
+     * @param selectedMould 模具信息
+     * @return
+     */
+    public MouldShellBaseInfoVo getMouldShellInfo(ProductionMouldInfoVo selectedMould) {
+        if (null == selectedMould) {
+            return null;
+        }
+        String mouldSetCode = selectedMould.getMouldSetCode();
+        if (StringUtils.isBlank(mouldSetCode)) {
+            return null;
+        }
+        Map<String, MouldShellBaseInfoVo> allMouldShellMap = baseDataContainer.getMouldShellMap();
+        if (CollectionUtils.isEmpty(allMouldShellMap)) {
+            return null;
+        }
+        return allMouldShellMap.get(mouldSetCode);
+    }
+
+    /**
+     * 清空所有模壳的使用量
+     */
+    public void clearAllMouldShellUsed() {
+        Map<String, MouldShellBaseInfoVo> allMouldShellMap = baseDataContainer.getMouldShellMap();
+        if (CollectionUtils.isEmpty(allMouldShellMap)) {
+            return;
+        }
+        allMouldShellMap.forEach((mouldSetCode, mouldShellInfo) -> mouldShellInfo.clearDayUsed());
     }
 
     /**

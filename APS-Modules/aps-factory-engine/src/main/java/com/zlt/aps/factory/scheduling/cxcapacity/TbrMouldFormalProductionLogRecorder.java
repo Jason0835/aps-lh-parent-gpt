@@ -68,7 +68,7 @@ public class TbrMouldFormalProductionLogRecorder {
      * @return
      */
     public static String addProductionContinueGroupLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始分组计划模具排产排产在机结构====",
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始分组计划模具排产,排产在机结构====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_CONTINUE_GROUP_PRODUCTION, logContent);
@@ -125,6 +125,25 @@ public class TbrMouldFormalProductionLogRecorder {
                 groupName, type.getDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_CONTINUE_GROUP_SINGLE_GROUP_NO_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加分组计划模具正式排产-排产在机结构没有分配到机台日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构 %s %s 没有分配到机台产能====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组名 TBR 结构名
+     * @param type      续作类型
+     * @return
+     */
+    public static String addProductionContinueGroupNoAllocationCxMachineLog(Context context, String groupName, ContinueTypeEnum type) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构 %s %s 没有分配到机台产能====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, type.getDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_CONTINUE_GROUP_PRODUCTION, logContent);
         return logContent;
     }
 

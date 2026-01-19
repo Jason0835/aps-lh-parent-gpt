@@ -199,7 +199,7 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         leaseTime = 300
     )
     @PostMapping("/createMonthPrediction")
-    public AjaxResult createMonthPrediction(@RequestBody MpProductionPrediction createCondition){
+    public AjaxResult createMonthPrediction(@RequestBody MpProductionPrediction createCondition) throws InterruptedException {
         return mpProductionPredictionService.createMonthPrediction(createCondition);
     }
 

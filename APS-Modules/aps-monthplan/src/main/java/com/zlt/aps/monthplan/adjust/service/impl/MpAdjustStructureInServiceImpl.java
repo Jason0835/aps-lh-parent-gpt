@@ -9,6 +9,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -100,7 +102,11 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Override
     public List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO) {
-        return factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
+        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
+        if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+            mpFinalAdjustList = mpFinalAdjustList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
+        }
+        return mpFinalAdjustList;
     }
 
     @Override
@@ -111,6 +117,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         List<String> paramCodeList = new ArrayList<>();
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MULTI_CX_MACHINE_LOCK_DAYS.getCode());
+        paramCodeList.add(MonthPlanEnums.TRIAL_SKU_SINGLE_DAY_QTY_UP_LIMIT.getCode());
+        paramCodeList.add(MonthPlanEnums.TRIAL_SKU_STRUCT_START_DAY_IS_PRODUCTION.getCode());
+        paramCodeList.add(MonthPlanEnums.TRIAL_SKU_SUNDAY_IS_PRODUCTION.getCode());
         return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
@@ -125,7 +134,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Override
     public Integer getLockEndDay(MpRollAdjustContextDTO contextDTO) {
         int lockDays = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
-        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
         if (PubUtil.isEmpty(structureAllocationList)){
             return lockDays;
         }
@@ -147,18 +156,24 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     }
 
     @Override
-    public Integer getStructureDeadline(MpRollAdjustContextDTO contextDTO) {
+    public void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO) {
+        int beginDay = FactoryConstant.MONTH_MAX_DAY;
         int endDay = 0;
-        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
-        if (PubUtil.isEmpty(structureAllocationList)){
-            return endDay;
-        }
-        // 取最大的成型机收尾日作为结构的收尾日
-        for (MpStructureAllocation allocation:structureAllocationList){
-            if (endDay < allocation.getEndDay()){
-                endDay = allocation.getEndDay();
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
+        if (PubUtil.isNotEmpty(structureAllocationList)){
+            // 取最大的成型机收尾日作为结构的收尾日
+            for (MpStructureAllocation allocation:structureAllocationList){
+                if (beginDay > allocation.getBeginDay()){
+                    beginDay = allocation.getBeginDay();
+                }
+                if (endDay < allocation.getEndDay()){
+                    endDay = allocation.getEndDay();
+                }
             }
         }
-        return endDay;
+
+        contextDTO.setStartDay(beginDay);
+        contextDTO.setEndDay(endDay);
+        contextDTO.setStructureDeadLine(endDay);
     }
 }

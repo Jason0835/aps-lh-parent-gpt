@@ -1,13 +1,17 @@
 package com.zlt.aps.monthplan.factory.service;
 
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.bill.common.service.IDocService;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -23,7 +27,7 @@ import java.util.Map;
  * 修改内容：...
  * @date 2025-12-23
  */
-public interface IFactoryMonthPlanProductionFinalResultService extends IService<FactoryMonthPlanProductionFinalResult> {
+public interface IFactoryMonthPlanProductionFinalResultService extends IDocService<FactoryMonthPlanProductionFinalResult> {
 
     /**
      * 根据条件，列表查询
@@ -73,5 +77,27 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IService<
      * @param finalVersion
      * @return
      */
-    List<FactoryMonthPlanProductionFinalResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
+    List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion finalVersion);
+    /**
+     * 查询最终排产结果
+     * @param monthPlanVersions
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion currentFinalVersion, Set<String> monthPlanVersions);
+
+    /**
+     * 定稿
+     *
+     * @param factoryMonthPlanProdFinal 分厂年月
+     * @return 结果
+     */
+    @Transactional(rollbackFor = Exception.class)
+    AjaxResult finalized(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
+
+    /**
+     * 获取定稿排产结果
+     * @param finalVersion
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResult> findFinalProductionResult(MpFactoryProductionVersion finalVersion);
 }

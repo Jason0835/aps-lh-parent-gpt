@@ -1,9 +1,9 @@
 package com.zlt.aps.monthplan.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
 
 import java.util.List;
@@ -73,4 +73,27 @@ public interface IFactoryConsoleService {
      * @return
      */
     AjaxResult deleteMonthPlanProductionVersion(FactoryProductionParamVo factoryProductionParam);
+
+    /**
+     * 查询对应年月+分厂的需求计划版本
+     */
+    List<String> versionList(FactoryMonthPlanProductionFinalResult query);
+
+    /**
+     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     *
+     * @param query 查询条件
+     * @return
+     */
+    List<String> productionVersionList(FactoryMonthPlanProductionFinalResult query);
+
+    /**
+     * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产
+     *
+     * @param query
+     * @return
+     */
+    FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query);
+
+    FactoryMonthPlanFinalVersionInfoVo getFinalVersionInfo(String factoryCode, Integer year, Integer month);
 }

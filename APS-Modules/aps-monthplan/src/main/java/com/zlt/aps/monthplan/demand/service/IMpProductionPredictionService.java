@@ -5,7 +5,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
 import com.zlt.bill.common.service.IDocService;
 
-import java.util.Set;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -26,11 +26,11 @@ public interface IMpProductionPredictionService  extends IDocService<MpProductio
    * @param createCondition 参数
    * @return 结果
    */
-  AjaxResult createMonthPrediction(MpProductionPrediction createCondition);
+  AjaxResult createMonthPrediction(MpProductionPrediction createCondition) throws InterruptedException;
   /**
    *  获取预测版本号列表
    * @param queryCondition 查询条件
    * @return 预测版本号列表
    */
-  Set<String> findPredictionVersion(MpProductionPrediction queryCondition);
+  List<String> findPredictionVersion(MpProductionPrediction queryCondition);
 }

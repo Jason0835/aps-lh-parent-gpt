@@ -201,6 +201,14 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String embryoCode;
 
     /**
+     * 主物料(胎胚描述)
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚描述)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
+    /**
      * 是否零度材料
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.isZeroRack")
@@ -564,12 +572,4 @@ public class ProductionMonthPlanInit extends BaseEntity {
     @TableField(value = "NO_PRODUCTION_REASON")
     private String noProductionReason;
 
-    /**
-     * todo 后续要删除
-     *
-     * @return
-     */
-    public String getProductCode() {
-        return "";
-    }
 }

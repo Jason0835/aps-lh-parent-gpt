@@ -67,7 +67,7 @@ public class MpAdjustStructureLogServiceImpl extends AbstractDocService<MpAdjust
     }
 
     @Override
-    public void deleteAdjustLogByVersion(String factoryCode, String year, String month, String version) {
-        adjustStructureLogEntityMapper.deleteAdjustLogByVersion(factoryCode,year,month,version);
+    public void deleteAdjustLogByVersion(String factoryCode, String year, String month, String version,String structureName) {
+        adjustStructureLogEntityMapper.deleteAdjustLogByVersion(factoryCode,year,month,version,structureName);
     }
 }

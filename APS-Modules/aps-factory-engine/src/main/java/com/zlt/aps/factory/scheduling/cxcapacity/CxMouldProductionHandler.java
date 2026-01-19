@@ -92,11 +92,11 @@ public class CxMouldProductionHandler {
             log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoRatioLog(context, groupName, cxMachineCode));
             return;
         }
-        String brandCode = cxMachineInfo.getCxMachineBrandCode();
+        String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         MonthPlanStructureLhRatioVo cxLhRatio = productionPlanInfo.getLhRatio(cxMachineInfo);
         if (null == cxLhRatio) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, brandCode));
+            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, machineTypeCode));
             return;
         }
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());
@@ -104,6 +104,8 @@ public class CxMouldProductionHandler {
         //20260108 开启本轮可排产
         productionPlanInfo.setThisRoundCanProduction();
         CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+        //处理结构提前收尾
+        GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
     }
 
     /**
@@ -133,6 +135,10 @@ public class CxMouldProductionHandler {
         //按日构建限制
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> newLimit = new HashMap<>();
         for (Integer day = startDay; day <= productionPlan.getEndDay(); day++) {
+            //停产日跳过
+            if (cxMachineInfo.getStopDayInfo().contains(day)) {
+                continue;
+            }
             GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByCxMachineAllocation(context, cxMachineInfo, day, productionPlan);
             newLimit.put(day, dayLimit);
         }

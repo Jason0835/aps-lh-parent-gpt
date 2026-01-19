@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -8,6 +9,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
 
@@ -125,7 +127,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 动平衡
      */
-    @Excel(name = "ui.data.column.productStock.isDynamicBalance", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.productStock.isDynamicBalance", dictType = "biz_yes_no")
     @ApiModelProperty(value = "动平衡", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
@@ -133,7 +135,7 @@ public class MdmProductStock extends BaseEntity {
     /**
      * 均匀性
      */
-    @Excel(name = "ui.data.column.productStock.isUniformity", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.productStock.isUniformity", dictType = "biz_yes_no")
     @ApiModelProperty(value = "均匀性", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
@@ -178,6 +180,12 @@ public class MdmProductStock extends BaseEntity {
     @TableField(value = "IS_EXCEED_TIRE")
     private String isExceedTire;
 
+    @Excel(name = "ui.data.column.demandPlan.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
+    private Date updateTime;
+
     /**
      * 年周号整数值
      */
@@ -189,6 +197,19 @@ public class MdmProductStock extends BaseEntity {
      */
     @TableField(exist = false)
     private Integer leftOverQty;
+
+    /**
+     * 花纹
+     */
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(exist = false)
+    private String pattern;
+    /**
+     * 规格
+     */
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(exist = false)
+    private String specifications;
 
     /**
      * 以分厂+物料为维度，转换库存
@@ -211,6 +232,11 @@ public class MdmProductStock extends BaseEntity {
     public String getStockWithoutOrderGroupKey() {
         String keyFormat = "%s|%s|*|%s|*|%s";
         return String.format(keyFormat, materialCode,weekYear, isDynamicBalance,isUniformity);
+    }
+
+    public String getAlternateMaterialGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, brand,specifications, pattern);
     }
 
 

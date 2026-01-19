@@ -208,6 +208,4 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "提报日期", name = "billDate")
     @TableField(exist = false)
     private Date billDate;
-
-
 }

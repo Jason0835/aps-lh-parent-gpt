@@ -209,4 +209,16 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
         AjaxResult ajaxResult = iMpAdjustResultService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    @ResponseBody
+    public TableDataInfo getVersionList(MpAdjustResult queryVO) {
+        return iMpAdjustResultService.getVersionList(queryVO);
+    }
+
+
 }

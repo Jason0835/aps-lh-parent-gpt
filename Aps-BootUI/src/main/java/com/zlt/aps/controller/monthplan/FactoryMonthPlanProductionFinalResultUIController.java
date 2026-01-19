@@ -82,11 +82,10 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         }
         FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
         BeanUtils.copyProperties(param, condition);
-        TableDataInfo list = iFactoryMonthPlanProductionFinalResultService.list(condition);
-        // SKU排产明细排序
-        sortSkuScheduleItem((List<FactoryMonthPlanProductionFinalResult>) list.getRows());
-        return list;
+        return iFactoryMonthPlanProductionFinalResultService.list(condition);
     }
+
+
 
 
 
@@ -146,7 +145,7 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.modelName");
     }
 
     /**

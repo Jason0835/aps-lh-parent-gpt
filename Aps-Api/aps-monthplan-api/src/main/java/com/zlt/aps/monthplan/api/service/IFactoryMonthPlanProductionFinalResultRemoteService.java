@@ -32,14 +32,14 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
      * 查询列表
      */
     @ApiOperation("查询列表")
-    @PostMapping("/FactoryMonthPlanFinalResult/list")
-    TableDataInfo list(@RequestBody FactoryMonthPlanProductionFinalResult QueryVO);
+    @PostMapping("/factoryMonthPlanFinalResult/list")
+    TableDataInfo list(@RequestBody FactoryMonthPlanProductionFinalResult queryVO);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
-    @PostMapping("/FactoryMonthPlanFinalResult/save")
+    @PostMapping("/factoryMonthPlanFinalResult/save")
     AjaxResult save(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProductionFinalResult);
 
 
@@ -47,35 +47,35 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
      * 删除
      */
     @ApiOperation("删除")
-    @DeleteMapping("/FactoryMonthPlanFinalResult/remove")
+    @DeleteMapping("/factoryMonthPlanFinalResult/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/FactoryMonthPlanFinalResult/{id}")
+    @GetMapping(value = "/factoryMonthPlanFinalResult/{id}")
     FactoryMonthPlanProductionFinalResult getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
-    @PostMapping("/FactoryMonthPlanFinalResult/checkUnique")
+    @PostMapping("/factoryMonthPlanFinalResult/checkUnique")
     String checkUnique(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProductionFinalResultVO);
 
     /**
      * 导出工厂月生产计划-最终排产计划定稿列表
      */
     @ApiOperation("导出列表")
-    @PostMapping("/FactoryMonthPlanFinalResult/exportData/{fileName}")
+    @PostMapping("/factoryMonthPlanFinalResult/exportData/{fileName}")
     byte[] exportData(@RequestBody FactoryMonthPlanProductionFinalResult queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入工厂月生产计划-最终排产计划定稿数据
      */
     @ApiOperation("导入工厂月生产计划-最终排产计划定稿")
-    @PostMapping("/FactoryMonthPlanFinalResult/importData")
+    @PostMapping("/factoryMonthPlanFinalResult/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
 }

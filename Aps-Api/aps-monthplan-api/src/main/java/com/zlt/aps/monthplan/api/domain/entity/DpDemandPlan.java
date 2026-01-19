@@ -101,7 +101,7 @@ public class DpDemandPlan extends BaseEntity {
     /**
      * 品牌
      */
-    @Excel(name = "ui.data.column.demandPlan.brand")
+    @Excel(name = "ui.data.column.demandPlan.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
@@ -121,6 +121,12 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
+    /**
+     * 结构类型
+     */
+    @ApiModelProperty(value = "结构类型", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
 
     /**
      * 主花纹
@@ -463,4 +469,10 @@ public class DpDemandPlan extends BaseEntity {
         String keyFormat = "%d|*|%d|*|%s|*|%s|*|%s|*|%s";
         return String.format(keyFormat, this.year, this.month, this.factoryCode, this.productTypeCode, this.monthPlanVersion,this.materialDesc);
     }
+
+    public String getAlternateMaterialGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, brand,specifications, pattern);
+    }
+
 }

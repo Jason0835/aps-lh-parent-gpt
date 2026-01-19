@@ -34,10 +34,21 @@ public class MpWeekRollAdjustDTO implements Serializable {
     @ApiModelProperty(value = "版本号")
     private String version;
 
-    /** 排产机台,多个机台用逗号分隔 */
+    @ApiModelProperty(value = "开始日期")
+    private Integer startDay;
+
+    @ApiModelProperty(value = "结束日期")
+    private Integer endDay;
+
+    @ApiModelProperty(value = "调整开始日期")
+    private Integer adjustStartDay;
+
+    @ApiModelProperty(value = "调整结束日期")
+    private Integer adjustEndDay;
+
+    /** 排产机台*/
     @ApiModelProperty(value = "排产机台")
     private String scheduledMachines;
-
 
     /**
      * 调整类型 01-结构内，02-结构外

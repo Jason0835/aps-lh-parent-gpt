@@ -100,7 +100,7 @@ public class CxContinueProductionHandler {
         Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaxDaySingleLhMachineQty();
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, null, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
+        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, earliestConclusionLhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产 CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, earliestConclusionLhGroup, lhProductionQtyHelper, startDay, realEndDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组

@@ -102,11 +102,21 @@ public class CxContinueGroupAllocationHandler {
         productionContinue(productionContext, groupPlanInfo, groupContinueInfo, mouldShellMap);
         /**
          * 2、在产机台的分配
-         * 2.1、在产分组需求粗算所需机台数 > 在产机台数，则表示还需增机台，则在产机台直接按满产算
-         * 2.2、如果=，则表示刚好，也直接按满产算
-         * 2.3、在产分组需求粗算所需机台数 < 在产机台数
+         * 2.1、在产机台数 = 1时，直接分配多少就是多少
+         * 2.2、在产分组需求粗算所需机台数 > 在产机台数，则表示还需增机台，则在产机台直接按满产算
+         * 2.3、如果=，则表示刚好，也直接按满产算
+         * 2.4、在产分组需求粗算所需机台数 < 在产机台数
          *
          */
+        //如果在产机台数只有一台的情形下，直接分配
+        if (BigDecimal.ONE.intValue() == productionCount) {
+            List<CxMachineAllocationPlanHelper> buildResult = buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
+            if (groupPlanInfo.getLeftOverNeedAllocationDays() <= BigDecimal.ZERO.intValue()) {
+                groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            }
+            return buildResult;
+        }
+        //在产机台数有多台情形下
         if (needCount.compareTo(BigDecimal.valueOf(productionCount)) >= BigDecimal.ZERO.intValue()) {
             if (needCount.compareTo(BigDecimal.valueOf(productionCount)) > BigDecimal.ZERO.intValue()) {
                 return buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
@@ -390,7 +400,7 @@ public class CxContinueGroupAllocationHandler {
         List<GroupDayProductionSummaryHelper> summaryList = groupPlanInfo.getGroupProductionSummary();
         Integer maxEmbryoCount = groupContinueInfo.getDeductionCountLimitValue(deductionMachineCount, CxMachineLimitTypeEnum.MAX_EMBRYO_SIZE);
         Integer maxLhGroupCount = groupContinueInfo.getDeductionCountLimitValue(deductionMachineCount, CxMachineLimitTypeEnum.MAX_LH_COUNT);
-        //提取胎胚种类数，模具数都符合的的记录
+        //提取胎胚种类数，硫化机台数都符合的的记录
         List<GroupDayProductionSummaryHelper> canDeductionList = summaryList.stream().filter(summary -> summary.isMatchDeductionMachine(maxEmbryoCount, maxLhGroupCount)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(canDeductionList)) {
             return null;

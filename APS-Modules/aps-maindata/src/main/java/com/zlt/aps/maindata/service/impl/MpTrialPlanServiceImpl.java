@@ -16,6 +16,8 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -114,6 +116,12 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
 
     @Override
     protected Boolean serviceCheckAndDataHandle(MpTrialPlan importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        // 校验数量是否为双数
+        if (importDocEntity.getTrialQty() % 2 != 0) {
+            String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.trialQty.isEvenNum");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
         importDocEntity.setImportTime(new Date());
         importDocEntity.setIsImport(ApsConstant.TRUE);
         if (serviceCheckParams.containsKey("user")) {
@@ -126,9 +134,11 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
                 importDocEntity.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                importDocEntity.setMadeInfo(mdmSkuConstructionRef.getEmbryoNo());
+                importDocEntity.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
                 importDocEntity.setTextNo(mdmSkuConstructionRef.getTextNo());
+                importDocEntity.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
                 importDocEntity.setLhNo(mdmSkuConstructionRef.getLhNo());
+                importDocEntity.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
             }
         }
         if (serviceCheckParams.containsKey("materialInfoMap")) {

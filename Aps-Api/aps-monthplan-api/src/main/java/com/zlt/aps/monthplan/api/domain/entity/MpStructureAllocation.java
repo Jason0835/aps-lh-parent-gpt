@@ -33,7 +33,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 工厂编号
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.factoryCode")
+    @Excel(name = "ui.data.column.mpStructureAllocation.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -41,7 +41,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 年份
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.year")
+    @Excel(name = "ui.data.column.mpStructureAllocation.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
@@ -49,7 +49,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 月份
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.month")
+    @Excel(name = "ui.data.column.mpStructureAllocation.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -97,6 +97,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 最大胎胚种类数
      */
+    @Excel(name = "ui.data.column.mpStructureAllocation.maxEmbryoCodeCount", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最大胎胚种类数", name = "maxEmbryoCodeCount")
     @TableField(value = "MAX_EMBRYO_CODE_COUNT")
     private Integer maxEmbryoCodeCount;
@@ -104,6 +105,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 最大硫化机台数
      */
+    @Excel(name = "ui.data.column.mpStructureAllocation.maxLhMachineCount", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最大硫化机台数", name = "maxLhMachineCount")
     @TableField(value = "MAX_LH_MACHINE_COUNT")
     private Integer maxLhMachineCount;
@@ -111,6 +113,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 实单最低硫化机台数
      */
+    @Excel(name = "ui.data.column.mpStructureAllocation.minLhMachineCount", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "实单最低硫化机台数", name = "minLhMachineCount")
     @TableField(value = "MIN_LH_MACHINE_COUNT")
     private Integer minLhMachineCount;
@@ -118,7 +121,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 排产净需求
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.netQty")
+    @Excel(name = "ui.data.column.mpStructureAllocation.netQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产净需求", name = "netQty")
     @TableField(value = "NET_QTY")
     private Integer netQty;
@@ -126,7 +129,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 排产净需求(含损耗)
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.lossQty")
+    @Excel(name = "ui.data.column.mpStructureAllocation.lossQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产净需求(含损耗)", name = "lossQty")
     @TableField(value = "LOSS_QTY")
     private Integer lossQty;
@@ -134,7 +137,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 开始日期
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.beginDay")
+    @Excel(name = "ui.data.column.mpStructureAllocation.beginDay", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "开始日期", name = "beginDay")
     @TableField(value = "BEGIN_DAY")
     private Integer beginDay;
@@ -142,7 +145,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 结束日期
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.endDay")
+    @Excel(name = "ui.data.column.mpStructureAllocation.endDay", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "结束日期", name = "endDay")
     @TableField(value = "END_DAY")
     private Integer endDay;
@@ -150,10 +153,25 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 分配天数
      */
-    @Excel(name = "ui.data.column.mpStructureAllocation.allotDays")
+    @Excel(name = "ui.data.column.mpStructureAllocation.allotDays", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "分配天数", name = "allotDays")
     @TableField(value = "ALLOT_DAYS")
     private Integer allotDays;
+
+    /**
+     * 备注
+     */
+    @Excel(name = "ui.data.column.mpStructureAllocation.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+
+    /**
+     * 调整结束日期
+     */
+    @ApiModelProperty(value = "调整结束日期", name = "adjustEndDay")
+    @TableField(exist = false)
+    private Integer adjustEndDay;
 
     /**
      * 判断productionDay是否在beginDay与endDay范围内

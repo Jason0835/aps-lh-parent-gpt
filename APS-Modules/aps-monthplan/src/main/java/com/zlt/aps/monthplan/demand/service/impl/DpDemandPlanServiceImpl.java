@@ -10,6 +10,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -18,6 +19,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
+import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
@@ -25,10 +27,11 @@ import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -36,6 +39,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.common.utils.DemandPlanGrouper;
+import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
@@ -51,8 +55,6 @@ import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanSurplusService;
 import com.zlt.sysdef.domain.SysDocType;
-import lombok.Data;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 
@@ -132,6 +134,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IMonthPlanSurplusService monthPlanSurplusService;
     // 月度硫化监控
     private final IMpMonthPlanMonitorService monthPlanMonitorService;
+    // 周期结构配置
+    private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
 
     @Override
     protected String getDocTypeCode() {
@@ -185,34 +189,64 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
         createCondition.setMonthPlanVersion(monthPlanVersion);
         // 3. 并行获取数据
-        DataCollection data = fetchRequiredDataInParallel(monthPlanVersion);
+        PredictionContext data = fetchRequiredDataInParallel(monthPlanVersion);
         // 4. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
+        PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap());
         // 5. 批量保存分配结果
         saveAllocationResults(createCondition, monthPlanVersion, allocationResult);
+
+        Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(data.getFinishedProductStocks(),data.getMaterialInfoMap());
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
             createCondition, allocationResult.getNetDemands(), data);
 
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
-            saveDemandPlans(createCondition, demandPlans, data);
+            saveDemandPlans(createCondition, demandPlans, data,alternateMaterialMap);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
     }
 
-    private void saveFactoryProductionVersion(YearMonth yearMonth, String monthPlanVersion) {
+    private Map<String, List<MdmProductStock>> processAlternateMaterial(List<MdmProductStock> productStocks, Map<String, MdmMaterialInfo> materialInfoMap) {
+        if(CollectionUtils.isEmpty(productStocks) || CollectionUtils.isEmpty(materialInfoMap)){
+            return Collections.emptyMap();
+        }
+        Map<String,List<MdmProductStock>> map =   productStocks.stream().collect(Collectors.groupingBy(MdmProductStock::getMaterialCode));
+        map.forEach((materialCode,stockList) -> {
+            MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
+            if(null == materialInfo){
+                return;
+            }
+            stockList.forEach(stock -> {
+                stock.setSpecifications(materialInfo.getSpecifications());
+                stock.setPattern(materialInfo.getPattern());
+            });
+        });
+        return productStocks.stream().filter(this::filterAlternateMaterial).collect(Collectors.groupingBy(MdmProductStock::getAlternateMaterialGroupKey));
+    }
+
+    private boolean filterAlternateMaterial(MdmProductStock item) {
+        if(StringUtils.isBlank(item.getBrand()) || StringUtils.isBlank(item.getPattern()) || StringUtils.isBlank(item.getPattern())) {
+            return false;
+        }
+        if(null == item.getStockQty() || item.getStockQty() == 0 || null == item.getLeftOverQty()) {
+            return false;
+        }
+        return Objects.equals(item.getStockQty(),item.getLeftOverQty());
+    }
+
+    private void saveFactoryProductionVersion(DpDemandPlan createCondition,YearMonth yearMonth, String monthPlanVersion) {
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         version.setYear(yearMonth.getYear());
         version.setMonth(yearMonth.getMonthValue());
         version.setMonthPlanVersion(monthPlanVersion);
-        version.setPlanType(ProductionPlanType.NORMAL.getPlanType());
+        version.setPlanType(createCondition.getPlanType());
         version.setIsFinal(YesOrNoEnum.NO.getCode());
         version.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         factoryProductionVersionMapper.insert(version);
@@ -255,32 +289,45 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setIncludePostpone(true);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());
         // 3. 并行获取数据
-        DataCollection data = fetchRequiredDataInParallel(monthPlanVersion);
+        PredictionContext data = fetchRequiredDataInParallel(monthPlanVersion);
+        data.setPostponeOrders(null);
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 4. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
-            monthPlanVersion, data.salesOrders, data.getFinishedProductStockMap(),
+        PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
+            monthPlanVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap());
         // 5. 批量保存分配结果
         saveAllocationResults(createCondition, monthPlanVersion, allocationResult);
-
+        Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(data.getFinishedProductStocks(),data.getMaterialInfoMap());
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
             createCondition, allocationResult.getNetDemands(), data);
         List<DpDemandPlan> adjustRequirePlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
-            adjustRequirePlans =  saveDemandPlans(createCondition,demandPlans, data);
+            adjustRequirePlans =  saveDemandPlans(createCondition,demandPlans, data,alternateMaterialMap);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tMonth,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
         return adjustRequirePlans;
     }
 
     @Override
-    public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion) {
+    public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
+        if(CollectionUtils.isEmpty(predictionContext.getAllocationResult().getNetDemands())) {
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanMouldDayResult> productionFinalResults;
+        if(YesOrNoEnum.YES.getCode().equals(finalVersion.getIsFinal())) {
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findFinalProductionResult(finalVersion);
+        }else{
+            productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
+        }
+        if(CollectionUtils.isEmpty(productionFinalResults)) {
+            return Collections.emptyList();
+        }
         YearMonth tMonth = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
         // 		11、计算T+1月的需求量	  = 第9步骤中T月实单未排产量 + 第10步骤中T月周期储备未排产量  + 第8步中的T+1月的储备订单(包含周期排产储备+常规储备)
         YearMonth tPlus1Month =   tMonth.plusMonths(1);
@@ -289,47 +336,37 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
-        createCondition.setIncludePostpone(true);
         createCondition.setMonthPlanVersion(predictionVersion);
-        // 2. 并行获取数据
-        DataCollection data = fetchRequiredDataInParallel(predictionVersion,finalVersion);
-        // 3. 处理销售订单分配
-        OrderAllocationResult allocationResult = processSalesOrderAllocation(tPlus1Month,
-            predictionVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
-            data.getMonthSurplusMap());
-        // 5. 批量保存分配结果
-        saveAllocationResults(createCondition, predictionVersion, allocationResult);
-        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-        List<FactoryMonthPlanProductionFinalResult> productionFinalResults = factoryMonthPlanProductionFinalResultService.findProductionFinalResult(finalVersion);
-        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(allocationResult.getNetDemands(),productionFinalResults,mpMonthPlanMonitors);
+        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        predictionContext.setMonthSurplusMap(monthSurplusMap);
+        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),productionFinalResults);
         if(CollectionUtils.isEmpty(netDemands)){
+            predictionContext.getAllocationResult().setNetDemands(Collections.emptyList());
             return Collections.emptyList();
         }
-        List<SupplyOrderPool> cycleStockOrders = PredictionAllocationHelper.calculateCycleStockOrder(data.getSupplyOrderPools(),productionFinalResults,mpMonthPlanMonitors);
-        // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
-        String monthPlanVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
-        createCondition.setMonthPlanVersion(monthPlanVersion);
-        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(tPlus1Month);
-        if(CollectionUtils.isEmpty(supplyOrderPools)){
-            supplyOrderPools = Lists.newArrayList();
-        }
+        predictionContext.getAllocationResult().setNetDemands(netDemands);
+        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
+        List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
         if(!CollectionUtils.isEmpty(cycleStockOrders)){
             supplyOrderPools.addAll(cycleStockOrders);
         }
-        data.supplyOrderPools = supplyOrderPools;
-        data.postponeOrders = null;
+        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
+        List<SupplyOrderPool> leftSupplyOrders = PredictionAllocationHelper.calculateSupplyOrder(supplyOrderPools,productionFinalResults,mpMonthPlanMonitors);
+        predictionContext.setSupplyOrderPools(leftSupplyOrders);
+        predictionContext.setPostponeOrders(null);
+        Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
-            createCondition,netDemands, data);
+            createCondition,netDemands, predictionContext);
         List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
-            mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, data);
+            mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext,alternateMaterialMap);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition,null, supplyOrderPools);
         // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(tPlus1Month,monthPlanVersion);
+        saveFactoryProductionVersion(createCondition, tPlus1Month,predictionVersion);
         return mergedDemandPlans;
     }
 
@@ -354,9 +391,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String,Integer> cycleReserveQtyMap = calculateCycleReserveQty(dataList);
         Map<String,Integer> conventionReserveQtyMap = calculateConventionReserveQty(dataList);
         dataList.forEach(demandPlan -> {
-            if (StringUtils.isBlank(demandPlan.getProductTypeCode())) {
-                demandPlan.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
-            }
             String key = demandPlan.getMonthPlanVersionKey();
             DpDemandPlan result = saleDemandMap.get(key);
             Map<String,Integer> stockMap = stockQtyMap.getOrDefault(key, new HashMap<>());
@@ -383,6 +417,105 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             saleDemandMap.put(key, result);
         });
         return datas;
+    }
+
+    @Override
+    public PredictionContext buildPredictionContext() {
+        CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
+            CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
+        CompletableFuture<List<MdmProductStock>> stocksFuture =
+            CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
+        CompletableFuture<Map<String, String>> productionTypeFuture =
+            CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
+        CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
+            CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
+        CompletableFuture<Integer> minProductionQtyFuture =
+            CompletableFuture.supplyAsync(this::getMinProductionQty);
+        CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
+            CompletableFuture.supplyAsync(this::fetchMaterialInfo);
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
+            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
+        // 等待所有任务完成
+        CompletableFuture.allOf(
+            salesOrdersFuture, stocksFuture,productionTypeFuture,minProductionQtyFuture,fetchMaterialInfoFuture,monthlySaleQtyFuture,
+            cycleSchStruConfFuture
+        ).join();
+        try {
+            List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
+            List<MdmProductStock> finishedProductStocks = stocksFuture.get();
+            Map<String, String> productionTypeMap = productionTypeFuture.get();
+            int minProductionQty = minProductionQtyFuture.get();
+            Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
+            Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
+            List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
+            if(!CollectionUtils.isEmpty(finishedProductStocks)){
+                finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
+            }
+            // 按优先级分离销售订单
+            Map<Boolean, List<SalesOrderPool>> partitionedOrders =
+                partitionSalesOrdersByPriority(salesOrders);
+
+            // 处理成品库存映射
+            Map<String, List<MdmProductStock>> finishedProductStockMap =
+                CollectionUtils.isEmpty(finishedProductStocks) ?
+                    new HashMap<>(16) :
+                    finishedProductStocks.stream()
+                        .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
+            return new PredictionContext(
+                salesOrders,
+                finishedProductStocks,
+                finishedProductStockMap,
+                productionTypeMap,
+                null,
+                partitionedOrders.get(false),
+                partitionedOrders.get(true),
+                null,
+                monthlySaleQty,
+                minProductionQty,
+                materialInfoMap,
+                cycleSchStruConfs
+            );
+
+        } catch (Exception e) {
+            log.error("并行获取数据失败", e);
+            throw new BusinessException("获取数据失败");
+        }
+
+    }
+
+    @Override
+    public List<DpDemandPlan> createInitPredictionRequire(DpDemandPlan createCondition, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext) {
+        YearMonth tMonth = YearMonth.of(finalVersion.getYear(), finalVersion.getMonth());
+        createCondition.setYear(tMonth.getYear());
+        createCondition.setMonth(tMonth.getMonthValue());
+        // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
+        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
+        createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
+        createCondition.setMonthPlanVersion(predictionVersion);
+        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        predictionContext.setMonthSurplusMap(monthSurplusMap);
+        // 3. 处理销售订单分配
+        PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
+            predictionVersion, predictionContext.getSalesOrders(), predictionContext.getFinishedProductStockMap(),
+            predictionContext.getMonthSurplusMap());
+        // 5. 批量保存分配结果
+        saveAllocationResults(createCondition, predictionVersion, allocationResult);
+        List<SupplyOrderPool>   cycleStockOrders =  this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
+        predictionContext.setSupplyOrderPools(cycleStockOrders);
+        predictionContext.setPostponeOrders(null);
+        Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());
+        // 6. 处理需求计划生成
+        List<DpDemandPlan> demandPlans = generateDemandPlans(
+            createCondition, allocationResult.getNetDemands(), predictionContext);
+        List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
+        // 7. 合并并保存需求计划
+        if (!CollectionUtils.isEmpty(demandPlans)) {
+            mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext,alternateMaterialMap);
+        }
+        // 9. 保存分厂排产版本
+        saveFactoryProductionVersion(createCondition, tMonth,predictionVersion);
+        predictionContext.setAllocationResult(allocationResult);
+        return mergedDemandPlans;
     }
 
     private Map<String, Integer> calculateConventionReserveQty(List<DpDemandPlan> dataList) {
@@ -475,13 +608,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey, Collectors.summingInt(DpDemandPlan::getPostponeNetQty)));
     }
 
-    private List<SupplyOrderPool> createSupplyOrder(YearMonth yearMonth) {
+    private List<SupplyOrderPool> createSupplyOrder(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException {
         // 8、按【生成周期排产】、【生成储备排产】的逻辑得到T+1月的周期排产储备和常规储备数据(此时T月的月度计划已有，故而结构最新排产月份会有变化)
         // 13、按【生成周期排产】、【生成储备排产】的逻辑得到T+2月的周期排产储备和常规储备数据(此时T+1月的月度计划已预测，故而结构最新排产月份会有变化)
         // 生成周期排产储备
-        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(yearMonth);
+        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(createCondition,yearMonth);
         // 生成常规储备
-        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(yearMonth);
+        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(createCondition,yearMonth);
         List<SupplyOrderPool> allStockUpOrders = Lists.newArrayList();
         if(!CollectionUtils.isEmpty(cycleStockUpOrders)){
             allStockUpOrders.addAll(cycleStockUpOrders);
@@ -490,67 +623,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             allStockUpOrders.addAll(precedentStockUpOrders);
         }
         return allStockUpOrders;
-    }
-
-    private DataCollection fetchRequiredDataInParallel(String predictionVersion,MpFactoryProductionVersion finalVersion) {
-        CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
-            CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
-        CompletableFuture<List<MdmProductStock>> stocksFuture =
-            CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
-        CompletableFuture<Map<String, String>> productionTypeFuture =
-            CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
-        CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
-            CompletableFuture.supplyAsync(() -> this.fetchSupplyOrderPool(finalVersion));
-        CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
-            CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
-        CompletableFuture<Integer> minProductionQtyFuture =
-            CompletableFuture.supplyAsync(this::getMinProductionQty);
-        CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
-            CompletableFuture.supplyAsync(this::fetchMaterialInfo);
-        // 等待所有任务完成
-        CompletableFuture.allOf(
-            salesOrdersFuture, stocksFuture,productionTypeFuture,minProductionQtyFuture,fetchMaterialInfoFuture,supplyOrdersFuture,monthlySaleQtyFuture
-        ).join();
-        try {
-            List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
-            List<SupplyOrderPool> supplyOrders = supplyOrdersFuture.get();
-            List<MdmProductStock> finishedProductStocks = stocksFuture.get();
-            Map<String, String> productionTypeMap = productionTypeFuture.get();
-            int minProductionQty = minProductionQtyFuture.get();
-            Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
-            Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
-            if(!CollectionUtils.isEmpty(finishedProductStocks)){
-                finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
-            }
-            // 按优先级分离销售订单
-            Map<Boolean, List<SalesOrderPool>> partitionedOrders =
-                partitionSalesOrdersByPriority(salesOrders);
-
-            // 处理成品库存映射
-            Map<String, List<MdmProductStock>> finishedProductStockMap =
-                CollectionUtils.isEmpty(finishedProductStocks) ?
-                    new HashMap<>(16) :
-                    finishedProductStocks.stream()
-                        .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-            Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,finishedProductStocks);
-            return new DataCollection(
-                salesOrders,
-                finishedProductStocks,
-                finishedProductStockMap,
-                productionTypeMap,
-                supplyOrders,
-                partitionedOrders.get(false),
-                partitionedOrders.get(true),
-                monthSurplusMap,
-                monthlySaleQty,
-                minProductionQty,
-                materialInfoMap
-            );
-
-        } catch (Exception e) {
-            log.error("并行获取数据失败", e);
-            throw new BusinessException("获取数据失败");
-        }
     }
 
     /**
@@ -574,10 +646,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     private Map<String, MdmMaterialInfo> fetchMaterialInfo() {
         return materialInfoService.skuToMaterialInfo();
-    }
-
-    private List<SupplyOrderPool> fetchSupplyOrderPool(MpFactoryProductionVersion finalVersion) {
-        return this.dpOrderPoolSnapshotService.fetchSupplyOrderPool(finalVersion);
     }
 
     private void validateFinalizedForAdjust(DpDemandPlan createCondition) {
@@ -613,12 +681,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private List<DpDemandPlan> saveDemandPlans(
         DpDemandPlan createCondition,
         List<DpDemandPlan> demandPlans,
-        DataCollection data) {
+        PredictionContext data,
+        Map<String, List<MdmProductStock>> alternateMaterialMap) {
         // 合并需求计划
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
             createCondition,
-            demandPlans, data.minProductionQty, data.materialInfoMap,
-            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),data.getProductionTypeMap(),data.getMonthlySaleQty());
+            demandPlans, data.getMinProductionQty(), data.getMaterialInfoMap(),
+            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),
+            data.getProductionTypeMap(),
+            data.getMonthlySaleQty(),
+            data.getCycleSchStruConfs(),
+            alternateMaterialMap);
         if (!CollectionUtils.isEmpty(mergedPlans)) {
             this.baseDao.insertBatch(mergedPlans);
         }
@@ -644,7 +717,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 并行获取所有必要数
      */
-    private DataCollection fetchRequiredDataInParallel(String monthPlanVersion) {
+    private PredictionContext fetchRequiredDataInParallel(String monthPlanVersion) {
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
             CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
 
@@ -664,11 +737,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
             CompletableFuture.supplyAsync(this::fetchMaterialInfo);
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
+            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
 
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,
-            supplyOrdersFuture, monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture
+            supplyOrdersFuture, monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture,
+            cycleSchStruConfFuture
         ).join();
 
         try {
@@ -679,6 +755,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
+            List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
 
             if(!CollectionUtils.isEmpty(finishedProductStocks)){
                 finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
@@ -694,7 +771,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
 
-            return new DataCollection(
+            return new PredictionContext(
                 salesOrders,
                 finishedProductStocks,
                 finishedProductStockMap,
@@ -705,7 +782,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 monthSurplusMap,
                 monthlySaleQty,
                 minProductionQty,
-                materialInfoMap
+                materialInfoMap,
+                cycleSchStruConf
             );
 
         } catch (Exception e) {
@@ -717,7 +795,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 处理销售订单分配
      */
-    private OrderAllocationResult processSalesOrderAllocation(
+    private PredictionContext.OrderAllocationResult processSalesOrderAllocation(
         YearMonth tMonth,
         String monthPlanVersion,
         List<SalesOrderPool> allocationOrders,
@@ -725,7 +803,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, Integer> monthSurplusMap) {
 
         if (CollectionUtils.isEmpty(allocationOrders)) {
-            return new OrderAllocationResult(
+            return new PredictionContext.OrderAllocationResult(
                 Collections.emptyList(),
                 Collections.emptyList(),
                 finishedProductStockMap
@@ -737,7 +815,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap);
-        return new OrderAllocationResult(allocations, allocations, finishedProductStockMap);
+        return new PredictionContext.OrderAllocationResult(allocations, allocations, finishedProductStockMap);
     }
 
     /**
@@ -746,7 +824,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void saveAllocationResults(
         DpDemandPlan createCondition,
         String monthPlanVersion,
-        OrderAllocationResult allocationResult) {
+        PredictionContext.OrderAllocationResult allocationResult) {
 
         // 批量插入分配结果
         if (!CollectionUtils.isEmpty(allocationResult.getAllocations())) {
@@ -764,7 +842,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private List<DpDemandPlan> generateDemandPlans(
         DpDemandPlan createCondition,
         List<DpOrderOffsetDetail> netDemands,
-        DataCollection data) {
+        PredictionContext data) {
         List<DpDemandPlan> demandPlans = new ArrayList<>();
         // 处理净需求
         if (!CollectionUtils.isEmpty(netDemands)) {
@@ -859,7 +937,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty) {
+    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty,List<MdmCycleSchStruConf> cycleSchStruConfs,Map<String, List<MdmProductStock>> alternateMaterialMap) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -884,7 +962,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 skuMap,
                 finishedProductStockMap,
                 mdmMonthSurplusMap,
-                productionTypeMap,monthlySaleQty));
+                productionTypeMap,
+                monthlySaleQty,
+                cycleSchStruConfs,
+                alternateMaterialMap));
         });
         log.info("groupKeys:{}",groupMap.keySet());
         return list;
@@ -898,11 +979,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, List<MdmProductStock>> finishedProductStockMap,
             Map<String, Integer> mdmMonthSurplusMap,
             Map<String, String> productionTypeMap,
-            Map<String, Integer> monthlySaleQty) {
+            Map<String, Integer> monthlySaleQty,
+            List<MdmCycleSchStruConf> cycleSchStruConfs,
+            Map<String, List<MdmProductStock>> alternateMaterialMap) {
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置物料信息（使用computeIfAbsent优化Map访问）
-        setMaterialInfo(mergedPlan, skuMap);
+        setMaterialInfo(mergedPlan, skuMap,cycleSchStruConfs);
+        // 设置是否替换料
+        setIsAlternateMaterial(mergedPlan,alternateMaterialMap);
         // 设置库存和计划盈余
         setStockAndSurplusInfo(mergedPlan, finishedProductStockMap, mdmMonthSurplusMap);
         // 设置排产分类
@@ -913,6 +998,18 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         setAverageSaleQty(mergedPlan,monthlySaleQty);
 
         return mergedPlan;
+    }
+
+    private void setIsAlternateMaterial(DpDemandPlan mergedPlan, Map<String, List<MdmProductStock>> alternateMaterialMap) {
+        if(CollectionUtils.isEmpty(alternateMaterialMap) || StringUtils.isBlank(mergedPlan.getBrand()) || StringUtils.isBlank(mergedPlan.getSpecifications()) || StringUtils.isBlank(mergedPlan.getPattern())) {
+            mergedPlan.setIsAlternateMaterial(YesOrNoEnum.NO.getCode());
+            return;
+        }
+        if(alternateMaterialMap.containsKey(mergedPlan.getAlternateMaterialGroupKey())) {
+            mergedPlan.setIsAlternateMaterial(YesOrNoEnum.YES.getCode());
+            return;
+        }
+        mergedPlan.setIsAlternateMaterial(YesOrNoEnum.NO.getCode());
     }
 
     private void setAverageSaleQty(DpDemandPlan mergedPlan, Map<String, Integer> monthlySaleQty) {
@@ -940,7 +1037,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 设置物料信息
      */
-    private void setMaterialInfo(DpDemandPlan demandPlan, Map<String, MdmMaterialInfo> skuMap) {
+    private void setMaterialInfo(DpDemandPlan demandPlan, Map<String, MdmMaterialInfo> skuMap,List<MdmCycleSchStruConf> cycleSchStruConfs) {
         Optional.ofNullable(skuMap.get(demandPlan.getMaterialCode()))
             .ifPresent(materialInfo -> {
                 demandPlan.setMaterialDesc(materialInfo.getMaterialDesc());
@@ -955,7 +1052,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 demandPlan.setPattern(materialInfo.getPattern());
                 demandPlan.setHierarchy(materialInfo.getHierarchy());
                 demandPlan.setProSize(materialInfo.getProSize());
+                demandPlan.setStructureType(this.setStructureType(demandPlan.getStructureName(),cycleSchStruConfs));
             });
+    }
+
+    private String setStructureType(String structureName, List<MdmCycleSchStruConf> cycleSchStruConfs) {
+        if(StringUtils.isBlank(structureName) || CollectionUtils.isEmpty(cycleSchStruConfs)) {
+            return ProductionGroupTypeEnum.CONVENTION.getGroupType();
+        }
+        long count = cycleSchStruConfs.stream().filter(item -> structureName.equals(item.getStructureName())).count();
+        return count > 0?ProductionGroupTypeEnum.CYCLE.getGroupType():ProductionGroupTypeEnum.CONVENTION.getGroupType();
     }
 
     /**
@@ -1065,67 +1171,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
 
-    /**
-     * 数据集合
-     */
-    @Data
-    private static class DataCollection {
-        private  List<SalesOrderPool> salesOrders;
-        private  List<MdmProductStock> finishedProductStocks;
-        private  Map<String, List<MdmProductStock>> finishedProductStockMap;
-        private  Map<String, String> productionTypeMap;
-        private  List<SupplyOrderPool> supplyOrderPools;
-        private  List<SalesOrderPool> allocationOrders;
-        private  List<SalesOrderPool> postponeOrders;
-        private  Map<String, Integer> monthSurplusMap;
-        private  Map<String, Integer>  monthlySaleQty;
-        private  Integer  minProductionQty;
-        private  Map<String, MdmMaterialInfo> materialInfoMap;
 
-        public DataCollection(
-            List<SalesOrderPool> salesOrders,
-            List<MdmProductStock> finishedProductStocks,
-            Map<String, List<MdmProductStock>> finishedProductStockMap,
-            Map<String, String> productionTypeMap,
-            List<SupplyOrderPool> supplyOrderPools,
-            List<SalesOrderPool> allocationOrders,
-            List<SalesOrderPool> postponeOrders,
-            Map<String, Integer> monthSurplusMap,
-            Map<String, Integer>  monthlySaleQty,
-            Integer  minProductionQty,
-            Map<String, MdmMaterialInfo> materialInfoMap) {
-            this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
-            this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
-            this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
-            this.productionTypeMap = productionTypeMap != null ? productionTypeMap : new HashMap<>();
-            this.supplyOrderPools = supplyOrderPools != null ? supplyOrderPools : Collections.emptyList();
-            this.allocationOrders = allocationOrders != null ? allocationOrders : Collections.emptyList();
-            this.postponeOrders = postponeOrders != null ? postponeOrders : Collections.emptyList();
-            this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : new HashMap<>();
-            this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
-            this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
-            this.materialInfoMap = materialInfoMap != null ? materialInfoMap : new HashMap<>();
-        }
-    }
-
-    /**
-     * 订单分配结果
-     */
-    @Getter
-    private static class OrderAllocationResult {
-        private final List<DpOrderOffsetDetail> allocations;
-        private final List<DpOrderOffsetDetail> netDemands;
-        private final Map<String, List<MdmProductStock>> stockMap;
-
-        public OrderAllocationResult(
-            List<DpOrderOffsetDetail> allocations,
-            List<DpOrderOffsetDetail> netDemands,
-            Map<String, List<MdmProductStock>> stockMap) {
-            this.allocations = allocations != null ? allocations : Collections.emptyList();
-            this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
-            this.stockMap = stockMap != null ? stockMap : new HashMap<>();
-        }
-    }
 
     /**
      * 数量统计内部类

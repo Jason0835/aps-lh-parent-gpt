@@ -176,10 +176,10 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String mainMaterialDesc;
 
     /**
-     * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
+     * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
      */
     @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.constructionStage", dictType = "biz_construction_stage")
-    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
     /**
@@ -336,7 +336,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 排产顺序
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionSequence")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.productionSequence")
     @ApiModelProperty(value = "排产顺序", name = "productionSequence")
     @TableField(value = "PRODUCTION_SEQUENCE")
     private Long productionSequence;
@@ -704,7 +704,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 显示顺序
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.displaySeq")
+//    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.displaySeq")
     @ApiModelProperty(value = "显示顺序", name = "displaySeq")
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;

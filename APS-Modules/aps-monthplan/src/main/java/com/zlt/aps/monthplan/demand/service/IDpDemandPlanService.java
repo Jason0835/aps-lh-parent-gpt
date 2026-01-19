@@ -4,6 +4,7 @@ package com.zlt.aps.monthplan.demand.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -56,11 +57,24 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @param finalVersion
      * @return
      */
-    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion);
+    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException;
     /**
      *  列表查询数据
      * @param queryWrapper
      * @return
      */
     List<DpDemandPlan> list(QueryWrapper<DpDemandPlan> queryWrapper);
+    /**
+     * 构建预测上下文
+     * @return 预测上下文
+     */
+    PredictionContext buildPredictionContext();
+    /**
+     *  生成T月需求计划
+     * @param param
+     * @param finalVersion
+     * @param predictionContext
+     * @return
+     */
+    List<DpDemandPlan> createInitPredictionRequire(DpDemandPlan param, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext);
 }
