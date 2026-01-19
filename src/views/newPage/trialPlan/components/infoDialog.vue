@@ -55,6 +55,15 @@ export default {
           new Error(this.$t("common.rule.noPoint"))
         );
       }
+      const lastDigit = parseInt(strValue[strValue.length - 1]);
+      console.log(lastDigit)
+      console.log([0, 2, 4, 6, 8].includes(lastDigit))
+
+      if (![0, 2, 4, 6, 8].includes(lastDigit)) {
+        return callback(
+          new Error(this.$t("必须为双数"))
+        );
+      }
 
       // 转换为数字
       const numValue = Number(strValue);

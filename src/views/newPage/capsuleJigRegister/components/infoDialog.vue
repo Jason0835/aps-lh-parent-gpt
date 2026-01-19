@@ -126,7 +126,7 @@ export default {
         ],
         proSize: [
           {
-            required: true,
+            required: false,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },

@@ -210,6 +210,11 @@ export default {
           label: this.$t("ui.data.column.skuConstruction.embryoCode"),
           width: 180,
         },
+        {
+          prop: "mainMaterialDesc",
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          width: 300,
+        },
         // {
         //   prop: "curingTime",
         //   label: this.$t("ui.data.column.skuConstruction.curingTime"),

@@ -14,7 +14,7 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
-      :showSummary="true"
+      :showSummary="false"
       :selectArea="false"
       :span-method="objectSpanMethod"
       :summary-method="getSummaryMethod"
@@ -132,8 +132,8 @@ export default {
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
-          width: 180,
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width: 280,
         },
         {
           prop: "mesMaterialCode",
@@ -495,10 +495,10 @@ export default {
           label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
         },
-        {
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
-          prop: "mainMaterialDesc",
-        },
+        // {
+        //   label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+        //   prop: "mainMaterialDesc",
+        // },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",

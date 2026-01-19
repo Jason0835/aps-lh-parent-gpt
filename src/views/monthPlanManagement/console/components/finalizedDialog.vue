@@ -95,7 +95,9 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
+          type: "select",
           disabled: true,
+          dictData: this.parentDict.type.biz_factory_name,
         },
         {
           prop: "monthPlanVersion",

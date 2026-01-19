@@ -281,7 +281,8 @@
 
 
 
-  "ui.data.demandPlan.stockQtyTotal": "总库存"
+  "ui.data.demandPlan.stockQtyTotal": "总库存",
+  "common.rule.double":"必须为双数"
 
 
 }

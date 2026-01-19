@@ -120,12 +120,16 @@ import {
   deleteMonthPlanRequire,
 } from "@/api/factory/console";
 //components
+import { getVersionList as requireProductionPlanVersionList } from "@/api/demand/requireProductionPlan";
+import { listProductionVersionList } from "@/api/monthplan/mouldingDayResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 import addDialog from "./components/addDialog.vue";
 import finalizedDialog from "./components/finalizedDialog.vue";
 import noVersionList from "./components/noVersionList.vue";
+import cos from "highlight.js/lib/languages/cos";
+import { f } from "tlt-ui";
 
 export default {
   name: "Console",
@@ -134,7 +138,7 @@ export default {
     addDialog,
     infoDialog,
     finalizedDialog,
-    noVersionList
+    noVersionList,
   },
   dicts: [
     "biz_factory_name",
@@ -142,7 +146,7 @@ export default {
     "biz_yes_no",
     "biz_channel_type",
     "biz_brand_type",
-    "biz_product_type"
+    "biz_product_type",
   ],
   provide() {
     return {
@@ -165,6 +169,8 @@ export default {
       importDefaultValue: {},
       importRules: {},
       map: null,
+      planVersionList: [],
+      productionVersionList: [],
     };
   },
   computed: {
@@ -181,7 +187,7 @@ export default {
                 {row.monthPlanVersion}
                 <div>
                   <text-button
-                   onClick={() => this.handleRouterMonthPlanVersion(row)}
+                    onClick={() => this.handleRouterMonthPlanVersion(row)}
                   >
                     {"明细"}
                   </text-button>
@@ -219,7 +225,6 @@ export default {
               this.dict.type.biz_factory_name,
               row.factoryCode
             );
-
           },
         },
         {
@@ -266,9 +271,7 @@ export default {
                   </text-button>
                 </div>
                 <div>
-                  <text-button
-                  onClick={() => this.handleInitDetail(row)}
-                  >
+                  <text-button onClick={() => this.handleInitDetail(row)}>
                     {this.$t("明细")}
                   </text-button>
                 </div>
@@ -404,26 +407,78 @@ export default {
         {
           label: this.$t("需求计划版本"),
           prop: "monthPlanVersion",
+          type: "select",
+          dictData: this.planVersionList,
+          listeners: {
+            change: this.handlePlanChange,
+          },
         },
         {
           label: this.$t("月度生产计划版本"),
           prop: "productionVersion",
+          type: "select",
+          dictData: this.productionVersionList,
         },
       ];
     },
   },
   methods: {
+    handleChange(val) {
+      this.$set(this.search, "productionVersion", "");
+      this.$set(this.query, "productionVersion", "");
+      this.search.monthPlanVersion = val;
+      this.query.monthPlanVersion = val;
+      this.listProductionVersionList();
+    },
+    async requireProductionPlanVersionList() {
+      try {
+        const res = await requireProductionPlanVersionList(this.formatParams());
+        console.log(res);
+        let list = [];
+        for (let index = 0; index < res.length; index++) {
+          let obj = {};
+          obj.label = res[index];
+          obj.value = res[index];
+          list.push(obj);
+        }
+        this.planVersionList = list;
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    async listProductionVersionList() {
+      try {
+        const res = await listProductionVersionList(this.formatParams());
+        console.log(res);
+        let list = [];
+        for (let index = 0; index < res.length; index++) {
+          let obj = {};
+          obj.label = res[index];
+          obj.value = res[index];
+          list.push(obj);
+        }
+        this.productionVersionList = list;
+      } catch (error) {
+        console.log(error);
+      }
+    },
     handleYearMonthChange(val) {
       console.log(val);
       this.query.yearMonth = val;
       this.search.yearMonth = val;
     },
+    handlePlanChange(val) {
+      this.query.monthPlanVersion = val;
+      this.search.monthPlanVersion = val;
+
+      this.listProductionVersionList();
+    },
     handleAdd() {
       if (this.$refs.noVersionListRef) {
         const params = {
-        ...this.query,
-        ...this.sort,
-      };
+          ...this.query,
+          ...this.sort,
+        };
         this.$refs.noVersionListRef.show(params);
       }
     },
@@ -571,12 +626,12 @@ export default {
       this.$router.push({
         path: `./console/productionMonthPlanInit/${row.initVersion}`,
         query: {
-          year:row.year,
+          year: row.year,
           month: row.month,
           factoryCode: row.factoryCode,
           monthPlanVersion: row.monthPlanVersion,
           productionVersion: row.productionVersion,
-        }
+        },
       });
     },
     handleMould(row) {
@@ -609,12 +664,11 @@ export default {
       });
     },
     handleRouterProductionVersions(row) {
-
       let query = {
         yearMonth: `${row.year}-${row.month}`,
         factoryCode: row.factoryCode,
         monthPlanVersion: row.monthPlanVersion,
-        productionVersion :row.productionVersion
+        productionVersion: row.productionVersion,
       };
       if (row.productionStartDate) {
         query.productionStartDate = row.productionStartDate;
@@ -728,7 +782,7 @@ export default {
             list.push(obj);
           }
         });
-        console.log((list));
+        console.log(list);
         // this.data = [
         //   {
         //   'year':2025,
@@ -746,7 +800,7 @@ export default {
         //   productionVersion:'20251107162311'
         // }
         // ];
-        this.data=list;
+        this.data = list;
 
         this.page.total = data.total;
       } catch (error) {
@@ -760,7 +814,7 @@ export default {
     const date = moment();
     let defaultParams = {
       yearMonth: date.format("yyyy-MM"),
-      factoryCode:'116'
+      factoryCode: "116",
     };
     this.search = {
       ...defaultParams,
@@ -768,11 +822,11 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    this.requireProductionPlanVersionList();
+    this.listProductionVersionList();
     this.getList();
   },
-  activated() {
-
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>
