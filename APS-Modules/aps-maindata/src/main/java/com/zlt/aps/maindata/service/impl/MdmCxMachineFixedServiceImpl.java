@@ -244,11 +244,6 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
             return Boolean.FALSE;
         }
-        if (StringUtils.isNotBlank(structureErrorMsg) || StringUtils.isNotBlank(materialCodeErrorMsg)) {
-            String message = structureErrorMsg + materialCodeErrorMsg;
-            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
-            return Boolean.FALSE;
-        }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 }
