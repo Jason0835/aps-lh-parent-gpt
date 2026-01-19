@@ -213,6 +213,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             productionPrediction.setYear(yearMonth.getYear());
             productionPrediction.setMonth(yearMonth.getMonthValue());
             productionPrediction.setMonthPlanVersion(tMonthDemandPlan.getMonthPlanVersion());
+            productionPrediction.setMainMaterialDesc(listGroupByMaterialCode.get(0).getMainMaterialDesc());
             productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
             productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
             productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));
@@ -284,14 +285,16 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getTypeBlockQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTypeBlockQty).sum();
+        FactoryMonthPlanMouldDayResult mouldDayResult = listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).findFirst().orElse(null);
+        return null == mouldDayResult?0:mouldDayResult.getTypeBlockQty();
     }
 
     private int calculateMouldQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).mapToInt(FactoryMonthPlanMouldDayResult::getMouldCavityQty).sum();
+        FactoryMonthPlanMouldDayResult mouldDayResult = listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).findFirst().orElse(null);
+        return null == mouldDayResult?0:mouldDayResult.getMouldCavityQty();
     }
 
     private int calculateProductionQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode, YearMonth yearMonth) {

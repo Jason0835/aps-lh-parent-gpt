@@ -262,14 +262,16 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getTypeBlockQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTypeBlockQty).sum();
+        FactoryMonthPlanMouldDayResult mouldDayResult = listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).findFirst().orElse(null);
+        return null == mouldDayResult?0:mouldDayResult.getTypeBlockQty();
     }
 
     private int calculateMouldQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
         if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).mapToInt(FactoryMonthPlanMouldDayResult::getMouldCavityQty).sum();
+        FactoryMonthPlanMouldDayResult mouldDayResult = listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).findFirst().orElse(null);
+        return null == mouldDayResult?0:mouldDayResult.getMouldCavityQty();
     }
 
     private int calculateProductionQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode, YearMonth yearMonth) {
