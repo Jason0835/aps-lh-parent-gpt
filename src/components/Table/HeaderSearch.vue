@@ -91,11 +91,11 @@ export default {
         let value = item.valueKey ? item.valueKey : "value";
 
         // 获取或初始化过滤后的数据
-        if (!this.filteredDictData.has(item.prop)) {
-          this.filteredDictData.set(item.prop, item.dictData);
-        }
+        // if (!this.filteredDictData.has(item.prop)) {
+        //   this.filteredDictData.set(item.prop, item.dictData);
+        // }
 
-        const currentFilteredData = this.filteredDictData.get(item.prop);
+        // const currentFilteredData = this.filteredDictData.get(item.prop);
         return (
           <el-select
             style="width:100%;"
@@ -105,26 +105,26 @@ export default {
             placeholder={this.$t("common.rule.select")}
             filterable={item.filterable}
             on={item.listeners}
-            filter-method={(query) => {
+           // filter-method={(query) => {
             // 移除空格
-            const cleanQuery = query ? query.replace(/\s+/g, '') : ''
+          //  const cleanQuery = query ? query.replace(/\s+/g, '') : ''
 
-            if (!cleanQuery) {
-              this.filteredDictData.set(item.prop, item.dictData)
-            } else {
-              const filtered = item.dictData.filter(row => {
-                const rowLabel = row[label] || ''
-                const cleanLabel = rowLabel.replace(/\s+/g, '')
-                return cleanLabel.toLowerCase().includes(cleanQuery.toLowerCase())
-              })
-              this.filteredDictData.set(item.prop, filtered)
-            }
+          //  if (!cleanQuery) {
+          //    this.filteredDictData.set(item.prop, item.dictData)
+          //  } else {
+           //   const filtered = item.dictData.filter(row => {
+         //       const rowLabel = row[label] || ''
+           //     const cleanLabel = rowLabel.replace(/\s+/g, '')
+           //     return cleanLabel.toLowerCase().includes(cleanQuery.toLowerCase())
+           //   })
+            //  this.filteredDictData.set(item.prop, filtered)
+         //   }
 
             // 触发重新渲染
-            this.$forceUpdate()
-          }}
+          //  this.$forceUpdate()
+        // }}
           >
-            {currentFilteredData.map((row) => {
+            {item.dictData.map((row) => {
               return (
                 <el-option
                   key={row[value]}

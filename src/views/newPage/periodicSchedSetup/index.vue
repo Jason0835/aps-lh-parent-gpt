@@ -69,7 +69,7 @@
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import { mapState,mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -100,7 +100,7 @@ export default {
   },
   data() {
     return {
-      structureList:[],
+      // structureList:[],
       loading: false,
       data: [],
       selection: [],
@@ -117,6 +117,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -339,34 +340,34 @@ export default {
         this.loading = false;
       }
     },
-    async getStructureList() {
-      try {
+    // async getStructureList() {
+    //   try {
 
-        const res = await selectSkuStructure({
-          pageSize: 1000,
-          pageNum: 1,
+    //     const res = await selectSkuStructure({
+    //       pageSize: 1000,
+    //       pageNum: 1,
 
-        });
-        let list=[]
-        for (let i = 0; i < res.rows.length; i++) {
-          let obj={
-            label:res.rows[i].structureName,
-            value:res.rows[i].structureName
-          }
-          list.push(obj)
+    //     });
+    //     let list=[]
+    //     for (let i = 0; i < res.rows.length; i++) {
+    //       let obj={
+    //         label:res.rows[i].structureName,
+    //         value:res.rows[i].structureName
+    //       }
+    //       list.push(obj)
 
-        }
-        this.structureList=list
-        console.log(res);
-      } catch (error) {
-        console.log(error);
-      } finally {
-      }
-    },
+    //     }
+    //     this.structureList=list
+    //     console.log(res);
+    //   } catch (error) {
+    //     console.log(error);
+    //   } finally {
+    //   }
+    // },
   },
 
   created() {
-    this.getStructureList()
+    // this.getStructureList()
     const now = new Date();
 
     const year = now.getFullYear();

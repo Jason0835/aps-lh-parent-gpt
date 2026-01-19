@@ -213,6 +213,11 @@ export default {
           },
         },
         {
+          prop: "lhNo",
+          label: this.$t("ui.data.column.trialPlan.lhNo"),
+          width: 180,
+        },
+        {
           prop: "trialQty",
           label: this.$t("common.num"),
           width: 120,
@@ -240,7 +245,7 @@ export default {
         },
         {
           prop: "embryoReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          label: this.$t("ui.data.column.trialPlan.madeInfo"),
           width: 180,
         },
         // {
@@ -253,7 +258,7 @@ export default {
         // },
         {
           prop: "textReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.textNo"),
+          label: this.$t("ui.data.column.trialPlan.moldingInfo"),
           width: 180,
         },
         // {
@@ -266,7 +271,7 @@ export default {
         // },
         {
           prop: "lhReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.lhNo"),
+          label: this.$t("ui.data.column.trialPlan.vulcanizationInfo"),
           width: 180,
         },
         // {

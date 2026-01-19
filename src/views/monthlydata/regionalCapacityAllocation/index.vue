@@ -252,7 +252,9 @@ export default {
           label: this.$t("common.area"),
           type: "select",
           filterable: true,
-          dictData:this.areaDist
+          dictData:this.areaDist,
+          special:true
+
         },
       ];
     },
