@@ -199,6 +199,19 @@ public class MdmProductStock extends BaseEntity {
     private Integer leftOverQty;
 
     /**
+     * 花纹
+     */
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(exist = false)
+    private String pattern;
+    /**
+     * 规格
+     */
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(exist = false)
+    private String specifications;
+
+    /**
      * 以分厂+物料为维度，转换库存
      *
      * @return
@@ -219,6 +232,11 @@ public class MdmProductStock extends BaseEntity {
     public String getStockWithoutOrderGroupKey() {
         String keyFormat = "%s|%s|*|%s|*|%s";
         return String.format(keyFormat, materialCode,weekYear, isDynamicBalance,isUniformity);
+    }
+
+    public String getAlternateMaterialGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, brand,specifications, pattern);
     }
 
 
