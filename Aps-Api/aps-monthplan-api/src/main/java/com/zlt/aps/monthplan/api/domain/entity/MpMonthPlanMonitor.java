@@ -84,11 +84,13 @@ public class MpMonthPlanMonitor extends BaseEntity {
     private String structureName;
 
     /** 成型机台 */
+    @Excel(name = "ui.data.column.mpMonthPlanMonitor.cxMachine")
     @ApiModelProperty(value = "成型机台", name = "cxMachine")
     @TableField(exist = false)
     private String cxMachine;
 
     /** 硫化机台 */
+    @Excel(name = "ui.data.column.mpMonthPlanMonitor.lhMachine")
     @ApiModelProperty(value = "硫化机台", name = "lhMachine")
     @TableField(exist = false)
     private String lhMachine;
