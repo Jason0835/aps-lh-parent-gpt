@@ -342,7 +342,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                 MouldRelationTypeEnum relationType = MouldRelationTypeEnum.getInstance(associationInfo.getRelationType());
                 ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
                 if (null == productionMouldInfo) {
-                    productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mouldCode, relationType);
+                    productionMouldInfo = createEmptyProductionMouldInfo(mouldCode, relationType);
                     if (null == productionMouldInfo) {
                         return;
                     }
@@ -576,4 +576,34 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         return allMouldRelationInfoList.stream()
                 .collect(Collectors.groupingBy(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc));
     }
+
+
+    /**
+     * 创建空的排产模具信息
+     * 只包含型腔模号及relationType类型
+     *
+     * @param mouldCode    型腔模号
+     * @param relationType 关系类型
+     * @return
+     */
+    public static ProductionMouldInfoVo createEmptyProductionMouldInfo(String mouldCode, MouldRelationTypeEnum relationType) {
+        if (StringUtils.isBlank(mouldCode)) {
+            return null;
+        }
+        ProductionMouldInfoVo productionMouldInfo = new ProductionMouldInfoVo();
+        productionMouldInfo.setMouldCode(mouldCode);
+        if (null == relationType) {
+            productionMouldInfo.setRelationType(MouldRelationTypeEnum.SKU_RELATION_CONFIGURATION);
+        } else {
+            productionMouldInfo.setRelationType(relationType);
+        }
+        //可排产日信息
+        productionMouldInfo.setProductionDaySet(new HashSet<>(64));
+        //关联SKU
+        productionMouldInfo.setAssociationMaterialSet(new HashSet<>(32));
+        //排产完毕日
+        productionMouldInfo.setFinishDaySet(new HashSet<>(64));
+        return productionMouldInfo;
+    }
+
 }
