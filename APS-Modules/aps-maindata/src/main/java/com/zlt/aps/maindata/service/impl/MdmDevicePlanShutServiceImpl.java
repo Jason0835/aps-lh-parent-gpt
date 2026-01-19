@@ -151,8 +151,8 @@ public class MdmDevicePlanShutServiceImpl extends AbstractDocService<MdmDevicePl
                 unique = checkUnique(importDocEntity);
             } catch (Exception e) {
                 logger.error("设备计划停机数据唯一性校验异常", e);
-                String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.REPEAT.getCode(), errorRowNum, String.format(uniqueMsg, errorRowNum), importErrorLogs);
+//                String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, e.getMessage(), importErrorLogs);
                 return Boolean.FALSE;
             }
         }
