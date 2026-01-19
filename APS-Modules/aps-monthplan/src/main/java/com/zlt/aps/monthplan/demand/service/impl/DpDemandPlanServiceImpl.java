@@ -391,9 +391,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String,Integer> cycleReserveQtyMap = calculateCycleReserveQty(dataList);
         Map<String,Integer> conventionReserveQtyMap = calculateConventionReserveQty(dataList);
         dataList.forEach(demandPlan -> {
-            if (StringUtils.isBlank(demandPlan.getProductTypeCode())) {
-                demandPlan.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
-            }
             String key = demandPlan.getMonthPlanVersionKey();
             DpDemandPlan result = saleDemandMap.get(key);
             Map<String,Integer> stockMap = stockQtyMap.getOrDefault(key, new HashMap<>());
