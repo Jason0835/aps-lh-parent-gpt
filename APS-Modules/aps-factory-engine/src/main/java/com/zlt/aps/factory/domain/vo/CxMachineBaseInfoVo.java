@@ -16,6 +16,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
+import javax.swing.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.*;
@@ -346,6 +347,17 @@ public class CxMachineBaseInfoVo implements Serializable {
             allocationList = new ArrayList<>();
         }
         allocationList.add(addAllocationPlan);
+        //20260119 处理成型工装的日使用量
+        Integer startDay = addAllocationPlan.getStartDay();
+        Integer endDay = addAllocationPlan.getEndDay();
+        for(Integer productionDay = startDay; productionDay <= endDay; productionDay++ ){
+            if(stopDayInfo.contains(productionDay)){
+                continue;
+            }
+            //todo
+        }
+
+
     }
 
     /**

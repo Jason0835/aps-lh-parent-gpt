@@ -59,9 +59,8 @@ public class MouldAllocationInfoVo implements Serializable {
         return String.format(keyFormat, structureName, mainPattern);
     }
 
-
     /**
-     * 获取剩余使用量的模壳数量
+     * 获取剩余使用量的模具数量
      * 续作Sku场景，以第一天的排产量来确定
      *
      * @return
@@ -96,7 +95,7 @@ public class MouldAllocationInfoVo implements Serializable {
     }
 
     /**
-     * 清空模壳的每日使用量
+     * 清空模具分配比例的每日使用量
      */
     public void clearDayUsed() {
         if (CollectionUtils.isEmpty(dayLimitInfoMap)) {
@@ -106,7 +105,7 @@ public class MouldAllocationInfoVo implements Serializable {
     }
 
     /**
-     * 在productionDay天，模壳使用量+1
+     * 在productionDay天，模具使用量+1
      *
      * @param productionDay 排产日
      * @param mouldCode     型腔模号

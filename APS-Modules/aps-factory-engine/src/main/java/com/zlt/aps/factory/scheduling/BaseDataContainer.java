@@ -9,9 +9,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +29,11 @@ public class BaseDataContainer implements Serializable {
      * key=cxMachineCode : value=成型机信息
      */
     Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo;
+    /**
+     * 成型鼓(工装台账)信息集合
+     * key=鼓类型 ：value=鼓类型台账信息{key=鼓groupId ：value=数量}
+     */
+    Map<String, Map<String, TireDrumInfoVo>> tireDrumInfoMap;
     /**
      * 模具信息
      * key=型腔模号 : value=模具信息
@@ -53,9 +56,14 @@ public class BaseDataContainer implements Serializable {
     Map<String, MouldAllocationInfoVo> groupMainPatternAllocationLimitMap;
     /**
      * 模壳总数信息
-     * key=模块标准 : value=模块标准数量
+     * key=模壳标准 : value=模壳标准数量
      */
     Map<String, MouldShellBaseInfoVo> mouldShellMap;
+    /**
+     * 胶囊卡盘总数信息
+     * key=胶囊卡盘GroupId : value=胶囊卡盘总数信息
+     */
+    Map<String, CapsuleChuckInfoVo> capsuleChuckInfoMap;
     /**
      * 生胎对应的特殊原材料配置信息
      * key=胎胚号 : value={ key=特殊原材料编码 : value=比例}
@@ -104,4 +112,35 @@ public class BaseDataContainer implements Serializable {
         }
         return true;
     }
+
+    /**
+     * 获取proSize的剩余机台数数量-在机结构
+     * 需要根据成型鼓、胎体鼓、带束层鼓中剩余量最小的
+     *
+     * @param proSize
+     * @return
+     */
+    public Integer getLeftOverQtyByProSizeAndContinueGroupPlan(String proSize) {
+        if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(tireDrumInfoMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //获取匹配的工装类型各自信息
+        Map<String, Integer> workWeakTypeLimitQtyMap = new HashMap<>();
+        tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
+            List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(limitGroupList)) {
+                workWeakTypeLimitQtyMap.put(workWeakType, BigDecimal.ZERO.intValue());
+                return;
+            }
+            Integer sumQty = limitGroupList.stream().mapToInt(TireDrumInfoVo::getLeftOverUsedQtyByContinueGroup).sum();
+            workWeakTypeLimitQtyMap.put(workWeakType, sumQty);
+        });
+        if (CollectionUtils.isEmpty(workWeakTypeLimitQtyMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //取得工装类型中剩余量最低的
+        Optional<Map.Entry<String, Integer>> minEntry = workWeakTypeLimitQtyMap.entrySet().stream().min(Map.Entry.comparingByValue());
+        return minEntry.get().getValue();
+    }
+
 }

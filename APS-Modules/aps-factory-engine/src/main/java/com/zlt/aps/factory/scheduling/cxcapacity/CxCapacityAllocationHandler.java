@@ -246,6 +246,7 @@ public class CxCapacityAllocationHandler {
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(addHelper);
         //20260109 标记分配完成
+        allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);

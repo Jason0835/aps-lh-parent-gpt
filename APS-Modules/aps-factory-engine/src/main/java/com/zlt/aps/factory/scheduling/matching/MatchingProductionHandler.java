@@ -1815,7 +1815,7 @@ public class MatchingProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService()
                 .getMouldAllocationInfo(productionContext);
-        log.info(TbrBeforeProductionGroupLogRecorder.addMouldAllocationLog(context, mouldAllocationInfoList));
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldAllocationLog(context, mouldAllocationInfoList));
         if (CollectionUtils.isEmpty(mouldAllocationInfoList)) {
             return Collections.emptyMap();
         }

@@ -10,6 +10,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 全钢排产上下文
@@ -100,7 +101,6 @@ public class TbrProductionContext extends Context {
         resetCalculateInventorySalesRatio(materialDesc);
     }
 
-
     /**
      * 根据排产计划，获取其可用的最大模具量
      * 模具分配比例(不同结构间)
@@ -162,6 +162,69 @@ public class TbrProductionContext extends Context {
         }
         allMouldAllocationLimitMap.forEach((controlDimensionKey, limit) -> limit.clearDayUsed());
     }
+
+    /**
+     * 根据排产计划，获取其可用的最大模具量
+     * 胶囊卡盘
+     *
+     * @param productionPlan 排产计划
+     * @return
+     */
+    public Integer getCapsuleChuckLimitQty(MonthPlanProductionRequirePlanVo productionPlan) {
+        CapsuleChuckInfoVo limitInfo = getCapsuleChuckInfo(productionPlan);
+        if (null == limitInfo) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return limitInfo.getLeftOverUsedQtyByContinueSku();
+    }
+
+    /**
+     * 根据排产计划，获取满足胶囊卡盘限制的排产日范围
+     *
+     * @param productionPlan
+     * @return
+     */
+    public Set<Integer> getCapsuleChuckRange(MonthPlanProductionRequirePlanVo productionPlan) {
+        CapsuleChuckInfoVo limitInfo = getCapsuleChuckInfo(productionPlan);
+        if (null == limitInfo) {
+            return Collections.emptySet();
+        }
+        return limitInfo.getEnableDoubleMouldProductionRange();
+    }
+
+    /**
+     * 根据排产计划，获取其模具分配控制对象实例信息
+     * 模具分配比例(不同结构间)
+     *
+     * @param productionPlan 排产计划
+     * @return
+     */
+    public CapsuleChuckInfoVo getCapsuleChuckInfo(MonthPlanProductionRequirePlanVo productionPlan) {
+        if (null == productionPlan) {
+            return null;
+        }
+        Map<String, CapsuleChuckInfoVo> allCapsuleChuckInfoMap = baseDataContainer.getCapsuleChuckInfoMap();
+        if (CollectionUtils.isEmpty(allCapsuleChuckInfoMap)) {
+            return null;
+        }
+        List<CapsuleChuckInfoVo> findCapsuleChuckInfoList = allCapsuleChuckInfoMap.values().stream().filter(singleCapsuleChuck -> singleCapsuleChuck.isMatch(productionPlan)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(findCapsuleChuckInfoList)) {
+            return null;
+        }
+        findCapsuleChuckInfoList.sort(Comparator.comparing(CapsuleChuckInfoVo::getGroupId));
+        return findCapsuleChuckInfoList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 清空所有模具分配比例使用量
+     */
+    public void clearAllCapsuleChuckUsed() {
+        Map<String, CapsuleChuckInfoVo> allCapsuleChuckInfoMap = baseDataContainer.getCapsuleChuckInfoMap();
+        if (CollectionUtils.isEmpty(allCapsuleChuckInfoMap)) {
+            return;
+        }
+        allCapsuleChuckInfoMap.forEach((groupId, limit) -> limit.clearDayUsed());
+    }
     /**
      * 获取模壳可放两副模具的日期集合
      *
@@ -207,6 +270,7 @@ public class TbrProductionContext extends Context {
         }
         allMouldShellMap.forEach((mouldSetCode, mouldShellInfo) -> mouldShellInfo.clearDayUsed());
     }
+
 
     /**
      * 获取materialDesc在startDay~endDay范围内可排产的两副模具

@@ -97,8 +97,9 @@ public class GroupPlanBeforeConclusionHandler {
             return;
         }
         CxMachineAllocationPlanHelper lastInfo = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        BeforeConclusionInfoHelper beforeConclusionInfo = BeforeConclusionInfoHelper.build(beforeConclusionDay, deductionDay, deductionDaySet);
         //更新数据
-        updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionDay, deductionDay, deductionDaySet, groupPlanInfo, selectCxMachineInfo, lastInfo, false);
+        updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, selectCxMachineInfo, lastInfo, false);
         log.info(addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay));
     }
 
@@ -137,7 +138,8 @@ public class GroupPlanBeforeConclusionHandler {
             Set<Integer> deductionDaySet = cxMachineInfo.getLastProductionDayInfo();
             Integer beforeConclusionDay = lastInfo.getStartDay();
             Integer deductionDay = lastInfo.getAllocationDay();
-            updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionDay, deductionDay, deductionDaySet, groupPlanInfo, cxMachineInfo, lastInfo, true);
+            BeforeConclusionInfoHelper beforeConclusionInfo = BeforeConclusionInfoHelper.build(beforeConclusionDay, deductionDay, deductionDaySet);
+            updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, cxMachineInfo, lastInfo, true);
             log.info(addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay));
             return;
         }
@@ -163,8 +165,9 @@ public class GroupPlanBeforeConclusionHandler {
         Integer beforeConclusionDay = lowMinLhMachineCountList.get(BigDecimal.ZERO.intValue()).getProductionDay();
         Integer deductionDay = lowMinLhMachineCountList.size();
         Set<Integer> deductionDaySet = lowMinLhMachineCountList.stream().map(CxMachineUsedLhInfo::getProductionDay).collect(Collectors.toSet());
+        BeforeConclusionInfoHelper beforeConclusionInfo = BeforeConclusionInfoHelper.build(beforeConclusionDay, deductionDay, deductionDaySet);
         //更新数据
-        updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionDay, deductionDay, deductionDaySet, groupPlanInfo, cxMachineInfo, lastInfo, true);
+        updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, cxMachineInfo, lastInfo, true);
         log.info(addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay));
     }
 
@@ -185,14 +188,24 @@ public class GroupPlanBeforeConclusionHandler {
      * @param allocationInfo      成型机台分配详情
      * @param isSingleMachine     是否单机台
      */
-    private static void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, Integer beforeConclusionDay, Integer deductionDay, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
+    private static void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
         //重新计算(分组)分配的天数: 需要排产天数 - 还需排产天数 - 收尾天数
         Integer leftOverNeedAllocationDays = groupPlanInfo.getLeftOverNeedAllocationDays();
         Integer theoryDays = groupPlanInfo.getTheoryDays();
+        Integer deductionDay = beforeConclusionInfo.getDeductionDay();
+        Integer beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
+        Set<Integer> deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
         Integer realAllocationDayBeforeConclusion = theoryDays - leftOverNeedAllocationDays - deductionDay;
         Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
         if (realAllocationDayBeforeConclusion < minAllocationDays) {
+            //分组计划不排产
             groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, minAllocationDays);
+            //更新提前收尾信息
+            updateBeforeConclusionForAllocation(beforeConclusionInfo, cxMachineInfo, allocationInfo);
+            beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
+            deductionDay = beforeConclusionInfo.getDeductionDay();
+            deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
         }
         //标记结构分配完成
         groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
@@ -249,6 +262,28 @@ public class GroupPlanBeforeConclusionHandler {
                 });
             });
         });
+    }
+
+    /**
+     * 当结构提前收尾导致不满足最低排产天数时，收尾信息按整个分配段处理
+     *
+     * @param beforeConclusionInfo 提前收尾信息对象
+     * @param cxMachineInfo        成型机台
+     * @param allocationInfo       成型机台分配段
+     */
+    private static void updateBeforeConclusionForAllocation(BeforeConclusionInfoHelper beforeConclusionInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo) {
+        Integer allocationStartDay = allocationInfo.getStartDay();
+        Integer allocationEndDay = allocationInfo.getEndDay();
+        Integer beforeConclusionDay = allocationStartDay;
+        Integer deductionDay = allocationInfo.getAllocationDay();
+        Set<Integer> deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
+        for (Integer productionDay = allocationStartDay; productionDay <= allocationEndDay; productionDay++) {
+            if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+                continue;
+            }
+            deductionDaySet.add(productionDay);
+        }
+        beforeConclusionInfo.updateInfo(beforeConclusionDay, deductionDay, deductionDaySet);
     }
 
     /**
@@ -374,6 +409,62 @@ public class GroupPlanBeforeConclusionHandler {
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_BEFORE_CONCLUSION, logContent);
         return logContent;
+    }
+}
+
+/**
+ * 构建提前收尾信息对象
+ *
+ * @author ZLT
+ * @date 20260115
+ */
+@Getter
+class BeforeConclusionInfoHelper {
+
+    private Integer beforeConclusionDay;
+
+    private Integer deductionDay;
+
+    private Set<Integer> deductionDaySet;
+
+    /**
+     * 构建新提前收尾信息对象
+     *
+     * @param beforeConclusionDay 收尾日
+     * @param deductionDay        收尾天数
+     * @param deductionDaySet     收尾日集合
+     * @return
+     */
+    public static BeforeConclusionInfoHelper build(Integer beforeConclusionDay, Integer deductionDay, Set<Integer> deductionDaySet) {
+        return new BeforeConclusionInfoHelper(beforeConclusionDay, deductionDay, deductionDaySet);
+    }
+
+    /**
+     * 更新收尾信息
+     *
+     * @param beforeConclusionDay 新的收尾日
+     * @param deductionDay        收尾天数
+     * @param deductionDaySet     提前收尾的排产天集合
+     */
+    public void updateInfo(Integer beforeConclusionDay, Integer deductionDay, Set<Integer> deductionDaySet) {
+        this.beforeConclusionDay = beforeConclusionDay;
+        this.deductionDay = deductionDay;
+        if (!CollectionUtils.isEmpty(deductionDaySet)) {
+            this.deductionDaySet.addAll(deductionDaySet);
+        }
+    }
+
+    /**
+     * 构造函数
+     *
+     * @param beforeConclusionDay
+     * @param deductionDay
+     * @param deductionDaySet
+     */
+    private BeforeConclusionInfoHelper(Integer beforeConclusionDay, Integer deductionDay, Set<Integer> deductionDaySet) {
+        this.beforeConclusionDay = beforeConclusionDay;
+        this.deductionDay = deductionDay;
+        this.deductionDaySet = deductionDaySet;
     }
 }
 

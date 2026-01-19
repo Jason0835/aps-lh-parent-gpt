@@ -9,25 +9,25 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 模壳的日信息对象
- * 模壳日数量限制
- * 模壳日使用量
+ * 胶囊卡盘日排产限制对象
+ * 卡盘数量
+ * 日使用量
  *
  * @author ZLT
- * @date 20260116
+ * @date 20260119
  */
 @Getter
-public class MouldShellDayInfoHelper implements Serializable {
+public class CapsuleChuckDayInfoHelper implements Serializable {
     /**
-     * 模套型号
+     * 胶囊卡盘分组Id
      */
-    private String mouldSetCode;
+    private String groupId;
     /**
      * 排产日
      */
     private Integer productionDay;
     /**
-     * 模壳数量
+     * 卡盘总数
      */
     private Integer maxLimitQty;
     /**
@@ -35,20 +35,20 @@ public class MouldShellDayInfoHelper implements Serializable {
      */
     private Integer usedQty;
     /**
-     * 已使用模具
+     * 已使用模具--模具对应胶囊使用
      */
     private Set<String> usedMouldSet;
 
     /**
      * 创建初始化对象
      *
-     * @param mouldSetCode  模壳型号
+     * @param groupId       胶囊卡盘
      * @param productionDay 排产日
      * @param maxLimitQty   最大数量
      * @return
      */
-    public static MouldShellDayInfoHelper buildInit(String mouldSetCode, Integer productionDay, Integer maxLimitQty) {
-        return new MouldShellDayInfoHelper(mouldSetCode, productionDay, maxLimitQty);
+    public static CapsuleChuckDayInfoHelper buildInit(String groupId, Integer productionDay, Integer maxLimitQty) {
+        return new CapsuleChuckDayInfoHelper(groupId, productionDay, maxLimitQty);
     }
 
     /**
@@ -68,7 +68,7 @@ public class MouldShellDayInfoHelper implements Serializable {
     }
 
     /**
-     * 模壳使用量 + 1
+     * 胶囊使用量 + 1
      *
      * @param mouldCode 型腔模号
      */
@@ -111,12 +111,12 @@ public class MouldShellDayInfoHelper implements Serializable {
     /**
      * 构造函数
      *
-     * @param mouldSetCode
-     * @param productionDay
-     * @param maxLimitQty
+     * @param groupId       分组Id
+     * @param productionDay 排产日
+     * @param maxLimitQty   最大量
      */
-    MouldShellDayInfoHelper(String mouldSetCode, Integer productionDay, Integer maxLimitQty) {
-        this.mouldSetCode = mouldSetCode;
+    CapsuleChuckDayInfoHelper(String groupId, Integer productionDay, Integer maxLimitQty) {
+        this.groupId = groupId;
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();
