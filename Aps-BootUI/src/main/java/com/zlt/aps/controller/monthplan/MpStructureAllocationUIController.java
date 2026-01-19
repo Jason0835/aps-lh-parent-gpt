@@ -11,6 +11,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.common.utils.PubUtil;
@@ -322,5 +323,19 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         return iMpStructureAllocationService.getVersionList(queryVO);
     }
 
+    /**
+     * 获取日期最接近的下一个结构
+     */
+    @ApiOperation("获取日期最接近的下一个结构")
+    @PostMapping("/getNextStructure")
+    @ResponseBody
+    public AjaxResult getNextStructure(MpStructureAllocation queryVO) {
+        if (StringUtils.isEmpty(queryVO.getFactoryCode()) || queryVO.getYear() == null || queryVO.getMonth() == null
+                || StringUtils.isEmpty(queryVO.getCxMachineCode()) || queryVO.getBeginDay() == null || queryVO.getEndDay() == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.notQueryCondition"));
+        }
+        MpStructureAllocation mpStructureAllocation = iMpStructureAllocationService.getNextStructure(queryVO);
+        return AjaxResult.success(mpStructureAllocation);
+    }
 
 }

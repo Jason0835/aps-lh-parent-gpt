@@ -122,7 +122,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * @param deductionDay
      */
     public void beforeConclusion(Integer conclusionDay, Integer deductionDay) {
-        endDay = conclusionDay;
+        endDay = conclusionDay - BigDecimal.ONE.intValue();
         String tisFormat = I18nUtil.getMessage("alg.data.groupCapacity.beforeConclusion");
         remark = String.format(tisFormat, conclusionDay);
         if (allocationDay <= deductionDay) {

@@ -233,7 +233,7 @@ public class MpWeekRollAdjustEngine {
         int secStartDay;
         List<FactoryMonthPlanFinalAdjustVo> canMoveFinalList;
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        //从锁定次日到月底次日，依次遍历
+        //从锁定次日到结构收尾日，依次遍历
         for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
             adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, contextDTO.getDailyCapacityLimitVoMap().get(i), null);
             contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),i,contextDTO.getDailyCapacityLimitVoMap().get(i).toString())).append(ApsConstant.DIVISION);
@@ -278,7 +278,7 @@ public class MpWeekRollAdjustEngine {
      */
     private List<FactoryMonthPlanFinalAdjustVo> findCanMoveSkuList(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int secStartDay) {
         List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream()
-                .filter(x->secStartDay == x.getBeginDay()).sorted((o1, o2) -> {
+                .filter(x->x.getBeginDay()!=null && secStartDay == x.getBeginDay()).sorted((o1, o2) -> {
                     // 自定义比较逻辑(总的已排实单量)
                     int totalQty1 = o1.getHeightProductionQty() + o1.getMidProductionQty();
                     int totalQty2 = o2.getHeightProductionQty() + o2.getMidProductionQty();
@@ -552,6 +552,7 @@ public class MpWeekRollAdjustEngine {
         String dayField,matchDayField;
         StringBuffer sb = new StringBuffer();
         int structureDeadline = contextDTO.getStructureDeadLine();
+        int oriTotalMatchQty = totalMatchQty;
         //实单肯定在前，从后向前扣减
         for (int i = structureDeadline; i>= startDay; i--){
             dayField = FactoryConstant.DAY_FIELD+i;
@@ -571,7 +572,7 @@ public class MpWeekRollAdjustEngine {
             }
             sb.append(prodFinal.getFieldValueByFieldName(matchDayField)).append(",");
             if (totalMatchQty == 0){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,每日搭配量:%s",contextDTO.getStructureName(), totalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【拆出搭配量】,总搭配量:%s,结构收尾日:%s,搭配开始日:%s,收尾->开始的每日搭配量:%s",contextDTO.getStructureName(), oriTotalMatchQty,structureDeadline,i,sb.toString())).append(ApsConstant.DIVISION);
                 //剩余搭配量=0,退出
                 break;
             }

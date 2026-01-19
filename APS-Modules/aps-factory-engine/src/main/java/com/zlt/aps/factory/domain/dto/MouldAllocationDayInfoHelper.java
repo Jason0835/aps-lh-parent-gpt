@@ -9,7 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 模壳的日信息对象
+ * 模具分配比例日控制信息对象
  * 模壳日数量限制
  * 模块日使用量
  *
@@ -17,11 +17,11 @@ import java.util.Set;
  * @date 20260116
  */
 @Getter
-public class MouldShellDayInfoHelper implements Serializable {
+public class MouldAllocationDayInfoHelper implements Serializable {
     /**
-     * 模套型号
+     * 控制维度 结构 + 主花纹
      */
-    private String mouldSetCode;
+    private String controlDimension;
     /**
      * 排产日
      */
@@ -42,13 +42,13 @@ public class MouldShellDayInfoHelper implements Serializable {
     /**
      * 创建初始化对象
      *
-     * @param mouldSetCode  模壳型号
-     * @param productionDay 排产日
-     * @param maxLimitQty   最大数量
+     * @param controlDimension 控制维度
+     * @param productionDay    排产日
+     * @param maxLimitQty      最大数量
      * @return
      */
-    public static MouldShellDayInfoHelper buildInit(String mouldSetCode, Integer productionDay, Integer maxLimitQty) {
-        return new MouldShellDayInfoHelper(mouldSetCode, productionDay, maxLimitQty);
+    public static MouldAllocationDayInfoHelper buildInit(String controlDimension, Integer productionDay, Integer maxLimitQty) {
+        return new MouldAllocationDayInfoHelper(controlDimension, productionDay, maxLimitQty);
     }
 
     /**
@@ -68,7 +68,7 @@ public class MouldShellDayInfoHelper implements Serializable {
     }
 
     /**
-     * 模壳使用量 + 1
+     * 使用量 + 1
      *
      * @param mouldCode 型腔模号
      */
@@ -89,7 +89,7 @@ public class MouldShellDayInfoHelper implements Serializable {
     }
 
     /**
-     * 模壳使用量 - 1
+     * 使用量 - 1
      */
     public void deductionUsedCount() {
         Integer existUsedQty = usedQty;
@@ -101,7 +101,7 @@ public class MouldShellDayInfoHelper implements Serializable {
     }
 
     /**
-     * 清空模壳使用量
+     * 清空使用量
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();
@@ -111,12 +111,12 @@ public class MouldShellDayInfoHelper implements Serializable {
     /**
      * 构造函数
      *
-     * @param mouldSetCode
-     * @param productionDay
-     * @param maxLimitQty
+     * @param controlDimension 控制维度
+     * @param productionDay    控制日
+     * @param maxLimitQty      最大数量
      */
-    MouldShellDayInfoHelper(String mouldSetCode, Integer productionDay, Integer maxLimitQty) {
-        this.mouldSetCode = mouldSetCode;
+    MouldAllocationDayInfoHelper(String controlDimension, Integer productionDay, Integer maxLimitQty) {
+        this.controlDimension = controlDimension;
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();

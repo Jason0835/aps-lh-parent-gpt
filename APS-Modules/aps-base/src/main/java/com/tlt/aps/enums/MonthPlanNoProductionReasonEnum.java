@@ -96,6 +96,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME("MP2102", "没有达到最低起产天数，不排", "alg.data.groupCapacity.noMinCxCapacityWholeStructureName"),
     /**
+     * MP2103 因低于实单最低配比提前收尾,导致没有达到最低起产天数，不排
+     */
+    NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME("MP2103", "因低于实单最低配比提前收尾,导致没有达到最低起产天数，不排", "alg.data.groupCapacity.noLowMinLhMachineCountWholeStructureName"),
+    /**
      * MP2201 成型产能不足，整个英寸不排
      */
     EXCEED_CX_CAPACITY_WHOLE_PRO_SIZE("MP2201", "成型产能不足，整个英寸不排", "alg.data.groupCapacity.exceedCxCapacityWholeProSize"),

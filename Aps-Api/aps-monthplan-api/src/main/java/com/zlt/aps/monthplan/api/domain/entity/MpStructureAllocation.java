@@ -165,6 +165,14 @@ public class MpStructureAllocation extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 调整结束日期
+     */
+    @ApiModelProperty(value = "调整结束日期", name = "adjustEndDay")
+    @TableField(exist = false)
+    private Integer adjustEndDay;
+
     /**
      * 判断productionDay是否在beginDay与endDay范围内
      * true表示在，false表示不在

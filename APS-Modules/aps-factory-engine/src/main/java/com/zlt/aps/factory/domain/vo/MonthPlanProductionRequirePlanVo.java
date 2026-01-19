@@ -479,6 +479,17 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 获取模具分配比例控制key
+     * 结构+主花纹
+     *
+     * @return
+     */
+    public String getMouldAllocationControlDimensionKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, getStructureName(), getMainPattern());
+    }
+
+    /**
      * 检测不排继续往下匹配的不排产原因
      * 1、计划本身不排产
      * 2、没有物料编码
