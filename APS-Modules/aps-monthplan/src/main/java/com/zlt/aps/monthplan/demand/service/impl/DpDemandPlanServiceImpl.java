@@ -27,6 +27,7 @@ import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 
@@ -316,7 +317,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     @Override
     public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
-        if(CollectionUtils.isEmpty(predictionContext.getAllocationResult().getNetDemands())) {
+        if(CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
             return Collections.emptyList();
         }
         List<FactoryMonthPlanMouldDayResult> productionFinalResults;
@@ -339,25 +340,36 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setMonthPlanVersion(predictionVersion);
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        List<DpOrderOffsetDetail>  netDemands = PredictionAllocationHelper.calculateSaleOrder(predictionContext.getAllocationResult().getNetDemands(),productionFinalResults);
-        if(CollectionUtils.isEmpty(netDemands)){
-            predictionContext.getAllocationResult().setNetDemands(Collections.emptyList());
+        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
+        List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
+        List<DpPredictOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
+        netDemands.forEach(predictionOffsetDetail -> {
+            predictionOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
+            predictionOffsetDetail.setYear(createCondition.getYear());
+            predictionOffsetDetail.setMonth(createCondition.getMonth());
+            predictionOffsetDetail.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        });
+        if(!CollectionUtils.isEmpty(fetchSupplyOrders)) {
+           fetchSupplyOrders.forEach(supplyOrderPool -> netDemands.add(buildPredictOffsetDetail(createCondition,supplyOrderPool)));
+        }
+        List<DpPredictOffsetDetail>  leftDemands = PredictionAllocationHelper.calculateSaleOrder(netDemands,productionFinalResults,mpMonthPlanMonitors);
+        if(CollectionUtils.isEmpty(leftDemands)){
+            predictionContext.setPredictOffsetDetails(Collections.emptyList());
             return Collections.emptyList();
         }
-        predictionContext.getAllocationResult().setNetDemands(netDemands);
-        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
-        List<SupplyOrderPool> cycleStockOrders = this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
-        if(!CollectionUtils.isEmpty(cycleStockOrders)){
-            supplyOrderPools.addAll(cycleStockOrders);
+        this.baseDao.insertBatch(leftDemands);
+        leftDemands =   netDemands.stream().filter(item -> null != item.getNetQty() && item.getNetQty() > 0).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(leftDemands)){
+            predictionContext.setPredictOffsetDetails(Collections.emptyList());
+            return Collections.emptyList();
         }
-        List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
-        List<SupplyOrderPool> leftSupplyOrders = PredictionAllocationHelper.calculateSupplyOrder(supplyOrderPools,productionFinalResults,mpMonthPlanMonitors);
-        predictionContext.setSupplyOrderPools(leftSupplyOrders);
+        predictionContext.setPredictOffsetDetails(leftDemands);
+        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
+        predictionContext.setSupplyOrderPools(supplyOrderPools);
         predictionContext.setPostponeOrders(null);
         Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());
         // 6. 处理需求计划生成
-        List<DpDemandPlan> demandPlans = generateDemandPlans(
-            createCondition,netDemands, predictionContext);
+        List<DpDemandPlan> demandPlans = generateDemandPlans(createCondition,predictionContext);
         List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
@@ -368,6 +380,33 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 9. 保存分厂排产版本
         saveFactoryProductionVersion(createCondition, tPlus1Month,predictionVersion);
         return mergedDemandPlans;
+    }
+
+    private List<DpDemandPlan> generateDemandPlans(DpDemandPlan createCondition, PredictionContext predictionContext) {
+        List<DpDemandPlan> demandPlans = new ArrayList<>();
+        // 处理净需求
+        if (!CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
+            demandPlans.addAll(SaleRequirePlanHelper.processNetDemands(createCondition,predictionContext.getPredictOffsetDetails()));
+        }
+        // 处理供应链订单
+        if (!CollectionUtils.isEmpty(predictionContext.getSupplyOrderPools())) {
+            demandPlans.addAll(transformSupplyOrdersToDemandPlans(predictionContext.getSupplyOrderPools(), createCondition));
+        }
+        return demandPlans;
+
+    }
+
+    private DpPredictOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,SupplyOrderPool supplyOrderPool) {
+        DpPredictOffsetDetail predictionOffsetDetail = new DpPredictOffsetDetail();
+        BeanUtils.copyProperties(supplyOrderPool,predictionOffsetDetail);
+        predictionOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
+        predictionOffsetDetail.setYear(createCondition.getYear());
+        predictionOffsetDetail.setMonth(createCondition.getMonth());
+        predictionOffsetDetail.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        predictionOffsetDetail.setOrderQty(supplyOrderPool.getQty());
+        predictionOffsetDetail.setScmPriority(supplyOrderPool.getOrderType());
+        predictionOffsetDetail.setNetQty(supplyOrderPool.getQty());
+        return predictionOffsetDetail;
     }
 
 
@@ -500,13 +539,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             predictionContext.getMonthSurplusMap());
         // 5. 批量保存分配结果
         saveAllocationResults(createCondition, predictionVersion, allocationResult);
-        List<SupplyOrderPool>   cycleStockOrders =  this.dpOrderPoolSnapshotService.fetchCycleStockOrder(finalVersion);
-        predictionContext.setSupplyOrderPools(cycleStockOrders);
+        List<DpPredictOffsetDetail>  predictOffsetDetails = this.buildPredictOffsetDetails(createCondition,allocationResult.getNetDemands());
+        predictionContext.setPredictOffsetDetails(predictOffsetDetails);
+        if(!CollectionUtils.isEmpty(predictOffsetDetails)){
+            this.baseDao.insertBatch(predictOffsetDetails);
+        }
+        List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
+        predictionContext.setSupplyOrderPools(fetchSupplyOrders);
         predictionContext.setPostponeOrders(null);
-        Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());
         // 6. 处理需求计划生成
-        List<DpDemandPlan> demandPlans = generateDemandPlans(
-            createCondition, allocationResult.getNetDemands(), predictionContext);
+        List<DpDemandPlan> demandPlans = generateDemandPlans(createCondition, allocationResult.getNetDemands(), predictionContext);
+        Map<String, List<MdmProductStock>> alternateMaterialMap = this.processAlternateMaterial(predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());
         List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
@@ -514,8 +557,29 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
         // 9. 保存分厂排产版本
         saveFactoryProductionVersion(createCondition, tMonth,predictionVersion);
-        predictionContext.setAllocationResult(allocationResult);
         return mergedDemandPlans;
+    }
+
+    private List<DpPredictOffsetDetail> buildPredictOffsetDetails(DpDemandPlan createCondition, List<DpOrderOffsetDetail> netDemands) {
+        List<DpPredictOffsetDetail> list = Lists.newArrayList();
+        if(CollectionUtils.isEmpty(netDemands)){
+            return list;
+        }
+        netDemands.forEach(demandPlan -> list.add(this.buildPredictOffsetDetail(createCondition,demandPlan)));
+        return list;
+    }
+
+    private DpPredictOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,DpOrderOffsetDetail demandPlan) {
+        DpPredictOffsetDetail predictOffsetDetail = new DpPredictOffsetDetail();
+        BeanUtils.copyProperties(demandPlan,predictOffsetDetail);
+        predictOffsetDetail.setBaseVale(null);
+        predictOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
+        predictOffsetDetail.setYear(createCondition.getYear());
+        predictOffsetDetail.setMonth(createCondition.getMonth());
+        predictOffsetDetail.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        predictOffsetDetail.setIsDelete(YesOrNoEnum.NO.getValue());
+        predictOffsetDetail.setNetQty(demandPlan.getProduceQtyDue());
+        return predictOffsetDetail;
     }
 
     private Map<String, Integer> calculateConventionReserveQty(List<DpDemandPlan> dataList) {

@@ -5,9 +5,11 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -22,7 +24,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class SaleRequirePlanHelper {
-
+    private final static String ZERO_YEAR_WEEK = "0000";
     /**
      * 销售订单按SKU分组
      *
@@ -140,6 +142,26 @@ public class SaleRequirePlanHelper {
      */
     private static Comparator<DpOrderOffsetDetail> getHighPerformanceComparator() {
         return new SalesOrderComparator();
+    }
+
+  public static List<DpDemandPlan> processNetDemands(DpDemandPlan createCondition, List<DpPredictOffsetDetail> predictOffsetDetails) {
+      return predictOffsetDetails.stream()
+          .map(item -> buildDemandPlanFromAllocation(createCondition,item))
+          .collect(Collectors.toList());
+  }
+
+    private static DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition, DpPredictOffsetDetail netDemand) {
+        DpDemandPlan demandPlan = new DpDemandPlan();
+        BeanUtils.copyProperties(netDemand, demandPlan);
+        demandPlan.setFactoryCode(createCondition.getFactoryCode());
+        demandPlan.setYear(createCondition.getYear());
+        demandPlan.setMonth(createCondition.getMonth());
+        demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        demandPlan.setPlanType(createCondition.getPlanType());
+        demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(netDemand.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setYearWeek(StringUtils.isBlank(netDemand.getWeekYear())?ZERO_YEAR_WEEK:netDemand.getWeekYear());
+        return demandPlan;
     }
 
     /**
@@ -263,7 +285,7 @@ public class SaleRequirePlanHelper {
         demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(netDemand.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setNetQty(netDemand.getProduceQtyDue());
-        demandPlan.setYearWeek(netDemand.getWeekYear());
+        demandPlan.setYearWeek(StringUtils.isBlank(netDemand.getWeekYear())?ZERO_YEAR_WEEK:netDemand.getWeekYear());
         return demandPlan;
     }
 
