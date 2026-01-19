@@ -306,6 +306,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResultList.add(mpAdjustResult);
         }
         baseDao.insertBatch(mpAdjustResultList);
+        contextDTO.setAdjustResultList(mpAdjustResultList);
     }
 
     /**

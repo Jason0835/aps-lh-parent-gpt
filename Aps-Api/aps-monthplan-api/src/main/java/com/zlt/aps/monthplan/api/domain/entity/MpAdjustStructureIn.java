@@ -206,6 +206,46 @@ public class MpAdjustStructureIn extends BaseEntity {
     private Integer typeBlockQty;
 
     /**
+     * 高优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.heightQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "高优先级", name = "heightQty")
+    @TableField(value = "HEIGHT_QTY")
+    private Integer heightQty;
+
+    /**
+     * 中优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.midQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "中优先级", name = "midQty")
+    @TableField(value = "MID_QTY")
+    private Integer midQty;
+
+    /**
+     * 暂缓订单
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.postponeQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
+    @TableField(value = "POSTPONE_QTY")
+    private Integer postponeQty;
+
+    /**
+     * 周期排产储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
+    @TableField(value = "CYCLE_RESERVE_QTY")
+    private Integer cycleReserveQty;
+
+    /**
+     * 常规储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
+    @TableField(value = "CONVENTION_RESERVE_QTY")
+    private Integer conventionReserveQty;
+
+    /**
      * 日硫化量
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dayVulcanizationQty")
