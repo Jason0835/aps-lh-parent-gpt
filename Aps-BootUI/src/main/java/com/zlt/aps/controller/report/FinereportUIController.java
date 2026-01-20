@@ -46,7 +46,7 @@ public class FinereportUIController extends BaseController {
      * @return 结果
      */
     @ApiOperation("越南工厂成型机数据报表")
-    @RequiresPermissions("report:singleTireTotalWeight")
+    @RequiresPermissions("report:factoryMoldingMachine")
     @PostMapping("/factoryMoldingMachine")
     @ResponseBody
     public AjaxResult factoryMoldingMachine() {
@@ -59,7 +59,7 @@ public class FinereportUIController extends BaseController {
      * @return 结果
      */
     @ApiOperation("越南工厂硫化机数据报表")
-    @RequiresPermissions("report:singleTireTotalWeight")
+    @RequiresPermissions("report:factoryVulcanizingMachine")
     @PostMapping("/factoryVulcanizingMachine")
     @ResponseBody
     public AjaxResult factoryVulcanizingMachine() {
@@ -72,7 +72,7 @@ public class FinereportUIController extends BaseController {
      * @return 结果
      */
     @ApiOperation("越南工厂结构在机数据报表")
-    @RequiresPermissions("report:singleTireTotalWeight")
+    @RequiresPermissions("report:productionStructure")
     @PostMapping("/productionStructure")
     @ResponseBody
     public AjaxResult productionStructure() {
