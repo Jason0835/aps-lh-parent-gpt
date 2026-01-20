@@ -11,7 +11,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：DpPredictOffsetDetail.java
- * 描    述：预测冲减分配对象 t_dp_predict_offset_detail
+ * 描    述：预测冲减分配对象 T_DP_PREDICT_OFFSET_DETAIL
  *@author yelq
  *@date 2026-01-20
  *@version 1.0
@@ -24,7 +24,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 @ApiModel(value = "预测冲减分配对象", description = "预测冲减分配对象 ")
 @Data
-@TableName(value = "t_dp_simulated_offset_detail")
+@TableName(value = "T_DP_PREDICT_OFFSET_DETAIL")
 public class DpPredictOffsetDetail extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
