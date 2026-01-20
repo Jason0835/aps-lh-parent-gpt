@@ -257,7 +257,7 @@ export function selectSystemRunReport(query) {
   })
 }
 
-
+//库存库龄分析
 export function inventoryAgeAnalysisReport(query) {
   return request({
     url: '/report/inventoryAgeAnalysis',
@@ -267,4 +267,37 @@ export function inventoryAgeAnalysisReport(query) {
 }
 export function exportSelectSystemRunReport(query) {
   downloadLink('/monthPlan/report/exportSystemRunReport', query)
+}
+
+//单胎总重报表
+export function totalWeightReport(query) {
+  return request({
+    url: '/report/singleTireTotalWeight',
+    method: 'post',
+    data: query
+  })
+}
+//成型机数据报表
+export function moldingMachineReport(query) {
+  return request({
+    url: '/report/factoryMoldingMachine',
+    method: 'post',
+    data: query
+  })
+}
+//硫化机数据报表
+export function vulcanizingMachineReport(query) {
+  return request({
+    url: '/report/factoryVulcanizingMachine',
+    method: 'post',
+    data: query
+  })
+}
+//结构在机数据报表
+export function productionStructureReport(query) {
+  return request({
+    url: '/report/productionStructure',
+    method: 'post',
+    data: query
+  })
 }
