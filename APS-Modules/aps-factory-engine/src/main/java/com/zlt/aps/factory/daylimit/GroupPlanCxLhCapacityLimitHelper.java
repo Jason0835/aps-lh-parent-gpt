@@ -1,7 +1,9 @@
-package com.zlt.aps.factory.domain.dto;
+package com.zlt.aps.factory.daylimit;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;

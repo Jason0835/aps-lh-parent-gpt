@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.domain.dto;
+package com.zlt.aps.factory.daylimit;
 
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;

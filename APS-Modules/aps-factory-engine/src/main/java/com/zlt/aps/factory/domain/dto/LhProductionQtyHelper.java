@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.domain.dto;
 
-import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import lombok.Data;
 
 import java.io.Serializable;

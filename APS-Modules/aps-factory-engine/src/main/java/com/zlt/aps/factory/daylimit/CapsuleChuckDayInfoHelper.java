@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.domain.dto;
+package com.zlt.aps.factory.daylimit;
 
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -9,17 +9,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 轮胎成型鼓日排产限制对象
- * 总数量
+ * 胶囊卡盘日排产限制对象
+ * 卡盘数量
  * 日使用量
  *
  * @author ZLT
  * @date 20260119
  */
 @Getter
-public class TireDrumDayInfoHelper implements Serializable {
+public class CapsuleChuckDayInfoHelper implements Serializable {
     /**
-     * 鼓分组Id
+     * 胶囊卡盘分组Id
      */
     private String groupId;
     /**
@@ -27,7 +27,7 @@ public class TireDrumDayInfoHelper implements Serializable {
      */
     private Integer productionDay;
     /**
-     * 总数
+     * 卡盘总数
      */
     private Integer maxLimitQty;
     /**
@@ -35,9 +35,9 @@ public class TireDrumDayInfoHelper implements Serializable {
      */
     private Integer usedQty;
     /**
-     * 已使用成型机台
+     * 已使用模具--模具对应胶囊使用
      */
-    private Set<String> usedCxMachineSet;
+    private Set<String> usedMouldSet;
 
     /**
      * 创建初始化对象
@@ -47,8 +47,8 @@ public class TireDrumDayInfoHelper implements Serializable {
      * @param maxLimitQty   最大数量
      * @return
      */
-    public static TireDrumDayInfoHelper buildInit(String groupId, Integer productionDay, Integer maxLimitQty) {
-        return new TireDrumDayInfoHelper(groupId, productionDay, maxLimitQty);
+    public static CapsuleChuckDayInfoHelper buildInit(String groupId, Integer productionDay, Integer maxLimitQty) {
+        return new CapsuleChuckDayInfoHelper(groupId, productionDay, maxLimitQty);
     }
 
     /**
@@ -68,18 +68,18 @@ public class TireDrumDayInfoHelper implements Serializable {
     }
 
     /**
-     * 鼓使用量 + 1
+     * 胶囊使用量 + 1
      *
-     * @param cxMachineCode 成型机台
+     * @param mouldCode 型腔模号
      */
-    public void addUsedCount(String cxMachineCode) {
-        if (StringUtils.isBlank(cxMachineCode)) {
+    public void addUsedCount(String mouldCode) {
+        if (StringUtils.isBlank(mouldCode)) {
             return;
         }
-        if (usedCxMachineSet.contains(cxMachineCode)) {
+        if (usedMouldSet.contains(mouldCode)) {
             return;
         }
-        usedCxMachineSet.add(cxMachineCode);
+        usedMouldSet.add(mouldCode);
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             existUsedQty = BigDecimal.ZERO.intValue();
@@ -89,26 +89,29 @@ public class TireDrumDayInfoHelper implements Serializable {
     }
 
     /**
-     * 鼓使用量 - 1
+     * 胶囊使用量 - 1
+     *
+     * @param mouldCode 型腔模号
      */
-    public void deductionUsedCount(String cxMachineCode) {
+    public void deductionUsedCount(String mouldCode) {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
         }
-        if (usedCxMachineSet.contains(cxMachineCode)) {
-            usedCxMachineSet.remove(cxMachineCode);
+        if (!usedMouldSet.contains(mouldCode)) {
+            return;
         }
+        usedMouldSet.remove(mouldCode);
         existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
         usedQty = existUsedQty;
     }
 
     /**
-     * 清空鼓使用量
+     * 清空胶囊卡盘使用量
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();
-        usedCxMachineSet = new HashSet<>();
+        usedMouldSet = new HashSet<>();
     }
 
     /**
@@ -118,12 +121,12 @@ public class TireDrumDayInfoHelper implements Serializable {
      * @param productionDay 排产日
      * @param maxLimitQty   最大量
      */
-    TireDrumDayInfoHelper(String groupId, Integer productionDay, Integer maxLimitQty) {
+    CapsuleChuckDayInfoHelper(String groupId, Integer productionDay, Integer maxLimitQty) {
         this.groupId = groupId;
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();
-        this.usedCxMachineSet = new HashSet<>();
+        this.usedMouldSet = new HashSet<>();
     }
 
 }

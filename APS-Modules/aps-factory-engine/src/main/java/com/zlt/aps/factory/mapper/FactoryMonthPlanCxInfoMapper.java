@@ -2,7 +2,7 @@ package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.factory.domain.vo.CxDevicePlanShutInfoVo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.CxWorkWearInfoVo;
+import com.zlt.aps.factory.daylimit.CxWorkWearInfoVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
