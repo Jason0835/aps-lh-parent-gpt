@@ -1181,6 +1181,10 @@ public class MpWeekRollAdjustEngine {
             matchDayField = FactoryConstant.MATCH_DAY_FIELD+i;
             if (mpFinalVo.getFieldValueByFieldName(matchDayField) != null){
                 //若搭配天的值不为空，直接退
+                if ((Integer) mpFinalVo.getFieldValueByFieldName(dayField) >
+                        (Integer) mpFinalVo.getFieldValueByFieldName(matchDayField)){
+                    iRealQty +=  (Integer) mpFinalVo.getFieldValueByFieldName(dayField) - (Integer) mpFinalVo.getFieldValueByFieldName(matchDayField);
+                }
                 break;
             }
             iRealQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
