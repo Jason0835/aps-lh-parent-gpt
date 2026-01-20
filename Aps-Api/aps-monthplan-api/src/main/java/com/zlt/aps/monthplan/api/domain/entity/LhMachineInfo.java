@@ -5,15 +5,12 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.monthplan.api.annotation.HtmlEscapeSerializer;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import org.apache.ibatis.type.JdbcType;
 
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.math.BigDecimal;
 
@@ -30,8 +27,7 @@ import java.math.BigDecimal;
  *     修 改 人：zlt
  *     修改内容：...
  */
-
-@ApiModel(value = "硫化机台信息对象", description = "硫化机台信息对象 ")
+@ApiModel(value = "硫化机台信息对象", description = "硫化机台信息对象")
 @Data
 @TableName(value = "T_LH_MACHINE_INFO")
 public class LhMachineInfo extends BaseEntity implements Serializable {
@@ -135,4 +131,33 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "备注", name = "remark")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 厂家
+     */
+    @ApiModelProperty(value = "厂家", name = "manufacturer")
+    @TableField("MANUFACTURER")
+    private String manufacturer;
+
+    /**
+     * 尺寸
+     */
+    @ApiModelProperty(value = "尺寸", name = "dimensionSize")
+    @TableField("DIMENSION_SIZE")
+    private String dimensionSize;
+
+    /**
+     * 热板直径
+     */
+    @ApiModelProperty(value = "热板直径", name = "hotPlateDiameter")
+    @TableField("HOT_PLATE_DIAMETER")
+    private String hotPlateDiameter;
+
+    /**
+     * 模套型号
+     */
+    @ApiModelProperty(value = "模套型号", name = "mouldSetCode")
+    @TableField("MOULD_SET_CODE")
+    private String mouldSetCode;
+
 }
