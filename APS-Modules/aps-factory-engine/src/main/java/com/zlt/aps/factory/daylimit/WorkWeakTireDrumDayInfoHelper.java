@@ -1,6 +1,5 @@
-package com.zlt.aps.factory.domain.vo;
+package com.zlt.aps.factory.daylimit;
 
-import com.zlt.aps.factory.domain.dto.TireDrumDayInfoHelper;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 

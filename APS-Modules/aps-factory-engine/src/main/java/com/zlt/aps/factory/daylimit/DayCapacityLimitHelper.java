@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.domain.dto;
+package com.zlt.aps.factory.daylimit;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;

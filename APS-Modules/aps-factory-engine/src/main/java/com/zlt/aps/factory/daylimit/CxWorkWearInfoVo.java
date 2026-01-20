@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.domain.vo;
+package com.zlt.aps.factory.daylimit;
 
 import lombok.Data;
 

@@ -24,7 +24,7 @@
            AND mmm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
     </select>
 
-    <select id="getWorkWearInfo" resultType="com.zlt.aps.factory.domain.vo.CxWorkWearInfoVo">
+    <select id="getWorkWearInfo" resultType="com.zlt.aps.factory.daylimit.CxWorkWearInfoVo">
         SELECT wwi.FACTORY_CODE,
                wwi.WORK_WEAR_NAME,
                wwi.SPECIFICATION_MODEL,

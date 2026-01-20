@@ -58,6 +58,7 @@ import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
+import com.zlt.aps.monthplan.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
@@ -144,6 +145,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IMpAdjustStructureInService mpAdjustStructureInService;
+
+    @Autowired
+    protected MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
 
     @Autowired
     protected BaseDao baseDao;
@@ -1245,7 +1249,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param isTrial
      * @return
      */
-    private MpAdjustDetailVo createBaseMpAdjustDetailVo(MpRollAdjustContextDTO contextDTO, String materialCode,
+    protected MpAdjustDetailVo createBaseMpAdjustDetailVo(MpRollAdjustContextDTO contextDTO, String materialCode,
                                                         Integer ordQty, String isTrial) {
         MpAdjustDetailVo adjustDetailVo = new MpAdjustDetailVo();
         // 基础通用字段赋值
@@ -1269,7 +1273,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param adjustDetailVo
      * @param monthPlan
      */
-    private void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+    protected void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
         if (monthPlan == null) {
             String materialCode = adjustDetailVo.getMaterialCode();
             // SKU日硫化产能
@@ -1344,7 +1348,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param adjustDetailVo
      * @param monthPlan
      */
-    private void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+    protected void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
         if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
             // 当为试制量试时，设置为订单量
             adjustDetailVo.setPreviousNetQty(adjustDetailVo.getOrdQty());
@@ -1412,6 +1416,61 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setMonth(contextDTO.getMpMonth());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
+    }
+
+    /**
+     * 计算型腔、活块可用量最大值
+     * @param contextDTO
+     */
+    protected Map<String, Object> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
+        return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
+                contextDTO.getFactoryCode(), new Date(), null);
+    }
+
+    /**
+     * 设置型腔、活块数量
+     * @param contextDTO
+     */
+    protected void setMoldCavityInsert(MpRollAdjustContextDTO contextDTO) {
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+        Map<String, Object> moldCavityInsertMap;
+        try {
+            // 计算型腔、活块可用量最大值
+            moldCavityInsertMap = calculateMoldCavityInsertMaxValue(contextDTO);
+        } catch (Exception e) {
+            log.error("计算型腔、活块可用量最大值失败! 原因:{}", e.getMessage(), e);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.calculateMoldCavityInsertMaxValueFail"));
+        } finally {
+            watch.stop();
+        }
+        log.info("计算型腔、活块可用量最大值完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
+
+        if (PubUtil.isEmpty(moldCavityInsertMap)) {
+            log.warn("计算型腔、活块可用量最大值 ==> 根据工厂:[{}] 年月:[{}] 型腔、活块可用量最大值列表为空，返回", contextDTO.getFactoryCode(),
+                    contextDTO.getYearMonth());
+            return;
+        }
+        // 调整明细列表
+        List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
+        // 型腔可用量（按结构+主花纹分组）
+        Map<String, Integer> cavityResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "cavityResults", new HashMap<>());
+        // 活块可用量（按物料描述分组）
+        Map<String, Integer> insertResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "insertResults", new HashMap<>());
+        // 遍历
+        for (MpAdjustDetailVo adjust : adjustList) {
+            // 设置型腔数量
+            String mouldCavityKey = adjust.getStructureName() + adjust.getMainPattern();
+            if (Convert.toInt(adjust.getMouldCavityQty(),0) == 0) {
+                adjust.setMouldCavityQty(MapUtils.getInteger(cavityResults, mouldCavityKey, 0));
+            }
+            // 设置活块数量
+            String typeBlockKey = adjust.getMaterialDesc();
+            if (Convert.toInt(adjust.getTypeBlockQty(),0) == 0) {
+                adjust.setTypeBlockQty(MapUtils.getInteger(insertResults, typeBlockKey, 0));
+            }
+        }
     }
 
 
