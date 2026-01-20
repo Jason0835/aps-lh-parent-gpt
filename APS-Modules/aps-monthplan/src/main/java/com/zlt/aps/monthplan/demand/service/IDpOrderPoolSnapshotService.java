@@ -43,5 +43,5 @@ public interface IDpOrderPoolSnapshotService  extends IDocService<DpOrderPoolSna
    * @param finalVersion
    * @return
    */
-  List<SupplyOrderPool> fetchCycleStockOrder(MpFactoryProductionVersion finalVersion);
+  List<SupplyOrderPool> fetchSupplyOrder(MpFactoryProductionVersion finalVersion);
 }

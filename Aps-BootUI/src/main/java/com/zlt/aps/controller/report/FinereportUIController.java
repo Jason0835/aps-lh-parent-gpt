@@ -78,4 +78,15 @@ public class FinereportUIController extends BaseController {
     public AjaxResult productionStructure() {
         return iFinereportService.productionStructure();
     }
+
+    /**
+     * 越南工厂年度产量
+     */
+    @ApiOperation("越南工厂年度产量")
+    @RequiresPermissions("report:productionYear")
+    @PostMapping("/productionYear")
+    @ResponseBody
+    public AjaxResult productionYear() {
+        return iFinereportService.productionYear();
+    }
 }

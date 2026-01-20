@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.common.utils;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
@@ -31,7 +32,7 @@ public class PredictionContext {
   private  Integer  minProductionQty;
   private  Map<String, MdmMaterialInfo> materialInfoMap;
   private  List<MdmCycleSchStruConf> cycleSchStruConfs;
-  private  OrderAllocationResult allocationResult;
+  private  List<DpPredictOffsetDetail> predictOffsetDetails;
 
   public PredictionContext(
       List<SalesOrderPool> salesOrders,
