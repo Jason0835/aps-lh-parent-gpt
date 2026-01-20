@@ -898,9 +898,21 @@ public class ProductionPlanGroupInfo {
             return false;
         }
         String specification = new ArrayList<>(specificationSet).get(BigDecimal.ZERO.intValue());
-        Integer sectionWidth = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(specification).get(BigDecimal.ZERO.intValue());
+        List<Integer> sectionWidthAndAspectRatioList = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(specification);
+        Integer sectionWidth;
+        if (CollectionUtils.isEmpty(sectionWidthAndAspectRatioList)) {
+            sectionWidth = BigDecimal.ZERO.intValue();
+        } else {
+            sectionWidth = sectionWidthAndAspectRatioList.get(BigDecimal.ZERO.intValue());
+        }
         String currentSpecification = new ArrayList<>(currentSpecificationSet).get(BigDecimal.ZERO.intValue());
-        Integer currentSectionWidth = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(currentSpecification).get(BigDecimal.ZERO.intValue());
+        List<Integer> currentSectionWidthAndAspectRatioList = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(currentSpecification);
+        Integer currentSectionWidth;
+        if (CollectionUtils.isEmpty(currentSectionWidthAndAspectRatioList)) {
+            currentSectionWidth = BigDecimal.ZERO.intValue();
+        } else {
+            currentSectionWidth = currentSectionWidthAndAspectRatioList.get(BigDecimal.ZERO.intValue());
+        }
         int diff = Math.abs(sectionWidth - currentSectionWidth);
         return diff <= diffValue;
     }

@@ -240,6 +240,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return;
         }
         setStructureName(productBaseInfo.getStructureName());
+        setSpecifications(productBaseInfo.getSpecifications());
+        setProSize(productBaseInfo.getProSize());
         setCantProduce(productBaseInfo.getCantProduce());
         setProductCategory(productBaseInfo.getProductCategory());
     }
