@@ -603,12 +603,12 @@ export default {
             width: 120,
           },
           {
-            prop: "startDate",
+            prop: "beginDay",
             label: this.$t("开始日期"),
             width: 120,
           },
           {
-            prop: "endDate",
+            prop: "endDay",
             label: this.$t("结束日期"),
             width: 120,
           },
