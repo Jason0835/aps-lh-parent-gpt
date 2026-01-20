@@ -52,6 +52,15 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     private String mouldCode;
 
     /**
+     * 主花纹
+     */
+    @ImportExcelValidated(maxLength = 20)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
+
+    /**
      * 物料编码
      */
     @ImportExcelValidated(required = true, maxLength = 32)
