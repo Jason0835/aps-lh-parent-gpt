@@ -303,6 +303,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResult.setId(null);
             mpAdjustResult.setAdjustType(contextDTO.getAdjustType());
             mpAdjustResult.setVersion(contextDTO.getVersion());
+            mpAdjustResult.setTotalPlanQty(finalAdjustVo.getTotalQty());
+            if (StringUtil.isEmptyWithTrim(mpAdjustResult.getIsLockSchedule())){
+                mpAdjustResult.setIsLockSchedule(YesOrNoEnum.NO.getCode());
+            }
             mpAdjustResultList.add(mpAdjustResult);
         }
         baseDao.insertBatch(mpAdjustResultList);
@@ -479,26 +483,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 monthPlanVo.setFieldValueByFieldName(dayFieldName, adjustResult.getFieldValueByFieldName(dayFieldName));
             }
             // 重算开始日期和结束日期
-            if (adjustResult.getStartDate() != null) {
+            if (adjustResult.getBeginDay() != null) {
                 try {
-                    String startDateStr = DateUtil.format(adjustResult.getStartDate(), BusiConstant.WeekRollAdjust.DATE_FORMAT_YYYYMMDD);
-                    monthPlanVo.setBeginDay(Integer.valueOf(startDateStr));
+                    monthPlanVo.setBeginDay(adjustResult.getBeginDay());
                 } catch (Exception e) {
                     log.error("更新月度生产计划：物料:{}的开始日期转换失败，跳过", materialCode, e);
                 }
             }
-            if (adjustResult.getEndDate() != null) {
+            if (adjustResult.getEndDay() != null) {
                 try {
-                    String endDateStr = DateUtil.format(adjustResult.getEndDate(), BusiConstant.WeekRollAdjust.DATE_FORMAT_YYYYMMDD);
-                    monthPlanVo.setEndDay(Integer.valueOf(endDateStr));
+                    monthPlanVo.setEndDay(adjustResult.getEndDay());
                 } catch (Exception e) {
                     log.error("更新月度生产计划：物料:{}的结束日期转换失败，跳过", materialCode, e);
                 }
             }
             // 获取业务数据对应的周数
             int week = 0;
-            if (adjustResult.getStartDate() != null) {
-                week = DateUtil.weekOfMonth(adjustResult.getStartDate());
+            if (adjustResult.getBeginDay() != null) {
+                //week = DateUtil.weekOfMonth(adjustResult.getStartDate());
             } else {
                 week = DateUtil.weekOfMonth(new Date());
             }
