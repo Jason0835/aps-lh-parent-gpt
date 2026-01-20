@@ -203,15 +203,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
             createCondition, allocationResult.getNetDemands(), data);
-
+        List<DpDemandPlan> mergedDemandPlans = Collections.emptyList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
-            saveDemandPlans(createCondition, demandPlans, data);
+            mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
-        // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
+        if(!CollectionUtils.isEmpty(mergedDemandPlans)){
+            // 9. 保存分厂排产版本
+            saveFactoryProductionVersion(mergedDemandPlans);
+        }
     }
 
     private void processAlternateMaterial(List<DpOrderOffsetDetail> netDemands,Map<String, List<MdmProductStock>> productStockMap) {
@@ -264,13 +266,13 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return isAlternateMaterial;
     }
 
-    private void saveFactoryProductionVersion(DpDemandPlan createCondition,YearMonth yearMonth, String monthPlanVersion) {
+    private void saveFactoryProductionVersion(List<DpDemandPlan> mergedDemandPlans) {
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        version.setYear(yearMonth.getYear());
-        version.setMonth(yearMonth.getMonthValue());
-        version.setMonthPlanVersion(monthPlanVersion);
-        version.setPlanType(createCondition.getPlanType());
+        version.setYear(mergedDemandPlans.get(0).getYear());
+        version.setMonth(mergedDemandPlans.get(0).getMonth());
+        version.setMonthPlanVersion(mergedDemandPlans.get(0).getMonthPlanVersion());
+        version.setPlanType(mergedDemandPlans.get(0).getPlanType());
         version.setIsFinal(YesOrNoEnum.NO.getCode());
         version.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
         factoryProductionVersionMapper.insert(version);
@@ -326,15 +328,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(
             createCondition, allocationResult.getNetDemands(), data);
-        List<DpDemandPlan> adjustRequirePlans = Lists.newArrayList();
+        List<DpDemandPlan> adjustRequirePlans = Collections.emptyList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
             adjustRequirePlans =  saveDemandPlans(createCondition,demandPlans, data);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
-        // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(createCondition, tMonth,monthPlanVersion);
+        if(!CollectionUtils.isEmpty(adjustRequirePlans)){
+            // 9. 保存分厂排产版本
+            saveFactoryProductionVersion(adjustRequirePlans);
+        }
         return adjustRequirePlans;
     }
 
@@ -393,15 +397,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         predictionContext.setPostponeOrders(null);
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(createCondition,predictionContext);
-        List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
+        List<DpDemandPlan> mergedDemandPlans = Collections.emptyList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
             mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext);
         }
         // 8. 保存订单池快照
         saveOrderPoolSnapshot(createCondition,null, supplyOrderPools);
-        // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(createCondition, tPlus1Month,predictionVersion);
+        if(!CollectionUtils.isEmpty(mergedDemandPlans)){
+            // 9. 保存分厂排产版本
+            saveFactoryProductionVersion(mergedDemandPlans);
+        }
         return mergedDemandPlans;
     }
 
@@ -575,13 +581,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         predictionContext.setPostponeOrders(null);
         // 6. 处理需求计划生成
         List<DpDemandPlan> demandPlans = generateDemandPlans(createCondition, allocationResult.getNetDemands(), predictionContext);
-        List<DpDemandPlan> mergedDemandPlans = Lists.newArrayList();
+        List<DpDemandPlan> mergedDemandPlans = Collections.emptyList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
             mergedDemandPlans = saveDemandPlans(createCondition, demandPlans, predictionContext);
         }
-        // 9. 保存分厂排产版本
-        saveFactoryProductionVersion(createCondition, tMonth,predictionVersion);
+        if(!CollectionUtils.isEmpty(mergedDemandPlans)){
+            // 9. 保存分厂排产版本
+            saveFactoryProductionVersion(mergedDemandPlans);
+        }
         return mergedDemandPlans;
     }
 
@@ -1033,7 +1041,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
 
         Map<String, List<DpDemandPlan>> groupMap = DemandPlanGrouper.groupDemandPlans(createCondition,demandPlans);
-        if(org.springframework.util.CollectionUtils.isEmpty(groupMap)) {
+        if(CollectionUtils.isEmpty(groupMap)) {
             return Collections.emptyList();
         }
         List<DpDemandPlan> list = Lists.newArrayList();
@@ -1163,7 +1171,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private int calculateRemainingQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
-        if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
+        if(CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
             return BigDecimal.ZERO.intValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
@@ -1199,7 +1207,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
 
     private int calculateStockQty(Map<String, List<MdmProductStock>> finishedProductStockMap, String groupKey) {
-        if(org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
+        if(CollectionUtils.isEmpty(finishedProductStockMap) || !finishedProductStockMap.containsKey(groupKey)){
             return BigDecimal.ZERO.intValue();
         }
         List<MdmProductStock> finishedProductStocks = finishedProductStockMap.get(groupKey);
@@ -1207,7 +1215,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private int calculatePlannedSurplus(Map<String, Integer> mdmMonthSurplusMap, String factoryMaterialKey) {
-        if(org.springframework.util.CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(factoryMaterialKey)){
+        if(CollectionUtils.isEmpty(mdmMonthSurplusMap) || !mdmMonthSurplusMap.containsKey(factoryMaterialKey)){
             return BigDecimal.ZERO.intValue();
         }
         return mdmMonthSurplusMap.get(factoryMaterialKey);
