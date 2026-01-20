@@ -8,6 +8,7 @@ import com.tlt.aps.enums.LocationTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.constant.DataSource;
+import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
@@ -598,6 +599,10 @@ public class MesItfServiceImpl implements MesItfService {
                     existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
                 }
                 for (MdmMaterialInfo entity : saveList) {
+                    // 物料类型转换
+                    String mesMaterialCategory = entity.getMesMaterialCategory();
+                    MouldCategoryConvertEnum convertEnum = MouldCategoryConvertEnum.getByMesCode(mesMaterialCategory);
+                    entity.setMaterialCategory(convertEnum.getCode());
                     entity.setBaseVale(null);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
