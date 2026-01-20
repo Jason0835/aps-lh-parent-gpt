@@ -1,6 +1,5 @@
 package com.zlt.aps.monthplan.factory.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
@@ -94,10 +93,10 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      *
      * @param query 查询条件
      */
-    List<String> versionList(FactoryMonthPlanProductionFinalResult query);
+    List<String> versionList(MpFactoryProductionVersion query);
 
     /**
      * 查询对应年月+分厂+需求计划版本的分厂月计划版本
      */
-    List<String> productionVersionList(FactoryMonthPlanProductionFinalResult query);
+    List<String> productionVersionList(MpFactoryProductionVersion query);
 }
