@@ -122,19 +122,21 @@ public class MpAdjustResult extends BaseEntity {
     @TableField(value = "TOTAL_PLAN_QTY")
     private Integer totalPlanQty;
 
-    /** 开始日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpAdjustResult.startDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "开始日期", name = "startDate")
-    @TableField(value = "START_DATE")
-    private Date startDate;
+    /**
+     * 开始日期
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.beginDay")
+    @ApiModelProperty(value = "开始日期", name = "beginDay")
+    @TableField(value = "BEGIN_DAY")
+    private Integer beginDay;
 
-    /** 结束日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mpAdjustResult.endDate", width = 30, dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "结束日期", name = "endDate")
-    @TableField(value = "END_DATE")
-    private Date endDate;
+    /**
+     * 结束日期
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.endDay")
+    @ApiModelProperty(value = "结束日期", name = "endDay")
+    @TableField(value = "END_DAY")
+    private Integer endDay;
 
     /** 1号计划量 */
     @Excel(name = "ui.data.column.mpAdjustResult.day1")
