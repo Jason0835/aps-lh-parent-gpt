@@ -24,7 +24,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 @ApiModel(value = "预测冲减分配对象", description = "预测冲减分配对象 ")
 @Data
-@TableName(value = "T_DP_PREDICT_OFFSET_DETAIL")
+@TableName(value = "t_dp_simulated_offset_detail")
 public class DpPredictOffsetDetail extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
