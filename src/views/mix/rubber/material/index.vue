@@ -98,6 +98,8 @@ export default {
     "biz_yes_no",
     "biz_product_type",
     "product_category",
+    "mes_material_category",
+    "mes_material_subcategory"
   ],
   provide() {
     return {
@@ -216,7 +218,24 @@ export default {
           label: this.$t("ui.data.column.monthplan.productType"),
         },
         {
+          prop: "mesMaterialCategory",
+          width: 120,
+          label: this.$t("MES物料大类"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.mes_material_category, value);
+          },
+        },
+        {
+          prop: "mesMaterialSubcategory",
+          width: 120,
+          label: this.$t("MES物料细类"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.mes_material_subcategory, value);
+          },
+        },
+        {
           prop: "productCategory",
+          width: 120,
           label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.product_category, value);
