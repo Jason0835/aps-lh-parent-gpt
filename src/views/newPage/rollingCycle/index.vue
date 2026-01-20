@@ -1113,7 +1113,6 @@ export default {
     },
     //获取版本列表
     async getVersionList(isGet = false) {
-      console.log('年月切换',this.activeName)
       let res;
       try {
         if (this.activeName == "first") {
@@ -1454,6 +1453,16 @@ export default {
 
     //结构外自动调整
     async handOutResult() {
+      console.log(this.data)
+      for (let i = 0; i < this.data.length; i++) {
+       if(this.data[i].confirmAdjustQty && !this.isNoPositiveInteger(this.data[i].confirmAdjustQty)){
+        return this.$modal.msgWarning(this.data[i].materialCode+'的调整量错误');
+       }
+       if(this.data[i].adjustPriority && !this.isPositiveInteger(this.data[i].adjustPriority)){
+        return this.$modal.msgWarning(this.data[i].materialCode+'的优先级错误');
+       }
+
+      }
       if (
         this.formInline.adjustEndDay == null ||
         this.formInline.adjustEndDay == ""

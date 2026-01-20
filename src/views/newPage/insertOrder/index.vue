@@ -302,6 +302,13 @@ export default {
           dictData: this.dict.type.biz_factory_name,
         },
         {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+        },
+        {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
@@ -428,10 +435,11 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        params.yearMonth=''
       }
 
       return params;

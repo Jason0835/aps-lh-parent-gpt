@@ -1,6 +1,6 @@
 
 <template>
-  <basic-container>
+  <basic-container  v-loading="loading">
 
     <iframe
     style="width: 100%; height: 90%;"
@@ -20,7 +20,8 @@ export default {
   dicts: [],
   data() {
     return {
-      url:''
+      url:'',
+      loading:false
     };
   },
   computed: {
@@ -28,8 +29,16 @@ export default {
   },
   methods: {
    async getUrl() {
-     let res=await totalWeightReport({})
-     this.url=res
+    this.loading=true
+    try{
+      let res=await totalWeightReport({})
+      this.url=res
+    }catch(err){
+
+    }finally{
+      this.loading=false
+    }
+
     },
   },
   created() {
