@@ -5,6 +5,7 @@ import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.utils.ApsCommonUtil;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -41,7 +42,8 @@ public class StockAllocationHelper {
       YearMonth yearMonth,
       Map<String, List<SalesOrderPool>> saleOrderGroupMap,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
-      Map<String,Integer> mdmMonthSurplusMap) {
+      Map<String,Integer> mdmMonthSurplusMap,
+      Map<String, MdmMaterialInfo> materialInfoMap) {
     List<DpOrderOffsetDetail> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(saleOrderGroupMap)) {
       return result;
@@ -55,6 +57,7 @@ public class StockAllocationHelper {
           yearMonth,
           finishedProductStockMap,
           mdmMonthSurplusMap,
+          materialInfoMap,
           groupKey,
           saleOrders
       );
@@ -72,38 +75,39 @@ public class StockAllocationHelper {
       YearMonth yearMonth,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
       Map<String,Integer> mdmMonthSurplusMap,
+      Map<String, MdmMaterialInfo> materialInfoMap,
       String groupKey,
       List<SalesOrderPool> saleOrders) {
     List<MdmProductStock> stockInfos = finishedProductStockMap.get(groupKey);
     // 无库存情况处理
     if (CollectionUtils.isEmpty(stockInfos)) {
       log.warn("No stock found for group: {}", groupKey);
-      return createZeroAllocations(monthPlanVersion,yearMonth,mdmMonthSurplusMap,groupKey, saleOrders);
+      return createZeroAllocations(monthPlanVersion,yearMonth,mdmMonthSurplusMap,materialInfoMap,groupKey, saleOrders);
     }
     // 获取排序配置并排序订单
     List<SalesOrderPool> sortedOrders = getSortedOrders(saleOrders);
     // 执行库存分配
-    StockAllocationResult result = allocateStockForOrders(monthPlanVersion,yearMonth,groupKey,mdmMonthSurplusMap,sortedOrders, stockInfos);
+    StockAllocationResult result = allocateStockForOrders(monthPlanVersion,yearMonth,groupKey,mdmMonthSurplusMap,materialInfoMap,sortedOrders, stockInfos);
     return result.getAllocations();
   }
 
   /**
    * 为无库存订单创建零分配记录
    */
-  private static List<DpOrderOffsetDetail> createZeroAllocations(String monthPlanVersion,YearMonth yearMonth,Map<String,Integer> mdmMonthSurplusMap,String groupKey, List<SalesOrderPool> saleOrders) {
+  private static List<DpOrderOffsetDetail> createZeroAllocations(String monthPlanVersion,YearMonth yearMonth,Map<String,Integer> mdmMonthSurplusMap,Map<String, MdmMaterialInfo> materialInfoMap,String groupKey, List<SalesOrderPool> saleOrders) {
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
     if(plannedSurplus == 0L) {
       for (SalesOrderPool order : saleOrders) {
         int orderQty = null == order.getOrdQty()?BigDecimal.ZERO.intValue():order.getOrdQty().intValue();
-        allocations.add(buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(),orderQty));
+        allocations.add(buildAllocation(order, materialInfoMap,monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(),orderQty));
       }
       return allocations;
     }
     // 获取排序配置并排序订单
     List<SalesOrderPool> sortedOrders = getSortedOrders(saleOrders);
     // 5、库存冲减后，继续扣减月底计划余量部分
-    StockAllocationResult result = allocateMonthSurplusForOrders(monthPlanVersion,yearMonth,plannedSurplus,sortedOrders);
+    StockAllocationResult result = allocateMonthSurplusForOrders(monthPlanVersion,yearMonth,plannedSurplus,materialInfoMap,sortedOrders);
     return result.getAllocations();
   }
 
@@ -351,13 +355,14 @@ public class StockAllocationHelper {
   /**
    * 为订单列表执行库存分配
    */
-  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
+  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,Map<String, MdmMaterialInfo> materialInfoMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
     int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
     int matchStockQty = stockInfos.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
         matchStockQty,
-        stockInfos
+        stockInfos,
+        materialInfoMap
     );
 
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
@@ -368,11 +373,12 @@ public class StockAllocationHelper {
     return new StockAllocationResult(allocations);
   }
 
-  private static StockAllocationResult allocateMonthSurplusForOrders(String monthPlanVersion,YearMonth yearMonth, Integer plannedSurplus, List<SalesOrderPool> sortedOrders) {
+  private static StockAllocationResult allocateMonthSurplusForOrders(String monthPlanVersion,YearMonth yearMonth, Integer plannedSurplus,Map<String, MdmMaterialInfo> materialInfoMap,List<SalesOrderPool> sortedOrders) {
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
         0,
-        null
+        null,
+        materialInfoMap
     );
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     for (SalesOrderPool order : sortedOrders) {
@@ -407,7 +413,7 @@ public class StockAllocationHelper {
         context.setPlannedSurplus(BigDecimal.ZERO.intValue());
       }
     }
-    return buildAllocation(order, monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
+    return buildAllocation(order,context.getMaterialInfoMap(), monthPlanVersion,yearMonth,stockQty,plannedSurplus, allocationQty,produceQtyDue);
   }
 
   private static int calculateAllocationQty(int orderQty, List<MdmProductStock> matchProductStocks) {
@@ -456,7 +462,7 @@ public class StockAllocationHelper {
         context.setPlannedSurplus(BigDecimal.ZERO.intValue());
       }
     }
-    return buildAllocation(order, monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
+    return buildAllocation(order,context.getMaterialInfoMap(), monthPlanVersion,yearMonth,BigDecimal.ZERO.intValue(),plannedSurplus, BigDecimal.ZERO.intValue(),produceQtyDue);
   }
 
   /**
@@ -585,7 +591,7 @@ public class StockAllocationHelper {
   /**
    * 构建分配记录
    */
-  private static DpOrderOffsetDetail buildAllocation(SalesOrderPool order, String version,YearMonth yearMonth,int stockQty,int plannedSurplus,int allocationQty,int produceQtyDue) {
+  private static DpOrderOffsetDetail buildAllocation(SalesOrderPool order,Map<String, MdmMaterialInfo> materialInfoMap, String version,YearMonth yearMonth,int stockQty,int plannedSurplus,int allocationQty,int produceQtyDue) {
     DpOrderOffsetDetail allocation = new DpOrderOffsetDetail();
     BeanUtils.copyProperties(order, allocation);
     allocation.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -610,6 +616,11 @@ public class StockAllocationHelper {
     allocation.setStockQty(stockQty);
     allocation.setAllocationQty(allocationQty);
     allocation.setProduceQtyDue(produceQtyDue);
+    MdmMaterialInfo materialInfo = materialInfoMap.get(order.getOriMaterialCode());
+    if(null != materialInfo) {
+      allocation.setSpecifications(materialInfo.getSpecifications());
+      allocation.setPattern(materialInfo.getPattern());
+    }
     return allocation;
   }
 
@@ -622,11 +633,12 @@ public class StockAllocationHelper {
     private Integer plannedSurplus;
     private Integer  matchStockQty;
     private List<MdmProductStock> stockInfos;
-
-    public StockAllocationContext(Integer plannedSurplus,Integer  matchStockQty,List<MdmProductStock> stockInfos) {
+    private Map<String, MdmMaterialInfo> materialInfoMap;
+    public StockAllocationContext(Integer plannedSurplus,Integer  matchStockQty,List<MdmProductStock> stockInfos,Map<String, MdmMaterialInfo> materialInfoMap) {
       this.plannedSurplus = plannedSurplus;
       this.matchStockQty = matchStockQty;
       this.stockInfos = stockInfos;
+      this.materialInfoMap = materialInfoMap;
     }
   }
 
