@@ -1245,7 +1245,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param isTrial
      * @return
      */
-    private MpAdjustDetailVo createBaseMpAdjustDetailVo(MpRollAdjustContextDTO contextDTO, String materialCode,
+    protected MpAdjustDetailVo createBaseMpAdjustDetailVo(MpRollAdjustContextDTO contextDTO, String materialCode,
                                                         Integer ordQty, String isTrial) {
         MpAdjustDetailVo adjustDetailVo = new MpAdjustDetailVo();
         // 基础通用字段赋值
@@ -1269,7 +1269,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param adjustDetailVo
      * @param monthPlan
      */
-    private void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+    protected void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
         if (monthPlan == null) {
             String materialCode = adjustDetailVo.getMaterialCode();
             // SKU日硫化产能
@@ -1344,7 +1344,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param adjustDetailVo
      * @param monthPlan
      */
-    private void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+    protected void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
         if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
             // 当为试制量试时，设置为订单量
             adjustDetailVo.setPreviousNetQty(adjustDetailVo.getOrdQty());
