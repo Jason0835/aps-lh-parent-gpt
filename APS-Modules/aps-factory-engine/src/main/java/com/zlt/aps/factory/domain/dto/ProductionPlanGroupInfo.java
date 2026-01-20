@@ -185,6 +185,9 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return;
         }
+        theoryDays = BigDecimal.ZERO.intValue();
+        leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        needCxCapacityMachineCount = BigDecimal.ZERO;
         String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
     }
