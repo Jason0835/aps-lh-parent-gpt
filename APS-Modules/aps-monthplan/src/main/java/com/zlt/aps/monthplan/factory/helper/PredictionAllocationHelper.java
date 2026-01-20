@@ -2,10 +2,9 @@ package com.zlt.aps.monthplan.factory.helper;
 
 
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
-import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -32,20 +31,29 @@ public class PredictionAllocationHelper {
   /**
    * 根据库存对冲顺序配置，进行库存分配
    */
-  public static List<DpOrderOffsetDetail> calculateSaleOrder(
-      List<DpOrderOffsetDetail> netDemands,
-      List<FactoryMonthPlanMouldDayResult> productionFinalResults) {
-    List<DpOrderOffsetDetail> result = new ArrayList<>();
-    if(CollectionUtils.isEmpty(netDemands)) {
+  public static List<DpPredictOffsetDetail> calculateSaleOrder(
+      List<DpPredictOffsetDetail> tMonthDemands,
+      List<FactoryMonthPlanMouldDayResult> productionFinalResults,
+      List<MpMonthPlanMonitor>  mpMonthPlanMonitors) {
+    List<DpPredictOffsetDetail> result = new ArrayList<>();
+    if(CollectionUtils.isEmpty(tMonthDemands)) {
       return result;
     }
-    Map<String,List<DpOrderOffsetDetail>>  netDemandGroupMap = netDemands.stream().collect(Collectors.groupingBy(DpOrderOffsetDetail::getMaterialCode));
-    Map<String,List<FactoryMonthPlanMouldDayResult>> productionGroupMap = calculateProductionQty(productionFinalResults);
-    List<DpOrderOffsetDetail> allocations;
+    Map<String,List<DpPredictOffsetDetail>>  netDemandGroupMap = tMonthDemands.stream().collect(Collectors.groupingBy(DpPredictOffsetDetail::getMaterialCode));
+    Map<String,Integer> productionQtyMap = calculateProductionQty(productionFinalResults);
+    Map<String,Integer> completionQtyMap = calculateCompletionQty(mpMonthPlanMonitors);
+    Map<String,List<FactoryMonthPlanMouldDayResult>> productionGroupMap = getProductionGroupMap(productionFinalResults);
+    List<DpPredictOffsetDetail> allocations;
+    BigDecimal stockQty;
     List<FactoryMonthPlanMouldDayResult> productionResults;
-    for (Map.Entry<String, List<DpOrderOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
+    int productionQty;
+    int completionQty;
+    for (Map.Entry<String, List<DpPredictOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
+      productionQty = productionQtyMap.getOrDefault(entry.getKey(),0);
+      completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
+      stockQty = BigDecimal.valueOf(productionQty - completionQty);
       productionResults = productionGroupMap.get(entry.getKey());
-      allocations = processOrderGroup(entry.getValue(), productionResults);
+      allocations = processOrderGroup(entry.getValue(),completionQty,stockQty,productionResults);
       if(CollectionUtils.isEmpty(allocations)) {
         continue;
       }
@@ -54,28 +62,54 @@ public class PredictionAllocationHelper {
     return result;
   }
 
+  private static Map<String, List<FactoryMonthPlanMouldDayResult>> getProductionGroupMap(List<FactoryMonthPlanMouldDayResult> productionFinalResults) {
+    if(CollectionUtils.isEmpty(productionFinalResults)) {
+      return Collections.emptyMap();
+    }
+    return productionFinalResults.stream()
+        .filter(Objects::nonNull)
+        .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()))
+        .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
+  }
+
+  private static Map<String, Integer> calculateCompletionQty(List<MpMonthPlanMonitor> mpMonthPlanMonitors) {
+    if(CollectionUtils.isEmpty(mpMonthPlanMonitors)) {
+      return Collections.emptyMap();
+    }
+    return mpMonthPlanMonitors.stream()
+        .filter(Objects::nonNull)
+        .filter(monthPlanMonitor -> StringUtils.isNotBlank(monthPlanMonitor.getMaterialCode()) &&   null != monthPlanMonitor.getProductionQty() )
+        .collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode, Collectors.summingInt(MpMonthPlanMonitor::getProductionQty)));
+  }
+
 
   /**
    * 处理单个订单组的库存分配
    */
-  private static List<DpOrderOffsetDetail> processOrderGroup(
-      List<DpOrderOffsetDetail> saleOrders,
+  private static List<DpPredictOffsetDetail> processOrderGroup(
+      List<DpPredictOffsetDetail> saleOrders,
+      int completionQty,
+      BigDecimal stockQty,
       List<FactoryMonthPlanMouldDayResult> productionResults
       ) {
-          List<DpOrderOffsetDetail> result = new ArrayList<>();
-          // 定义优先级处理配置
+          List<DpPredictOffsetDetail> result = new ArrayList<>();
+          // 定义优先级处理配置 (高 > 周期 > 中 > 常规 >  暂缓)
           List<PriorityProcessor> processors = Arrays.asList(
               new PriorityProcessor(ApsConstant.SAL_PRIORITY_HIGHT,
                   FactoryMonthPlanMouldDayResult::getHeightProductionQty),
+              new PriorityProcessor(ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP,
+                  FactoryMonthPlanMouldDayResult::getCycleProductionQty),
               new PriorityProcessor(ApsConstant.SAL_PRIORITY_MID,
                   FactoryMonthPlanMouldDayResult::getMidProductionQty),
+              new PriorityProcessor(ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP,
+                  FactoryMonthPlanMouldDayResult::getConventionProductionQty),
               new PriorityProcessor(ApsConstant.SAL_PRIORITY_POSTPONE,
                   FactoryMonthPlanMouldDayResult::getPostponeProductionQty)
           );
 
           // 处理每个优先级
           for (PriorityProcessor processor : processors) {
-            processPriority(saleOrders, productionResults, result, processor);
+            processPriority(saleOrders,completionQty, stockQty,productionResults, result, processor);
           }
           return result;
   }
@@ -84,31 +118,36 @@ public class PredictionAllocationHelper {
    * 处理单一优先级
    */
   private static void processPriority(
-      List<DpOrderOffsetDetail> saleOrders,
+      List<DpPredictOffsetDetail> saleOrders,
+      int completionQty,
+      BigDecimal stockQty,
       List<FactoryMonthPlanMouldDayResult> productionResults,
-      List<DpOrderOffsetDetail> result,
+      List<DpPredictOffsetDetail> result,
       PriorityProcessor processor) {
-
     // 查找该优先级的销售订单
-    Optional<DpOrderOffsetDetail> saleOrderOpt = findSaleOrderByPriority(saleOrders, processor.getPriority());
-
+    Optional<DpPredictOffsetDetail> saleOrderOpt = findSaleOrderByPriority(saleOrders, processor.getPriority());
     if (!saleOrderOpt.isPresent()) {
       return;
     }
-
-    DpOrderOffsetDetail saleOrder = saleOrderOpt.get();
-
-    // 计算该优先级的生产数量
-    int productionQty = calculateProductionQty(productionResults, processor.getProductionQtyExtractor());
-
     // 计算该优先级的总订单数量
     int totalOrderQty = calculateTotalOrderQty(saleOrders, processor.getPriority());
-
+    BigDecimal remainingQty = BigDecimal.valueOf(totalOrderQty);
+    DpPredictOffsetDetail saleOrder = saleOrderOpt.get();
+    if (stockQty.compareTo(remainingQty) >= 0) {
+      stockQty = stockQty.subtract(remainingQty);
+      remainingQty = BigDecimal.ZERO;
+    } else {
+      // 当前库存不足，全部冲减
+      stockQty = BigDecimal.ZERO;
+      remainingQty = remainingQty.subtract(stockQty);
+    }
+    saleOrder.setStockQty(stockQty.intValue());
+    // 计算该优先级的生产数量
+    int productionQty = calculateProductionQty(productionResults, processor.getProductionQtyExtractor());
+    saleOrder.setProductionQty(productionQty);
+    saleOrder.setCompletionQty(completionQty);
     // 计算净需求量
-    int netDemand = Math.max(totalOrderQty - productionQty, 0);
-
-    // 更新并添加到结果
-    saleOrder.setProduceQtyDue(netDemand);
+    saleOrder.setNetQty(remainingQty.intValue());
     result.add(saleOrder);
   }
 
@@ -116,13 +155,13 @@ public class PredictionAllocationHelper {
    * 计算总订单数量
    */
   private static int calculateTotalOrderQty(
-      List<DpOrderOffsetDetail> saleOrders,
+      List<DpPredictOffsetDetail> saleOrders,
       String priority) {
 
     return saleOrders.stream()
         .filter(order -> priority.equals(order.getScmPriority()))
-        .filter(order -> order.getProduceQtyDue() != null && order.getProduceQtyDue() > 0)
-        .mapToInt(DpOrderOffsetDetail::getProduceQtyDue)
+        .filter(order -> order.getNetQty() != null && order.getNetQty() > 0)
+        .mapToInt(DpPredictOffsetDetail::getNetQty)
         .sum();
   }
 
@@ -145,121 +184,25 @@ public class PredictionAllocationHelper {
   /**
    * 按优先级查找销售订单
    */
-  private static Optional<DpOrderOffsetDetail> findSaleOrderByPriority(
-      List<DpOrderOffsetDetail> saleOrders,
+  private static Optional<DpPredictOffsetDetail> findSaleOrderByPriority(
+      List<DpPredictOffsetDetail> saleOrders,
       String priority) {
 
     return saleOrders.stream()
         .filter(order -> priority.equals(order.getScmPriority()))
-        .filter(order -> order.getProduceQtyDue() != null && order.getProduceQtyDue() > 0)
         .findFirst();
   }
 
-  private static Map<String,List<FactoryMonthPlanMouldDayResult>> calculateProductionQty(List<FactoryMonthPlanMouldDayResult> productionFinalResults) {
+  private static Map<String,Integer> calculateProductionQty(List<FactoryMonthPlanMouldDayResult> productionFinalResults) {
     if(CollectionUtils.isEmpty(productionFinalResults)) {
       return Collections.emptyMap();
     }
     return productionFinalResults.stream()
         .filter(Objects::nonNull)
-        .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()))
-        .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
+        .filter(productionFinalResult -> StringUtils.isNotBlank(productionFinalResult.getMaterialCode()) &&   null != productionFinalResult.getTotalQty())
+        .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode, Collectors.summingInt(FactoryMonthPlanMouldDayResult::getTotalQty)));
   }
 
-
-  public static Map<String,List<MpMonthPlanMonitor>> calculateCompleteQty(List<MpMonthPlanMonitor> mpMonthPlanMonitors) {
-    if(CollectionUtils.isEmpty(mpMonthPlanMonitors)) {
-      return Collections.emptyMap();
-    }
-    return mpMonthPlanMonitors.stream()
-        .filter(Objects::nonNull)
-        .filter(monthPlanMonitor -> StringUtils.isNotBlank(monthPlanMonitor.getMaterialCode()))
-        .collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode));
-  }
-
-  public static List<SupplyOrderPool> calculateSupplyOrder(List<SupplyOrderPool> cycleStockOrders, List<FactoryMonthPlanMouldDayResult> productionFinalResults, List<MpMonthPlanMonitor> mpMonthPlanMonitors) {
-    List<SupplyOrderPool> result = new ArrayList<>();
-    if(CollectionUtils.isEmpty(cycleStockOrders)) {
-      return result;
-    }
-    Map<String,List<SupplyOrderPool>>  netDemandGroupMap = cycleStockOrders.stream().collect(Collectors.groupingBy(SupplyOrderPool::getMaterialCode));
-    Map<String,List<FactoryMonthPlanMouldDayResult>> productionGroupMap = calculateProductionQty(productionFinalResults);
-    Map<String,List<MpMonthPlanMonitor>> completionGroupMap = calculateCompleteQty(mpMonthPlanMonitors);
-    List<SupplyOrderPool> allocations;
-    List<FactoryMonthPlanMouldDayResult> productionResults;
-    List<MpMonthPlanMonitor> completionResults;
-    for (Map.Entry<String, List<SupplyOrderPool>> entry : netDemandGroupMap.entrySet()) {
-      productionResults = productionGroupMap.get(entry.getKey());
-      completionResults = completionGroupMap.get(entry.getKey());
-      allocations = processSupplyOrderGroup(entry.getValue(), productionResults,completionResults);
-      result.addAll(allocations);
-    }
-    return result;
-  }
-
-  private static void resetCompletionResults(List<MpMonthPlanMonitor> completionResults) {
-    if(CollectionUtils.isEmpty(completionResults)) {
-      return;
-    }
-    completionResults.forEach(mpMonthPlanMonitor -> mpMonthPlanMonitor.setProductionQty(BigDecimal.ZERO.intValue()));
-  }
-
-  private static List<SupplyOrderPool> processSupplyOrderGroup(List<SupplyOrderPool> supplyOrderPools, List<FactoryMonthPlanMouldDayResult> productionResults, List<MpMonthPlanMonitor> completionResults) {
-    List<SupplyOrderPool> result = new ArrayList<>();
-    // 定义优先级处理配置
-    List<PriorityProcessor> processors = Arrays.asList(
-        new PriorityProcessor(ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP,
-            FactoryMonthPlanMouldDayResult::getCycleProductionQty),
-        new PriorityProcessor(ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP,
-            FactoryMonthPlanMouldDayResult::getConventionProductionQty)
-    );
-    // 处理每个优先级
-    for (PriorityProcessor processor : processors) {
-      processSupplyPriority(supplyOrderPools, productionResults, completionResults,result, processor);
-    }
-    return result;
-  }
-
-  private static void processSupplyPriority(List<SupplyOrderPool> supplyOrderPools, List<FactoryMonthPlanMouldDayResult> productionResults, List<MpMonthPlanMonitor> completionResults, List<SupplyOrderPool> result, PriorityProcessor processor) {
-    // 查找该优先级的销售订单
-    Optional<SupplyOrderPool> supplyOrderOpt = findSupplyOrderByPriority(supplyOrderPools, processor.getPriority());
-    if (!supplyOrderOpt.isPresent()) {
-      return;
-    }
-    SupplyOrderPool supplyOrder = supplyOrderOpt.get();
-    // 计算该优先级的生产数量
-    int productionQty = calculateProductionQty(productionResults, processor.getProductionQtyExtractor());
-    // 计算该优先级的总订单数量
-    int totalSupplyOrderQty = calculateTotalSupplyOrderQty(supplyOrderPools, processor.getPriority());
-    int totalCompleteQty = calculateTotalCompleteQty(completionResults);
-    // 计算净需求量
-    int netDemand = Math.max(totalSupplyOrderQty - productionQty + totalCompleteQty, 0);
-    // 更新并添加到结果
-    supplyOrder.setQty(netDemand);
-    result.add(supplyOrder);
-    resetCompletionResults(completionResults);
-  }
-
-  private static int calculateTotalCompleteQty(List<MpMonthPlanMonitor> completionResults) {
-    if(CollectionUtils.isEmpty(completionResults)) {
-      return 0;
-    }
-    return completionResults.stream().filter(item -> null != item.getProductionQty()).mapToInt(MpMonthPlanMonitor::getProductionQty).sum();
-  }
-
-  private static int calculateTotalSupplyOrderQty(List<SupplyOrderPool> supplyOrderPools, String priority) {
-    return supplyOrderPools.stream()
-        .filter(order -> priority.equals(order.getOrderType()))
-        .filter(order -> order.getQty() != null && order.getQty() > 0)
-        .mapToInt(SupplyOrderPool::getQty)
-        .sum();
-  }
-
-  private static Optional<SupplyOrderPool> findSupplyOrderByPriority(List<SupplyOrderPool> supplyOrderPools, String priority) {
-    return supplyOrderPools.stream()
-        .filter(order -> priority.equals(order.getOrderType()))
-        .filter(order -> order.getQty() != null && order.getQty() > 0)
-        .findFirst();
-  }
 
   /**
    * 优先级处理器 - 封装优先级处理逻辑
