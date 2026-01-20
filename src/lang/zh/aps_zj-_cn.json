@@ -278,9 +278,6 @@
   "ui.data.insertOrder.heightQty": "高优先级订单净需求",
   "ui.data.insertOrder.productionQty": "排产总量",
   "ui.data.insertOrder.monthQty": "月排产量",
-
-
-
   "ui.data.demandPlan.stockQtyTotal": "总库存",
   "common.rule.double":"必须为双数",
   "ui.data.mouldingDayResult.heightProductionQty":"高优先级排产数量",

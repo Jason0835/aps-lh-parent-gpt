@@ -152,6 +152,10 @@ export default {
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
         },
         {
+          prop: "mainPattern",
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },

@@ -245,7 +245,7 @@ import {
   removeOutHistory,
   versionOutHistory,
   outNextStructure,
-  saveAdjustResult
+  saveAdjustResult,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -402,7 +402,10 @@ export default {
                     key={row.id}
                     v-model={row.confirmAdjustQty}
                     placeholder="请输入内容"
-                    type="number"
+                    onInput={(value) => {
+                      // 移除小数点和小数部分
+                      row.confirmAdjustQty = value.replace(/[^\d]/g, "");
+                    }}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
                       this.editAdjust(row);
@@ -421,10 +424,14 @@ export default {
                 <div>
                   <el-input
                     key={row.id}
-                    type="number"
                     v-model={row.adjustPriority}
                     disabled={row.isSkuAdd != "1"}
-                    type="number"
+                    onInput={(value) => {
+                      // 移除小数点、负号和其他非数字字符
+                      // ^[1-9]\d*$ 匹配正整数，不包括0
+                      // 将值设置为正整数
+                      row.adjustPriority = value.replace(/[^\d]/g, "");
+                    }}
                     placeholder="请输入"
                     min={0}
                     onBlur={(e) => {
@@ -610,34 +617,35 @@ export default {
             width: 120,
             label: this.$t("锁定上机日期"),
             render: ({ row }) => {
-            return (
-              <div>
-                {!this.isTabChange && (
-                  <el-select
-                    v-model={row.isLockSchedule}
-                    onChange={(val) => this.handleLockScheduleChange(row, val)}
-                  >
-                    {this.dict.type.biz_yes_no.map((item) => (
-                      <el-option
-                        key={item.value}
-                        label={item.label}
-                        value={item.value}
-                      ></el-option>
-                    ))}
-                  </el-select>
-                )}
-                {this.isTabChange && (
-                  <span>
-                    {this.selectDictLabel(
-                      this.dict.type.biz_yes_no,
-                      row.isLockSchedule
-                    )}
-                  </span>
-                )}
-              </div>
-            );
-
-        },
+              return (
+                <div>
+                  {!this.isTabChange && (
+                    <el-select
+                      v-model={row.isLockSchedule}
+                      onChange={(val) =>
+                        this.handleLockScheduleChange(row, val)
+                      }
+                    >
+                      {this.dict.type.biz_yes_no.map((item) => (
+                        <el-option
+                          key={item.value}
+                          label={item.label}
+                          value={item.value}
+                        ></el-option>
+                      ))}
+                    </el-select>
+                  )}
+                  {this.isTabChange && (
+                    <span>
+                      {this.selectDictLabel(
+                        this.dict.type.biz_yes_no,
+                        row.isLockSchedule
+                      )}
+                    </span>
+                  )}
+                </div>
+              );
+            },
             // formatter: (row, column, value) => {
             //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             // },
@@ -745,6 +753,10 @@ export default {
                       key={row.id}
                       v-model={row.confirmAdjustQty}
                       placeholder="请输入内容"
+                      onInput={(value) => {
+                        // 移除小数点和小数部分
+                        row.confirmAdjustQty = value.replace(/[^\d]/g, "");
+                      }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
                         this.editOutAdjust(row);
@@ -766,11 +778,16 @@ export default {
                   {this.isEdit && (
                     <el-input
                       key={row.id}
-                      type="number"
                       v-model={row.adjustPriority}
                       disabled={row.isSkuAdd != "1"}
                       placeholder="请输入"
-                      min={1}
+                      min={0}
+                      onInput={(value) => {
+                        // 移除小数点、负号和其他非数字字符
+                        // ^[1-9]\d*$ 匹配正整数，不包括0
+                        // 将值设置为正整数
+                        row.adjustPriority = value.replace(/[^\d]/g, "");
+                      }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
                         this.editOutAdjust(row, "adjustPriority");
@@ -1015,7 +1032,7 @@ export default {
   },
   methods: {
     //修改锁定上机日期
-     handleLockScheduleChange(row,val){
+    handleLockScheduleChange(row, val) {
       saveAdjustResult(row)
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
@@ -1052,17 +1069,15 @@ export default {
       return /^(0|[1-9]\d*)$/.test(num);
     },
     async editAdjust(row, type) {
-      if (!type) {
-        console.log('调整量',row.confirmAdjustQty,this.isNoPositiveInteger(row.confirmAdjustQty))
-        if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
-          return this.$modal.msgWarning("不能有小数点");
-        }
-      } else {
-        console.log('优先级',row.adjustPriority,this.isPositiveInteger(row.adjustPriority))
-        if (!this.isPositiveInteger(row.adjustPriority)) {
-          return this.$modal.msgWarning("请输入正整数");
-        }
-      }
+      // if (!type) {
+      //   if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
+      //     return this.$modal.msgWarning("不能有小数点");
+      //   }
+      // } else {
+      //   if (!this.isPositiveInteger(row.adjustPriority)) {
+      //     return this.$modal.msgWarning("请输入正整数");
+      //   }
+      // }
 
       try {
         let res = await saveAdjust(row);
@@ -1071,15 +1086,15 @@ export default {
       } catch (err) {}
     },
     async editOutAdjust(row, type) {
-      if (!type) {
-        if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
-          return this.$modal.msgWarning("不能有小数点");
-        }
-      } else {
-        if (!this.isPositiveInteger(row.adjustPriority)) {
-          return this.$modal.msgWarning("请输入正整数");
-        }
-      }
+      // if (!type) {
+      //   if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
+      //     return this.$modal.msgWarning("不能有小数点");
+      //   }
+      // } else {
+      //   if (!this.isPositiveInteger(row.adjustPriority)) {
+      //     return this.$modal.msgWarning("请输入正整数");
+      //   }
+      // }
       try {
         let res = await editOutHistory(row);
         this.$modal.msgSuccess(res.msg);
@@ -1122,7 +1137,7 @@ export default {
           res = await versionStructure(this.formatParams());
         }
         if (this.activeName == "three") {
-          if(!this.isTabChange)return
+          if (!this.isTabChange) return;
           res = await resultVersion(this.formatParams());
         }
 
@@ -1165,7 +1180,7 @@ export default {
           });
         }
       } catch (err) {
-        console.log(err)
+        console.log(err);
       } finally {
         // if (isGet) {
         //   this.getList();
@@ -1238,7 +1253,7 @@ export default {
       this.isShowFoot = false;
       this.isShowResult = false;
       this.showOutResult = false;
-      this.isTabChange=true
+      this.isTabChange = true;
       this.getVersionList(true);
     },
     //确认调整结果
@@ -1438,11 +1453,9 @@ export default {
         this.isTabChange = false;
         this.isShowFoot = true;
         this.activeName = "three";
-        this.versionList=[]
+        this.versionList = [];
         this.$set(this.search, "version", "");
         this.$set(this.query, "version", "");
-
-
       } catch (err) {
         console.log(err);
         this.show = true;
@@ -1453,15 +1466,24 @@ export default {
 
     //结构外自动调整
     async handOutResult() {
-      console.log(this.data)
+      console.log(this.data);
       for (let i = 0; i < this.data.length; i++) {
-       if(this.data[i].confirmAdjustQty && !this.isNoPositiveInteger(this.data[i].confirmAdjustQty)){
-        return this.$modal.msgWarning(this.data[i].materialCode+'的调整量错误');
-       }
-       if(this.data[i].adjustPriority && !this.isPositiveInteger(this.data[i].adjustPriority)){
-        return this.$modal.msgWarning(this.data[i].materialCode+'的优先级错误');
-       }
-
+        if (
+          this.data[i].confirmAdjustQty &&
+          !this.isNoPositiveInteger(this.data[i].confirmAdjustQty)
+        ) {
+          return this.$modal.msgWarning(
+            this.data[i].materialCode + "的调整量错误"
+          );
+        }
+        if (
+          this.data[i].adjustPriority &&
+          !this.isPositiveInteger(this.data[i].adjustPriority)
+        ) {
+          return this.$modal.msgWarning(
+            this.data[i].materialCode + "的优先级错误"
+          );
+        }
       }
       if (
         this.formInline.adjustEndDay == null ||
