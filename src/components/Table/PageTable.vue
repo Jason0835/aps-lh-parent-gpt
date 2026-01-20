@@ -491,7 +491,12 @@ export default {
 ::v-deep .warning-row {
     background: #FFCCCC;
   }
-
+  ::v-deep .light-yellow {
+    background: #FFFFE0;
+  }
+  ::v-deep .deep-yellow {
+    background: #FFCC00;
+  }
 ::v-deep .el-table__header-wrapper {
   .cell.is-required::before {
     content: "*";

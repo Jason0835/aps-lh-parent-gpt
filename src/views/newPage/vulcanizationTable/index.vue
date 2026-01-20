@@ -142,7 +142,7 @@ export default {
         },
         {
           prop: "mesMaterialCode",
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
           width:120,
         },
 
@@ -227,7 +227,7 @@ export default {
         },
         {
           prop: "mesMaterialCode",
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
 
       ];

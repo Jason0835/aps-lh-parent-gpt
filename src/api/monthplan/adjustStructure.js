@@ -167,3 +167,13 @@ export function outNextStructure(query) {
     data: query
   })
 }
+
+
+//结构内结果修改
+export function saveAdjustResult(query) {
+  return request({
+    url: '/monthplan/mpAdjustResult/save',
+    method: 'post',
+    data: query
+  })
+}

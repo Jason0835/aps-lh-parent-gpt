@@ -245,6 +245,7 @@ import {
   removeOutHistory,
   versionOutHistory,
   outNextStructure,
+  saveAdjustResult
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -285,7 +286,7 @@ export default {
 
       isShowFoot: false,
       formInline: {},
-      isTabChange: true,
+      isTabChange: true, //从tab页点击到调整结果页
       versionList: [],
       isShowResult: false,
       getLoading: false,
@@ -565,11 +566,7 @@ export default {
             label: this.$t("成型机台"),
             width: 120,
           },
-          {
-            prop: "version",
-            label: this.$t("版本号"),
-            width: 180,
-          },
+
           {
             prop: "structureName",
             label: this.$t("产品结构"),
@@ -609,14 +606,50 @@ export default {
             width: 120,
           },
           {
-            prop: "adjustEndDate",
+            prop: "isLockSchedule",
             width: 120,
             label: this.$t("锁定上机日期"),
-            formatter: (row, column, value) => {
-              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-            },
+            render: ({ row }) => {
+            return (
+              <div>
+                {!this.isTabChange && (
+                  <el-select
+                    v-model={row.isLockSchedule}
+                    onChange={(val) => this.handleLockScheduleChange(row, val)}
+                  >
+                    {this.dict.type.biz_yes_no.map((item) => (
+                      <el-option
+                        key={item.value}
+                        label={item.label}
+                        value={item.value}
+                      ></el-option>
+                    ))}
+                  </el-select>
+                )}
+                {this.isTabChange && (
+                  <span>
+                    {this.selectDictLabel(
+                      this.dict.type.biz_yes_no,
+                      row.isLockSchedule
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+
+        },
+            // formatter: (row, column, value) => {
+            //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            // },
           },
         ];
+        if (this.isTabChange) {
+          list.splice(1, 0, {
+            prop: "version",
+            label: this.$t("版本号"),
+            width: 180,
+          });
+        }
         const days = 31;
         for (let i = 0; i < days; i++) {
           list.push({
@@ -981,16 +1014,16 @@ export default {
     },
   },
   methods: {
-    filterDot(row, value) {
-      // 过滤小数点
-
-      const filteredValue = value.replace(/\./g, "");
-      if (value !== filteredValue) {
-        console.log("value", value);
-        row.confirmAdjustQty = filteredValue;
-        // 如果需要响应式更新
-        // this.$forceUpdate();
-      }
+    //修改锁定上机日期
+     handleLockScheduleChange(row, val){
+      saveAdjustResult(row)
+        .then((res) => {
+          this.$modal.msgSuccess(res.msg);
+          // this.getList();
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     },
 
     //单结构调整提交
@@ -1035,7 +1068,7 @@ export default {
         this.getList();
       } catch (err) {}
     },
-    async editOutAdjust(row,type) {
+    async editOutAdjust(row, type) {
       if (!type) {
         if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
           return this.$modal.msgWarning("不能有小数点");
@@ -1409,8 +1442,11 @@ export default {
 
     //结构外自动调整
     async handOutResult() {
-      if(this.formInline.adjustEndDay==null || this.formInline.adjustEndDay==""){
-        return this.$modal.msgWarning("请选择调整结束日期")
+      if (
+        this.formInline.adjustEndDay == null ||
+        this.formInline.adjustEndDay == ""
+      ) {
+        return this.$modal.msgWarning("请选择调整结束日期");
       }
       this.loading = true;
       this.autoLoading = true;
@@ -1596,9 +1632,8 @@ export default {
         this.getOutResultList(res.rows[0].version);
         this.isShowFoot = true;
         this.showOutResult = true;
-        this.formInline.adjustStartDay=this.formInline.beginDay
-        this.formInline.adjustEndDay=this.formInline.endDay
-
+        this.formInline.adjustStartDay = this.formInline.beginDay;
+        this.formInline.adjustEndDay = this.formInline.endDay;
 
         this.getOutVersionList();
       } catch (err) {
@@ -1771,7 +1806,7 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.structureName=''
+        params.structureName = "";
         let res = await outNextStructure(params);
         if (res.id) {
           this.showOutResult = false;

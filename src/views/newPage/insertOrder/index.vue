@@ -324,7 +324,7 @@ export default {
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
         {
           prop: "materialCode",

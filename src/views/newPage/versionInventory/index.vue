@@ -6,6 +6,7 @@
       v-loading="loading"
       :columns="columns"
       :searchColumns="searchColumns"
+       :row-class-name="tableRowClassName"
       :data="data"
       :page="page"
       :search="search"
@@ -234,6 +235,15 @@ export default {
     },
   },
   methods: {
+    tableRowClassName({ row, rowIndex }) {
+      if (row.isExceedSixMonth == 1) {
+        return "light-yellow";
+      }
+      if (row.isExceedNineMonth == 1) {
+        return "deep-yellow";
+      }
+      return "";
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();

@@ -152,11 +152,11 @@ export default {
             return false;
           },
         },
-        {
-          prop: "id",
-          label: "ID",
-          width: 80,
-        },
+        // {
+        //   prop: "id",
+        //   label: "ID",
+        //   width: 80,
+        // },
 
         {
           prop: "factoryCode",

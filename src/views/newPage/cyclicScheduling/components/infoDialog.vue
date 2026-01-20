@@ -285,9 +285,14 @@ export default {
           year: arr[0],
           month: arr[1],
         });
-        this.showTip = true;
+
+
         this.tipMsg = res.data.msg;
-        // console.log(res);
+         if(this.form.orderType==2){
+          this.showTip = true;
+        }else{
+          this.showTip = false
+        }
         // this.$modal.msgWarning(res.data.msg);
       } catch (err) {
         console.log(err);

@@ -168,7 +168,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
-          prop: "productTypeCode",
+          prop: "productCategory",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.product_category, value);
           },
@@ -208,8 +208,8 @@ export default {
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
-          width: 180,
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          width: 280,
         },
         {
           prop: "materialDesc",
@@ -373,7 +373,7 @@ export default {
           prop: "specifications",
         },
         {
-          label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
           prop: "mainMaterialDesc",
         },
         {

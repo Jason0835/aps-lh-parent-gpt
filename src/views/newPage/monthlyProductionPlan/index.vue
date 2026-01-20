@@ -430,7 +430,7 @@ export default {
           prop: "structureName",
         },
         // {
-        //   label: this.$t("ui.data.column.skuEmbryoRelation.materialCode"),
+        //   label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         //   prop: "mainMaterialDesc",
         // },
         {
