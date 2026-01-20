@@ -40,6 +40,8 @@ public class FinereportController {
     private String FACTORY_VULCANIZING_MACHINE_URL;
     @Value("${finereport.url.productionStructure}")
     private String PRODUCTION_STRUCTURE_URL;
+    @Value("${finereport.url.productionYear}")
+    private String PRODUCTION_YEAR_URL;
 
 	@ApiOperation("库龄分析报表")
 	@GetMapping("/inventoryAgeAnalysis")
@@ -126,6 +128,26 @@ public class FinereportController {
     @GetMapping("/productionStructure")
     public AjaxResult productionStructure() {
         String rptUrl = PRODUCTION_STRUCTURE_URL;
+        // 模拟登录帆软服务，获取token
+        AjaxResult loginResult = this.loginFinereport();
+        if (AjaxResultUtils.checkAjaxError(loginResult)) {
+            return loginResult;
+        }
+        // 拼接报表url
+        String token = String.valueOf(loginResult.get(AjaxResult.DATA_TAG));
+        Object realUrl = StringUtils.join(rptUrl, "?preview=true&fine_auth_token=", token); // 拼接url，需要使用Object接收，ajaxResult才会放到data里
+        return AjaxResult.success(realUrl);
+    }
+
+    /**
+     * 越南工厂年度产量报表
+     *
+     * @return 结果集合
+     */
+    @ApiOperation("越南工厂年度产量报表")
+    @GetMapping("/productionYear")
+    public AjaxResult productionYear() {
+        String rptUrl = PRODUCTION_YEAR_URL;
         // 模拟登录帆软服务，获取token
         AjaxResult loginResult = this.loginFinereport();
         if (AjaxResultUtils.checkAjaxError(loginResult)) {

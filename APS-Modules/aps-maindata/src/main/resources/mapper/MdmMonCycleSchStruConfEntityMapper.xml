@@ -19,7 +19,7 @@
                cssc.STRUCTURE_NAME,
                cssc.TURNOVER_MONTH,
                cssc.MIN_VULCANIZING_MACHINE
-        FROM T_DP_CYCLE_SCH_STRU_CONF cssc
+        FROM T_DP_CYCLE_STRUCT_CONFIG cssc
         WHERE cssc.IS_DELETE = 0
           AND EXISTS (SELECT 1
                       FROM T_MP_MONTH_PLAN_PROD_FINAL a

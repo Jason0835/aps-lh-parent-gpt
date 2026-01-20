@@ -59,4 +59,12 @@ public interface IFinereportService {
     @ApiOperation("越南工厂结构在机数据报表")
     @GetMapping("/finereport/productionStructure")
     AjaxResult productionStructure();
+
+
+    /**
+     * 越南工厂年度产量报表
+     */
+    @ApiOperation("越南工厂年度产量报表")
+    @GetMapping("/finereport/productionYear")
+    AjaxResult productionYear();
 }

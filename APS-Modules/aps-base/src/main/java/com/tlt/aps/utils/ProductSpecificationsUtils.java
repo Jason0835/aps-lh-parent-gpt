@@ -53,6 +53,7 @@ public class ProductSpecificationsUtils {
      * @return
      */
     public static List<Integer> parseSectionWidthAndAspectRatio(String specifications) {
+        log.info("解析规格数据：" + specifications);
         if (StringUtils.isBlank(specifications)) {
             return Collections.emptyList();
         }
