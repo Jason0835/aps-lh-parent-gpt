@@ -602,7 +602,9 @@ public class MesItfServiceImpl implements MesItfService {
                     // 物料类型转换
                     String mesMaterialCategory = entity.getMesMaterialCategory();
                     MouldCategoryConvertEnum convertEnum = MouldCategoryConvertEnum.getByMesCode(mesMaterialCategory);
-                    entity.setMaterialCategory(convertEnum.getCode());
+                    if (convertEnum != null) {
+                        entity.setMaterialCategory(convertEnum.getCode());
+                    }
                     entity.setBaseVale(null);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
