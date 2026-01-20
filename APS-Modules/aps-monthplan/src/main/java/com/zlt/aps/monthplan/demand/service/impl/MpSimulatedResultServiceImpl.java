@@ -13,7 +13,6 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
@@ -24,6 +23,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
+import com.zlt.aps.monthplan.common.utils.ProductionSchedulingService;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IDpSimulatedOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
@@ -76,12 +76,12 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     private final IMdmMaterialInfoService materialInfoService;
     // 需求计划
     private final IDpDemandPlanService dpDemandPlanService;
-    // 排产
-    private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
 
     private final IMpPredictionDetailService mpPredictionDetailService;
 
     private final IDpSimulatedOffsetDetailService dpSimulatedOffsetDetailService;
+
+    private final ProductionSchedulingService productionSchedulingService;
 
     @Override
     protected String getDocTypeCode() {
@@ -169,7 +169,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
               // 排产汇总
               if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
                   Context context = buildContext(currentMonthDemands);
-                  monthPlanProductionSchedulingService.general(context);
+                  productionSchedulingService.executeSchedulingInNewTransaction(param,context);
                   currentFinalVersion = createProductionVersion(context,currentMonthDemands);
                   productionVersions.put(currentMonth,currentFinalVersion);
               }
