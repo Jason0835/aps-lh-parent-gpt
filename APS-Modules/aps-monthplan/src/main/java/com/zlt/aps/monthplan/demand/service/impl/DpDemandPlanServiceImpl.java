@@ -27,7 +27,7 @@ import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 
@@ -338,6 +338,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
+    @Transactional
     public List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
         if(CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
             return Collections.emptyList();
@@ -364,7 +365,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         predictionContext.setMonthSurplusMap(monthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
         List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
-        List<DpPredictOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
+        List<DpSimulatedOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
         netDemands.forEach(predictionOffsetDetail -> {
             predictionOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
             predictionOffsetDetail.setYear(createCondition.getYear());
@@ -374,7 +375,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(fetchSupplyOrders)) {
            fetchSupplyOrders.forEach(supplyOrderPool -> netDemands.add(buildPredictOffsetDetail(createCondition,supplyOrderPool)));
         }
-        List<DpPredictOffsetDetail>  leftDemands = PredictionAllocationHelper.calculateSaleOrder(netDemands,productionFinalResults,mpMonthPlanMonitors);
+        List<DpSimulatedOffsetDetail>  leftDemands = PredictionAllocationHelper.calculateSaleOrder(netDemands,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(leftDemands)){
             predictionContext.setPredictOffsetDetails(Collections.emptyList());
             return Collections.emptyList();
@@ -417,9 +418,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     }
 
-    private DpPredictOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,SupplyOrderPool supplyOrderPool) {
-        DpPredictOffsetDetail predictionOffsetDetail = new DpPredictOffsetDetail();
+    private DpSimulatedOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,SupplyOrderPool supplyOrderPool) {
+        DpSimulatedOffsetDetail predictionOffsetDetail = new DpSimulatedOffsetDetail();
         BeanUtils.copyProperties(supplyOrderPool,predictionOffsetDetail);
+        predictionOffsetDetail.setBaseVale(null);
+        predictionOffsetDetail.setId(null);
         predictionOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
         predictionOffsetDetail.setYear(createCondition.getYear());
         predictionOffsetDetail.setMonth(createCondition.getMonth());
@@ -561,7 +564,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 5. 批量保存分配结果
         saveAllocationResults(createCondition, predictionVersion, allocationResult);
         this.processAlternateMaterial(allocationResult.getNetDemands(),predictionContext.getFinishedProductStockMap());
-        List<DpPredictOffsetDetail>  predictOffsetDetails = this.buildPredictOffsetDetails(createCondition,allocationResult.getNetDemands());
+        List<DpSimulatedOffsetDetail>  predictOffsetDetails = this.buildPredictOffsetDetails(createCondition,allocationResult.getNetDemands());
         predictionContext.setPredictOffsetDetails(predictOffsetDetails);
         if(!CollectionUtils.isEmpty(predictOffsetDetails)){
             this.baseDao.insertBatch(predictOffsetDetails);
@@ -581,8 +584,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return mergedDemandPlans;
     }
 
-    private List<DpPredictOffsetDetail> buildPredictOffsetDetails(DpDemandPlan createCondition, List<DpOrderOffsetDetail> netDemands) {
-        List<DpPredictOffsetDetail> list = Lists.newArrayList();
+    private List<DpSimulatedOffsetDetail> buildPredictOffsetDetails(DpDemandPlan createCondition, List<DpOrderOffsetDetail> netDemands) {
+        List<DpSimulatedOffsetDetail> list = Lists.newArrayList();
         if(CollectionUtils.isEmpty(netDemands)){
             return list;
         }
@@ -590,10 +593,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return list;
     }
 
-    private DpPredictOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,DpOrderOffsetDetail demandPlan) {
-        DpPredictOffsetDetail predictOffsetDetail = new DpPredictOffsetDetail();
+    private DpSimulatedOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,DpOrderOffsetDetail demandPlan) {
+        DpSimulatedOffsetDetail predictOffsetDetail = new DpSimulatedOffsetDetail();
         BeanUtils.copyProperties(demandPlan,predictOffsetDetail);
         predictOffsetDetail.setBaseVale(null);
+        predictOffsetDetail.setId(null);
         predictOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
         predictOffsetDetail.setYear(createCondition.getYear());
         predictOffsetDetail.setMonth(createCondition.getMonth());

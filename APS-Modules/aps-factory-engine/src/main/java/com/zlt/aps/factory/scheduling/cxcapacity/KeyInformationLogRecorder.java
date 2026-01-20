@@ -33,7 +33,7 @@ public class KeyInformationLogRecorder {
      * @param allContinueGroupMap 所有在机结构分组信息
      */
     public static void recorderInitGroupInfoLog(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allContinueGroupMap) {
-        if (CollectionUtils.isEmpty(allContinueGroupMap)) {
+        if (CollectionUtils.isEmpty(allGroupPlanMap)) {
             return;
         }
         allGroupPlanMap.forEach((structureName, groupPlanInfo) -> {
@@ -56,7 +56,7 @@ public class KeyInformationLogRecorder {
      * @param continueAllocationList 分配结果
      */
     public static void recorderContinueAllocationGroupInfoLog(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allContinueGroupMap, List<CxMachineAllocationPlanHelper> continueAllocationList) {
-        if (CollectionUtils.isEmpty(allContinueGroupMap)) {
+        if (CollectionUtils.isEmpty(allGroupPlanMap)) {
             return;
         }
         Map<String, List<CxMachineAllocationPlanHelper>> groupAllocationMap = getAllocationInfoByGroupName(continueAllocationList);

@@ -108,6 +108,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      */
     private Integer ratio;
     /**
+     * 挑选时，可排产天数：与成型鼓取得交集后的天数
+     */
+    private Integer selectedProductionDys;
+    /**
      * 针对计划的固定优先级
      */
     private Integer fixedPriority;
@@ -152,6 +156,55 @@ public class CxMachineBaseInfoVo implements Serializable {
             currentRatio = BigDecimal.ZERO.intValue();
         }
         return currentRemainDays * currentRatio;
+    }
+
+    /**
+     * 根据选中的selectedGroup，确认可排产日范围
+     *
+     * @param context       排产上下文
+     * @param selectedGroup 选中分组计划
+     * @return
+     */
+    public Set<Integer> confirmProductionRange(Context context, ProductionPlanGroupInfo selectedGroup) {
+        if (null == context || null == selectedGroup) {
+            return Collections.emptySet();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String proSize = selectedGroup.getProSizeInfo();
+        //获取成型工装的排产日集合
+        Set<Integer> workWeakProductionInfo = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(proSize);
+        if (CollectionUtils.isEmpty(workWeakProductionInfo)) {
+            return Collections.emptySet();
+        }
+        //最后一个分配信息的排产日
+        Integer startDay = getAllocationStartDay();
+        //成型机本身的排产日
+        Set<Integer> localProductionInfo = getHasProductionDayInfo(productionContext, startDay);
+        if (CollectionUtils.isEmpty(localProductionInfo)) {
+            return Collections.emptySet();
+        }
+        return localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+    }
+
+    /**
+     * 获取确认的排产日范围，与workWeakProductionInfo取交集
+     *
+     * @param context                排产上下文
+     * @param workWeakProductionInfo 成型工装可排产日集合
+     * @return
+     */
+    public Set<Integer> confirmProductionRange(Context context, Set<Integer> workWeakProductionInfo) {
+        if (null == context || CollectionUtils.isEmpty(workWeakProductionInfo)) {
+            return Collections.emptySet();
+        }
+        //最后一个分配信息的排产日
+        Integer startDay = getAllocationStartDay();
+        //成型机本身的排产日
+        Set<Integer> localProductionInfo = getHasProductionDayInfo(context, startDay);
+        if (CollectionUtils.isEmpty(localProductionInfo)) {
+            return Collections.emptySet();
+        }
+        return localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
     }
 
     /**
@@ -227,6 +280,32 @@ public class CxMachineBaseInfoVo implements Serializable {
             }
         }
         return false;
+    }
+
+    /**
+     * 获取成型机台在startDay~周期结束日可排产的集合信息
+     * 需要剔除自身的停产日
+     *
+     * @param context  排产上下文
+     * @param startDay 开始日
+     * @return
+     */
+    private Set<Integer> getHasProductionDayInfo(Context context, Integer startDay) {
+        if (null == startDay || null == context) {
+            return Collections.emptySet();
+        }
+        Integer endDay = context.getMonthDays();
+        if (startDay > endDay) {
+            return Collections.emptySet();
+        }
+        Set<Integer> productionDaySet = new HashSet<>(64);
+        for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
+            if (stopDayInfo.contains(productionDay)) {
+                continue;
+            }
+            productionDaySet.add(productionDay);
+        }
+        return productionDaySet;
     }
 
     /**

@@ -14,12 +14,12 @@ import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
+import com.zlt.aps.monthplan.common.utils.ProductionSchedulingService;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
@@ -67,10 +67,10 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final IMdmMaterialInfoService materialInfoService;
     // 需求计划
     private final IDpDemandPlanService dpDemandPlanService;
-    // 排产
-    private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
     // 预测明细
     private final IMpPredictionDetailService mpPredictionDetailService;
+
+    private final ProductionSchedulingService productionSchedulingService;
 
 
     @Override
@@ -131,15 +131,14 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         // 排产汇总
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
             Context context = buildContext(tPlus1MonthDemands);
-            monthPlanProductionSchedulingService.general(context);
+            productionSchedulingService.executeSchedulingInNewTransaction(param,context);
             MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(context,tPlus1MonthDemands);
-
             productionVersions.put(monthRangeResult.getTPlus1Month(),finalVersionByTplus1Month);
             tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month,predictionContext);
         }
         if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             Context context = buildContext(tPlus2MonthDemands);
-            monthPlanProductionSchedulingService.general(context);
+            productionSchedulingService.executeSchedulingInNewTransaction(param,context);
             MpFactoryProductionVersion finalVersionByTplus2Month = createProductionVersion(context,tPlus2MonthDemands);
             productionVersions.put(monthRangeResult.getTPlus2Month(),finalVersionByTplus2Month);
         }

@@ -432,27 +432,46 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
             return;
         }
-        //对挑选出的结构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan);
-        if (null == selectedCxMachine) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, addNewGroupPlan.getGroupName()));
-            //20260109 标记分配完成--没有找到合适，说明后面也找不到
+        //20260120 判断成型鼓是否符合条件
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String proSize = addNewGroupPlan.getProSizeInfo();
+        String groupName = addNewGroupPlan.getGroupName();
+        //获取成型工装的排产日集合
+        Set<Integer> workWeakProductionInfo = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(proSize);
+        if (CollectionUtils.isEmpty(workWeakProductionInfo)) {
+            log.info(TbrProductionGroupLogRecorder.addNoWorkWeakMatchPlanLog(productionContext, null, groupName, proSize));
+            //20260120 标记分配完成--没有成型工装，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            //todo 结构标记不可排产
+            //下一新增结构
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
         }
+        //对挑选出的结构，匹配还有排产量的成型机台
+        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, workWeakProductionInfo);
+        if (null == selectedCxMachine) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, groupName));
+            //20260109 标记分配完成--没有找到合适，说明后面也找不到
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            //下一新增结构
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            return;
+        }
+        Set<Integer> hasProductionDaySet = selectedCxMachine.confirmProductionRange(context, workWeakProductionInfo);
+        Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
+        Integer startDay = selectedCxMachine.getAllocationStartDay();
+        startDay = Math.max(startDay, realStartDay);
+        Integer remainingDays = selectedCxMachine.getRemainingDays();
+//        Integer realRemainingDays = hasProductionDaySet.size();
+//        remainingDays = Math.min(remainingDays, realRemainingDays);
         //分配产能
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
-        Integer remainingDays = selectedCxMachine.getRemainingDays();
-        //todo 判断成型鼓是否符合条件
         Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新剩余天数
         Integer leftOver = remainingDays - realAllocationDays;
         selectedCxMachine.setRemainingDays(leftOver);
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
-        Integer startDay = selectedCxMachine.getAllocationStartDay();
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);
         //对成型机台进行模拟模具排产

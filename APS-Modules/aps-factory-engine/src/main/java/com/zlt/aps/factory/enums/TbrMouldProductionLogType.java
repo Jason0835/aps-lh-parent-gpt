@@ -194,6 +194,10 @@ public enum TbrMouldProductionLogType {
      */
     REVERSE_MACHINE_CAPACITY_COVER_NO_MATCH_PLAN("20-14-08", "收尾机台没有找到产能可覆盖机台又匹配的计划"),
     /**
+     * 20-14 机台-分组计划匹配
+     */
+    MACHINE_MATCH_PLAN("20-14", "机台-分组计划匹配"),
+    /**
      * 20-14-09 收尾机台反向匹配到计划分组
      */
     REVERSE_MACHINE_SELECTED_GROUP_PLAN("20-14-09", "收尾机台反向匹配到计划分组"),

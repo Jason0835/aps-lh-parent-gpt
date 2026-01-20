@@ -189,17 +189,25 @@ public class GroupPlanBeforeConclusionHandler {
      */
     private static void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
         //重新计算(分组)分配的天数: 需要排产天数 - 还需排产天数 - 收尾天数
-        Integer leftOverNeedAllocationDays = groupPlanInfo.getLeftOverNeedAllocationDays();
-        Integer theoryDays = groupPlanInfo.getTheoryDays();
         Integer deductionDay = beforeConclusionInfo.getDeductionDay();
         Integer beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
         Set<Integer> deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
-        Integer realAllocationDayBeforeConclusion = theoryDays - leftOverNeedAllocationDays - deductionDay;
+        Integer realAllocationDayBeforeConclusion;
+        if (!isSingleMachine) {
+            Integer leftOverNeedAllocationDays = groupPlanInfo.getLeftOverNeedAllocationDays();
+            Integer theoryDays = groupPlanInfo.getTheoryDays();
+            realAllocationDayBeforeConclusion = theoryDays - leftOverNeedAllocationDays - deductionDay;
+        } else {
+            Integer allocationDay = allocationInfo.getAllocationDay();
+            realAllocationDayBeforeConclusion = allocationDay - deductionDay;
+        }
         Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
         //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
         if (realAllocationDayBeforeConclusion < minAllocationDays) {
-            //分组计划不排产
-            groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, minAllocationDays);
+            if (!isSingleMachine) {
+                //分组计划不排产-单台
+                groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, minAllocationDays);
+            }
             //更新提前收尾信息
             updateBeforeConclusionForAllocation(beforeConclusionInfo, cxMachineInfo, allocationInfo);
             beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
