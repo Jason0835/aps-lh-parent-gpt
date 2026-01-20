@@ -368,6 +368,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setMonthPlanVersion(predictionVersion);
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
+        predictionContext.setOriginalMonthSurplusMap(monthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
         List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
         List<DpSimulatedOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
@@ -540,6 +541,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
                 null,
+                null,
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
@@ -564,6 +566,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setMonthPlanVersion(predictionVersion);
         Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
         predictionContext.setMonthSurplusMap(monthSurplusMap);
+        predictionContext.setOriginalMonthSurplusMap(monthSurplusMap);
         // 3. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             predictionVersion, predictionContext.getSalesOrders(), predictionContext.getFinishedProductStockMap(),
@@ -784,7 +787,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpDemandPlan> mergedPlans = mergedDemandPlan(
             createCondition,
             demandPlans, data.getMinProductionQty(), data.getMaterialInfoMap(),
-            data.getFinishedProductStockMap(), data.getMonthSurplusMap(),
+            data.getFinishedProductStockMap(), data.getOriginalMonthSurplusMap(),
             data.getProductionTypeMap(),
             data.getMonthlySaleQty(),
             data.getCycleSchStruConfs());
@@ -875,6 +878,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 supplyOrderPools,
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
+                monthSurplusMap,
                 monthSurplusMap,
                 monthlySaleQty,
                 minProductionQty,

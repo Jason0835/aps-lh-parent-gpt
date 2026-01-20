@@ -22,11 +22,12 @@ import java.util.Map;
 public class PredictionContext {
   private List<SalesOrderPool> salesOrders;
   private  List<MdmProductStock> finishedProductStocks;
-  private Map<String, List<MdmProductStock>> finishedProductStockMap;
+  private  Map<String, List<MdmProductStock>> finishedProductStockMap;
   private  Map<String, String> productionTypeMap;
   private  List<SupplyOrderPool> supplyOrderPools;
   private  List<SalesOrderPool> allocationOrders;
   private  List<SalesOrderPool> postponeOrders;
+  private  Map<String, Integer> originalMonthSurplusMap;
   private  Map<String, Integer> monthSurplusMap;
   private  Map<String, Integer>  monthlySaleQty;
   private  Integer  minProductionQty;
@@ -42,6 +43,7 @@ public class PredictionContext {
       List<SupplyOrderPool> supplyOrderPools,
       List<SalesOrderPool> allocationOrders,
       List<SalesOrderPool> postponeOrders,
+      Map<String, Integer> originalMonthSurplusMap,
       Map<String, Integer> monthSurplusMap,
       Map<String, Integer>  monthlySaleQty,
       Integer  minProductionQty,
@@ -49,15 +51,16 @@ public class PredictionContext {
       List<MdmCycleSchStruConf> cycleSchStruConfs) {
     this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
     this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
-    this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
-    this.productionTypeMap = productionTypeMap != null ? productionTypeMap : new HashMap<>();
+    this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : Collections.emptyMap();
+    this.productionTypeMap = productionTypeMap != null ? productionTypeMap : Collections.emptyMap();
     this.supplyOrderPools = supplyOrderPools != null ? supplyOrderPools : Collections.emptyList();
     this.allocationOrders = allocationOrders != null ? allocationOrders : Collections.emptyList();
     this.postponeOrders = postponeOrders != null ? postponeOrders : Collections.emptyList();
-    this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : new HashMap<>();
-    this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
+    this.originalMonthSurplusMap = originalMonthSurplusMap != null ? originalMonthSurplusMap : Collections.emptyMap();
+    this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : Collections.emptyMap();
+    this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : Collections.emptyMap();
     this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
-    this.materialInfoMap = materialInfoMap != null ? materialInfoMap : new HashMap<>();
+    this.materialInfoMap = materialInfoMap != null ? materialInfoMap : Collections.emptyMap();
     this.cycleSchStruConfs = cycleSchStruConfs != null ? cycleSchStruConfs : Collections.emptyList();
   }
 
