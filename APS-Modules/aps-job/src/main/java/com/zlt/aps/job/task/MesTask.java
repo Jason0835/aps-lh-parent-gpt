@@ -1,7 +1,6 @@
 package com.zlt.aps.job.task;
 
 import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
@@ -44,13 +43,4 @@ public class MesTask {
     public void syncRawSpecialMaterialStock() {
         iMesItfService.syncRawSpecialMaterialStock(new RawSpecialMaterialStock());
     }
-
-    /**
-     * 同步原材料出库
-     */
-    @ApiOperation("同步原材料出库-默认当前日期")
-    public void syncRawMaterialOutboundRecord() {
-        iMesItfService.syncRawMaterialOutboundRecord(new AuxReqSyncDataLogs());
-    }
-
 }
