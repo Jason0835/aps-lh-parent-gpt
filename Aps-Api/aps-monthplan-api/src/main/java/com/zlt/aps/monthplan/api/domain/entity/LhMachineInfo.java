@@ -147,14 +147,14 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String dimensionSize;
 
     /**
-     * 热板直径
+     * 热板直径，单位：mm
      */
-    @ApiModelProperty(value = "热板直径", name = "hotPlateDiameter")
+    @ApiModelProperty(value = "热板直径，单位：mm", name = "hotPlateDiameter")
     @TableField("HOT_PLATE_DIAMETER")
     private String hotPlateDiameter;
 
     /**
-     * 模套型号
+     * 模套型号，默认值：通用
      */
     @ApiModelProperty(value = "模套型号", name = "mouldSetCode")
     @TableField("MOULD_SET_CODE")
