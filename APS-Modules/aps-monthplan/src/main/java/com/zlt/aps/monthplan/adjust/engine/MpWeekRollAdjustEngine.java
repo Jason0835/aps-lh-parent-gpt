@@ -685,7 +685,7 @@ public class MpWeekRollAdjustEngine {
                 totalMatchQty -= dayQty;
             }else{
                 //若剩余搭配量 < 日排产量，则当日排产量扣减剩余调整量
-                prodFinal.setFieldValueByFieldName(matchDayField,dayQty - totalMatchQty);
+                prodFinal.setFieldValueByFieldName(matchDayField,totalMatchQty);
                 totalMatchQty = 0;
             }
             sb.append(prodFinal.getFieldValueByFieldName(matchDayField)).append(",");
@@ -1181,6 +1181,10 @@ public class MpWeekRollAdjustEngine {
             matchDayField = FactoryConstant.MATCH_DAY_FIELD+i;
             if (mpFinalVo.getFieldValueByFieldName(matchDayField) != null){
                 //若搭配天的值不为空，直接退
+                if ((Integer) mpFinalVo.getFieldValueByFieldName(dayField) >
+                        (Integer) mpFinalVo.getFieldValueByFieldName(matchDayField)){
+                    iRealQty +=  (Integer) mpFinalVo.getFieldValueByFieldName(dayField) - (Integer) mpFinalVo.getFieldValueByFieldName(matchDayField);
+                }
                 break;
             }
             iRealQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
