@@ -5,9 +5,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
-import com.zlt.aps.monthplan.demand.mapper.DpPredictOffsetDetailEntityMapper;
-import com.zlt.aps.monthplan.demand.service.IDpPredictOffsetDetailService;
+import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
+import com.zlt.aps.monthplan.demand.mapper.DpSimulatedOffsetDetailEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IDpSimulatedOffsetDetailService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
@@ -20,13 +20,14 @@ import java.util.List;
 import java.util.Set;
 
 import org.springframework.transaction.annotation.Transactional;
+
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：DpPredictOffsetDetailServiceImpl.java
- * 描    述：DpPredictOffsetDetailServiceImpl预测冲减分配业务层处理
+ * 文件名称：DpSimulatedOffsetDetailServiceImpl.java
+ * 描    述：DpSimulatedOffsetDetailServiceImpl预测冲减分配业务层处理
  *@author yelq
  *@date 2026-01-20
  *@version 1.0
@@ -40,25 +41,26 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
-public class DpPredictOffsetDetailServiceImpl extends AbstractDocService<DpPredictOffsetDetail>  implements IDpPredictOffsetDetailService {
-    private final DpPredictOffsetDetailEntityMapper dpPredictOffsetDetailMapper;
+public class DpSimulatedOffsetDetailServiceImpl extends AbstractDocService<DpSimulatedOffsetDetail>  implements IDpSimulatedOffsetDetailService {
+    private final DpSimulatedOffsetDetailEntityMapper dpSimulatedOffsetDetailEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
-        return "2026012011";
+        return "20260120";
     }
 
     @Override
     protected SysDocType getSysDocType() {
         SysDocType sysDocType = new SysDocType();
-        sysDocType.setDocTypeCode("2026012011");
+        sysDocType.setDocTypeCode("20260120");
         return sysDocType;
     }
 
     @Override
-    public String checkUnique(DpPredictOffsetDetail docEntityVO) {
+    public String checkUnique(DpSimulatedOffsetDetail docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.dpPredictOffsetDetail.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.dpSimulatedOffsetDetail.notUnique"));
         }
         return unique;
     }
@@ -70,22 +72,22 @@ public class DpPredictOffsetDetailServiceImpl extends AbstractDocService<DpPredi
     }
 
     @Override
-    public List<DpPredictOffsetDetail> findPredictOffsetDetail(Set<String> monthPlanVersions) {
+    public List<DpSimulatedOffsetDetail> findPredictOffsetDetail(Set<String> monthPlanVersions) {
         if(CollectionUtils.isEmpty(monthPlanVersions)) {
-           return Collections.emptyList();
+            return Collections.emptyList();
         }
-        List<DpPredictOffsetDetail> result = new ArrayList<>();
+        List<DpSimulatedOffsetDetail> result = new ArrayList<>();
         if(!CollectionUtils.isEmpty(monthPlanVersions)) {
             final int batchSize = 1000;
             List<String> versionList = new ArrayList<>(monthPlanVersions);
             for (int i = 0; i < versionList.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, versionList.size());
                 List<String> batchVersions = versionList.subList(i, end);
-                LambdaQueryWrapper<DpPredictOffsetDetail> wrapper =
-                    Wrappers.lambdaQuery(DpPredictOffsetDetail.class)
-                        .in(DpPredictOffsetDetail::getMonthPlanVersion, batchVersions)
-                        .eq(DpPredictOffsetDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
-                result.addAll(dpPredictOffsetDetailMapper.selectList(wrapper));
+                LambdaQueryWrapper<DpSimulatedOffsetDetail> wrapper =
+                    Wrappers.lambdaQuery(DpSimulatedOffsetDetail.class)
+                        .in(DpSimulatedOffsetDetail::getMonthPlanVersion, batchVersions)
+                        .eq(DpSimulatedOffsetDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
+                result.addAll(dpSimulatedOffsetDetailEntityMapper.selectList(wrapper));
             }
         }
         return result;
