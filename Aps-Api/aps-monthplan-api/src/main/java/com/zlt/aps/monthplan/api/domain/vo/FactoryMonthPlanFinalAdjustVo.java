@@ -15,6 +15,10 @@ import lombok.Data;
 @Data
 public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFinalResult {
 
+    @ApiModelProperty(value = "是否含特殊材料", name = "hasSpecialMaterial")
+    @TableField(exist = false)
+    private String hasSpecialMaterial;
+
     /**
      * 锁定量
      */

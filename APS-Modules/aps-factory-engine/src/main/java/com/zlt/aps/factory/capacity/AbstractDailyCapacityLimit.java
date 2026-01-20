@@ -88,7 +88,7 @@ public abstract class AbstractDailyCapacityLimit {
      */
     public void calcLhMachinesWithEmbryoTypes(List<? extends BaseEntity> mpProdFinalList, int iDay,
                                                MpDailyCapacityLimitVo dailyCapacityLimitVo,String mainPattern) {
-        if (PubUtil.isEmpty(mpProdFinalList)){
+        if (PubUtil.isEmpty(mpProdFinalList) || dailyCapacityLimitVo == null){
             return;
         }
         // 按日期向下，统计日硫化机台数
@@ -104,7 +104,7 @@ public abstract class AbstractDailyCapacityLimit {
         int dayPlanQty,dailyLhQty;
         String dayField = FactoryConstant.DAY_FIELD + iDay;
         // 次日字段
-        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1);
+        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
         String embryoFieldValue;
         for (BaseEntity mpFinalVo: mpProdFinalList){
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null) {
