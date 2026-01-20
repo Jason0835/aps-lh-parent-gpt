@@ -154,6 +154,8 @@ export default {
           year: this.form.year,
           month: this.form.month,
           factoryCode: this.form.factoryCode,
+          isSelectedDemand:'1',
+          planType:'01'
         });
         console.log(res);
         this.planVersionList = res;

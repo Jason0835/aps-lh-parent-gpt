@@ -387,9 +387,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
-          // listeners: {
-          //   change: this.handleYearMonthChange,
-          // },
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           prop: "factoryCode",
@@ -424,16 +424,15 @@ export default {
   },
   methods: {
     handleChange(val) {
-      this.$set(this.search, "productionVersion", "");
-      this.$set(this.query, "productionVersion", "");
-      this.search.monthPlanVersion = val;
-      this.query.monthPlanVersion = val;
-      this.listProductionVersionList();
+
+      // this.search.monthPlanVersion = val;
+      // this.query.monthPlanVersion = val;
+      // this.listProductionVersionList();
     },
     async requireProductionPlanVersionList() {
       try {
         const res = await requireProductionPlanVersionList(this.formatParams());
-        console.log(res);
+
         let list = [];
         for (let index = 0; index < res.length; index++) {
           let obj = {};
@@ -449,7 +448,7 @@ export default {
     async listProductionVersionList() {
       try {
         const res = await listProductionVersionList(this.formatParams());
-        console.log(res);
+
         let list = [];
         for (let index = 0; index < res.length; index++) {
           let obj = {};
@@ -466,8 +465,16 @@ export default {
       console.log(val);
       this.query.yearMonth = val;
       this.search.yearMonth = val;
+      this.$set(this.search, "monthPlanVersion", "");
+      this.$set(this.query, "monthPlanVersion", "");
+      this.$set(this.search, "productionVersion", "");
+      this.$set(this.query, "productionVersion", "");
+      this.requireProductionPlanVersionList()
     },
     handlePlanChange(val) {
+      console.log('查询')
+      this.$set(this.search, "productionVersion", "");
+      this.$set(this.query, "productionVersion", "");
       this.query.monthPlanVersion = val;
       this.search.monthPlanVersion = val;
 
@@ -760,7 +767,6 @@ export default {
         this.loading = true;
         this.map = {};
         const data = await listConsole(this.formatParams());
-        console.log(data);
         // this.data = data.rows;
         this.originTableData = data.rows;
 

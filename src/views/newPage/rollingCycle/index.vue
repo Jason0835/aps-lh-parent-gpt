@@ -1015,7 +1015,7 @@ export default {
   },
   methods: {
     //修改锁定上机日期
-     handleLockScheduleChange(row, val){
+     handleLockScheduleChange(row,val){
       saveAdjustResult(row)
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
@@ -1046,17 +1046,19 @@ export default {
       }
     },
     isNoPositiveInteger(num) {
-      return /^\d+$/.test(num);
+      return /^-?\d+$/.test(num);
     },
     isPositiveInteger(num) {
       return /^(0|[1-9]\d*)$/.test(num);
     },
     async editAdjust(row, type) {
       if (!type) {
+        console.log('调整量',row.confirmAdjustQty,this.isNoPositiveInteger(row.confirmAdjustQty))
         if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
           return this.$modal.msgWarning("不能有小数点");
         }
       } else {
+        console.log('优先级',row.adjustPriority,this.isPositiveInteger(row.adjustPriority))
         if (!this.isPositiveInteger(row.adjustPriority)) {
           return this.$modal.msgWarning("请输入正整数");
         }
@@ -1094,6 +1096,7 @@ export default {
         ...this.search,
         yearMonth: val,
       };
+
       this.getVersionList();
     },
     handleFactoryChange(val) {
@@ -1105,10 +1108,12 @@ export default {
         ...this.search,
         factoryCode: val,
       };
+
       this.getVersionList();
     },
     //获取版本列表
     async getVersionList(isGet = false) {
+      console.log('年月切换',this.activeName)
       let res;
       try {
         if (this.activeName == "first") {
@@ -1118,6 +1123,7 @@ export default {
           res = await versionStructure(this.formatParams());
         }
         if (this.activeName == "three") {
+          if(!this.isTabChange)return
           res = await resultVersion(this.formatParams());
         }
 
@@ -1160,6 +1166,7 @@ export default {
           });
         }
       } catch (err) {
+        console.log(err)
       } finally {
         // if (isGet) {
         //   this.getList();
@@ -1232,7 +1239,7 @@ export default {
       this.isShowFoot = false;
       this.isShowResult = false;
       this.showOutResult = false;
-
+      this.isTabChange=true
       this.getVersionList(true);
     },
     //确认调整结果
@@ -1404,7 +1411,7 @@ export default {
       }
     },
 
-    //自动调整
+    //结构自动调整
     async handShowResult() {
       this.show = false;
       this.loading = true;
@@ -1432,6 +1439,11 @@ export default {
         this.isTabChange = false;
         this.isShowFoot = true;
         this.activeName = "three";
+        this.versionList=[]
+        this.$set(this.search, "version", "");
+        this.$set(this.query, "version", "");
+
+
       } catch (err) {
         console.log(err);
         this.show = true;
