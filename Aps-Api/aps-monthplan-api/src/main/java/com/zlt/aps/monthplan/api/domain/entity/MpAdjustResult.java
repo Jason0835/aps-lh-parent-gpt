@@ -323,7 +323,7 @@ public class MpAdjustResult extends BaseEntity {
     private Integer day31;
 
     /** 是否锁定上机日期：0-否，1-是 */
-    @Excel(name = "ui.data.column.mpAdjustResult.isLockSchedule")
+    @Excel(name = "ui.data.column.mpAdjustResult.isLockSchedule", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否锁定上机日期：0-否，1-是", name = "isLockSchedule")
     @TableField(value = "IS_LOCK_SCHEDULE")
     private String isLockSchedule;

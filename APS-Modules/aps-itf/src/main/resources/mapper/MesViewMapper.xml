@@ -57,4 +57,17 @@
         <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
     </select>
+
+    <select id="selectMesBrandDict" resultType="com.zlt.aps.itf.vo.MesBrandDict">
+        SELECT OBJID,
+               RECORD_TIME,
+               DELETE_FLAG,
+               BRAND_CODE,
+               BRAND_NAME,
+               BRAND_SHORT_NAME,
+               OTHER_NAME,
+               SEQ_INDEX,
+               REMARK
+        FROM CBM_BRAND
+    </select>
 </mapper>

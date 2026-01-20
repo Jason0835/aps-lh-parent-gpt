@@ -9,6 +9,7 @@ import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdResultDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
@@ -265,7 +266,7 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     @PostMapping("/versionList")
     @ApiOperation("查询对应年月+分厂的需求计划版本")
-    public AjaxResult versionList(FactoryMonthPlanProductionFinalResult saleMonthPlanRequire) {
+    public AjaxResult versionList(MpFactoryProductionVersion saleMonthPlanRequire) {
         return factoryConsoleService.versionList(saleMonthPlanRequire);
     }
 
@@ -275,7 +276,7 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     @PostMapping("/getProductionVersionList")
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
-    public AjaxResult getProductionVersionList(FactoryMonthPlanProductionFinalResult query) {
+    public AjaxResult getProductionVersionList(MpFactoryProductionVersion query) {
         return factoryConsoleService.getProductionVersionList(query);
     }
 

@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -129,4 +130,13 @@ public interface IMesItfService {
     @ApiOperation("下发月计划")
     @PostMapping("/mesItf/issueMonthPlan")
     public AjaxResult issueMonthPlan(@RequestBody List<FactoryMonthPlanProductionFinalResult> finalResultList);
+
+    /**
+     * 查询MES品牌字典
+     *
+     * @return 结果
+     */
+    @ApiOperation("查询MES品牌字典")
+    @PostMapping("/mesItf/selectMesBrandDict")
+    public List<MesBrandDict> selectMesBrandDict();
 }

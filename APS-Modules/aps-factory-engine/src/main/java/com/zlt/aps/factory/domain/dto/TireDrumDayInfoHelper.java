@@ -9,25 +9,25 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 模具分配比例日控制信息对象
- * 模壳日数量限制
- * 模块日使用量
+ * 轮胎成型鼓日排产限制对象
+ * 总数量
+ * 日使用量
  *
  * @author ZLT
- * @date 20260116
+ * @date 20260119
  */
 @Getter
-public class MouldAllocationDayInfoHelper implements Serializable {
+public class TireDrumDayInfoHelper implements Serializable {
     /**
-     * 控制维度 结构 + 主花纹
+     * 鼓分组Id
      */
-    private String controlDimension;
+    private String groupId;
     /**
      * 排产日
      */
     private Integer productionDay;
     /**
-     * 模壳数量
+     * 总数
      */
     private Integer maxLimitQty;
     /**
@@ -35,20 +35,20 @@ public class MouldAllocationDayInfoHelper implements Serializable {
      */
     private Integer usedQty;
     /**
-     * 已使用模具
+     * 已使用成型机台
      */
-    private Set<String> usedMouldSet;
+    private Set<String> usedCxMachineSet;
 
     /**
      * 创建初始化对象
      *
-     * @param controlDimension 控制维度
-     * @param productionDay    排产日
-     * @param maxLimitQty      最大数量
+     * @param groupId       胶囊卡盘
+     * @param productionDay 排产日
+     * @param maxLimitQty   最大数量
      * @return
      */
-    public static MouldAllocationDayInfoHelper buildInit(String controlDimension, Integer productionDay, Integer maxLimitQty) {
-        return new MouldAllocationDayInfoHelper(controlDimension, productionDay, maxLimitQty);
+    public static TireDrumDayInfoHelper buildInit(String groupId, Integer productionDay, Integer maxLimitQty) {
+        return new TireDrumDayInfoHelper(groupId, productionDay, maxLimitQty);
     }
 
     /**
@@ -68,18 +68,18 @@ public class MouldAllocationDayInfoHelper implements Serializable {
     }
 
     /**
-     * 使用量 + 1
+     * 鼓使用量 + 1
      *
-     * @param mouldCode 型腔模号
+     * @param cxMachineCode 成型机台
      */
-    public void addUsedCount(String mouldCode) {
-        if (StringUtils.isBlank(mouldCode)) {
+    public void addUsedCount(String cxMachineCode) {
+        if (StringUtils.isBlank(cxMachineCode)) {
             return;
         }
-        if (usedMouldSet.contains(mouldCode)) {
+        if (usedCxMachineSet.contains(cxMachineCode)) {
             return;
         }
-        usedMouldSet.add(mouldCode);
+        usedCxMachineSet.add(cxMachineCode);
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             existUsedQty = BigDecimal.ZERO.intValue();
@@ -89,41 +89,41 @@ public class MouldAllocationDayInfoHelper implements Serializable {
     }
 
     /**
-     * 使用量 - 1
+     * 鼓使用量 - 1
      */
-    public void deductionUsedCount(String mouldCode) {
+    public void deductionUsedCount(String cxMachineCode) {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
         }
-        if(usedMouldSet.contains(mouldCode)){
-            usedMouldSet.remove(mouldCode);
-            existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
-            usedQty = existUsedQty;
+        if (usedCxMachineSet.contains(cxMachineCode)) {
+            usedCxMachineSet.remove(cxMachineCode);
         }
+        existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
+        usedQty = existUsedQty;
     }
 
     /**
-     * 清空使用量
+     * 清空鼓使用量
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();
-        usedMouldSet = new HashSet<>();
+        usedCxMachineSet = new HashSet<>();
     }
 
     /**
      * 构造函数
      *
-     * @param controlDimension 控制维度
-     * @param productionDay    控制日
-     * @param maxLimitQty      最大数量
+     * @param groupId       分组Id
+     * @param productionDay 排产日
+     * @param maxLimitQty   最大量
      */
-    MouldAllocationDayInfoHelper(String controlDimension, Integer productionDay, Integer maxLimitQty) {
-        this.controlDimension = controlDimension;
+    TireDrumDayInfoHelper(String groupId, Integer productionDay, Integer maxLimitQty) {
+        this.groupId = groupId;
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();
-        this.usedMouldSet = new HashSet<>();
+        this.usedCxMachineSet = new HashSet<>();
     }
 
 }

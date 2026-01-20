@@ -1,12 +1,17 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
+
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -80,7 +85,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 产品结构(物料信息.结构)
      */
-    @Excel(name = "ui.data.column.dpStockVersion.structureName")
+//    @Excel(name = "ui.data.column.dpStockVersion.structureName")
     @ApiModelProperty(value = "产品结构(物料信息.结构)", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
@@ -111,7 +116,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 需求对冲后-余量库存
      */
-    @Excel(name = "ui.data.column.dpStockVersion.remainingQty", cellType = Excel.ColumnType.NUMERIC)
+//    @Excel(name = "ui.data.column.dpStockVersion.remainingQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月结库存余量", name = "REMAINING_QTY")
     @TableField(value = "REMAINING_QTY")
     private Integer remainingQty;
@@ -142,7 +147,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 是否超3个月胎，字典：biz_yes_no，1 是 0 否
      */
-    @Excel(name = "ui.data.column.dpStockVersion.isExceedThreeMonth", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.dpStockVersion.isExceedThreeMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超3个月胎，字典：biz_yes_no，1 是 0 否", name = "isExceedThreeMonth")
     @TableField(value = "IS_EXCEED_THREE_MONTH")
     private String isExceedThreeMonth;
@@ -158,7 +163,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 是否超9个月胎，字典：biz_yes_no，1 是 0 否
      */
-    @Excel(name = "ui.data.column.dpStockVersion.isExceedNineMonth", dictType = "biz_yes_no")
+//    @Excel(name = "ui.data.column.dpStockVersion.isExceedNineMonth", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否超9个月胎，字典：biz_yes_no，1 是 0 否", name = "isExceedNineMonth")
     @TableField(value = "IS_EXCEED_NINE_MONTH")
     private String isExceedNineMonth;
@@ -174,10 +179,16 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 内外销
      */
-    @Excel(name = "ui.data.column.dpStockVersion.domesticExportSale")
+//    @Excel(name = "ui.data.column.dpStockVersion.domesticExportSale")
     @ApiModelProperty(value = "内外销", name = "domesticExportSale")
     @TableField(exist = false)
     private String domesticExportSale;
+
+    @Excel(name = "ui.data.column.demandPlan.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
+    private Date updateTime;
 
     /**
      * 获取分厂销售需求版本计划分组Key

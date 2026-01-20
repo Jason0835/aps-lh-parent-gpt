@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -205,6 +206,46 @@ public class MpAdjustStructureIn extends BaseEntity {
     private Integer typeBlockQty;
 
     /**
+     * 高优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.heightQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "高优先级", name = "heightQty")
+    @TableField(value = "HEIGHT_QTY")
+    private Integer heightQty;
+
+    /**
+     * 中优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.midQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "中优先级", name = "midQty")
+    @TableField(value = "MID_QTY")
+    private Integer midQty;
+
+    /**
+     * 暂缓订单
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.postponeQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
+    @TableField(value = "POSTPONE_QTY")
+    private Integer postponeQty;
+
+    /**
+     * 周期排产储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
+    @TableField(value = "CYCLE_RESERVE_QTY")
+    private Integer cycleReserveQty;
+
+    /**
+     * 常规储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
+    @TableField(value = "CONVENTION_RESERVE_QTY")
+    private Integer conventionReserveQty;
+
+    /**
      * 日硫化量
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dayVulcanizationQty")
@@ -285,6 +326,24 @@ public class MpAdjustStructureIn extends BaseEntity {
     @ApiModelProperty(value = "是否SKU新增")
     @TableField(value = "IS_SKU_ADD")
     private String isSkuAdd;
+
+    /**
+     * 紧急程度 数据字典 biz_urgency_type 01 紧急 04 普通
+     */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.urgencyType", dictType = "biz_urgency_type")
+    @ApiModelProperty(value = "紧急程度 数据字典 biz_urgency_type 01 紧急 04 普通", name = "urgencyType")
+    @TableField(value = "URGENCY_TYPE")
+    private String urgencyType;
+
+    /**
+     * 制造示方书号
+     */
+    @ImportExcelValidated(maxLength = 30)
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.embryoNo")
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(value = "EMBRYO_NO")
+    private String embryoNo;
+
 
     /**
      * 获取分组key

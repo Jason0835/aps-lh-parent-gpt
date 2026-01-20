@@ -306,6 +306,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResultList.add(mpAdjustResult);
         }
         baseDao.insertBatch(mpAdjustResultList);
+        contextDTO.setAdjustResultList(mpAdjustResultList);
     }
 
     /**
@@ -731,6 +732,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (contextDTO.getMpYear() != null && contextDTO.getMpMonth() != null) {
             // 年月
             contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + String.format("%02d",contextDTO.getMpMonth())));
+            // 获取定稿的排产版本
+            MpFactoryProductionVersion version = getIsFinalVersion(contextDTO);
+            if (version != null) {
+                // 排产版本号
+                contextDTO.setProductionVersion(version.getProductionVersion());
+                // 需求计划版本
+                contextDTO.setMonthPlanVersion(version.getMonthPlanVersion());
+            }
         }
     }
 
@@ -1057,8 +1066,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
-        contextDTO.setProductionVersion(factoryProductionVersion.getProductionVersion());
-        contextDTO.setMonthPlanVersion(factoryProductionVersion.getMonthPlanVersion());
     }
 
 

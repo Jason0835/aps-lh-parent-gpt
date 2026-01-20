@@ -162,6 +162,23 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取结构下的英寸信息，随意一条计划的因此即可
+     *
+     * @return
+     */
+    public String getProSizeInfo() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProSizeList = groupPlanData.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getProSize())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProSizeList)) {
+            return null;
+        }
+        Set<String> proSizeSet = hasProSizeList.stream().map(MonthPlanProductionRequirePlanVo::getProSize).collect(Collectors.toSet());
+        return new ArrayList<>(proSizeSet).get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
      * 更新设置整个分组计划不排产
      */
     public void setNoProductionNoReachMinProductionDays(Integer minProductionDays) {

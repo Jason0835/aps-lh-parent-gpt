@@ -73,7 +73,7 @@ public class CxCapacityAllocationHandler {
                 Integer allocationDay = cxMachineBaseInfo.getMaxProductionDays();
                 cxMachineBaseInfo.setRemainingDays(BigDecimal.ZERO.intValue());
                 CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
-                cxMachineBaseInfo.addAllocationPlanInfo(helper);
+                cxMachineBaseInfo.addAllocationPlanInfo(context, helper);
                 continueAllocationMap.put(cxCapacityInfo.getCxMachineCode(), helper);
             }
             //不是整台部分
@@ -85,7 +85,7 @@ public class CxCapacityAllocationHandler {
             BigDecimal decimalPart = machineCount.subtract(integerPart);
             Integer allocationDay = decimalPart.multiply(BigDecimal.valueOf(context.getMaxProductionDays())).setScale(0, RoundingMode.UP).intValue();
             CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
-            cxMachineBaseInfo.addAllocationPlanInfo(helper);
+            cxMachineBaseInfo.addAllocationPlanInfo(context, helper);
             continueAllocationMap.put(cxMachineBaseInfo.getCxMachineCode(), helper);
             Integer newRemainingDays = cxMachineBaseInfo.getRemainingDays() - allocationDay;
             cxMachineBaseInfo.setRemainingDays(newRemainingDays);
@@ -233,10 +233,12 @@ public class CxCapacityAllocationHandler {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
             return;
         }
+        //todo 判断成型鼓是否符合条件
+
+
         Integer minAllocationDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
         log.info(TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan));
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
-        //todo 判断成型鼓是否符合条件
         Integer needAllocationDays = allocationGroupPlan.getRemainingNeedAllocationDays();
         //更新剩余时间
         Integer leftOver = remainingDays - needAllocationDays;
@@ -244,8 +246,9 @@ public class CxCapacityAllocationHandler {
         CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
         Integer startDay = lastHelper.getEndDay() + BigDecimal.ONE.intValue();
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
-        cxMachineInfo.addAllocationPlanInfo(addHelper);
+        cxMachineInfo.addAllocationPlanInfo(context, addHelper);
         //20260109 标记分配完成
+        allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);

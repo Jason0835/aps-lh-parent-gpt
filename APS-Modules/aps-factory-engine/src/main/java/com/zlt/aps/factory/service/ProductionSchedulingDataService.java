@@ -149,6 +149,22 @@ public interface ProductionSchedulingDataService {
     Map<String, CxMachineBaseInfoVo> getCxMachineBaseInfo(Context context);
 
     /**
+     * 获取工厂的成型鼓台账信息
+     *
+     * @param context
+     * @return
+     */
+    List<MdmWorkWearInfo> getWorkWearInfo(Context context);
+
+    /**
+     * 获取工厂的胶囊卡盘信息
+     *
+     * @param context
+     * @return
+     */
+    List<MdmCapsuleChuck> getCapsuleChuck(Context context);
+
+    /**
      * 获取投产施工基础信息
      *
      * @return

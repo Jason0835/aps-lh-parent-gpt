@@ -174,6 +174,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
         contextDTO.setStartDay(beginDay);
         contextDTO.setEndDay(endDay);
+        contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
     }
 }

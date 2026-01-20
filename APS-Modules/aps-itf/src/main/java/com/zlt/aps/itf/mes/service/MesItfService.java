@@ -2,6 +2,7 @@ package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 
 import java.text.ParseException;
@@ -120,4 +121,11 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMoldShell(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询品牌信息
+     *
+     * @return 结果
+     */
+    List<MesBrandDict> selectMesBrandDict();
 }

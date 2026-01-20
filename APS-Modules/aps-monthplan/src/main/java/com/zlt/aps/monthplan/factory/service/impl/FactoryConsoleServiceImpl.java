@@ -8,7 +8,6 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
@@ -264,7 +263,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
      * @param query
      */
     @Override
-    public List<String> versionList(FactoryMonthPlanProductionFinalResult query) {
+    public List<String> versionList(MpFactoryProductionVersion query) {
         if (query.getYear() == null || query.getMonth() == null || StringUtils.isBlank(query.getFactoryCode())) {
             return Collections.emptyList();
         }
@@ -278,7 +277,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
      * @return
      */
     @Override
-    public List<String> productionVersionList(FactoryMonthPlanProductionFinalResult query) {
+    public List<String> productionVersionList(MpFactoryProductionVersion query) {
         if (query.getYear() == null || query.getMonth() == null || StringUtils.isBlank(query.getFactoryCode()) || StringUtils.isBlank(query.getMonthPlanVersion())) {
             return Collections.emptyList();
         }

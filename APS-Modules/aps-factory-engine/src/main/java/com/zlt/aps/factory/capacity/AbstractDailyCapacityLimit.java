@@ -2,6 +2,7 @@ package com.zlt.aps.factory.capacity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
@@ -19,6 +20,11 @@ import java.util.Map;
  * @date 2025/12/24
  */
 public abstract class AbstractDailyCapacityLimit {
+
+    /**
+     * 施工阶段字段
+     */
+    private static String CONSTRUCTION_STAGE_FIELD = "constructionStage";
 
     /**
      * 初始化日产能
@@ -102,6 +108,11 @@ public abstract class AbstractDailyCapacityLimit {
         String embryoFieldValue;
         for (BaseEntity mpFinalVo: mpProdFinalList){
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null) {
+                continue;
+            }
+            if (mpFinalVo.getFieldValueByFieldName(CONSTRUCTION_STAGE_FIELD) != null &&
+                    ConstructionStageEnum.MEASUREMENT.getStage().equals(mpFinalVo.getFieldValueByFieldName(CONSTRUCTION_STAGE_FIELD))){
+                //试制 不纳入统计
                 continue;
             }
             // 日计划量

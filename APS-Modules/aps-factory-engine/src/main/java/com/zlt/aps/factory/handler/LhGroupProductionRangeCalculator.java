@@ -27,7 +27,8 @@ import java.util.stream.Collectors;
  * 1、硫化组关联的机台对应的胎胚种类数的限制
  * 2、挑选的模具本身排产日的限制(模具可排产日以及模具已排日)
  * 3、挑选的模具对应的模壳总数限制
- * 4、排产的计划，对应的结构+主花纹的模具分配比例限制
+ * 4、挑选的模具对应的胶囊总数限制
+ * 5、排产的计划，对应的结构+主花纹的模具分配比例限制
  *
  * @author ZLT
  * @date 20260117
@@ -91,6 +92,15 @@ public class LhGroupProductionRangeCalculator {
             return Collections.emptySet();
         }
         intersectionSet = intersectionSet.stream().filter(mouldAllocationSet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            return Collections.emptySet();
+        }
+        //20260119 取得与胶囊卡盘总数排产范围的交集
+        Set<Integer> capsuleChuckSet = productionContext.getCapsuleChuckRange(addSkuInfo);
+        if (CollectionUtils.isEmpty(capsuleChuckSet)) {
+            return Collections.emptySet();
+        }
+        intersectionSet = intersectionSet.stream().filter(capsuleChuckSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
             return Collections.emptySet();
         }

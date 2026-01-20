@@ -11,7 +11,7 @@ import java.util.Set;
 /**
  * 模壳的日信息对象
  * 模壳日数量限制
- * 模块日使用量
+ * 模壳日使用量
  *
  * @author ZLT
  * @date 20260116

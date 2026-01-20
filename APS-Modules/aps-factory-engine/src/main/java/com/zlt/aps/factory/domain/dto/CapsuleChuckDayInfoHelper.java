@@ -9,25 +9,25 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 模具分配比例日控制信息对象
- * 模壳日数量限制
- * 模块日使用量
+ * 胶囊卡盘日排产限制对象
+ * 卡盘数量
+ * 日使用量
  *
  * @author ZLT
- * @date 20260116
+ * @date 20260119
  */
 @Getter
-public class MouldAllocationDayInfoHelper implements Serializable {
+public class CapsuleChuckDayInfoHelper implements Serializable {
     /**
-     * 控制维度 结构 + 主花纹
+     * 胶囊卡盘分组Id
      */
-    private String controlDimension;
+    private String groupId;
     /**
      * 排产日
      */
     private Integer productionDay;
     /**
-     * 模壳数量
+     * 卡盘总数
      */
     private Integer maxLimitQty;
     /**
@@ -35,20 +35,20 @@ public class MouldAllocationDayInfoHelper implements Serializable {
      */
     private Integer usedQty;
     /**
-     * 已使用模具
+     * 已使用模具--模具对应胶囊使用
      */
     private Set<String> usedMouldSet;
 
     /**
      * 创建初始化对象
      *
-     * @param controlDimension 控制维度
-     * @param productionDay    排产日
-     * @param maxLimitQty      最大数量
+     * @param groupId       胶囊卡盘
+     * @param productionDay 排产日
+     * @param maxLimitQty   最大数量
      * @return
      */
-    public static MouldAllocationDayInfoHelper buildInit(String controlDimension, Integer productionDay, Integer maxLimitQty) {
-        return new MouldAllocationDayInfoHelper(controlDimension, productionDay, maxLimitQty);
+    public static CapsuleChuckDayInfoHelper buildInit(String groupId, Integer productionDay, Integer maxLimitQty) {
+        return new CapsuleChuckDayInfoHelper(groupId, productionDay, maxLimitQty);
     }
 
     /**
@@ -68,7 +68,7 @@ public class MouldAllocationDayInfoHelper implements Serializable {
     }
 
     /**
-     * 使用量 + 1
+     * 胶囊使用量 + 1
      *
      * @param mouldCode 型腔模号
      */
@@ -89,22 +89,25 @@ public class MouldAllocationDayInfoHelper implements Serializable {
     }
 
     /**
-     * 使用量 - 1
+     * 胶囊使用量 - 1
+     *
+     * @param mouldCode 型腔模号
      */
     public void deductionUsedCount(String mouldCode) {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
         }
-        if(usedMouldSet.contains(mouldCode)){
-            usedMouldSet.remove(mouldCode);
-            existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
-            usedQty = existUsedQty;
+        if (!usedMouldSet.contains(mouldCode)) {
+            return;
         }
+        usedMouldSet.remove(mouldCode);
+        existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
+        usedQty = existUsedQty;
     }
 
     /**
-     * 清空使用量
+     * 清空胶囊卡盘使用量
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();
@@ -114,12 +117,12 @@ public class MouldAllocationDayInfoHelper implements Serializable {
     /**
      * 构造函数
      *
-     * @param controlDimension 控制维度
-     * @param productionDay    控制日
-     * @param maxLimitQty      最大数量
+     * @param groupId       分组Id
+     * @param productionDay 排产日
+     * @param maxLimitQty   最大量
      */
-    MouldAllocationDayInfoHelper(String controlDimension, Integer productionDay, Integer maxLimitQty) {
-        this.controlDimension = controlDimension;
+    CapsuleChuckDayInfoHelper(String groupId, Integer productionDay, Integer maxLimitQty) {
+        this.groupId = groupId;
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();

@@ -140,14 +140,14 @@ public interface IFactoryConsoleRemoteService {
      */
     @PostMapping("/factoryConsole/versionList")
     @ApiOperation("查询对应年月+分厂的需求计划版本")
-    public AjaxResult versionList(@RequestBody FactoryMonthPlanProductionFinalResult query);
+    public AjaxResult versionList(@RequestBody MpFactoryProductionVersion query);
 
     /**
      * 查询对应年月+分厂+需求计划版本的分厂月计划版本
      */
     @PostMapping("/factoryConsole/getProductionVersionList")
     @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
-    public AjaxResult getProductionVersionList(@RequestBody FactoryMonthPlanProductionFinalResult query);
+    public AjaxResult getProductionVersionList(@RequestBody MpFactoryProductionVersion query);
 
     /**
      * 获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产

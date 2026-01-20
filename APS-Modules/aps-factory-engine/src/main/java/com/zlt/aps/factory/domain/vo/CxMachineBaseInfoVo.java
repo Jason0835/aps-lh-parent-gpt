@@ -335,10 +335,12 @@ public class CxMachineBaseInfoVo implements Serializable {
 
     /**
      * 新增分配的分组计划信息
+     * 同时，将成型工装的日使用量 + 1
+     * 因都是3鼓机台，故而每种工装类型的日使用量都 + 1
      *
-     * @param addAllocationPlan
+     * @param addAllocationPlan 分配信息对象
      */
-    public void addAllocationPlanInfo(CxMachineAllocationPlanHelper addAllocationPlan) {
+    public void addAllocationPlanInfo(Context context, CxMachineAllocationPlanHelper addAllocationPlan) {
         if (null == addAllocationPlan) {
             return;
         }
@@ -346,6 +348,39 @@ public class CxMachineBaseInfoVo implements Serializable {
             allocationList = new ArrayList<>();
         }
         allocationList.add(addAllocationPlan);
+        //20260119 处理成型工装的日使用量
+        Integer startDay = addAllocationPlan.getStartDay();
+        Integer endDay = addAllocationPlan.getEndDay();
+        String proSize = addAllocationPlan.getProductionPlanInfo().getProSizeInfo();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
+            if (stopDayInfo.contains(productionDay)) {
+                continue;
+            }
+            productionContext.getBaseDataContainer().addUsedCount(productionDay, proSize, cxMachineCode);
+        }
+    }
+
+    /**
+     * 处理结构提前收尾
+     * 需要将成型工装数量还原即使用数量 - 1
+     *
+     * @param context         排产上下文
+     * @param deductionDaySet 收尾的日期
+     * @param groupPlanInfo   收尾的结构信息
+     */
+    public void handlerBeforeConclusion(Context context, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo) {
+        String proSize = groupPlanInfo.getProSizeInfo();
+        if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(deductionDaySet)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        deductionDaySet.forEach(beforeConclusionDay -> {
+            if (stopDayInfo.contains(beforeConclusionDay)) {
+                return;
+            }
+            productionContext.getBaseDataContainer().releaseUsedCount(beforeConclusionDay, proSize, cxMachineCode);
+        });
     }
 
     /**
