@@ -5,13 +5,12 @@ import com.alibaba.fastjson.JSONValidator;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
-import com.zlt.aps.itf.finereport.vo.FinereportParams;
 import com.zlt.aps.itf.util.PostMethodUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -55,9 +54,9 @@ public class FinereportController {
      * @return 结果集合
      */
     @ApiOperation("报表预览公共页面")
-    @PostMapping("/reportView")
-    public AjaxResult reportView(FinereportParams params) {
-        String rptUrl = REPORT_VIEW_URL + "/" + params.getReportCode();
+    @GetMapping("/reportView/{reportCode}")
+    public AjaxResult reportView(@PathVariable("reportCode") String reportCode) {
+        String rptUrl = REPORT_VIEW_URL + "/" + reportCode;
         // 模拟登录帆软服务，获取token
         AjaxResult loginResult = this.loginFinereport();
         if (AjaxResultUtils.checkAjaxError(loginResult)) {
