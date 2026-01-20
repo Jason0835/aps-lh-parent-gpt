@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.zlt.aps.factory.domain.dto.DayCapacityLimitHelper;
+import com.zlt.aps.factory.domain.dto.TireDrumDayInfoHelper;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Data;
@@ -141,6 +142,114 @@ public class BaseDataContainer implements Serializable {
         //取得工装类型中剩余量最低的
         Optional<Map.Entry<String, Integer>> minEntry = workWeakTypeLimitQtyMap.entrySet().stream().min(Map.Entry.comparingByValue());
         return minEntry.get().getValue();
+    }
+
+    /**
+     * 获取符合proSize的成型工装量排产日集合
+     * 需要3鼓都有剩余量1
+     *
+     * @param proSize
+     * @return
+     */
+    public Set<Integer> getLeftOverProductionDayInfo(String proSize) {
+        if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(tireDrumInfoMap)) {
+            return Collections.emptySet();
+        }
+        Map<String, Map<String, TireDrumInfoVo>> effectiveMap = new HashMap<>();
+        tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
+            List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(limitGroupList)) {
+                return;
+            }
+            //todo 每天的剩余使用量
+
+        });
+        return null;
+    }
+
+    /**
+     * 按groupName增加在productionDay日的成型工装使用量
+     * 因当前TBR都是三股机台，故而工装类型全部+1
+     *
+     * @param productionDay 排产日
+     * @param groupName     当前为英寸
+     * @param cxMachineCode 成型机台
+     */
+    public void addUsedCount(Integer productionDay, String groupName, String cxMachineCode) {
+        if (isCheckEmpty(productionDay, groupName)) {
+            return;
+        }
+        tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
+            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, groupName, productionDay);
+            if (null == dayLimitInfo) {
+                return;
+            }
+            dayLimitInfo.addUsedCount(cxMachineCode);
+        });
+    }
+
+    /**
+     * 因提前收尾，导致按groupName在productionDay日的成型工装使用量释放，即使用量 - 1
+     * 因当前TBR都是三股机台，故而工装类型全部 - 1
+     *
+     * @param productionDay 排产日
+     * @param groupName     当前为英寸
+     * @param cxMachineCode 成型机台
+     */
+    public void releaseUsedCount(Integer productionDay, String groupName, String cxMachineCode) {
+        if (isCheckEmpty(productionDay, groupName)) {
+            return;
+        }
+        tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
+            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, groupName, productionDay);
+            if (null == dayLimitInfo) {
+                return;
+            }
+            dayLimitInfo.deductionUsedCount(cxMachineCode);
+        });
+    }
+
+    /**
+     * 根据成型工装类型限制信息，获取匹配proSize，在productionDay
+     * 的日排产限制对象
+     *
+     * @param workWeakTypeLimitInfo 某种成型工装类型限制对象
+     * @param proSize               英寸
+     * @param productionDay         排产日
+     * @return
+     */
+    private TireDrumDayInfoHelper getDayLimitInfo(Map<String, TireDrumInfoVo> workWeakTypeLimitInfo, String proSize, Integer productionDay) {
+        if (CollectionUtils.isEmpty(workWeakTypeLimitInfo) || StringUtils.isBlank(proSize) || null == productionDay) {
+            return null;
+        }
+        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(limitGroupList)) {
+            //没有找到与proSize匹配的成型工装限制信息
+            return null;
+        }
+        //随意一条
+        limitGroupList.sort(Comparator.comparing(TireDrumInfoVo::getGroupId));
+        TireDrumInfoVo tireDrumInfo = limitGroupList.get(BigDecimal.ZERO.intValue());
+        Map<Integer, TireDrumDayInfoHelper> dayLimitInfoMap = tireDrumInfo.getDayLimitInfoMap();
+        if (CollectionUtils.isEmpty(dayLimitInfoMap)) {
+            //没有找到在productionDay的日排产限制信息
+            return null;
+        }
+        return dayLimitInfoMap.get(productionDay);
+    }
+
+    /**
+     * 校验空参数
+     *
+     * @param productionDay 排产日
+     * @param groupName     分组信息
+     * @return
+     */
+    private boolean isCheckEmpty(Integer productionDay, String groupName) {
+        if (StringUtils.isBlank(groupName) || null == productionDay) {
+            return true;
+        }
+        return CollectionUtils.isEmpty(tireDrumInfoMap);
     }
 
 }

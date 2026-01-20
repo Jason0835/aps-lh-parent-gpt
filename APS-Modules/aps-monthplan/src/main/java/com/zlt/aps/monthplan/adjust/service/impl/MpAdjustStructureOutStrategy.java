@@ -144,11 +144,13 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //规格挑选可用机台
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        weekRollAdjustEngine.structureOutAdjustForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), MapUtils.getObject(mpProdFinalMap, contextDTO.getStructureName(), new ArrayList<>()));
+        weekRollAdjustEngine.structureOutAdjustForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
         //保存调整日志
         saveMpAdjustLog(contextDTO);
+
+        contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
     }
 
     /**
@@ -203,17 +205,22 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      */
     @Override
     protected void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
+        int beginDay = FactoryConstant.MONTH_MAX_DAY;
         int endDay = 0;
         List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();
         if (PubUtil.isNotEmpty(structureAllocationList)){
             // 取最大的成型机收尾日作为结构的收尾日
             for (MpStructureAllocation allocation:structureAllocationList){
+                if (beginDay > allocation.getBeginDay()){
+                    beginDay = allocation.getBeginDay();
+                }
                 if (endDay < allocation.getEndDay()){
                     endDay = allocation.getEndDay();
                 }
             }
         }
 
+        contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
         //若结构收尾日小于锁定日，提示
         if (contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){

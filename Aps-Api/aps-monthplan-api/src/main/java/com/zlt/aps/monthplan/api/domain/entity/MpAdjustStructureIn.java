@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
@@ -285,6 +286,24 @@ public class MpAdjustStructureIn extends BaseEntity {
     @ApiModelProperty(value = "是否SKU新增")
     @TableField(value = "IS_SKU_ADD")
     private String isSkuAdd;
+
+    /**
+     * 紧急程度 数据字典 biz_urgency_type 01 紧急 04 普通
+     */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.urgencyType", dictType = "biz_urgency_type")
+    @ApiModelProperty(value = "紧急程度 数据字典 biz_urgency_type 01 紧急 04 普通", name = "urgencyType")
+    @TableField(value = "URGENCY_TYPE")
+    private String urgencyType;
+
+    /**
+     * 制造示方书号
+     */
+    @ImportExcelValidated(maxLength = 30)
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.embryoNo")
+    @ApiModelProperty(value = "制造示方书号", name = "embryoNo")
+    @TableField(value = "EMBRYO_NO")
+    private String embryoNo;
+
 
     /**
      * 获取分组key

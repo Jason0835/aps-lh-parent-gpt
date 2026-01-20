@@ -89,19 +89,25 @@ public class CapsuleChuckDayInfoHelper implements Serializable {
     }
 
     /**
-     * 模壳使用量 - 1
+     * 胶囊使用量 - 1
+     *
+     * @param mouldCode 型腔模号
      */
-    public void deductionUsedCount() {
+    public void deductionUsedCount(String mouldCode) {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
         }
+        if (!usedMouldSet.contains(mouldCode)) {
+            return;
+        }
+        usedMouldSet.remove(mouldCode);
         existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
         usedQty = existUsedQty;
     }
 
     /**
-     * 清空模壳使用量
+     * 清空胶囊卡盘使用量
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();

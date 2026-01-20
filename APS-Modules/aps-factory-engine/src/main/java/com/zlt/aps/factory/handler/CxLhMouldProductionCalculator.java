@@ -424,6 +424,43 @@ public class CxLhMouldProductionCalculator {
     }
 
     /**
+     * 处理提前收尾，导致需要释放的模壳使用量、模具分配比例使用量、胶囊卡盘使用量
+     *
+     * @param context             排产上下文
+     * @param groupPlanInfo       提前收尾结构
+     * @param beforeConclusionDay 提前收尾日
+     * @param singleMould         模具信息
+     */
+    public static void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, Integer beforeConclusionDay, ProductionMouldInfoVo singleMould, String materialDesc) {
+        if (null == groupPlanInfo || StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        if (null == beforeConclusionDay || null == singleMould) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(singlePlan -> materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(productionPlanList)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        MonthPlanProductionRequirePlanVo productionPlan = productionPlanList.get(BigDecimal.ZERO.intValue());
+        //模具分配比例控制对象
+        MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
+        //胶囊卡盘数量控制对象
+        CapsuleChuckInfoVo capsuleChuckInfo = productionContext.getCapsuleChuckInfo(productionPlan);
+        //模壳标准使用量 - 1
+        updateMouldShellInfoByMould(productionContext, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
+        //模具分配比例使用量 - 1
+        updateMouldAllocationRatioInfoByMould(mouldAllocationControlInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
+        //胶囊卡盘使用量 - 1
+        updateCapsuleChuckInfoByMould(capsuleChuckInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
      * 续作Sku使用续作模具进行排产
      *
      * @param context         排产上下文
@@ -564,12 +601,12 @@ public class CxLhMouldProductionCalculator {
         //胶囊卡盘数量控制对象
         CapsuleChuckInfoVo capsuleChuckInfo = productionContext.getCapsuleChuckInfo(productionPlan);
         doubleMouldList.forEach(singleMould -> {
-            //模壳标准使用量
-            updateMouldShellInfoByMould(productionContext, productionDay, singleMould);
-            //模具分配比例使用量
-            updateMouldAllocationRatioInfoByMould(mouldAllocationControlInfo, productionDay, singleMould);
-            //胶囊卡盘使用量
-            updateCapsuleChuckInfoByMould(capsuleChuckInfo, productionDay, singleMould);
+            //模壳标准使用量 + 1
+            updateMouldShellInfoByMould(productionContext, productionDay, singleMould, YesOrNoEnum.YES.getValue());
+            //模具分配比例使用量 + 1
+            updateMouldAllocationRatioInfoByMould(mouldAllocationControlInfo, productionDay, singleMould, YesOrNoEnum.YES.getValue());
+            //胶囊卡盘使用量 + 1
+            updateCapsuleChuckInfoByMould(capsuleChuckInfo, productionDay, singleMould, YesOrNoEnum.YES.getValue());
         });
 
 
@@ -628,12 +665,15 @@ public class CxLhMouldProductionCalculator {
 
     /**
      * 更新模壳使用量
+     * 1、isAdd = 1时，模壳使用量 + 1
+     * 2、isAdd = 0时，模壳使用量 - 1
      *
      * @param productionContext 排产上下文
      * @param productionDay     排产日
      * @param singleMould       单副模具
+     * @param isAdd             1(使用数 + 1) 0(使用数 - 1)
      */
-    private static void updateMouldShellInfoByMould(TbrProductionContext productionContext, Integer productionDay, ProductionMouldInfoVo singleMould) {
+    private static void updateMouldShellInfoByMould(TbrProductionContext productionContext, Integer productionDay, ProductionMouldInfoVo singleMould, Integer isAdd) {
         //模具使用的模壳标准
         String mouldSetCode = singleMould.getMouldSetCode();
         if (StringUtils.isBlank(mouldSetCode)) {
@@ -645,43 +685,67 @@ public class CxLhMouldProductionCalculator {
             return;
         }
         //使用数+1
-        mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+        if (YesOrNoEnum.YES.getValue().equals(isAdd)) {
+            mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+        }
+        //使用数-1
+        if (YesOrNoEnum.NO.getValue().equals(isAdd)) {
+            mouldShellInfo.deductionUsedCount(productionDay, singleMould.getMouldCode());
+        }
     }
 
     /**
      * 更新模具分配比例的使用
-     * 数量 + 1
+     * 1、isAdd = 1时，模具分配比例使用量 + 1
+     * 2、isAdd = 0时，模具分配比例使用量 - 1
      *
      * @param mouldAllocationControlInfo 模具分配比例对象
      * @param productionDay              排产日
      * @param singleMould                单副模具
+     * @param isAdd                      1(使用数 + 1) 0(使用数 - 1)
      */
-    private static void updateMouldAllocationRatioInfoByMould(MouldAllocationInfoVo mouldAllocationControlInfo, Integer productionDay, ProductionMouldInfoVo singleMould) {
+    private static void updateMouldAllocationRatioInfoByMould(MouldAllocationInfoVo mouldAllocationControlInfo, Integer productionDay, ProductionMouldInfoVo singleMould, Integer isAdd) {
         if (null == mouldAllocationControlInfo) {
             return;
         }
         if (null == singleMould || StringUtils.isBlank(singleMould.getMouldCode())) {
             return;
         }
-        mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+        //使用数+1
+        if (YesOrNoEnum.YES.getValue().equals(isAdd)) {
+            mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+        }
+        //使用数-1
+        if (YesOrNoEnum.NO.getValue().equals(isAdd)) {
+            mouldAllocationControlInfo.deductionUsedCount(productionDay, singleMould.getMouldCode());
+        }
     }
 
     /**
      * 更新模具胶囊卡盘使用
-     * 数量 + 1
+     * 1、isAdd = 1时，胶囊卡盘使用量 + 1
+     * 2、isAdd = 0时，胶囊卡盘使用量 - 1
      *
      * @param capsuleChuckInfo 模具胶囊卡盘对象
      * @param productionDay    排产日
      * @param singleMould      单副模具
+     * @param isAdd            1(使用数 + 1) 0(使用数 - 1)
      */
-    private static void updateCapsuleChuckInfoByMould(CapsuleChuckInfoVo capsuleChuckInfo, Integer productionDay, ProductionMouldInfoVo singleMould) {
+    private static void updateCapsuleChuckInfoByMould(CapsuleChuckInfoVo capsuleChuckInfo, Integer productionDay, ProductionMouldInfoVo singleMould, Integer isAdd) {
         if (null == capsuleChuckInfo) {
             return;
         }
         if (null == singleMould || StringUtils.isBlank(singleMould.getMouldCode())) {
             return;
         }
-        capsuleChuckInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+        //使用数+1
+        if (YesOrNoEnum.YES.getValue().equals(isAdd)) {
+            capsuleChuckInfo.addUsedCount(productionDay, singleMould.getMouldCode());
+        }
+        //使用数-1
+        if (YesOrNoEnum.NO.getValue().equals(isAdd)) {
+            capsuleChuckInfo.deductionUsedCount(productionDay, singleMould.getMouldCode());
+        }
     }
 
 

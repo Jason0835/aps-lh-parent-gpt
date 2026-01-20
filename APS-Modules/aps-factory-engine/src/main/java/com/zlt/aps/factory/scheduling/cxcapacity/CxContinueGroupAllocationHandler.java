@@ -196,7 +196,7 @@ public class CxContinueGroupAllocationHandler {
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
             ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
             CxMachineAllocationPlanHelper helper = new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
-            cxMachineInfo.addAllocationPlanInfo(helper);
+            cxMachineInfo.addAllocationPlanInfo(context, helper);
             allocationList.add(helper);
         });
         return allocationList;
@@ -247,7 +247,7 @@ public class CxContinueGroupAllocationHandler {
                 cxMachineInfo.setRemainingDays(remainingDays - allocationDay);
                 groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
                 CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
-                cxMachineInfo.addAllocationPlanInfo(helper);
+                cxMachineInfo.addAllocationPlanInfo(context, helper);
                 allocationList.add(helper);
                 sumDays = sumDays - allocationDay;
             }
@@ -264,7 +264,7 @@ public class CxContinueGroupAllocationHandler {
             cxMachineInfo.setRemainingDays(remainingDays - leftOverAllocationDay);
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
             CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
-            cxMachineInfo.addAllocationPlanInfo(helper);
+            cxMachineInfo.addAllocationPlanInfo(context, helper);
             allocationList.add(helper);
             leftOverSplitDays = leftOverSplitDays - leftOverAllocationDay;
         }

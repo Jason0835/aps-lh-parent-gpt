@@ -167,7 +167,7 @@ public class CapsuleChuckInfoVo implements Serializable {
     }
 
     /**
-     * 在productionDay天，模具使用量+1
+     * 在productionDay天，胶囊卡盘使用量+1
      *
      * @param productionDay 排产日
      * @param mouldCode     型腔模号
@@ -183,4 +183,20 @@ public class CapsuleChuckInfoVo implements Serializable {
         dayLimit.addUsedCount(mouldCode);
     }
 
+    /**
+     * 在productionDay天，胶囊卡盘使用量+1
+     *
+     * @param productionDay 排产日
+     * @param mouldCode     型腔模号
+     */
+    public void deductionUsedCount(Integer productionDay, String mouldCode) {
+        if (CollectionUtils.isEmpty(dayLimitInfoMap)) {
+            return;
+        }
+        CapsuleChuckDayInfoHelper dayLimit = dayLimitInfoMap.get(productionDay);
+        if (null == dayLimit) {
+            return;
+        }
+        dayLimit.deductionUsedCount(mouldCode);
+    }
 }
