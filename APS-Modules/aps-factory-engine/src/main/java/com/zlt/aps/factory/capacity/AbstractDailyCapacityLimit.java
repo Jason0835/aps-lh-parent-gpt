@@ -152,8 +152,10 @@ public abstract class AbstractDailyCapacityLimit {
             }
 
             // 统计胎胚种类数
-            embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
-            dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
+            if (dayPlanQty > 0){
+                embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
+                dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
+            }
         }
         int iCount = Math.max(remainderCount,changeMouldCount);
 
