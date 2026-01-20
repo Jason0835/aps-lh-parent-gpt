@@ -45,7 +45,7 @@ public class MdmMaterialInfo extends BaseEntity {
      * MES物料大类
      */
     @ImportExcelValidated(maxLength = 10)
-    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCategory", dictType = "mes_material_category")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCategory", dictType = "mes_material_category")
     @ApiModelProperty(value = "MES物料大类", name = "materialCategory")
     @TableField(value = "MES_MATERIAL_CATEGORY")
     private String mesMaterialCategory;
@@ -54,7 +54,7 @@ public class MdmMaterialInfo extends BaseEntity {
      * MES物料细类
      */
     @ImportExcelValidated(maxLength = 10)
-    @Excel(name = "ui.data.column.mdmMaterialInfo.materialCategory", dictType = "mes_material_subcategory")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialSubcategory", dictType = "mes_material_subcategory")
     @ApiModelProperty(value = "MES物料细类", name = "mesMaterialSubcategory")
     @TableField(value = "MES_MATERIAL_SUBCATEGORY")
     private String mesMaterialSubcategory;
