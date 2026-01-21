@@ -12,6 +12,8 @@ import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.CxDevicePlanShutInfoHelper;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrBeforeProductionGroupLogRecorder;
@@ -546,7 +548,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
-        noProductionPlanList.stream().forEach(noProductionPlan -> {
+        noProductionPlanList.forEach(noProductionPlan -> {
             String noProductionReason = noProductionPlan.getReason();
             if (StringUtils.isNotBlank(noProductionReason)) {
                 noProductionPlan.setReason(String.format("[%s]", noProductionReason));

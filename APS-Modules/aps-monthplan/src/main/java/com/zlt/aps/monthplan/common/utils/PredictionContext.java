@@ -1,7 +1,7 @@
 package com.zlt.aps.monthplan.common.utils;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
@@ -21,43 +21,49 @@ import java.util.Map;
 @Data
 public class PredictionContext {
   private List<SalesOrderPool> salesOrders;
+  private Map<String,Integer> orderQtyMap;
   private  List<MdmProductStock> finishedProductStocks;
-  private Map<String, List<MdmProductStock>> finishedProductStockMap;
+  private  Map<String, List<MdmProductStock>> finishedProductStockMap;
   private  Map<String, String> productionTypeMap;
   private  List<SupplyOrderPool> supplyOrderPools;
   private  List<SalesOrderPool> allocationOrders;
   private  List<SalesOrderPool> postponeOrders;
+  private  Map<String, Integer> originalMonthSurplusMap;
   private  Map<String, Integer> monthSurplusMap;
   private  Map<String, Integer>  monthlySaleQty;
   private  Integer  minProductionQty;
   private  Map<String, MdmMaterialInfo> materialInfoMap;
   private  List<MdmCycleSchStruConf> cycleSchStruConfs;
-  private  List<DpPredictOffsetDetail> predictOffsetDetails;
+  private  List<DpSimulatedOffsetDetail> predictOffsetDetails;
 
   public PredictionContext(
       List<SalesOrderPool> salesOrders,
+      Map<String,Integer> orderQtyMap,
       List<MdmProductStock> finishedProductStocks,
       Map<String, List<MdmProductStock>> finishedProductStockMap,
       Map<String, String> productionTypeMap,
       List<SupplyOrderPool> supplyOrderPools,
       List<SalesOrderPool> allocationOrders,
       List<SalesOrderPool> postponeOrders,
+      Map<String, Integer> originalMonthSurplusMap,
       Map<String, Integer> monthSurplusMap,
       Map<String, Integer>  monthlySaleQty,
       Integer  minProductionQty,
       Map<String, MdmMaterialInfo> materialInfoMap,
       List<MdmCycleSchStruConf> cycleSchStruConfs) {
     this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
+    this.orderQtyMap = orderQtyMap != null ? orderQtyMap : Collections.emptyMap();
     this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
-    this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : new HashMap<>();
-    this.productionTypeMap = productionTypeMap != null ? productionTypeMap : new HashMap<>();
+    this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : Collections.emptyMap();
+    this.productionTypeMap = productionTypeMap != null ? productionTypeMap : Collections.emptyMap();
     this.supplyOrderPools = supplyOrderPools != null ? supplyOrderPools : Collections.emptyList();
     this.allocationOrders = allocationOrders != null ? allocationOrders : Collections.emptyList();
     this.postponeOrders = postponeOrders != null ? postponeOrders : Collections.emptyList();
-    this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : new HashMap<>();
-    this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : new HashMap<>();
+    this.originalMonthSurplusMap = originalMonthSurplusMap != null ? originalMonthSurplusMap : Collections.emptyMap();
+    this.monthSurplusMap = monthSurplusMap != null ? monthSurplusMap : Collections.emptyMap();
+    this.monthlySaleQty = monthlySaleQty != null ? monthlySaleQty : Collections.emptyMap();
     this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
-    this.materialInfoMap = materialInfoMap != null ? materialInfoMap : new HashMap<>();
+    this.materialInfoMap = materialInfoMap != null ? materialInfoMap : Collections.emptyMap();
     this.cycleSchStruConfs = cycleSchStruConfs != null ? cycleSchStruConfs : Collections.emptyList();
   }
 

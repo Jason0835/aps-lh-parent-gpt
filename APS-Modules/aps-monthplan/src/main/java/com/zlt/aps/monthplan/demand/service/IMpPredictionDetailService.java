@@ -8,6 +8,7 @@ import com.zlt.bill.common.service.IDocService;
 
 import java.time.YearMonth;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -28,5 +29,11 @@ public interface IMpPredictionDetailService  extends IDocService<MpPredictionDet
    * @param tMonthDemandPlan
    * @param productionVersions
    */
-  void batchInsert(DpDemandPlan tMonthDemandPlan,Map<YearMonth, MpFactoryProductionVersion> productionVersions);
+  void batchInsert(DpDemandPlan tMonthDemandPlan,MpFactoryProductionVersion currentFinalVersion,Map<YearMonth, MpFactoryProductionVersion> productionVersions);
+  /**
+   * 获取版本信息
+   * @param batchNumbers
+   * @return
+   */
+  Map<String, Map<String, MpPredictionDetail>> fetchVersion(Set<String> batchNumbers);
 }

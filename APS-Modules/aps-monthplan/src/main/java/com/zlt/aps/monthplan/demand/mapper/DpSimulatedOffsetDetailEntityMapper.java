@@ -1,12 +1,12 @@
 package com.zlt.aps.monthplan.demand.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：DpPredictOffsetDetailMapper.java
+ * 文件名称：DpSimulatedOffsetDetailMapper.java
  * 描    述：预测冲减分配Mapper接口
  *@author yelq
  *@date 2026-01-20
@@ -18,5 +18,6 @@ import org.apache.ibatis.annotations.Mapper;
  *     修改内容：...
  */
 @Mapper
-public interface DpPredictOffsetDetailEntityMapper extends CommBaseMapper<DpPredictOffsetDetail> {
+public interface DpSimulatedOffsetDetailEntityMapper extends CommBaseMapper<DpSimulatedOffsetDetail> {
+
 }

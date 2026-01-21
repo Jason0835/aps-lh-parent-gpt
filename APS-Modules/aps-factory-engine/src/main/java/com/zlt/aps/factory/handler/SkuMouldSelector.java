@@ -5,7 +5,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;

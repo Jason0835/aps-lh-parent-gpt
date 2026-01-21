@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.domain.dto;
+package com.zlt.aps.factory.daylimit;
 
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -9,25 +9,25 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 胶囊卡盘日排产限制对象
- * 卡盘数量
- * 日使用量
+ * 模壳的日信息对象
+ * 模壳日数量限制
+ * 模壳日使用量
  *
  * @author ZLT
- * @date 20260119
+ * @date 20260116
  */
 @Getter
-public class CapsuleChuckDayInfoHelper implements Serializable {
+public class MouldShellDayInfoHelper implements Serializable {
     /**
-     * 胶囊卡盘分组Id
+     * 模套型号
      */
-    private String groupId;
+    private String mouldSetCode;
     /**
      * 排产日
      */
     private Integer productionDay;
     /**
-     * 卡盘总数
+     * 模壳数量
      */
     private Integer maxLimitQty;
     /**
@@ -35,20 +35,20 @@ public class CapsuleChuckDayInfoHelper implements Serializable {
      */
     private Integer usedQty;
     /**
-     * 已使用模具--模具对应胶囊使用
+     * 已使用模具
      */
     private Set<String> usedMouldSet;
 
     /**
      * 创建初始化对象
      *
-     * @param groupId       胶囊卡盘
+     * @param mouldSetCode  模壳型号
      * @param productionDay 排产日
      * @param maxLimitQty   最大数量
      * @return
      */
-    public static CapsuleChuckDayInfoHelper buildInit(String groupId, Integer productionDay, Integer maxLimitQty) {
-        return new CapsuleChuckDayInfoHelper(groupId, productionDay, maxLimitQty);
+    public static MouldShellDayInfoHelper buildInit(String mouldSetCode, Integer productionDay, Integer maxLimitQty) {
+        return new MouldShellDayInfoHelper(mouldSetCode, productionDay, maxLimitQty);
     }
 
     /**
@@ -68,7 +68,7 @@ public class CapsuleChuckDayInfoHelper implements Serializable {
     }
 
     /**
-     * 胶囊使用量 + 1
+     * 模壳使用量 + 1
      *
      * @param mouldCode 型腔模号
      */
@@ -89,25 +89,19 @@ public class CapsuleChuckDayInfoHelper implements Serializable {
     }
 
     /**
-     * 胶囊使用量 - 1
-     *
-     * @param mouldCode 型腔模号
+     * 模壳使用量 - 1
      */
-    public void deductionUsedCount(String mouldCode) {
+    public void deductionUsedCount() {
         Integer existUsedQty = usedQty;
         if (null == existUsedQty) {
             return;
         }
-        if (!usedMouldSet.contains(mouldCode)) {
-            return;
-        }
-        usedMouldSet.remove(mouldCode);
         existUsedQty = existUsedQty - BigDecimal.ONE.intValue();
         usedQty = existUsedQty;
     }
 
     /**
-     * 清空胶囊卡盘使用量
+     * 清空模壳使用量
      */
     public void clearUsedCount() {
         usedQty = BigDecimal.ZERO.intValue();
@@ -117,12 +111,12 @@ public class CapsuleChuckDayInfoHelper implements Serializable {
     /**
      * 构造函数
      *
-     * @param groupId       分组Id
-     * @param productionDay 排产日
-     * @param maxLimitQty   最大量
+     * @param mouldSetCode
+     * @param productionDay
+     * @param maxLimitQty
      */
-    CapsuleChuckDayInfoHelper(String groupId, Integer productionDay, Integer maxLimitQty) {
-        this.groupId = groupId;
+    MouldShellDayInfoHelper(String mouldSetCode, Integer productionDay, Integer maxLimitQty) {
+        this.mouldSetCode = mouldSetCode;
         this.productionDay = productionDay;
         this.maxLimitQty = maxLimitQty;
         this.usedQty = BigDecimal.ZERO.intValue();

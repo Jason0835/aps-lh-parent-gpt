@@ -3,6 +3,8 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;

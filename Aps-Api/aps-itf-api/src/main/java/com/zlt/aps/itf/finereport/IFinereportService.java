@@ -2,12 +2,11 @@ package com.zlt.aps.itf.finereport;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.itf.finereport.vo.FinereportParams;
 
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * 分厂月度计划控制台业务
@@ -23,8 +22,8 @@ public interface IFinereportService {
      * @return 结果集合
      */
     @ApiOperation("报表预览公共页面")
-    @PostMapping("/finereport/reportView")
-    AjaxResult reportView(FinereportParams params);
+    @GetMapping("/finereport/reportView/{reportCode}")
+    AjaxResult reportView(@PathVariable("reportCode") String reportCode);
     
     /**
      * 同步已计划未发货数据

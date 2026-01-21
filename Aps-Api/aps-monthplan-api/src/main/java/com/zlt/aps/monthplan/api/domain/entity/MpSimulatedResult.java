@@ -8,6 +8,8 @@ import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.util.Map;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpSimulatedResult.java
@@ -307,4 +309,8 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
+
+    @ApiModelProperty(value = "版本映射", name = "versionMap")
+    @TableField(exist = false)
+    private Map<String,MpPredictionDetail> versionMap;
 }

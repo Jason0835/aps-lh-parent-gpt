@@ -5,7 +5,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import lombok.extern.slf4j.Slf4j;
@@ -144,15 +144,17 @@ public class SaleRequirePlanHelper {
         return new SalesOrderComparator();
     }
 
-  public static List<DpDemandPlan> processNetDemands(DpDemandPlan createCondition, List<DpPredictOffsetDetail> predictOffsetDetails) {
+  public static List<DpDemandPlan> processNetDemands(DpDemandPlan createCondition, List<DpSimulatedOffsetDetail> predictOffsetDetails) {
       return predictOffsetDetails.stream()
           .map(item -> buildDemandPlanFromAllocation(createCondition,item))
           .collect(Collectors.toList());
   }
 
-    private static DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition, DpPredictOffsetDetail netDemand) {
+    private static DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition, DpSimulatedOffsetDetail netDemand) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
+        demandPlan.setBaseVale(null);
+        demandPlan.setId(null);
         demandPlan.setFactoryCode(createCondition.getFactoryCode());
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
@@ -162,6 +164,17 @@ public class SaleRequirePlanHelper {
         demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setYearWeek(StringUtils.isBlank(netDemand.getWeekYear())?ZERO_YEAR_WEEK:netDemand.getWeekYear());
         return demandPlan;
+    }
+
+    public static Map<String, Integer> calculateOrderQty(List<SalesOrderPool> salesOrders) {
+        if (CollectionUtils.isEmpty(salesOrders)) {
+            return Collections.emptyMap();
+        }
+        return salesOrders
+            .parallelStream()
+            .filter(Objects::nonNull)
+            .filter(order -> order.getGroupKey() != null && null != order.getOrdQty())
+            .collect(Collectors.groupingBy(SalesOrderPool::getGroupKey, Collectors.summingInt(item -> item.getOrdQty().intValue())));
     }
 
     /**
