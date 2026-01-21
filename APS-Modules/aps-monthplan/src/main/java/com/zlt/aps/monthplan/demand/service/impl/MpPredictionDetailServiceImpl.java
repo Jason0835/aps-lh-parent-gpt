@@ -1,21 +1,28 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.google.common.collect.Maps;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
+import com.zlt.aps.monthplan.demand.mapper.MpPredictionDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +46,9 @@ import org.springframework.util.CollectionUtils;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
+@RequiredArgsConstructor
 public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredictionDetail>  implements IMpPredictionDetailService {
+    private final MpPredictionDetailEntityMapper mpPredictionDetailEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2026011616";
@@ -88,6 +97,32 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
         if(!CollectionUtils.isEmpty(result)){
             this.baseDao.insertBatch(result);
         }
+    }
+
+    @Override
+    public Map<String, Map<String, MpPredictionDetail>> fetchVersion(Set<String> batchNumbers) {
+        LambdaQueryWrapper<MpPredictionDetail> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(MpPredictionDetail::getBatchNumber,batchNumbers);
+        wrapper.eq(MpPredictionDetail::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MpPredictionDetail> list =  this.mpPredictionDetailEntityMapper.selectList(wrapper);
+        if(org.apache.commons.collections.CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        Map<String, Map<String, MpPredictionDetail>> result = Maps.newHashMap();
+        Map<String,List<MpPredictionDetail>>  map = list.stream().collect(Collectors.groupingBy(MpPredictionDetail::getBatchNumber));
+        map.forEach((batchNumber,value)->{
+            value.sort(Comparator.comparing(MpPredictionDetail::getYear).thenComparing(MpPredictionDetail::getMonth));
+            Map<String, MpPredictionDetail> versionMap = Maps.newHashMap();
+            for(int i = 0,size=value.size();i<size;i++){
+                String key = "T";
+                if(i > 0) {
+                    key = key.concat(String.valueOf(i));
+                }
+                versionMap.put(key,value.get(i));
+            }
+            result.put(batchNumber,versionMap);
+        });
+        return result;
     }
 
 }

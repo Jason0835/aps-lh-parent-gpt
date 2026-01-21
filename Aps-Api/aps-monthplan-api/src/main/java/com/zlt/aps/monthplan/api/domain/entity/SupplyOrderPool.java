@@ -170,6 +170,11 @@ public class SupplyOrderPool extends BaseEntity {
     @TableField("REMARK")
     private String remark;
 
+    /** 更新时间，用于导出展示 */
+    @Excel(name = "ui.data.column.supplyOrderPool.updateDate")
+    @TableField(exist = false)
+    private String updateDate;
+
     @ApiModelProperty("订单来源：01：正常 02：产量预测：03：实单模拟")
     @TableField("SOURCE_TYPE")
     private String sourceType;
@@ -196,6 +201,8 @@ public class SupplyOrderPool extends BaseEntity {
     @ApiModelProperty(value = "结构", name = "structureName")
     @TableField(exist = false)
     private String structureName;
+
+
 
     /**
      * 以分厂+物料为维度，转换销售订单

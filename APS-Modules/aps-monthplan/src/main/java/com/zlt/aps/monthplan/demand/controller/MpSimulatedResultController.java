@@ -8,23 +8,27 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
-import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -44,13 +48,11 @@ import java.util.List;
 @Api(tags = "S2-1004.实单模拟排产")
 @RestController
 @RequestMapping("/simulatedResult")
+@AllArgsConstructor
 public class MpSimulatedResultController extends AbstractDocBizController<MpSimulatedResult> {
-
-    @Autowired
-    private IMpSimulatedResultService mpSimulatedResultService;
-
-    @Autowired
-    private MpSimulatedResultEntityMapper entityMapper;
+    private final IMpSimulatedResultService mpSimulatedResultService;
+    private final MpSimulatedResultEntityMapper entityMapper;
+    private final IMpPredictionDetailService mpPredictionDetailService;
 
     /**
      * 查询S2-1004.实单模拟排产列表
@@ -63,7 +65,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
         if(CollectionUtils.isEmpty(tableResult.getRows())) {
             return tableResult;
         }
-        this.translationList((List<MpSimulatedResult>)tableResult.getRows());
+        this.translationList((List<MpSimulatedResult>)tableResult.getRows(),true);
         return tableResult;
     }
 
@@ -152,7 +154,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     protected List<MpSimulatedResult> listExportData(MpSimulatedResult obj) {
         QueryWrapper<MpSimulatedResult> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return translationList(entityMapper.selectList(wrapper));
+        return translationList(entityMapper.selectList(wrapper),false);
     }
 
     /**
@@ -160,9 +162,17 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
      *
      * @param resultList
      */
-    private List<MpSimulatedResult> translationList(List<MpSimulatedResult> resultList) {
+    private List<MpSimulatedResult> translationList(List<MpSimulatedResult> resultList,boolean fetchVersion) {
+        if(!fetchVersion) {
+            for (MpSimulatedResult item : resultList) {
+                item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
+            }
+            return resultList;
+        }
+        Set<String> batchNumbers = resultList.stream().map(MpSimulatedResult::getMonthPlanVersion).collect(Collectors.toSet());
+        Map<String,Map<String, MpPredictionDetail>> versionMap = this.mpPredictionDetailService.fetchVersion(batchNumbers);
         for (MpSimulatedResult item : resultList) {
-            item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
+            item.setVersionMap(versionMap.get(item.getMonthPlanVersion()));
         }
         return resultList;
     }

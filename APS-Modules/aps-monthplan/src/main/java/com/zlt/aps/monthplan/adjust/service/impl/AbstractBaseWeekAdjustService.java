@@ -783,13 +783,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (contextDTO.getMpYear() != null && contextDTO.getMpMonth() != null) {
             // 年月
             contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + String.format("%02d",contextDTO.getMpMonth())));
-            // 获取定稿的排产版本
-            MpFactoryProductionVersion version = getIsFinalVersion(contextDTO);
-            if (version != null) {
+            // 获取定稿的月度计划
+            FactoryMonthPlanFinalAdjustVo monthPlan = getIsFinalMonthPlan(contextDTO);
+            if (monthPlan != null) {
                 // 排产版本号
-                contextDTO.setProductionVersion(version.getProductionVersion());
+                contextDTO.setProductionVersion(monthPlan.getProductionVersion());
                 // 需求计划版本
-                contextDTO.setMonthPlanVersion(version.getMonthPlanVersion());
+                contextDTO.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
             }
         }
     }
@@ -1107,10 +1107,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     private void initMonthPlan(MpRollAdjustContextDTO contextDTO) {
         // 查询月度生产计划
         MpFactoryProductionVersion factoryProductionVersion = getIsFinalVersion(contextDTO);
+        if (factoryProductionVersion == null) {
+            return;
+        }
         FactoryMonthPlanProductionFinalResult queryVO = new FactoryMonthPlanProductionFinalResult();
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
         queryVO.setYearMonth(contextDTO.getYearMonth());
-        queryVO.setMonthPlanVersion(factoryProductionVersion == null ? null : factoryProductionVersion.getMonthPlanVersion());
+        queryVO.setMonthPlanVersion(factoryProductionVersion.getMonthPlanVersion());
 
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
         buildMonthPlanCondition(queryWrapper, queryVO);
@@ -1217,6 +1220,25 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     public abstract void specialCheck(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 获取定稿的月度计划
+     *
+     * @param contextDTO
+     * @return
+     */
+    private FactoryMonthPlanFinalAdjustVo getIsFinalMonthPlan(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isEmpty(contextDTO.getFactoryMonthPlanProdFinalList())) {
+            // 初始化月度生产计划
+            initMonthPlan(contextDTO);
+        }
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanList = contextDTO.getFactoryMonthPlanProdFinalList();
+        FactoryMonthPlanFinalAdjustVo monthPlan = null;
+        if (PubUtil.isNotEmpty(monthPlanList)) {
+            monthPlan = monthPlanList.get(0);
+        }
+        return monthPlan;
+    }
 
     /**
      * 获取定稿的排产版本
