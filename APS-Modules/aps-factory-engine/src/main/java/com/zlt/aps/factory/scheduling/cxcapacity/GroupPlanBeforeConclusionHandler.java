@@ -223,15 +223,11 @@ public class GroupPlanBeforeConclusionHandler {
         Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
         //更新分配信息
         allocationInfo.beforeConclusion(beforeConclusionDay, deductionDay);
-        //如果分配量为零，则直接删除
-        if (allocationInfo.getAllocationDay() <= BigDecimal.ZERO.intValue()) {
-            cxMachineInfo.getAllocationList().remove(allocationInfo);
-        }
         if (CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
-        //20260119 释放，成型工装
-        cxMachineInfo.handlerBeforeConclusion(productionContext, deductionDaySet, groupPlanInfo);
+        //20260119 释放，成型工装使用量，切换结构使用量
+        cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
         //已排产的模具信息？
         if (isSingleMachine) {

@@ -3,6 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -210,8 +211,8 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
-     * 增加在机结构-硫化组排产Sku超出胎胚种类数限制日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 超出胎胚种类数限制====
+     * 增加结构-硫化组排产Sku超出限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 超出%s====
      *
      * @param context           排程上下文
      * @param groupName         分组名-结构
@@ -219,13 +220,13 @@ public class TbrMouldProductionLogRecorder {
      * @param materialDesc      Sku信息
      * @return
      */
-    public static String addContinueLhGroupSkuEmbryoLimitLog(Context context, String groupName, String onLineMachineInfo, String materialDesc) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 超出胎胚种类数限制====";
+    public static String addLhGroupSkuLimitLog(Context context, String groupName, String onLineMachineInfo, String materialDesc, MouldProductionLimitTypeEnum limitType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 超出%s====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, materialDesc);
+                groupName, onLineMachineInfo, materialDesc, limitType.getLimitDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_EMBRYO_LH_GROUP, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_LH_GROUP, logContent);
         return logContent;
     }
 

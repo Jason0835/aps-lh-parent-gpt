@@ -597,6 +597,46 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加成型机切换结构日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日切换成结构：%s ====
+     *
+     * @param context         排程上下文
+     * @param cxMachineCode   成型机台
+     * @param changeDay       切换日
+     * @param changeGroupName 切换后的分组
+     * @return
+     */
+    public static String addCxMachineChangeGroupLog(Context context, String cxMachineCode, Integer changeDay, String changeGroupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日切换成结构：%s ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, changeDay, changeGroupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加成型机切换结构日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日提前收尾结构 %s 切换结构使用量释放 ====
+     *
+     * @param context         排程上下文
+     * @param cxMachineCode   成型机台
+     * @param changeDay       切换日
+     * @param changeGroupName 切换后的分组
+     * @return
+     */
+    public static String addReleaseCxMachineChangeGroupLog(Context context, String cxMachineCode, Integer changeDay, String changeGroupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日提前收尾结构 %s 切换结构使用量释放 ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, changeDay, changeGroupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加结构匹配到成型机-最终被选定日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====
      *
@@ -642,11 +682,35 @@ public class TbrProductionGroupLogRecorder {
      * 增加结构没有获取到合适的成型机数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 没有合适的成型机====
      *
-     * @param context 排程上下文
+     * @param context   排程上下文
+     * @param groupName 分组名
      * @return
      */
     public static String addGroupNoSelectedCxMachineLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 没有合适的成型机====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName);
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 没有合适的成型机====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+
+    /**
+     * 增加达到每日结构切换限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机：%s 达到每日切换结构[%s]次限制====
+     *
+     * @param context       排程上下文
+     * @param cxMachineCode 机台编码
+     * @param maxLimit      限制次数
+     * @return
+     */
+    public static String addChangeGroupLimitCxMachineLog(Context context, String cxMachineCode, Integer maxLimit) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机：%s 达到每日切换结构[%s]次限制====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, maxLimit);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
         return logContent;
