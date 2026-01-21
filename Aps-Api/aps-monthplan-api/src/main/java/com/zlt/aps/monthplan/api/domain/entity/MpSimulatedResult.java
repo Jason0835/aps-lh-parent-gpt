@@ -312,5 +312,5 @@ public class MpSimulatedResult extends BaseEntity {
 
     @ApiModelProperty(value = "版本映射", name = "versionMap")
     @TableField(exist = false)
-    private Map<String,String> versionMap;
+    private Map<String,MpPredictionDetail> versionMap;
 }

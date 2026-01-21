@@ -8,6 +8,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
@@ -169,7 +170,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
             return resultList;
         }
         Set<String> batchNumbers = resultList.stream().map(MpSimulatedResult::getMonthPlanVersion).collect(Collectors.toSet());
-        Map<String,Map<String,String>> versionMap = this.mpPredictionDetailService.fetchVersion(batchNumbers);
+        Map<String,Map<String, MpPredictionDetail>> versionMap = this.mpPredictionDetailService.fetchVersion(batchNumbers);
         for (MpSimulatedResult item : resultList) {
             item.setVersionMap(versionMap.get(item.getMonthPlanVersion()));
         }
