@@ -21,6 +21,7 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.common.thread.AsyncVo;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.common.utils.ProductionSchedulingService;
@@ -49,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.web.context.request.async.DeferredResult;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -111,8 +113,19 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     }
 
     @Override
-    public AjaxResult createVmMonthPrediction(MpSimulatedResult createCondition) throws InterruptedException {
-        try{
+    public DeferredResult<Object> createVmMonthPrediction(MpSimulatedResult createCondition) {
+        DeferredResult<Object> result = new DeferredResult<>(70000L);
+        try {
+            AsyncVo<String, Object> request = new AsyncVo<>();
+            request.setResult(result);
+            this.dealQueque(request,createCondition);
+        } catch (Exception e) {
+            throw new BusinessException(e.getMessage());
+        }
+        return result;
+    }
+
+    private void dealQueque(AsyncVo<String, Object> orderRequest,MpSimulatedResult createCondition) throws InterruptedException {
             YearMonth yearMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
             // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
             MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(yearMonth);
@@ -180,11 +193,11 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             if(CollectionUtils.isNotEmpty(list)) {
                 this.baseDao.insertBatch(list);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
-        return AjaxResult.success();
+        // 设置响应结果
+        // 调用此方法时立即向浏览器发出响应；未调用时请求被挂起
+        orderRequest.getResult().setResult(AjaxResult.success());
+        // applicationContext.publishEvent(new DownloadFileEvent(targetCourseware));
     }
 
     private Context buildContext(List<DpDemandPlan> tPlus1MonthDemands) {
