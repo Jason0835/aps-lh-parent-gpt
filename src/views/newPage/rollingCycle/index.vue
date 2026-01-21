@@ -332,11 +332,13 @@ export default {
             prop: "structureName",
             label: this.$t("产品结构"),
             width: 180,
+            fixed: "left",
           },
           {
             prop: "scheduledMachines",
             label: this.$t("排产机台"),
             width: 120,
+            fixed: "left",
           },
           {
             prop: "version",
@@ -347,11 +349,13 @@ export default {
             prop: "materialCode",
             label: this.$t("物料编码"),
             width: 120,
+            fixed: "left",
           },
           {
             prop: "materialDesc",
             label: this.$t("物料描述"),
             width: 320,
+            fixed: "left",
           },
           {
             prop: "hasSpecialMaterial",
@@ -453,11 +457,11 @@ export default {
             label: this.$t("实际调整"),
             width: 120,
           },
-          {
-            prop: "adjustmentReason",
-            label: this.$t("调整原因"),
-            width: 120,
-          },
+          // {
+          //   prop: "adjustmentReason",
+          //   label: this.$t("调整原因"),
+          //   width: 120,
+          // },
           {
             align: "center",
             label: this.$t("ui.data.btn.option"),
@@ -812,11 +816,11 @@ export default {
             label: this.$t("实际调整"),
             width: 120,
           },
-          {
-            prop: "adjustmentReason",
-            label: this.$t("调整原因"),
-            width: 120,
-          },
+          // {
+          //   prop: "adjustmentReason",
+          //   label: this.$t("调整原因"),
+          //   width: 120,
+          // },
           {
             align: "center",
             label: this.$t("ui.data.btn.option"),

@@ -235,7 +235,12 @@ export default {
           render: ({ row }) => {
             return (
               <div>
-                <div>{this.selectDictLabel(this.dict.type.biz_product_type, row.productTypeCode)}</div>
+                <div>
+                  {this.selectDictLabel(
+                    this.dict.type.biz_product_type,
+                    row.productTypeCode
+                  )}
+                </div>
                 <div>
                   <text-button
                     onClick={() => {
@@ -342,8 +347,13 @@ export default {
           label: this.$t("ui.data.column.console.isFinal"),
           prop: "isFinal",
           align: "center",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          // formatter: (row, column, value) => {
+          //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          // },
+          render: ({ row }) => {
+            return (
+             <span>{row.isFinal==1?'是':''}</span>
+            );
           },
         },
         // {
@@ -424,7 +434,6 @@ export default {
   },
   methods: {
     handleChange(val) {
-
       // this.search.monthPlanVersion = val;
       // this.query.monthPlanVersion = val;
       // this.listProductionVersionList();
@@ -469,10 +478,10 @@ export default {
       this.$set(this.query, "monthPlanVersion", "");
       this.$set(this.search, "productionVersion", "");
       this.$set(this.query, "productionVersion", "");
-      this.requireProductionPlanVersionList()
+      this.requireProductionPlanVersionList();
     },
     handlePlanChange(val) {
-      console.log('查询')
+      console.log("查询");
       this.$set(this.search, "productionVersion", "");
       this.$set(this.query, "productionVersion", "");
       this.query.monthPlanVersion = val;
