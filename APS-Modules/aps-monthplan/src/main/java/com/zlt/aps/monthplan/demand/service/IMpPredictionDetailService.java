@@ -35,5 +35,5 @@ public interface IMpPredictionDetailService  extends IDocService<MpPredictionDet
    * @param batchNumbers
    * @return
    */
-  Map<String, Map<String, String>> fetchVersion(Set<String> batchNumbers);
+  Map<String, Map<String, MpPredictionDetail>> fetchVersion(Set<String> batchNumbers);
 }

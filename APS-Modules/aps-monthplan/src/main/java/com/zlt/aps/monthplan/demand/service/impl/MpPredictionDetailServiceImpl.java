@@ -100,7 +100,7 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
     }
 
     @Override
-    public Map<String, Map<String, String>> fetchVersion(Set<String> batchNumbers) {
+    public Map<String, Map<String, MpPredictionDetail>> fetchVersion(Set<String> batchNumbers) {
         LambdaQueryWrapper<MpPredictionDetail> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(MpPredictionDetail::getBatchNumber,batchNumbers);
         wrapper.eq(MpPredictionDetail::getIsDelete, YesOrNoEnum.NO.getValue());
@@ -108,17 +108,17 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
         if(org.apache.commons.collections.CollectionUtils.isEmpty(list)){
             return Collections.emptyMap();
         }
-        Map<String, Map<String, String>> result = Maps.newHashMap();
+        Map<String, Map<String, MpPredictionDetail>> result = Maps.newHashMap();
         Map<String,List<MpPredictionDetail>>  map = list.stream().collect(Collectors.groupingBy(MpPredictionDetail::getBatchNumber));
         map.forEach((batchNumber,value)->{
             value.sort(Comparator.comparing(MpPredictionDetail::getYear).thenComparing(MpPredictionDetail::getMonth));
-            Map<String, String> versionMap = Maps.newHashMap();
+            Map<String, MpPredictionDetail> versionMap = Maps.newHashMap();
             for(int i = 0,size=value.size();i<size;i++){
                 String key = "T";
                 if(i > 0) {
                     key = key.concat(String.valueOf(i));
                 }
-                versionMap.put(key,value.get(i).getPredictionVersion());
+                versionMap.put(key,value.get(i));
             }
             result.put(batchNumber,versionMap);
         });
