@@ -1454,6 +1454,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setDayVulcanizationQty(monthPlan.getDayVulcanizationQty());
         adjustDetailVo.setCuringTime(monthPlan.getCuringTime());
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
+        adjustDetailVo.setHeightQty(monthPlan.getHeightProductionQty());
+        adjustDetailVo.setMidQty(monthPlan.getMidProductionQty());
+        adjustDetailVo.setPostponeQty(monthPlan.getPostponeProductionQty());
+        adjustDetailVo.setCycleReserveQty(monthPlan.getCycleProductionQty());
+        adjustDetailVo.setConventionReserveQty(monthPlan.getConventionProductionQty());
     }
 
 
