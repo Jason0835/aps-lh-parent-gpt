@@ -391,7 +391,7 @@ public class MesItfServiceImpl implements MesItfService {
     private void deleteMdmProductStock(String factoryCode, Date stockDate) {
         Map<String, Object> map = new HashMap<>();
         map.put("FACTORY_CODE", factoryCode);
-//        map.put("STOCK_DATE", stockDate);
+        map.put("STOCK_DATE", stockDate);
         baseDao.deleteByMap(MdmProductStock.class, map);
     }
 
@@ -436,6 +436,8 @@ public class MesItfServiceImpl implements MesItfService {
             if (CollectionUtils.isNotEmpty(saveList)) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("FACTORY_CODE", mdmUnqualifiedStock.getFactoryCode());
+                map.put("YEAR", mdmUnqualifiedStock.getYear());
+                map.put("MONTH", mdmUnqualifiedStock.getMonth());
                 baseDao.deleteByMap(ProductStockMonth.class, map);
                 List<List<MdmUnqualifiedStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
                 for (List<MdmUnqualifiedStock> importList : splitList) {
@@ -458,7 +460,13 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmUnqualifiedStock> getUnqualifiedStock(MdmUnqualifiedStock mdmUnqualifiedStock) {
         // 查询视图
-        return mesViewMapper.selectUnqualifiedStock(mdmUnqualifiedStock);
+        List<MdmUnqualifiedStock> unqualifiedStockList = mesViewMapper.selectUnqualifiedStock(mdmUnqualifiedStock);
+        for (MdmUnqualifiedStock unqualifiedStock : unqualifiedStockList) {
+            Date stockDate = unqualifiedStock.getStockDate();
+            unqualifiedStock.setYear(DateUtils.getYear(stockDate));
+            unqualifiedStock.setMonth(DateUtils.getMonth(stockDate));
+        }
+        return unqualifiedStockList;
     }
 
     /**
@@ -532,8 +540,8 @@ public class MesItfServiceImpl implements MesItfService {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
                     record.setMaterialDesc(materialInfo.getMaterialDesc());
                     record.setMesMaterialCode(materialInfo.getMesMaterialCode());
-                    saveList.add(record);
                 }
+                saveList.add(record);
             }
             Map<String, Object> map = new HashMap<>(16);
             map.put("OUTBOUND_DATE", outboundDate);
