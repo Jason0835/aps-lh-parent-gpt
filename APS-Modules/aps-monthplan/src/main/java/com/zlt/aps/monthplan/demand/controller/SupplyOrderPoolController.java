@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -86,6 +87,7 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
                 .collect(Collectors.toList());
         Map<String, String> areaNameMap = getAreaNameMap(convertVoList);
         for (SupplyOrderPool supplyOrderPool : list) {
+            supplyOrderPool.setUpdateDate(DateUtil.formatDateTime(supplyOrderPool.getUpdateTime()));
             String saleArea = supplyOrderPool.getSaleArea();
             if (StringUtils.isNotBlank(saleArea)){
                 String[] areaSplitArr = saleArea.split(",");
