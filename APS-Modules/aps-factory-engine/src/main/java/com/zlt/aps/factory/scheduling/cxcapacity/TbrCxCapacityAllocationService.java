@@ -20,6 +20,7 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -565,10 +566,41 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         getDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
-
+        Map<Long,Integer>  sumProductionMap =  calculateProductionResult(detailLogList);
+        //保存未排计划明细
+        saveNoProductionPlanResult(productionContext, sumProductionMap);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
         getDataService().saveMouldProductionResult(dayResultList);
+    }
+
+    private void saveNoProductionPlanResult(TbrProductionContext productionContext, Map<Long, Integer> sumProductionMap) {
+        Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
+        if (CollectionUtils.isEmpty(productionPlanMap)) {
+            return;
+        }
+        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, sumProductionMap);
+        if (CollectionUtils.isEmpty(noProductionPlanList)) {
+            return;
+        }
+        getDataService().saveNoProductionPlan(noProductionPlanList);
+    }
+
+    private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {
+        Map<Long, Integer> sumMonthPlanMap = new HashMap<>();
+        detailList.forEach(productionDetail -> {
+            Long monthPlanId = productionDetail.getMonthPlanId();
+            Integer productionQty = productionDetail.getTotalQty();
+            if (null == productionQty) {
+                productionQty = BigDecimal.ZERO.intValue();
+            }
+            Integer plannedProductionQty = sumMonthPlanMap.get(monthPlanId);
+            if (null == plannedProductionQty) {
+                plannedProductionQty = BigDecimal.ZERO.intValue();
+            }
+            sumMonthPlanMap.put(monthPlanId, plannedProductionQty + productionQty);
+        });
+        return sumMonthPlanMap;
     }
 
     /**
