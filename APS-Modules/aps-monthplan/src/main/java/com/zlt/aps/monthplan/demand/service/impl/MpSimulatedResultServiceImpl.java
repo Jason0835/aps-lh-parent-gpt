@@ -114,7 +114,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
 
     @Override
     public DeferredResult<Object> createVmMonthPrediction(MpSimulatedResult createCondition) {
-        DeferredResult<Object> result = new DeferredResult<>(240000L);
+        DeferredResult<Object> result = new DeferredResult<>(480000L);
         try {
             AsyncVo<String, Object> request = new AsyncVo<>();
             request.setResult(result);
