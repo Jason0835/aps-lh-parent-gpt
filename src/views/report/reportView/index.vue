@@ -13,7 +13,7 @@
 
 import { reportUrt } from "@/api/monthplan/report";
 export default {
-  name: "reportView",
+  name: "ReportView",
   components: {
     // tltUpload,
   },
@@ -33,8 +33,13 @@ export default {
     },
   },
   created() {
-    if(this.$route.query.reportCode){
-      this.getUrl(this.$route.query.reportCode)
+    const fullPath = this.$route.fullPath;
+
+    // 解析路径获取最后一个参数
+    const pathSegments = fullPath.split('/');
+    const lastParam = pathSegments[pathSegments.length - 1];
+    if(lastParam){
+      this.getUrl(lastParam)
     }
 
   },
