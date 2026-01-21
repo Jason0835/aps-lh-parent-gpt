@@ -103,7 +103,7 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "create_time desc,id desc";
     }
 
     private Map<String, String> getAreaNameMap(List<AreaConvertVo> convertVoList) {
