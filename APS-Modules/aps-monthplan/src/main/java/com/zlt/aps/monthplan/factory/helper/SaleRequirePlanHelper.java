@@ -166,6 +166,17 @@ public class SaleRequirePlanHelper {
         return demandPlan;
     }
 
+    public static Map<String, Integer> calculateOrderQty(List<SalesOrderPool> salesOrders) {
+        if (CollectionUtils.isEmpty(salesOrders)) {
+            return Collections.emptyMap();
+        }
+        return salesOrders
+            .parallelStream()
+            .filter(Objects::nonNull)
+            .filter(order -> order.getGroupKey() != null && null != order.getOrdQty())
+            .collect(Collectors.groupingBy(SalesOrderPool::getGroupKey, Collectors.summingInt(item -> item.getOrdQty().intValue())));
+    }
+
     /**
      * 自定义高性能比较器实现
      * 避免重复解析和lambda开销

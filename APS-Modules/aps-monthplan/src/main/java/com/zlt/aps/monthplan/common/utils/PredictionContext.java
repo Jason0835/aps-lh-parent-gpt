@@ -21,6 +21,7 @@ import java.util.Map;
 @Data
 public class PredictionContext {
   private List<SalesOrderPool> salesOrders;
+  private Map<String,Integer> orderQtyMap;
   private  List<MdmProductStock> finishedProductStocks;
   private  Map<String, List<MdmProductStock>> finishedProductStockMap;
   private  Map<String, String> productionTypeMap;
@@ -37,6 +38,7 @@ public class PredictionContext {
 
   public PredictionContext(
       List<SalesOrderPool> salesOrders,
+      Map<String,Integer> orderQtyMap,
       List<MdmProductStock> finishedProductStocks,
       Map<String, List<MdmProductStock>> finishedProductStockMap,
       Map<String, String> productionTypeMap,
@@ -50,6 +52,7 @@ public class PredictionContext {
       Map<String, MdmMaterialInfo> materialInfoMap,
       List<MdmCycleSchStruConf> cycleSchStruConfs) {
     this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
+    this.orderQtyMap = orderQtyMap != null ? orderQtyMap : Collections.emptyMap();
     this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
     this.finishedProductStockMap = finishedProductStockMap != null ? finishedProductStockMap : Collections.emptyMap();
     this.productionTypeMap = productionTypeMap != null ? productionTypeMap : Collections.emptyMap();

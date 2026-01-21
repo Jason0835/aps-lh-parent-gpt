@@ -532,8 +532,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
+            Map<String,Integer> orderQtyMap = SaleRequirePlanHelper.calculateOrderQty(salesOrders);
+
             return new PredictionContext(
                 salesOrders,
+                orderQtyMap,
                 finishedProductStocks,
                 finishedProductStockMap,
                 productionTypeMap,
@@ -790,7 +793,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             data.getFinishedProductStockMap(), data.getOriginalMonthSurplusMap(),
             data.getProductionTypeMap(),
             data.getMonthlySaleQty(),
-            data.getCycleSchStruConfs());
+            data.getCycleSchStruConfs(),
+            data.getOrderQtyMap());
         if (!CollectionUtils.isEmpty(mergedPlans)) {
             this.baseDao.insertBatch(mergedPlans);
         }
@@ -870,8 +874,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
 
+            Map<String,Integer> orderQtyMap = SaleRequirePlanHelper.calculateOrderQty(salesOrders);
+
             return new PredictionContext(
                 salesOrders,
+                orderQtyMap,
                 finishedProductStocks,
                 finishedProductStockMap,
                 productionTypeMap,
@@ -1038,7 +1045,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             ));
     }
 
-    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty,List<MdmCycleSchStruConf> cycleSchStruConfs) {
+    private List<DpDemandPlan> mergedDemandPlan(DpDemandPlan createCondition,List<DpDemandPlan> demandPlans,int minProductionQty,Map<String, MdmMaterialInfo> skuMap,Map<String,List<MdmProductStock>> finishedProductStockMap,Map<String,Integer> mdmMonthSurplusMap,Map<String, String> productionTypeMap,Map<String, Integer> monthlySaleQty,List<MdmCycleSchStruConf> cycleSchStruConfs,Map<String, Integer> orderQtyMap) {
         // 快速失败：空集合直接返回
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
@@ -1064,7 +1071,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 mdmMonthSurplusMap,
                 productionTypeMap,
                 monthlySaleQty,
-                cycleSchStruConfs));
+                cycleSchStruConfs,
+                orderQtyMap));
         });
         log.info("groupKeys:{}",groupMap.keySet());
         return list;
@@ -1079,7 +1087,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, Integer> mdmMonthSurplusMap,
             Map<String, String> productionTypeMap,
             Map<String, Integer> monthlySaleQty,
-            List<MdmCycleSchStruConf> cycleSchStruConfs) {
+            List<MdmCycleSchStruConf> cycleSchStruConfs,
+            Map<String, Integer> orderQtyMap) {
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置替换料
@@ -1091,7 +1100,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 设置排产分类
         setProductionType(mergedPlan,productionTypeMap);
         // 计算并设置各类数量统计
-        setQuantityStatistics(mergedPlan, groupPlans, minProductionQty);
+        setQuantityStatistics(mergedPlan, groupPlans, minProductionQty,orderQtyMap);
         // 设置月均销量
         setAverageSaleQty(mergedPlan,monthlySaleQty);
 
@@ -1189,18 +1198,19 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private void setQuantityStatistics(
             DpDemandPlan demandPlan,
             List<DpDemandPlan> groupPlans,
-            int minProductionQty) {
+            int minProductionQty,Map<String, Integer> orderQtyMap) {
         // 使用统计对象收集所有数据，避免多次遍历
         QuantityStatistics statistics = groupPlans.stream()
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
         // 设置优先级相关数量
         // 设置基本数量
-        demandPlan.setOrderQty(statistics.totalOrderQty);
+        demandPlan.setOrderQty(orderQtyMap.getOrDefault(demandPlan.getGroupFactoryAndMaterialKey(),0));
         demandPlan.setHeightQty(statistics.heightQty);
         demandPlan.setMidQty(statistics.midQty);
         demandPlan.setPostponeQty(statistics.postponeQty);
         demandPlan.setCycleReserveQty(statistics.cycleReserveQty);
         demandPlan.setConventionReserveQty(statistics.conventionReserveQty);
+
         // 计算派生数量
         calculateDerivedQuantities(demandPlan, statistics);
 
@@ -1269,7 +1279,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 使用累加器模式，单次遍历完成所有统计
      */
     private static class QuantityStatistics {
-        int totalOrderQty = 0;
         int heightQty = 0;
         int midQty = 0;
         int postponeQty = 0;
@@ -1285,13 +1294,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             int netQty = plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {
-                totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
                 heightQty += netQty;
             } else if (ApsConstant.SAL_PRIORITY_MID.equals(priority)) {
-                totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
                 midQty += netQty;
             } else if (ApsConstant.SAL_PRIORITY_POSTPONE.equals(priority)) {
-                totalOrderQty += plan.getOrderQty() == null? BigDecimal.ZERO.intValue(): plan.getOrderQty();
                 postponeQty += netQty;
             } else if (ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP.equals(priority)) {
                 cycleReserveQty += netQty;
@@ -1301,7 +1307,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
 
         void combine(QuantityStatistics other) {
-            this.totalOrderQty += other.totalOrderQty;
             this.heightQty += other.heightQty;
             this.midQty += other.midQty;
             this.postponeQty += other.postponeQty;
