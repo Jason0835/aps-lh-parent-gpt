@@ -28,7 +28,7 @@ public class NoProductionPlanUtils {
         noProductionPlan.setReason(unProductionReason);
         Integer needProductionQty = productionPlan.getFactProdReqQty();
         Integer plannedQty = sumProductionMap.getOrDefault(monthPlanId,0);
-        long unProductionQty = needProductionQty - plannedQty;
+        int unProductionQty = needProductionQty - plannedQty;
         noProductionPlan.setUnProductionQty(unProductionQty);
         if (!needProductionQty.equals(plannedQty)) {
           list.add(noProductionPlan);
