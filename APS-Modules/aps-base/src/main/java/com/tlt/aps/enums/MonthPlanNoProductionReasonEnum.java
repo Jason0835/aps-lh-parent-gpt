@@ -32,6 +32,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_STRUCTURE_NAME("MP1203", "没有结构", "alg.data.initCheck.noStructureName"),
     /**
+     * MP1207 没有主花纹
+     */
+    NO_MAIN_PATTERN("MP1207","没有主花纹", "alg.data.initCheck.noMainPattern"),
+    /**
      * MP1204 没有寸口
      */
     NO_PRO_SIZE("MP1204", "没有寸口", "alg.data.initCheck.noProSize"),

@@ -342,8 +342,8 @@ public class CxCapacityAllocationHandler {
         //设置机台固定信息
         maxCapacityList.stream().forEach(cxMachineInfo -> cxMachineInfo.setFixedPriority(cxMachineInfo.getFixedPriorityValue(addNewGroupPlan)));
         //固定优先
-        Integer minFixedPriority = hasProductionDayList.stream().mapToInt(CxMachineBaseInfoVo::getFixedPriority).min().getAsInt();
-        List<CxMachineBaseInfoVo> fixedPriorityList = enableCxMachineList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
+        Integer minFixedPriority = maxCapacityList.stream().mapToInt(CxMachineBaseInfoVo::getFixedPriority).min().getAsInt();
+        List<CxMachineBaseInfoVo> fixedPriorityList = maxCapacityList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
         if (fixedPriorityList.size() == BigDecimal.ONE.intValue()) {
             CxMachineBaseInfoVo fixedSelected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
             log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineTypeCode()));
