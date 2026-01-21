@@ -26,7 +26,7 @@ public class NoProductionPlanUtils {
         noProductionPlan.setBaseVale(null);
         noProductionPlan.setId(null);
         noProductionPlan.setReason(unProductionReason);
-        Integer needProductionQty = productionPlan.getFactProdReqQty();
+        Integer needProductionQty = productionPlan.getCxCapacityRequireQty();
         Integer plannedQty = sumProductionMap.getOrDefault(monthPlanId,0);
         int unProductionQty = needProductionQty - plannedQty;
         noProductionPlan.setUnProductionQty(unProductionQty);

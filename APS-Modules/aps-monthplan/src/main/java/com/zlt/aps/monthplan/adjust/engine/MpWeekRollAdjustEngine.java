@@ -1413,8 +1413,8 @@ public class MpWeekRollAdjustEngine {
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         //2、排实单
         int iOrder = 0;
-        for (MpAdjustStructureOut adjustStructInVo:incrementAdjustList){
-            mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
+        for (MpAdjustStructureOut adjustStructOutVo:incrementAdjustList){
+            mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructOutVo);
             iOrder += 1;
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
             //2.1、敲定在机SKU新的上机日期
@@ -1424,7 +1424,7 @@ public class MpWeekRollAdjustEngine {
                 continue;
             }
             //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
-            newPlanQty = adjustStructInVo.getConfirmAdjustQty();
+            newPlanQty = adjustStructOutVo.getConfirmAdjustQty();
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,新的上机日期:%s,新的排产量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
             //2.4、增模排产,挤占空产能
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,排序:%s,物料编码:%s,开始！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
@@ -1488,8 +1488,7 @@ public class MpWeekRollAdjustEngine {
      * @return 定稿记录对象
      */
     private FactoryMonthPlanFinalAdjustVo createMpFinalAdjustVo(MpRollAdjustContextDTO contextDTO, MpAdjustStructureOut adjustStructOutVo) {
-        FactoryMonthPlanFinalAdjustVo mpFinalVo;
-        mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+        FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
         mpFinalVo.setFactoryCode(contextDTO.getFactoryCode());
         mpFinalVo.setYear(contextDTO.getMpYear());
         mpFinalVo.setMonth(contextDTO.getMpMonth());

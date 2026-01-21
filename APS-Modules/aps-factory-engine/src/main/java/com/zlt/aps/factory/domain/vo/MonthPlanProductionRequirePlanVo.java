@@ -100,11 +100,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public void initProductionDataInfo() {
         productionFlag = getIsProduction();
-        //产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
-        Integer heightLossQty = getHeightLossQty() - getHeightQty();
-        Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
-        Integer sumLossQty = heightLossQty + noHeightLossQty;
-        cxCapacityRequireQty = getNetQty() + sumLossQty;
+        cxCapacityRequireQty = this.getCxCapacityRequireQty();
         heightProductionQty = getHeightLossQty();
         productionQty = cxCapacityRequireQty;
     }
@@ -710,5 +706,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             setNoProductionReason(String.format("%s,%s", noProductionReason, addNoProductionReason));
         }
+    }
+
+    public int getCxCapacityRequireQty() {
+        //产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
+        Integer heightLossQty = getHeightLossQty() - getHeightQty();
+        Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
+        Integer sumLossQty = heightLossQty + noHeightLossQty;
+        cxCapacityRequireQty = getNetQty() + sumLossQty;
+        return cxCapacityRequireQty;
     }
 }
