@@ -566,7 +566,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         getDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
-        Map<Long,Integer>  sumProductionMap =  calculateProductionResult(detailLogList);
+        Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
         //构建汇总的排产结果
@@ -899,6 +899,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         context.setStopDays(stopDaySet);
     }
 
+
     /**
      * 2.1.6：构建日产能限制对象信息
      *
@@ -907,8 +908,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
+        DayCapacityLimitVo dayCapacityLimit = new DayCapacityLimitVo(Collections.emptyMap());
         if (CollectionUtils.isEmpty(startProductionRatioMap)) {
-            productionContext.getBaseDataContainer().setDayCapacityLimitMap(Collections.emptyMap());
+            baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
             return;
         }
         Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(startProductionRatioMap.size());
@@ -917,7 +919,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
             dayCapacityLimitMap.put(productionDay, dayInitLimit);
         });
-        baseDataContainer.setDayCapacityLimitMap(dayCapacityLimitMap);
+        dayCapacityLimit.updateWholeDayLimitInfo(dayCapacityLimitMap);
+        baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
     }
 
     /**

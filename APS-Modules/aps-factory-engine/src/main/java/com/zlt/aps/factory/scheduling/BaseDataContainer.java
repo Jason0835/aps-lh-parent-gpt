@@ -71,10 +71,10 @@ public class BaseDataContainer implements Serializable {
      */
     Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
     /**
-     * 日产能控制信息
-     * key=排产日 : value=日排产控制信息
+     * 日产能限制控制对象
+     *
      */
-    Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap;
+    DayCapacityLimitVo dayCapacityLimit;
     /**
      * 分组(结构)成型硫化配比
      */

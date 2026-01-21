@@ -13,7 +13,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
-import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanProdFinalRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -40,8 +39,6 @@ import java.util.Date;
 public class FactoryConsoleUIController extends BaseController {
 
     private final IFactoryConsoleRemoteService factoryConsoleService;
-
-    private final IFactoryMonthPlanProdFinalRemoteService iFactoryMonthPlanProdFinalRemoteService;
 
     /**
      * 根据条件查询工厂需要排产及已经排产的销售生产需求计划列表
