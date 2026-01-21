@@ -1008,7 +1008,7 @@ public class MpWeekRollAdjustEngine {
         FactoryMonthPlanFinalAdjustVo sameSpec2PatternVo = null;
         FactoryMonthPlanFinalAdjustVo sameEmbryo2MainPatternVo = null;
         FactoryMonthPlanFinalAdjustVo minMatchQtyVo = null;
-        int minMatchQty = 0;
+        int minMatchQty = newOtherFinalList.get(0).getConventionProductionQty();
         for (FactoryMonthPlanFinalAdjustVo tFinalVo: newOtherFinalList){
             //若有多个SKU，优先匹配同规格同花纹、同胎胚同模具的SKU，其次匹配搭配量少的SKU
             //同规格同花纹：定稿表.规格相同 AND 定稿表.花纹相同
@@ -1021,7 +1021,7 @@ public class MpWeekRollAdjustEngine {
                     curFinalVo.getMainPattern().equals(tFinalVo.getMainPattern())){
                 sameEmbryo2MainPatternVo = tFinalVo;
             }
-            if (minMatchQty < tFinalVo.getConventionProductionQty() ){
+            if (minMatchQty <= tFinalVo.getConventionProductionQty() ){
                 minMatchQtyVo = tFinalVo;
                 minMatchQty = tFinalVo.getConventionProductionQty();
             }
