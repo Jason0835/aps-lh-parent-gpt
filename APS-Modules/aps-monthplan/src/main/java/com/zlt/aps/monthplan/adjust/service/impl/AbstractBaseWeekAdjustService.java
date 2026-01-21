@@ -76,6 +76,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -1116,6 +1117,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
+        if (PubUtil.isNotEmpty(resultList) && StringUtils.isEmpty(contextDTO.getProductionVersion())) {
+            // 月度计划排产版本
+            contextDTO.setProductionVersion(resultList.get(0).getProductionVersion());
+        }
     }
 
 
@@ -1268,6 +1273,55 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             matchMonthPlanList(contextDTO, resultList, materialCode, monthPlanMap,
                     Convert.toInt(salesOrder.getOrdQty(),0), ApsConstant.FALSE);
+        }
+        return resultList;
+    }
+
+    /**
+     * 构建结构调整明细（月度计划有，无订单）
+     * @param contextDTO
+     * @return
+     */
+    protected List<MpAdjustDetailVo> buildAdjustDetailByMonthPlanList(MpRollAdjustContextDTO contextDTO) {
+        // 销售订单池列表
+        List<SalesOrderPool> salesOrderPoolList = contextDTO.getSalesOrderPoolList();
+        // 试制量试计划列表
+        List<MpTrialPlan> trialPlanList = contextDTO.getMpTrialPlanList();
+        // 月度生产计划列表
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanProdList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 结果集初始化
+        List<MpAdjustDetailVo> resultList = new ArrayList<>();
+        // 列表为空则直接返回空结果
+        if (PubUtil.isEmpty(monthPlanProdList)) {
+            return resultList;
+        }
+        // 销售订单池列表
+        Set<String> salesOrderSet = salesOrderPoolList.stream()
+                .map(SalesOrderPool::getOriMaterialCode)
+                .collect(Collectors.toSet());
+        // 试制量试计划列表
+        Set<String> trialPlanSet = trialPlanList.stream()
+                .map(MpTrialPlan::getMaterialCode)
+                .collect(Collectors.toSet());
+        // 遍历月度生产计划
+        for (FactoryMonthPlanFinalAdjustVo monthPlan : monthPlanProdList) {
+            String materialCode = monthPlan.getMaterialCode();
+            // 物料编码为空则跳过
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            // 存在订单或者试制量试跳过
+            if (salesOrderSet.contains(materialCode) || trialPlanSet.contains(materialCode)) {
+                continue;
+            }
+            // 创建基础通用字段
+            MpAdjustDetailVo adjustDetailVo = createBaseMpAdjustDetailVo(contextDTO, materialCode, 0, ApsConstant.FALSE);
+            // 设置月度生产计划关联的字段
+            setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan);
+            // 调整前净需求量
+            setPreviousNetQty(adjustDetailVo, monthPlan);
+            // 添加到结果集
+            resultList.add(adjustDetailVo);
         }
         return resultList;
     }
