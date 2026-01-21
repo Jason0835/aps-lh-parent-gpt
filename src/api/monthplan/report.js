@@ -301,3 +301,16 @@ export function productionStructureReport(query) {
     data: query
   })
 }
+
+
+//报表统一处理接口
+export function reportUrt(query) {
+  return request({
+    url: '/report/reportView',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}

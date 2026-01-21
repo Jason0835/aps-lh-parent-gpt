@@ -404,7 +404,7 @@ export default {
                     placeholder="请输入内容"
                     onInput={(value) => {
                       // 移除小数点和小数部分
-                      row.confirmAdjustQty = value.replace(/[^\d]/g, "");
+                      row.confirmAdjustQty = value.replace(/\./g, '')
                     }}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
@@ -430,7 +430,11 @@ export default {
                       // 移除小数点、负号和其他非数字字符
                       // ^[1-9]\d*$ 匹配正整数，不包括0
                       // 将值设置为正整数
+
                       row.adjustPriority = value.replace(/[^\d]/g, "");
+                      if(value>99999){
+                        row.adjustPriority=99999
+                      }
                     }}
                     placeholder="请输入"
                     min={0}
@@ -755,7 +759,7 @@ export default {
                       placeholder="请输入内容"
                       onInput={(value) => {
                         // 移除小数点和小数部分
-                        row.confirmAdjustQty = value.replace(/[^\d]/g, "");
+                        row.confirmAdjustQty = value.replace(/\./g, '')
                       }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
@@ -787,6 +791,9 @@ export default {
                         // ^[1-9]\d*$ 匹配正整数，不包括0
                         // 将值设置为正整数
                         row.adjustPriority = value.replace(/[^\d]/g, "");
+                        if(value>99999){
+                        row.adjustPriority=99999
+                      }
                       }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
@@ -1158,7 +1165,7 @@ export default {
 
         this.versionList = list;
         if (list.length > 0) {
-          if (this.activeName == "first") {
+          if (this.activeName != "second") {
             this.$set(this.search, "version", list[0].value);
             this.$set(this.query, "version", list[0].value);
           } else {
@@ -1166,7 +1173,7 @@ export default {
             this.$set(this.query, "productionVersion", list[0].value);
           }
         } else {
-          if (this.activeName == "first") {
+          if (this.activeName!= "second") {
             this.$set(this.search, "version", "");
             this.$set(this.query, "version", "");
           } else {
@@ -1269,6 +1276,7 @@ export default {
             this.adjustType == "01"
               ? this.data[0]?.version
               : this.outResultData[0]?.version,
+          productionVersion: this.data[0]?.productionVersion,
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
