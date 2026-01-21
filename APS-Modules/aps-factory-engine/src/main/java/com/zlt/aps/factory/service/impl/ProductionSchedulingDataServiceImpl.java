@@ -548,7 +548,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
-        noProductionPlanList.stream().forEach(noProductionPlan -> {
+        noProductionPlanList.forEach(noProductionPlan -> {
             String noProductionReason = noProductionPlan.getReason();
             if (StringUtils.isNotBlank(noProductionReason)) {
                 noProductionPlan.setReason(String.format("[%s]", noProductionReason));

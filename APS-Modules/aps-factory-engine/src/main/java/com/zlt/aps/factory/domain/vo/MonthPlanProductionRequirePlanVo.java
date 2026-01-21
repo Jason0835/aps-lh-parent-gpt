@@ -241,7 +241,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         }
         setStructureName(productBaseInfo.getStructureName());
         setSpecifications(productBaseInfo.getSpecifications());
-//        setProSize(productBaseInfo.getProSize());
+        setProSize(productBaseInfo.getProSize());
+        setMainPattern(productBaseInfo.getMainPattern());
         setCantProduce(productBaseInfo.getCantProduce());
         setProductCategory(productBaseInfo.getProductCategory());
     }
@@ -562,6 +563,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             isProduction = YesOrNoEnum.NO.getCode();
             String noStructureNameReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_STRUCTURE_NAME);
             addNoProductionReason(noStructureNameReason);
+        }
+        //全钢 - 主花纹
+        if (StringUtils.isBlank(getMainPattern())) {
+            isProduction = YesOrNoEnum.NO.getCode();
+            String noMainPatternReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MAIN_PATTERN);
+            addNoProductionReason(noMainPatternReason);
         }
         return isProduction;
     }
