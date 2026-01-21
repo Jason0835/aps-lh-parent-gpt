@@ -1,8 +1,8 @@
 package com.zlt.aps.monthplan.factory.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.zlt.aps.factory.mapper.FactoryNoProductionPlanMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
+import com.zlt.aps.monthplan.factory.mapper.MonthPlanNoProductionPlanMapper;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanNoProductionPlanService;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -56,7 +56,7 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
     private IMonthPlanNoProductionPlanService monthPlanNoProductionPlanService;
 
     @Autowired
-    private FactoryNoProductionPlanMapper entityMapper;
+    private MonthPlanNoProductionPlanMapper entityMapper;
 
     /**
      * 查询S2-0606.排产结果-未排产计划列表

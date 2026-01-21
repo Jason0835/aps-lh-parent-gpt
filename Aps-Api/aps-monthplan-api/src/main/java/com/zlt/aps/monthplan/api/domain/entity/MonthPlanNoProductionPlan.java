@@ -269,5 +269,11 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     @TableField(value = "REASON")
     private String reason;
 
+    /**
+     * 生产实际排产量
+     */
+    @ApiModelProperty(value = "生产实际排产量", name = "totalQty")
+    @TableField(exist = false)
+    private Long totalQty;
 
 }
