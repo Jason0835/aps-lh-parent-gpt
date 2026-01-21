@@ -68,13 +68,13 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
     }
 
     @Override
-    public void batchInsert(DpDemandPlan tMonthDemandPlan, Map<YearMonth, MpFactoryProductionVersion> productionVersions) {
+    public void batchInsert(DpDemandPlan tMonthDemandPlan, MpFactoryProductionVersion currentFinalVersion,Map<YearMonth, MpFactoryProductionVersion> productionVersions) {
         List<MpPredictionDetail> result = new ArrayList<>();
         productionVersions.forEach((yearMonth, productionVersion) -> {
             MpPredictionDetail predictionDetail = new MpPredictionDetail();
             predictionDetail.setPredictionVersion(productionVersion.getMonthPlanVersion());
-            predictionDetail.setMonthPlanVersion(productionVersion.getMonthPlanVersion());
-            predictionDetail.setProductionVersion(productionVersion.getProductionVersion());
+            predictionDetail.setMonthPlanVersion(currentFinalVersion.getMonthPlanVersion());
+            predictionDetail.setProductionVersion(currentFinalVersion.getProductionVersion());
             predictionDetail.setPredictionProductionVersion(predictionDetail.getProductionVersion());
             predictionDetail.setYear(yearMonth.getYear());
             predictionDetail.setMonth(yearMonth.getMonthValue());

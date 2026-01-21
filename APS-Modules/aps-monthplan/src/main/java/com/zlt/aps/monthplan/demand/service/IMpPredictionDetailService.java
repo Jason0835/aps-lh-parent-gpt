@@ -28,5 +28,5 @@ public interface IMpPredictionDetailService  extends IDocService<MpPredictionDet
    * @param tMonthDemandPlan
    * @param productionVersions
    */
-  void batchInsert(DpDemandPlan tMonthDemandPlan,Map<YearMonth, MpFactoryProductionVersion> productionVersions);
+  void batchInsert(DpDemandPlan tMonthDemandPlan,MpFactoryProductionVersion currentFinalVersion,Map<YearMonth, MpFactoryProductionVersion> productionVersions);
 }
