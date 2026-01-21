@@ -651,6 +651,19 @@ constantRoutes.push(
     component: Layout,
     hidden: true,
     redirect: "noredirect",
+    children: [
+      {
+        path: "insertOrderDetail/:id",
+        component: () => import("@/views/newPage/insertOrderDetail"),
+        name: "insertOrderDetail",
+        meta: { title: "实单模拟明细" },
+      }],
+  },
+  {
+    path: "/monthPlanManagement",
+    component: Layout,
+    hidden: true,
+    redirect: "noredirect",
     permissions: ["monthplan:productionMonthPlanInit:list"],
     children: [
       {

@@ -19,7 +19,14 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" v-hasPermi="['monthplan:simulatedResult:createVmMonthPrediction']"  :loading="createLoading" plain @click="createVersion">{{ $t("ui.data.insertOrder.creater") }}</el-button>
+        <el-button
+          type="primary"
+          v-hasPermi="['monthplan:simulatedResult:createVmMonthPrediction']"
+          :loading="createLoading"
+          plain
+          @click="createVersion"
+          >{{ $t("ui.data.insertOrder.creater") }}</el-button
+        >
         <!-- <el-button
           type="primary"
           plain
@@ -58,7 +65,7 @@
 </template>
 <script>
 //lib
-import { mapState ,mapGetters} from "vuex";
+import { mapState, mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -92,7 +99,7 @@ export default {
   },
   data() {
     return {
-      createLoading:false,
+      createLoading: false,
       loading: false,
       data: [],
       selection: [],
@@ -109,7 +116,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    ...mapGetters("globalList", ["structureList"]),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -122,22 +129,22 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-          width:120,
+          width: 120,
         },
         {
           prop: "year",
           label: this.$t("ui.data.colume.year"),
-          width:120,
+          width: 120,
         },
         {
           prop: "month",
           label: this.$t("ui.data.colume.month"),
-          width:120,
+          width: 120,
         },
         {
           prop: "productTypeCode",
           label: this.$t("ui.data.column.monthplan.productType"),
-          width:120,
+          width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -150,22 +157,22 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:180,
+          width: 180,
         },
         {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
-          width:120,
+          width: 120,
         },
         {
           prop: "pattern",
           label: this.$t("ui.data.column.modelinfo.pattern"),
-          width:120,
+          width: 120,
         },
         {
           prop: "mainPattern",
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
-          width:120,
+          width: 120,
         },
         {
           prop: "brand",
@@ -173,56 +180,72 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width:120,
+          width: 120,
         },
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width:320,
+          width: 320,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width:120,
+          width: 120,
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:320,
+          width: 320,
         },
         {
           prop: "mouldQty",
           label: this.$t("ui.data.insertOrder.mouldQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "typeBlockQty",
           label: this.$t("ui.data.monthlyProductionPlan.typeBlockQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "netQty",
           label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
-          width:120,
+          width: 120,
         },
         {
           prop: "heightQty",
           label: this.$t("ui.data.insertOrder.heightQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "productionQty",
           label: this.$t("ui.data.insertOrder.productionQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "monthPlanVersion",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
-          width:180,
+          width: 180,
         },
         {
           prop: "month1",
-          label: 'T'+this.$t("ui.data.insertOrder.monthQty"),
+          align:'right',
+          label: "T" + this.$t("ui.data.insertOrder.monthQty"),
+          render: ({ row }) => {
+            return (
+              <div>
+                <div>
+                  <text-button
+                    onClick={() => {
+                      this.showDetail(row.versionMap[`T`]);
+                    }}
+                  >
+                    {row[`month1`]}
+                  </text-button>
+                </div>
+              </div>
+            );
+          },
         },
         // {
         //   prop: "T+1月排产量",
@@ -236,7 +259,6 @@ export default {
         //   prop: "T+n月排产量",
         //   label: this.$t("T+n月排产量"),
         // },
-
 
         // {
         //   align: "center",
@@ -269,27 +291,42 @@ export default {
 
       for (let i = 0; i < 23; i++) {
         columns.push({
-          label: `T+${i + 1}`+ this.$t("ui.data.insertOrder.monthQty"),
+          label: `T+${i + 1}` + this.$t("ui.data.insertOrder.monthQty"),
           // label: this.$t("ui.data.column.mouldingDayResult.day", {
           //   day: i + 1,
           // }),
           prop: `month${i + 2}`,
           minWidth: "80px",
           type: "number",
+          render: ({ row }) => {
+            return (
+              <div>
+                <div>
+                  <text-button
+                    onClick={() => {
+                      this.showDetail(row.versionMap[`T${i + 1}`]);
+                    }}
+                  >
+                    {row[`month${i + 2}`]}
+                  </text-button>
+                </div>
+              </div>
+            );
+          },
         });
       }
       columns.push(
         {
           prop: "remark",
           label: this.$t("common.remark"),
-          width:120,
+          width: 120,
         },
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width: 180,
-        },
-      )
+        }
+      );
 
       return columns;
     },
@@ -312,8 +349,8 @@ export default {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
-          dictData:this.structureList,
-          filterable: true
+          dictData: this.structureList,
+          filterable: true,
         },
         {
           prop: "productTypeCode",
@@ -346,24 +383,39 @@ export default {
           label: this.$t("common.brand"),
           type: "select",
           dictData: this.dict.type.biz_brand_type,
-
         },
       ];
     },
   },
   methods: {
+    showDetail(row) {
+      console.log(row)
+      if(!row)return
+      let query={
+        monthPlanVersion:row.predictionVersion,
+        sourceType:row.planType,
+        productionVersion:row.predictionProductionVersion,
+        year:row.year,
+        month:row.month<10? "0" + row.month : row.month
+      }
+      this.$router.push({
+        path: `./insertOrderDetail/` + row.id,
+        query,
+      });
+
+    },
     async createVersion() {
-      this.handleAdd()
-      return
+      this.handleAdd();
+      return;
 
       try {
-        this.createLoading=true
+        this.createLoading = true;
         let res = await createVmMonthPrediction(this.formatParams());
         this.$modal.msgSuccess(res.msg);
         this.getList();
-        this.createLoading=false
+        this.createLoading = false;
       } catch (err) {
-        this.createLoading=false
+        this.createLoading = false;
       }
     },
     handleAdd() {
@@ -439,7 +491,7 @@ export default {
         let arr = params.yearMonth.split("-");
         params.year = arr[0];
         params.month = arr[1];
-        params.yearMonth=''
+        params.yearMonth = "";
       }
 
       return params;
