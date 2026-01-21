@@ -18,70 +18,44 @@
       :showSummary="false"
       :selectArea="false"
     >
-      <!-- <template slot="header">
-        <el-button
-          type="primary"
-          plain
-          >{{ $t("MES抓取") }}</el-button
-        >
-        <el-button
-          type="primary"
-          plain
-          v-hasPermi="['monthplan:ProductMoldingLimit:add']"
-          @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <el-button
-          type="warning"
-          v-hasPermi="['monthplan:ProductMoldingLimit:edit']"
-          :disabled="selection.length !== 1"
-          @click="handleDelete(selection[0])"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['monthplan:ProductMoldingLimit:import']"
-          @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
-        <el-button
-          @click="handleExport"
-          v-hasPermi="['monthplan:ProductMoldingLimit:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
-        >
-      </template> -->
+      <template slot="header">
+        <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
+          <el-tab-pane label="净需求计划" name="first"> </el-tab-pane>
+          <el-tab-pane label="供应链订单" name="second"> </el-tab-pane>
+          <el-tab-pane label="排产计划" name="three"> </el-tab-pane>
+          <el-tab-pane label="未排产计划" name="four"> </el-tab-pane>
+        </el-tabs>
+      </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
       downloadUrl="/mdm/productMoldingLimit/importTemplate"
       uploadUrl="/mdm/productMoldingLimit/importData"
       @uploadSuccess="getList"
     />
-    <infoDialog ref="infoRef" @success="getList" />
+    <!-- <infoDialog ref="infoRef" @success="getList" /> -->
   </basic-container>
 </template>
 <script>
 //lib
-import { mapState ,mapGetters} from "vuex";
+import { mapState, mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-import {
-  listVulcanizationTable,
-} from "@/api/monthplan/vulcanizationTable";
+import { listVulcanizationTable } from "@/api/monthplan/vulcanizationTable";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
-import infoDialog from "./components/infoDialog.vue";
+// import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "VulcanizationTable",
+  name: "insertOrderDetail",
   components: {
     tltUpload,
-    infoDialog,
+    // infoDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -102,10 +76,11 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      activeName:'first'
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    ...mapGetters("globalList", ["structureList"]),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -114,92 +89,94 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "onboardDate",
-          label: this.$t("financialManagement.averageAccountsReceivable.updateTime"),
-          width:180,
+          label: this.$t(
+            "financialManagement.averageAccountsReceivable.updateTime"
+          ),
+          width: 180,
         },
 
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:180,
+          width: 180,
         },
 
         {
           prop: "lhMachine",
           label: this.$t("ui.data.vulcanizationTable.lhMachine"),
-          width:120,
+          width: 120,
         },
         {
           prop: "cxMachine",
           label: this.$t("ui.data.vulcanizationTable.cxMachine"),
-          width:120,
+          width: 120,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.colume.wms.unused.productCode"),
-          width:120,
+          width: 120,
         },
 
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:320,
+          width: 320,
         },
         {
           prop: "mesMaterialCode",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width:120,
+          width: 120,
         },
 
         {
           prop: "mouldQty",
           label: this.$t("ui.data.vulcanizationTable.mouldQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "netDemandQty",
           label: this.$t("ui.data.vulcanizationTable.netDemandQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "onboardDate",
           label: this.$t("ui.data.column.monthplan.boardingDate"),
-          width:120,
+          width: 120,
         },
         {
           prop: "unqualifiedQty",
           label: this.$t("ui.data.vulcanizationTable.unqualifiedQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "productionQty",
           label: this.$t("ui.data.vulcanizationTable.productionQty"),
-          width:120,
+          width: 120,
         },
         {
           prop: "lhMargin",
           label: this.$t("ui.data.vulcanizationTable.lhMargin"),
-          width:120,
+          width: 120,
         },
         {
           prop: "expectedCloseDay",
           label: this.$t("ui.data.vulcanizationTable.expectedCloseDay"),
-          width:120,
+          width: 120,
         },
         {
           prop: "expectedCloseDate",
           label: this.$t("ui.data.vulcanizationTable.expectedCloseDate"),
-          width:120,
+          width: 120,
         },
         {
           prop: "planCloseDate",
           label: this.$t("ui.data.vulcanizationTable.planCloseDate"),
-          width:120,
+          width: 120,
         },
         {
           prop: "diffDay",
           label: this.$t("ui.data.vulcanizationTable.diffDay"),
-          width:120,
+          width: 120,
         },
       ];
 
@@ -207,13 +184,12 @@ export default {
     },
     searchColumns() {
       return [
-      {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
-
         },
         {
           prop: "yearMonth",
@@ -222,40 +198,21 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
-
         },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
-          dictData:this.structureList,
-          filterable: true
+          dictData: this.structureList,
+          filterable: true,
         },
-        {
-          prop: "cxMachine",
-          label: this.$t("ui.data.vulcanizationTable.cxMachine"),
-        },
-        {
-          prop: "lhMachine",
-          label: this.$t("ui.data.vulcanizationTable.lhMachine"),
-        },
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
-        },
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
-        {
-          prop: "mesMaterialCode",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-        },
-
       ];
     },
   },
   methods: {
+    handleClick(){
+
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -331,7 +288,7 @@ export default {
         let arr = params.yearMonth.split("-");
         params.year = arr[0];
         params.month = arr[1];
-        params.yearMonth=''
+        params.yearMonth = "";
       }
       return params;
     },
@@ -340,9 +297,9 @@ export default {
       try {
         this.loading = true;
 
-        const data = await listVulcanizationTable(this.formatParams());
-        this.data = data.rows;
-        this.page.total = data.total;
+        // const data = await listVulcanizationTable(this.formatParams());
+        // this.data = data.rows;
+        // this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {

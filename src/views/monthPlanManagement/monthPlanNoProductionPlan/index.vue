@@ -85,6 +85,9 @@ export default {
     "biz_channel_type",
     "biz_brand_type",
     "biz_construction_stage",
+    "biz_product_characteristics",
+    "biz_product_type",
+    "biz_schedule_type"
   ],
   provide() {
     return {
@@ -114,20 +117,8 @@ export default {
   computed: {
     columns() {
       let columns = [
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.物料编码"),
-        //   prop: "productCode",
-        //   minWidth: 100,
-        //   sortable: "custom",
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.物料描述"),
-        //   prop: "productDesc",
-        //   minWidth: 250,
-        //   sortable: "custom",
-        // },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           minWidth: 100,
           formatter: (row, column, value) => {
@@ -135,19 +126,29 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.year"),
+          label: this.$t("ui.data.colume.year"),
           prop: "year",
           minWidth: 100,
           // sortable: "custom",
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.month"),
+          label: this.$t("ui.data.colume.month"),
           prop: "month",
           minWidth: 100,
           // sortable: "custom",
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.constructionStage"),
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          prop: "materialCode",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          prop: "materialDesc",
+          minWidth: 300,
+        },
+        {
+          label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
           prop: "constructionStage",
           minWidth: 100,
           formatter: (row, column, value) => {
@@ -158,152 +159,118 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.productCode"),
-          prop: "productCode",
-          minWidth: 100,
-          // sortable: "custom",
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.productDesc"),
-          prop: "productDesc",
-          minWidth: 250,
-          // sortable: "custom",
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.locationType"),
-          prop: "locationType",
-          minWidth: 100,
-          // sortable: "custom",
+          label: this.$t("ui.data.column.monthplan.productType"),
+          prop: "productTypeCode",
+          minWidth: 120,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_stor_type, value);
+            return this.selectDictLabel(
+              this.dict.type.biz_product_type,
+              value
+            );
           },
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.channel"),
-          prop: "channel",
-          minWidth: 100,
-          // sortable: "custom",
+          label: this.$t("ui.data.DemandPlan.productionType"),
+          prop: "productionType",
+          minWidth: 120,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_channel_type, value);
+            return this.selectDictLabel(
+              this.dict.type.biz_schedule_type,
+              value
+            );
           },
         },
+
         {
-          label: this.$t("ui.data.column.mouldingDayResult.brand"),
-          prop: "brand",
-          minWidth: 100,
-          // sortable: "custom",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
-          },
-        },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.施工号"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        //   sortable: "custom",
-        // },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.proSize"),
+          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
           prop: "proSize",
           minWidth: 100,
           // sortable: "custom",
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.specifications"),
+          label: this.$t("ui.data.column.trialPlan.specifications"),
           prop: "specifications",
-          minWidth: 100,
+          minWidth: 120,
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.pattern"),
+          label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "pattern",
           minWidth: 140,
           // sortable: "custom",
         },
-        ,
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.levelCode"),
-        //   prop: "levelCode",
-        //   minWidth: 100,
-        //   sortable: "custom",
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.类型标识"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        //   sortable: "custom",
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.BOI"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        // },
-
         {
-          label: this.$t("ui.data.column.mouldingDayResult.prodReqPlan"),
-          prop: "prodReqPlan",
-          minWidth: 100,
-        },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.备库计划"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.预计超欠产"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.理论生产需求计划"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        // },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.totalQty"),
-          prop: "totalQty",
-          minWidth: 100,
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.factProdReqQty"),
-          prop: "factProdReqQty",
-          minWidth: 100,
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.differenceQty"),
+          label: this.$t("ui.data.mouldingDayResult.differenceQty"),
           prop: "unProductionQty",
-          minWidth: 100,
+          minWidth: 120,
         },
-
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.成型机编号"),
-        //   prop: "productDesc",
-        //   minWidth: 100,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.mouldNo"),
-        //   prop: "mouldNo",
-        //   minWidth: 100,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.mouldQty"),
-        //   prop: "mouldQty",
-        //   minWidth: 100,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.beginDate"),
-        //   prop: "beginDate",
-        //   minWidth: 100,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.mouldingDayResult.endDay"),
-        //   prop: "endDay",
-        //   minWidth: 100,
-        // },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.reason"),
+          label: this.$t("ui.data.monthlyProductionPlan.reason"),
           prop: "reason",
           minWidth: 240,
         },
+        {
+          label: this.$t("ui.data.DemandPlan.orderQty"),
+          prop: "orderQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.DemandPlan.netQty"),
+          prop: "netQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.mouldingDayResult.totalQty"),
+          prop: "totalQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.DemandPlan.unPostponeNetQty"),
+          prop: "unPostponeNetQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.DemandPlan.postponeNetQty"),
+          prop: "postponeNetQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.DemandPlan.isProduction"),
+          prop: "isProduction",
+          minWidth: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_yes_no,
+              value
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.monthlyProductionPlan.heightQty"),
+          prop: "heightQty",
+          minWidth: 120,
+        },
+        // {
+        //   label: this.$t("高优先级需求(含损耗)"),
+        //   prop: "heightLossQty",
+        //   minWidth: 120,
+        // },
+        {
+          label: this.$t("ui.data.monthlyProductionPlan.factProdReqQty"),
+          prop: "factProdReqQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.DemandPlan.conventionReserveQty"),
+          prop: "conventionReserveQty",
+          minWidth: 120,
+        },
+        {
+          label: this.$t("ui.data.DemandPlan.cycleReserveQty"),
+          prop: "cycleReserveQty",
+          minWidth: 120,
+        },
+
+        ,
         {
           label: this.$t("common.remark"),
           prop: "remark",
@@ -343,43 +310,41 @@ export default {
         //   clearable: false,
         // },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.productCode"),
-          prop: "productCode",
+          label: this.$t("ui.data.colume.wms.unused.productCode"),
+          prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.productDesc"),
-          prop: "productDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          prop: "materialDesc",
         },
+        // {
+        //   prop: "locationType",
+        //   label: this.$t("产品类型"),
+        //   type: "select",
+        //   dictData: this.dict.type.biz_stor_type,
+        // },
+        // {
+        //   label: this.$t("ui.data.column.mouldingDayResult.channel"),
+        //   prop: "channel",
+        //   type: "select",
+        //   dictData: this.dict.type.biz_channel_type,
+        // },
+        // {
+        //   label: this.$t("ui.data.column.mouldingDayResult.brand"),
+        //   prop: "brand",
+        //   type: "select",
+        //   dictData: this.dict.type.biz_brand_type,
+        // },
         {
-          prop: "locationType",
-          label: this.$t(
-            "ui.data.column.LocationChannelConfiguration.locationType"
-          ),
-          type: "select",
-          dictData: this.dict.type.biz_stor_type,
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.channel"),
-          prop: "channel",
-          type: "select",
-          dictData: this.dict.type.biz_channel_type,
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.brand"),
-          prop: "brand",
-          type: "select",
-          dictData: this.dict.type.biz_brand_type,
-        },
-        {
-          label: this.$t("ui.data.column.mouldingDayResult.specifications"),
+          label: this.$t("ui.data.column.trialPlan.specifications"),
           prop: "specifications",
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.proSize"),
+          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
           prop: "proSize",
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.pattern"),
+          label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "pattern",
         },
         // {

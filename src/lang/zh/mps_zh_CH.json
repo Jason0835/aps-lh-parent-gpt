@@ -2937,6 +2937,7 @@
   "ui.data.column.monthPlanAdjustNotice.beginDate": "开始日",
   "ui.data.column.monthPlanAdjustNotice.endDate": "结束日",
   "ui.data.column.monthPlanAdjustNotice.adjustQty": "调整量",
-  "ui.data.column.mouldingDayResult": ""
+  "ui.data.column.mouldingDayResult": "",
+  "financialManagement.averageAccountsReceivable.updateTime":"日期"
 
 }
