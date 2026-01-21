@@ -394,10 +394,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
         predictionContext.setPredictOffsetDetails(leftDemands);
         List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,tPlus1Month);
-        predictionContext.setSupplyOrderPools(supplyOrderPools);
-        predictionContext.setPostponeOrders(null);
         // 6. 处理需求计划生成
-        List<DpDemandPlan> demandPlans = generateDemandPlans(createCondition,predictionContext);
+        List<DpDemandPlan> demandPlans = generateDemandPlans(createCondition,leftDemands,supplyOrderPools);
         List<DpDemandPlan> mergedDemandPlans = Collections.emptyList();
         // 7. 合并并保存需求计划
         if (!CollectionUtils.isEmpty(demandPlans)) {
@@ -412,18 +410,34 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return mergedDemandPlans;
     }
 
-    private List<DpDemandPlan> generateDemandPlans(DpDemandPlan createCondition, PredictionContext predictionContext) {
+    private List<DpDemandPlan> generateDemandPlans(DpDemandPlan createCondition, List<DpSimulatedOffsetDetail>  leftDemands, List<SupplyOrderPool> supplyOrderPools) {
         List<DpDemandPlan> demandPlans = new ArrayList<>();
         // 处理净需求
-        if (!CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
-            demandPlans.addAll(SaleRequirePlanHelper.processNetDemands(createCondition,predictionContext.getPredictOffsetDetails()));
+        if (!CollectionUtils.isEmpty(leftDemands)) {
+            leftDemands.forEach(leftDemand -> demandPlans.add(buildDemandPlanFromAllocation(createCondition,leftDemand)));
         }
         // 处理供应链订单
-        if (!CollectionUtils.isEmpty(predictionContext.getSupplyOrderPools())) {
-            demandPlans.addAll(transformSupplyOrdersToDemandPlans(predictionContext.getSupplyOrderPools(), createCondition));
+        if (!CollectionUtils.isEmpty(supplyOrderPools)) {
+            demandPlans.addAll(transformSupplyOrdersToDemandPlans(supplyOrderPools, createCondition));
         }
         return demandPlans;
 
+    }
+
+    private static DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition, DpSimulatedOffsetDetail netDemand) {
+        DpDemandPlan demandPlan = new DpDemandPlan();
+        BeanUtils.copyProperties(netDemand, demandPlan);
+        demandPlan.setBaseVale(null);
+        demandPlan.setId(null);
+        demandPlan.setFactoryCode(createCondition.getFactoryCode());
+        demandPlan.setYear(createCondition.getYear());
+        demandPlan.setMonth(createCondition.getMonth());
+        demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        demandPlan.setPlanType(createCondition.getPlanType());
+        demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(netDemand.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setYearWeek(StringUtils.isBlank(netDemand.getWeekYear())?ZERO_YEAR_WEEK:netDemand.getWeekYear());
+        return demandPlan;
     }
 
     private DpSimulatedOffsetDetail buildPredictOffsetDetail(DpDemandPlan createCondition,SupplyOrderPool supplyOrderPool) {
@@ -686,10 +700,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(CollectionUtils.isEmpty(dataList)) {
             return Collections.emptyMap();
         }
-        return dataList.stream()
-            .filter(Objects::nonNull)
-            .filter(demandPlan ->  demandPlan.getOrderQty() != null)
-            .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey, Collectors.summingInt(DpDemandPlan::getOrderQty)));
+        Map<String, Integer> result = Maps.newHashMap();
+        Map<String,List<DpDemandPlan>> map =   dataList.stream().collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey));
+        map.forEach( (key, value) -> result.put(key,null == value.get(0).getOrderQty()?0:value.get(0).getOrderQty()));
+        return result;
     }
 
     private Map<String, Integer> calculateNetQty(List<DpDemandPlan> dataList) {
