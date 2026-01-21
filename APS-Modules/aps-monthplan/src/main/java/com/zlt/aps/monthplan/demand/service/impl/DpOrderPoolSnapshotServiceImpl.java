@@ -190,6 +190,9 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
     private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SupplyOrderPool supplyOrder) {
         DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
         BeanUtils.copyProperties(supplyOrder, entity);
+        if(StringUtils.isNotBlank(supplyOrder.getBrand())) {
+            entity.setBrand(DictUtils.getLabel(DICT_TYPE_BRAND,supplyOrder.getBrand()));
+        }
         entity.setId(null);
         entity.setBaseVale(null);
         entity.setYear(createCondition.getYear());
