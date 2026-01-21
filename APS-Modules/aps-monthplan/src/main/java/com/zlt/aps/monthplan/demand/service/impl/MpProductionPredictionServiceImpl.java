@@ -232,7 +232,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setMonth3(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTPlus2Month()));
                 result.add(productionPrediction);
         });
-        this.mpPredictionDetailService.batchInsert(demandPlan,productionVersions);
+        this.mpPredictionDetailService.batchInsert(demandPlan,currentFinalVersion,productionVersions);
         return result;
     }
 

@@ -270,7 +270,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
             productionPrediction.setMonth24(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus23Month()));
             result.add(productionPrediction);
         });
-        this.mpPredictionDetailService.batchInsert(tMonthDemandPlan,productionVersions);
+        this.mpPredictionDetailService.batchInsert(tMonthDemandPlan,currentFinalVersion,productionVersions);
         return result;
     }
 

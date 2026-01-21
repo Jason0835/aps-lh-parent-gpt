@@ -9,6 +9,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -18,6 +19,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
@@ -57,7 +59,12 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpSimulatedResult queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableResult = super.list(queryVO);
+        if(CollectionUtils.isEmpty(tableResult.getRows())) {
+            return tableResult;
+        }
+        this.translationList((List<MpSimulatedResult>)tableResult.getRows());
+        return tableResult;
     }
 
     @Override
