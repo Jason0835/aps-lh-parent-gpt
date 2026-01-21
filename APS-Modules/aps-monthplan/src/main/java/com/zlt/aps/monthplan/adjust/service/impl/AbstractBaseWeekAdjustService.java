@@ -355,8 +355,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         log.info("开始执行周程调整确认流程，年份：{}，月份：{}，版本：{}",
                 contextDTO.getMpYear(), contextDTO.getMpMonth(), contextDTO.getVersion());
         try {
-            // 1、保存周程调整结果
-            saveAdjustResult(contextDTO);
+            // 1、查询周程调整结果
+            queryAdjustResult(contextDTO);
             // 2、查询月度生产计划
             queryMonthPlanList(contextDTO);
             // 3、更新月度生产计划
@@ -521,6 +521,47 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     }
 
+
+    /**
+     * 查询周程调整结果
+     *
+     * @param contextDTO
+     */
+    private void queryAdjustResult(MpRollAdjustContextDTO contextDTO) {
+        if (contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null) {
+            log.warn("查询周程调整结果：年份或者月份为空，直接返回");
+            return;
+        }
+        // 工厂编码
+        String factoryCode = contextDTO.getFactoryCode();
+        // 年份
+        Integer year = contextDTO.getMpYear();
+        // 月份
+        Integer month = contextDTO.getMpMonth();
+        // 版本
+        String version = contextDTO.getVersion();
+        // 排产版本
+        String productionVersion = contextDTO.getProductionVersion();
+
+        MpAdjustResult queryVO = new MpAdjustResult();
+        queryVO.setFactoryCode(factoryCode);
+        queryVO.setYear(year);
+        queryVO.setMonth(month);
+        queryVO.setVersion(version);
+        queryVO.setProductionVersion(productionVersion);
+
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        buildAdjustResultCondition(queryWrapper, queryVO);
+
+        try {
+            List<MpAdjustResult> resultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+            contextDTO.setAdjustResultList(resultList);
+        } catch (Exception e) {
+            log.error("查询周程调整结果异常，年份：{}，月份：{}，版本：{}", year, month, version, e);
+            throw new RuntimeException("查询月度生产计划失败", e);
+        }
+    }
+
     /**
      * 保存周程调整结果
      *
@@ -553,6 +594,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             log.warn("查询月度生产计划：年份或者月份为空，直接返回");
             return;
         }
+        // 工厂编码
+        String factoryCode = contextDTO.getFactoryCode();
         // 年份
         Integer year = contextDTO.getMpYear();
         // 月份
@@ -561,6 +604,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String productionVersion = contextDTO.getProductionVersion();
 
         FactoryMonthPlanProductionFinalResult queryVO = new FactoryMonthPlanProductionFinalResult();
+        queryVO.setFactoryCode(factoryCode);
         queryVO.setYear(year);
         queryVO.setMonth(month);
         queryVO.setProductionVersion(productionVersion);
@@ -1101,7 +1145,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getFactoryCode()), FactoryMonthPlanProductionFinalResult::getFactoryCode, queryVO.getFactoryCode());
         queryWrapper.eq(queryVO.getYearMonth() != null, FactoryMonthPlanProductionFinalResult::getYearMonth, queryVO.getYearMonth());
         queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMonthPlanVersion()), FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, queryVO.getMonthPlanVersion());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), FactoryMonthPlanProductionFinalResult::getProductionVersion, queryVO.getProductionVersion());
         queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 构建调整结果条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildAdjustResultCondition(LambdaQueryWrapper<MpAdjustResult> queryWrapper, MpAdjustResult queryVO) {
+        queryWrapper.eq(queryVO.getYear() != null, MpAdjustResult::getYear, queryVO.getYear());
+        queryWrapper.eq(queryVO.getMonth() != null, MpAdjustResult::getMonth, queryVO.getMonth());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getFactoryCode()), MpAdjustResult::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getVersion()), MpAdjustResult::getVersion, queryVO.getVersion());
+        queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), MpAdjustResult::getProductionVersion, queryVO.getProductionVersion());
+        queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
     /**
