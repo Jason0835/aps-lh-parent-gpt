@@ -41,6 +41,22 @@ public class MdmUnqualifiedStock extends BaseEntity {
     private String factoryCode;
 
     /**
+     * 年份
+     */
+    @Excel(name = "ui.data.column.monthStock.year")
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /**
+     * 月份
+     */
+    @Excel(name = "ui.data.column.monthStock.month")
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
+
+    /**
      * 库存日期
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
