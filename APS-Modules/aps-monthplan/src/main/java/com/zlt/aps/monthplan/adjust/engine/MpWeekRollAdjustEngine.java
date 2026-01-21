@@ -1239,6 +1239,7 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         //1.排序(量试->正式),量试中按紧急程度升序，正式中按用户调整优先级升序
+        //List<MpAdjustStructureIn> incAdjustBatchTrailList = incrementAdjustList.stream().filter()
         incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getConstructionStage)
                 .thenComparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());

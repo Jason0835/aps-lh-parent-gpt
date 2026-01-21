@@ -36,7 +36,7 @@ public abstract class AbstractDailyCapacityLimit {
                                         List<MpStructureAllocation> mpStructAllocList){
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
-        for (int i = startDay; i< FactoryConstant.MONTH_MAX_DAY; i++){
+        for (int i = startDay; i<= FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
                 dailyCapacityLimitVo = new MpDailyCapacityLimitVo();
