@@ -6,6 +6,7 @@ import cn.hutool.core.convert.Convert;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.core.utils.SecurityUtils;
@@ -1599,6 +1600,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         Map<String, Integer> cavityResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "cavityResults", new HashMap<>());
         // 活块可用量（按物料描述分组）
         Map<String, Integer> insertResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "insertResults", new HashMap<>());
+        log.info("计算型腔、活块可用量最大值 ==> 型腔可用量:{} 活块可用量:{}", JSONObject.toJSONString(cavityResults), JSONObject.toJSONString(insertResults));
         // 遍历
         for (MpAdjustDetailVo adjust : adjustList) {
             // 设置型腔数量
