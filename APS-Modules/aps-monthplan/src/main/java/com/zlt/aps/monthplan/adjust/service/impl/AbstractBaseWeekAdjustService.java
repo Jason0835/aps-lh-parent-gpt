@@ -1117,6 +1117,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
         List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
         contextDTO.setFactoryMonthPlanProdFinalList(resultList);
+        if (PubUtil.isNotEmpty(resultList) && StringUtils.isEmpty(contextDTO.getProductionVersion())) {
+            // 月度计划排产版本
+            contextDTO.setProductionVersion(resultList.get(0).getProductionVersion());
+        }
     }
 
 
