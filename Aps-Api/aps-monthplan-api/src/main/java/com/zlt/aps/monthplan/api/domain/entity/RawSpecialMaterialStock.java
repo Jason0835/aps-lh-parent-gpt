@@ -3,10 +3,8 @@ package com.zlt.aps.monthplan.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.monthplan.api.annotation.HtmlEscapeSerializer;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -41,6 +39,22 @@ public class RawSpecialMaterialStock extends BaseEntity {
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    /**
+     * 年份
+     */
+    @Excel(name = "ui.data.column.monthStock.year")
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /**
+     * 月份
+     */
+    @Excel(name = "ui.data.column.monthStock.month")
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
 
     /**
      * 库存日期

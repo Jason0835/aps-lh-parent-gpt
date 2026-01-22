@@ -391,7 +391,7 @@ public class MesItfServiceImpl implements MesItfService {
     private void deleteMdmProductStock(String factoryCode, Date stockDate) {
         Map<String, Object> map = new HashMap<>();
         map.put("FACTORY_CODE", factoryCode);
-        map.put("STOCK_DATE", stockDate);
+//        map.put("STOCK_DATE", stockDate);
         baseDao.deleteByMap(MdmProductStock.class, map);
     }
 
@@ -490,6 +490,8 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 Map<String, Object> map = new HashMap<>();
                 map.put("FACTORY_CODE", rawSpecialMaterialStock.getFactoryCode());
+                map.put("YEAR", rawSpecialMaterialStock.getYear());
+                map.put("MONTH", rawSpecialMaterialStock.getMonth());
                 baseDao.deleteByMap(RawSpecialMaterialStock.class, map);
                 List<List<RawSpecialMaterialStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
                 for (List<RawSpecialMaterialStock> importList : splitList) {
@@ -512,7 +514,13 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<RawSpecialMaterialStock> getRawSpecialMaterialStock(RawSpecialMaterialStock rawSpecialMaterialStock) {
         // 查询视图
-        return mesViewMapper.selectRawSpecialMaterialStock(rawSpecialMaterialStock);
+        List<RawSpecialMaterialStock> stockList = mesViewMapper.selectRawSpecialMaterialStock(rawSpecialMaterialStock);
+        for (RawSpecialMaterialStock stock : stockList) {
+            Date stockDate = stock.getStockDate();
+            stock.setYear(DateUtils.getYear(stockDate));
+            stock.setMonth(DateUtils.getMonth(stockDate));
+        }
+        return stockList;
     }
 
     /**
