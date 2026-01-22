@@ -909,11 +909,11 @@ public class MpWeekRollAdjustEngine {
      * 扣减其他SKU的搭配量，并模拟挤占
      * @param lockNextDay 锁定次日
      * @param endDay 结束日（新上机日向前）
-     * @param remainPlanQty 剩余计划量
+     * @param planQty 计划量
      * @param curFinalVo 当前定稿Vo
      * @param mpProdFinalList 定稿列表
      */
-    private void deductMatchOtherSku(MpRollAdjustContextDTO contextDTO,int lockNextDay,int endDay,int remainPlanQty,FactoryMonthPlanFinalAdjustVo curFinalVo,
+    private void deductMatchOtherSku(MpRollAdjustContextDTO contextDTO,int lockNextDay,int endDay,int planQty,FactoryMonthPlanFinalAdjustVo curFinalVo,
                                 List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         if (PubUtil.isEmpty(mpProdFinalList)){
             return;
@@ -947,6 +947,7 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         FactoryMonthPlanFinalAdjustVo optimalFinalVo;
+        int remainPlanQty;
         while (newOtherFinalList.size() >0 ){
             // 2.从多个SKU中，匹配其他最优的定稿SKU记录
             optimalFinalVo = getOptimalOtherSku(curFinalVo, newOtherFinalList);
@@ -957,8 +958,8 @@ public class MpWeekRollAdjustEngine {
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),clearDayValue)).append(ApsConstant.DIVISION);
             // 4.增模模拟排产
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-开始！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay)).append(ApsConstant.DIVISION);
-            remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, remainPlanQty, curFinalVo);
-            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-结束,剩余排产计划量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,remainPlanQty)).append(ApsConstant.DIVISION);
+            remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, planQty, curFinalVo);
+            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-结束,剩余排产计划量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,planQty)).append(ApsConstant.DIVISION);
             if (remainPlanQty > 0){
                 String optimalMaterialCode = optimalFinalVo.getMaterialCode();
                 newOtherFinalList.removeIf(item->item.getMaterialCode().equals(optimalMaterialCode));
@@ -968,7 +969,7 @@ public class MpWeekRollAdjustEngine {
         }
         // 5.递归，扣减其他SKU的搭配量，并模拟挤占
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,递归-开始！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay-1)).append(ApsConstant.DIVISION);
-        deductMatchOtherSku(contextDTO,lockNextDay,endDay-1,remainPlanQty,curFinalVo,mpProdFinalList);
+        deductMatchOtherSku(contextDTO,lockNextDay,endDay-1,planQty,curFinalVo,mpProdFinalList);
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,递归-结束！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay-1)).append(ApsConstant.DIVISION);
 
     }
