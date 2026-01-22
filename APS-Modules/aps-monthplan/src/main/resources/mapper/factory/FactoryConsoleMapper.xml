@@ -58,7 +58,9 @@
                      1
                  FROM
                      t_mp_proc_version pv
-                 WHERE pv.YEAR = mv.YEAR
+                 WHERE
+                     pv.FACTORY_CODE = mv.FACTORY_CODE
+                 AND pv.YEAR = mv.YEAR
                  AND pv.MONTH = mv.MONTH
                  AND pv.MONTH_PLAN_VERSION = mv.MONTH_PLAN_VERSION
                  AND IFNULL(pv.PLAN_TYPE, '00') = '01'
