@@ -1513,7 +1513,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setPattern(materialInfo.getPattern());
             adjustDetailVo.setProductCategory(materialInfo.getProductCategory());
             adjustDetailVo.setProSize(materialInfo.getProSize());
-            adjustDetailVo.setDayVulcanizationQty(skuLhCapacity.getStandardCapacity());
+            adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
             adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
