@@ -66,18 +66,20 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         // 5、按照结构、物料编码维度进行分组，并汇总订单量
         resultList = sumByStructureAndMaterial(resultList);
         contextDTO.setAdjustDetailList(resultList);
-        // 6、设置净需求
+        // 6、设置是否特殊材料
+        setHasSpecialMaterial(contextDTO);
+        // 7、设置净需求
         setCurrentNetQty(contextDTO);
-        // 7、设置计划剩余排产量、计划已排产量、已生产量
+        // 8、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
-        // 8、筛选：|净需求 - 计划已排产量| > 0的数据
+        // 9、筛选：|净需求 - 计划已排产量| > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 9、设置其他字段
+        // 10、设置其他字段
         setOtherField(contextDTO);
     }
 
@@ -89,8 +91,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      * @return
      */
     @Override
-    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
-                                                                     List<MpAdjustDetailVo> adjustDetailList) {
+    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO, List<MpAdjustDetailVo> adjustDetailList) {
         if (PubUtil.isEmpty(adjustDetailList)) {
             return;
         }
