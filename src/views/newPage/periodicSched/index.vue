@@ -285,6 +285,11 @@ export default {
       this.yearMonth = "";
     },
     showModal() {
+      const now = new Date();
+      now.setMonth(now.getMonth() + 1);
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
+      this.yearMonth= `${year}-${month}`
       this.visible = true;
     },
     handleAdd() {

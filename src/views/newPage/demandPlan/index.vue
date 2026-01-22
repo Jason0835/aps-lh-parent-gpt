@@ -108,6 +108,7 @@
   </basic-container>
 </template>
 <script>
+import { mapState, mapGetters } from "vuex";
 import { downloadLink } from "@/utils/request";
 import {
   listDemandPlan,
@@ -118,7 +119,6 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoForm from "@/views/components/infoForm.vue";
 import infoDialog from "./components/infoDialog.vue";
-import { di } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "DemandPlan",
@@ -192,6 +192,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters("globalList", ["structureList"]),
     columns() {
       let columns = [
         // { type: "selection", fixed: "left" },
@@ -502,6 +503,13 @@ export default {
           dictData: this.dict.type.biz_product_type,
         },
         {
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData: this.structureList,
+          filterable: true,
+        },
+        {
           prop: "orderPriority",
           label: this.$t("ui.data.DemandPlan.order"),
           type: "select",
@@ -526,6 +534,18 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        },
+        {
+          prop: "scmPriority",
+          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
+        {
+          prop: "isProduction",
+          label: this.$t("ui.data.DemandPlan.isProduction"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
         },
       ];
     },

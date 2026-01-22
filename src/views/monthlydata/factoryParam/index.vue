@@ -199,6 +199,10 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
+        {
+          prop: "paramName",
+          label: this.$t("参数名称"),
+        },
       ];
     },
   },

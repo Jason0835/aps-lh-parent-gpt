@@ -90,6 +90,7 @@
                 <el-select
                   v-model="formInline.adjustStartDay"
                   style="width: 100px"
+                  disabled
                 >
                   <el-option
                     v-for="item in dayList"
@@ -1658,7 +1659,7 @@ export default {
         this.data = res.rows;
         this.isEdit = false;
         this.showOutResult = false;
-        this, (isShowFoot = fa);
+        this.isShowFoot = false;
       } catch (err) {
         console.log(err);
       } finally {
@@ -1765,7 +1766,7 @@ export default {
         this.$set(this.page, "current", 1);
       }
       if (this.activeName == "singleResult") {
-        this.resizeOutHistoryList();
+        // this.resizeOutHistoryList();
         return;
       }
 
@@ -1833,6 +1834,7 @@ export default {
           }
           data = await listResult(this.formatParams());
         } else {
+
           return;
         }
         this.data = data.rows;
@@ -1872,6 +1874,8 @@ export default {
           this.isShowFoot = false;
           this.isEdit = false;
           this.formInline = res;
+          this.data=[]
+          this.outResultData=[]
         } else {
           this.$modal.msgWarning("已经是最后一个结构");
         }
