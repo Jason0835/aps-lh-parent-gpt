@@ -463,6 +463,19 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         Integer startDay = selectedCxMachine.getAllocationStartDay();
         startDay = Math.max(startDay, realStartDay);
+        //20260121 切换结构控制
+        DayCapacityLimitVo dayCapacityLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer realChangeDay = dayCapacityLimitHandler.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
+        if (null == realChangeDay) {
+            //记录日志
+            Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
+            log.info(TbrProductionGroupLogRecorder.addChangeGroupLimitCxMachineLog(context, selectedCxMachine.getCxMachineCode(), maxChangeLimit));
+            //20260109 标记分配完成--没有找到合适，说明后面也找不到
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            //下一新增结构
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+        }
+        startDay = realStartDay;
         Integer remainingDays = selectedCxMachine.getRemainingDays();
 //        Integer realRemainingDays = hasProductionDaySet.size();
 //        remainingDays = Math.min(remainingDays, realRemainingDays);

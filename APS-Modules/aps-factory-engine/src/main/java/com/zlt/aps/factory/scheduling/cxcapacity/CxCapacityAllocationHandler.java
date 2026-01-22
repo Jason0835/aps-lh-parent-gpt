@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
@@ -196,49 +197,62 @@ public class CxCapacityAllocationHandler {
      * @param cxMachineInfo                成型产能信息
      */
     public static void selectedGroupPlanByCxMachine(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
-        if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
-            //todo 记录日志
-            return;
-        }
-        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-        if (CollectionUtils.isEmpty(allocationList)) {
-            //记录日志 空机台不是收尾
-            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context, cxMachineInfo));
-            return;
-        }
-        Integer remainingDays = cxMachineInfo.getRemainingDays();
-        if (remainingDays <= BigDecimal.ZERO.intValue()) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoRemainingCapacityLog(context, cxMachineInfo));
-            return;
-        }
-        //成型剩余产能能覆盖结构剩余排产净需求量
-        Map<String, ProductionPlanGroupInfo> capacityCoverageMap = getProductionCapacityCoverage(context, estimateGroupCxAllocationMap, cxMachineInfo);
-        if (CollectionUtils.isEmpty(capacityCoverageMap)) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindCapacityPlanLog(context, cxMachineInfo));
-            return;
-        }
-        //剔除不可匹配的结构信息（不可作业的结构或是SKU需要剔除,零度供料架）
-        Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(context, capacityCoverageMap, cxMachineInfo);
-        if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
-            return;
-        }
+//        if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
+//            //todo 记录日志
+//            return;
+//        }
+//        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+//        if (CollectionUtils.isEmpty(allocationList)) {
+//            //记录日志 空机台不是收尾
+//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context, cxMachineInfo));
+//            return;
+//        }
+//        Integer remainingDays = cxMachineInfo.getRemainingDays();
+//        if (remainingDays <= BigDecimal.ZERO.intValue()) {
+//            //记录日志
+//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoRemainingCapacityLog(context, cxMachineInfo));
+//            return;
+//        }
+//        //成型剩余产能能覆盖结构剩余排产净需求量
+//        Map<String, ProductionPlanGroupInfo> capacityCoverageMap = getProductionCapacityCoverage(context, estimateGroupCxAllocationMap, cxMachineInfo);
+//        if (CollectionUtils.isEmpty(capacityCoverageMap)) {
+//            //记录日志
+//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindCapacityPlanLog(context, cxMachineInfo));
+//            return;
+//        }
+//        //剔除不可匹配的结构信息（不可作业的结构或是SKU需要剔除,零度供料架）
+//        Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(context, capacityCoverageMap, cxMachineInfo);
+//        if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
+//            //记录日志
+//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
+//            return;
+//        }
         //获取合适优先级的一个结构
-        ProductionPlanGroupInfo allocationGroupPlan = selectedOne(context, enableGroupPlanMap, cxMachineInfo);
+        ProductionPlanGroupInfo allocationGroupPlan = getSelectedGroup(context, estimateGroupCxAllocationMap, cxMachineInfo);
         if (null == allocationGroupPlan) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
             return;
         }
+        String groupName = allocationGroupPlan.getGroupName();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         log.info(TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan));
         //重新计算分配的起始时间
         Integer startDay = cxMachineInfo.getAllocationStartDay();
         Set<Integer> hasProductionDaySet = cxMachineInfo.confirmProductionRange(context, allocationGroupPlan);
         Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         startDay = Math.max(startDay, realStartDay);
+        //20260121 切换结构的控制
+        DayCapacityLimitVo dayCapacityLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer realChangeDay = dayCapacityLimitHandler.confirmStartDayByChangeGroup(productionContext, startDay, groupName, cxMachineInfo, hasProductionDaySet);
+        if (null == realChangeDay) {
+            //记录日志
+            Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
+            log.info(TbrProductionGroupLogRecorder.addChangeGroupLimitCxMachineLog(context, cxMachineInfo.getCxMachineCode(), maxChangeLimit));
+            return;
+        }
+        startDay = realChangeDay;
+        Integer remainingDays = cxMachineInfo.getRemainingDays();
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
         Integer needAllocationDays = allocationGroupPlan.getRemainingNeedAllocationDays();
         //更新剩余时间
@@ -364,6 +378,49 @@ public class CxCapacityAllocationHandler {
     }
 
     /**
+     * 获取产能可覆盖，机台可匹配的分组计划
+     *
+     * @param context                      排产上下文
+     * @param estimateGroupCxAllocationMap 所有分组计划
+     * @param cxMachineInfo                成型机台
+     * @return
+     */
+    private static ProductionPlanGroupInfo getSelectedGroup(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
+        if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
+            //todo 记录日志
+            return null;
+        }
+        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+        if (CollectionUtils.isEmpty(allocationList)) {
+            //记录日志 空机台不是收尾
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context, cxMachineInfo));
+            return null;
+        }
+        Integer remainingDays = cxMachineInfo.getRemainingDays();
+        if (remainingDays <= BigDecimal.ZERO.intValue()) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoRemainingCapacityLog(context, cxMachineInfo));
+            return null;
+        }
+        //成型剩余产能能覆盖结构剩余排产净需求量
+        Map<String, ProductionPlanGroupInfo> capacityCoverageMap = getProductionCapacityCoverage(context, estimateGroupCxAllocationMap, cxMachineInfo);
+        if (CollectionUtils.isEmpty(capacityCoverageMap)) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindCapacityPlanLog(context, cxMachineInfo));
+            return null;
+        }
+        //剔除不可匹配的结构信息（不可作业的结构或是SKU需要剔除,零度供料架）
+        Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(context, capacityCoverageMap, cxMachineInfo);
+        if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
+            return null;
+        }
+        //获取合适优先级的一个结构
+        return selectedOne(context, enableGroupPlanMap, cxMachineInfo);
+    }
+
+    /**
      * 得到成型机台剩余产能能覆盖剩余排产净需求的分组结构计划
      *
      * @param context                      排产上下文
@@ -476,8 +533,7 @@ public class CxCapacityAllocationHandler {
         if (fixedGroupPlanList.size() == BigDecimal.ONE.intValue()) {
             return fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
         }
-        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-        CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        CxMachineAllocationPlanHelper lastHelper = cxMachineInfo.getLastAllocationInfo();
         //取前规格排产计划-所有
         List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getProductionPlanInfo().getGroupPlanData();
         //2、与前结构含有同规格的优先
