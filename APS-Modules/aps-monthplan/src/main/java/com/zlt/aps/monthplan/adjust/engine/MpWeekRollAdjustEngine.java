@@ -1390,10 +1390,11 @@ public class MpWeekRollAdjustEngine {
      */
     private void resetBegin2EndDay(int startDay,int endDay,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         String dayField;
-        int totalQty = 0;
+        int totalQty;
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList){
             int realBeginDay = FactoryConstant.MONTH_MAX_DAY;
             int realEndDay = 0;
+            totalQty = 0;
             for (int i = startDay; i <= endDay; i++){
                 dayField = FactoryConstant.DAY_FIELD + i;
                 if (mpFinalVo.getFieldValueByFieldName(dayField) != null &&
