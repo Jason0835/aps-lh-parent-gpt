@@ -46,9 +46,4 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    * @return
    */
   Map<String, Map<String, Integer>> calculateStockQty();
-  /**
-   *  汇总库存
-   * @return
-   */
-  Map<String, Map<String, Integer>> calculateStockQty(String monthPlanVersion);
 }
