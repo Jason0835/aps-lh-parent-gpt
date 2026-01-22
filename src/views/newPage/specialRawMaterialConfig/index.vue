@@ -142,6 +142,16 @@ export default {
           },
         },
         {
+          prop: "year",
+          label: this.$t("ui.data.colume.year"),
+          width: 120,
+        },
+        {
+          prop: "month",
+          label: this.$t("ui.data.colume.month"),
+          width: 120,
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.masterdata.materialCode"),
         },
@@ -179,6 +189,7 @@ export default {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
+          width: 180,
           render: ({ row }) => {
             return (
               <div>
@@ -213,6 +224,15 @@ export default {
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+        },
+        {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
+
         },
         {
           prop: "materialCode",
@@ -316,6 +336,12 @@ export default {
         params.createTimeEnd = params.createTime[1];
         params.createTime = undefined;
       }
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        params.yearMonth=''
+      }
 
       return params;
     },
@@ -335,7 +361,11 @@ export default {
     },
   },
   created() {
+    const now = new Date();
+    const year = now.getFullYear(); // 2024
+    const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
     let defaultParams = {
+      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",
     };
     this.search = {
