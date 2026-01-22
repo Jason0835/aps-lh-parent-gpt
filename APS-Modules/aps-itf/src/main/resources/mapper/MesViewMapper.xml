@@ -49,7 +49,7 @@
             resultType="com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock">
         SELECT CONVERT(DATE, STOCK_DATE, 23) AS STOCK_DATE,
         SPEC_MATERIAL_CODE AS MATERIAL_CODE,
-        STANDARD_CODE AS STANDARD_LENGTH,
+        CONVERT(INT, STANDARD_CODE) AS STANDARD_LENGTH,
         STOCK_NUM AS STOCK,
         -- DATA_VERSION,
         -- COMPANY_CODE,

@@ -1,31 +1,26 @@
 package com.zlt.aps.monthplan.raw.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
-import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-
+import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
+import com.zlt.aps.maindata.service.IRawSpecialMaterialStockService;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
-import com.zlt.aps.maindata.service.IRawSpecialMaterialStockService;
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -148,6 +143,8 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
     @Override
     protected void builderCondition(QueryWrapper<RawSpecialMaterialStock> queryWrapper, RawSpecialMaterialStock queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("standardLength")), "STANDARD_LENGTH", queryVO.getFieldValueByFieldName("standardLength"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stock")), "STOCK", queryVO.getFieldValueByFieldName("stock"));

@@ -564,6 +564,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.clearAllMouldAllocationUsed();
         //清除胶囊卡盘使用量
         productionContext.clearAllCapsuleChuckUsed();
+        //清除日排产限制使用量
+        productionContext.clearAllDayLimitUsed();
     }
 
     /**
@@ -881,6 +883,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
             context.setStopDays(Collections.emptySet());
+            context.setCapacityRatioMap(Collections.emptyMap());
             return;
         }
         //排产开始日
@@ -912,7 +915,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         context.setStopDays(stopDaySet);
     }
 
-
     /**
      * 2.1.6：构建日产能限制对象信息
      *
@@ -920,18 +922,28 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      */
     private void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
-        Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
         DayCapacityLimitVo dayCapacityLimit = new DayCapacityLimitVo(Collections.emptyMap());
-        if (CollectionUtils.isEmpty(startProductionRatioMap)) {
+        Set<Integer> productionDayList = productionContext.getProductionDay();
+        if (CollectionUtils.isEmpty(productionDayList)) {
             baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
             return;
         }
-        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(startProductionRatioMap.size());
         ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
-        startProductionRatioMap.forEach((productionDay, ratio) -> {
+        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(productionDayList.size());
+        Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
+        productionDayList.forEach(productionDay -> {
+            Integer ratio = startProductionRatioMap.get(productionDay);
             DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
             dayCapacityLimitMap.put(productionDay, dayInitLimit);
         });
+//        if (CollectionUtils.isEmpty(startProductionRatioMap)) {
+//            baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
+//            return;
+//        }
+//        startProductionRatioMap.forEach((productionDay, ratio) -> {
+//            DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
+//            dayCapacityLimitMap.put(productionDay, dayInitLimit);
+//        });
         dayCapacityLimit.updateWholeDayLimitInfo(dayCapacityLimitMap);
         baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
     }

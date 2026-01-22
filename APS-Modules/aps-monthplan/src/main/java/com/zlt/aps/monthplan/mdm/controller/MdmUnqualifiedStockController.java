@@ -152,6 +152,8 @@ public class MdmUnqualifiedStockController extends AbstractDocBizController<MdmU
     @Override
     protected void builderCondition(QueryWrapper<MdmUnqualifiedStock> queryWrapper, MdmUnqualifiedStock queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
         Object beginValue = queryVO.getParams().get("beginStockDate");
         Object endValue = queryVO.getParams().get("endStockDate");
         queryWrapper.ge(PubUtil.isNotEmpty(beginValue), "STOCK_DATE", beginValue);
