@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class ProductionPlanDistributor {
 
     /**
-     * 对Sku排产realDayProductionQty数量，按先高优级在净需求排产，分配计划排产量
+     * 对Sku排产realDayProductionQty数量，按先高优级再净需求排产，分配计划排产量
      *
      * @param realDayProductionQty 排产量
      * @param continueSkuPlanList  sku的排产计划集合
