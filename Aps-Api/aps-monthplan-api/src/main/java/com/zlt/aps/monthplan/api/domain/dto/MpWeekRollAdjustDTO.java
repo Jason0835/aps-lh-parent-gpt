@@ -34,6 +34,9 @@ public class MpWeekRollAdjustDTO implements Serializable {
     @ApiModelProperty(value = "版本号")
     private String version;
 
+    @ApiModelProperty(value = "月度计划排产版本")
+    private String productionVersion;
+
     @ApiModelProperty(value = "开始日期")
     private Integer startDay;
 

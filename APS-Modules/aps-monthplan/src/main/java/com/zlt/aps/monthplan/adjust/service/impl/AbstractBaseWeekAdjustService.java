@@ -1224,6 +1224,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMonthPlanVersion()), FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, queryVO.getMonthPlanVersion());
         queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), FactoryMonthPlanProductionFinalResult::getProductionVersion, queryVO.getProductionVersion());
         queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(queryVO.getYear() != null, FactoryMonthPlanProductionFinalResult::getYear, queryVO.getYear());
+        queryWrapper.eq(queryVO.getMonth() != null, FactoryMonthPlanProductionFinalResult::getMonth, queryVO.getMonth());
     }
 
     /**
