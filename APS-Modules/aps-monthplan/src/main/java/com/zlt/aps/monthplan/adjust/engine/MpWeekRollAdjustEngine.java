@@ -311,6 +311,8 @@ public class MpWeekRollAdjustEngine {
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+        //9.重置开始/结束日
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
     }
 
     /**
