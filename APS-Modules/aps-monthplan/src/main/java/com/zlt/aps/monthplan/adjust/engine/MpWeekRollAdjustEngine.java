@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -1244,72 +1245,84 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         //1.排序(量试->正式),量试中按紧急程度升序，正式中按用户调整优先级升序
-        //List<MpAdjustStructureIn> incAdjustBatchTrailList = incrementAdjustList.stream().filter()
-        incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getConstructionStage)
-                .thenComparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+        List<MpAdjustStructureIn> incAdjustBatchTrailList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.MEASUREMENT.getStage().equals(x.getConstructionStage()))
+                .sorted(Comparator.comparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+        List<MpAdjustStructureIn> incAdjustFormalList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(x.getConstructionStage()))
+                .sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Integer newOnLineDay,newPlanQty,newEndDay;
-        FactoryMonthPlanFinalAdjustVo mpFinalVo;
         //2、排实单
-        int iOrder = 0;
-        MpAdjustStructureIn structureIn;
-       /* Iterator<MpAdjustStructureIn> incrementAdjustIter = incrementAdjustList.iterator();
-        while (incrementAdjustIter.hasNext()){
-            structureIn = incrementAdjustIter.next();
-            mpFinalVo = createMpFinalAdjustVo(contextDTO, structureIn);
-            iOrder += 1;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
+        Integer newOnLineDay;
+        Iterator<MpAdjustStructureIn> incAdjustFormalIter,incAdjustBatchTrailIter;
+        for (int i=lockNextDay; i<contextDTO.getStructureDeadLine();i++){
             //2.1、敲定SKU新的上机日期
             newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, null);
             if (newOnLineDay == null){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,新的上机日期:%s不存在,继续找下一天！", contextDTO.getStructureName(),newOnLineDay)).append(ApsConstant.DIVISION);
                 continue;
             }
-            if (ConstructionStageEnum.MEASUREMENT.getStage().equals(structureIn.getConstructionStage()) &&
-                    getTrialNewOnlineDay(contextDTO,newOnLineDay,newOnLineDay,mpProdFinalList) == null){
-                //量试，且新上机日不符合要求，刚将正式的记录移到第1笔
-
-            }
-        }*/
-        for (MpAdjustStructureIn adjustStructInVo:incrementAdjustList){
-            mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
-            iOrder += 1;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
-            //2.1、敲定SKU新的上机日期
-            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, null);
-            if (newOnLineDay == null){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-                continue;
-            }
-            //2.2、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
-            mpProdFinalList.add(mpFinalVo);
-
-            //2.3、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
-            newPlanQty = adjustStructInVo.getConfirmAdjustQty();
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,新的上机日期:%s,新的排产量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
-            //2.4、增模排产,挤占空产能
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,排序:%s,物料编码:%s,开始！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-            int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,排序:%s,物料编码:%s,结束！还有剩余排产计划量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
-            //2.5、若还有剩余，向前挤占其他SKU的搭配量
-            if (remainPlanQty > 0){
-                // 若剩余量 > 0，说明实单还有剩余
-                // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
-                newEndDay = newOnLineDay == lockNextDay ? lockNextDay:newOnLineDay-1;
-                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-开始！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-                deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,remainPlanQty,mpFinalVo,mpProdFinalList);
-                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-结束！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-            }
-
-            //2.6、若当前SKU没有排上，则移除
-            int productionQty = getProductionQty(newOnLineDay,contextDTO.getStructureDeadLine(),mpFinalVo);
-            if (productionQty <=0){
-                mpProdFinalList.remove(mpFinalVo);
+            //2.2、若有量试列表，优先排产
+            if (PubUtil.isNotEmpty(incAdjustBatchTrailList)){
+                if (getTrialNewOnlineDay(contextDTO,newOnLineDay,newOnLineDay, mpProdFinalList) == null){
+                    //若新的上机日 不符合 量试上机要求
+                    //2.2.1 正式规格列表 占位
+                    incAdjustFormalIter = incAdjustFormalList.iterator();
+                    while (incAdjustFormalIter.hasNext()){
+                        incOneAdjust(contextDTO,mpProdFinalList,incAdjustFormalIter.next(),lockNextDay,newOnLineDay);
+                        incAdjustFormalIter.remove();
+                    }
+                }else {
+                    //2.2.1 排产量试列表
+                    incAdjustBatchTrailIter = incAdjustBatchTrailList.iterator();
+                    while (incAdjustBatchTrailIter.hasNext()){
+                        incOneAdjust(contextDTO,mpProdFinalList,incAdjustBatchTrailIter.next(),lockNextDay,newOnLineDay);
+                        incAdjustBatchTrailIter.remove();
+                    }
+                }
             }else{
-                //重置各优先级总排产量
-                resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
+                //2.3、排产正式列表
+                if (PubUtil.isNotEmpty(incAdjustFormalList)){
+                    Iterator<MpAdjustStructureIn> incAdjustIter = incAdjustFormalList.iterator();
+                    while (incAdjustIter.hasNext()){
+                        incOneAdjust(contextDTO,mpProdFinalList,incAdjustIter.next(),lockNextDay,newOnLineDay);
+                        incAdjustIter.remove();
+                    }
+                }
             }
+        }
+    }
+
+    private void incOneAdjust(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustStructureIn adjustStructInVo, int lockNextDay,int newOnLineDay) {
+        Integer newEndDay;
+        Integer newPlanQty;
+        FactoryMonthPlanFinalAdjustVo mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
+        //2.2、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
+        mpProdFinalList.add(mpFinalVo);
+
+        //2.3、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
+        newPlanQty = adjustStructInVo.getConfirmAdjustQty();
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,新的上机日期:%s,新的排产量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
+        //2.4、增模排产,挤占空产能
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,物料编码:%s,开始！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+        int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
+        //2.5、若还有剩余，向前挤占其他SKU的搭配量
+        if (remainPlanQty > 0){
+            // 若剩余量 > 0，说明实单还有剩余
+            // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
+            newEndDay = newOnLineDay == lockNextDay ? lockNextDay :newOnLineDay-1;
+            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-开始！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+            deductMatchOtherSku(contextDTO, lockNextDay,newEndDay,remainPlanQty,mpFinalVo, mpProdFinalList);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-结束！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+        }
+
+        //2.6、若当前SKU没有排上，则移除
+        int productionQty = getProductionQty(newOnLineDay, contextDTO.getStructureDeadLine(),mpFinalVo);
+        if (productionQty <=0){
+            mpProdFinalList.remove(mpFinalVo);
+        }else{
+            //重置各优先级总排产量
+            resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
         }
     }
 

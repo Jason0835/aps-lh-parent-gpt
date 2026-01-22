@@ -313,13 +313,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //2、保存调整记录
         MpAdjustResult mpAdjustResult;
         List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
+        int totalQty = 0;
         for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:factoryMonthPlanProdFinalList){
             mpAdjustResult = new MpAdjustResult();
             BeanUtils.copyProperties(finalAdjustVo,mpAdjustResult);
             mpAdjustResult.setId(null);
             mpAdjustResult.setAdjustType(contextDTO.getAdjustType());
             mpAdjustResult.setVersion(contextDTO.getVersion());
-            mpAdjustResult.setTotalPlanQty(finalAdjustVo.getTotalQty());
+            mpAdjustResult.setTotalPlanQty(totalQty);
             if (StringUtil.isEmptyWithTrim(mpAdjustResult.getIsLockSchedule())){
                 mpAdjustResult.setIsLockSchedule(YesOrNoEnum.NO.getCode());
             }
