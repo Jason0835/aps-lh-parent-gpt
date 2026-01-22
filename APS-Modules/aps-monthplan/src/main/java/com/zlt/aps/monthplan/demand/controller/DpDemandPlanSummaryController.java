@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
 @Api(tags = "需求计划")
 @AllArgsConstructor
 @RestController
-@RequestMapping("/demandPlan")
+@RequestMapping("/demandPlanSummary")
 public class DpDemandPlanSummaryController extends AbstractDocBizController<DpDemandPlanSummary> {
 
     private final IDpDemandPlanService dpDemandPlanService;
