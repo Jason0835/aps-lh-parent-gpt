@@ -8,6 +8,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSummary;
 import com.zlt.aps.monthplan.api.service.IDpDemandPlanRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -60,7 +61,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @RequiresPermissions("monthplan:demandPlan:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DpDemandPlan dpDemandPlan) {
+    public TableDataInfo list(DpDemandPlanSummary dpDemandPlan) {
         return iDpDemandPlanService.list(dpDemandPlan);
     }
 
@@ -148,8 +149,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @GetMapping({"/export"})
     @RequiresPermissions("monthplan:demandPlan:export")
     @ResponseBody
-    @Override
-    public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
+    public void export(HttpServletResponse response, DpDemandPlanSummary entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iDpDemandPlanService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);

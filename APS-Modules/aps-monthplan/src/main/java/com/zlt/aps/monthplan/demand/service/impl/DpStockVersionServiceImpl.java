@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -133,6 +134,39 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
             result.put(key, map);
         });
         return result;
+    }
+
+    @Override
+    public Map<String, Map<String, Integer>> calculateStockQty(Set<String> monthPlanVersions) {
+        List<DpStockVersion> list = this.findCurrentStockVersion(monthPlanVersions);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        YearMonth now = YearMonth.now();
+        YearMonth lastOneYear = now.minusYears(BigDecimal.ONE.intValue());
+        YearMonth lastTwoYear = now.minusYears(BigDecimal.ONE.intValue() + BigDecimal.ONE.intValue());
+        Map<String, Map<String, Integer>> result = new HashMap<>();
+        Map<String,List<DpStockVersion>> stockMap =   list.stream().collect(Collectors.groupingBy(DpStockVersion::getMonthPlanVersionKey));
+        stockMap.forEach((key,value)->{
+            Map<String, Integer> map = Maps.newHashMap();
+            int totalStockQty = value.stream().filter(item -> null != item.getStockQty()).mapToInt(DpStockVersion::getStockQty).sum();
+            int currentStockQty = value.stream().filter(item -> filter(item,now)).mapToInt(DpStockVersion::getStockQty).sum();
+            int lastOneYearStockQty = value.stream().filter(item -> filter(item,lastOneYear)).mapToInt(DpStockVersion::getStockQty).sum();
+            int lastTwoYearStockQty = value.stream().filter(item -> filter(item,lastTwoYear)).mapToInt(DpStockVersion::getStockQty).sum();
+            map.put(StringConstant.ZERO,totalStockQty);
+            map.put(StringConstant.ONE,currentStockQty);
+            map.put(StringConstant.TWO,lastOneYearStockQty);
+            map.put(StringConstant.THREE,lastTwoYearStockQty);
+            result.put(key, map);
+        });
+        return result;
+    }
+
+    private List<DpStockVersion> findCurrentStockVersion(Set<String> monthPlanVersions) {
+        LambdaQueryWrapper<DpStockVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(DpStockVersion::getMonthPlanVersionKey,monthPlanVersions);
+        wrapper.eq(DpStockVersion::getIsDelete, YesOrNoEnum.NO.getValue());
+        return this.dpStockVersionEntityMapper.selectList(wrapper);
     }
 
     private List<DpStockVersion> findCurrentStockVersion() {
