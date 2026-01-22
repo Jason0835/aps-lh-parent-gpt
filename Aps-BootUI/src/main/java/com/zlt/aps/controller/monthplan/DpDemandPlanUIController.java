@@ -8,7 +8,9 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.service.IDpDemandPlanRemoteService;
+import com.zlt.aps.monthplan.api.service.IDpDemandPlanSumRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -52,6 +54,8 @@ import javax.servlet.http.HttpServletResponse;
 public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @Autowired
     private IDpDemandPlanRemoteService iDpDemandPlanService;
+    @Autowired
+    private IDpDemandPlanSumRemoteService iDpDemandPlanSumRemoteService;
 
     /**
      * 根据条件查询主表数据
@@ -60,8 +64,8 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @RequiresPermissions("monthplan:demandPlan:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DpDemandPlan dpDemandPlan) {
-        return iDpDemandPlanService.list(dpDemandPlan);
+    public TableDataInfo list(DpDemandPlanSum dpDemandPlan) {
+        return iDpDemandPlanSumRemoteService.list(dpDemandPlan);
     }
 
     /**
@@ -148,10 +152,9 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @GetMapping({"/export"})
     @RequiresPermissions("monthplan:demandPlan:export")
     @ResponseBody
-    @Override
-    public void export(HttpServletResponse response, DpDemandPlan entity) throws IOException {
+    public void export(HttpServletResponse response, DpDemandPlanSum entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iDpDemandPlanService.exportData(entity,fileName);
+        byte[] excelBytes = iDpDemandPlanSumRemoteService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
