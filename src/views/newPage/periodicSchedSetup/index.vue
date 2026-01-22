@@ -126,6 +126,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
+          width: 180,
           label: this.$t("common.factory"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -133,10 +134,12 @@ export default {
         },
         {
           prop: "year",
+          width: 180,
           label: this.$t("ui.data.colume.year"),
         },
         {
           prop: "month",
+          width: 180,
           label: this.$t("ui.data.colume.month"),
         },
         {
@@ -145,10 +148,12 @@ export default {
         },
         {
           prop: "turnoverMonth",
+          width: 180,
           label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
+          width: 180,
           label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
         },
 

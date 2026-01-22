@@ -177,6 +177,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
+          width: 180,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -184,14 +185,16 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:300
+
         },
         {
           prop: "turnoverMonth",
+          width: 180,
           label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
         },
         {
           prop: "minVulcanizingMachine",
+          width: 180,
           label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
         },
         {
@@ -204,6 +207,7 @@ export default {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
+
           render: ({ row }) => {
             return (
               <div>

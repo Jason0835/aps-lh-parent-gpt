@@ -222,7 +222,7 @@
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import { mapState,mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -319,6 +319,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -875,6 +876,9 @@ export default {
         {
           prop: "structureName",
           label: this.$t("产品结构"),
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
         {
           prop: this.activeName == "second" ? "productionVersion" : "version",

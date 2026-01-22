@@ -419,6 +419,7 @@ export default {
           prop: "monthPlanVersion",
           type: "select",
           dictData: this.planVersionList,
+          filterable: true,
           listeners: {
             change: this.handlePlanChange,
           },
@@ -428,6 +429,7 @@ export default {
           prop: "productionVersion",
           type: "select",
           dictData: this.productionVersionList,
+          filterable: true
         },
       ];
     },
