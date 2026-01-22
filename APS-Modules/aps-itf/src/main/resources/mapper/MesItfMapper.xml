@@ -84,7 +84,8 @@
         FACTORY_CODE,
         BRAND,
         MES_MATERIAL_CATEGORY,
-        MES_MATERIAL_SUBCATEGORY
+        MES_MATERIAL_SUBCATEGORY,
+        SINGLE_TIRE_WEIGHT
         FROM MES_BAS_MATERIAL
         WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
