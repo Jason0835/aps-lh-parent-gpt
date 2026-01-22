@@ -230,9 +230,9 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          // type: "select",
-          // dictData:this.structureList,
-          // filterable: true
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
       ];
     },

@@ -34,6 +34,7 @@
 //lib
 import moment from "moment";
 import Big from "big.js";
+import { mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
@@ -77,6 +78,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     columns() {
       let columns = [
         {
@@ -428,6 +430,9 @@ export default {
         {
           label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
         // {
         //   label: this.$t("ui.data.rubberMaterial.embryoDesc"),

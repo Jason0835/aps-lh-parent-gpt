@@ -307,7 +307,10 @@ export default {
   methods: {
     initYearRange() {
       const currentYear = new Date().getFullYear();
-      for (let i = currentYear - 1; i <= currentYear + 1; i++) {
+      // for (let i = currentYear - 1; i <= currentYear + 1; i++) {
+      //   this.yearRange.push(i);
+      // }
+      for (let i = currentYear - 10; i <= currentYear + 10; i++) {
         this.yearRange.push(i);
       }
     },
