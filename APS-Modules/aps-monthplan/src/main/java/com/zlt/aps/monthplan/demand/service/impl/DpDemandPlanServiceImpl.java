@@ -39,6 +39,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.common.event.SummaryDemandEvent;
 import com.zlt.aps.monthplan.common.utils.DemandPlanGrouper;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
@@ -61,6 +62,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
@@ -139,6 +141,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     // 周期结构配置
     private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
 
+    private final ApplicationContext applicationContext;
+
     @Override
     protected String getDocTypeCode() {
         return "0802";
@@ -213,6 +217,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(mergedDemandPlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(mergedDemandPlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
     }
 
@@ -338,6 +343,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(adjustRequirePlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(adjustRequirePlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(adjustRequirePlans.get(0)));
         }
         return adjustRequirePlans;
     }
@@ -406,6 +412,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(mergedDemandPlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(mergedDemandPlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
         return mergedDemandPlans;
     }
@@ -609,6 +616,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(mergedDemandPlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(mergedDemandPlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
         return mergedDemandPlans;
     }
