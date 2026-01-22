@@ -717,7 +717,72 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @TableField(value = "DISPLAY_SEQ")
     private Integer displaySeq;
 
+    @TableField(exist = false)
+    private Integer  heightLossQty;
 
+    @TableField(exist = false)
+    private Integer  cycleReserveLossQty;
+
+    @TableField(exist = false)
+    private Integer  midLossQty;
+    @TableField(exist = false)
+    private Integer conventionReserveQty;
+    @TableField(exist = false)
+    private Integer postponeQty;
+
+
+    /**
+     * 根据优先级顺序分配生产数量
+     * 顺序：heightLossQty -> cycleReserveLossQty -> midLossQty -> conventionReserveQty -> postponeQty
+     */
+    public void allocateProductionByPriority() {
+        // 初始化所有生产数量为0
+        this.heightProductionQty = 0;
+        this.cycleProductionQty = 0;
+        this.midProductionQty = 0;
+        this.conventionProductionQty = 0;
+        this.postponeProductionQty = 0;
+
+        if (this.totalQty == null || this.totalQty <= 0) {
+            return;
+        }
+
+        int remainingQty = this.totalQty;
+
+        // 1. 分配高优先级
+        if (this.heightLossQty != null && this.heightLossQty > 0) {
+            this.heightProductionQty = Math.min(remainingQty, this.heightLossQty);
+            remainingQty -= this.heightProductionQty;
+        }
+
+        // 2. 分配周期储备
+        if (remainingQty > 0 && this.cycleReserveLossQty != null && this.cycleReserveLossQty > 0) {
+            this.cycleProductionQty = Math.min(remainingQty, this.cycleReserveLossQty);
+            remainingQty -= this.cycleProductionQty;
+        }
+
+        // 3. 分配中优先级
+        if (remainingQty > 0 && this.midLossQty != null && this.midLossQty > 0) {
+            this.midProductionQty = Math.min(remainingQty, this.midLossQty);
+            remainingQty -= this.midProductionQty;
+        }
+
+        // 4. 分配常规储备
+        if (remainingQty > 0 && this.conventionReserveQty != null && this.conventionReserveQty > 0) {
+            this.conventionProductionQty = Math.min(remainingQty, this.conventionReserveQty);
+            remainingQty -= this.conventionProductionQty;
+        }
+
+        // 5. 分配暂缓订单（如果有剩余）
+        if (remainingQty > 0) {
+            // 如果设置了postponeQty，则不超过该值
+            if (this.postponeQty != null && this.postponeQty > 0) {
+                this.postponeProductionQty = Math.min(remainingQty, this.postponeQty);
+            } else {
+                this.postponeProductionQty = remainingQty;
+            }
+        }
+    }
     /**
      * 分组|*|主花纹
      * TBR 为结构

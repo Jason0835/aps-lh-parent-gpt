@@ -98,6 +98,7 @@ public class MouldProductionResultHandler {
             mergeNoProductionReason(dayResult, requireList);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));
+            dayResult.allocateProductionByPriority();
             dayResult.setDifferenceQty(dayResult.getFactProdReqQty() - dayResult.getTotalQty());
             resultList.add(dayResult);
         });
@@ -230,6 +231,15 @@ public class MouldProductionResultHandler {
         Integer noHeightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
         Integer lossQty = (heightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
         dayResult.setFactProdReqQty(sumNetQty + lossQty);
+
+        int sumCycleReserveQty = requireList.stream().filter(item -> null != item.getCycleReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
+        int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
+        int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
+        int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
+        dayResult.setCycleReserveLossQty(sumCycleReserveQty + lossQty);
+        dayResult.setConventionReserveQty(sumConventionQty);
+        dayResult.setMidLossQty(sumMidQty + lossQty);
+        dayResult.setPostponeQty(sumPostponeQty);
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());
         dayResult.setMidProductionQty(BigDecimal.ZERO.intValue());
