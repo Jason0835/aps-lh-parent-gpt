@@ -11,6 +11,8 @@
         where is_delete = 0
         <if test="factoryCode != null  and factoryCode != ''">and factory_code = #{factoryCode}</if>
         <if test="productTypeCode != null  and productTypeCode != ''">and product_type_code = #{productTypeCode}</if>
+        <if test="paramCode != null and paramCode != ''">and PARAM_CODE like concat(concat('%', #{paramCode}), '%')</if>
+        <if test="paramName != null and paramName != ''">and PARAM_NAME like concat(concat('%', #{paramName}), '%')</if>
     </select>
 
     <select id="getParamByBrandList" resultType="com.zlt.aps.maindata.domain.dto.ProductBrandDto">

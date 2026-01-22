@@ -515,11 +515,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 获取业务数据对应的周数
             int week = 0;
-            if (adjustResult.getBeginDay() != null) {
-                //week = DateUtil.weekOfMonth(adjustResult.getStartDate());
-            } else {
+//            if (adjustResult.getBeginDay() != null) {
+////                week = DateUtil.weekOfMonth(adjustResult.getBeginDay());
+//            } else {
                 week = DateUtil.weekOfMonth(new Date());
-            }
+//            }
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustResult.getTotalPlanQty());
         }
         // 更新月度生产计划
@@ -1513,7 +1513,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setPattern(materialInfo.getPattern());
             adjustDetailVo.setProductCategory(materialInfo.getProductCategory());
             adjustDetailVo.setProSize(materialInfo.getProSize());
-            adjustDetailVo.setDayVulcanizationQty(skuLhCapacity.getStandardCapacity());
+            adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
             adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());

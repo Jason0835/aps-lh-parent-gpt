@@ -3,13 +3,12 @@ package com.zlt.aps.factory.handler;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
-import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
+import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
@@ -462,6 +461,8 @@ public class CxLhMouldProductionCalculator {
         updateMouldAllocationRatioInfoByMould(mouldAllocationControlInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
         //胶囊卡盘使用量 - 1
         updateCapsuleChuckInfoByMould(capsuleChuckInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
+        //20260122 换模次数 -1
+        updateChangeMouldInfoByMould(context, beforeConclusionDay, productionPlan.getMaterialDesc(), singleMould);
     }
 
     /**
@@ -752,6 +753,26 @@ public class CxLhMouldProductionCalculator {
         }
     }
 
+    /**
+     * 换模次数-1
+     *
+     * @param context       排产上下文
+     * @param productionDay 排产日
+     * @param materialDesc  物料描述
+     * @param singleMould   模具信息
+     */
+    private static void updateChangeMouldInfoByMould(Context context, Integer productionDay, String materialDesc, ProductionMouldInfoVo singleMould) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return;
+        }
+        String mouldCode = singleMould.getMouldCode();
+        if (StringUtils.isBlank(mouldCode) || StringUtils.isBlank(materialDesc) || null == productionDay) {
+            return;
+        }
+        dayCapacityLimit.deductionChangeMouldUsedQty(context, productionDay, materialDesc, mouldCode);
+    }
 
     private CxLhMouldProductionCalculator() {
 

@@ -3,11 +3,12 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
@@ -39,35 +40,41 @@ public class CxAddSkuProductionHandler {
      * @param excludeDays   排除的收尾时间点
      */
     public static void productionAddSkuByContinueCxMachine(Context context, ProductionPlanGroupInfo groupPlanInfo, Set<Integer> excludeDays) {
+        //基础校验 有可排产计划且能找到最早收尾的硫化组
+        EarliestConclusionLhGroupHelper lhGroup = checkBaseProductionCondition(context, groupPlanInfo, excludeDays);
+        if (null == lhGroup) {
+            return;
+        }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = groupPlanInfo.getGroupName();
         String onLineMachineInfo = String.join(StringConstant.COMMA, groupPlanInfo.getAllocationCxMachineCodeSet());
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
-        if (CollectionUtils.isEmpty(groupPlanData)) {
-            //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo));
-            return;
-        }
+//        if (CollectionUtils.isEmpty(groupPlanData)) {
+//            //记录日志
+//            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo));
+//            return;
+//        }
+//        List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
+//        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
+//            //记录日志
+//            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo));
+//            return;
+//        }
+//        //获取最先收尾的硫化组
+//        EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext, excludeDays);
+//        if (null == lhGroup) {
+//            //记录日志
+//            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo));
+//            return;
+//        }
+//        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
+//        if (startDay > endDay) {
+//            return;
+//        }
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
-            //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo));
-            return;
-        }
-        //获取最先收尾的硫化组
-        EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext, excludeDays);
-        if (null == lhGroup) {
-            //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo));
-            return;
-        }
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = lhGroup.getEndDay();
-        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
-        if (startDay > endDay) {
-            return;
-        }
         //获取优先级最高的Sku信息
         String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
         log.info(TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc));
@@ -195,6 +202,52 @@ public class CxAddSkuProductionHandler {
         CxLhMouldProductionCalculator.lhProductionByCxMachineHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
+    }
+
+    /**
+     * 校验基本排产条件
+     * 1、groupPlanInfo存在排产计划
+     * 2、groupPlanInfo本轮有能排产的计划
+     * 3、groupPlanInfo中能找到收尾且可排产的硫化组
+     * 4、收尾的硫化组startDay不能超出endDay
+     * true 表示匹配 false表示不匹配
+     *
+     * @param context       排产上下文
+     * @param groupPlanInfo 分组计划对象实例
+     * @param excludeDays   需要排产的排产日
+     * @return
+     */
+    private static EarliestConclusionLhGroupHelper checkBaseProductionCondition(Context context, ProductionPlanGroupInfo groupPlanInfo, Set<Integer> excludeDays) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String groupName = groupPlanInfo.getGroupName();
+        String onLineMachineInfo = String.join(StringConstant.COMMA, groupPlanInfo.getAllocationCxMachineCodeSet());
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo));
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo));
+            return null;
+        }
+        //获取最先收尾的硫化组
+        EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext, excludeDays);
+        if (null == lhGroup) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo));
+            return null;
+        }
+        Integer startDay = lhGroup.getClosingDay();
+        //成型分配的排产范围起始日~分组收尾日
+        Integer endDay = lhGroup.getEndDay();
+        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
+        if (startDay > endDay) {
+            return null;
+        }
+        return lhGroup;
     }
 
     /**

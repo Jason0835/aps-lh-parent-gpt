@@ -1,7 +1,9 @@
 package com.zlt.aps.factory.domain.dto;
 
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -109,6 +111,20 @@ public class CxLhProductionHelper implements Serializable {
         //排产模具是否要清空？
     }
 
+
+    /**
+     * 当前硫化组是否需要换模
+     *
+     * @param addSkuInfo
+     * @return
+     */
+    public boolean isChangeMould(MonthPlanProductionRequirePlanVo addSkuInfo) {
+        if (null == addSkuInfo || StringUtils.isEmpty(addSkuInfo.getMaterialDesc())) {
+            return false;
+        }
+        String connectSkuMaterialDesc = addSkuInfo.getMaterialDesc();
+        return !connectSkuMaterialDesc.equals(materialDesc);
+    }
     /**
      * 更新可排产时间范围
      *
