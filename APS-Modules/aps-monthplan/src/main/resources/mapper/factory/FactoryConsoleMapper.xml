@@ -37,25 +37,37 @@
     </select>
 
     <select id="getNoSelectedVersionList" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo" resultType="com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo">
-        SELECT mv.YEAR,
-               mv.MONTH,
-               mv.FACTORY_CODE,
-               mv.PRODUCT_TYPE_CODE,
-               mv.MONTH_PLAN_VERSION,
-               mv.CREATE_TIME
-          FROM t_mp_proc_version mv
-         WHERE IFNULL(mv.IS_DELETE, 0) = 0
-           AND IFNULL(mv.PLAN_TYPE, '00') = '01'
-           AND IFNULL(mv.IS_SELECTED_DEMAND, 0) = 0
-           AND mv.YEAR = #{year,jdbcType=DECIMAL}
-           AND mv.MONTH = #{month,jdbcType=DECIMAL}
-           AND NOT EXISTS (SELECT 1 FROM t_mp_proc_version pv
-                              WHERE IFNULL(pv.IS_DELETE, 0) = 0
-                                AND IFNULL(pv.PLAN_TYPE, '00') = '01'
-                                AND IFNULL(pv.IS_SELECTED_DEMAND, 0) = 1
-                                AND mv.YEAR = pv.YEAR
-                                AND mv.MONTH = pv.MONTH
-                                AND mv.MONTH_PLAN_VERSION = pv.MONTH_PLAN_VERSION)
-         ORDER BY CREATE_TIME DESC
+            SELECT
+              mv.YEAR,
+              mv.MONTH,
+              mv.FACTORY_CODE,
+              mv.PRODUCT_TYPE_CODE,
+              mv.MONTH_PLAN_VERSION,
+              mv.CREATE_TIME
+             FROM
+                 t_mp_proc_version mv
+             WHERE
+                 mv.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+             AND mv.YEAR = #{year,jdbcType=DECIMAL}
+             AND mv.MONTH = #{month,jdbcType=DECIMAL}
+             AND IFNULL(mv.PLAN_TYPE, '00') = '01'
+             AND IFNULL(mv.IS_SELECTED_DEMAND, 0) = 0
+             AND IFNULL(mv.IS_DELETE, 0) = 0
+             AND NOT EXISTS (
+                 SELECT
+                     1
+                 FROM
+                     t_mp_proc_version pv
+                 WHERE
+                     pv.FACTORY_CODE = mv.FACTORY_CODE
+                 AND pv.YEAR = mv.YEAR
+                 AND pv.MONTH = mv.MONTH
+                 AND pv.MONTH_PLAN_VERSION = mv.MONTH_PLAN_VERSION
+                 AND IFNULL(pv.PLAN_TYPE, '00') = '01'
+                 AND IFNULL(pv.IS_SELECTED_DEMAND, 0) = 1
+                 AND IFNULL(pv.IS_DELETE, 0) = 0
+             )
+             ORDER BY
+                CREATE_TIME DESC
     </select>
 </mapper>
