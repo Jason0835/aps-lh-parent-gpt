@@ -12,7 +12,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmCycleSchStruConf.java
- * 描    述：周期排产结构配置对象 T_DP_CYCLE_SCH_STRU_CONF
+ * 描    述：周期排产结构配置对象 T_DP_CYCLE_STRUCT_CONFIG
  *
  * @author zlt
  * @version 1.0

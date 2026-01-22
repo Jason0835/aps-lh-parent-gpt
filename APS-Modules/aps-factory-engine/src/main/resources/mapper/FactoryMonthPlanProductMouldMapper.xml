@@ -37,7 +37,7 @@
                mdp.MATERIAL_CODE,
                mdp.MATERIAL_DESC,
                mdp.MOULD_CODE,
-               '' AS MAIN_PATTERN,
+               mdp.MAIN_PATTERN,
                mdp.MOULD_CODE AS BASE_MOULD_CODE,
                '' AS MOULD_TYPE,
                1 AS MOULD_STATUS,
@@ -97,7 +97,7 @@
                mdp.MATERIAL_DESC,
                mdp.MOULD_CODE,
                mdp.BOARDING_DATE,
-               '' AS MAIN_PATTERN,
+               mdp.MAIN_PATTERN,
                mdp.MOULD_CODE AS BASE_MOULD_CODE,
                '' AS MOULD_TYPE,
                1 AS MOULD_STATUS,
@@ -160,7 +160,7 @@
                mdp.MATERIAL_DESC,
                mdp.MOULD_CODE,
                mdp.BOARDING_DATE,
-               '' AS MAIN_PATTERN,
+               mdp.MAIN_PATTERN,
                mdp.MOULD_CODE AS BASE_MOULD_CODE,
                '' AS MOULD_TYPE,
                1 AS MOULD_STATUS,
@@ -184,7 +184,7 @@
                           AND mdp.FACTORY_CODE = mpi.FACTORY_CODE)
     </select>
 
-    <select id="getMouldShellInfo" resultType="com.zlt.aps.factory.domain.vo.MouldShellBaseInfoVo">
+    <select id="getMouldShellInfo" resultType="com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo">
         SELECT FACTORY_CODE,
                MOULD_SET_CODE,
                MACHINE_QTY,
@@ -195,7 +195,7 @@
            AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
     </select>
 
-    <select id="getMouldAllocationInfo" resultType="com.zlt.aps.factory.domain.vo.MouldAllocationInfoVo">
+    <select id="getMouldAllocationInfo" resultType="com.zlt.aps.factory.daylimit.MouldAllocationInfoVo">
         SELECT mma.FACTORY_CODE,
                mma.MAIN_PATTERN,
                mma.PATTERN,

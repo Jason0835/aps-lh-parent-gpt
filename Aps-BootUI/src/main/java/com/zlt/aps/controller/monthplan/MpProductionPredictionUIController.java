@@ -21,6 +21,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 
+import java.time.YearMonth;
 import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -204,8 +205,7 @@ public class MpProductionPredictionUIController extends BaseUIController<MpProdu
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMpProductionPredictionService.importData(context,false);
-        return ajaxResult;
+        return iMpProductionPredictionService.importData(context,false);
     }
 
     @ApiOperation("生成订单预测")
@@ -213,6 +213,12 @@ public class MpProductionPredictionUIController extends BaseUIController<MpProdu
     @RequiresPermissions("monthplan:productionPrediction:createMonthPrediction")
     @PostMapping("/createMonthPrediction")
     public AjaxResult createMonthPrediction(MpProductionPrediction createCondition){
+        // 获取操作日所在月份
+        YearMonth currentMonth = YearMonth.now();
+        // T月 = 当月 + 1个月
+        YearMonth tMonth = currentMonth.plusMonths(1);
+        createCondition.setYear(tMonth.getYear());
+        createCondition.setMonth(tMonth.getMonthValue());
         return iMpProductionPredictionService.createMonthPrediction(createCondition);
     }
 

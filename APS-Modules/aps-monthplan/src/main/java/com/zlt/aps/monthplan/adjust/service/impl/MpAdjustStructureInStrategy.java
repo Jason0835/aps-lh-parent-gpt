@@ -16,6 +16,7 @@ import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
+import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
@@ -49,11 +50,14 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、构建结构内调整明细（试制量试计划）
         List<MpAdjustDetailVo> adjustDetailByTrialList = buildAdjustDetailByTrialList(contextDTO);
+        // 4、构建结构内调整明细（月度计划有，无订单）
+        List<MpAdjustDetailVo> adjustDetailByMonthPlanList = buildAdjustDetailByMonthPlanList(contextDTO);
         // 结构内调整明细结果列表
         List<MpAdjustDetailVo> resultList = new ArrayList<>();
         resultList.addAll(adjustDetailByTrialList);
         resultList.addAll(adjustDetailList);
-        // 4、通过结构过滤调整明细
+        resultList.addAll(adjustDetailByMonthPlanList);
+        // 5、通过结构过滤调整明细
         filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
         Assert.isFalse(PubUtil.isEmpty(resultList), () -> {
@@ -61,21 +65,25 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 5、按照结构、物料编码维度进行分组，并汇总订单量
+        // 6、按照结构、物料编码维度进行分组，并汇总订单量
         resultList = sumByStructureAndMaterial(resultList);
         contextDTO.setAdjustDetailList(resultList);
-        // 6、设置净需求
+        // 7、设置是否特殊材料
+        setHasSpecialMaterial(contextDTO);
+        // 8、设置型腔、活块数量
+        setMoldCavityInsert(contextDTO);
+        // 9、设置净需求
         setCurrentNetQty(contextDTO);
-        // 7、设置计划剩余排产量、计划已排产量、已生产量
+        // 10、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
-        // 8、筛选：|净需求 - 计划剩余排产量| > 0的数据
+        // 11、筛选：|净需求 - 计划剩余排产量| > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 9、设置其他字段
+        // 12、设置其他字段
         setOtherField(contextDTO);
     }
 
@@ -173,6 +181,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
     public void specialCheck(MpRollAdjustContextDTO contextDTO) {
 
     }
+
 
     /**
      * 构建结构内调整明细（试制量试计划）

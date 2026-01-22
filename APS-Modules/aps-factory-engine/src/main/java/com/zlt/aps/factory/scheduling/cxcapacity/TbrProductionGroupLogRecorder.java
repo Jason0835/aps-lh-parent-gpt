@@ -358,6 +358,53 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加没有找到工装类型(成型鼓)数日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 没有找到可用成型鼓数量====
+     *
+     * @param context       排程上下文
+     * @param cxMachineInfo 机台信息
+     * @param groupName     分组名
+     * @param proSize       英寸
+     * @return
+     */
+    public static String addNoWorkWeakMatchPlanLog(Context context, CxMachineBaseInfoVo cxMachineInfo, String groupName, String proSize) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 没有找到可用成型鼓数量====";
+        String cxMachineCode = "";
+        if (null != cxMachineInfo) {
+            cxMachineCode = cxMachineInfo.getCxMachineCode();
+        }
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, groupName, proSize);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
+        return logContent;
+    }
+
+
+    /**
+     * 增加可排产天数小于最小上机天数日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产天数[%s] < 最低上机天数[%s]====
+     *
+     * @param context            排程上下文
+     * @param cxMachineInfo      机台信息
+     * @param groupName          分组名
+     * @param proSize            英寸
+     * @param realProductionDays 可排产天数
+     * @param minAllocationDays  最低上机天数
+     * @return
+     */
+    public static String addLowMinAllocationDayLog(Context context, CxMachineBaseInfoVo cxMachineInfo, String groupName, String proSize, Integer realProductionDays, Integer minAllocationDays) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产天数[%s] < 最低上机天数[%s]====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineInfo.getCxMachineCode(), groupName, proSize, realProductionDays, minAllocationDays);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加收尾机台找到匹配的分组计划日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，收尾机台：%s 找到匹配的计划分组：%====
      *
@@ -496,11 +543,11 @@ public class TbrProductionGroupLogRecorder {
      * 增加结构没有匹配到成型机-限制生产日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 没有成型硫化配比配置====
      *
-     * @param context       排程上下文
-     * @param groupName     分组名
-     * @param isZeroRack    分组是否要求零度
-     * @param cxMachineCode 成型机台
-     * @param machineTypeCode     机型
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
      * @return
      */
     public static String addGroupNoSelectedNoRatioLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
@@ -514,11 +561,11 @@ public class TbrProductionGroupLogRecorder {
      * 增加结构匹配到成型机-初步被选中日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 初步被选中====
      *
-     * @param context       排程上下文
-     * @param groupName     分组名
-     * @param isZeroRack    分组是否要求零度
-     * @param cxMachineCode 成型机台
-     * @param machineTypeCode     机型
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
      * @return
      */
     public static String addGroupSelectedCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
@@ -529,20 +576,84 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加结构匹配到成型机-最终被选定-最大产能日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮产能大优先被选定====
+     *
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
+     * @return
+     */
+    public static String addSelectedFinalByMaxCapacityMachineLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
+        String logContentFormat = " =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮产能大优先被选定====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isZeroRack, cxMachineCode, machineTypeCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加成型机切换结构日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日切换成结构：%s ====
+     *
+     * @param context         排程上下文
+     * @param cxMachineCode   成型机台
+     * @param changeDay       切换日
+     * @param changeGroupName 切换后的分组
+     * @return
+     */
+    public static String addCxMachineChangeGroupLog(Context context, String cxMachineCode, Integer changeDay, String changeGroupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日切换成结构：%s ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, changeDay, changeGroupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加成型机切换结构日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日提前收尾结构 %s 切换结构使用量释放 ====
+     *
+     * @param context         排程上下文
+     * @param cxMachineCode   成型机台
+     * @param changeDay       切换日
+     * @param changeGroupName 切换后的分组
+     * @return
+     */
+    public static String addReleaseCxMachineChangeGroupLog(Context context, String cxMachineCode, Integer changeDay, String changeGroupName) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 在[%s]日提前收尾结构 %s 切换结构使用量释放 ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, changeDay, changeGroupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加结构匹配到成型机-最终被选定日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====
      *
-     * @param context       排程上下文
-     * @param groupName     分组名
-     * @param isZeroRack    分组是否要求零度
-     * @param cxMachineCode 成型机台
-     * @param brandCode     机型
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
      * @return
      */
-    public static String addGroupSelectedFixedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String brandCode) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, brandCode);
+    public static String addGroupSelectedFixedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isZeroRack, cxMachineCode, machineTypeCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FIXED_FINAL_CX_MACHINE, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
         return logContent;
     }
 
@@ -550,15 +661,18 @@ public class TbrProductionGroupLogRecorder {
      * 增加结构匹配到成型机-最终被选定日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮最终被选定====
      *
-     * @param context       排程上下文
-     * @param groupName     分组名
-     * @param isZeroRack    分组是否要求零度
-     * @param cxMachineCode 成型机台
-     * @param machineTypeCode     机型
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
      * @return
      */
     public static String addGroupSelectedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮最终被选定====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isZeroRack, cxMachineCode, machineTypeCode);
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮(规格、英寸、断面宽)最终被选定====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isZeroRack, cxMachineCode, machineTypeCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
         return logContent;
@@ -568,11 +682,35 @@ public class TbrProductionGroupLogRecorder {
      * 增加结构没有获取到合适的成型机数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 没有合适的成型机====
      *
-     * @param context 排程上下文
+     * @param context   排程上下文
+     * @param groupName 分组名
      * @return
      */
     public static String addGroupNoSelectedCxMachineLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 没有合适的成型机====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName);
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 没有合适的成型机====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+
+    /**
+     * 增加达到每日结构切换限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机：%s 达到每日切换结构[%s]次限制====
+     *
+     * @param context       排程上下文
+     * @param cxMachineCode 机台编码
+     * @param maxLimit      限制次数
+     * @return
+     */
+    public static String addChangeGroupLimitCxMachineLog(Context context, String cxMachineCode, Integer maxLimit) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机：%s 达到每日切换结构[%s]次限制====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, maxLimit);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
         return logContent;

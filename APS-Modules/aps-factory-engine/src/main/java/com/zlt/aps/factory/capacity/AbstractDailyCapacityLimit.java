@@ -36,7 +36,7 @@ public abstract class AbstractDailyCapacityLimit {
                                         List<MpStructureAllocation> mpStructAllocList){
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
-        for (int i = startDay; i< FactoryConstant.MONTH_MAX_DAY; i++){
+        for (int i = startDay; i<= FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
                 dailyCapacityLimitVo = new MpDailyCapacityLimitVo();
@@ -88,7 +88,7 @@ public abstract class AbstractDailyCapacityLimit {
      */
     public void calcLhMachinesWithEmbryoTypes(List<? extends BaseEntity> mpProdFinalList, int iDay,
                                                MpDailyCapacityLimitVo dailyCapacityLimitVo,String mainPattern) {
-        if (PubUtil.isEmpty(mpProdFinalList)){
+        if (PubUtil.isEmpty(mpProdFinalList) || dailyCapacityLimitVo == null){
             return;
         }
         // 按日期向下，统计日硫化机台数
@@ -104,7 +104,7 @@ public abstract class AbstractDailyCapacityLimit {
         int dayPlanQty,dailyLhQty;
         String dayField = FactoryConstant.DAY_FIELD + iDay;
         // 次日字段
-        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1);
+        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
         String embryoFieldValue;
         for (BaseEntity mpFinalVo: mpProdFinalList){
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null) {
@@ -152,8 +152,10 @@ public abstract class AbstractDailyCapacityLimit {
             }
 
             // 统计胎胚种类数
-            embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
-            dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
+            if (dayPlanQty > 0){
+                embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
+                dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
+            }
         }
         int iCount = Math.max(remainderCount,changeMouldCount);
 

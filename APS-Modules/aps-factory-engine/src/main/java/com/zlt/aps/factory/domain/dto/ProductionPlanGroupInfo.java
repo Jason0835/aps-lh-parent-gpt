@@ -5,13 +5,17 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
+import com.zlt.aps.factory.daylimit.LhGroupProductionRangeCalculator;
+import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.factory.daylimit.MouldProductionDayLimitHelper;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
-import com.zlt.aps.factory.handler.LhGroupProductionRangeCalculator;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
@@ -185,6 +189,9 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return;
         }
+        theoryDays = BigDecimal.ZERO.intValue();
+        leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        needCxCapacityMachineCount = BigDecimal.ZERO;
         String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
     }
@@ -487,13 +494,14 @@ public class ProductionPlanGroupInfo {
      * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
      * 兼容考虑模具的上机时间--新模具到货计划
      *
-     * @param context       排产上下文
-     * @param addSkuInfo    需要上机的Sku
-     * @param preSelected   预计选中
-     * @param selectedMould 选中的模具
+     * @param context           排产上下文
+     * @param addSkuInfo        需要上机的Sku
+     * @param preSelected       预计选中
+     * @param selectedMould     选中的模具
+     * @param onLineMachineInfo 在产机台信息
      * @return
      */
-    public void correctProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected, List<ProductionMouldInfoVo> selectedMould) {
+    public void correctProductionDateRange(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected, List<ProductionMouldInfoVo> selectedMould, String onLineMachineInfo) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
             return;
         }
@@ -501,8 +509,10 @@ public class ProductionPlanGroupInfo {
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
-        Set<Integer> effectiveRangeSet = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays());
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays());
+        Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), limitHelper.getLimitType()));
             preSelected.updateProductionDateRange(null, null);
             return;
         }
@@ -898,9 +908,21 @@ public class ProductionPlanGroupInfo {
             return false;
         }
         String specification = new ArrayList<>(specificationSet).get(BigDecimal.ZERO.intValue());
-        Integer sectionWidth = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(specification).get(BigDecimal.ZERO.intValue());
+        List<Integer> sectionWidthAndAspectRatioList = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(specification);
+        Integer sectionWidth;
+        if (CollectionUtils.isEmpty(sectionWidthAndAspectRatioList)) {
+            sectionWidth = BigDecimal.ZERO.intValue();
+        } else {
+            sectionWidth = sectionWidthAndAspectRatioList.get(BigDecimal.ZERO.intValue());
+        }
         String currentSpecification = new ArrayList<>(currentSpecificationSet).get(BigDecimal.ZERO.intValue());
-        Integer currentSectionWidth = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(currentSpecification).get(BigDecimal.ZERO.intValue());
+        List<Integer> currentSectionWidthAndAspectRatioList = ProductSpecificationsUtils.parseSectionWidthAndAspectRatio(currentSpecification);
+        Integer currentSectionWidth;
+        if (CollectionUtils.isEmpty(currentSectionWidthAndAspectRatioList)) {
+            currentSectionWidth = BigDecimal.ZERO.intValue();
+        } else {
+            currentSectionWidth = currentSectionWidthAndAspectRatioList.get(BigDecimal.ZERO.intValue());
+        }
         int diff = Math.abs(sectionWidth - currentSectionWidth);
         return diff <= diffValue;
     }

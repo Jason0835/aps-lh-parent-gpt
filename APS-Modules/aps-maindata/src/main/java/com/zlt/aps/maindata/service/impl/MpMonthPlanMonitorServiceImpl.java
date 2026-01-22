@@ -3,12 +3,17 @@ package com.zlt.aps.maindata.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.maindata.mapper.MdmUnqualifiedStockEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
+import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -16,11 +21,13 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang.time.DateUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -42,6 +49,10 @@ import java.util.*;
 public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPlanMonitor>  implements IMpMonthPlanMonitorService {
 
     private final MpMonthPlanMonitorEntityMapper mpMonthPlanMonitorEntityMapper;
+
+    @Autowired
+    private MdmUnqualifiedStockEntityMapper unqualifiedStockEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MONTH0612";
@@ -103,12 +114,32 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
         }
         MpFactoryProductionVersion productionVersion = productionVersionList.get(0);
         Date productionStartDate = productionVersion.getProductionStartDate();
+        // 查询不合格库存
         List<MpMonthPlanMonitor> list = new ArrayList<>();
+        List<String> materialCodeList = finalList.stream().map(FactoryMonthPlanProductionFinalResult::getMaterialCode).distinct().collect(Collectors.toList());
+        List<MdmUnqualifiedStock> mdmUnqualifiedStockList = new ArrayList<>();
+        List<List<String>> splitList = ScmListUtils.getSplitList(materialCodeList, 500);
+        for (List<String> codeList : splitList) {
+            LambdaQueryWrapper<MdmUnqualifiedStock> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(MdmUnqualifiedStock::getYear, param.getYear());
+            wrapper.eq(MdmUnqualifiedStock::getMonth, param.getMonth());
+            wrapper.in(MdmUnqualifiedStock::getMaterialCode, codeList);
+            mdmUnqualifiedStockList.addAll(unqualifiedStockEntityMapper.selectList(wrapper));
+        }
+        Map<String, Integer> unqualifiedStockMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(mdmUnqualifiedStockList)) {
+            unqualifiedStockMap = mdmUnqualifiedStockList.stream().collect(Collectors
+                    .toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getYear(), item.getMonth(),
+                                    item.getMaterialCode()),
+                            MdmUnqualifiedStock::getStockQty, Integer::sum));
+        }
         for (FactoryMonthPlanProductionFinalResult finalResult : finalList) {
             MpMonthPlanMonitor monitor = new MpMonthPlanMonitor();
             monitor.setFactoryCode(finalResult.getFactoryCode());
-            monitor.setYear(finalResult.getYear());
-            monitor.setMonth(finalResult.getMonth());
+            Integer year = finalResult.getYear();
+            monitor.setYear(year);
+            Integer month = finalResult.getMonth();
+            monitor.setMonth(month);
             monitor.setYearMonth(finalResult.getYearMonth());
             monitor.setMonthPlanVersion(finalResult.getMonthPlanVersion());
             monitor.setProductionVersion(finalResult.getProductionVersion());
@@ -127,15 +158,26 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
             Integer beginDay = finalResult.getBeginDay();
             Date onboardDate = DateUtils.addDays(productionStartDate, beginDay - 1);
             monitor.setOnboardDate(onboardDate);
-            monitor.setUnqualifiedQty(finalResult.getUniformityQty());
-//            monitor.setMouldQty(finalResult.getMouldQty());
-//            monitor.setNetDemandQty(finalResult.getNetDemandQty());
+            // 根据年月+工厂+物料，取不合格库存数量
+            String mapKey = GenerageMapKeyUtils.createMapKey(finalResult.getFactoryCode(), finalResult.getYear(), finalResult.getMonth(),
+                    finalResult.getMaterialCode());
+            if (unqualifiedStockMap.containsKey(mapKey)) {
+                monitor.setUnqualifiedQty(unqualifiedStockMap.get(mapKey));
+            }
+            monitor.setMouldQty(finalResult.getMouldChangeInfo());
+            monitor.setNetDemandQty(finalResult.getProdReqPlan());
 //            monitor.setProductionQty(finalResult.getProductionQty());
-//            monitor.setLhMargin(finalResult.getLhMargin());
-//            monitor.setExpectedCloseDay();
-//            monitor.setExpectedCloseDate();
-//            monitor.setPlanCloseDate();
-//            monitor.setDiffDay();
+            Integer productionQty = ObjectUtils.defaultIfNull(monitor.getProductionQty(), 0);
+            Integer scheduleQty = ObjectUtils.defaultIfNull(monitor.getScheduleQty(), 0);
+            monitor.setLhMargin(scheduleQty - productionQty);
+            monitor.setExpectedCloseDay(0);
+
+            Integer endDay = finalResult.getEndDay();
+            Date date = DateUtils.parseDate(year + "-" + month + "-" + endDay);
+            monitor.setExpectedCloseDate(date);
+            monitor.setPlanCloseDate(date);
+            long diffMillTime = DateUtils.getDiffMillTime(monitor.getExpectedCloseDate(), monitor.getPlanCloseDate());
+            monitor.setDiffDay(Integer.parseInt(String.valueOf(diffMillTime)) / 1000 / 60 / 60 / 24);
             list.add(monitor);
         }
         baseDao.insertBatch(list);

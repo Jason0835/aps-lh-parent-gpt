@@ -146,9 +146,9 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP("30-14-01-07", "在机结构硫化组排产Sku没有合适的排产模具"),
     /**
-     * 30-14-01-08 硫化组排产Sku超出胎胚种类数限制
+     * 30-14-01-08 硫化组排产Sku达到限制
      */
-    MOULD_SKU_LIMIT_EMBRYO_LH_GROUP("30-14-01-08", "硫化组排产Sku超出胎胚种类数限制"),
+    MOULD_SKU_LIMIT_LH_GROUP("30-14-01-08", "硫化组排产Sku达到限制"),
     /**
      * 20-14-00-01 在机分组(TBR结构)没有排产计划
      */
@@ -193,6 +193,10 @@ public enum TbrMouldProductionLogType {
      * 20-14-08 收尾机台没有找到产能可覆盖机台又匹配的计划
      */
     REVERSE_MACHINE_CAPACITY_COVER_NO_MATCH_PLAN("20-14-08", "收尾机台没有找到产能可覆盖机台又匹配的计划"),
+    /**
+     * 20-14 机台-分组计划匹配
+     */
+    MACHINE_MATCH_PLAN("20-14", "机台-分组计划匹配"),
     /**
      * 20-14-09 收尾机台反向匹配到计划分组
      */

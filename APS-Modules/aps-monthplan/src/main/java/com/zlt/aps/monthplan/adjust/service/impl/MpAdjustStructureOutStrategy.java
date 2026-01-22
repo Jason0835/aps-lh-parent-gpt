@@ -50,29 +50,36 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
         // 2、构建结构外调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
-        // 3、通过排产机台、结构筛选结构外调整明细
-        filterAdjustDetailList(contextDTO,adjustDetailList);
+        // 3、构建结构内调整明细（月度计划有，无订单）
+        List<MpAdjustDetailVo> adjustDetailByMonthPlanList = buildAdjustDetailByMonthPlanList(contextDTO);
+        List<MpAdjustDetailVo> resultList = new ArrayList<>();
+        resultList.addAll(adjustDetailList);
+        resultList.addAll(adjustDetailByMonthPlanList);
+        // 4、通过排产机台、结构筛选结构外调整明细
+        filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
-        Assert.isFalse(PubUtil.isEmpty(adjustDetailList), () -> {
+        Assert.isFalse(PubUtil.isEmpty(resultList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
                     contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 4、按照结构、物料编码维度进行分组，并汇总订单量
-        List<MpAdjustDetailVo> resultList = sumByStructureAndMaterial(adjustDetailList);
+        // 5、按照结构、物料编码维度进行分组，并汇总订单量
+        resultList = sumByStructureAndMaterial(resultList);
         contextDTO.setAdjustDetailList(resultList);
-        // 5、设置净需求
+        // 6、设置是否特殊材料
+        setHasSpecialMaterial(contextDTO);
+        // 7、设置净需求
         setCurrentNetQty(contextDTO);
-        // 6、设置计划剩余排产量、计划已排产量、已生产量
+        // 8、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
-        // 7、筛选：|净需求 - 计划已排产量| > 0的数据
+        // 9、筛选：|净需求 - 计划已排产量| > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchAdjustDetailList"), contextDTO.getYearMonth());
             return new BusinessException(msg);
         });
-        // 8、设置其他字段
+        // 10、设置其他字段
         setOtherField(contextDTO);
     }
 
@@ -84,8 +91,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      * @return
      */
     @Override
-    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO,
-                                                                     List<MpAdjustDetailVo> adjustDetailList) {
+    protected void filterAdjustDetailList(MpRollAdjustContextDTO contextDTO, List<MpAdjustDetailVo> adjustDetailList) {
         if (PubUtil.isEmpty(adjustDetailList)) {
             return;
         }

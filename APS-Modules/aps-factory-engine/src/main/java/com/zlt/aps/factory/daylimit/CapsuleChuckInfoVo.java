@@ -1,9 +1,9 @@
-package com.zlt.aps.factory.domain.vo;
+package com.zlt.aps.factory.daylimit;
 
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.CapsuleChuckDayInfoHelper;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;

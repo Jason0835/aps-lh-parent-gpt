@@ -2,7 +2,7 @@ package com.zlt.aps.monthplan.factory.helper;
 
 
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.DpPredictOffsetDetail;
+import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import lombok.Getter;
@@ -31,24 +31,24 @@ public class PredictionAllocationHelper {
   /**
    * 根据库存对冲顺序配置，进行库存分配
    */
-  public static List<DpPredictOffsetDetail> calculateSaleOrder(
-      List<DpPredictOffsetDetail> tMonthDemands,
+  public static List<DpSimulatedOffsetDetail> calculateSaleOrder(
+      List<DpSimulatedOffsetDetail> tMonthDemands,
       List<FactoryMonthPlanMouldDayResult> productionFinalResults,
       List<MpMonthPlanMonitor>  mpMonthPlanMonitors) {
-    List<DpPredictOffsetDetail> result = new ArrayList<>();
+    List<DpSimulatedOffsetDetail> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(tMonthDemands)) {
       return result;
     }
-    Map<String,List<DpPredictOffsetDetail>>  netDemandGroupMap = tMonthDemands.stream().collect(Collectors.groupingBy(DpPredictOffsetDetail::getMaterialCode));
+    Map<String,List<DpSimulatedOffsetDetail>>  netDemandGroupMap = tMonthDemands.stream().collect(Collectors.groupingBy(DpSimulatedOffsetDetail::getMaterialCode));
     Map<String,Integer> productionQtyMap = calculateProductionQty(productionFinalResults);
     Map<String,Integer> completionQtyMap = calculateCompletionQty(mpMonthPlanMonitors);
     Map<String,List<FactoryMonthPlanMouldDayResult>> productionGroupMap = getProductionGroupMap(productionFinalResults);
-    List<DpPredictOffsetDetail> allocations;
+    List<DpSimulatedOffsetDetail> allocations;
     BigDecimal stockQty;
     List<FactoryMonthPlanMouldDayResult> productionResults;
     int productionQty;
     int completionQty;
-    for (Map.Entry<String, List<DpPredictOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
+    for (Map.Entry<String, List<DpSimulatedOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
       productionQty = productionQtyMap.getOrDefault(entry.getKey(),0);
       completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
       stockQty = BigDecimal.valueOf(productionQty - completionQty);
@@ -86,13 +86,13 @@ public class PredictionAllocationHelper {
   /**
    * 处理单个订单组的库存分配
    */
-  private static List<DpPredictOffsetDetail> processOrderGroup(
-      List<DpPredictOffsetDetail> saleOrders,
+  private static List<DpSimulatedOffsetDetail> processOrderGroup(
+      List<DpSimulatedOffsetDetail> saleOrders,
       int completionQty,
       BigDecimal stockQty,
       List<FactoryMonthPlanMouldDayResult> productionResults
       ) {
-          List<DpPredictOffsetDetail> result = new ArrayList<>();
+          List<DpSimulatedOffsetDetail> result = new ArrayList<>();
           // 定义优先级处理配置 (高 > 周期 > 中 > 常规 >  暂缓)
           List<PriorityProcessor> processors = Arrays.asList(
               new PriorityProcessor(ApsConstant.SAL_PRIORITY_HIGHT,
@@ -118,21 +118,21 @@ public class PredictionAllocationHelper {
    * 处理单一优先级
    */
   private static void processPriority(
-      List<DpPredictOffsetDetail> saleOrders,
+      List<DpSimulatedOffsetDetail> saleOrders,
       int completionQty,
       BigDecimal stockQty,
       List<FactoryMonthPlanMouldDayResult> productionResults,
-      List<DpPredictOffsetDetail> result,
+      List<DpSimulatedOffsetDetail> result,
       PriorityProcessor processor) {
     // 查找该优先级的销售订单
-    Optional<DpPredictOffsetDetail> saleOrderOpt = findSaleOrderByPriority(saleOrders, processor.getPriority());
+    Optional<DpSimulatedOffsetDetail> saleOrderOpt = findSaleOrderByPriority(saleOrders, processor.getPriority());
     if (!saleOrderOpt.isPresent()) {
       return;
     }
     // 计算该优先级的总订单数量
     int totalOrderQty = calculateTotalOrderQty(saleOrders, processor.getPriority());
     BigDecimal remainingQty = BigDecimal.valueOf(totalOrderQty);
-    DpPredictOffsetDetail saleOrder = saleOrderOpt.get();
+    DpSimulatedOffsetDetail saleOrder = saleOrderOpt.get();
     if (stockQty.compareTo(remainingQty) >= 0) {
       stockQty = stockQty.subtract(remainingQty);
       remainingQty = BigDecimal.ZERO;
@@ -146,6 +146,8 @@ public class PredictionAllocationHelper {
     int productionQty = calculateProductionQty(productionResults, processor.getProductionQtyExtractor());
     saleOrder.setProductionQty(productionQty);
     saleOrder.setCompletionQty(completionQty);
+    saleOrder.setBaseVale(null);
+    saleOrder.setId(null);
     // 计算净需求量
     saleOrder.setNetQty(remainingQty.intValue());
     result.add(saleOrder);
@@ -155,13 +157,13 @@ public class PredictionAllocationHelper {
    * 计算总订单数量
    */
   private static int calculateTotalOrderQty(
-      List<DpPredictOffsetDetail> saleOrders,
+      List<DpSimulatedOffsetDetail> saleOrders,
       String priority) {
 
     return saleOrders.stream()
         .filter(order -> priority.equals(order.getScmPriority()))
         .filter(order -> order.getNetQty() != null && order.getNetQty() > 0)
-        .mapToInt(DpPredictOffsetDetail::getNetQty)
+        .mapToInt(DpSimulatedOffsetDetail::getNetQty)
         .sum();
   }
 
@@ -184,8 +186,8 @@ public class PredictionAllocationHelper {
   /**
    * 按优先级查找销售订单
    */
-  private static Optional<DpPredictOffsetDetail> findSaleOrderByPriority(
-      List<DpPredictOffsetDetail> saleOrders,
+  private static Optional<DpSimulatedOffsetDetail> findSaleOrderByPriority(
+      List<DpSimulatedOffsetDetail> saleOrders,
       String priority) {
 
     return saleOrders.stream()

@@ -100,11 +100,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public void initProductionDataInfo() {
         productionFlag = getIsProduction();
-        //产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
-        Integer heightLossQty = getHeightLossQty() - getHeightQty();
-        Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
-        Integer sumLossQty = heightLossQty + noHeightLossQty;
-        cxCapacityRequireQty = getNetQty() + sumLossQty;
+        cxCapacityRequireQty = this.getCxCapacityRequireQty();
         heightProductionQty = getHeightLossQty();
         productionQty = cxCapacityRequireQty;
     }
@@ -240,6 +236,9 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return;
         }
         setStructureName(productBaseInfo.getStructureName());
+        setSpecifications(productBaseInfo.getSpecifications());
+        setProSize(productBaseInfo.getProSize());
+        setMainPattern(productBaseInfo.getMainPattern());
         setCantProduce(productBaseInfo.getCantProduce());
         setProductCategory(productBaseInfo.getProductCategory());
     }
@@ -561,6 +560,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             String noStructureNameReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_STRUCTURE_NAME);
             addNoProductionReason(noStructureNameReason);
         }
+        //全钢 - 主花纹
+        if (StringUtils.isBlank(getMainPattern())) {
+            isProduction = YesOrNoEnum.NO.getCode();
+            String noMainPatternReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MAIN_PATTERN);
+            addNoProductionReason(noMainPatternReason);
+        }
         return isProduction;
     }
 
@@ -701,5 +706,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             setNoProductionReason(String.format("%s,%s", noProductionReason, addNoProductionReason));
         }
+    }
+
+    public int getCxCapacityRequireQty() {
+        //产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
+        Integer heightLossQty = getHeightLossQty() - getHeightQty();
+        Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
+        Integer sumLossQty = heightLossQty + noHeightLossQty;
+        cxCapacityRequireQty = getNetQty() + sumLossQty;
+        return cxCapacityRequireQty;
     }
 }

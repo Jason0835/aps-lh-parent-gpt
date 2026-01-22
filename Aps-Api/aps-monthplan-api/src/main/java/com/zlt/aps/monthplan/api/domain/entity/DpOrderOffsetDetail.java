@@ -108,6 +108,18 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
+    /**
+     * 规格
+     */
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(value = "SPECIFICATIONS")
+    private String specifications;
+    /**
+     * 花纹
+     */
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(value = "PATTERN")
+    private String pattern;
 
     /** MES物料编码 */
     @Excel(name = "ui.data.column.orderOffsetDetail.mesMaterialCode")
@@ -208,4 +220,30 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "提报日期", name = "billDate")
     @TableField(exist = false)
     private Date billDate;
+    /**
+     * 是否替换料
+     */
+    @ApiModelProperty(value = "是否替换料", name = "isAlternateMaterial")
+    @TableField(exist = false)
+    private String isAlternateMaterial;
+
+    /**
+     * 品牌+规格+花纹
+     *
+     * @return
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, brand, specifications, pattern);
+    }
+
+    /**
+     * 分厂+物料描述
+     *
+     * @return
+     */
+    public String getStockGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialDesc);
+    }
 }

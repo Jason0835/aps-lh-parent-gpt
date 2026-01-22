@@ -1,9 +1,9 @@
 package com.zlt.aps.factory.scheduling;
 
-import com.zlt.aps.factory.domain.dto.DayCapacityLimitHelper;
-import com.zlt.aps.factory.domain.dto.TireDrumDayInfoHelper;
+import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.aps.monthplan.api.enums.WorkWearTypeEnum;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -71,10 +71,10 @@ public class BaseDataContainer implements Serializable {
      */
     Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
     /**
-     * 日产能控制信息
-     * key=排产日 : value=日排产控制信息
+     * 日产能限制控制对象
+     *
      */
-    Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap;
+    DayCapacityLimitVo dayCapacityLimit;
     /**
      * 分组(结构)成型硫化配比
      */
@@ -155,16 +155,54 @@ public class BaseDataContainer implements Serializable {
         if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(tireDrumInfoMap)) {
             return Collections.emptySet();
         }
-        Map<String, Map<String, TireDrumInfoVo>> effectiveMap = new HashMap<>();
+        //1、汇总可匹配proSize各成型工装的每日排产信息：01 成型鼓 02 胎体鼓 03 带束层鼓
+        Map<String, List<WorkWeakTireDrumDayInfoHelper>> workWeakInfoMap = new HashMap<>();
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
             List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(limitGroupList)) {
                 return;
             }
-            //todo 每天的剩余使用量
-
+            //每天的剩余使用量统计
+            List<WorkWeakTireDrumDayInfoHelper> summeryLeftOverList = WorkWeakTireDrumDayInfoHelper.buildSummery(limitGroupList);
+            workWeakInfoMap.put(workWeakType, summeryLeftOverList);
         });
-        return null;
+        if (CollectionUtils.isEmpty(workWeakInfoMap)) {
+            return Collections.emptySet();
+        }
+        //2、获取各工装类型剩余量超过1的日排产信息
+        Map<String, Set<Integer>> workWeakProductionDayMap = new HashMap<>();
+        workWeakInfoMap.forEach((workWeakType, productionInfoList) -> {
+            if (CollectionUtils.isEmpty(productionInfoList)) {
+                return;
+            }
+            List<WorkWeakTireDrumDayInfoHelper> hasProductionList = productionInfoList.stream().filter(dayLimitInfo -> dayLimitInfo.getLeftOverCount() >= BigDecimal.ONE.intValue()).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(hasProductionList)) {
+                return;
+            }
+            Set<Integer> productionSet = hasProductionList.stream().map(WorkWeakTireDrumDayInfoHelper::getProductionDay).collect(Collectors.toSet());
+            if (CollectionUtils.isEmpty(productionSet)) {
+                return;
+            }
+            workWeakProductionDayMap.put(workWeakType, productionSet);
+        });
+        if (CollectionUtils.isEmpty(workWeakProductionDayMap)) {
+            return Collections.emptySet();
+        }
+        //3、因当前都是3鼓，故而需要各工装类型都需要有剩余量，取交集
+        Set<Integer> resultSet = null;
+        for (WorkWearTypeEnum workWearType : WorkWearTypeEnum.values()) {
+            Set<Integer> productionSet = workWeakProductionDayMap.get(workWearType.getType());
+            if (CollectionUtils.isEmpty(productionSet)) {
+                return Collections.emptySet();
+            }
+            if (null == resultSet) {
+                resultSet = productionSet;
+                continue;
+            }
+            Set<Integer> intersectionSet = resultSet.stream().filter(productionSet::contains).collect(Collectors.toSet());
+            resultSet = intersectionSet;
+        }
+        return resultSet;
     }
 
     /**

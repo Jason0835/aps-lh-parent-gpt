@@ -1,8 +1,9 @@
-package com.zlt.aps.factory.handler;
+package com.zlt.aps.factory.daylimit;
 
-import com.zlt.aps.factory.domain.dto.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
@@ -53,13 +54,13 @@ public class LhGroupProductionRangeCalculator {
      * @param stopDaySet        停工日集合(忽略机台时，传整体停工日，但机台时为机台停工日)
      * @return
      */
-    public static Set<Integer> confirmProductionRange(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer lhGroupStartDay, Integer lhGroupEndDay, List<ProductionMouldInfoVo> selectedMould, List<GroupPlanCxLhCapacityLimitHelper> dayLimitList, Set<Integer> stopDaySet) {
+    public static MouldProductionDayLimitHelper confirmProductionRange(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer lhGroupStartDay, Integer lhGroupEndDay, List<ProductionMouldInfoVo> selectedMould, List<GroupPlanCxLhCapacityLimitHelper> dayLimitList, Set<Integer> stopDaySet) {
         String productionEmbryoCode = addSkuInfo.getEmbryoCode();
         //在满足硫化配比限制下，取得排产计划可排的满足胎胚种类数限制的排产范围
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             //说明达到胎胚种类数限制
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.EMBRYO_CODE_COUNT_LIMIT);
         }
         //取得与胎胚种类数范围的交集
         Set<Integer> effectiveDaySet = new HashSet<>(productionContext.getMonthDays());
@@ -70,39 +71,39 @@ public class LhGroupProductionRangeCalculator {
             }
         }
         if (CollectionUtils.isEmpty(effectiveDaySet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_LOCAL_LIMIT);
         }
         //取得与模具排产范围的交集
         Set<Integer> effectiveMouldSet = getEffectiveDay(effectiveDaySet, selectedMould);
         if (CollectionUtils.isEmpty(effectiveMouldSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.EMBRYO_COUNT_AND_MOULD_LOCAL_LIMIT);
         }
         //20260116 取得与模壳排产范围的交集
         Set<Integer> mouldShellSet = productionContext.getMouldShellRange(selectedMould.get(BigDecimal.ZERO.intValue()));
         if (CollectionUtils.isEmpty(mouldShellSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_SHELL_LIMIT);
         }
         Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_SHELL_DOUBLE_LIMIT);
         }
         //20260617 取得与模具分配比例排产范围的交集
         Set<Integer> mouldAllocationSet = productionContext.getMouldAllocationRange(addSkuInfo);
         if (CollectionUtils.isEmpty(mouldAllocationSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_ALLOCATION_LIMIT);
         }
         intersectionSet = intersectionSet.stream().filter(mouldAllocationSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_ALLOCATION_DOUBLE_LIMIT);
         }
         //20260119 取得与胶囊卡盘总数排产范围的交集
         Set<Integer> capsuleChuckSet = productionContext.getCapsuleChuckRange(addSkuInfo);
         if (CollectionUtils.isEmpty(capsuleChuckSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CAPSULE_CHUCK_LIMIT);
         }
         intersectionSet = intersectionSet.stream().filter(capsuleChuckSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
-            return Collections.emptySet();
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CAPSULE_CHUCK_DOUBLE_LIMIT);
         }
         //取得最早的一段连续时间
         Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRange(intersectionSet, stopDaySet);
@@ -114,7 +115,7 @@ public class LhGroupProductionRangeCalculator {
             }
             result.add(productionDay);
         });
-        return result;
+        return new MouldProductionDayLimitHelper(result, MouldProductionLimitTypeEnum.NO_LIMIT);
     }
 
     /**

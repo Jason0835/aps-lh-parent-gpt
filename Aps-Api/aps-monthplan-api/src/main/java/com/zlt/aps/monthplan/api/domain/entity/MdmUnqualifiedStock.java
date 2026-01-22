@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -8,6 +9,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
 
@@ -39,6 +41,22 @@ public class MdmUnqualifiedStock extends BaseEntity {
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    /**
+     * 年份
+     */
+    @Excel(name = "ui.data.column.monthStock.year")
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /**
+     * 月份
+     */
+    @Excel(name = "ui.data.column.monthStock.month")
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
 
     /**
      * 库存日期
@@ -81,4 +99,9 @@ public class MdmUnqualifiedStock extends BaseEntity {
     @TableField(value = "STOCK_QTY")
     private Integer stockQty;
 
+    @Excel(name = "ui.data.column.demandPlan.updateTime", dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
+    private Date updateTime;
 }
