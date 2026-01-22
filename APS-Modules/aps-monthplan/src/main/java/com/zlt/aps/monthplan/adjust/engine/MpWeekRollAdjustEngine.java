@@ -549,9 +549,9 @@ public class MpWeekRollAdjustEngine {
 
         int emptyQty = needDeductQty > oriRealOrdQty ? oriRealOrdQty:needDeductQty;
         prodFinal.setTotalQty(prodFinal.getTotalQty() - emptyQty);
-        //将调减量置到空产能
-        prodFinal.setEmptyQty(emptyQty);
-        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减各总排产量,物料编码:%s,调减后,高优先级排产量:%s,中优级排产量:%s,暂缓排产量:%s,空出产能:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),prodFinal.getHeightProductionQty(),prodFinal.getMidProductionQty(),prodFinal.getPostponeProductionQty(),prodFinal.getEmptyQty())).append(ApsConstant.DIVISION);
+        //将调减量置到实际调整量
+        prodFinal.setActualAdjustQty(emptyQty);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减各总排产量,物料编码:%s,调减后,高优先级排产量:%s,中优级排产量:%s,暂缓排产量:%s,空出产能:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),prodFinal.getHeightProductionQty(),prodFinal.getMidProductionQty(),prodFinal.getPostponeProductionQty(),prodFinal.getActualAdjustQty())).append(ApsConstant.DIVISION);
     }
 
     /**
@@ -582,7 +582,7 @@ public class MpWeekRollAdjustEngine {
         int dayQty;
         String dayField;
         int iDay = contextDTO.getLockEndDay() + 1;
-        int realDeductQty = prodFinal.getEmptyQty();
+        int realDeductQty = prodFinal.getActualAdjustQty();
         //实单肯定在前，从后向前扣减
         for (int i = FactoryConstant.MONTH_MAX_DAY; i> contextDTO.getLockEndDay(); i--){
             dayField = FactoryConstant.DAY_FIELD+i;
@@ -607,7 +607,7 @@ public class MpWeekRollAdjustEngine {
                 break;
             }
         }
-        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减每日排产量,物料编码:%s,需要调整量:%s,剩余调整量:%s,从后向前扣到:%s日",contextDTO.getStructureName(),prodFinal.getMaterialCode(),prodFinal.getEmptyQty(),realDeductQty,iDay)).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减每日排产量,物料编码:%s,需要调整量:%s,剩余调整量:%s,从后向前扣到:%s日",contextDTO.getStructureName(),prodFinal.getMaterialCode(),prodFinal.getActualAdjustQty(),realDeductQty,iDay)).append(ApsConstant.DIVISION);
         return iDay;
     }
 
@@ -961,7 +961,8 @@ public class MpWeekRollAdjustEngine {
             remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, remainPlanQty, curFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-结束,剩余排产计划量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,remainPlanQty)).append(ApsConstant.DIVISION);
             if (remainPlanQty > 0){
-                newOtherFinalList.remove(optimalFinalVo);
+                String optimalMaterialCode = optimalFinalVo.getMaterialCode();
+                newOtherFinalList.removeIf(item->item.getMaterialCode().equals(optimalMaterialCode));
             }else{
                 break;
             }

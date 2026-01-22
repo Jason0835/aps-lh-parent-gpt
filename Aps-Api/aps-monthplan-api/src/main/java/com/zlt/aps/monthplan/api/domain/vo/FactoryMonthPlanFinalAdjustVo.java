@@ -27,11 +27,11 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private Integer lockQty;
 
     /**
-     * 空产能
+     * 实际调整量
      */
     @TableField(exist = false)
-    @ApiModelProperty(value = "空产能", name = "emptyQty")
-    private Integer emptyQty;
+    @ApiModelProperty(value = "实际调整量", name = "actualAdjustQty")
+    private Integer actualAdjustQty;
 
     /**
      * 搭配量
