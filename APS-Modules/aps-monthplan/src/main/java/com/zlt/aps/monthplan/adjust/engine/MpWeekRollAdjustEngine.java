@@ -548,7 +548,6 @@ public class MpWeekRollAdjustEngine {
         }
 
         int emptyQty = needDeductQty > oriRealOrdQty ? oriRealOrdQty:needDeductQty;
-        prodFinal.setTotalQty(prodFinal.getTotalQty() - emptyQty);
         //将调减量置到实际调整量
         prodFinal.setActualAdjustQty(emptyQty);
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减各总排产量,物料编码:%s,调减后,高优先级排产量:%s,中优级排产量:%s,暂缓排产量:%s,空出产能:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),prodFinal.getHeightProductionQty(),prodFinal.getMidProductionQty(),prodFinal.getPostponeProductionQty(),prodFinal.getActualAdjustQty())).append(ApsConstant.DIVISION);
@@ -1025,7 +1024,7 @@ public class MpWeekRollAdjustEngine {
                     curFinalVo.getMainPattern().equals(tFinalVo.getMainPattern())){
                 sameEmbryo2MainPatternVo = tFinalVo;
             }
-            if (minMatchQty <= tFinalVo.getConventionProductionQty() ){
+            if (minMatchQty >= tFinalVo.getConventionProductionQty() ){
                 minMatchQtyVo = tFinalVo;
                 minMatchQty = tFinalVo.getConventionProductionQty();
             }
@@ -1436,11 +1435,11 @@ public class MpWeekRollAdjustEngine {
      */
     private void resetBegin2EndDay(int startDay,int endDay,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         String dayField;
-        int totalQty;
+        int accTotalQty;
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList){
             int realBeginDay = FactoryConstant.MONTH_MAX_DAY;
             int realEndDay = 0;
-            totalQty = 0;
+            accTotalQty = 0;
             for (int i = startDay; i <= endDay; i++){
                 dayField = FactoryConstant.DAY_FIELD + i;
                 if (mpFinalVo.getFieldValueByFieldName(dayField) != null &&
@@ -1451,12 +1450,14 @@ public class MpWeekRollAdjustEngine {
                     if (realEndDay < i){
                         realEndDay = i;
                     }
-                    totalQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+                    accTotalQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
                 }
             }
             mpFinalVo.setBeginDay(realBeginDay);
             mpFinalVo.setEndDay(realEndDay);
-            mpFinalVo.setTotalQty(totalQty);
+            //实际调整量 = 原实际排产量 - 累计排产量
+            mpFinalVo.setActualAdjustQty(mpFinalVo.getTotalQty() - accTotalQty);
+            mpFinalVo.setTotalQty(accTotalQty);
         }
     }
 
