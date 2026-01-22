@@ -584,7 +584,7 @@ public class MpWeekRollAdjustEngine {
         //实单肯定在前，从后向前扣减
         for (int i = FactoryConstant.MONTH_MAX_DAY; i> contextDTO.getLockEndDay(); i--){
             dayField = FactoryConstant.DAY_FIELD+i;
-            if (prodFinal.getFieldValueByFieldName(dayField) == null){
+            if (prodFinal.getFieldValueByFieldName(dayField) == null || (Integer) prodFinal.getFieldValueByFieldName(dayField) == 0){
                 continue;
             }
             dayQty = (Integer) prodFinal.getFieldValueByFieldName(dayField);
