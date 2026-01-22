@@ -87,6 +87,7 @@
 //lib
 import moment from "moment";
 //utils
+import { mapGetters} from "vuex";
 import { downloadLink } from "@/utils/request";
 //interface
 import {
@@ -146,6 +147,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     columns() {
       let columns = [
         {
@@ -199,6 +201,11 @@ export default {
               value
             );
           },
+          width: 120,
+        },
+        {
+          label: this.$t("ui.data.vulcanizationTable.cxMachine"),
+          prop: "cxMachineCode",
           width: 120,
         },
         {
@@ -354,6 +361,9 @@ export default {
         {
           label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
         {
           prop: "productStatus",
