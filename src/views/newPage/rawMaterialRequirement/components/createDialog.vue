@@ -76,6 +76,13 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
         },
+        {
+          prop: "isSpringFestivalMonth",
+          label: this.$t("是否春节月份"),
+          type: "select",
+          clearable: false,
+          dictData: this.parentDict.type.biz_yes_no,
+        },
 
       ],
     };
@@ -117,6 +124,7 @@ export default {
       let defaultParams = {
         factoryCode: "116",
         yearMonth: `${year}-${month}`,
+        isSpringFestivalMonth:'0'
       };
       this.form={
         ...defaultParams

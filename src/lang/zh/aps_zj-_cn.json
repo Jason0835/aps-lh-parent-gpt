@@ -310,7 +310,14 @@
   "ui.data.monthlyProductionPlan.factProdReqQty":"实际生产需求(含损耗)",
   "ui.data.monthlyProductionPlan.postponeProductionQty":"暂缓订单排产数量",
   "ui.data.monthlyProductionPlan.trialProductionQty":"试制量试排产数量",
-  "ui.data.monthlyProductionPlan.reason":"未排产原因"
+  "ui.data.monthlyProductionPlan.reason":"未排产原因",
+
+
+
+  "ui.data.material.mesMaterialCategory":"MES物料大类",
+  "ui.data.material.mesMaterialSubcategory":"MES物料细类",
+  "ui.data.rawMaterialRequirement.isSpringFestivalMonth":"是否春节月份"
+
 
 
 }

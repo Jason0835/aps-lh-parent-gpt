@@ -97,7 +97,7 @@ export default {
     infoDialog,
     createDialog
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_rawMaterial_type'],
+  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_rawMaterial_type','biz_yes_no'],
   provide() {
     return {
       parentDict: this.dict,
