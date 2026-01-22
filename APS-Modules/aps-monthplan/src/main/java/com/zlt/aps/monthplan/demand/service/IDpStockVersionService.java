@@ -10,7 +10,6 @@ import com.zlt.bill.common.service.IDocService;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -47,9 +46,4 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    * @return
    */
   Map<String, Map<String, Integer>> calculateStockQty();
-  /**
-   *  汇总库存
-   * @return
-   */
-  Map<String, Map<String, Integer>> calculateStockQty(Set<String> monthPlanVersions);
 }
