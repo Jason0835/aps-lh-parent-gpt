@@ -69,6 +69,7 @@
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
+    <createDialog ref="createRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -87,12 +88,14 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
+import createDialog from "./components/createDialog.vue";
 
 export default {
   name: "RawMaterialRequirement",
   components: {
     tltUpload,
     infoDialog,
+    createDialog
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_rawMaterial_type'],
   provide() {
@@ -278,6 +281,11 @@ export default {
       this.$router.push("/rawMaterial/rawWeekUsage");
     },
     async generatePlan() {
+
+      if (this.$refs.createRef) {
+        this.$refs.createRef.show();
+      }
+      return
       try {
         this.loading = true;
         let res = await generateMdmProductConstruction(this.formatParams());
