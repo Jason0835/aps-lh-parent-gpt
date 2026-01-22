@@ -4,14 +4,19 @@ import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.CxMachineFixedPriorityEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
+import com.zlt.aps.factory.daylimit.LhGroupProductionRangeCalculator;
+import com.zlt.aps.factory.daylimit.MouldProductionDayLimitHelper;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
-import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.daylimit.LhGroupProductionRangeCalculator;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrMouldProductionLogRecorder;
+import com.zlt.aps.factory.scheduling.cxcapacity.TbrProductionGroupLogRecorder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
@@ -29,6 +34,7 @@ import java.util.stream.Stream;
  * @date 20251215
  */
 @Data
+@Slf4j
 public class CxMachineBaseInfoVo implements Serializable {
 
     /**
@@ -426,29 +432,52 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (null == allocationList) {
             allocationList = new ArrayList<>();
         }
+        CxMachineAllocationPlanHelper lastAllocation = getLastAllocationInfo();
         allocationList.add(addAllocationPlan);
         //20260119 处理成型工装的日使用量
         Integer startDay = addAllocationPlan.getStartDay();
         Integer endDay = addAllocationPlan.getEndDay();
         String proSize = addAllocationPlan.getProductionPlanInfo().getProSizeInfo();
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
             if (stopDayInfo.contains(productionDay)) {
                 continue;
             }
-            productionContext.getBaseDataContainer().addUsedCount(productionDay, proSize, cxMachineCode);
+            baseDataContainer.addUsedCount(productionDay, proSize, cxMachineCode);
+        }
+        //20260121 切换结构
+        if (isChangeGroup(lastAllocation, addAllocationPlan)) {
+            String groupName = addAllocationPlan.getAllocationGroup();
+            log.info(TbrProductionGroupLogRecorder.addCxMachineChangeGroupLog(productionContext, cxMachineCode, startDay, groupName));
+            baseDataContainer.getDayCapacityLimit().addChangeGroupNameUsedQty(productionContext, startDay, cxMachineCode, groupName);
         }
     }
 
     /**
+     * 判断是否切换分组(TBR-结构)
+     *
+     * @param changeDay       切换日
+     * @param changeGroupName 切换分组名
+     * @return
+     */
+    public boolean isChangeGroup(Integer changeDay, String changeGroupName) {
+        CxMachineAllocationPlanHelper lastAllocation = getLastAllocationInfo();
+        return isChangeGroup(lastAllocation, changeDay, changeGroupName);
+    }
+
+    /**
      * 处理结构提前收尾
+     * 需要处理切换结构使用量 -1
      * 需要将成型工装数量还原即使用数量 - 1
      *
      * @param context         排产上下文
+     * @param allocationInfo  结构收尾的分配段信息
      * @param deductionDaySet 收尾的日期
      * @param groupPlanInfo   收尾的结构信息
      */
-    public void handlerBeforeConclusion(Context context, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo) {
+    public void handlerBeforeConclusion(Context context, CxMachineAllocationPlanHelper allocationInfo, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo) {
+        handlerBeforeConclusionByAllocation(context, allocationInfo);
         String proSize = groupPlanInfo.getProSizeInfo();
         if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(deductionDaySet)) {
             return;
@@ -471,8 +500,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(allocationList)) {
             return Collections.emptySet();
         }
-        int lastIndex = allocationList.size() - BigDecimal.ONE.intValue();
-        CxMachineAllocationPlanHelper lastInfo = allocationList.get(lastIndex);
+        CxMachineAllocationPlanHelper lastInfo = getLastAllocationInfo();
+        if (null == lastInfo) {
+            return Collections.emptySet();
+        }
         Integer startDay = lastInfo.getStartDay();
         Integer endDay = lastInfo.getEndDay();
         Set<Integer> productionSet = new HashSet<>();
@@ -524,8 +555,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = selectedLhGroup.getProductionDay();
         Integer preEndDay = endDay;
-        Set<Integer> effectiveRangeSet = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo);
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo);
+        Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, addSkuInfo.getStructureName(), cxMachineCode, addSkuInfo.getMaterialDesc(), limitHelper.getLimitType()));
             return null;
         }
 //        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
@@ -578,7 +611,13 @@ public class CxMachineBaseInfoVo implements Serializable {
             return;
         }
         //取得最后一个分配的分组结构计划
-        CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        CxMachineAllocationPlanHelper lastHelper = getLastAllocationInfo();
+        if (null == lastHelper) {
+            sameSpecifications = YesOrNoEnum.YES.getCode();
+            sameProSize = YesOrNoEnum.YES.getCode();
+            sectionWidthCondition = YesOrNoEnum.YES.getCode();
+            return;
+        }
         List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getRealProductionPlanList();
         String sameSpecifications = YesOrNoEnum.NO.getCode();
         if (addGroupPlan.hasSameSpecifications(realProductionPlanList)) {
@@ -606,8 +645,97 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(allocationList)) {
             return ProductionConstant.MONTH_START_DAY;
         }
-        CxMachineAllocationPlanHelper lastHelper = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
+        CxMachineAllocationPlanHelper lastHelper = getLastAllocationInfo();
+        if (null == lastHelper) {
+            return ProductionConstant.MONTH_START_DAY;
+        }
         return lastHelper.getEndDay() + BigDecimal.ONE.intValue();
+    }
+
+    /**
+     * 获取最后一个配置
+     *
+     * @return
+     */
+    public CxMachineAllocationPlanHelper getLastAllocationInfo() {
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return null;
+        }
+        int size = allocationList.size();
+        return allocationList.get(size - BigDecimal.ONE.intValue());
+    }
+
+    /**
+     * 结构提前收尾段处理
+     * 分配信息是否需要移除
+     *
+     * @param context        排产上下文
+     * @param allocationInfo 提前收尾段
+     */
+    private void handlerBeforeConclusionByAllocation(Context context, CxMachineAllocationPlanHelper allocationInfo) {
+        if (null == allocationInfo) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return;
+        }
+        if (allocationInfo.getAllocationDay() > BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        //如果分配量为零，则直接删除
+        boolean isDeleted = allocationList.remove(allocationInfo);
+        if (!isDeleted) {
+            return;
+        }
+        Integer changeDay = allocationInfo.getStartDay();
+        CxMachineAllocationPlanHelper lastInfo = getLastAllocationInfo();
+        if (isChangeGroup(lastInfo, allocationInfo)) {
+            TbrProductionContext productionContext = (TbrProductionContext) context;
+            String groupName = allocationInfo.getAllocationGroup();
+            log.info(TbrProductionGroupLogRecorder.addReleaseCxMachineChangeGroupLog(productionContext, cxMachineCode, changeDay, groupName));
+            productionContext.getBaseDataContainer().getDayCapacityLimit().deductionChangeGroupNameUsedQty(productionContext, changeDay, cxMachineCode, groupName);
+        }
+    }
+
+    /**
+     * 判断是否切换结构
+     *
+     * @param beforeAllocation 前一个配置
+     * @param afterAllocation  后一个配置
+     * @return
+     */
+    private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, CxMachineAllocationPlanHelper afterAllocation) {
+        if (null == afterAllocation) {
+            return false;
+        }
+
+        Integer startDay = afterAllocation.getStartDay();
+        String groupName = afterAllocation.getAllocationGroup();
+        return isChangeGroup(beforeAllocation, startDay, groupName);
+    }
+
+    /**
+     * 判断是否切换分组(TBR为结构)
+     *
+     * @param beforeAllocation 前一配置
+     * @param changeStartDay   切换日
+     * @param changeGroupName  切换的分组名
+     * @return
+     */
+    private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, Integer changeStartDay, String changeGroupName) {
+        if (null == changeStartDay || StringUtils.isBlank(changeGroupName)) {
+            return false;
+        }
+        //第一天先不判断
+        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
+            return false;
+        }
+        //前面没有，不算切换
+        if (null == beforeAllocation) {
+            return false;
+        }
+        //分组名是否相同
+        return !beforeAllocation.getAllocationGroup().equals(changeGroupName);
     }
 
     /**

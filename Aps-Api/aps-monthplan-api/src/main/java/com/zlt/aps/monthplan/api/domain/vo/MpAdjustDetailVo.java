@@ -25,4 +25,8 @@ public class MpAdjustDetailVo extends MpAdjustStructureIn {
     @TableField(exist = false)
     private String isTrial;
 
+    @ApiModelProperty(value = "胎胚号")
+    @TableField(exist = false)
+    private String embryoCode;
+
 }
