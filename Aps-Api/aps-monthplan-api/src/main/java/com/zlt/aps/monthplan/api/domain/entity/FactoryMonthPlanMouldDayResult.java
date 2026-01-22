@@ -168,6 +168,14 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private String productionType;
 
     /**
+     * 生胎代码
+     */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.embryoCode")
+    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
+    /**
      * 主物料(胎胚号)
      */
     @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mainMaterialDesc")

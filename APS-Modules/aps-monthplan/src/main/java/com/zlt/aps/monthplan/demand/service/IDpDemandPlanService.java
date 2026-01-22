@@ -78,3 +78,4 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      */
     List<DpDemandPlan> createInitPredictionRequire(DpDemandPlan param, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext);
 }
+
