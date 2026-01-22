@@ -1,11 +1,14 @@
 package com.zlt.aps.factory.domain.dto;
 
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -108,6 +111,20 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         cxLhGroup.setProductionQty(this.beforeProductionQty);
         cxLhGroup.setProductionMouldSet(this.usedMouldSet);
         return cxLhGroup;
+    }
+
+    /**
+     * 当前硫化组是否需要换模
+     *
+     * @param addSkuInfo
+     * @return
+     */
+    public boolean isChangeMould(MonthPlanProductionRequirePlanVo addSkuInfo) {
+        if (null == addSkuInfo || StringUtils.isEmpty(addSkuInfo.getMaterialDesc())) {
+            return false;
+        }
+        String connectSkuMaterialDesc = addSkuInfo.getMaterialDesc();
+        return !connectSkuMaterialDesc.equals(beforeMaterialDesc);
     }
 
     /**

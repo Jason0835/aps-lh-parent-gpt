@@ -2,11 +2,15 @@ package com.zlt.aps.factory.scheduling;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
-import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -228,6 +232,7 @@ public class TbrProductionContext extends Context {
         }
         allCapsuleChuckInfoMap.forEach((groupId, limit) -> limit.clearDayUsed());
     }
+
     /**
      * 获取模壳可放两副模具的日期集合
      *
@@ -274,6 +279,16 @@ public class TbrProductionContext extends Context {
         allMouldShellMap.forEach((mouldSetCode, mouldShellInfo) -> mouldShellInfo.clearDayUsed());
     }
 
+    /**
+     * 清空所有的换模使用量
+     */
+    public void clearAllDayLimitUsed() {
+        DayCapacityLimitVo dayCapacityLimitHandler = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimitHandler) {
+            return;
+        }
+        dayCapacityLimitHandler.resetUsedQty();
+    }
 
     /**
      * 获取materialDesc在startDay~endDay范围内可排产的两副模具

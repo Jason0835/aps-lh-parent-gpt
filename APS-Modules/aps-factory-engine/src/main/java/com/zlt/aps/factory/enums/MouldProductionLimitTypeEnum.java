@@ -55,8 +55,11 @@ public enum MouldProductionLimitTypeEnum {
     /**
      * 09 胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数多重限制
      */
-    CAPSULE_CHUCK_DOUBLE_LIMIT("09", "胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数多重限制");
-
+    CAPSULE_CHUCK_DOUBLE_LIMIT("09", "胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数多重限制"),
+    /**
+     * 10 换模次数限制
+     */
+    CHANGE_MOULD_LIMIT("09", "换模次数限制");
     /**
      * 限制类型
      */

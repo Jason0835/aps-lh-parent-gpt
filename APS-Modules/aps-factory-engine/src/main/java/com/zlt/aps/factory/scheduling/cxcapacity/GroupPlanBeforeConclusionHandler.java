@@ -258,7 +258,7 @@ public class GroupPlanBeforeConclusionHandler {
                     if (CollectionUtils.isEmpty(dayProductionList)) {
                         return;
                     }
-                    //20260119 释放，模具分配比例、模壳标准、胶囊卡盘
+                    //20260119 释放，模具分配比例、模壳标准、胶囊卡盘、换模次数
                     CxLhMouldProductionCalculator.handlerBeforeConclusion(productionContext, groupPlanInfo, singleDeductionDay, mouldInfo, materialDesc);
                     List<CxMouldDayProductionHelper> reserveList = new ArrayList<>();
                     dayProductionList.forEach(singleProduction -> {
