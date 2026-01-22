@@ -62,9 +62,9 @@ public class ProductionConstant {
      */
     public final static String PRODUCT_PROFIT_KEY_FORMAT = "%s|*|%s";
     /**
-     * 字符分隔符
+     * 字符分隔符 |*|
      */
-    public final static String PRODUCT_SPLIT = "\\|\\*\\|";
+    public final static String JOINT_SPLIT = "\\|\\*\\|";
     /**
      * 默认-利润优先值 100
      */

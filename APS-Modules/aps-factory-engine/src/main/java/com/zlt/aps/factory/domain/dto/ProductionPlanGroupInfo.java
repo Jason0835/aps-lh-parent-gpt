@@ -5,13 +5,11 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
-import com.zlt.aps.factory.daylimit.LhGroupProductionRangeCalculator;
-import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.factory.daylimit.MouldProductionDayLimitHelper;
+import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -562,6 +560,22 @@ public class ProductionPlanGroupInfo {
         Integer newClosingDay = sortList.get(BigDecimal.ZERO.intValue());
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
+        //20260122 换模次数控制
+        if (!preSelected.isChangeMould(addSkuInfo)) {
+            return;
+        }
+        //需要换模
+        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        changeMouldLimitHandler.confirmStartDayByChangeMouldLimit(productionContext, preSelected, selectedMould);
+        Integer changeMouldDay = preSelected.getClosingDay();
+        if (null == changeMouldDay || null == preSelected.getEndDay()) {
+            //记录日志
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
+            return;
+        }
+        //换模次数处理
+        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
 
     /**

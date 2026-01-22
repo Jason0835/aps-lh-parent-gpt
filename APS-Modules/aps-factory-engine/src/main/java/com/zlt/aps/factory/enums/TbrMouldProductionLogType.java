@@ -134,6 +134,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_BEFORE_CONCLUSION("20-25", "结构提前收尾业务"),
     /**
+     * 20-26 日排产限制业务控制
+     */
+    DAY_LIMIT_CONTROL("20-26", "日排产限制业务控制"),
+    /**
      * 20-14-01-05 在机分组使用在产机台排产硫化组
      */
     CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE("20-14-01-05", "在机分组使用在产机台排产硫化组"),
