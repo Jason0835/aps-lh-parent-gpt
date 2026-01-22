@@ -1294,34 +1294,42 @@ public class MpWeekRollAdjustEngine {
         }
     }
 
+    /**
+     * 新增调整记录
+     * @param contextDTO 周程滚动上下文
+     * @param mpProdFinalList 定稿列表
+     * @param adjustStructInVo 结构内调整记录
+     * @param lockNextDay 锁定次日
+     * @param newOnLineDay 新的上机日
+     */
     private void incOneAdjust(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustStructureIn adjustStructInVo, int lockNextDay,int newOnLineDay) {
         Integer newEndDay;
         Integer newPlanQty;
         FactoryMonthPlanFinalAdjustVo mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
         //2.2、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
         mpProdFinalList.add(mpFinalVo);
-
+        String constructionStage = ConstructionStageEnum.getInstance(adjustStructInVo.getConstructionStage()).getDesc();
         //2.3、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
         newPlanQty = adjustStructInVo.getConfirmAdjustQty();
-        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,新的上机日期:%s,新的排产量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,物料编码:%s,新的上机日期:%s,新的排产量:%s", contextDTO.getStructureName(),constructionStage,mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
         //2.4、增模排产,挤占空产能
-        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,物料编码:%s,开始！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,--增模排产,物料编码:%s,开始！", contextDTO.getStructureName(),constructionStage,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
         int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
-        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),constructionStage,mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
         //2.5、若还有剩余，向前挤占其他SKU的搭配量
         if (remainPlanQty > 0){
             // 若剩余量 > 0，说明实单还有剩余
             // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
             newEndDay = newOnLineDay == lockNextDay ? lockNextDay :newOnLineDay-1;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-开始！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,物料编码:%s,扣减其他SKU的搭配-开始！", contextDTO.getStructureName(),constructionStage, mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             deductMatchOtherSku(contextDTO, lockNextDay,newEndDay,remainPlanQty,mpFinalVo, mpProdFinalList);
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-结束！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,物料编码:%s,扣减其他SKU的搭配-结束！", contextDTO.getStructureName(),constructionStage, mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
         }
 
         //2.6、若当前SKU没有排上，则移除
         int productionQty = getProductionQty(newOnLineDay, contextDTO.getStructureDeadLine(),mpFinalVo);
         if (productionQty <=0){
-            mpProdFinalList.remove(mpFinalVo);
+            mpProdFinalList.removeIf(item -> item.getMaterialCode().equals(mpFinalVo.getMaterialCode()));
         }else{
             //重置各优先级总排产量
             resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
