@@ -1372,6 +1372,41 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
+     * 重置各优先级总排产量
+     * @param adjustStructOutVo 调整记录
+     * @param mpFinalVo 定稿记录
+     * @param productionQty 排产量
+     */
+    private void resetTotalProductionQty(MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int productionQty){
+
+        mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
+        mpFinalVo.setHeightProductionQty(mpFinalVo.getHeightProductionQty() == null ? 0:mpFinalVo.getHeightProductionQty());
+        mpFinalVo.setCycleProductionQty(mpFinalVo.getCycleProductionQty() == null ? 0:mpFinalVo.getCycleProductionQty());
+        mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
+        mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
+
+        if (adjustStructOutVo.getPostponeQty()>=0 && productionQty >=0){
+            //有暂缓需求
+            mpFinalVo.setPostponeProductionQty(adjustStructOutVo.getPostponeQty());
+            productionQty -= adjustStructOutVo.getPostponeQty();
+        }
+        if (adjustStructOutVo.getHeightQty()>=0 && productionQty >=0){
+            //有高优先级需求
+            mpFinalVo.setHeightProductionQty(adjustStructOutVo.getHeightQty());
+            productionQty -= adjustStructOutVo.getHeightQty();
+        }
+        if (adjustStructOutVo.getCycleReserveQty()>=0 && productionQty >=0){
+            //有周期性需求
+            mpFinalVo.setCycleProductionQty(adjustStructOutVo.getCycleReserveQty());
+            productionQty -= adjustStructOutVo.getCycleReserveQty();
+        }
+        //其他全归到 中优先级需求
+        if (productionQty >=0){
+            mpFinalVo.setMidProductionQty(productionQty);
+        }
+    }
+
+    /**
      * 检查是否有排产
      * @param startDay 开始日
      * @param endDay 开始日
@@ -1445,15 +1480,17 @@ public class MpWeekRollAdjustEngine {
         int iOrder = 0;
         for (MpAdjustStructureOut adjustStructOutVo:incrementAdjustList){
             mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructOutVo);
+            //2.1、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
+            mpProdFinalList.add(mpFinalVo);
             iOrder += 1;
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
-            //2.1、敲定在机SKU新的上机日期
+            //2.2、敲定在机SKU新的上机日期
             newOnLineDay = getNewOnLineDayForStructOut(contextDTO, lockNextDay, null);
             if (newOnLineDay == null){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
                 continue;
             }
-            //2.2、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
+            //2.3、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
             newPlanQty = adjustStructOutVo.getConfirmAdjustQty();
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,新的上机日期:%s,新的排产量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
             //2.4、增模排产,挤占空产能
@@ -1470,8 +1507,14 @@ public class MpWeekRollAdjustEngine {
                 contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,物料编码:%s,扣减其他SKU的搭配-结束！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             }
 
-            //2.6、将新增的SKU纳入定稿列表
-            mpProdFinalList.add(mpFinalVo);
+            //2.6、若当前SKU没有排上，则移除
+            int productionQty = getProductionQty(newOnLineDay, contextDTO.getStructureDeadLine(),mpFinalVo);
+            if (productionQty <=0){
+                mpProdFinalList.removeIf(item -> item.getMaterialCode().equals(adjustStructOutVo.getMaterialCode()));
+            }else{
+                //重置各优先级总排产量
+                resetTotalProductionQty(adjustStructOutVo,mpFinalVo,productionQty);
+            }
         }
     }
 
