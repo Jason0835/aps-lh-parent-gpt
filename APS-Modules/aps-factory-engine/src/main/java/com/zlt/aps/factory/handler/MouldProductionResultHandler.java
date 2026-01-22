@@ -421,11 +421,24 @@ public class MouldProductionResultHandler {
             return;
         }
         //获取模具使用数变化集合，按排产日由小到大顺序遍历
-        List<String> usedLhMachineCount = new ArrayList<>();
+        List<Integer> usedLhMachineCount = new ArrayList<>();
         lhMachineNumberDayMap.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> {
             Integer mouldNumber = entry.getKey() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            usedLhMachineCount.add(mouldNumber.toString());
+            usedLhMachineCount.add(mouldNumber);
         });
-        result.setMouldChangeInfo(String.join(StringConstant.DASH, usedLhMachineCount));
+        List<String> resultLhMachineCount = new ArrayList<>();
+        int size = usedLhMachineCount.size();
+        int startIndex = BigDecimal.ZERO.intValue();
+        if (size > BigDecimal.ONE.intValue()) {
+            Integer firstMouldNumber = usedLhMachineCount.get(BigDecimal.ZERO.intValue());
+            Integer secondMouldNumber = usedLhMachineCount.get(BigDecimal.ONE.intValue());
+            if (firstMouldNumber < secondMouldNumber) {
+                startIndex = BigDecimal.ONE.intValue();
+            }
+        }
+        for (int index = startIndex; index < size; index++) {
+            resultLhMachineCount.add(String.valueOf(usedLhMachineCount.get(index)));
+        }
+        result.setMouldChangeInfo(String.join(StringConstant.DASH, resultLhMachineCount));
     }
 }
