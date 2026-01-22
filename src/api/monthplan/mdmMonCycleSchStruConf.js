@@ -13,3 +13,10 @@ export function removeMonCycleSchStruConf(query) {
     data: query
   })
 }
+export function saveMonCycleSchStruConf(query) {
+  return request({
+    url: '/monthplan/mdmMonCycleSchStruConf/save',
+    method: 'post',
+    data: query
+  })
+}

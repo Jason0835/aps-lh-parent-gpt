@@ -30,11 +30,11 @@
 
 <script>
 import { mapState } from "vuex";
-
-// import { editCxSpecifyMachine } from "@/api/cx/cxSpecifyMachine";
-import { editProductMoldingLimit } from "@/api/mdm/productMoldingLimit";
+import { saveMonCycleSchStruConf } from "@/api/monthplan/mdmMonCycleSchStruConf";
 
 import infoForm from "@/views/components/infoForm.vue";
+import DictData from "@/components/DictData";
+import { min } from "lodash";
 
 export default {
   components: { infoForm },
@@ -54,14 +54,14 @@ export default {
             trigger: "change",
           },
         ],
-        结构: [
+        turnoverMonth: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        周转月数: [
+        minVulcanizingMachine: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -104,27 +104,38 @@ export default {
     columns() {
       return [
         {
-          prop: "工厂",
-          label: this.$t("工厂"),
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          disabled: true,
         },
         {
-          prop: "结构",
-          label: this.$t("结构"),
+          prop: "year",
+          label: this.$t("ui.data.colume.year"),
+          disabled: true,
         },
         {
-          prop: "周转月数",
-          label: this.$t("周转月数"),
+          prop: "month",
+          label: this.$t("ui.data.colume.month"),
+          disabled: true,
+        },
+        {
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          disabled: true,
+        },
+        {
+          prop: "turnoverMonth",
+          label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
           type: "number",
+          min: 0,
         },
         {
-          prop: "最低硫化机台数",
-          label: this.$t("最低硫化机台数"),
+          prop: "minVulcanizingMachine",
+          label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
           type: "number",
-        },
-
-        {
-          prop: "备注",
-          label: this.$t("备注"),
+          min: 0,
         },
       ];
     },
@@ -135,8 +146,8 @@ export default {
       try {
         this.loading = true;
 
-        // const res = await editProductMoldingLimit(params);
-        // this.$modal.msgSuccess(res.msg);
+        const res = await saveMonCycleSchStruConf(params);
+        this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
 

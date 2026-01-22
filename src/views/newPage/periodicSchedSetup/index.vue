@@ -30,7 +30,7 @@
           type="danger"
           v-hasPermi="['monthplan:mdmMonCycleSchStruConf:remove']"
           @click="handleDeleteAll"
-            :disabled="selection.length == 0"
+          :disabled="selection.length == 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <!-- <el-button
@@ -69,7 +69,7 @@
 </template>
 <script>
 //lib
-import { mapState,mapGetters } from "vuex";
+import { mapState, mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -77,10 +77,7 @@ import {
   listMonCycleSchStruConf,
   removeMonCycleSchStruConf,
 } from "@/api/monthplan/mdmMonCycleSchStruConf";
-import {
-  selectSkuStructure,
-
-} from "@/api/monthplan/skuStructure";
+import { selectSkuStructure } from "@/api/monthplan/skuStructure";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -117,7 +114,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    ...mapGetters("globalList", ["structureList"]),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -168,7 +165,6 @@ export default {
         },
         {
           align: "center",
-          halign: "center",
           label: this.$t("ui.data.btn.option"),
           minWidth: 180,
           width: 200,
@@ -176,7 +172,6 @@ export default {
           render: ({ row }) => {
             return (
               <div>
-
                 <el-button
                   class="minus"
                   type="danger"
@@ -184,6 +179,14 @@ export default {
                   v-hasPermi={["monthplan:mdmMonCycleSchStruConf:remove"]}
                 >
                   {this.$t("ui.frame.btn.delete")}
+                </el-button>
+                <el-button
+                v-hasPermi={["monthplan:mdmMonCycleSchStruConf:edit"]}
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
               </div>
             );
@@ -226,14 +229,14 @@ export default {
           label: this.$t("ui.data.colume.yearMonth"),
           type: "date",
           dateType: "month",
-          valueFormat:'yyyy-MM',
+          valueFormat: "yyyy-MM",
         },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
-          dictData:this.structureList,
-          filterable: true
+          dictData: this.structureList,
+          filterable: true,
         },
       ];
     },
@@ -309,7 +312,10 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/monthplan/mdmMonCycleSchStruConf/export", this.formatParams(false));
+      downloadLink(
+        "/monthplan/mdmMonCycleSchStruConf/export",
+        this.formatParams(false)
+      );
     },
 
     formatParams(hasPage = true) {
@@ -323,11 +329,10 @@ export default {
         params.pageNum = this.page.current;
       }
 
-
       if (params.yearMonth) {
-        let array = params.yearMonth.split("-")
-        params.year = array[0]
-        params.month = array[1]
+        let array = params.yearMonth.split("-");
+        params.year = array[0];
+        params.month = array[1];
       }
 
       return params;
@@ -389,8 +394,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>
