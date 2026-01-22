@@ -31,7 +31,7 @@ public interface IDpDemandPlanRemoteService {
      * 查询列表
      */
     @ApiOperation("查询列表")
-    @PostMapping("/demandPlanSummary/list")
+    @PostMapping("/demandPlan/list")
     TableDataInfo list(@RequestBody DpDemandPlanSummary queryVO);
 
     /**
@@ -67,7 +67,7 @@ public interface IDpDemandPlanRemoteService {
      * 导出需求计划列表
     */
     @ApiOperation("导出列表")
-    @PostMapping("/demandPlanSummary/exportData/{fileName}")
+    @PostMapping("/demandPlan/exportData/{fileName}")
     byte[] exportData(@RequestBody DpDemandPlanSummary queryVO, @PathVariable("fileName") String fileName);
 
     /**
