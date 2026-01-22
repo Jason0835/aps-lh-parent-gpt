@@ -117,6 +117,20 @@ public class MdmProductStock extends BaseEntity {
     private Integer stockQty;
 
     /**
+     * 入库量
+     */
+    @ApiModelProperty(value = "入库量", name = "inboundQty")
+    @TableField(value = "INBOUND_QTY")
+    private Integer inboundQty;
+
+    /**
+     * 出库量
+     */
+    @ApiModelProperty(value = "出库量", name = "outboundQty")
+    @TableField(value = "OUTBOUND_QTY")
+    private Integer outboundQty;
+
+    /**
      * 年周号
      */
     @Excel(name = "ui.data.column.productStock.weekYear")

@@ -159,6 +159,7 @@ public class FinereportController {
         return AjaxResult.success(realUrl);
     }
 
+
 	/**
 	 * 登录帆软服务器获取token
 	 *
