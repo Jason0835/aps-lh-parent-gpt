@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSummary;
 import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +32,7 @@ public interface IDpDemandPlanRemoteService {
      */
     @ApiOperation("查询列表")
     @PostMapping("/demandPlan/list")
-    TableDataInfo list(@RequestBody DpDemandPlan queryVO);
+    TableDataInfo list(@RequestBody DpDemandPlanSummary queryVO);
 
     /**
     * 保存
@@ -67,7 +68,7 @@ public interface IDpDemandPlanRemoteService {
     */
     @ApiOperation("导出列表")
     @PostMapping("/demandPlan/exportData/{fileName}")
-    byte[] exportData(@RequestBody DpDemandPlan queryVO, @PathVariable("fileName") String fileName);
+    byte[] exportData(@RequestBody DpDemandPlanSummary queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入需求计划数据
