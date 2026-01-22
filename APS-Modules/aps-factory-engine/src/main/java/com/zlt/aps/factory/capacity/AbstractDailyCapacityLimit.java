@@ -106,6 +106,7 @@ public abstract class AbstractDailyCapacityLimit {
         // 次日字段
         String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
         String embryoFieldValue;
+        dailyCapacityLimitVo.getEmbryoCodes().clear();
         for (BaseEntity mpFinalVo: mpProdFinalList){
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null) {
                 continue;
