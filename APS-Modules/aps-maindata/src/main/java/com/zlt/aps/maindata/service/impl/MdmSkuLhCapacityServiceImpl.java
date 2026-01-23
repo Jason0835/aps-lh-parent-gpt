@@ -96,22 +96,27 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
         if (PubUtil.isEmpty(sourceList)) {
             return;
         }
-        // 计算APS日硫化量：APS日硫化量 = 24 * 60 / 硫化总时间(min)
+
+        /**
+         * 模具产能：向下取整（ 24 * 60 * 60 /（ 硫化总时间（s）+ 机械动作时间（s）))
+         * APS日硫化产能计算：模具产能 * 2
+         */
         sourceList.stream()
                 .filter(skuCapacity -> {
-                    Integer sum = skuCapacity.getSumVulcanization();
+                    Integer sum = skuCapacity.getVulcanizationTime();
                     return sum != null && sum > 0;
                 })
                 .forEach(skuCapacity -> {
-                    Integer sumVulcanization = skuCapacity.getSumVulcanization();
-                    double divisionResult = (double) ApsConstant.MINUTES_PER_DAY / sumVulcanization;
-                    double ceilResult = Math.ceil(divisionResult);
-                    skuCapacity.setApsCapacity(Convert.toInt(ceilResult));
+                    Integer vulcanizationTime = skuCapacity.getVulcanizationTime();
+                    Integer mechanicalTime = skuCapacity.getMechanicalTime();
+                    double divisionResult = (double) ApsConstant.SECOND_PER_DAY / (vulcanizationTime + mechanicalTime);
+                    double ceilResult = Math.floor(divisionResult);
+                    skuCapacity.setApsCapacity(Convert.toInt(ceilResult) * 2);
                 });
         // 设置默认值
         sourceList.stream()
                 .filter(skuCapacity -> {
-                    Integer sum = skuCapacity.getSumVulcanization();
+                    Integer sum = skuCapacity.getVulcanizationTime();
                     return sum == null || sum <= 0;
                 })
                 .forEach(skuCapacity -> skuCapacity.setApsCapacity(0));

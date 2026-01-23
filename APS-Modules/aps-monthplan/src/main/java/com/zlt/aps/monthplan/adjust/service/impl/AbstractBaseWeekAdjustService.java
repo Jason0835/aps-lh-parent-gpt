@@ -293,9 +293,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Override
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+        //1、执行自动调整
         doAutoAdjust(contextDTO);
-        //保存调整结果
+        //2、保存调整结果
         saveMpAdjustResult(contextDTO);
+        //3、回填实际调整
+        backfillRealAdjustResult(contextDTO);
+    }
+
+    /**
+     * 回填实际调整
+     * @param contextDTO 周程滚动上下文
+     */
+    protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO){
+
     }
 
     /**
