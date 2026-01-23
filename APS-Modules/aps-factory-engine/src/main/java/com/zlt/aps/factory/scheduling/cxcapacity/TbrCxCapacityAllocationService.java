@@ -582,19 +582,19 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         getDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
         Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
-        //保存未排计划明细
-        saveNoProductionPlanResult(productionContext, sumProductionMap);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
+        //保存未排计划明细
+        saveNoProductionPlanResult(productionContext,dayResultList, sumProductionMap);
         getDataService().saveMouldProductionResult(dayResultList);
     }
 
-    private void saveNoProductionPlanResult(TbrProductionContext productionContext, Map<Long, Integer> sumProductionMap) {
+    private void saveNoProductionPlanResult(TbrProductionContext productionContext,List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
         Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(productionPlanMap)) {
             return;
         }
-        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, sumProductionMap);
+        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap,dayResultList, sumProductionMap);
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
