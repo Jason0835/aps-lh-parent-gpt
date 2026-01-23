@@ -535,7 +535,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.finalized.checkEmptyParam"));
         }
         // 根据分厂编码，及日期，获取定稿版本信息
-        MpFactoryProductionVersion version = factoryProductionVersionService.getFinalVersionByYearMonth(param.getFactoryCode(), param.getYear(), param.getMonth())
+        MpFactoryProductionVersion version = factoryProductionVersionService.getFinalVersionByYearMonth(param.getFactoryCode(), param.getYear(), param.getMonth());
         if (version == null) {
             return Collections.emptyList();
         }
