@@ -1,6 +1,9 @@
 package com.zlt.aps.monthplan.factory.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.monthplan.factory.mapper.MonthPlanNoProductionPlanMapper;
 import com.zlt.aps.monthplan.factory.service.IMonthPlanNoProductionPlanService;
@@ -14,6 +17,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -65,7 +72,33 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MonthPlanNoProductionPlan queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableResult = super.list(queryVO);
+        if(CollectionUtils.isEmpty(tableResult.getRows())) {
+            return tableResult;
+        }
+        this.translationList((List<MonthPlanNoProductionPlan>)tableResult.getRows());
+        return tableResult;
+    }
+
+    private void translationList(List<MonthPlanNoProductionPlan> list) {
+        Locale locale = I18nUtil.getLocaleFromRedis();
+        list.forEach(noProductionPlan -> {
+            String reason = noProductionPlan.getReason();
+            if (StringUtils.isNotBlank(reason)) {
+                if (reason.contains("|")) {
+                    String[] split = reason.split("\\|");
+                    List<String> reasonList = new ArrayList<>(split.length);
+                    for (String reasonI18n : split) {
+                        String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
+                        reasonList.add(convertValue);
+                    }
+                    noProductionPlan.setReason(String.join(",", reasonList));
+                } else {
+                    String convertValue = JsonI18nConvertUtils.getConvertValue(reason, locale);
+                    noProductionPlan.setReason(convertValue);
+                }
+            }
+        });
     }
 
     @Override
@@ -137,7 +170,12 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
     protected List<MonthPlanNoProductionPlan> listExportData(MonthPlanNoProductionPlan obj) {
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MonthPlanNoProductionPlan> list = entityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)) {
+            return Collections.emptyList();
+        }
+        this.translationList(list);
+        return list;
     }
 
     @Override

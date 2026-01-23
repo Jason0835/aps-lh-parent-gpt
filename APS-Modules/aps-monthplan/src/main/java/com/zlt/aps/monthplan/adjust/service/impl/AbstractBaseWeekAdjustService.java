@@ -293,9 +293,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Override
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+        //1、执行自动调整
         doAutoAdjust(contextDTO);
-        //保存调整结果
+        //2、保存调整结果
         saveMpAdjustResult(contextDTO);
+        //3、回填实际调整
+        backfillRealAdjustResult(contextDTO);
+    }
+
+    /**
+     * 回填实际调整
+     * @param contextDTO 周程滚动上下文
+     */
+    protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO){
+
     }
 
     /**
@@ -1224,6 +1235,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getMonthPlanVersion()), FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, queryVO.getMonthPlanVersion());
         queryWrapper.eq(StringUtils.isNotEmpty(queryVO.getProductionVersion()), FactoryMonthPlanProductionFinalResult::getProductionVersion, queryVO.getProductionVersion());
         queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(queryVO.getYear() != null, FactoryMonthPlanProductionFinalResult::getYear, queryVO.getYear());
+        queryWrapper.eq(queryVO.getMonth() != null, FactoryMonthPlanProductionFinalResult::getMonth, queryVO.getMonth());
     }
 
     /**

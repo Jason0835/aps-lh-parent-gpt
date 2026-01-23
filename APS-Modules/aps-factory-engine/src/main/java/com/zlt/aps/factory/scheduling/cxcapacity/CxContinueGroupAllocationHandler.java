@@ -54,7 +54,6 @@ public class CxContinueGroupAllocationHandler {
             return Collections.emptyList();
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        Map<String, MouldShellBaseInfoVo> mouldShellMap = productionContext.getBaseDataContainer().getMouldShellMap();
         List<CxMachineAllocationPlanHelper> allAllocationResult = new ArrayList<>();
         //按在机结构分组--排产在机结构的续作Sku在 在产机台的排产，并得到各在产机台的产能分配
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
@@ -62,7 +61,7 @@ public class CxContinueGroupAllocationHandler {
             if (null == groupPlan) {
                 return;
             }
-            List<CxMachineAllocationPlanHelper> singleGroupAllocationResult = allocationProductionCxMachineAndProductionContinue(productionContext, groupPlan, cxContinueInfo, mouldShellMap);
+            List<CxMachineAllocationPlanHelper> singleGroupAllocationResult = allocationProductionCxMachineAndProductionContinue(productionContext, groupPlan, cxContinueInfo);
             if (CollectionUtils.isEmpty(singleGroupAllocationResult)) {
                 log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName));
                 return;
@@ -87,9 +86,8 @@ public class CxContinueGroupAllocationHandler {
      * @param context           排产上下文
      * @param groupPlanInfo     分组计划信息对象
      * @param groupContinueInfo 分组计划对应的续作Sku信息
-     * @param mouldShellMap     模壳信息
      */
-    private static List<CxMachineAllocationPlanHelper> allocationProductionCxMachineAndProductionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    private static List<CxMachineAllocationPlanHelper> allocationProductionCxMachineAndProductionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         if (CollectionUtils.isEmpty(productionCxMachineCodeSet)) {
@@ -98,12 +96,8 @@ public class CxContinueGroupAllocationHandler {
         //粗算得到的机台
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
         Integer productionCount = productionCxMachineCodeSet.size();
-//        //20260119 修正在产机台数：成型鼓数量
-//        String proSize = groupPlanInfo.getProSizeInfo();
-//        Integer maxCount = productionContext.getBaseDataContainer().getLeftOverQtyByProSizeAndContinueGroupPlan(proSize);
-//        productionCount = Math.min(maxCount, productionCount);
         //1、排产续作部分（续作Sku高优先级排产、同规格同花纹高优级排产、同生胎同模具高优级排产）
-        productionContinue(productionContext, groupPlanInfo, groupContinueInfo, mouldShellMap);
+        productionContinue(productionContext, groupPlanInfo, groupContinueInfo);
         /**
          * 2、在产机台的分配
          * 2.1、在产机台数 = 1时，直接分配多少就是多少
@@ -142,9 +136,8 @@ public class CxContinueGroupAllocationHandler {
      * @param context           排产上下文
      * @param groupPlanInfo     分组计划信息对象
      * @param groupContinueInfo 分组计划-续作Sku信息对象
-     * @param mouldShellMap     模壳信息
      */
-    private static void productionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    private static void productionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuInfoMap)) {
             //todo 记录日志
@@ -169,9 +162,9 @@ public class CxContinueGroupAllocationHandler {
         productionContinueSku(productionContext, groupPlanInfo, continueSkuInfoMap);
         //2、接着进行同规格同花纹的续作高优先级部分进行模拟排产
         Integer monthDays = context.getMonthDays();
-        CxContinueProductionHandler.productionContinueByType(context, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap, mouldShellMap);
+        CxContinueProductionHandler.productionContinueByType(context, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap);
         //3、接着进行共生胎，同模具的续作高优级部分进行模拟排产
-        CxContinueProductionHandler.productionContinueByType(context, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap, mouldShellMap);
+        CxContinueProductionHandler.productionContinueByType(context, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap);
     }
 
     /**

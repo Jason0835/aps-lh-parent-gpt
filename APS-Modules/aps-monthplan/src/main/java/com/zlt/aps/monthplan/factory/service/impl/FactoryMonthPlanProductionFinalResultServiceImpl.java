@@ -16,6 +16,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.IncrementConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.tlt.aps.utils.IncrementService;
 import com.tlt.aps.utils.JsonUtils;
@@ -79,6 +80,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private IncrementService incrementService;
     @Autowired
     private EventPublisher eventPublisher;
+    @Autowired
+    private FactoryProductionVersionServiceImpl factoryProductionVersionService;
 
     @Override
     protected String getDocTypeCode() {
@@ -520,5 +523,25 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         eventPublisher.publish(event);
         log.info("发布月计划定稿事件完成");
     }
+
+    /**
+     * 获取定稿版本的月度计划
+     * @param param
+     * @return
+     */
+    @Override
+    public List<FactoryMonthPlanProductionFinalResult> listMonthProdFinalPlans(FactoryMonthPlanProductionFinalResult param) {
+        if (StringUtils.isEmpty(param.getFactoryCode()) || param.getYear() == null || param.getMonth() == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.finalized.checkEmptyParam"));
+        }
+        // 根据分厂编码，及日期，获取定稿版本信息
+        MpFactoryProductionVersion version = factoryProductionVersionService.getFinalVersionByYearMonth(param.getFactoryCode(), param.getYear(), param.getMonth());
+        if (version == null) {
+            return Collections.emptyList();
+        }
+        param.setMonthPlanVersion(version.getMonthPlanVersion());
+        return getDataList(param);
+    }
+
 
 }

@@ -16,10 +16,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -596,9 +593,28 @@ public class CxLhMouldProductionCalculator {
         //模具排产信息-计划分配
         Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = skuProductionPlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
         Map<Long, Integer> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(realDayProductionQty, skuProductionPlanList);
+        Set<String> isSelectedSingle = new HashSet<>();
         productionPlanMap.forEach((monthPlanId, planProductionQty) -> {
             MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
             doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineInfo));
+            //奇数补充 出现两条单奇数
+            ProductionMouldInfoVo firstMould = doubleMouldList.get(BigDecimal.ZERO.intValue());
+            ProductionMouldInfoVo secondMould = doubleMouldList.get(BigDecimal.ONE.intValue());
+            ProductionMouldInfoVo singleMould;
+            if (planProductionQty % ProductionConstant.DOUBLE_MOULD_PRODUCTION != BigDecimal.ZERO.intValue()) {
+                if (isSelectedSingle.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+                    return;
+                }
+                if (isSelectedSingle.contains(firstMould.getMouldCode())) {
+                    singleMould = secondMould;
+                } else {
+                    singleMould = firstMould;
+                }
+                isSelectedSingle.add(singleMould.getMouldCode());
+                if (null != singleMould) {
+                    singleMould.addProductionInfo(productionDay, groupPlan, isDayFinish, ProductionConstant.DOUBLE_MOULD_PRODUCTION, cxMachineInfo);
+                }
+            }
         });
         MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         //模具分配比例控制对象

@@ -13,6 +13,7 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -97,6 +98,7 @@ public class MouldProductionResultHandler {
             mergeNoProductionReason(dayResult, requireList);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));
+            dayResult.allocateProductionByPriority();
             dayResult.setDifferenceQty(dayResult.getFactProdReqQty() - dayResult.getTotalQty());
             resultList.add(dayResult);
         });
@@ -229,6 +231,15 @@ public class MouldProductionResultHandler {
         Integer noHeightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
         Integer lossQty = (heightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
         dayResult.setFactProdReqQty(sumNetQty + lossQty);
+
+        int sumCycleReserveQty = requireList.stream().filter(item -> null != item.getCycleReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
+        int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
+        int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
+        int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
+        dayResult.setCycleReserveLossQty(sumCycleReserveQty + lossQty);
+        dayResult.setConventionReserveQty(sumConventionQty);
+        dayResult.setMidLossQty(sumMidQty + lossQty);
+        dayResult.setPostponeQty(sumPostponeQty);
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());
         dayResult.setMidProductionQty(BigDecimal.ZERO.intValue());
@@ -399,16 +410,33 @@ public class MouldProductionResultHandler {
             return;
         }
         Integer singleLhMachineCapacity = result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        Map<Integer, Integer> lhMachineCountMap = new HashMap<>();
-        dayProductionQty.forEach((day, productionQty) -> lhMachineCountMap.put(day, BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue()));
+        List<MouldDayUsedNumber> lhMachineCountList = new ArrayList<>();
+        dayProductionQty.forEach((day, productionQty) ->{
+            Integer usedLhMachineNumber = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue();
+            MouldDayUsedNumber used = new MouldDayUsedNumber(day, usedLhMachineNumber);
+            lhMachineCountList.add(used);
+        });
+        //日期从小到大，判断第一天如果小于第二天则舍弃第一天的模具数
+        lhMachineCountList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
+        int size = lhMachineCountList.size();
+        int startIndex = BigDecimal.ZERO.intValue();
+        if (size > BigDecimal.ONE.intValue()) {
+            Integer firstMouldNumber = lhMachineCountList.get(BigDecimal.ZERO.intValue()).getUsedLhMachineCount();
+            Integer secondMouldNumber = lhMachineCountList.get(BigDecimal.ONE.intValue()).getUsedLhMachineCount();
+            if (firstMouldNumber < secondMouldNumber) {
+                startIndex = BigDecimal.ONE.intValue();
+            }
+        }
+        List<MouldDayUsedNumber> resultList = lhMachineCountList.subList(startIndex, size - startIndex);
+        //对排产量，保留第一个排产日，日期从小到大
         Map<Integer, Integer> lhMachineNumberDayMap = new HashMap<>();
-        //获取使用硫化机台数的日期值，只保留一个日，按排产日由小到大顺序遍历
-        lhMachineCountMap.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
-            Integer lhMachineCount = entry.getValue();
+        resultList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
+        resultList.forEach(mouldDayUsedNumber ->{
+            Integer lhMachineCount = mouldDayUsedNumber.getUsedLhMachineCount();
             if (null == lhMachineCount) {
                 return;
             }
-            Integer day = entry.getKey();
+            Integer day = mouldDayUsedNumber.getProductionDay();
             if (null == day) {
                 return;
             }
@@ -421,11 +449,31 @@ public class MouldProductionResultHandler {
             return;
         }
         //获取模具使用数变化集合，按排产日由小到大顺序遍历
-        List<String> usedLhMachineCount = new ArrayList<>();
+        List<String> resultLhMachineCount = new ArrayList<>();
         lhMachineNumberDayMap.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> {
             Integer mouldNumber = entry.getKey() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            usedLhMachineCount.add(mouldNumber.toString());
+            resultLhMachineCount.add(String.valueOf(mouldNumber));
         });
-        result.setMouldChangeInfo(String.join(StringConstant.DASH, usedLhMachineCount));
+        result.setMouldChangeInfo(String.join(StringConstant.DASH, resultLhMachineCount));
+    }
+}
+
+/**
+ * 模具日使用数
+ */
+@Getter
+class MouldDayUsedNumber {
+    /**
+     * 排产日
+     */
+    private Integer productionDay;
+    /**
+     * 使用的硫化机台数
+     */
+    private Integer usedLhMachineCount;
+
+    public MouldDayUsedNumber(Integer productionDay, Integer usedLhMachineCount) {
+        this.productionDay = productionDay;
+        this.usedLhMachineCount = usedLhMachineCount;
     }
 }

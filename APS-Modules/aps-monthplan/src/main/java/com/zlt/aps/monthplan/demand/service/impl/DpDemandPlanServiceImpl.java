@@ -39,6 +39,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.common.event.SummaryDemandEvent;
 import com.zlt.aps.monthplan.common.utils.DemandPlanGrouper;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
@@ -61,6 +62,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
@@ -139,6 +141,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     // 周期结构配置
     private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
 
+    private final ApplicationContext applicationContext;
+
     @Override
     protected String getDocTypeCode() {
         return "0802";
@@ -213,6 +217,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(mergedDemandPlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(mergedDemandPlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
     }
 
@@ -233,11 +238,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 return;
             }
             value.forEach(item -> {
-                    if(0 == item.getProduceQtyDue()) {
-                        item.setIsAlternateMaterial(YesOrNoEnum.NO.getCode());
-                        return;
-                    }
-                    item.setIsAlternateMaterial(this.getIsAlternateMaterial(item.getGroupKey(),mapGroupByAlternateMaterial,productStockMap));
+                if(0 == item.getProduceQtyDue()) {
+                    item.setIsAlternateMaterial(YesOrNoEnum.NO.getCode());
+                    return;
+                }
+                item.setIsAlternateMaterial(this.getIsAlternateMaterial(item.getGroupKey(),mapGroupByAlternateMaterial,productStockMap));
             });
         });
     }
@@ -254,7 +259,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String,List<DpOrderOffsetDetail>>  map = list.stream().collect(Collectors.groupingBy(DpOrderOffsetDetail::getStockGroupKey));
         for (Map.Entry<String, List<DpOrderOffsetDetail>> entry : map.entrySet()) {
             if(!productStockMap.containsKey(entry.getKey())) {
-               continue;
+                continue;
             }
             List<MdmProductStock> productStocks = productStockMap.get(entry.getKey());
             int leftOverQty = productStocks.stream().filter(item -> null != item.getLeftOverQty()).mapToInt(MdmProductStock::getLeftOverQty).sum();
@@ -338,6 +343,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(adjustRequirePlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(adjustRequirePlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(adjustRequirePlans.get(0)));
         }
         return adjustRequirePlans;
     }
@@ -379,7 +385,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             predictionOffsetDetail.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         });
         if(!CollectionUtils.isEmpty(fetchSupplyOrders)) {
-           fetchSupplyOrders.forEach(supplyOrderPool -> netDemands.add(buildPredictOffsetDetail(createCondition,supplyOrderPool)));
+            fetchSupplyOrders.forEach(supplyOrderPool -> netDemands.add(buildPredictOffsetDetail(createCondition,supplyOrderPool)));
         }
         List<DpSimulatedOffsetDetail>  leftDemands = PredictionAllocationHelper.calculateSaleOrder(netDemands,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(leftDemands)){
@@ -406,6 +412,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(mergedDemandPlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(mergedDemandPlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
         return mergedDemandPlans;
     }
@@ -609,6 +616,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(!CollectionUtils.isEmpty(mergedDemandPlans)){
             // 9. 保存分厂排产版本
             saveFactoryProductionVersion(mergedDemandPlans);
+            applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
         return mergedDemandPlans;
     }
@@ -1093,16 +1101,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private DpDemandPlan buildMergedDemandPlan(
-            DpDemandPlan template,
-            List<DpDemandPlan> groupPlans,
-            int minProductionQty,
-            Map<String, MdmMaterialInfo> skuMap,
-            Map<String, List<MdmProductStock>> finishedProductStockMap,
-            Map<String, Integer> mdmMonthSurplusMap,
-            Map<String, String> productionTypeMap,
-            Map<String, Integer> monthlySaleQty,
-            List<MdmCycleSchStruConf> cycleSchStruConfs,
-            Map<String, Integer> orderQtyMap) {
+        DpDemandPlan template,
+        List<DpDemandPlan> groupPlans,
+        int minProductionQty,
+        Map<String, MdmMaterialInfo> skuMap,
+        Map<String, List<MdmProductStock>> finishedProductStockMap,
+        Map<String, Integer> mdmMonthSurplusMap,
+        Map<String, String> productionTypeMap,
+        Map<String, Integer> monthlySaleQty,
+        List<MdmCycleSchStruConf> cycleSchStruConfs,
+        Map<String, Integer> orderQtyMap) {
         // 使用构建器模式创建新对象（避免BeanCopyUtils的性能开销）
         DpDemandPlan mergedPlan = createMergedDemandPlan(template);
         // 设置替换料
@@ -1210,9 +1218,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      * 性能优化：单次遍历完成所有统计
      */
     private void setQuantityStatistics(
-            DpDemandPlan demandPlan,
-            List<DpDemandPlan> groupPlans,
-            int minProductionQty,Map<String, Integer> orderQtyMap) {
+        DpDemandPlan demandPlan,
+        List<DpDemandPlan> groupPlans,
+        int minProductionQty,Map<String, Integer> orderQtyMap) {
         // 使用统计对象收集所有数据，避免多次遍历
         QuantityStatistics statistics = groupPlans.stream()
             .collect(QuantityStatistics::new, QuantityStatistics::accumulate, QuantityStatistics::combine);
@@ -1365,3 +1373,4 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
 
 }
+

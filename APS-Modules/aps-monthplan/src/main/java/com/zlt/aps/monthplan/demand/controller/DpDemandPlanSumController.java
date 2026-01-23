@@ -1,44 +1,30 @@
 package com.zlt.aps.monthplan.demand.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.core.web.page.PageDomain;
-import com.ruoyi.common.core.web.page.TableSupport;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.common.utils.CollectionKit;
-import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
-import com.zlt.aps.monthplan.common.utils.StringUtil;
-import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
-import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.impl.DpDemandPlanServiceImpl;
-import com.zlt.common.utils.PubUtil;
-
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
+import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanSumEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IDpDemandPlanSumService;
+import com.zlt.common.utils.PubUtil;
+import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.CollectionUtils;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
+
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -47,57 +33,39 @@ import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService ;
 
 /**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：DpDemandPlanController.java
- * 描    述：需求计划 控制层类：....
- *@author yelq
- *@date 2025-12-25
- *@version 1.0
- *
+* Copyright (c) 2022, All rights reserved。
+* 文件名称：DpDemandPlanSumController.java
+* 描    述：需求计划汇总 控制层类：....
+*@author yelq
+*@date 2026-01-22
+*@version 1.0
+*
  *  修改记录：
- *     修改时间：...
- *     修 改 人：yelq
- *     修改内容：...
- */
+*     修改时间：...
+*     修 改 人：yelq
+*     修改内容：...
+*/
 @Slf4j
-@Api(tags = "需求计划")
-@AllArgsConstructor
+@Api(tags = "需求计划汇总")
 @RestController
-@RequestMapping("/demandPlan")
-public class DpDemandPlanController extends AbstractDocBizController<DpDemandPlan> {
+@RequestMapping("/demandPlanSum")
+public class DpDemandPlanSumController extends AbstractDocBizController<DpDemandPlanSum> {
 
-    private final IDpDemandPlanService dpDemandPlanService;
-    private final RequirementVersionService requirementVersionService;
-    private final DpDemandPlanEntityMapper entityMapper;
+    @Autowired
+    private IDpDemandPlanSumService dpDemandPlanSumService;
+
+    @Autowired
+    private DpDemandPlanSumEntityMapper entityMapper;
 
     /**
-     * 查询需求计划列表
+     * 查询需求计划汇总列表
      */
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody DpDemandPlan queryVO) {
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
-        builderCondition(queryWrapper,queryVO);
-        List<DpDemandPlan> dataList =  dpDemandPlanService.list(queryWrapper);
-        if(CollectionUtils.isEmpty(dataList)) {
-            return getDataTable(Collections.emptyList());
-        }
-        Comparator<DpDemandPlan> comparator = Comparator.comparing(DpDemandPlan::getCreateTime).reversed();
-        PageDomain pageDomain = TableSupport.buildPageRequest();
-        Integer pageNum = pageDomain.getPageNum();
-        Integer pageSize = pageDomain.getPageSize();
-        pageNum = pageNum == null ? 1 : pageNum;
-        pageSize = pageSize == null ? 10000000 : pageSize;
-        List<DpDemandPlan>  list = CollectionKit.sortPageAll(pageNum,pageSize,comparator,dataList);
-        TableDataInfo rspData = new TableDataInfo();
-        rspData.setCode(200);
-        rspData.setRows(list);
-        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
-        rspData.setTotal(dataList.size());
-        return rspData;
+    public TableDataInfo list(@RequestBody DpDemandPlanSum queryVO) {
+        return super.list(queryVO);
     }
-
 
     @Override
     protected String getOrderBy() {
@@ -105,82 +73,41 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     }
 
     /**
-     * 保存
-     */
-    @Log(title = "ui.data.column.dpDemandPlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存")
-    @PostMapping("/save")
-    @Override
-    public AjaxResult save(@RequestBody DpDemandPlan billVO){
-        return super.save(billVO);
-    }
-
-    /**
-     * 删除
-     */
-    @Log(title = "ui.data.column.dpDemandPlan.modelName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除")
-    @DeleteMapping("/remove")
-    @Override
-    public AjaxResult removeByIds(@RequestBody List<Long> ids){
-        return super.removeByIds(ids);
-    }
-
-
-    /**
-     * 获取需求计划详细信息
-     */
-    @ApiOperation("获取详细信息")
-    @GetMapping(value = "/{billId}")
-    @Override
-    public DpDemandPlan getInfo(@PathVariable("billId") Long billId) {
-        return super.getInfo(billId);
-    }
-
-
-    /**
-     * 根据集合导入需求计划数据
-     * @param importContext 导入上下文
-     * @param updateSupport 已存在记录是否更新
-     * @return 结果
-     */
-    @Log(title = "ui.data.column.dpDemandPlan.modelName", businessType = BusinessType.IMPORT)
-    @ApiOperation("导入数据")
-    @PostMapping("/importData")
-    @Override
-    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
-    }
-
-
-    /**
      * 导出列表
      */
-    @Log(title = "需求计划", businessType = BusinessType.EXPORT)
-    @ApiOperation("导入数据")
+    @Log(title = "需求计划汇总", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody DpDemandPlan queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody DpDemandPlanSum queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    protected List<DpDemandPlan> listExportData(DpDemandPlan obj) {
-        QueryWrapper<DpDemandPlan> wrapper = new QueryWrapper<>();
+    protected List<DpDemandPlanSum> listExportData(DpDemandPlanSum obj) {
+        QueryWrapper<DpDemandPlanSum> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        List<DpDemandPlan> dataList =  dpDemandPlanService.list(wrapper);
-        if(CollectionUtils.isEmpty(dataList)) {
-            return Collections.emptyList();
-        }
-        Comparator<DpDemandPlan> comparator = Comparator.comparing(DpDemandPlan::getCreateTime).reversed();
-        dataList.sort(comparator);
-        return dataList;
+        List<DpDemandPlanSum> list = entityMapper.selectList(wrapper);
+        list.forEach(item -> item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime())));
+        return list;
+    }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.demandPlanSum.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody DpDemandPlanSum billVO){
+        this.dpDemandPlanSumService.batchUpdateForDemand(billVO);
+        return AjaxResult.success();
     }
 
     @Override
     protected IDocService getDocService(){
-        return dpDemandPlanService;
+        return dpDemandPlanSumService;
     }
 
     /**
@@ -190,33 +117,21 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
      * @param queryVO
      */
     @Override
-    protected void builderCondition(QueryWrapper<DpDemandPlan> queryWrapper, DpDemandPlan queryVO) {
+    protected void builderCondition(QueryWrapper<DpDemandPlanSum> queryWrapper, DpDemandPlanSum queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion"))) {
-            String monthPlanVersion = queryVO.getMonthPlanVersion();
-            if(StringUtils.isNotBlank(monthPlanVersion)) {
-                log.info("monthPlanVersion:{}",monthPlanVersion);
-                queryWrapper.like("MONTH_PLAN_VERSION", monthPlanVersion);
-            }
-        }
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialCode").toString()) ) {
-            queryWrapper.like("MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
-        }
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("structureName").toString()) ) {
-            queryWrapper.like("STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
-        }
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")) && StringUtils.isNotBlank(queryVO.getFieldValueByFieldName("materialDesc").toString()) ) {
-            queryWrapper.like("MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
-        }
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmPriority")), "SCM_PRIORITY", queryVO.getFieldValueByFieldName("scmPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isAlternateMaterial")), "IS_ALTERNATE_MATERIAL", queryVO.getFieldValueByFieldName("isAlternateMaterial"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("locationType")), "LOCATION_TYPE", queryVO.getFieldValueByFieldName("locationType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionType")), "PRODUCTION_TYPE", queryVO.getFieldValueByFieldName("productionType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("yearWeek")), "YEAR_WEEK", queryVO.getFieldValueByFieldName("yearWeek"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDynamicBalance")), "IS_DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("isDynamicBalance"));
@@ -251,49 +166,14 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDebitPlan")), "IS_DEBIT_PLAN", queryVO.getFieldValueByFieldName("isDebitPlan"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliveryDateDue")), "DELIVERY_DATE_DUE", queryVO.getFieldValueByFieldName("deliveryDateDue"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isImport")), "IS_IMPORT", queryVO.getFieldValueByFieldName("isImport"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureType")), "STRUCTURE_TYPE", queryVO.getFieldValueByFieldName("structureType"));
     }
 
 
     @Override
     protected String getTypeCode(){
-        return "2025122521";
+        return "2026012216";
     }
 
-    @ApiOperation("生成需求计划")
-    @RedissonLockAnno(uniqueMark = "redissonLock:demandPlan:createMonthRequire:",
-        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-        msgKey = "ui.data.alert.createMonthRequire.run",
-        waitTime = 5,
-        leaseTime = 300
-    )
-    @PostMapping("/createMonthRequire")
-    public AjaxResult createMonthRequire(@RequestBody DpDemandPlan createCondition){
-        if (createCondition == null || StringUtil.isEmpty(createCondition.getMonthPlanVersion())) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.demandPlan.isnull"));
-        }
-
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("MONTH_PLAN_VERSION", createCondition.getMonthPlanVersion());
-        entityMapper.selectCount(queryWrapper);
-        if (entityMapper.selectCount(queryWrapper) > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.demandPlan.notUnique"));
-        }
-
-        dpDemandPlanService.createMonthRequire(createCondition);
-        return AjaxResult.success();
-    }
-
-    @ApiOperation("生成需求计划版本")
-    @PostMapping("/createMonthRequireVersion")
-    public AjaxResult createMonthRequireVersion(){
-        return AjaxResult.success( requirementVersionService.generateVersion(DpDemandPlanServiceImpl.PREFIX));
-    }
-
-    @ApiOperation("查询需求计划版本号")
-    @PostMapping("/findMonthPlanVersion")
-    public AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlan queryCondition){
-        return AjaxResult.success(dpDemandPlanService.findMonthPlanVersion(queryCondition));
-    }
 
 }
-
