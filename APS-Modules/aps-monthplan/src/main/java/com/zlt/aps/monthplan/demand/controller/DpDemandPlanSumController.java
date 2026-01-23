@@ -69,7 +69,7 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "update_time DESC,ID DESC,MAIN_PATTERN ASC,STRUCTURE_NAME ASC";
     }
 
     /**
@@ -103,6 +103,12 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
     public AjaxResult save(@RequestBody DpDemandPlanSum billVO){
         this.dpDemandPlanSumService.batchUpdateForDemand(billVO);
         return AjaxResult.success();
+    }
+
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    public AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlanSum queryCondition){
+        return AjaxResult.success(dpDemandPlanSumService.findMonthPlanVersion(queryCondition));
     }
 
     @Override

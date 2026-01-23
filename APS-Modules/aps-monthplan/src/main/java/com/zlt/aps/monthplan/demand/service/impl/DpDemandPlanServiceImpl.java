@@ -295,21 +295,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
-    public List<String> findMonthPlanVersion(DpDemandPlan queryCondition) {
-        LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DpDemandPlan::getFactoryCode, queryCondition.getFactoryCode());
-        wrapper.eq(DpDemandPlan::getYear, queryCondition.getYear());
-        wrapper.eq(DpDemandPlan::getMonth, queryCondition.getMonth());
-        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.orderByDesc(DpDemandPlan::getCreateTime);
-        List<DpDemandPlan> list =  this.demandPlanEntityMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(list)){
-            return Collections.emptyList();
-        }
-        return list.stream().map(DpDemandPlan::getMonthPlanVersion).distinct().collect(Collectors.toList());
-    }
-
-    @Override
     public List<DpDemandPlan> createAdjustRequire(DpDemandPlan createCondition) {
         // 1. 前置校验
         validateFinalizedForAdjust(createCondition);
