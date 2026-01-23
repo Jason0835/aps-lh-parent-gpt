@@ -174,7 +174,7 @@
         border
         stripe
         style="width: 100%"
-        max-height="300"
+        max-height="250"
       >
         <el-table-column
           v-for="item in outResultColumns"
@@ -455,7 +455,7 @@ export default {
             },
           },
           {
-            prop: "actualAdjustment",
+            prop: "actualAdjustQty",
             label: this.$t("实际调整"),
             width: 120,
           },
@@ -814,7 +814,7 @@ export default {
             },
           },
           {
-            prop: "actualAdjustment",
+            prop: "actualAdjustQty",
             label: this.$t("实际调整"),
             width: 120,
           },
@@ -1689,7 +1689,7 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
         this.data = res.rows;
-        this.getOutResultList(res.rows[0].version);
+        this.getOutResultList(res.rows[0].productionVersion);
         this.isShowFoot = true;
         this.showOutResult = true;
         this.formInline.adjustStartDay = this.formInline.beginDay;
@@ -1704,7 +1704,7 @@ export default {
     },
 
     //结构外初始化结构列表
-    async getOutResultList(version) {
+    async getOutResultList(productionVersion) {
       try {
         let params = {
           ...this.query,
@@ -1716,9 +1716,10 @@ export default {
           params.month = arr[1];
           params.yearMonth = "";
         }
-        params.version = version;
-        params.adjustType = this.adjustType;
-        let res = await listResult(params);
+        params.productionVersion = productionVersion;
+        params.structureName=this.formInline.structureName
+        let res = await getStructureDetail(params);
+        this.outResultData=res.rows
         console.log("初始化");
         console.log(res);
       } catch (err) {
