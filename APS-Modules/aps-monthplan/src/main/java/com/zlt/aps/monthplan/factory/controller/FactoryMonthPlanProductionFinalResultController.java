@@ -136,4 +136,16 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     protected List<FactoryMonthPlanProductionFinalResult> listExportData(FactoryMonthPlanProductionFinalResult obj) {
         return factoryMonthPlanProductionFinalResultService.getDataList(obj);
     }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody FactoryMonthPlanProductionFinalResult queryVO) {
+        this.startPage();
+        List<FactoryMonthPlanProductionFinalResult> list = entityMapper.getVersionList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
+    }
 }

@@ -173,4 +173,14 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         response.flushBuffer();
     }
 
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    @ResponseBody
+    public TableDataInfo getVersionList(FactoryMonthPlanProductionFinalResult queryVO) {
+        return iFactoryMonthPlanProductionFinalResultService.getVersionList(queryVO);
+    }
+
 }
