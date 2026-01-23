@@ -3,14 +3,16 @@ import request from '@/utils/request'
 // =
 export function listDemandPlan(query) {
   return request({
-    url: '/monthplan/demandPlan/list',
+    // url: '/monthplan/demandPlan/list',
+    url: '/monthplan/demandPlanSum/list',
     method: 'post',
     data: query
   })
 }
 export function saveDemandPlan(query) {
   return request({
-    url: '/monthplan/demandPlan/save',
+    // url: '/monthplan/demandPlan/save',
+    url: '/monthplan/demandPlanSum/save',
     method: 'post',
     data: query
   })

@@ -252,7 +252,9 @@ export default {
                 {this.hasPermission("monthplan:demandPlan:edit") && (
                   <el-select
                     v-model={row.scmPriority}
-                    onChange={(val) => this.handlePriorityChange(row, val)}
+                    onChange={(val) =>
+                      this.handlePriorityChange(row, "scmPriority")
+                    }
                   >
                     {this.dict.type.biz_yes_no.map((item) => (
                       <el-option
@@ -374,7 +376,9 @@ export default {
                   row.isReachMinProductionQty == 0 && (
                     <el-select
                       v-model={row.isProduction}
-                      onChange={(val) => this.handlePriorityChange(row, val)}
+                      onChange={(val) =>
+                        this.handlePriorityChange(row, "isProduction")
+                      }
                     >
                       {this.dict.type.biz_yes_no.map((item) => (
                         <el-option
@@ -390,7 +394,9 @@ export default {
                     <el-select
                       disabled
                       v-model={row.isProduction}
-                      onChange={(val) => this.handlePriorityChange(row, val)}
+                      onChange={(val) =>
+                        this.handlePriorityChange(row, "isProduction")
+                      }
                     >
                       {this.dict.type.biz_yes_no.map((item) => (
                         <el-option
@@ -648,13 +654,25 @@ export default {
         type: "warning",
       }).then(() => {});
     },
-    handlePriorityChange(row, val) {
-      console.log(row, val);
+    handlePriorityChange(row, type) {
+      console.log(row, type);
+      let params = {};
+      if (type == "scmPriority") {
+        params = {
+          id: row.id,
+          scmPriority: row.scmPriority,
+        };
+      }else{
+        params = {
+          id: row.id,
+          isProduction: row.isProduction,
+        };
+      }
       // let params = {
       //   id: row.id,
       //   orderPriority: val,
       // };
-      saveDemandPlan(row)
+      saveDemandPlan(params)
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
           this.getList();
@@ -689,7 +707,8 @@ export default {
       this.getList();
     },
     handleExport() {
-      downloadLink("/monthplan/demandPlan/export", this.formatParams(false));
+      // downloadLink("/monthplan/demandPlan/export", this.formatParams(false));
+      downloadLink("/monthplan/demandPlanSum/export", this.formatParams(false));
     },
 
     handleSelectionChange(rows) {
@@ -737,7 +756,9 @@ export default {
       }
     },
     async getVersionList(isGet) {
-      if(isGet){this.loading=true}
+      if (isGet) {
+        this.loading = true;
+      }
       try {
         const data = await getVersionSelect(this.formatParams());
         let list = [];
@@ -749,27 +770,25 @@ export default {
           list.push(obj);
         }
         this.versionList = list;
-        if(list.length>0){
-          this.$set(this.search,'monthPlanVersion',list[0].value)
-          this.$set(this.query,'monthPlanVersion',list[0].value)
-
-        }else{
-          this.$set(this.search,'monthPlanVersion','')
-          this.$set(this.query,'monthPlanVersion','')
-        }
-
-        if (isGet) {
-          (this.page = {
-            current: 1,
-            pageSize: 20,
-            total: 0,
-          }),
-            this.getList();
+        if (list.length > 0) {
+          this.$set(this.search, "monthPlanVersion", list[0].value);
+          this.$set(this.query, "monthPlanVersion", list[0].value);
+        } else {
+          this.$set(this.search, "monthPlanVersion", "");
+          this.$set(this.query, "monthPlanVersion", "");
         }
       } catch (error) {
         console.error(error);
-        this.loading=false
+        this.loading = false;
       } finally {
+        if (isGet) {
+          this.page = {
+            current: 1,
+            pageSize: 20,
+            total: 0,
+          };
+          this.getList();
+        }
       }
     },
   },
