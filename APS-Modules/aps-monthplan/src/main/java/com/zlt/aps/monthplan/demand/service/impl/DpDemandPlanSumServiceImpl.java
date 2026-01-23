@@ -74,17 +74,29 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
     @Override
     public void batchUpdateForDemand(DpDemandPlanSum billVO) {
         DpDemandPlanSum existObj =  dpDemandPlanSumEntityMapper.selectById(billVO.getId());
+        updateDpDemandPlanSum(billVO);
         List<DpDemandPlan> list = this.findDemandPlan(existObj);
         if(CollectionUtils.isEmpty(list)) {
             return;
         }
-        if(!StringUtils.isBlank(billVO.getScmPriority())) {
+        if(StringUtils.isNotBlank(billVO.getScmPriority())) {
             list.forEach(dpDemandPlan -> dpDemandPlan.setScmPriority(billVO.getScmPriority()));
             this.baseDao.updateBatch(list);
             return;
         }
         list.forEach(dpDemandPlan -> dpDemandPlan.setIsProduction(billVO.getIsProduction()));
         this.baseDao.updateBatch(list);
+    }
+
+    private void updateDpDemandPlanSum(DpDemandPlanSum billVO) {
+        if(StringUtils.isNotBlank(billVO.getScmPriority())) {
+            billVO.setScmPriority(billVO.getScmPriority());
+            this.dpDemandPlanSumEntityMapper.updateById(billVO);
+            return;
+        }
+        billVO.setIsProduction(billVO.getIsProduction());
+        this.dpDemandPlanSumEntityMapper.updateById(billVO);
+
     }
 
     private List<DpDemandPlan> findDemandPlan(DpDemandPlanSum existObj) {
