@@ -71,7 +71,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
 
     @Override
     protected String getOrderBy() {
-        return "update_time DESC,ID DESC,PRO_SIZE ASC,EMBRYO_CODE ASC,PATTERN ASC,MAIN_PATTERN ASC,SPECIFICATIONS ASC,STRUCTURE_NAME ASC";
+        return "update_time DESC,ID DESC,PATTERN ASC,MAIN_PATTERN ASC,SPECIFICATIONS ASC,STRUCTURE_NAME ASC";
     }
 
     /**
