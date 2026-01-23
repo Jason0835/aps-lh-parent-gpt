@@ -217,16 +217,13 @@ public class GroupPlanBeforeConclusionHandler {
         }
         //标记结构分配完成
         groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-        //更新成型剩余天数
-        Integer remainingDays = cxMachineInfo.getRemainingDays();
-        cxMachineInfo.setRemainingDays(remainingDays + deductionDay);
         Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
         //更新分配信息
         allocationInfo.beforeConclusion(beforeConclusionDay, deductionDay);
         if (CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
-        //20260119 释放，成型工装使用量，切换结构使用量
+        //20260119 释放，成型工装使用量，切换结构使用量、分配日
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
         //已排产的模具信息？

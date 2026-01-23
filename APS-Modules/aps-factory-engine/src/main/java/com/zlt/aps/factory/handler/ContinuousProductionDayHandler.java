@@ -16,10 +16,36 @@ import java.util.*;
 public class ContinuousProductionDayHandler {
 
     /**
-     * 从sumProductionDay中获取日期最早的一段连续排产日
+     * 获取最早一段连续排产日，结果中已经剔除了stopDay
      *
-     * @param sumProductionDay
-     * @param stopDay
+     * @param sumProductionDay 日期集合
+     * @param stopDay          停工日集合
+     * @return
+     */
+    public static Set<Integer> getEarliestContinuousRangeResultExcludeStop(Set<Integer> sumProductionDay, Set<Integer> stopDay) {
+        Set<Integer> earliestContinuousRangeResult = getEarliestContinuousRange(sumProductionDay, stopDay);
+        if (CollectionUtils.isEmpty(earliestContinuousRangeResult)) {
+            return Collections.emptySet();
+        }
+        if (CollectionUtils.isEmpty(stopDay)) {
+            return earliestContinuousRangeResult;
+        }
+        Set<Integer> excludeResult = new HashSet<>();
+        earliestContinuousRangeResult.forEach(day -> {
+            if (stopDay.contains(day)) {
+                return;
+            }
+            excludeResult.add(day);
+        });
+        return excludeResult;
+    }
+
+    /**
+     * 从sumProductionDay中获取日期最早的一段连续排产日
+     * 此时返回的连续集合中还会包含stopDay
+     *
+     * @param sumProductionDay 日期集合
+     * @param stopDay          停工集合
      * @return
      */
     public static Set<Integer> getEarliestContinuousRange(Set<Integer> sumProductionDay, Set<Integer> stopDay) {
@@ -31,12 +57,32 @@ public class ContinuousProductionDayHandler {
             result.addAll(sumProductionDay);
             return result;
         }
+        //拼接停工日
         if (!CollectionUtils.isEmpty(stopDay)) {
             sumProductionDay.addAll(stopDay);
         }
-        //按日期升序
-        List<Integer> allList = new ArrayList<>(sumProductionDay);
+        return getEarliestContinuousRange(sumProductionDay);
+    }
+
+    /**
+     * 从allDayInfo中取得最早的一段连续日集合
+     *
+     * @param allDayInfo 所有日期集合
+     * @return
+     */
+    private static Set<Integer> getEarliestContinuousRange(Set<Integer> allDayInfo) {
+        if (CollectionUtils.isEmpty(allDayInfo)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> result = new HashSet<>();
+        if (allDayInfo.size() == BigDecimal.ONE.intValue()) {
+            result.addAll(allDayInfo);
+            return result;
+        }
+        //按数字升序，从小到大
+        List<Integer> allList = new ArrayList<>(allDayInfo);
         Collections.sort(allList);
+        //取得首个
         Integer start = allList.get(BigDecimal.ZERO.intValue());
         Integer end = start;
         Integer size = allList.size();

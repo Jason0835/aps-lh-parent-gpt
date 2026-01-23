@@ -6,6 +6,7 @@ import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
@@ -692,15 +693,14 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         cxMachineInfo.setCxLhRatioMap(new HashMap<>());
         cxMachineInfo.setAllocationList(new ArrayList<>());
         cxMachineInfo.setAllocationDaySet(new HashSet<>());
-        //成型停产日
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (StringUtils.isBlank(cxMachineCode)) {
             return;
         }
         Set<Integer> stopDaySet = new HashSet<>();
+        //成型停产日-即本身维修停机日
         CxDevicePlanShutInfoHelper stopInfoHelper = cxStopInfo.get(cxMachineCode);
         if (null != stopInfoHelper) {
-            //本身维修停机日
             stopDaySet = stopInfoHelper.getStopDaySet();
         }
         //全局停工日
@@ -713,7 +713,14 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //排产日信息
         cxMachineInfo.setStopDayInfo(stopDaySet);
         cxMachineInfo.setMaxProductionDays(maxProductionDays);
-        cxMachineInfo.setRemainingDays(maxProductionDays);
+        Set<Integer> productionDaySet = new HashSet<>(64);
+        for (Integer productionDay = ProductionConstant.MONTH_START_DAY; productionDay <= monthDays; productionDay++) {
+            if (stopDaySet.contains(productionDay)) {
+                continue;
+            }
+            productionDaySet.add(productionDay);
+        }
+        cxMachineInfo.setTheoryProductionDaySet(productionDaySet);
     }
 
     /**

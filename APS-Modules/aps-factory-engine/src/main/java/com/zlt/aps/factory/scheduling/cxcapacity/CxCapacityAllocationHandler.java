@@ -72,7 +72,6 @@ public class CxCapacityAllocationHandler {
                 //续作Sku信息 cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
                 Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
                 Integer allocationDay = cxMachineBaseInfo.getMaxProductionDays();
-                cxMachineBaseInfo.setRemainingDays(BigDecimal.ZERO.intValue());
                 CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
                 cxMachineBaseInfo.addAllocationPlanInfo(context, helper);
                 continueAllocationMap.put(cxCapacityInfo.getCxMachineCode(), helper);
@@ -89,7 +88,6 @@ public class CxCapacityAllocationHandler {
             cxMachineBaseInfo.addAllocationPlanInfo(context, helper);
             continueAllocationMap.put(cxMachineBaseInfo.getCxMachineCode(), helper);
             Integer newRemainingDays = cxMachineBaseInfo.getRemainingDays() - allocationDay;
-            cxMachineBaseInfo.setRemainingDays(newRemainingDays);
             //加入收尾匹配
             if (newRemainingDays > BigDecimal.ZERO.intValue()) {
                 productionContext.addReverseMachine(cxMachineBaseInfo.getCxMachineCode());
@@ -197,36 +195,6 @@ public class CxCapacityAllocationHandler {
      * @param cxMachineInfo                成型产能信息
      */
     public static void selectedGroupPlanByCxMachine(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
-//        if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
-//            //todo 记录日志
-//            return;
-//        }
-//        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-//        if (CollectionUtils.isEmpty(allocationList)) {
-//            //记录日志 空机台不是收尾
-//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context, cxMachineInfo));
-//            return;
-//        }
-//        Integer remainingDays = cxMachineInfo.getRemainingDays();
-//        if (remainingDays <= BigDecimal.ZERO.intValue()) {
-//            //记录日志
-//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoRemainingCapacityLog(context, cxMachineInfo));
-//            return;
-//        }
-//        //成型剩余产能能覆盖结构剩余排产净需求量
-//        Map<String, ProductionPlanGroupInfo> capacityCoverageMap = getProductionCapacityCoverage(context, estimateGroupCxAllocationMap, cxMachineInfo);
-//        if (CollectionUtils.isEmpty(capacityCoverageMap)) {
-//            //记录日志
-//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindCapacityPlanLog(context, cxMachineInfo));
-//            return;
-//        }
-//        //剔除不可匹配的结构信息（不可作业的结构或是SKU需要剔除,零度供料架）
-//        Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(context, capacityCoverageMap, cxMachineInfo);
-//        if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
-//            //记录日志
-//            log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
-//            return;
-//        }
         //获取合适优先级的一个结构
         ProductionPlanGroupInfo allocationGroupPlan = getSelectedGroup(context, estimateGroupCxAllocationMap, cxMachineInfo);
         if (null == allocationGroupPlan) {
@@ -238,7 +206,7 @@ public class CxCapacityAllocationHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         log.info(TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan));
         //重新计算分配的起始时间
-        Integer startDay = cxMachineInfo.getAllocationStartDay();
+        Integer startDay = cxMachineInfo.getNextStartDay();
         Set<Integer> hasProductionDaySet = cxMachineInfo.confirmProductionRange(context, allocationGroupPlan);
         Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         startDay = Math.max(startDay, realStartDay);
@@ -255,9 +223,8 @@ public class CxCapacityAllocationHandler {
         Integer remainingDays = cxMachineInfo.getRemainingDays();
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
         Integer needAllocationDays = allocationGroupPlan.getRemainingNeedAllocationDays();
-        //更新剩余时间
+        //剩余时间
         Integer leftOver = remainingDays - needAllocationDays;
-        cxMachineInfo.setRemainingDays(leftOver);
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
         //20260109 标记分配完成
@@ -327,18 +294,24 @@ public class CxCapacityAllocationHandler {
         //获取分组及零度零度供料架
         String structureName = addNewGroupPlan.getGroupName();
         String isZeroRack = addNewGroupPlan.getIsZero();
+        //最小分配天数
+        Integer minAllocationDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
         //挑选机台
         List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
         }
-        //20260120 挑选排产日结合有交集的，结合成型工装数量-成型鼓
+        //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓
         List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> {
             Set<Integer> hasProductionDaySet = singleMachine.confirmProductionRange(context, workWeakProductionInfo);
             if (CollectionUtils.isEmpty(hasProductionDaySet)) {
                 return false;
             }
+            if (hasProductionDaySet.size() < minAllocationDays) {
+                return false;
+            }
+            singleMachine.setSelectedProductionDaySet(hasProductionDaySet);
             singleMachine.setSelectedProductionDys(hasProductionDaySet.size());
             return true;
         }).collect(Collectors.toList());
@@ -379,6 +352,7 @@ public class CxCapacityAllocationHandler {
 
     /**
      * 获取产能可覆盖，机台可匹配的分组计划
+     * 通过机台反向匹配计划
      *
      * @param context                      排产上下文
      * @param estimateGroupCxAllocationMap 所有分组计划
@@ -422,6 +396,7 @@ public class CxCapacityAllocationHandler {
 
     /**
      * 得到成型机台剩余产能能覆盖剩余排产净需求的分组结构计划
+     * 此时会结合成型工装的数量
      *
      * @param context                      排产上下文
      * @param estimateGroupCxAllocationMap 分组结构计划集合
@@ -468,7 +443,7 @@ public class CxCapacityAllocationHandler {
             if (CollectionUtils.isEmpty(hasProductionSet)) {
                 return;
             }
-            //成型剩余产能 Integer remainingCapacityQty = BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ratio)).multiply(BigDecimal.valueOf(remainingDays)).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).intValue();
+            //成型剩余产能
             Integer realRemainingDays = hasProductionSet.size();
             if (realRemainingDays < remainingNeedDays) {
                 return;
