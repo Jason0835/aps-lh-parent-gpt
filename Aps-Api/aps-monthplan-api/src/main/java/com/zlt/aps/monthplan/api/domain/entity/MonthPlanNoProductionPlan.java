@@ -119,6 +119,15 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
+
+    /**
+     * 英寸
+     */
+    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
+    @TableField(value = "PRO_SIZE")
+    private String proSize;
+
     /** 规格 */
     @Excel(name = "ui.data.column.monthPlanNoProductionPlan.specifications")
     @ApiModelProperty(value = "规格", name = "specifications")
@@ -268,7 +277,6 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     @ApiModelProperty(value = "未排产原因", name = "reason")
     @TableField(value = "REASON")
     private String reason;
-
     /**
      * 生产实际排产量
      */
