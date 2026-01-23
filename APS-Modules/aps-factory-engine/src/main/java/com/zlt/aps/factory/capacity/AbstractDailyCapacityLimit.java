@@ -202,8 +202,8 @@ public abstract class AbstractDailyCapacityLimit {
      * @return true-满足，false-不满足
      */
     public boolean checkCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
-        return dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
-                dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines();
+        return dailyCapacityLimitVo.getUsedEmbryoTypes() <= dailyCapacityLimitVo.getMaxEmbryoTypes() &&
+                dailyCapacityLimitVo.getUsedLhMachines() <= dailyCapacityLimitVo.getMaxLhMachines();
     }
 
     public Integer getDayVulcanizationQty(BaseEntity mpFinalVo){
