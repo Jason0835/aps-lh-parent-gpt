@@ -62,7 +62,7 @@ public class CxContinueGroupAllocationHandler {
             }
             List<CxMachineAllocationPlanHelper> singleGroupAllocationResult = allocationProductionCxMachineAndProductionContinue(productionContext, groupPlan, cxContinueInfo);
             if (CollectionUtils.isEmpty(singleGroupAllocationResult)) {
-                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName));
+                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName, null));
                 return;
             }
             allAllocationResult.addAll(singleGroupAllocationResult);

@@ -102,7 +102,7 @@
 			CREATE_TIME DATETIME,
 			update_by VARCHAR(20),
 			update_time DATETIME
-            ) ENGINE=MEMORY;
+            );
     </update>
 
     <insert id="insertTempTable">
