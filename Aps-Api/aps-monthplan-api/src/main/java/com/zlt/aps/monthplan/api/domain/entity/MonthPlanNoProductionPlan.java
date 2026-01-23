@@ -180,7 +180,6 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     private String isProduction;
 
     /** 订单量 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.orderQty")
     @ApiModelProperty(value = "订单量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
     private Integer orderQty;

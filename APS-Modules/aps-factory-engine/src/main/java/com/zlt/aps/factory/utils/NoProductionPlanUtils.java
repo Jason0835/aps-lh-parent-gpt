@@ -34,8 +34,6 @@ public class NoProductionPlanUtils {
         BeanUtils.copyProperties(productionPlan, noProductionPlan);
         noProductionPlan.setBaseVale(null);
         noProductionPlan.setId(null);
-        noProductionPlan.setOrderQty(productionPlan.getOrderQty());
-        log.info("materialCode: {},orderQty:{}",productionPlan.getMaterialCode(),productionPlan.getOrderQty());
         noProductionPlan.setReason(unProductionReason);
         Integer needProductionQty = productionPlan.getCxCapacityRequireQty();
         Integer plannedQty = sumProductionMap.getOrDefault(monthPlanId,0);

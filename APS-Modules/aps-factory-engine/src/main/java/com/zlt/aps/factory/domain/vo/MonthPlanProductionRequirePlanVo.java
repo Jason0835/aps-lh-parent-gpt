@@ -93,10 +93,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     private Integer isThisRound;
     /**
-     * 订单量
-     */
-    private Integer orderQty;
-    /**
      * 初始的排产数据设置
      * 标记初始的排产标记
      * 产能预算的产能需求量
@@ -215,8 +211,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     public static MonthPlanProductionRequirePlanVo buildInitProductionPlan(Context context, String productionVersion, DpDemandPlan require) {
         MonthPlanProductionRequirePlanVo plan = new MonthPlanProductionRequirePlanVo();
         BeanUtils.copyProperties(require, plan);
-        log.info("buildInitProductionPlan:materialCode:{},orderQty:{}", require.getMaterialCode(),require.getOrderQty());
-        plan.setOrderQty(require.getOrderQty());
         plan.setId(null);
         plan.setProductionVersion(productionVersion);
         plan.setMonthPlanId(require.getId());
