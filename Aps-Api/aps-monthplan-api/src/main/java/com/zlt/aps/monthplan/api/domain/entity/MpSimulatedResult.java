@@ -288,6 +288,13 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+    /**
+     * 生胎代码
+     */
+    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
     /** 更新时间，用于导出展示 */
     @Excel(name = "ui.data.column.simulatedResult.updateDate")
     @TableField(exist = false)
