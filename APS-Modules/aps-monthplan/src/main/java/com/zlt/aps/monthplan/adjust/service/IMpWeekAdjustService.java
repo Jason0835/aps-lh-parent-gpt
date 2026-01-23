@@ -29,5 +29,11 @@ public interface IMpWeekAdjustService {
      */
     void confirmAdjust(MpRollAdjustContextDTO contextDTO);
 
+
+    /**
+     * 获得初始版本
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    void initVersion(MpRollAdjustContextDTO contextDTO);
 }
 

@@ -16,10 +16,11 @@ import com.zlt.aps.monthplan.adjust.service.impl.MpWeekAdjustFactory;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
-import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -107,7 +108,7 @@ public class MpWeekRollAdjustController extends BaseController {
                 throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
             }
             // 构建上下文对象
-            MpRollAdjustContextDTO contextDTO = buildAutoAdjustContext(weekRollAdjustDTO);
+            MpRollAdjustContextDTO contextDTO = buildAutoAdjustContext(weekRollAdjustDTO,weekAdjustStrategy);
             log.info("自动调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
                     contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
             // 执行周程滚动调整策略（自动调整）
@@ -157,15 +158,27 @@ public class MpWeekRollAdjustController extends BaseController {
          * @param weekRollAdjustDTO
          * @return
          */
-    private MpRollAdjustContextDTO buildAutoAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+    private MpRollAdjustContextDTO buildAutoAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO, IMpWeekAdjustService weekAdjustStrategy) {
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
+        //1.初始定稿版本信息
+        weekAdjustStrategy.initVersion(contextDTO);
+        //2.月计划定稿数据空检查
+        if (PubUtil.isEmpty(contextDTO.getFactoryProductionVersionList())){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
+                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
+        }
+        MpFactoryProductionVersion firstVersion = contextDTO.getFactoryProductionVersionList().get(0);
+        contextDTO.setMonthPlanVersion(firstVersion.getMonthPlanVersion());
+        contextDTO.setProductType(firstVersion.getProductTypeCode());
+        contextDTO.setProductionVersion(firstVersion.getProductionVersion());
+
         contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO));
-        if (PubUtil.isNotEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
+        /*if (PubUtil.isNotEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
             FactoryMonthPlanFinalAdjustVo firstFinalVo = contextDTO.getFactoryMonthPlanProdFinalList().get(0);
-            contextDTO.setProductionVersion(firstFinalVo.getProductionVersion());
+            contextDTO.setMonthPlanVersion(firstFinalVo.getMonthPlanVersion());
             contextDTO.setProductType(firstFinalVo.getProductTypeCode());
             contextDTO.setProductionVersion(firstFinalVo.getProductionVersion());
-        }
+        }*/
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
         //当日作为调整日
         contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
