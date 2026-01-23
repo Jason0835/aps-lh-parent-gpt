@@ -116,4 +116,14 @@ public class DpDemandPlanSumUIController extends BaseUIController<DpDemandPlanSu
         return iDpDemandPlanSumService.save(dpDemandPlanSum);
     }
 
+    /**
+     * 查询需求计划版本号
+     */
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    @ResponseBody
+    public AjaxResult findMonthPlanVersion(DpDemandPlanSum queryCondition) {
+        return iDpDemandPlanSumService.findMonthPlanVersion(queryCondition);
+    }
+
 }

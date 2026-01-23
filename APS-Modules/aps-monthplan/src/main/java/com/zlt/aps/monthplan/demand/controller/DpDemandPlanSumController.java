@@ -105,6 +105,12 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         return AjaxResult.success();
     }
 
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    public AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlanSum queryCondition){
+        return AjaxResult.success(dpDemandPlanSumService.findMonthPlanVersion(queryCondition));
+    }
+
     @Override
     protected IDocService getDocService(){
         return dpDemandPlanSumService;
