@@ -1,18 +1,24 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
-import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
-import com.zlt.aps.factory.domain.vo.*;
+import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
+import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
+import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
+import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 分组计划排产前-数据准备日志记录器
@@ -157,7 +163,7 @@ public class TbrBeforeProductionGroupLogRecorder {
     }
 
     /**
-     * 增加获读取特殊原材料库存日志信息记录
+     * 增加获读取工作日历日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到生产日历信息为空====
      * 或是
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到生产日历数据====
@@ -250,7 +256,7 @@ public class TbrBeforeProductionGroupLogRecorder {
      * 或是
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到工装台账数据====
      *
-     * @param context       排程上下文
+     * @param context         排程上下文
      * @param allWorkWearInfo 工装台账信息
      * @return
      */
@@ -419,14 +425,92 @@ public class TbrBeforeProductionGroupLogRecorder {
     }
 
     /**
-     * 增加续作Sku没有数据日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到续作Sku信息====
+     * 增加读取前一个月的排产版本日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有读取到前一个月[%d-%d]的定稿排产版本====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到前一个月[%d-%d]的定稿排产版本 需求版本 %s 排产版本 %s ====
      *
-     * @param context 排程上下文
+     * @param context       排程上下文
+     * @param previousMonth 排产参数配置
      * @return
      */
-    public static String addContinueSkuEmptyLog(Context context) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到续作Sku信息====",
+    public static String addReaderPreviousMonthLog(Context context, LocalDate previousMonth, MpFactoryProductionVersion previousVersion) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有读取到前一个月[%d-%d]的定稿排产版本====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                previousMonth.getYear(), previousMonth.getMonthValue());
+        if (null != previousVersion) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到前一个月[%d-%d]的定稿排产版本 需求版本 %s 排产版本 %s====";
+            logContent = String.format(logContentFormat,
+                    context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                    previousMonth.getYear(), previousMonth.getMonthValue(), previousVersion.getMonthPlanVersion(), previousVersion.getProductionVersion());
+        }
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加获读取特殊原材料库存日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到生产日历信息为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到生产日历数据====
+     *
+     * @param context           排程上下文
+     * @param productionDayInfo 生产日历信息
+     * @return
+     */
+    public static String addReaderPreviousMonthProductionCalendarLog(Context context, List<ProductionDayInfoVo> productionDayInfo, LocalDate previousMonth) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到前一个月[%d-%d]生产日历数据为空====";
+        if (!CollectionUtils.isEmpty(productionDayInfo)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到前一个月[%d-%d]生产日历数据====";
+        }
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                previousMonth.getYear(), previousMonth.getMonthValue());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加读取续作Sku日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取续作Sku信息====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到续作Sku信息====
+     *
+     * @param context         排程上下文
+     * @param continueSkuInfo 续作Sku信息
+     * @return
+     */
+    public static String addReadContinueSkuDataLog(Context context, List<ContinueProductInfo> continueSkuInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取续作Sku信息====";
+        if (!CollectionUtils.isEmpty(continueSkuInfo)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到续作Sku信息====";
+        }
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加读取在机结构日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到在机结构信息====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到在机结构信息====
+     *
+     * @param context               排程上下文
+     * @param continueGroupInfoList 续作Sku信息
+     * @return
+     */
+    public static String addReadContinueGroupDataLog(Context context, List<ContinueGroupInfo> continueGroupInfoList) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到在机结构信息====";
+        if (!CollectionUtils.isEmpty(continueGroupInfoList)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到在机结构信息====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
@@ -438,15 +522,23 @@ public class TbrBeforeProductionGroupLogRecorder {
      * 增加在机分组计划没有在产机台信息日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 没有在产机台====
      *
-     * @param context   排程上下文
-     * @param groupName 分组名
+     * @param context          排程上下文
+     * @param groupName        分组名
+     * @param onLineMachineSet 续作在产机台
      * @return
      */
-    public static String addContinueGroupNoOnLineMachineLog(Context context, String groupName) {
+    public static String addContinueGroupNoOnLineMachineLog(Context context, String groupName, Set<String> onLineMachineSet) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 没有在产机台====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
+        if (!CollectionUtils.isEmpty(onLineMachineSet)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 在产机台: %s====";
+            String onLineMachineInfo = String.join(StringConstant.COMMA, onLineMachineSet);
+            logContent = String.format(logContentFormat,
+                    context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                    groupName, onLineMachineInfo);
+        }
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_NO_ON_LINE_MACHINE_EMPTY, logContent);
         return logContent;
