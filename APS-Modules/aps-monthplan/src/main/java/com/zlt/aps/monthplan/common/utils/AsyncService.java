@@ -148,6 +148,7 @@ public class AsyncService {
       productionPrediction.setYear(yearMonth.getYear());
       productionPrediction.setMonth(yearMonth.getMonthValue());
       productionPrediction.setMonthPlanVersion(tMonthDemandPlan.getMonthPlanVersion());
+      productionPrediction.setEmbryoCode(listGroupByMaterialCode.get(0).getEmbryoCode());
       productionPrediction.setMainMaterialDesc(listGroupByMaterialCode.get(0).getMainMaterialDesc());
       productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
       productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));

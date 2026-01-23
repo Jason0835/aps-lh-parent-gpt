@@ -196,14 +196,4 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     public AjaxResult createMonthRequireVersion() {
         return iDpDemandPlanService.createMonthRequireVersion();
     }
-
-    /**
-     * 查询需求计划版本号
-     */
-    @ApiOperation("查询需求计划版本号")
-    @PostMapping("/findMonthPlanVersion")
-    @ResponseBody
-    public AjaxResult findMonthPlanVersion(DpDemandPlan queryCondition) {
-        return iDpDemandPlanService.findMonthPlanVersion(queryCondition);
-    }
 }

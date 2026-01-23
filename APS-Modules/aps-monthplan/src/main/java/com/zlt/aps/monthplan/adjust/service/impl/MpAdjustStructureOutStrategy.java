@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
@@ -16,6 +17,7 @@ import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
@@ -99,6 +101,88 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         CollUtil.filter(adjustDetailList, item -> StringUtils.equals(item.getStructureName(), contextDTO.getStructureName())
                 && (StringUtils.isEmpty(item.getScheduledMachines())
                 || StringUtils.contains(item.getScheduledMachines(), contextDTO.getScheduledMachines())));
+    }
+
+    /**
+     * 查询调整明细
+     *
+     * @param contextDTO
+     */
+    @Override
+    protected void queryAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
+        if (contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null
+                || StringUtils.isEmpty(contextDTO.getVersion())) {
+            log.warn("查询调整明细：年份或者月份为空，直接返回");
+            return;
+        }
+        // 年份
+        Integer year = contextDTO.getMpYear();
+        // 月份
+        Integer month = contextDTO.getMpMonth();
+        // 调整版本号
+        String version = contextDTO.getVersion();
+
+        MpAdjustStructureOut queryVO = new MpAdjustStructureOut();
+        queryVO.setYear(year);
+        queryVO.setMonth(month);
+        queryVO.setVersion(version);
+
+        LambdaQueryWrapper<MpAdjustStructureOut> queryWrapper = new LambdaQueryWrapper<>();
+        buildAdjustDetailCondition(queryWrapper, queryVO);
+
+        try {
+            List<MpAdjustStructureOut> adjustStructureOutList = mpAdjustStructureOutEntityMapper.selectList(queryWrapper);
+            List<MpAdjustDetailVo> adjustDetailList = BeanUtil.copyToList(adjustStructureOutList, MpAdjustDetailVo.class);
+            contextDTO.setAdjustDetailList(adjustDetailList);
+            log.info("查询调整明细成功，年份：{}，月份：{}，版本：{}，共查询:{}条记录",
+                    year, month, version, adjustDetailList.size());
+        } catch (Exception e) {
+            log.error("查询调整明细异常，年份：{}，月份：{}，版本：{}", year, month, version, e);
+            throw new RuntimeException("查询调整明细失败", e);
+        }
+    }
+
+    /**
+     * 更新调整明细
+     * 将本次调整的量，回填到"调整明细".实际调整；置换过程回填到“调整明细".调整原因
+     *
+     * @param contextDTO
+     */
+    @Override
+    protected void updateAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(adjustDetailList)) {
+            log.warn("更新调整明细：调整结果列表或调整明细列表为空，直接返回");
+            return;
+        }
+        // 调整结果按照物料编号分组
+        Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
+        // 遍历调整明细列表匹配调整结果(更新实际调整、调整原因)
+        List<MpAdjustStructureOut> adjustStructureOutList = BeanUtil.copyToList(adjustDetailList, MpAdjustStructureOut.class);
+        for (MpAdjustStructureOut adjustStructureOut : adjustStructureOutList) {
+            String materialCode = adjustStructureOut.getMaterialCode();
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            if (adjustResult == null) {
+                log.warn("更新调整明细：物料编号:{}未查询到对应调整结果，跳过", materialCode);
+                continue;
+            }
+            // 实际调整
+            adjustStructureOut.setActualAdjustQty(adjustResult.getTotalPlanQty());
+            // 调整原因 TODO
+            adjustStructureOut.setAdjustReason("");
+        }
+        // 更新调整明细
+        try {
+            baseDao.updateBatch(adjustStructureOutList);
+            log.info("更新调整明细成功，共更新:{}条记录", adjustStructureOutList.size());
+        } catch (Exception e) {
+            log.error("更新调整明细批量操作异常", e);
+            throw new RuntimeException("更新调整明细失败", e);
+        }
     }
 
     /**
