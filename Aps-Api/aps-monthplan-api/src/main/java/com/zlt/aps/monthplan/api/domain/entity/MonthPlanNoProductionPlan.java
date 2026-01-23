@@ -141,13 +141,13 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     private String pattern;
 
     /** 排产分类 数据字典：biz_product_characteristics 1 主销产品 2 常规产品 3 周期排产产品 4 波动性产品 5 按单排产产品 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.productionType")
+    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类 数据字典：biz_product_characteristics 1 主销产品 2 常规产品 3 周期排产产品 4 波动性产品 5 按单排产产品", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
 
     /** 施工阶段 0 无工艺 1 试制 2 量试 3 正式 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.constructionStage")
+    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.constructionStage", dictType = "biz_construction_stage")
     @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
@@ -159,25 +159,22 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     private String yearWeek;
 
     /** 动平衡要求 0 不要求 1 要求 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.isDynamicBalance")
     @ApiModelProperty(value = "动平衡要求 0 不要求 1 要求", name = "isDynamicBalance")
     @TableField(value = "IS_DYNAMIC_BALANCE")
     private String isDynamicBalance;
 
     /** 是否试制量试计划 0 不是 1 是 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.isTrialPlan")
     @ApiModelProperty(value = "是否试制量试计划 0 不是 1 是", name = "isTrialPlan")
     @TableField(value = "IS_TRIAL_PLAN")
     private String isTrialPlan;
 
     /** 均匀性要求 0 不要求 1 要求 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.isUniformity")
     @ApiModelProperty(value = "均匀性要求 0 不要求 1 要求", name = "isUniformity")
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
 
     /** 是否排产 0 不排产 1 排产 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.isProduction")
+    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.isProduction", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否排产 0 不排产 1 排产", name = "isProduction")
     @TableField(value = "IS_PRODUCTION")
     private String isProduction;
