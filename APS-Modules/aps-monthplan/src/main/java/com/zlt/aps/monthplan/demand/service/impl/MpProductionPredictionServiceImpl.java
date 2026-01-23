@@ -200,7 +200,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
 
         List<MpProductionPrediction> result = Lists.newArrayList();
-        YearMonth yearMonth = YearMonth.now();
+        YearMonth yearMonth = monthRangeResult.getTMonth();
         DpDemandPlan demandPlan = tMonthDemands.get(0);
 
         map.forEach((materialCode, value) -> {
