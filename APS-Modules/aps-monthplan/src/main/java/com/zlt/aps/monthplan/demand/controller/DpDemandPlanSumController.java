@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanSumService;
@@ -66,10 +67,6 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         return super.list(queryVO);
     }
 
-    private void translationList(List<DpDemandPlanSum> rows) {
-
-    }
-
     @Override
     protected String getOrderBy() {
         return "create_time desc";
@@ -92,10 +89,20 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         QueryWrapper<DpDemandPlanSum> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         List<DpDemandPlanSum> list = entityMapper.selectList(wrapper);
-        list.forEach(item -> {
-            item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
-        });
+        list.forEach(item -> item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime())));
         return list;
+    }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.demandPlanSum.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody DpDemandPlanSum billVO){
+        this.dpDemandPlanSumService.batchUpdateForDemand(billVO);
+        return AjaxResult.success();
     }
 
     @Override

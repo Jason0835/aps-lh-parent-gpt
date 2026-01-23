@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.api.service;
 
 import com.ruoyi.common.constant.ServiceNameConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -36,4 +37,10 @@ public interface IDpDemandPlanSumRemoteService {
     @ApiOperation("导出列表")
     @PostMapping("/demandPlanSum/exportData/{fileName}")
     byte[] exportData(@RequestBody DpDemandPlanSum queryVO, @PathVariable("fileName") String fileName);
+    /**
+     * 保存
+     */
+    @ApiOperation("保存")
+    @PostMapping("/demandPlanSum/save")
+    AjaxResult save(@RequestBody DpDemandPlanSum dpDemandPlanSum);
 }

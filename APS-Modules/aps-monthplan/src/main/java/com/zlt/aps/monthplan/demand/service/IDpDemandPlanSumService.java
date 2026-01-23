@@ -17,5 +17,9 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface IDpDemandPlanSumService  extends IDocService<DpDemandPlanSum>{
-
+  /**
+   * 批量更新需求计划
+   * @param billVO
+   */
+  void batchUpdateForDemand(DpDemandPlanSum billVO);
 }
