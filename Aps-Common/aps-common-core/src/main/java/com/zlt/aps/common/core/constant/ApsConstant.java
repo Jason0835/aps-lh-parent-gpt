@@ -440,6 +440,11 @@ public class ApsConstant {
     public static final int MINUTES_PER_DAY = 24 * 60;
 
     /**
+     * 每日秒数
+     */
+    public static final int SECOND_PER_DAY = 24 * 60 * 60;
+
+    /**
      * 硫化排程管理，自动排程
      */
     public static final String REDIS_APS_LH_AUTO_SCHEDULE = "APS:LH:AUTO:SCHEDULE:";
