@@ -37,6 +37,9 @@ public class NoProductionPlanUtils {
         Integer plannedQty = sumProductionMap.getOrDefault(monthPlanId,0);
         int unProductionQty = needProductionQty - plannedQty;
         noProductionPlan.setUnProductionQty(unProductionQty);
+        if(unProductionQty == 0) {
+          return;
+        }
         if(StringUtils.isBlank(productionPlan.getMaterialDesc()) || !mouldDayResultMap.containsKey(productionPlan.getMaterialDesc())){
           list.add(noProductionPlan);
           return;
