@@ -7,6 +7,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
@@ -46,6 +47,7 @@ import java.util.Optional;
 public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStructureAllocation> implements IMpStructureAllocationService {
 
     private final MpStructureAllocationEntityMapper entityMapper;
+    private final FactoryMonthPlanProductionFinalResultServiceImpl monthPlanProductionFinalResultService;
 
     @Override
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
@@ -100,6 +102,34 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 唯一校验字段
         return Arrays.asList("factoryCode","year","month","structureName");
     }
+
+
+    @Override
+    public int save(MpStructureAllocation mpStructureAllocation) {
+        mpStructureAllocation.setBaseVale(null);
+        this.checkUnique(mpStructureAllocation);
+        // 工厂
+        String factoryCode = mpStructureAllocation.getFactoryCode();
+        // 年
+        Integer year = mpStructureAllocation.getYear();
+        // 月
+        Integer month = mpStructureAllocation.getMonth();
+        // 获取定稿的月度计划
+        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
+        param.setFactoryCode(factoryCode);
+        param.setYear(year);
+        param.setMonth(month);
+
+        List<FactoryMonthPlanProductionFinalResult>  monthPlanProductionFinalResultList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
+        if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
+            FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
+            mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
+            mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
+        }
+        return baseDao.save(mpStructureAllocation);
+    }
+
+
 
 
     /**

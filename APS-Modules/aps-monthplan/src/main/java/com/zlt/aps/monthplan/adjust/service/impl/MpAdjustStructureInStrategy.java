@@ -135,7 +135,36 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setFactoryMonthPlanProdFinalList(newFinalList);
     }
 
-//    /**
+    /**
+     * 回填实际调整
+     * @param contextDTO 周程滚动上下文
+     */
+    @Override
+    protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustStructureIn> mpAdjustStructureInList = contextDTO.getMpAdjustStructureInList();
+        if (PubUtil.isEmpty(mpAdjustStructureInList)){
+            return;
+        }
+        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isEmpty(mpFinalAdjustList)){
+            return;
+        }
+        Map<String, FactoryMonthPlanFinalAdjustVo> mpFinalAdjustMap = mpFinalAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
+                Collectors.collectingAndThen(Collectors.toList(),m-> {
+                    return m.get(0);
+                })));
+        //更新实际调整量
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
+        for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
+            mpFinalVo = mpFinalAdjustMap.get(structureIn.getMaterialCode());
+            if (mpFinalVo != null){
+                structureIn.setActualAdjustQty(mpFinalVo.getActualAdjustQty());
+            }
+        }
+        baseDao.updateBatch(mpAdjustStructureInList);
+    }
+
+    //    /**
 //     * 获取检查为空的字段
 //     * @return
 //     */

@@ -6,14 +6,14 @@ import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.CxDevicePlanShutInfoHelper;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrBeforeProductionGroupLogRecorder;
@@ -691,6 +691,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //成型硫化配比信息--为后续准备
         cxMachineInfo.setCxLhRatioMap(new HashMap<>());
         cxMachineInfo.setAllocationList(new ArrayList<>());
+        cxMachineInfo.setAllocationDaySet(new HashSet<>());
         //成型停产日
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (StringUtils.isBlank(cxMachineCode)) {

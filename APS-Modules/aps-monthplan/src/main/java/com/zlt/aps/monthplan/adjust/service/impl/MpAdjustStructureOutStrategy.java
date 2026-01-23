@@ -159,6 +159,31 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
     }
 
+    @Override
+    protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustStructureOut> mpAdjustStructureOutList = contextDTO.getMpAdjustStructureOutList();
+        if (PubUtil.isEmpty(mpAdjustStructureOutList)){
+            return;
+        }
+        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isEmpty(mpFinalAdjustList)){
+            return;
+        }
+        Map<String, FactoryMonthPlanFinalAdjustVo> mpFinalAdjustMap = mpFinalAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
+                Collectors.collectingAndThen(Collectors.toList(),m-> {
+                    return m.get(0);
+                })));
+        //更新实际调整量
+        FactoryMonthPlanFinalAdjustVo mpFinalVo;
+        for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
+            mpFinalVo = mpFinalAdjustMap.get(structureOut.getMaterialCode());
+            if (mpFinalVo != null){
+                structureOut.setActualAdjustQty(mpFinalVo.getActualAdjustQty());
+            }
+        }
+        baseDao.updateBatch(mpAdjustStructureOutList);
+    }
+
     /**
      * 更新结构转产表对应成型机台的调整开始日、结束日
      * @param structureAllocationList

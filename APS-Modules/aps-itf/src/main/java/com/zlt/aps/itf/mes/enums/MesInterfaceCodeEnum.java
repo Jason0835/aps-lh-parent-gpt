@@ -49,7 +49,7 @@ public enum MesInterfaceCodeEnum {
     /**
      * 半部件BOM接口
      */
-    CONSTRUCTION_INFO("CONSTRUCTION_INFO", "mesBomItfService", "syncConstructionInfo", "半部件BOM接口"),
+    CONSTRUCTION_INFO("MES_CONSTRUCTION_INFO", "mesBomItfService", "syncConstructionInfo", "半部件BOM接口"),
 
     /**
      * 成型及半部件BOM施工信息同步

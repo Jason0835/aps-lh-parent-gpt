@@ -24,10 +24,7 @@ public class MonthCalculator {
   /**
    * 计算月份范围
    */
-  public static MonthRangeResult calculateMonthRanges(YearMonth currentMonth) {
-    // T月 = 当月 + 1个月
-    YearMonth tMonth = currentMonth.plusMonths(1);
-
+  public static MonthRangeResult calculateMonthRanges(YearMonth tMonth) {
     // T+1月 = T月 + 1个月
     YearMonth tPlus1Month = tMonth.plusMonths(1);
 
