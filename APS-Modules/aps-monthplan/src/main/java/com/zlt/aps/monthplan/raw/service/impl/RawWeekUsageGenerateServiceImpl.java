@@ -185,7 +185,7 @@ public class RawWeekUsageGenerateServiceImpl {
         // 创建一个新的计划对象，只包含必要信息
         FactoryMonthPlanProdFinal copy = new FactoryMonthPlanProdFinal();
         copy.setFactoryCode(plan.getFactoryCode());
-        copy.setMainMaterialDesc(plan.getMainMaterialDesc());
+        copy.setEmbryoCode(plan.getEmbryoCode());
         copy.setMaterialCode(plan.getMaterialCode());
         // 使用当天的产量
         copy.setTotalQty(dailyQty);
@@ -200,7 +200,7 @@ public class RawWeekUsageGenerateServiceImpl {
         Map<String, Integer> embryoProductionMap = new HashMap<>();
 
         for (FactoryMonthPlanProdFinal plan : weekPlans) {
-            String embryoCode = plan.getMainMaterialDesc();
+            String embryoCode = plan.getEmbryoCode();
             int productionQty = plan.getTotalQty();
 
             if (productionQty > 0) {
