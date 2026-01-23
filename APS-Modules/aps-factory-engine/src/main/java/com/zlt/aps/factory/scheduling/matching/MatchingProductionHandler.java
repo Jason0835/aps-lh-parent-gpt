@@ -706,6 +706,7 @@ public class MatchingProductionHandler {
             if (requirePlan == null) {// 不存在直接转换
                 requirePlan = MonthPlanProductionRequirePlanVo.buildInitProductionPlan(null, productionVersion,
                         demandPlan);
+                requirePlan.setOrderQty(demandPlan.getOrderQty());
                 requirePlan.setHeightLossQty(demandPlan.getMidQty());
                 requirePlan.setFactProdReqQty(demandPlan.getNetQty());
                 requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息

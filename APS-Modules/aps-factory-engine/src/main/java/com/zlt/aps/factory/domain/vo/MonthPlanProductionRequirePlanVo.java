@@ -9,6 +9,7 @@ import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.common.utils.PubUtil;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
  * @author ZLT
  * @date 20251209
  */
+@Slf4j
 @Data
 public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
 
@@ -213,6 +215,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     public static MonthPlanProductionRequirePlanVo buildInitProductionPlan(Context context, String productionVersion, DpDemandPlan require) {
         MonthPlanProductionRequirePlanVo plan = new MonthPlanProductionRequirePlanVo();
         BeanUtils.copyProperties(require, plan);
+        log.info("buildInitProductionPlan:materialCode:{},orderQty:{}", require.getMaterialCode(),require.getOrderQty());
         plan.setOrderQty(require.getOrderQty());
         plan.setId(null);
         plan.setProductionVersion(productionVersion);
