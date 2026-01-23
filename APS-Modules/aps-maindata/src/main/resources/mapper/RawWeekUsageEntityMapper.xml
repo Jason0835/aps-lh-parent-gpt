@@ -28,7 +28,7 @@
 
     <!-- 批量插入预警记录 -->
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO raw_warning_record (
+        INSERT INTO t_raw_warning_record (
         factory_code,
         warning_type,
         material_code,
@@ -67,7 +67,7 @@
     <!-- 批量更新预警记录 -->
     <update id="batchUpdateRawWarningRecord" parameterType="java.util.List">
         <foreach collection="list" item="item" separator=";">
-            UPDATE raw_warning_record
+            UPDATE t_raw_warning_record
             <set>
                 <if test="item.status != null">status = #{item.status},</if>
                 <if test="item.notified != null">notified = #{item.notified},</if>

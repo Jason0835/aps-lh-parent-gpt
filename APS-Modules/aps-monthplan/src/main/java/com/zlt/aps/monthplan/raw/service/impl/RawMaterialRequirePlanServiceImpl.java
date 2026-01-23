@@ -904,7 +904,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private BigDecimal formatAndValidateBigDecimal(BigDecimal value, String fieldName) {
         if (value == null) {
-            return null;
+            return BigDecimal.ZERO;
         }
 
         try {
