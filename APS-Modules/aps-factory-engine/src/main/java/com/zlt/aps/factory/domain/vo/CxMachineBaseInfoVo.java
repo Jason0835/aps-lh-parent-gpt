@@ -128,6 +128,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      */
     private List<CxMachineAllocationPlanHelper> allocationList;
     /**
+     * 已分配日集合
+     */
+    private Set<Integer> allocationDaySet;
+    /**
      * 计划是否同规格
      */
     private String sameSpecifications;
@@ -186,7 +190,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         //最后一个分配信息的排产日
         Integer startDay = getAllocationStartDay();
-        //成型机本身的排产日
+        //成型机本身的排产日集合
         Set<Integer> localProductionInfo = getHasProductionDayInfo(productionContext, startDay);
         if (CollectionUtils.isEmpty(localProductionInfo)) {
             return Collections.emptySet();
@@ -308,7 +312,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         Set<Integer> productionDaySet = new HashSet<>(64);
         for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
-            if (stopDayInfo.contains(productionDay)) {
+            //停产日及已排产日剔除
+            if (stopDayInfo.contains(productionDay) || allocationDaySet.contains(productionDaySet)) {
                 continue;
             }
             productionDaySet.add(productionDay);
@@ -446,6 +451,8 @@ public class CxMachineBaseInfoVo implements Serializable {
             if (stopDayInfo.contains(productionDay)) {
                 continue;
             }
+            //20260123 成型已分配日
+            allocationDaySet.add(productionDay);
             baseDataContainer.addUsedCount(productionDay, proSize, cxMachineCode);
         }
         //20260121 切换结构
@@ -489,6 +496,8 @@ public class CxMachineBaseInfoVo implements Serializable {
             if (stopDayInfo.contains(beforeConclusionDay)) {
                 return;
             }
+            //20260123 分配日清除
+            allocationDaySet.remove(beforeConclusionDay);
             productionContext.getBaseDataContainer().releaseUsedCount(beforeConclusionDay, proSize, cxMachineCode);
         });
     }

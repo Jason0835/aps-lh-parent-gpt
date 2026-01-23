@@ -117,7 +117,7 @@ public class FormalProductionHandler {
         }
         //同规格同花纹 or 共生胎同模具
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == type || ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == type) {
-            CxContinueProductionHandler.productionContinueByType(context, groupPlan, type, monthDays, continueSkuInfoMap, mouldShellMap);
+            CxContinueProductionHandler.productionContinueByType(context, groupPlan, type, monthDays, continueSkuInfoMap);
             return;
         }
     }

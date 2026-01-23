@@ -3,7 +3,6 @@ package com.zlt.aps.monthplan.demand.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.bill.common.service.IDocService;
-import org.springframework.web.context.request.async.DeferredResult;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -24,5 +23,5 @@ public interface IMpSimulatedResultService  extends IDocService<MpSimulatedResul
    * @param createCondition
    * @return
    */
-  DeferredResult<Object> createVmMonthPrediction(MpSimulatedResult createCondition) throws InterruptedException;
+  void createVmMonthPrediction(MpSimulatedResult createCondition) throws Exception;
 }

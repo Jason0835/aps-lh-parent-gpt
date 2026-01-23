@@ -22,7 +22,6 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.async.DeferredResult;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -147,8 +146,9 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
             leaseTime = 300
     )
     @PostMapping("/createVmMonthPrediction")
-    public DeferredResult<Object> createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws InterruptedException {
-        return this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
+    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws Exception {
+        this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
+        return AjaxResult.success();
     }
 
     @Override

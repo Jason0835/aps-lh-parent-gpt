@@ -47,7 +47,7 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
     @Override
     public Set<String> excludeOverdueCycleProduction() {
         // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         // 构建查询条件
         QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
@@ -85,7 +85,7 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
     @Override
     public Set<String> excludeOverduePrecedentProduction() {
         // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         // 构建查询条件
         QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
@@ -123,7 +123,7 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
     @Override
     public boolean checkOverdue(SupplyOrderPool supplyOrderPool) {
         // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         // 构建查询条件
         QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();

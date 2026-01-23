@@ -100,4 +100,11 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @return
      */
     List<FactoryMonthPlanMouldDayResult> findFinalProductionResult(MpFactoryProductionVersion finalVersion);
+
+    /**
+     * 获取定稿版本的月度计划
+     * @param param
+     * @return
+     */
+    List<FactoryMonthPlanProductionFinalResult> listMonthProdFinalPlans(FactoryMonthPlanProductionFinalResult param);
 }

@@ -1,56 +1,33 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
-import com.tlt.aps.enums.ProductTypeEnum;
-import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
-import com.zlt.aps.monthplan.common.thread.AsyncVo;
+import com.zlt.aps.monthplan.common.utils.AsyncService;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
-import com.zlt.aps.monthplan.common.utils.PredictionContext;
-import com.zlt.aps.monthplan.common.utils.ProductionSchedulingService;
-import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.IDpSimulatedOffsetDetailService;
-import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
-import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
-import org.springframework.web.context.request.async.DeferredResult;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -70,20 +47,10 @@ import org.springframework.web.context.request.async.DeferredResult;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulatedResult>  implements IMpSimulatedResultService {
-    private static final String PREFIX = "VM";
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
-    // 定稿的月度排产计划
-    private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
-    // 物料信息
-    private final IMdmMaterialInfoService materialInfoService;
-    // 需求计划
-    private final IDpDemandPlanService dpDemandPlanService;
+    private final AsyncService asyncService;
 
-    private final IMpPredictionDetailService mpPredictionDetailService;
 
-    private final IDpSimulatedOffsetDetailService dpSimulatedOffsetDetailService;
-
-    private final ProductionSchedulingService productionSchedulingService;
 
     @Override
     protected String getDocTypeCode() {
@@ -113,240 +80,18 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     }
 
     @Override
-    public DeferredResult<Object> createVmMonthPrediction(MpSimulatedResult createCondition) {
-        DeferredResult<Object> result = new DeferredResult<>(1440000L);
-        try {
-            AsyncVo<String, Object> request = new AsyncVo<>();
-            request.setResult(result);
-            this.dealQueque(request,createCondition);
-        } catch (Exception e) {
-            throw new BusinessException(e.getMessage());
-        }
-        return result;
-    }
-
-    private void dealQueque(AsyncVo<String, Object> orderRequest,MpSimulatedResult createCondition) throws InterruptedException {
-            YearMonth yearMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
-            // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
-            MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(yearMonth);
-            // 3、检查是否已有T月月度计划(定稿)
-            //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-            List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(monthRange.getTMonth());
-            if (CollectionUtils.isEmpty(finalVersions)) {
-                throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
-            }
-            MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
-            PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
-            Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
-            productionVersions.put(monthRange.getTMonth(),finalVersion);
-            // 生成T月模拟需求计划
-            // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
-            // T+1月需求生成：T月需求-T月已排+T+1（周期+常规）
-            // 对冲规则：供应链优先级+提报日期逐笔扣除(先冲实单)
-            DpDemandPlan param = new DpDemandPlan();
-            param.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-            param.setPlanType(ProductionPlanType.SIMULATE.getPlanType());
-            param.setPrefix(PREFIX);
-            List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
-            // 定义要处理的所有月份
-            YearMonth[] monthsToProcess = {
-                monthRange.getTPlus1Month(),
-                monthRange.getTPlus2Month(),
-                monthRange.getTPlus3Month(),
-                monthRange.getTPlus4Month(),
-                monthRange.getTPlus5Month(),
-                monthRange.getTPlus6Month(),
-                monthRange.getTPlus7Month(),
-                monthRange.getTPlus8Month(),
-                monthRange.getTPlus9Month(),
-                monthRange.getTPlus10Month(),
-                monthRange.getTPlus11Month(),
-                monthRange.getTPlus12Month(),
-                monthRange.getTPlus13Month(),
-                monthRange.getTPlus14Month(),
-                monthRange.getTPlus15Month(),
-                monthRange.getTPlus16Month(),
-                monthRange.getTPlus17Month(),
-                monthRange.getTPlus18Month(),
-                monthRange.getTPlus19Month(),
-                monthRange.getTPlus20Month(),
-                monthRange.getTPlus21Month(),
-                monthRange.getTPlus22Month(),
-                monthRange.getTPlus23Month()
-            };
-            MpFactoryProductionVersion currentFinalVersion = finalVersion;
-            List<DpDemandPlan> currentMonthDemands;
-            // 对应的历史数据偏移量（从5开始递减）
-            for (YearMonth currentMonth : monthsToProcess) {
-                // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-                currentMonthDemands =  dpDemandPlanService.createPredictionRequire(param,currentFinalVersion,predictionContext);
-                // 排产汇总
-                if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
-                    Context context = buildContext(currentMonthDemands);
-                    productionSchedulingService.executeSchedulingInNewTransaction(param,context);
-                    currentFinalVersion = createProductionVersion(context,currentMonthDemands);
-                    productionVersions.put(currentMonth,currentFinalVersion);
-                }
-            }
-            Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
-            List<MpSimulatedResult> list = buildSimulatedResult(monthRange,productionVersions,tMonthDemands,materialInfoMap);
-            if(CollectionUtils.isNotEmpty(list)) {
-                this.baseDao.insertBatch(list);
-            }
-
-        // 设置响应结果
-        // 调用此方法时立即向浏览器发出响应；未调用时请求被挂起
-        orderRequest.getResult().setResult(AjaxResult.success());
-        // applicationContext.publishEvent(new DownloadFileEvent(targetCourseware));
-    }
-
-    private Context buildContext(List<DpDemandPlan> tPlus1MonthDemands) {
-        Context context = new Context();
-        context.setFactoryCode(tPlus1MonthDemands.get(0).getFactoryCode());
-        context.setYear(tPlus1MonthDemands.get(0).getYear());
-        context.setMonth(tPlus1MonthDemands.get(0).getMonth());
-        context.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
-        context.setPrefixVersion(PREFIX);
-        context.setProductType(ProductTypeEnum.getEnumByValue(tPlus1MonthDemands.get(0).getProductTypeCode()));
-        return context;
-    }
-
-    private List<MpSimulatedResult> buildSimulatedResult(MonthCalculator.MonthRangeResult monthRange,Map<YearMonth, MpFactoryProductionVersion> productionVersions,List<DpDemandPlan> tMonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
-        MpFactoryProductionVersion currentFinalVersion = productionVersions.get(monthRange.getTMonth());
-        Set<String> monthPlanVersions = productionVersions.values().stream().map(MpFactoryProductionVersion::getMonthPlanVersion).filter(monthPlanVersion -> !currentFinalVersion.getMonthPlanVersion().equals(monthPlanVersion)).collect(Collectors.toSet());
-        List<FactoryMonthPlanMouldDayResult> list = this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(currentFinalVersion,monthPlanVersions);
-        if(CollectionUtils.isEmpty(list)) {
-            return Collections.emptyList();
-        }
-        DpDemandPlan tMonthDemandPlan = tMonthDemands.get(0);
-        monthPlanVersions.add(tMonthDemandPlan.getMonthPlanVersion());
-        List<DpSimulatedOffsetDetail> predictOffsetDetails = dpSimulatedOffsetDetailService.findPredictOffsetDetail(monthPlanVersions);
-        Map<String,List<DpSimulatedOffsetDetail>> netDemandsGroupByMaterialCode = predictOffsetDetails.stream().collect(Collectors.groupingBy(DpSimulatedOffsetDetail::getMaterialCode));
-        Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
-        List<MpSimulatedResult> result = Lists.newArrayList();
-        YearMonth yearMonth = YearMonth.now();
-        map.forEach((materialCode, value) -> {
-            if(!materialInfoMap.containsKey(materialCode)) {
-                return;
-            }
-            List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode = map.get(materialCode);
-            List<DpSimulatedOffsetDetail> netDemands = netDemandsGroupByMaterialCode.get(materialCode);
-            MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
-            MpSimulatedResult productionPrediction = new MpSimulatedResult();
-            BeanUtils.copyProperties(materialInfo,productionPrediction);
-            productionPrediction.setId(null);
-            productionPrediction.setBaseVale(null);
-            productionPrediction.setFactoryCode(currentFinalVersion.getFactoryCode());
-            productionPrediction.setYear(yearMonth.getYear());
-            productionPrediction.setMonth(yearMonth.getMonthValue());
-            productionPrediction.setMonthPlanVersion(tMonthDemandPlan.getMonthPlanVersion());
-            productionPrediction.setMainMaterialDesc(listGroupByMaterialCode.get(0).getMainMaterialDesc());
-            productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
-            productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
-            productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));
-            productionPrediction.setNetQty(calculateNetQty(netDemands));
-            productionPrediction.setHeightQty(calculateHeightQty(netDemands));
-            productionPrediction.setProductionQty(calculateProductionQty(listGroupByMaterialCode));
-            productionPrediction.setMonth1(calculateProductionQty(listGroupByMaterialCode,monthRange.getTMonth()));
-            productionPrediction.setMonth2(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus1Month()));
-            productionPrediction.setMonth3(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus2Month()));
-
-            productionPrediction.setMonth4(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus3Month()));
-            productionPrediction.setMonth5(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus4Month()));
-
-            productionPrediction.setMonth6(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus5Month()));
-            productionPrediction.setMonth7(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus6Month()));
-
-            productionPrediction.setMonth8(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus7Month()));
-            productionPrediction.setMonth9(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus8Month()));
-
-            productionPrediction.setMonth10(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus9Month()));
-            productionPrediction.setMonth11(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus10Month()));
-
-            productionPrediction.setMonth12(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus11Month()));
-            productionPrediction.setMonth13(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus12Month()));
-
-            productionPrediction.setMonth14(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus13Month()));
-            productionPrediction.setMonth15(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus14Month()));
-
-            productionPrediction.setMonth16(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus15Month()));
-            productionPrediction.setMonth17(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus16Month()));
-
-            productionPrediction.setMonth18(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus17Month()));
-            productionPrediction.setMonth19(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus18Month()));
-
-            productionPrediction.setMonth20(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus19Month()));
-            productionPrediction.setMonth21(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus20Month()));
-
-            productionPrediction.setMonth22(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus21Month()));
-            productionPrediction.setMonth23(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus22Month()));
-            productionPrediction.setMonth24(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus23Month()));
-            result.add(productionPrediction);
-        });
-        this.mpPredictionDetailService.batchInsert(tMonthDemandPlan,currentFinalVersion,productionVersions);
-        return result;
-    }
-
-    private int calculateProductionQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
-        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
-            return 0;
-        }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getTotalQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTotalQty).sum();
-    }
-
-    private int calculateHeightQty(List<DpSimulatedOffsetDetail> netDemands) {
-        if(CollectionUtils.isEmpty(netDemands)){
-            return 0;
-        }
-        return netDemands.stream().filter(item -> ApsConstant.SAL_PRIORITY_HIGHT.equals(item.getScmPriority()) && null != item.getNetQty()).mapToInt(DpSimulatedOffsetDetail::getNetQty).sum();
-    }
-
-    private int calculateNetQty(List<DpSimulatedOffsetDetail> netDemands) {
-        if(CollectionUtils.isEmpty(netDemands)){
-            return 0;
-        }
-        return netDemands.stream().filter(item -> null != item.getNetQty()).mapToInt(DpSimulatedOffsetDetail::getNetQty).sum();
-    }
-
-    private int calculateTypeBlockQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
-        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
-            return 0;
-        }
-        FactoryMonthPlanMouldDayResult mouldDayResult = listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).findFirst().orElse(null);
-        return null == mouldDayResult?0:mouldDayResult.getTypeBlockQty();
-    }
-
-    private int calculateMouldQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
-        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
-            return 0;
-        }
-        FactoryMonthPlanMouldDayResult mouldDayResult = listGroupByMaterialCode.stream().filter(item -> null != item.getMouldCavityQty()).findFirst().orElse(null);
-        return null == mouldDayResult?0:mouldDayResult.getMouldCavityQty();
-    }
-
-    private int calculateProductionQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode, YearMonth yearMonth) {
-        if(CollectionUtils.isEmpty(listGroupByMaterialCode)){
-            return 0;
-        }
-        return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTotalQty).sum();
-    }
-
-    private MpFactoryProductionVersion createProductionVersion(Context context,List<DpDemandPlan> tPlus1MonthDemands) {
-        if(CollectionUtils.isEmpty(tPlus1MonthDemands)) {
-            return null;
-        }
-        MpFactoryProductionVersion productionVersion = new MpFactoryProductionVersion();
-        productionVersion.setFactoryCode(tPlus1MonthDemands.get(0).getFactoryCode());
-        productionVersion.setYear(tPlus1MonthDemands.get(0).getYear());
-        productionVersion.setMonth(tPlus1MonthDemands.get(0).getMonth());
-        productionVersion.setMonthPlanVersion(tPlus1MonthDemands.get(0).getMonthPlanVersion());
-        productionVersion.setProductionVersion(context.getProductionVersion());
-        return productionVersion;
-    }
-
-
-    private Map<String, MdmMaterialInfo> fetchMaterialInfo() {
-        return materialInfoService.skuToMaterialInfo();
+    public void createVmMonthPrediction(MpSimulatedResult createCondition) throws Exception {
+      YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
+      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
+      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
+      // 3、检查是否已有T月月度计划(定稿)
+      //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
+      List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(tMonth);
+      if (CollectionUtils.isEmpty(finalVersions)) {
+        throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
+      }
+      MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
+      asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange);
     }
 
     /**

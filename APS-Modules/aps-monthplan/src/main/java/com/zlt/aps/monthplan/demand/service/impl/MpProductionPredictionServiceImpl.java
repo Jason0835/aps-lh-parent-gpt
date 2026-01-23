@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -103,18 +102,20 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     @Override
     public AjaxResult createMonthPrediction(MpProductionPrediction createCondition) throws InterruptedException {
         // 获取操作日所在月份
-        YearMonth currentMonth = YearMonth.from(LocalDate.now());
+        YearMonth currentMonth = YearMonth.now();
+        // T月 = 当月 + 1个月
+        YearMonth tMonth = currentMonth.plusMonths(1);
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
-        MonthCalculator.MonthRangeResult monthRangeResult = MonthCalculator.calculateMonthRanges(currentMonth);
+        MonthCalculator.MonthRangeResult monthRangeResult = MonthCalculator.calculateMonthRanges(tMonth);
         // 3、检查是否已有T月月度计划(定稿)
         //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-        List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(monthRangeResult.getTMonth());
+        List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(tMonth);
         if (CollectionUtils.isEmpty(finalVersions)) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
         }
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
         Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
-        productionVersions.put(monthRangeResult.getTMonth(),finalVersion);
+        productionVersions.put(tMonth,finalVersion);
         PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
         // 生成T月模拟需求计划
         // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
@@ -232,7 +233,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setMonth3(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTPlus2Month()));
                 result.add(productionPrediction);
         });
-        this.mpPredictionDetailService.batchInsert(demandPlan,currentFinalVersion,productionVersions);
+        this.mpPredictionDetailService.batchInsert(demandPlan,productionVersions);
         return result;
     }
 
