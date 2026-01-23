@@ -552,8 +552,8 @@ export default {
   },
   methods: {
     getListResize() {
-      this.getList();
-      this.getVersionList();
+      // this.getList();
+      this.getVersionList(true);
     },
     tableRowClassName({ row, rowIndex }) {
       if (row.isReachMinProductionQty == 0) {
@@ -736,7 +736,8 @@ export default {
         this.loading = false;
       }
     },
-    async getVersionList() {
+    async getVersionList(isGet) {
+      if(isGet){this.loading=true}
       try {
         const data = await getVersionSelect(this.formatParams());
         let list = [];
@@ -748,8 +749,26 @@ export default {
           list.push(obj);
         }
         this.versionList = list;
+        if(list.length>0){
+          this.$set(this.search,'monthPlanVersion',list[0].value)
+          this.$set(this.query,'monthPlanVersion',list[0].value)
+
+        }else{
+          this.$set(this.search,'monthPlanVersion','')
+          this.$set(this.query,'monthPlanVersion','')
+        }
+
+        if (isGet) {
+          (this.page = {
+            current: 1,
+            pageSize: 20,
+            total: 0,
+          }),
+            this.getList();
+        }
       } catch (error) {
         console.error(error);
+        this.loading=false
       } finally {
       }
     },
@@ -783,8 +802,8 @@ export default {
       };
     }
 
-    this.getVersionList();
-    this.getList();
+    this.getVersionList(true);
+    // this.getList();
   },
   activated() {},
 };
