@@ -43,4 +43,10 @@ public interface IDpDemandPlanSumRemoteService {
     @ApiOperation("保存")
     @PostMapping("/demandPlanSum/save")
     AjaxResult save(@RequestBody DpDemandPlanSum dpDemandPlanSum);
+    /**
+     * 查询需求计划版本号
+     */
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/demandPlanSum/findMonthPlanVersion")
+    AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlanSum queryCondition);
 }

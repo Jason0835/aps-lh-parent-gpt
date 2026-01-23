@@ -3,6 +3,9 @@ package com.zlt.aps.monthplan.demand.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IDpDemandPlanSumService.java
@@ -22,4 +25,10 @@ public interface IDpDemandPlanSumService  extends IDocService<DpDemandPlanSum>{
    * @param billVO
    */
   void batchUpdateForDemand(DpDemandPlanSum billVO);
+  /**
+   *  获取需求计划版本号列表
+   * @param queryCondition 查询条件
+   * @return 需求计划版本号列表
+   */
+  List<String> findMonthPlanVersion(DpDemandPlanSum queryCondition);
 }
