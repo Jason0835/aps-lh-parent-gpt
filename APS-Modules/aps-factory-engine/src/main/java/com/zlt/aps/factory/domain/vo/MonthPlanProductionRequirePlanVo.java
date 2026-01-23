@@ -213,6 +213,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     public static MonthPlanProductionRequirePlanVo buildInitProductionPlan(Context context, String productionVersion, DpDemandPlan require) {
         MonthPlanProductionRequirePlanVo plan = new MonthPlanProductionRequirePlanVo();
         BeanUtils.copyProperties(require, plan);
+        plan.setOrderQty(require.getOrderQty());
         plan.setId(null);
         plan.setProductionVersion(productionVersion);
         plan.setMonthPlanId(require.getId());

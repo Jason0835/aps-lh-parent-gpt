@@ -5,6 +5,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
  * 不排产计划工具类
  * @author Yelq
  */
+@Slf4j
 public class NoProductionPlanUtils {
   public static List<MonthPlanNoProductionPlan> buildNoProductionPlanList(Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap, List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
     List<MonthPlanNoProductionPlan> list = Lists.newArrayList();
@@ -32,6 +34,8 @@ public class NoProductionPlanUtils {
         BeanUtils.copyProperties(productionPlan, noProductionPlan);
         noProductionPlan.setBaseVale(null);
         noProductionPlan.setId(null);
+        noProductionPlan.setOrderQty(productionPlan.getOrderQty());
+        log.info("materialCode: {},orderQty:{}",productionPlan.getMaterialCode(),productionPlan.getOrderQty());
         noProductionPlan.setReason(unProductionReason);
         Integer needProductionQty = productionPlan.getCxCapacityRequireQty();
         Integer plannedQty = sumProductionMap.getOrDefault(monthPlanId,0);
