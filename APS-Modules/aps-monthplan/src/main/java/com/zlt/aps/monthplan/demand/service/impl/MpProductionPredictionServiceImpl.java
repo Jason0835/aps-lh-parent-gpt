@@ -101,10 +101,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
     @Override
     public AjaxResult createMonthPrediction(MpProductionPrediction createCondition) throws InterruptedException {
-        // 获取操作日所在月份
-        YearMonth currentMonth = YearMonth.now();
-        // T月 = 当月 + 1个月
-        YearMonth tMonth = currentMonth.plusMonths(1);
+        YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
         MonthCalculator.MonthRangeResult monthRangeResult = MonthCalculator.calculateMonthRanges(tMonth);
         // 3、检查是否已有T月月度计划(定稿)
