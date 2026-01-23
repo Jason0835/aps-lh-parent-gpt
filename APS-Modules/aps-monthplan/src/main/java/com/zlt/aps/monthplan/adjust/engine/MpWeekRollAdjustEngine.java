@@ -947,15 +947,23 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         FactoryMonthPlanFinalAdjustVo optimalFinalVo;
-        int remainPlanQty;
+        int remainPlanQty,deductMatchQty;
         while (newOtherFinalList.size() >0 ){
             // 2.从多个SKU中，匹配其他最优的定稿SKU记录
             optimalFinalVo = getOptimalOtherSku(curFinalVo, newOtherFinalList);
             // 3.清空搭配日计划 及扣减搭配总量
             clearMpFinalDayValue(contextDTO,endDay,curFinalVo);
             int clearDayValue = clearMpFinalDayValue(contextDTO,endDay,optimalFinalVo);
-            optimalFinalVo.setConventionProductionQty(optimalFinalVo.getConventionProductionQty() - clearDayValue);
-            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),clearDayValue)).append(ApsConstant.DIVISION);
+            if (optimalFinalVo.getConventionProductionQty()>= clearDayValue){
+                //若搭配量比清空的值大，即能覆盖，那减少的搭配量 = 清空的值
+                deductMatchQty = clearDayValue;
+                optimalFinalVo.setConventionProductionQty(optimalFinalVo.getConventionProductionQty() - clearDayValue);
+            }else {
+                //若搭配量比清空的值小，即不能覆盖，那减少的搭配量 = 搭配量
+                deductMatchQty = optimalFinalVo.getConventionProductionQty();
+                optimalFinalVo.setConventionProductionQty(0);
+            }
+            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),deductMatchQty)).append(ApsConstant.DIVISION);
             // 4.增模模拟排产
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-开始！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay)).append(ApsConstant.DIVISION);
             remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, planQty, curFinalVo);
