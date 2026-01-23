@@ -40,7 +40,7 @@ public interface I18nChangeMapper {
      *
      * @return 影响行数
      */
-    int createTempTable(@Param("tableSuffix") String tableSuffix);
+    int createTempTable();
 
     /**
      * 删除临时表
