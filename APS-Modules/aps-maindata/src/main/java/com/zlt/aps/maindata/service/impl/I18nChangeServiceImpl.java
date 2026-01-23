@@ -552,7 +552,8 @@ public class I18nChangeServiceImpl implements I18nChangeService {
 
         // 批量merge到DB
         if (!changeList.isEmpty()) {
-            i18nChangeMapper.createTempTable();
+            String tableSuffix = UUID.randomUUID().toString().replace("-", "");
+            i18nChangeMapper.createTempTable(tableSuffix);
             for (List<I18nChange> list : ScmListUtils.getSplitList(changeList, 500)) {
                 // 如果 changeKey+relId已经存在，则调用更新SQL，否则调用新增SQL
                 i18nChangeMapper.insertTempTable(list);
