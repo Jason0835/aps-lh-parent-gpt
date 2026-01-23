@@ -100,14 +100,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Arrays.asList("factoryCode","year","month","structureName");
+        return Arrays.asList("factoryCode","year","month","structureName", "productionVersion");
     }
 
 
     @Override
     public int save(MpStructureAllocation mpStructureAllocation) {
-        mpStructureAllocation.setBaseVale(null);
-        this.checkUnique(mpStructureAllocation);
         // 工厂
         String factoryCode = mpStructureAllocation.getFactoryCode();
         // 年
@@ -126,6 +124,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
             mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
         }
+        mpStructureAllocation.setBaseVale(null);
+        this.checkUnique(mpStructureAllocation);
         return baseDao.save(mpStructureAllocation);
     }
 

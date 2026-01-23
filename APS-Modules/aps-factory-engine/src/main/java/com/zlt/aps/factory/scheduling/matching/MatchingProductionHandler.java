@@ -1,32 +1,5 @@
 package com.zlt.aps.factory.scheduling.matching;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
-
 import com.alibaba.nacos.shaded.com.google.common.base.Objects;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -36,28 +9,11 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
-import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
-import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
-import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
-import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
-import com.zlt.aps.factory.domain.dto.MatchingMouldDayUsedHelper;
-import com.zlt.aps.factory.domain.dto.MatchingPlanLimitHelper;
-import com.zlt.aps.factory.domain.dto.MatchingProductDayHelper;
 import com.zlt.aps.factory.daylimit.MouldAllocationDayInfoHelper;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductLhCapacityVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
-import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.*;
+import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
@@ -77,16 +33,22 @@ import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.core.dao.basedao.BaseDao;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 搭配排产处理类
@@ -380,7 +342,7 @@ public class MatchingProductionHandler {
 
     /**
      * 查询符合条件的成型硫化组关系
-     * 
+     *
      * @param newDoubleMouldList
      * @param cxMachineBaseInfo
      * @param cxMachineInfoSet
@@ -940,7 +902,7 @@ public class MatchingProductionHandler {
 
     /**
      * 构建成型硫化组
-     * 
+     *
      * @param productionContext
      * @param mouldInfoMap
      */
@@ -1000,7 +962,7 @@ public class MatchingProductionHandler {
 
     /**
      * 根据成型硫化配比填充空白的硫化组
-     * 
+     *
      * @param productionContext
      * @param cxMachineBaseInfo
      */
@@ -1765,8 +1727,8 @@ public class MatchingProductionHandler {
                                                           Integer month, Integer lastDay) {
         List<ContinueGroupInfo> continueGroupInfoList = getDataService().getContinueGroupInfo(factoryCode, year, month,
                 lastDay);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addContinueSkuEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, List<ContinueGroupInfo>> continueGroupInfoMap = continueGroupInfoList.stream()
@@ -1800,7 +1762,7 @@ public class MatchingProductionHandler {
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName));
+            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, onLineMachineSet));
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }

@@ -89,8 +89,8 @@
 
     <update id="createTempTable">
         -- 创建临时表用于批量更新
-        CREATE
-        TEMPORARY TABLE temp_i18n_change (
+        CREATE TABLE IF NOT EXISTS temp_i18n_change_${tableSuffix}
+        (
             ID bigint NOT NULL PRIMARY KEY AUTO_INCREMENT,
 			REL_ID bigint NOT NULL,
 			CHANGE_KEY text,
@@ -102,7 +102,7 @@
 			CREATE_TIME DATETIME,
 			update_by VARCHAR(20),
 			update_time DATETIME
-		);
+            );
     </update>
 
     <insert id="insertTempTable">

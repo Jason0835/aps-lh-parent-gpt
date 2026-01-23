@@ -50,7 +50,7 @@ public class ProductionCycleUtils {
         }
         //升序排序，取最后一天
         productionDayList.sort(Comparator.comparing(Integer::intValue));
-        return productionDayList.get(productionDayList.size() - 1);
+        return productionDayList.get(productionDayList.size() - BigDecimal.ONE.intValue());
     }
 
     /**

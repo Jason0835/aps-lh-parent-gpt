@@ -207,14 +207,16 @@ public class DpDemandPlanSum extends BaseEntity {
     @TableField(value = "MIN_PRODUCTION_QTY")
     private Integer minProductionQty;
 
-    @Excel(name = "ui.data.column.demandPlanSum.updateTime")
-    @ApiModelProperty("更新时间")
-    @TableField(exist = false)
-    private String updateDate;
     @Excel(name = "ui.data.column.demandPlanSum.remark")
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    @Excel(name = "ui.data.column.demandPlanSum.updateTime")
+    @ApiModelProperty("更新日期")
+    @TableField(exist = false)
+    private String updateDate;
+
 
 
     /** 优先级(订单类型) */
@@ -307,7 +309,6 @@ public class DpDemandPlanSum extends BaseEntity {
     private String isImportantCustom;
 
     /** 是否必保计划 */
-    @Excel(name = "ui.data.column.demandPlanSum.isEnsurePlan")
     @ApiModelProperty(value = "是否必保计划", name = "isEnsurePlan")
     @TableField(value = "IS_ENSURE_PLAN")
     private String isEnsurePlan;
