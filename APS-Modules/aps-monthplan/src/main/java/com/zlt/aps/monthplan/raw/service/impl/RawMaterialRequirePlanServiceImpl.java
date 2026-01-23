@@ -151,10 +151,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 }
 
                 // 4. 检查订单预测生产计划
-                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
-                if (isSuccess(predictionCheck)) {
-                    return predictionCheck;
-                }
+//                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
+//                if (isSuccess(predictionCheck)) {
+//                    return predictionCheck;
+//                }
 
                 // 5. 查询特殊材料清单
                 List<RawSpecialMaterialRecord> specialMaterialRecordsList = getSpecialMaterialRecords(factoryCode);
@@ -485,7 +485,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 return;
             }
 
-            String embryoCode = plan.getMainMaterialDesc();
+            String embryoCode = plan.getEmbryoCode();
             List<MdmMaterialConsumeDetail> bomDetails = bomMap.get(embryoCode);
             if (CollectionUtils.isEmpty(bomDetails)) {
                 return;
@@ -1020,7 +1020,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         StringBuilder batchInfo = new StringBuilder();
 
         ratios.forEach(ratio -> {
-            BigDecimal proportion = ratio.getRatio();
+            BigDecimal proportion = ratio.getRatio().divide(new BigDecimal(100));
             BigDecimal standardLength = BigDecimal.valueOf(ratio.getStandardLength());
 
             // 计算该规格的需求量 = 总需求量 * 比例
