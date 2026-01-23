@@ -173,8 +173,12 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      const now = new Date();
+    const year = now.getFullYear(); // 2024
+    const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
       this.form = {
         factoryCode: "116",
+        yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       };
       this.isType = data;
     },

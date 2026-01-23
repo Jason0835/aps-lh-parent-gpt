@@ -655,7 +655,6 @@ export default {
       }).then(() => {});
     },
     handlePriorityChange(row, type) {
-      console.log(row, type);
       let params = {};
       if (type == "scmPriority") {
         params = {
