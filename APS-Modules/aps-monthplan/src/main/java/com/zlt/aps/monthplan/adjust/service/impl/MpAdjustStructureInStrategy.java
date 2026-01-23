@@ -98,6 +98,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
 
+
         //4.按结构序列化分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
