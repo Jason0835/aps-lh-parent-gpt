@@ -199,6 +199,12 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @TableField(value = "IS_UNIFORMITY")
     private String isUniformity;
 
+    /** EUDR，1 是 0 否 */
+    @Excel(name = "ui.data.column.orderOffsetDetail.isEudr", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "EUDR，1 是 0 否", name = "isEudr")
+    @TableField(value = "IS_EUDR")
+    private String isEudr;
+
     /** 发货模式 */
     @Excel(name = "ui.data.column.orderOffsetDetail.deliverGoodsType", dictType = "biz_deliver_goods_type")
     @ApiModelProperty(value = "发货模式", name = "deliverGoodsType")

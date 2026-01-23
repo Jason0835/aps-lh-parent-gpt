@@ -221,24 +221,25 @@ public class MouldProductionResultHandler {
          * 汇总需求信息-净需求(含损耗)、高优先级数量
          */
         //高优先级量
-        Integer heightNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
-        dayResult.setHeightQty(heightNetQty.intValue());
+        Integer heightNetQty = requireList.stream().filter(item -> null != item.getHeightQty()).mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
+        dayResult.setHeightQty(heightNetQty);
         //总需求(不含损耗)
-        Integer sumNetQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
-        dayResult.setProdReqPlan(sumNetQty.intValue());
+        Integer sumNetQty = requireList.stream().filter(item -> null != item.getNetQty()).mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        dayResult.setProdReqPlan(sumNetQty);
         //总需求(含损耗)
-        Integer heightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Integer noHeightLossQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        Integer lossQty = (heightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
+        Integer totalHeightLossQty = requireList.stream().filter(item -> null != item.getHeightLossQty()).mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
+        Integer noHeightLossQty = requireList.stream().filter(item -> null != item.getFactProdReqQty()).mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        int lossQty = (totalHeightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
         dayResult.setFactProdReqQty(sumNetQty + lossQty);
 
         int sumCycleReserveQty = requireList.stream().filter(item -> null != item.getCycleReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
         int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
         int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
+        dayResult.setHeightLossQty(totalHeightLossQty);
         dayResult.setCycleReserveLossQty(sumCycleReserveQty + lossQty);
-        dayResult.setConventionReserveQty(sumConventionQty);
         dayResult.setMidLossQty(sumMidQty + lossQty);
+        dayResult.setConventionReserveQty(sumConventionQty);
         dayResult.setPostponeQty(sumPostponeQty);
         //排产量置为零
         dayResult.setHeightProductionQty(BigDecimal.ZERO.intValue());

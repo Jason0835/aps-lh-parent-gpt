@@ -8,7 +8,6 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.CxMachineLimitTypeEnum;
@@ -63,7 +62,7 @@ public class CxContinueGroupAllocationHandler {
             }
             List<CxMachineAllocationPlanHelper> singleGroupAllocationResult = allocationProductionCxMachineAndProductionContinue(productionContext, groupPlan, cxContinueInfo);
             if (CollectionUtils.isEmpty(singleGroupAllocationResult)) {
-                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName));
+                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName, null));
                 return;
             }
             allAllocationResult.addAll(singleGroupAllocationResult);
@@ -116,6 +115,7 @@ public class CxContinueGroupAllocationHandler {
         }
         //在产机台数有多台情形下
         if (needCount.compareTo(BigDecimal.valueOf(productionCount)) >= BigDecimal.ZERO.intValue()) {
+            //在机分组还需要增加机台
             if (needCount.compareTo(BigDecimal.valueOf(productionCount)) > BigDecimal.ZERO.intValue()) {
                 return buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
             }
@@ -185,7 +185,6 @@ public class CxContinueGroupAllocationHandler {
         productionCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
             Integer allocationDays = cxMachineInfo.getMaxProductionDays();
-            cxMachineInfo.setRemainingDays(BigDecimal.ZERO.intValue());
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
             ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
             CxMachineAllocationPlanHelper helper = new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
@@ -237,7 +236,6 @@ public class CxContinueGroupAllocationHandler {
                 CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
                 Integer remainingDays = cxMachineInfo.getRemainingDays();
                 Integer allocationDay = Math.min(sumDays, remainingDays);
-                cxMachineInfo.setRemainingDays(remainingDays - allocationDay);
                 groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
                 CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
                 cxMachineInfo.addAllocationPlanInfo(context, helper);
@@ -254,7 +252,6 @@ public class CxContinueGroupAllocationHandler {
             Integer remainingDays = cxMachineInfo.getRemainingDays() - minAllocationDays;
             Integer leftOverAllocationDay = Math.min(leftOverSplitDays, remainingDays);
             Integer allocationDay = leftOverAllocationDay + minAllocationDays;
-            cxMachineInfo.setRemainingDays(remainingDays - leftOverAllocationDay);
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
             CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
             cxMachineInfo.addAllocationPlanInfo(context, helper);

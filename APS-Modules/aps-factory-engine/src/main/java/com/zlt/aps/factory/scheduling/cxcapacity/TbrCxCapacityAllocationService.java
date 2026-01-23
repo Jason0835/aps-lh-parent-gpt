@@ -99,7 +99,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext));
         if (CollectionUtils.isEmpty(requirePlanList)) {
-            throw new BusinessException(I18nUtil.getMessage("alg.data.initCheck.initEmpty"));
+            throw new BusinessException(I18nUtil.getMessage("alg.data.production.noRequirePlan"));
         }
         //设置初始的排产量数据信息
         requirePlanList.forEach(singlePlan -> {
@@ -318,6 +318,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Integer year = previousMonth.getYear();
         Integer month = previousMonth.getMonthValue();
         MpFactoryProductionVersion previousVersion = getDataService().getFinalVersion(factoryCode, year, month);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderPreviousMonthLog(context, previousMonth, previousVersion));
         if (null == previousVersion) {
             return Collections.emptyMap();
         }
@@ -330,6 +331,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         previousContext.setProductionEndDate(previousVersion.getProductionEndDate());
         //获取上个排产周期的工作日历
         List<ProductionDayInfoVo> previousProductionDayInfo = getDataService().getProductCalendar(previousContext);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderPreviousMonthProductionCalendarLog(context, previousProductionDayInfo, previousMonth));
         //确认最后排产日
         Integer lastDay = ProductionCycleUtils.getLastProductionDay(previousVersion, previousProductionDayInfo);
         if (lastDay <= BigDecimal.ZERO.intValue()) {
@@ -337,6 +339,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         //获取上个排产周期最后排产日的排产信息
         List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
         //构建续作分组信息(TBR为结构，PCR为英寸)
@@ -396,7 +399,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
             if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName));
+                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null));
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
@@ -459,10 +462,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
         }
-        Set<Integer> hasProductionDaySet = selectedCxMachine.confirmProductionRange(context, workWeakProductionInfo);
-        Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
-        Integer startDay = selectedCxMachine.getAllocationStartDay();
-        startDay = Math.max(startDay, realStartDay);
+        Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
+        Integer startDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         //20260121 切换结构控制
         DayCapacityLimitVo dayCapacityLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Integer realChangeDay = dayCapacityLimitHandler.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
@@ -475,8 +476,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             //下一新增结构
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
         }
-        startDay = realStartDay;
-        Integer remainingDays = selectedCxMachine.getRemainingDays();
+        startDay = realChangeDay;
+        Set<Integer> realProductionDaySet = hasProductionDaySet.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
+        Integer remainingDays = realProductionDaySet.size();
 //        Integer realRemainingDays = hasProductionDaySet.size();
 //        remainingDays = Math.min(remainingDays, realRemainingDays);
         //分配产能
@@ -484,8 +486,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新剩余天数
-        Integer leftOver = remainingDays - realAllocationDays;
-        selectedCxMachine.setRemainingDays(leftOver);
+        Integer leftOver1 = remainingDays - realAllocationDays;
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);
@@ -496,7 +497,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         }
         //重新获取机台的剩余日 提前收尾
-        leftOver = selectedCxMachine.getRemainingDays();
+        Integer leftOver = selectedCxMachine.getRemainingDays();
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
             CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
@@ -585,16 +586,16 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
         //保存未排计划明细
-        saveNoProductionPlanResult(productionContext,dayResultList, sumProductionMap);
+        saveNoProductionPlanResult(productionContext, dayResultList, sumProductionMap);
         getDataService().saveMouldProductionResult(dayResultList);
     }
 
-    private void saveNoProductionPlanResult(TbrProductionContext productionContext,List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
+    private void saveNoProductionPlanResult(TbrProductionContext productionContext, List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
         Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(productionPlanMap)) {
             return;
         }
-        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap,dayResultList, sumProductionMap);
+        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, dayResultList, sumProductionMap);
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
@@ -884,7 +885,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
             context.setStopDays(Collections.emptySet());
             context.setCapacityRatioMap(Collections.emptyMap());
-            return;
+            throw new BusinessException(I18nUtil.getMessage("alg.data.production.noConfigurationCalendar"));
         }
         //排产开始日
         Date productionStartDate = context.getProductionStartDate();
@@ -1298,8 +1299,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      */
     private Map<String, Set<String>> getContinueGroupInfo(Context context, String factoryCode, Integer year, Integer month, Integer lastDay) {
         List<ContinueGroupInfo> continueGroupInfoList = getDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
-            log.info(TbrBeforeProductionGroupLogRecorder.addContinueSkuEmptyLog(context));
             return Collections.emptyMap();
         }
         Map<String, List<ContinueGroupInfo>> continueGroupInfoMap = continueGroupInfoList.stream().collect(Collectors.groupingBy(ContinueGroupInfo::getGroupName));
@@ -1315,7 +1316,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
-     * 5.1.2：对续作的Sku设置分组信息
+     * 5.1.2：对续作的Sku设置在产机台信息
      * 按分组名匹配
      * TRB为结构
      * PCR为英寸
@@ -1324,7 +1325,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param continueGroupInfo 续作的分组信息-含机台
      */
     private void setContinueGroupByProduct(Context context, List<ContinueProductInfo> continueSkuInfo, Map<String, Set<String>> continueGroupInfo) {
-        if (CollectionUtils.isEmpty(continueGroupInfo) || CollectionUtils.isEmpty(continueGroupInfo)) {
+        if (CollectionUtils.isEmpty(continueSkuInfo) || CollectionUtils.isEmpty(continueGroupInfo)) {
             return;
         }
         continueSkuInfo.forEach(continueSku -> {
@@ -1333,7 +1334,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName));
+            log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, onLineMachineSet));
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }

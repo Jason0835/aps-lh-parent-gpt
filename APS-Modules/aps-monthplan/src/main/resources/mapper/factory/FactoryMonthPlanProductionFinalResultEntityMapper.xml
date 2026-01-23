@@ -2,4 +2,17 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper">
 
+    <select id="getVersionList" resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult">
+        SELECT
+        PRODUCTION_VERSION
+        FROM
+        T_MP_PROC_VERSION
+        WHERE
+        IS_DELETE = 0 AND PRODUCTION_VERSION IS NOT NULL
+        AND IS_FINAL = '1'
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="year != null and year != ''">AND YEAR = #{year}</if>
+        <if test="month != null and month != ''">AND MONTH = #{month}</if>
+</select>
+
 </mapper>

@@ -143,6 +143,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     private final ApplicationContext applicationContext;
 
+    // 排产设定
+    private final IFactoryParamService iFactoryParamService;
+
     @Override
     protected String getDocTypeCode() {
         return "0802";
@@ -219,6 +222,25 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             saveFactoryProductionVersion(mergedDemandPlans);
             applicationContext.publishEvent(new SummaryDemandEvent(mergedDemandPlans.get(0)));
         }
+    }
+
+
+    /**
+     *  获取EUDR年周号
+     * @return
+     */
+    private String getWeekYearForEudr() {
+        FactoryParam factoryParam = new FactoryParam();
+        factoryParam.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        factoryParam.setParamCode(MonthPlanEnums.EUDR_REQUIRE.getCode());
+        factoryParam.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        FactoryParam param = iFactoryParamService.getFacParamSingle(factoryParam);
+        String paramValue;
+        if (param == null) {
+            return StringUtils.EMPTY;
+        }
+        paramValue = StringUtils.isNotEmpty(param.getParamValue()) ? param.getParamValue() : param.getDefauleValue();
+        return paramValue;
     }
 
     private void processAlternateMaterial(List<DpOrderOffsetDetail> netDemands,Map<String, List<MdmProductStock>> productStockMap) {
@@ -357,9 +379,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
-        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> originalMonthSurplusMap;
+        Map<String, Integer> monthSurplusMap;
+        if(!CollectionUtils.isEmpty(initialData)) {
+            // 深度拷贝：创建新的HashMap，确保与原始数据隔离
+            originalMonthSurplusMap = Collections.unmodifiableMap(
+                new HashMap<>(initialData)
+            );
+            // 工作Map是原始数据的可修改副本
+            monthSurplusMap = new HashMap<>(originalMonthSurplusMap);
+        }else{
+            originalMonthSurplusMap = Collections.emptyMap();
+            monthSurplusMap = Collections.emptyMap();
+        }
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        predictionContext.setOriginalMonthSurplusMap(monthSurplusMap);
+        predictionContext.setOriginalMonthSurplusMap(originalMonthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
         List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
         List<DpSimulatedOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
@@ -550,7 +585,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
                 null,
-                null,
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
@@ -573,9 +607,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
-        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> originalMonthSurplusMap;
+        Map<String, Integer> monthSurplusMap;
+        if(!CollectionUtils.isEmpty(initialData)) {
+            // 深度拷贝：创建新的HashMap，确保与原始数据隔离
+            originalMonthSurplusMap = Collections.unmodifiableMap(
+                new HashMap<>(initialData)
+            );
+            // 工作Map是原始数据的可修改副本
+            monthSurplusMap = new HashMap<>(originalMonthSurplusMap);
+        }else{
+            originalMonthSurplusMap = Collections.emptyMap();
+            monthSurplusMap = Collections.emptyMap();
+        }
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        predictionContext.setOriginalMonthSurplusMap(monthSurplusMap);
+        predictionContext.setOriginalMonthSurplusMap(originalMonthSurplusMap);
         // 3. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             predictionVersion, predictionContext.getSalesOrders(), predictionContext.getFinishedProductStockMap(),
@@ -893,7 +940,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
                 monthSurplusMap,
-                monthSurplusMap,
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
@@ -927,9 +973,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 分组销售订单
         Map<String, List<SalesOrderPool>> saleOrderGroupMap =
             SaleRequirePlanHelper.getGroupSalesOrder(allocationOrders);
+        String weekYearForEudr = this.getWeekYearForEudr();
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
-            monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap,materialInfoMap);
+            monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap,materialInfoMap,weekYearForEudr);
         return new PredictionContext.OrderAllocationResult(allocations, allocations, finishedProductStockMap);
     }
 
