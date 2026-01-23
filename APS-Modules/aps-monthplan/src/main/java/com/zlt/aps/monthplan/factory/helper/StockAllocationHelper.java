@@ -43,7 +43,8 @@ public class StockAllocationHelper {
       Map<String, List<SalesOrderPool>> saleOrderGroupMap,
       Map<String,List<MdmProductStock>> finishedProductStockMap,
       Map<String,Integer> mdmMonthSurplusMap,
-      Map<String, MdmMaterialInfo> materialInfoMap) {
+      Map<String, MdmMaterialInfo> materialInfoMap,
+      String weekYearForEudr) {
     List<DpOrderOffsetDetail> result = new ArrayList<>();
     if(CollectionUtils.isEmpty(saleOrderGroupMap)) {
       return result;
@@ -59,7 +60,8 @@ public class StockAllocationHelper {
           mdmMonthSurplusMap,
           materialInfoMap,
           groupKey,
-          saleOrders
+          saleOrders,
+          weekYearForEudr
       );
       result.addAll(groupAllocations);
     }
@@ -77,7 +79,8 @@ public class StockAllocationHelper {
       Map<String,Integer> mdmMonthSurplusMap,
       Map<String, MdmMaterialInfo> materialInfoMap,
       String groupKey,
-      List<SalesOrderPool> saleOrders) {
+      List<SalesOrderPool> saleOrders,
+      String weekYearForEudr) {
     List<MdmProductStock> stockInfos = finishedProductStockMap.get(groupKey);
     // 无库存情况处理
     if (CollectionUtils.isEmpty(stockInfos)) {
@@ -87,7 +90,7 @@ public class StockAllocationHelper {
     // 获取排序配置并排序订单
     List<SalesOrderPool> sortedOrders = getSortedOrders(saleOrders);
     // 执行库存分配
-    StockAllocationResult result = allocateStockForOrders(monthPlanVersion,yearMonth,groupKey,mdmMonthSurplusMap,materialInfoMap,sortedOrders, stockInfos);
+    StockAllocationResult result = allocateStockForOrders(monthPlanVersion,yearMonth,groupKey,mdmMonthSurplusMap,materialInfoMap,sortedOrders, stockInfos,weekYearForEudr);
     return result.getAllocations();
   }
 
@@ -355,14 +358,16 @@ public class StockAllocationHelper {
   /**
    * 为订单列表执行库存分配
    */
-  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,Map<String, MdmMaterialInfo> materialInfoMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos) {
+  private static StockAllocationResult allocateStockForOrders(String monthPlanVersion,YearMonth yearMonth,String groupKey,Map<String,Integer> mdmMonthSurplusMap,Map<String, MdmMaterialInfo> materialInfoMap,List<SalesOrderPool> sortedOrders,List<MdmProductStock> stockInfos,
+                                                              String weekYearForEudr) {
     int plannedSurplus = mdmMonthSurplusMap.getOrDefault(groupKey,0);
     int matchStockQty = stockInfos.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
     StockAllocationContext context = new StockAllocationContext(
         plannedSurplus,
         matchStockQty,
         stockInfos,
-        materialInfoMap
+        materialInfoMap,
+        weekYearForEudr
     );
 
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
@@ -378,7 +383,8 @@ public class StockAllocationHelper {
         plannedSurplus,
         0,
         null,
-        materialInfoMap
+        materialInfoMap,
+        null
     );
     List<DpOrderOffsetDetail> allocations = new ArrayList<>();
     for (SalesOrderPool order : sortedOrders) {
@@ -470,6 +476,13 @@ public class StockAllocationHelper {
    */
   private static List<MdmProductStock> filterAndSortStocks(SalesOrderPool order, StockAllocationContext context) {
     List<MdmProductStock> stockInfos = context.getStockInfos();
+    // EUDR要求
+    if(YesOrNoEnum.YES.getCode().equals(order.getIsEudr())) {
+      return reduceInventoryByEudr(
+          order,
+          stockInfos,
+          context.weekYearForEudr);
+    }
     // 订单有年周号要求
     if(StringUtils.isNotBlank(order.getWeekYear()) && !ZERO_YEAR_WEEK.equals(order.getWeekYear()) && ApsCommonUtil.isNumber(order.getWeekYear())) {
         return reduceInventoryByWeekYear(
@@ -491,6 +504,26 @@ public class StockAllocationHelper {
     return reduceInventory(
         order,
         stockInfos,false,false);
+  }
+
+  private static List<MdmProductStock> reduceInventoryByEudr(SalesOrderPool order, List<MdmProductStock> stockInfos,String weekYear) {
+      if(StringUtils.isBlank(weekYear)) {
+        return Collections.emptyList();
+      }
+    BigDecimal orderQty = order.getOrdQty();
+    if (orderQty == null || orderQty.compareTo(BigDecimal.ZERO) <= 0) {
+      log.warn("数量无效，无法冲减库存");
+      return Collections.emptyList();
+    }
+    String transformed = weekYear.substring(2) + weekYear.substring(0,2);
+    int orderWeekYear = Integer.parseInt(transformed);
+    // 3. 过滤和排序库存
+    List<MdmProductStock> eligibleStocks = filterAndSortStocksByWeekYear(stockInfos, orderWeekYear);
+    if (CollectionUtils.isEmpty(eligibleStocks)) {
+      log.warn("没有符合条件的库存可以冲减");
+      return Collections.emptyList();
+    }
+    return eligibleStocks;
   }
 
   /**
@@ -634,11 +667,13 @@ public class StockAllocationHelper {
     private Integer  matchStockQty;
     private List<MdmProductStock> stockInfos;
     private Map<String, MdmMaterialInfo> materialInfoMap;
-    public StockAllocationContext(Integer plannedSurplus,Integer  matchStockQty,List<MdmProductStock> stockInfos,Map<String, MdmMaterialInfo> materialInfoMap) {
+    private String weekYearForEudr;
+    public StockAllocationContext(Integer plannedSurplus,Integer  matchStockQty,List<MdmProductStock> stockInfos,Map<String, MdmMaterialInfo> materialInfoMap,String weekYearForEudr) {
       this.plannedSurplus = plannedSurplus;
       this.matchStockQty = matchStockQty;
       this.stockInfos = stockInfos;
       this.materialInfoMap = materialInfoMap;
+      this.weekYearForEudr = weekYearForEudr;
     }
   }
 
