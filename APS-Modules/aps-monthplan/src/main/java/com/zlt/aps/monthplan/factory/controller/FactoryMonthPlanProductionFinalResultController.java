@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -42,6 +43,9 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
+
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultEntityMapper entityMapper;
 
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
