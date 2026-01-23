@@ -42,9 +42,8 @@ public class CxContinueProductionHandler {
      * @param continueType       续作类型 同规格同花纹 共生胎同模具
      * @param endDay             分组计划收尾日(理论)
      * @param continueSkuMap     分组计划中续作Sku信息集合
-     * @param mouldShellMap      模壳信息
      */
-    public static void productionContinueByType(Context context, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
+    public static void productionContinueByType(Context context, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = productionPlanInfo.getGroupName();
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
@@ -104,7 +103,7 @@ public class CxContinueProductionHandler {
         //逐日进行排产 CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList);
         CxLhMouldProductionCalculator.lhProductionByLhGroupHandler(context, earliestConclusionLhGroup, lhProductionQtyHelper, startDay, realEndDay, selectedMouldList, selectedProductionPlanList);
         //迭代下一个硫化组
-        productionContinueByType(productionContext, productionPlanInfo, continueType, endDay, continueSkuMap, mouldShellMap);
+        productionContinueByType(productionContext, productionPlanInfo, continueType, endDay, continueSkuMap);
     }
 
 //    /**

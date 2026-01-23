@@ -50,7 +50,7 @@ public class TireDrumInfoVo implements Serializable {
     private Map<Integer, TireDrumDayInfoHelper> dayLimitInfoMap;
 
     /**
-     * 根据胶囊卡盘配置转化成胶囊卡盘限制信息
+     * 根据成型鼓台账配置转化成成型鼓限制信息
      * 构建每日限制对象集合
      *
      * @param context      排产上下文
