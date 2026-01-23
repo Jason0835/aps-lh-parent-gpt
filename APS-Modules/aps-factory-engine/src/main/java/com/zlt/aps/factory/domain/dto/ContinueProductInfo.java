@@ -109,12 +109,6 @@ public class ContinueProductInfo implements Serializable {
                 cxMachineCodeSet.add(singleCxMachineCode);
             }
         });
-//        String[] cxMachineCodeArray = cxMachineCode.split(StringConstant.COMMA);
-//        for (String singleCxMachineCode : cxMachineCodeArray) {
-//            if (allCxMachineMap.containsKey(singleCxMachineCode)) {
-//                cxMachineCodeSet.add(singleCxMachineCode);
-//            }
-//        }
     }
 
     /**
