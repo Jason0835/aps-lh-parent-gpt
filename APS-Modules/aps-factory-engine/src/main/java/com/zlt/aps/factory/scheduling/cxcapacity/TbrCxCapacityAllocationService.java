@@ -99,7 +99,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext));
         if (CollectionUtils.isEmpty(requirePlanList)) {
-            throw new BusinessException(I18nUtil.getMessage("alg.data.initCheck.initEmpty"));
+            throw new BusinessException(I18nUtil.getMessage("alg.data.production.noRequirePlan"));
         }
         //设置初始的排产量数据信息
         requirePlanList.forEach(singlePlan -> {
@@ -885,7 +885,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
             context.setStopDays(Collections.emptySet());
             context.setCapacityRatioMap(Collections.emptyMap());
-            return;
+            throw new BusinessException(I18nUtil.getMessage("alg.data.production.noConfigurationCalendar"));
         }
         //排产开始日
         Date productionStartDate = context.getProductionStartDate();
