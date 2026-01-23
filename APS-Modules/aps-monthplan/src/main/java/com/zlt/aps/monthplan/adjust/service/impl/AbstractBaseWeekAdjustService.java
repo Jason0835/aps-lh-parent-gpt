@@ -1519,25 +1519,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MdmSkuConstructionRef skuConstructionRef = MapUtils.getObject(mdmSkuConstructionRefMap, materialCode, new MdmSkuConstructionRef());
         // 胎胚号
         adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
+        // SKU与结构关系列表
+        Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = convertToSkuStructureRefMap(contextDTO.getMdmSkuStructureRefList());
+        MdmSkuStructureRef skuStructureRef = MapUtils.getObject(mdmSkuStructureRefMap, materialCode, new MdmSkuStructureRef());
+        // 结构名称
+        adjustDetailVo.setStructureName(skuStructureRef.getStructureName());
+        // 月计划结构转产
+        Map<String, List<MpStructureAllocation>> structureAllocationMap = convertToStructureAllocationMap(contextDTO.getStructureAllocationList());
+        List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
+        // 排产机台,多个机台用逗号分隔
+        adjustDetailVo.setScheduledMachines(getCxMachineCodes(structureAllocationList));
 
         if (monthPlan == null) {
             // SKU日硫化产能
             Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = convertToSkuLhCapacityMap(contextDTO.getMdmSkuLhCapacityList());
             // 物料信息
             Map<String, MdmMaterialInfo> mdmMaterialInfoMap = convertToMaterialInfoMap(contextDTO.getMdmMaterialInfoList());
-            // SKU与结构关系列表
-            Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = convertToSkuStructureRefMap(contextDTO.getMdmSkuStructureRefList());
             // 试制量试计划
             Map<String, MpTrialPlan> mpTrialPlanMap = convertToTrialPlanMap(contextDTO.getMpTrialPlanList());
-
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
             MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
-            MdmSkuStructureRef skuStructureRef = MapUtils.getObject(mdmSkuStructureRefMap, materialCode, new MdmSkuStructureRef());
             MpTrialPlan trialPlan = MapUtils.getObject(mpTrialPlanMap, materialCode, new MpTrialPlan());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
-            adjustDetailVo.setStructureName(skuStructureRef.getStructureName());
             adjustDetailVo.setMaterialDesc(materialInfo.getMaterialDesc());
             adjustDetailVo.setProductTypeCode(materialInfo.getProductTypeCode());
             adjustDetailVo.setBrand(materialInfo.getBrand());
@@ -1565,8 +1570,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 有月度生产计划时，赋值关联字段
         adjustDetailVo.setIsSkuAdd(ApsConstant.FALSE);
-        adjustDetailVo.setScheduledMachines(monthPlan.getCxMachineCode());
-        adjustDetailVo.setStructureName(monthPlan.getStructureName());
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
         adjustDetailVo.setProductStatus(monthPlan.getProductStatus());
@@ -1587,6 +1590,21 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setPostponeQty(monthPlan.getPostponeProductionQty());
         adjustDetailVo.setCycleReserveQty(monthPlan.getCycleProductionQty());
         adjustDetailVo.setConventionReserveQty(monthPlan.getConventionProductionQty());
+    }
+
+    /**
+     * 获取机台编号（多个以,分隔）
+     * @param structureAllocationList
+     * @return
+     */
+    protected String getCxMachineCodes(List<MpStructureAllocation> structureAllocationList) {
+        if (PubUtil.isEmpty(structureAllocationList)) {
+            return "";
+        }
+        return structureAllocationList.stream()
+                .map(MpStructureAllocation::getCxMachineCode)
+                .filter(code -> StringUtils.isNotEmpty(code))
+                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_COMMA));
     }
 
 
@@ -2029,6 +2047,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             Integer netQtyChange = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getPreviousNetQty(),0);
             vo.setNetQtyChange(netQtyChange);
         });
+    }
+
+    /**
+     * 转MpStructureAllocation分组Map
+     */
+    private Map<String, List<MpStructureAllocation>> convertToStructureAllocationMap(List<MpStructureAllocation> structureAllocationList) {
+        if (PubUtil.isEmpty(structureAllocationList)) {
+            return Collections.emptyMap();
+        }
+        return structureAllocationList.stream()
+                .filter(allocation -> StringUtils.isNotEmpty(allocation.getStructureName()))
+                .collect(Collectors.groupingBy(MpStructureAllocation::getStructureName));
     }
 
 
