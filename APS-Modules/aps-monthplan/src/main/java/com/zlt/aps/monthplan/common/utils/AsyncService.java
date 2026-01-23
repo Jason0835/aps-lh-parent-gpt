@@ -132,7 +132,7 @@ public class AsyncService {
     Map<String,List<DpSimulatedOffsetDetail>> netDemandsGroupByMaterialCode = predictOffsetDetails.stream().collect(Collectors.groupingBy(DpSimulatedOffsetDetail::getMaterialCode));
     Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
     List<MpSimulatedResult> result = Lists.newArrayList();
-    YearMonth yearMonth = monthRange.getTMonth();
+    YearMonth yearMonth = YearMonth.now();
     map.forEach((materialCode, value) -> {
       if(!materialInfoMap.containsKey(materialCode)) {
         return;
