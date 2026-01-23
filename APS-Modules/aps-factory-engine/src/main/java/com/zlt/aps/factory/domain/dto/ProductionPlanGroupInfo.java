@@ -986,16 +986,16 @@ public class ProductionPlanGroupInfo {
         //分配的成型机台
         Set<String> cxMachineCodeSet = continueCxMachineAllocation.stream().map(CxMachineAllocationPlanHelper::getCxMachineCode).collect(Collectors.toSet());
         allocationCxMachineCodeSet = cxMachineCodeSet;
-        Integer monthDays = context.getMonthDays();
-        Set<Integer> stopDays = context.getStopDays();
-        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(monthDays);
-        for (Integer productionDay = ProductionConstant.MONTH_START_DAY; productionDay <= monthDays; productionDay++) {
-            if (stopDays.contains(productionDay)) {
-                continue;
-            }
-            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByContinueCxMachineAllocation(context, productionDay, continueCxMachineAllocation);
-            dayLimitInfo.put(productionDay, dayLimit);
+        Set<Integer> allProductionDaySet = getAllContinueProductionDaySet(context, continueCxMachineAllocation);
+        if (CollectionUtils.isEmpty(allProductionDaySet)) {
+            return;
         }
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(64);
+        allProductionDaySet.forEach(productionDay -> {
+            List<CxMachineAllocationPlanHelper> dayConfigurationList = getContinueProductionConfiguration(context, productionDay, continueCxMachineAllocation);
+            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByContinueCxMachineAllocation(context, productionDay, dayConfigurationList);
+            dayLimitInfo.put(productionDay, dayLimit);
+        });
         //如果没有
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             dayProductionLimitInfo = dayLimitInfo;
@@ -1027,29 +1027,30 @@ public class ProductionPlanGroupInfo {
      * @param groupAllocationList 结构转产配置集合
      */
     public void buildDayProductionLimitInfoByStructureAllocation(Context context, List<MpStructureAllocation> groupAllocationList) {
+        Integer monthDays = context.getMonthDays();
         if (CollectionUtils.isEmpty(groupAllocationList)) {
-            dayProductionLimitInfo = new HashMap<>();
+            dayProductionLimitInfo = new HashMap<>(monthDays);
             return;
         }
         List<MpStructureAllocation> effectiveList = groupAllocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getStructureName())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(effectiveList)) {
-            dayProductionLimitInfo = new HashMap<>();
+            dayProductionLimitInfo = new HashMap<>(monthDays);
+            return;
+        }
+        Set<Integer> allProductionDaySet = getAllProductionDaySet(context, effectiveList);
+        if (CollectionUtils.isEmpty(allProductionDaySet)) {
+            dayProductionLimitInfo = new HashMap<>(monthDays);
             return;
         }
         Set<String> allocationCxMachineCodeSet = effectiveList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
         this.allocationCxMachineCodeSet = allocationCxMachineCodeSet;
-        Integer monthDays = context.getMonthDays();
-        Set<Integer> stopDays = context.getStopDays();
-        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(monthDays);
-        Integer minDay = effectiveList.stream().mapToInt(MpStructureAllocation::getBeginDay).min().getAsInt();
-        Integer maxDay = effectiveList.stream().mapToInt(MpStructureAllocation::getEndDay).max().getAsInt();
-        for (Integer productionDay = minDay; productionDay <= maxDay; productionDay++) {
-            if (stopDays.contains(productionDay)) {
-                continue;
-            }
-            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByStructureAllocation(context, productionDay, effectiveList);
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitInfo = new HashMap<>(64);
+        allProductionDaySet.forEach(productionDay -> {
+            List<MpStructureAllocation> dayConfigurationList = getProductionConfiguration(context, productionDay, effectiveList);
+            GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByStructureAllocation(context, productionDay, dayConfigurationList);
             dayLimitInfo.put(productionDay, dayLimit);
-        }
+
+        });
         dayProductionLimitInfo = dayLimitInfo;
     }
 
@@ -1435,55 +1436,143 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
-     * 获取有效排产日范围集合，取配比与胎胚的交集
+     * 根据有效在产机台分配信息，构建所有可排产日信息
      *
-     * @param context               排产上下文
-     * @param preSelected           硫化组配比符合的排产日信息
-     * @param hasAddSkuByEmbryoList 胎胚种类数符合的排产日信息
-     */
-    private Set<Integer> getEffectiveDay(Context context, EarliestConclusionLhGroupHelper preSelected, List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuByEmbryoList) {
-        Set<Integer> productionDaySet = hasAddSkuByEmbryoList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
-        return getEffectiveDay(context, preSelected, productionDaySet);
-    }
-
-    /**
-     * 获取取得的有效排产日与模具可排产日的交集
-     *
-     * @param limitProductionDaySet 符合条件的排产日范围(硫化组、胎胚种类数)
-     * @param selectedMould         选中的模具
+     * @param context                     排产上下文
+     * @param continueCxMachineAllocation 分组下在产机台分配信息
      * @return
      */
-    private Set<Integer> getEffectiveDay(Set<Integer> limitProductionDaySet, List<ProductionMouldInfoVo> selectedMould) {
-        Set<Integer> firstProductionDaySet = selectedMould.get(BigDecimal.ZERO.intValue()).getProductionDaySet();
-        Set<Integer> secondProductionDaySet = selectedMould.get(BigDecimal.ONE.intValue()).getProductionDaySet();
-        if (CollectionUtils.isEmpty(firstProductionDaySet) || CollectionUtils.isEmpty(secondProductionDaySet)) {
+    private Set<Integer> getAllContinueProductionDaySet(Context context, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
             return Collections.emptySet();
         }
-        //取两个模具的排产日交集
-        Set<Integer> intersectionSet = firstProductionDaySet.stream().filter(secondProductionDaySet::contains).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(intersectionSet)) {
+        Set<Integer> allProductionDaySet = new HashSet<>();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        continueCxMachineAllocation.forEach(singleAllocation -> {
+            String cxMachineCode = singleAllocation.getCxMachineCode();
+            if (StringUtils.isBlank(cxMachineCode)) {
+                return;
+            }
+            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
+            if (null == cxMachineInfo) {
+                return;
+            }
+            for (Integer productionDay = singleAllocation.getStartDay(); productionDay <= singleAllocation.getEndDay(); productionDay++) {
+                if (!cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+                    allProductionDaySet.add(productionDay);
+                }
+            }
+        });
+        if (CollectionUtils.isEmpty(allProductionDaySet)) {
             return Collections.emptySet();
         }
-        return limitProductionDaySet.stream().filter(intersectionSet::contains).collect(Collectors.toSet());
+        return allProductionDaySet;
     }
 
     /**
-     * 根据preSelected的排产日范围，取得与productionDaySet的交集排产范围
+     * 获取续作分组在产机台在排产日的配置信息
      *
-     * @param context          排产上下文
-     * @param preSelected      硫化组配比符合的排产日信息
-     * @param productionDaySet 排产日范围
+     * @param context                     排产上下文
+     * @param productionDay               排产日
+     * @param continueCxMachineAllocation 分组下所有在产机台配置信息
+     * @return
      */
-    private Set<Integer> getEffectiveDay(Context context, EarliestConclusionLhGroupHelper preSelected, Set<Integer> productionDaySet) {
-        Integer preClosingDay = preSelected.getClosingDay();
-        Integer preEndDay = preSelected.getEndDay();
-        Set<Integer> effectiveDaySet = new HashSet<>(context.getMonthDays());
-        for (Integer effectiveDay = preClosingDay; effectiveDay <= preEndDay; effectiveDay++) {
-            if (productionDaySet.contains(effectiveDay)) {
-                effectiveDaySet.add(effectiveDay);
-            }
+    private List<CxMachineAllocationPlanHelper> getContinueProductionConfiguration(Context context, Integer productionDay, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+        if (null == productionDay || CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+            return Collections.emptyList();
         }
-        return effectiveDaySet;
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        List<CxMachineAllocationPlanHelper> effectiveList = new ArrayList<>();
+        continueCxMachineAllocation.forEach(singleAllocation -> {
+            String cxMachineCode = singleAllocation.getCxMachineCode();
+            if (StringUtils.isBlank(cxMachineCode)) {
+                return;
+            }
+            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
+            if (null == cxMachineInfo) {
+                return;
+            }
+            //停产日跳过
+            if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+                return;
+            }
+            if (productionDay >= singleAllocation.getStartDay() && productionDay <= singleAllocation.getEndDay()) {
+                effectiveList.add(singleAllocation);
+            }
+        });
+        return effectiveList;
+    }
+
+    /**
+     * 根据有效的分组下分配信息，构建所有可排产日信息
+     *
+     * @param context                排产上下文
+     * @param groupAllAllocationList 分组下的机台分配信息
+     * @return
+     */
+    private Set<Integer> getAllProductionDaySet(Context context, List<MpStructureAllocation> groupAllAllocationList) {
+        if (CollectionUtils.isEmpty(groupAllAllocationList)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> allProductionDaySet = new HashSet<>();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        groupAllAllocationList.forEach(singleAllocation -> {
+            String cxMachineCode = singleAllocation.getCxMachineCode();
+            if (StringUtils.isBlank(cxMachineCode)) {
+                return;
+            }
+            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
+            if (null == cxMachineInfo) {
+                return;
+            }
+            for (Integer productionDay = singleAllocation.getBeginDay(); productionDay <= singleAllocation.getEndDay(); productionDay++) {
+                if (!cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+                    allProductionDaySet.add(productionDay);
+                }
+            }
+        });
+        if (CollectionUtils.isEmpty(allProductionDaySet)) {
+            return Collections.emptySet();
+        }
+        return allProductionDaySet;
+    }
+
+    /**
+     * 获取在排产日的配置信息
+     *
+     * @param context                排产上下文
+     * @param productionDay          排产日
+     * @param groupAllAllocationList 分组下所有配置信息
+     * @return
+     */
+    private List<MpStructureAllocation> getProductionConfiguration(Context context, Integer productionDay, List<MpStructureAllocation> groupAllAllocationList) {
+        if (null == productionDay || CollectionUtils.isEmpty(groupAllAllocationList)) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        List<MpStructureAllocation> effectiveList = new ArrayList<>();
+        groupAllAllocationList.forEach(singleAllocation -> {
+            String cxMachineCode = singleAllocation.getCxMachineCode();
+            if (StringUtils.isBlank(cxMachineCode)) {
+                return;
+            }
+            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
+            if (null == cxMachineInfo) {
+                return;
+            }
+            //停产日跳过
+            if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
+                return;
+            }
+            if (productionDay >= singleAllocation.getBeginDay() && productionDay <= singleAllocation.getEndDay()) {
+                effectiveList.add(singleAllocation);
+            }
+        });
+        return effectiveList;
     }
 
     /**
