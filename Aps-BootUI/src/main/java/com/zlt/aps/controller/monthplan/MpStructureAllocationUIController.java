@@ -305,7 +305,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * 删除排产过程_结构排产
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mpStructureAllocation:remove")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
