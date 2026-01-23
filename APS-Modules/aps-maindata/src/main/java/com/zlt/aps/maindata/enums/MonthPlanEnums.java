@@ -195,7 +195,13 @@ public enum MonthPlanEnums {
     /**
      * SYS0208001 净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能
      */
-    NET_REQUIREMENT_DAY_CAPACITY("SYS0208001", "净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能");
+    NET_REQUIREMENT_DAY_CAPACITY("SYS0208001", "净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能"),
+    /**
+     *  SYS0206006 EUDR开始的年周号
+     */
+    EUDR_REQUIRE("SYS0206006","EUDR开始的年周号");
+
+
 
     private final String code;
     private final String name;

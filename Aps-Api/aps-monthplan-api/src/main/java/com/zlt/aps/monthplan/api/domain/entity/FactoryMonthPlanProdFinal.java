@@ -136,14 +136,6 @@ public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProductionFinalRe
      @TableField(exist = false)
     private String specCode;
 
-    /**
-     * 生胎代码
-     */
-    @Excel(name = "ui.data.column.factoryMonthPlanProdFinal.embryoCode")
-    @ImportExcelValidated(required = true, maxLength = 20)
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
-     @TableField(exist = false)
-    private String embryoCode;
 
     /**
      * 模具
