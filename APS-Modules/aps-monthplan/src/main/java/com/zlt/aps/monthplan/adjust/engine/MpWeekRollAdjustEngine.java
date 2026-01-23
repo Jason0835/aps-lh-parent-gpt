@@ -1456,8 +1456,8 @@ public class MpWeekRollAdjustEngine {
             }
             mpFinalVo.setBeginDay(realBeginDay);
             mpFinalVo.setEndDay(realEndDay);
-            //实际调整量 = 原实际排产量 - 累计排产量
-            mpFinalVo.setActualAdjustQty(mpFinalVo.getTotalQty() - accTotalQty);
+            //实际调整量 = 累计排产量 - 原实际排产量
+            mpFinalVo.setActualAdjustQty(accTotalQty - mpFinalVo.getTotalQty());
             mpFinalVo.setTotalQty(accTotalQty);
         }
     }
