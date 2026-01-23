@@ -69,7 +69,7 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "update_time DESC,ID DESC,MAIN_PATTERN ASC,STRUCTURE_NAME ASC";
     }
 
     /**
