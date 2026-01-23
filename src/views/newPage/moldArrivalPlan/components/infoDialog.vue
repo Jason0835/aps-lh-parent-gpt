@@ -90,6 +90,13 @@ export default {
             trigger: "change",
           },
         ],
+        mainPattern: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -150,6 +157,10 @@ export default {
           type: "date",
           valueFormat: "yyyy-MM-dd",
           disabled: true,
+        },
+        {
+          prop: "mainPattern",
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
         },
         {
           prop: "remark",

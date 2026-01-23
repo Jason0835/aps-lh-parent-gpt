@@ -218,11 +218,11 @@ export default {
           prop: "netQty",
           minWidth: 120,
         },
-        {
-          label: this.$t("ui.data.mouldingDayResult.totalQty"),
-          prop: "totalQty",
-          minWidth: 120,
-        },
+        // {
+        //   label: this.$t("ui.data.mouldingDayResult.totalQty"),
+        //   prop: "totalQty",
+        //   minWidth: 120,
+        // },
         {
           label: this.$t("ui.data.DemandPlan.unPostponeNetQty"),
           prop: "unPostponeNetQty",
