@@ -314,3 +314,12 @@ export function reportUrt(query) {
     },
   })
 }
+
+//订单冲减分配
+export function listOrderOffsetDetail(query) {
+  return request({
+    url: '/maindata/dpOrderOffsetDetail/list',
+    method: 'post',
+    data: query
+  })
+}

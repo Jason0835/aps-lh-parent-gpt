@@ -124,12 +124,19 @@ export default {
         : this.$t("common.button.add");
     },
     columns() {
-      return [
+      let list= [
       {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "warningType",
+          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          type: "select",
+          dictData: this.parentDict.type.warn_type,
+
         },
         {
           prop: "enabled",
@@ -168,6 +175,21 @@ export default {
           type: "select",
           dictData: this.parentDict.type.warn_level,
         },
+
+        {
+          prop: "remark",
+          label: this.$t("common.remark"),
+          maxlength: 200,
+        },
+      ];
+      if(this.form.warningType=='2'){
+        list= [
+      {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
         {
           prop: "warningType",
           label: this.$t("ui.data.column.rawMaterial.warningType"),
@@ -176,11 +198,110 @@ export default {
 
         },
         {
+          prop: "enabled",
+          label: this.$t("ui.data.column.rawMaterial.enabled"),
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+        },
+
+        {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.rawMaterial.materialCode"),
+          maxlength: 50,
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.rawMaterial.materialName"),
+          maxlength: 50,
+        },
+        // {
+        //   prop: "deviationUpper",
+        //   label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
+        //   type: "number",
+        //   min: 0,
+        //   max:999999,
+        // },
+        // {
+        //   prop: "deviationLower",
+        //   label: this.$t("ui.data.column.rawMaterial.deviationLower"),
+        //   type: "number",
+        //   min: 0,
+        //   max:999999,
+        // },
+        {
+          prop: "warningLevel",
+          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+          type: "select",
+          dictData: this.parentDict.type.warn_level,
+        },
+
+        {
           prop: "remark",
           label: this.$t("common.remark"),
           maxlength: 200,
         },
       ];
+      }else{
+        list= [
+      {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "warningType",
+          label: this.$t("ui.data.column.rawMaterial.warningType"),
+          type: "select",
+          dictData: this.parentDict.type.warn_type,
+
+        },
+        {
+          prop: "enabled",
+          label: this.$t("ui.data.column.rawMaterial.enabled"),
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+        },
+
+        {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.rawMaterial.materialCode"),
+          maxlength: 50,
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.rawMaterial.materialName"),
+          maxlength: 50,
+        },
+        {
+          prop: "deviationUpper",
+          label: this.$t("ui.data.column.rawMaterial.deviationUpper"),
+          type: "number",
+          min: 0,
+          max:999999,
+        },
+        {
+          prop: "deviationLower",
+          label: this.$t("ui.data.column.rawMaterial.deviationLower"),
+          type: "number",
+          min: 0,
+          max:999999,
+        },
+        {
+          prop: "warningLevel",
+          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+          type: "select",
+          dictData: this.parentDict.type.warn_level,
+        },
+
+        {
+          prop: "remark",
+          label: this.$t("common.remark"),
+          maxlength: 200,
+        },
+      ];
+      }
+      return list
     },
   },
   methods: {

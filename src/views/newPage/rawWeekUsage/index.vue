@@ -146,6 +146,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          width: 240,
         },
         {
           prop: "updateTime",

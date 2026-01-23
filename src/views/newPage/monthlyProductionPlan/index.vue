@@ -133,7 +133,7 @@ export default {
           width: 120,
         },
         {
-          prop: "mainMaterialDesc",
+          prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           width: 280,
         },

@@ -14,17 +14,17 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
-      :showSummary="true"
+      :showSummary="false"
       :selectArea="false"
       :span-method="objectSpanMethod"
       :summary-method="getSummaryMethod"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           @click="handleExport"
-          v-hasPermi="['report:proSizeSummary:export']"
+          v-hasPermi="['maindata:dpOrderOffsetDetail:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
-        > -->
+        >
       </template>
       <template slot="headerRight"> </template>
     </page-table>
@@ -35,20 +35,26 @@
 import moment from "moment";
 import Big from "big.js";
 //utils
-// import { downloadLink } from "@/utils/request";
+import { downloadLink } from "@/utils/request";
 //interface
-import {
-  listProSizeSummary,
-  exportProSizeSummary,
-} from "@/api/monthplan/report";
+import { listOrderOffsetDetail } from "@/api/monthplan/report";
 //components
 
 export default {
-  name: "ProSizeSummary",
+  name: "OrderInventoryWriteDown",
   components: {
     // tltUpload,
   },
-  dicts: ["biz_factory_name"],
+  dicts: [
+    "biz_factory_name",
+    "biz_product_name",
+    "biz_brand_type",
+    "biz_stor_type",
+    "biz_product_type",
+    "biz_deliver_goods_type",
+    "biz_order_type",
+    "biz_yes_no"
+  ],
   data() {
     return {
       loading: false,
@@ -69,128 +75,181 @@ export default {
     columns() {
       let columns = [
         {
-          prop: "年月",
-          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
-        },
-        {
-          prop: "工厂",
-          label: this.$t("工厂"),
-          align: "center",
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
           width: 120,
         },
         {
-          prop: "需求版本号",
+          prop: "year",
+          label: this.$t("年份"),
+          width: 120,
+        },
+        {
+          prop: "month",
+          label: this.$t("月份"),
+          width: 120,
+        },
+
+        {
+          prop: "monthPlanVersion",
           label: this.$t("需求版本号"),
+          width: 180,
         },
         {
-          prop: "产品分类",
-          label: this.$t("产品分类"),
+          prop: "productTypeCode",
+          label: this.$t("产品品类"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
+          width: 120,
         },
         {
-          prop: "内外销",
-          label: this.$t("内外销"),
+          prop: "locationType",
+          label: this.$t("ui.data.column.finishStock.wai"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_stor_type, value);
+          },
+          width: 120,
         },
         {
-          prop: "区域",
+          prop: "areaCode",
           label: this.$t("区域"),
+          width: 120,
         },
         {
-          prop: "客户",
+          prop: "customName",
           label: this.$t("客户"),
+          width: 120,
         },
         {
-          prop: "客户国别",
+          prop: "customNationCode",
           label: this.$t("客户国别"),
+          width: 120,
         },
         {
-          prop: "目的国",
+          prop: "destinationNationCode",
           label: this.$t("目的国"),
+          width: 120,
         },
         {
-          prop: "PO号",
+          prop: "poNumber",
           label: this.$t("PO号"),
+          width: 240,
         },
 
         {
-          prop: "品牌",
+          prop: "brand",
           label: this.$t("品牌"),
-          // align: "right",
-          // formatter: (row, column, value) => {
-          //   return value
-          //     ? Big(value).times(100).toString() + "%"
-          //     : value === 0
-          //     ? "0%"
-          //     : "";
-          // },
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
+          width: 120,
         },
         {
-          prop: "物料编码",
+          prop: "materialCode",
           label: this.$t("物料编码"),
-          // align: "right",
-          // formatter: (row, column, value) => {
-          //   return value
-          //     ? Big(value).times(100).toString() + "%"
-          //     : value === 0
-          //     ? "0%"
-          //     : "";
-          // },
+          width: 120,
         },
         {
-          prop: "物料描述",
+          prop: "materialDesc",
           label: this.$t("物料描述"),
+          width: 320,
         },
         {
-          prop: "订单数量",
+          prop: "orderQty",
           label: this.$t("订单数量"),
+          width: 120,
         },
 
         {
-          prop: "库存总数",
+          prop: "stockQty",
+          width: 120,
           label: this.$t("库存总数"),
         },
         {
-          prop: "库存分配量",
+          prop: "allocationQty",
+          width: 120,
           label: this.$t("库存分配量"),
         },
+        // {
+        //   prop: "生产分配量",
+        //   width: 120,
+        //   label: this.$t("生产分配量"),
+        // },
         {
-          prop: "生产分配量",
-          label: this.$t("生产分配量"),
-        },
-        {
-          prop: "月底计划余量分配量",
+          prop: "plannedSurplus",
+          width: 120,
           label: this.$t("月底计划余量分配量"),
         },
         {
-          prop: "年周号",
+          prop: "weekYear",
+          width: 120,
           label: this.$t("年周号"),
         },
         {
-          prop: "均匀性",
+          prop: "isUniformity",
+          width: 120,
           label: this.$t("均匀性"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_deliver_goods_type,
+              value
+            );
+          },
         },
         {
-          prop: "动平衡",
+          prop: "isDynamicBalance",
+          width: 120,
           label: this.$t("动平衡"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_deliver_goods_type,
+              value
+            );
+          },
         },
         {
-          prop: "发货模式",
-          label: this.$t("发货模式"),
+          prop: "deliverGoodsType",
+          label: this.$t("common.shipType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_deliver_goods_type,
+              value
+            );
+          },
         },
         {
-          prop: "供应链优先级",
-          label: this.$t("供应链优先级"),
+          prop: "scmPriority",
+          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
         },
         {
-          prop: "更新日期",
+          prop: "orderPriority",
+          label: this.$t("订单优先级"),
+          type: "select",
+          dictData: this.dict.type.biz_order_type,
+        },
+        {
+          width: 180,
+          prop: "updateTime",
           label: this.$t("更新日期"),
         },
-
       ];
 
       return columns;
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           prop: "yearMonth",
           label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
@@ -199,42 +258,36 @@ export default {
           valueFormat: "yyyy-MM",
           clearable: false,
         },
-        {
-          label: this.$t("common.factory"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-        },
+
         {
           label: this.$t("需求版本号"),
-          prop: "areaID",
-          type: "select",
+          prop: "monthPlanVersion",
         },
         {
-          label: this.$t("产品分类"),
-          prop: "brand",
+          prop: "productTypeCode",
+          label: this.$t("ui.data.column.monthplan.productType"),
           type: "select",
+          dictData: this.dict.type.biz_product_type,
         },
         {
           label: this.$t("区域"),
-          prop: "productDesc",
-          type: "select",
+          prop: "areaCode",
         },
         {
           label: this.$t("客户"),
-          prop: "productDesc",
+          prop: "customName",
         },
         {
           label: this.$t("PO号"),
-          prop: "productDesc",
+          prop: "poNumber",
         },
         {
           label: this.$t("物料编码"),
-          prop: "productDesc",
+          prop: "materialCode",
         },
         {
           label: this.$t("物料描述"),
-          prop: "productDesc",
+          prop: "materialDesc",
         },
       ];
     },
@@ -263,7 +316,10 @@ export default {
       this.getList();
     },
     handleExport() {
-      exportProSizeSummary(this.formatParams(false));
+      downloadLink(
+        "/maindata/dpOrderOffsetDetail/export",
+        this.formatParams(false)
+      );
     },
 
     // utils
@@ -344,8 +400,8 @@ export default {
       };
 
       if (hasPage) {
-        // params.pageSize = this.page.pageSize;
-        // params.pageNum = this.page.current;
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
       }
       if (params.yearMonth) {
         let arr = params.yearMonth.split("-");
@@ -366,261 +422,15 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        let list = [
-          {
-            年月:'20025-09',
-            需求版本号:'',
-            订单数量:'60',
-            库存总数:'121',
-            库存分配量:'60',
-            月底计划余量分配量:'1260',
-            订单类型:'周期排产储备',
-            产品品类:'TBR',
-            内外销:'外销',
-            储备数量:'1465',
-            适销区域:"非洲，东南亚",
-            近3个月月均销量:'1688',
-            近6个月月均销量:'1538',
-            滚动12个月销售频次:'450',
-            滚动12个月结构上机频次:'248',
-            超3个月库存:'12',
-            超6个月库存:'0',
-            超12个月库存:'0',
-            备库上限:'25',
-            工厂: "116",
-            年份: "2025",
-            月份: "11",
-            产品分类: "导向",
-            订单优先级: "高优先级",
-            区域: "北美",
-            品牌: "AMULET",
-            客户: "Join",
-            产品结构: "ST235/80R16",
-            主花纹: "AT505",
-            NC物料编码: "3302002547",
-            物料描述: "ST235/80R16 129/125M 14PR AT505 BL3HAM",
-            排产分类: "周期排产",
-            年周号: "2586",
-            均匀性: "是",
-            动平衡: "是",
-            订单量: "1247",
-            库存: "256",
-            月底余量: "158",
-            排产净需求: "3425",
-            是否排产: "是",
-            净需求: "3425",
-            净需求No: "3425",
-            高优先级: "300",
-            中优先级: "120",
-            暂缓订单: "10",
-            周期排产储备: "3000",
-            常规排产储备: "2000",
-            是否满足最小投产量: "是",
-            最小投产量值: "1000",
-            备注: "",
-            更新日期: "2025-11-20",
-            数量: "10",
-            客户国别: "越南",
-            目的国: "澳大利亚",
-            PO号: "JT25137-140XDW",
-            发货模式:'分批交货',
-            供应链优先级:'高',
-            提报日期:'2025-11-20',
-            EUDR:'29878',
-          },
-          {
-            年月:'20025-09',
-            需求版本号:'',
-            订单数量:'80',
-            库存总数:'121',
-            库存分配量:'61',
-            月底计划余量分配量:'160',
-            订单类型:'周期排产储备',
-            产品品类:'TBR',
-            内外销:'外销',
-            储备数量:'1465',
-            适销区域:"非洲，越南",
-            近3个月月均销量:'1688',
-            近6个月月均销量:'1538',
-            滚动12个月销售频次:'450',
-            滚动12个月结构上机频次:'248',
-            超3个月库存:'12',
-            超6个月库存:'0',
-            超12个月库存:'0',
-            备库上限:'25',
-            工厂: "116",
-            年份: "2025",
-            月份: "11",
-            产品分类: "导向",
-            订单优先级: "高优先级",
-            区域: "环亚太",
-            品牌: "AMULET",
-            客户: "Join",
-            产品结构: "11R22.5-JD571",
-            主花纹: "JF568",
-            NC物料编码: "330201108",
-            物料描述: "295/80R22.5 152/149J 18PR JD756 BL4HJY",
-            排产分类: "按单产",
-            年周号: "3425",
-            均匀性: "是",
-            动平衡: "是",
-            订单量: "1247",
-            库存: "256",
-            月底余量: "158",
-            排产净需求: "3425",
-            是否排产: "是",
-            净需求: "3425",
-            净需求No: "3425",
-            高优先级: "300",
-            中优先级: "120",
-            暂缓订单: "10",
-            周期排产储备: "3000",
-            常规排产储备: "2000",
-            是否满足最小投产量: "是",
-            最小投产量值: "1000",
-            备注: "",
-            更新日期: "2025-11-20",
-            数量: "10",
-            客户国别: "越南",
-            目的国: "索马里",
-            PO号: "ABS2507C",
-            发货模式:'整单发货',
-            供应链优先级:'高',
-            提报日期:'2025-11-20',
-            EUDR:'29878',
-          },
-          {
-            年月:'20025-09',
-            需求版本号:'',
-            订单数量:'140',
-            库存总数:'246',
-            库存分配量:'140',
-            月底计划余量分配量:'160',
-            订单类型:'常规储备',
-            产品品类:'PCR',
-            内外销:'外销',
-            储备数量:'1465',
-            适销区域:"非洲，越南",
-            近3个月月均销量:'1688',
-            近6个月月均销量:'1538',
-            滚动12个月销售频次:'450',
-            滚动12个月结构上机频次:'248',
-            超3个月库存:'12',
-            超6个月库存:'0',
-            超12个月库存:'0',
-            备库上限:'25',
-            工厂: "116",
-            年份: "2025",
-            月份: "11",
-            产品分类: "驱动",
-            订单优先级: "高优先级",
-            区域: "非洲",
-            品牌: "AMULET",
-            客户: "Join",
-            产品结构: "ST235/80R16",
-            主花纹: "AT505",
-            NC物料编码: "3302002547",
-            物料描述: "295/80R22.5 152/149J 18PR JD756 BL4HJY",
-            排产分类: "常规产品",
-            年周号: "0000",
-            均匀性: "是",
-            动平衡: "是",
-            订单量: "1247",
-            库存: "256",
-            月底余量: "158",
-            排产净需求: "3425",
-            是否排产: "是",
-            净需求: "3425",
-            净需求No: "3425",
-            高优先级: "300",
-            中优先级: "120",
-            暂缓订单: "10",
-            周期排产储备: "3000",
-            常规排产储备: "2000",
-            是否满足最小投产量: "是",
-            最小投产量值: "1000",
-            备注: "",
-            更新日期: "2025-11-20",
-            数量: "10",
-            客户国别: "越南",
-            目的国: "乌拉圭",
-            PO号: "JT25137-140XDW",
-            发货模式:'整单发货',
-            供应链优先级:'高',
-            提报日期:'2025-11-20',
-            EUDR:'29878',
-          },
-          {
-            年月:'20025-09',
-            需求版本号:'',
-            订单数量:'140',
-            库存总数:'246',
-            库存分配量:'140',
-            月底计划余量分配量:'160',
-            订单类型:'常规储备',
-            产品品类:'PCR',
-            内外销:'外销',
-            储备数量:'1465',
-            适销区域:"非洲，越南",
-            近3个月月均销量:'1688',
-            近6个月月均销量:'1538',
-            滚动12个月销售频次:'450',
-            滚动12个月结构上机频次:'248',
-            超3个月库存:'12',
-            超6个月库存:'0',
-            超12个月库存:'0',
-            备库上限:'25',
-            工厂: "116",
-            年份: "2025",
-            月份: "11",
-            产品分类: "驱动",
-            订单优先级: "高优先级",
-            区域: "非洲",
-            品牌: "AMULET",
-            客户: "Join",
-            产品结构: "ST235/80R16",
-            主花纹: "AT505",
-            NC物料编码: "3302002547",
-            物料描述: "12.00R20 158/155J 22PR JD756 BT0HJY",
-            排产分类: "常规产品",
-            年周号: "0000",
-            均匀性: "是",
-            动平衡: "是",
-            订单量: "1247",
-            库存: "256",
-            月底余量: "158",
-            排产净需求: "3425",
-            是否排产: "是",
-            净需求: "3425",
-            净需求No: "3425",
-            高优先级: "300",
-            中优先级: "120",
-            暂缓订单: "10",
-            周期排产储备: "3000",
-            常规排产储备: "2000",
-            是否满足最小投产量: "是",
-            最小投产量值: "1000",
-            备注: "",
-            更新日期: "2025-11-20",
-            数量: "10",
-            客户国别: "越南",
-            目的国: "乌拉圭",
-            PO号: "SOM-2501",
-            发货模式:'整单发货',
-            供应链优先级:'高',
-            提报日期:'2025-11-20',
-            EUDR:'29878',
-          },
-        ];
 
-        // const res = await listProSizeSummary(this.formatParams());
-        // // console.log()
+        const res = await listOrderOffsetDetail(this.formatParams());
+        // console.log()
 
-        // this.data = res.rows;
+        this.data = res.rows;
 
         // this.setSum(res.rows);
 
-        // this.page.total = data.total;
+        this.page.total = res.total;
       } catch (error) {
         console.error(error);
       } finally {
@@ -630,18 +440,19 @@ export default {
   },
   created() {
     const date = moment();
-    this.getList();
+
     this.search = {
       yearMonth: date.format("yyyy-MM"),
-      factoryCode: "",
+      factoryCode: "116",
     };
     this.query = {
       yearMonth: date.format("yyyy-MM"),
-      factoryCode: "",
+      factoryCode: "116",
     };
+    this.getList();
   },
   activated() {
-    this.getList();
+    // this.getList();
   },
 };
 </script>

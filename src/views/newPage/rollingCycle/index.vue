@@ -1190,17 +1190,17 @@ export default {
             this.$set(this.query, "productionVersion", "");
           }
         }
-        if (isGet) {
-          this.$nextTick(() => {
-            this.getList();
-          });
-        }
+        // if (isGet) {
+          // this.$nextTick(() => {
+          //   this.getList();
+          // });
+        // }
       } catch (err) {
         console.log(err);
       } finally {
-        // if (isGet) {
-        //   this.getList();
-        // }
+        if (isGet) {
+          this.getList();
+        }
       }
     },
 
@@ -1682,8 +1682,8 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.scheduledMachines = this.actionDate.cxMachineCode;
-        params.structureName = this.actionDate.structureName;
+        params.scheduledMachines = this.formInline.cxMachineCode;
+        params.structureName = this.formInline.structureName;
 
         params.adjustType = this.adjustType;
         this.isEdit = true;
@@ -1816,6 +1816,7 @@ export default {
         let arr = params.yearMonth.split("-");
         params.year = arr[0];
         params.month = arr[1];
+        params.yearMonth=''
       }
 
       return params;
