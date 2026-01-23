@@ -459,10 +459,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
         }
-        Set<Integer> hasProductionDaySet = selectedCxMachine.confirmProductionRange(context, workWeakProductionInfo);
-        Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
-        Integer startDay = selectedCxMachine.getAllocationStartDay();
-        startDay = Math.max(startDay, realStartDay);
+        Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
+        Integer startDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         //20260121 切换结构控制
         DayCapacityLimitVo dayCapacityLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Integer realChangeDay = dayCapacityLimitHandler.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
@@ -475,8 +473,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             //下一新增结构
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
         }
-        startDay = realStartDay;
-        Integer remainingDays = selectedCxMachine.getRemainingDays();
+        startDay = realChangeDay;
+        Set<Integer> realProductionDaySet = hasProductionDaySet.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
+        Integer remainingDays = realProductionDaySet.size();
 //        Integer realRemainingDays = hasProductionDaySet.size();
 //        remainingDays = Math.min(remainingDays, realRemainingDays);
         //分配产能
@@ -484,8 +483,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新剩余天数
-        Integer leftOver = remainingDays - realAllocationDays;
-        selectedCxMachine.setRemainingDays(leftOver);
+        Integer leftOver1 = remainingDays - realAllocationDays;
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);
@@ -496,7 +494,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         }
         //重新获取机台的剩余日 提前收尾
-        leftOver = selectedCxMachine.getRemainingDays();
+        Integer leftOver = selectedCxMachine.getRemainingDays();
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
             CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);

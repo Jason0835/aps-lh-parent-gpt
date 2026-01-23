@@ -13,6 +13,7 @@ import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.TbrMouldProductionLogRecorder;
@@ -103,22 +104,25 @@ public class CxMachineBaseInfoVo implements Serializable {
      */
     private Set<Integer> stopDayInfo;
     /**
-     * 最大可排产天数
+     * 最大可排产天数(已经剔除了停产日)
      */
     private Integer maxProductionDays;
-
     /**
-     * 剩余可分配天数
+     * 理论的排产天数集合
      */
-    private Integer remainingDays;
+    private Set<Integer> theoryProductionDaySet;
     /**
      * 非续作结构使用-当前硫化配比
      */
     private Integer ratio;
     /**
-     * 挑选时，可排产天数：与成型鼓取得交集后的天数
+     * 挑选时使用，可排产天数：与成型鼓取得交集后的天数
      */
     private Integer selectedProductionDys;
+    /**
+     * 挑选时使用，排产日集合
+     */
+    private Set<Integer> selectedProductionDaySet;
     /**
      * 针对计划的固定优先级
      */
@@ -159,7 +163,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      * @return
      */
     public Integer getRemainCapacity() {
-        Integer currentRemainDays = remainingDays;
+        Integer currentRemainDays = getRemainingDays();
         if (null == currentRemainDays) {
             currentRemainDays = BigDecimal.ZERO.intValue();
         }
@@ -171,7 +175,24 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 剩余分配日
+     * 最大排产日-已分配日
+     *
+     * @return
+     */
+    public Integer getRemainingDays() {
+        if (null == maxProductionDays || maxProductionDays <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (CollectionUtils.isEmpty(allocationDaySet)) {
+            return maxProductionDays;
+        }
+        return maxProductionDays - allocationDaySet.size();
+    }
+
+    /**
      * 根据选中的selectedGroup，确认可排产日范围
+     * 从最后一个分配日开始
      *
      * @param context       排产上下文
      * @param selectedGroup 选中分组计划
@@ -188,14 +209,21 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(workWeakProductionInfo)) {
             return Collections.emptySet();
         }
-        //最后一个分配信息的排产日
-        Integer startDay = getAllocationStartDay();
+        //最后下一个分配日
+        Integer startDay = getNextStartDay();
         //成型机本身的排产日集合
-        Set<Integer> localProductionInfo = getHasProductionDayInfo(productionContext, startDay);
+        Set<Integer> localProductionInfo = getHasLeftOverProductionDayInfoByStartDay(startDay);
         if (CollectionUtils.isEmpty(localProductionInfo)) {
             return Collections.emptySet();
         }
-        return localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+        //取得交集
+        Set<Integer> intersectionSet = localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+        //取得最早的一段连续时间
+        Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRangeResultExcludeStop(intersectionSet, stopDayInfo);
+        if (CollectionUtils.isEmpty(earliestContinuousSet)) {
+            return Collections.emptySet();
+        }
+        return earliestContinuousSet;
     }
 
     /**
@@ -209,14 +237,19 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (null == context || CollectionUtils.isEmpty(workWeakProductionInfo)) {
             return Collections.emptySet();
         }
-        //最后一个分配信息的排产日
-        Integer startDay = getAllocationStartDay();
         //成型机本身的排产日
-        Set<Integer> localProductionInfo = getHasProductionDayInfo(context, startDay);
+        Set<Integer> localProductionInfo = getHasLeftOverProductionDayInfo();
         if (CollectionUtils.isEmpty(localProductionInfo)) {
             return Collections.emptySet();
         }
-        return localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+        //取得交集
+        Set<Integer> intersectionSet = localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+        //取得最早的一段连续时间
+        Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRangeResultExcludeStop(intersectionSet, stopDayInfo);
+        if (CollectionUtils.isEmpty(earliestContinuousSet)) {
+            return Collections.emptySet();
+        }
+        return earliestContinuousSet;
     }
 
     /**
@@ -313,11 +346,64 @@ public class CxMachineBaseInfoVo implements Serializable {
         Set<Integer> productionDaySet = new HashSet<>(64);
         for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
             //停产日及已排产日剔除
-            if (stopDayInfo.contains(productionDay) || allocationDaySet.contains(productionDaySet)) {
+            if (stopDayInfo.contains(productionDay) || allocationDaySet.contains(productionDay)) {
                 continue;
             }
             productionDaySet.add(productionDay);
         }
+        return productionDaySet;
+    }
+
+    /**
+     * 获取成型机台所有可排产日集合信息
+     * 剔除停产日和已分配日
+     * 停产日包含：
+     * 1、机台本身的维修停产
+     * 2、工作日历中的停工日
+     *
+     * @return
+     */
+    private Set<Integer> getHasLeftOverProductionDayInfo() {
+        if (CollectionUtils.isEmpty(theoryProductionDaySet)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> productionDaySet = new HashSet<>(64);
+        theoryProductionDaySet.forEach(productionDay -> {
+            if (stopDayInfo.contains(productionDay) || allocationDaySet.contains(productionDay)) {
+                return;
+            }
+            productionDaySet.add(productionDay);
+        });
+        return productionDaySet;
+    }
+
+    /**
+     * 获取成型机台所有可排产日集合信息
+     * 剔除停产日和已分配日
+     * 停产日包含：
+     * 1、机台本身的维修停产
+     * 2、工作日历中的停工日
+     *
+     * @param startDay 开始排产日
+     * @return
+     */
+    private Set<Integer> getHasLeftOverProductionDayInfoByStartDay(Integer startDay) {
+        if (null == startDay) {
+            return Collections.emptySet();
+        }
+        if (CollectionUtils.isEmpty(theoryProductionDaySet)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> productionDaySet = new HashSet<>(64);
+        theoryProductionDaySet.forEach(productionDay -> {
+            if (productionDay < startDay) {
+                return;
+            }
+            if (stopDayInfo.contains(productionDay) || allocationDaySet.contains(productionDay)) {
+                return;
+            }
+            productionDaySet.add(productionDay);
+        });
         return productionDaySet;
     }
 
@@ -486,6 +572,11 @@ public class CxMachineBaseInfoVo implements Serializable {
      * @param groupPlanInfo   收尾的结构信息
      */
     public void handlerBeforeConclusion(Context context, CxMachineAllocationPlanHelper allocationInfo, Set<Integer> deductionDaySet, ProductionPlanGroupInfo groupPlanInfo) {
+        //20260123 分配日清除
+        if (!CollectionUtils.isEmpty(deductionDaySet)) {
+            allocationDaySet.removeAll(deductionDaySet);
+        }
+        //切换结构
         handlerBeforeConclusionByAllocation(context, allocationInfo);
         String proSize = groupPlanInfo.getProSizeInfo();
         if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(deductionDaySet)) {
@@ -496,7 +587,6 @@ public class CxMachineBaseInfoVo implements Serializable {
             if (stopDayInfo.contains(beforeConclusionDay)) {
                 return;
             }
-            //20260123 分配日清除
             allocationDaySet.remove(beforeConclusionDay);
             productionContext.getBaseDataContainer().releaseUsedCount(beforeConclusionDay, proSize, cxMachineCode);
         });
@@ -669,7 +759,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      *
      * @return
      */
-    public Integer getAllocationStartDay() {
+    public Integer getLastAllocationStartDay() {
         if (CollectionUtils.isEmpty(allocationList)) {
             return ProductionConstant.MONTH_START_DAY;
         }
@@ -678,6 +768,26 @@ public class CxMachineBaseInfoVo implements Serializable {
             return ProductionConstant.MONTH_START_DAY;
         }
         return lastHelper.getEndDay() + BigDecimal.ONE.intValue();
+    }
+
+    /**
+     * 获取下一个排产起始日，在当前最大的排产日基础上 + 1
+     *
+     * @return
+     */
+    public Integer getNextStartDay() {
+        if (CollectionUtils.isEmpty(theoryProductionDaySet)) {
+            return null;
+        }
+        if (CollectionUtils.isEmpty(allocationDaySet)) {
+            return ProductionConstant.MONTH_START_DAY;
+        }
+        if (allocationDaySet.size() == theoryProductionDaySet.size()) {
+            return null;
+        }
+        List<Integer> sortList = allocationDaySet.stream().sorted(Comparator.reverseOrder()).collect(Collectors.toList());
+        Integer maxDay = sortList.get(BigDecimal.ZERO.intValue());
+        return maxDay + BigDecimal.ONE.intValue();
     }
 
     /**
