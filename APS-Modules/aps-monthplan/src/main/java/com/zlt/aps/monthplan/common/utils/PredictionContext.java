@@ -8,6 +8,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import lombok.Data;
+import org.springframework.util.CollectionUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,8 +46,7 @@ public class PredictionContext {
       List<SupplyOrderPool> supplyOrderPools,
       List<SalesOrderPool> allocationOrders,
       List<SalesOrderPool> postponeOrders,
-      Map<String, Integer> originalMonthSurplusMap,
-      Map<String, Integer> monthSurplusMap,
+      Map<String, Integer> initialData,
       Map<String, Integer>  monthlySaleQty,
       Integer  minProductionQty,
       Map<String, MdmMaterialInfo> materialInfoMap,
@@ -65,6 +65,18 @@ public class PredictionContext {
     this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
     this.materialInfoMap = materialInfoMap != null ? materialInfoMap : Collections.emptyMap();
     this.cycleSchStruConfs = cycleSchStruConfs != null ? cycleSchStruConfs : Collections.emptyList();
+    if(!CollectionUtils.isEmpty(initialData)) {
+      // 深度拷贝：创建新的HashMap，确保与原始数据隔离
+      this.originalMonthSurplusMap = Collections.unmodifiableMap(
+          new HashMap<>(initialData)
+      );
+      // 工作Map是原始数据的可修改副本
+      this.monthSurplusMap = new HashMap<>(this.originalMonthSurplusMap);
+    }else{
+      this.originalMonthSurplusMap = Collections.emptyMap();
+      this.monthSurplusMap = Collections.emptyMap();
+    }
+
   }
 
   /**

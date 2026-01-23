@@ -28,7 +28,7 @@
 
     <!-- 批量插入预警记录 -->
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO raw_warning_record (
+        INSERT INTO t_raw_warning_record (
         factory_code,
         warning_type,
         material_code,
@@ -67,7 +67,7 @@
     <!-- 批量更新预警记录 -->
     <update id="batchUpdateRawWarningRecord" parameterType="java.util.List">
         <foreach collection="list" item="item" separator=";">
-            UPDATE raw_warning_record
+            UPDATE t_raw_warning_record
             <set>
                 <if test="item.status != null">status = #{item.status},</if>
                 <if test="item.notified != null">notified = #{item.notified},</if>
@@ -84,7 +84,7 @@
     <!-- 批量更新周用量记录（全字段更新） -->
     <update id="batchUpdate" parameterType="java.util.List">
         <foreach collection="list" item="item" index="index" separator=";">
-            UPDATE raw_week_usage
+            UPDATE t_raw_week_usage
             <set>
                 factory_code = #{item.factoryCode},
                 year = #{item.year},
@@ -92,7 +92,6 @@
                 week = #{item.week},
                 material_code = #{item.materialCode},
                 material_desc = #{item.materialDesc},
-                material_type = #{item.materialType},
                 plan_qty = #{item.planQty},
                 actual_qty = #{item.actualQty},
                 deviation_qty = #{item.deviationQty},
@@ -109,7 +108,7 @@
 
     <!-- 批量更新实际用量和偏差数据（优化版，使用CASE WHEN一次更新多条） -->
     <update id="batchUpdateActualAndDeviation" parameterType="java.util.List">
-        UPDATE raw_week_usage
+        UPDATE t_raw_week_usage
         <trim prefix="SET" suffixOverrides=",">
             actual_qty = CASE id
             <foreach collection="list" item="item">

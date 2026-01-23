@@ -289,11 +289,5 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         return AjaxResult.success( requirementVersionService.generateVersion(DpDemandPlanServiceImpl.PREFIX));
     }
 
-    @ApiOperation("查询需求计划版本号")
-    @PostMapping("/findMonthPlanVersion")
-    public AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlan queryCondition){
-        return AjaxResult.success(dpDemandPlanService.findMonthPlanVersion(queryCondition));
-    }
-
 }
 

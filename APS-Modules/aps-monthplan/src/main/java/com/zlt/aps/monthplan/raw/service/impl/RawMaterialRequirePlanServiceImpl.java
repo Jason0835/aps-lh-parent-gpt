@@ -8,11 +8,13 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.constant.Constant;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
+import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,9 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Autowired
     private FactoryMonthPlanProdFinalMapper factoryMonthPlanProdFinalMapper;
+
+    @Autowired
+    private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
 
     @Autowired
     private MpProductionPredictionEntityMapper mpOrderPredictionMapper;
@@ -137,7 +142,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
             try {
                 // 3. 检查月度生产计划是否已定稿
-                if (!checkMonthPlanFinalized(year, month)) {
+                if (!checkMonthPlanFinalized(factoryCode, year, month)) {
                     String message = StringUtils.format(
                             I18nUtil.getMessage("raw.material.require.plan.month.plan.not.finalized"),
                             year, String.format("%02d", month)
@@ -297,11 +302,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 检查月度生产计划是否已定稿
      */
-    private boolean checkMonthPlanFinalized(Integer year, Integer month) {
-        QueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = new QueryWrapper<>();
+    private boolean checkMonthPlanFinalized(String factoryCode, Integer year, Integer month) {
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("YEAR", year)
-                .eq("MONTH", month);
-        Long count = factoryMonthPlanProdFinalMapper.selectCount(queryWrapper);
+                .eq("MONTH", month)
+                .eq("IS_FINAL", Constant.TRUE)
+                .eq("FACTORY_CODE", factoryCode);
+        Long count = mpFactoryProductionVersionMapper.selectCount(queryWrapper);
         return count > 0;
     }
 
@@ -464,7 +471,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         // 1. 收集所有不重复的胎胚代码，批量查询所有BOM结构
         List<String> embryoCodes = monthPlans.stream()
-                .map(FactoryMonthPlanProdFinal::getMainMaterialDesc)
+                .map(FactoryMonthPlanProdFinal::getEmbryoCode)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
@@ -478,7 +485,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 return;
             }
 
-            String embryoCode = plan.getMainMaterialDesc();
+            String embryoCode = plan.getEmbryoCode();
             List<MdmMaterialConsumeDetail> bomDetails = bomMap.get(embryoCode);
             if (CollectionUtils.isEmpty(bomDetails)) {
                 return;
@@ -886,6 +893,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         // 设置创建信息
         plan.setCreateBy(username);
         plan.setCreateTime(new Date());
+        plan.setUpdateTime(new Date());
 
         return plan;
     }
@@ -896,7 +904,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private BigDecimal formatAndValidateBigDecimal(BigDecimal value, String fieldName) {
         if (value == null) {
-            return null;
+            return BigDecimal.ZERO;
         }
 
         try {
@@ -1012,7 +1020,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         StringBuilder batchInfo = new StringBuilder();
 
         ratios.forEach(ratio -> {
-            BigDecimal proportion = ratio.getRatio();
+            BigDecimal proportion = ratio.getRatio().divide(new BigDecimal(100));
             BigDecimal standardLength = BigDecimal.valueOf(ratio.getStandardLength());
 
             // 计算该规格的需求量 = 总需求量 * 比例

@@ -71,7 +71,7 @@ public class DayCapacityLimitVo implements Serializable {
             return theoryChangeDay;
         }
         //提取在theoryChangeDay后，首个最小的日期
-        Set<Integer> afterTheoryChangeDayList = hasChangeGroupSet.stream().filter(singleDay -> singleDay > theoryChangeDay).collect(Collectors.toSet());
+        Set<Integer> afterTheoryChangeDayList = hasChangeGroupSet.stream().filter(singleDay -> singleDay >= theoryChangeDay).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(afterTheoryChangeDayList)) {
             return null;
         }
@@ -108,7 +108,7 @@ public class DayCapacityLimitVo implements Serializable {
         if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
             return context.getProductionDay();
         }
-        List<DayCapacityLimitHelper> hasChangeGroupList = dayCapacityLimitMap.values().stream().filter(singleDay -> singleDay.getLeftOverUsedChangeGroupQty() > BigDecimal.ONE.intValue()).collect(Collectors.toList());
+        List<DayCapacityLimitHelper> hasChangeGroupList = dayCapacityLimitMap.values().stream().filter(singleDay -> singleDay.getLeftOverUsedChangeGroupQty() >= BigDecimal.ONE.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasChangeGroupList)) {
             return Collections.emptySet();
         }
@@ -126,7 +126,7 @@ public class DayCapacityLimitVo implements Serializable {
         if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
             return context.getProductionDay();
         }
-        List<DayCapacityLimitHelper> hasChangeMouldList = dayCapacityLimitMap.values().stream().filter(singleDay -> singleDay.getLeftOverUsedChangeMouldQty() > BigDecimal.ONE.intValue()).collect(Collectors.toList());
+        List<DayCapacityLimitHelper> hasChangeMouldList = dayCapacityLimitMap.values().stream().filter(singleDay -> singleDay.getLeftOverUsedChangeMouldQty() >= BigDecimal.ONE.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasChangeMouldList)) {
             return Collections.emptySet();
         }
@@ -203,7 +203,7 @@ public class DayCapacityLimitVo implements Serializable {
             return;
         }
         //开始时间需要推迟 提取在startDay后，首个最小的日期
-        Set<Integer> afterTheoryChangeDayList = hasChangeMouldDaySet.stream().filter(singleDay -> singleDay > startDay).collect(Collectors.toSet());
+        Set<Integer> afterTheoryChangeDayList = hasChangeMouldDaySet.stream().filter(singleDay -> singleDay >= startDay).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(afterTheoryChangeDayList)) {
             lhGroup.updateProductionDateRange(null, null);
             return;
@@ -245,7 +245,7 @@ public class DayCapacityLimitVo implements Serializable {
             return;
         }
         //开始时间需要推迟 提取在startDay后，首个最小的日期
-        Set<Integer> afterTheoryChangeDayList = hasChangeMouldDaySet.stream().filter(singleDay -> singleDay > startDay).collect(Collectors.toSet());
+        Set<Integer> afterTheoryChangeDayList = hasChangeMouldDaySet.stream().filter(singleDay -> singleDay >= startDay).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(afterTheoryChangeDayList)) {
             newLhGroup.updateProductionDateRange(null, null);
             return;

@@ -295,21 +295,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
-    public List<String> findMonthPlanVersion(DpDemandPlan queryCondition) {
-        LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DpDemandPlan::getFactoryCode, queryCondition.getFactoryCode());
-        wrapper.eq(DpDemandPlan::getYear, queryCondition.getYear());
-        wrapper.eq(DpDemandPlan::getMonth, queryCondition.getMonth());
-        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.orderByDesc(DpDemandPlan::getCreateTime);
-        List<DpDemandPlan> list =  this.demandPlanEntityMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(list)){
-            return Collections.emptyList();
-        }
-        return list.stream().map(DpDemandPlan::getMonthPlanVersion).distinct().collect(Collectors.toList());
-    }
-
-    @Override
     public List<DpDemandPlan> createAdjustRequire(DpDemandPlan createCondition) {
         // 1. 前置校验
         validateFinalizedForAdjust(createCondition);
@@ -372,9 +357,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
-        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> originalMonthSurplusMap;
+        Map<String, Integer> monthSurplusMap;
+        if(!CollectionUtils.isEmpty(initialData)) {
+            // 深度拷贝：创建新的HashMap，确保与原始数据隔离
+            originalMonthSurplusMap = Collections.unmodifiableMap(
+                new HashMap<>(initialData)
+            );
+            // 工作Map是原始数据的可修改副本
+            monthSurplusMap = new HashMap<>(originalMonthSurplusMap);
+        }else{
+            originalMonthSurplusMap = Collections.emptyMap();
+            monthSurplusMap = Collections.emptyMap();
+        }
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        predictionContext.setOriginalMonthSurplusMap(monthSurplusMap);
+        predictionContext.setOriginalMonthSurplusMap(originalMonthSurplusMap);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
         List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
         List<DpSimulatedOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
@@ -565,7 +563,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
                 null,
-                null,
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
@@ -588,9 +585,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
-        Map<String, Integer> monthSurplusMap = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> originalMonthSurplusMap;
+        Map<String, Integer> monthSurplusMap;
+        if(!CollectionUtils.isEmpty(initialData)) {
+            // 深度拷贝：创建新的HashMap，确保与原始数据隔离
+            originalMonthSurplusMap = Collections.unmodifiableMap(
+                new HashMap<>(initialData)
+            );
+            // 工作Map是原始数据的可修改副本
+            monthSurplusMap = new HashMap<>(originalMonthSurplusMap);
+        }else{
+            originalMonthSurplusMap = Collections.emptyMap();
+            monthSurplusMap = Collections.emptyMap();
+        }
         predictionContext.setMonthSurplusMap(monthSurplusMap);
-        predictionContext.setOriginalMonthSurplusMap(monthSurplusMap);
+        predictionContext.setOriginalMonthSurplusMap(originalMonthSurplusMap);
         // 3. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             predictionVersion, predictionContext.getSalesOrders(), predictionContext.getFinishedProductStockMap(),
@@ -907,7 +917,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 supplyOrderPools,
                 partitionedOrders.get(false),
                 partitionedOrders.get(true),
-                monthSurplusMap,
                 monthSurplusMap,
                 monthlySaleQty,
                 minProductionQty,
