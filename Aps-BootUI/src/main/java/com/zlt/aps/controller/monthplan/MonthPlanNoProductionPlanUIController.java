@@ -74,7 +74,7 @@ public class MonthPlanNoProductionPlanUIController extends BaseUIController<Mont
      */
     @Override
     public String getProcedureCode() {
-        return "0";
+        return I18nUtil.getMessage("ui.data.column.monthPlanNoProductionPlan.modelName");
     }
 
     /**
@@ -99,6 +99,7 @@ public class MonthPlanNoProductionPlanUIController extends BaseUIController<Mont
         return AjaxResult.success();
     }
 
+    @RequiresPermissions("monthplan:monthPlanNoProductionPlan:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
