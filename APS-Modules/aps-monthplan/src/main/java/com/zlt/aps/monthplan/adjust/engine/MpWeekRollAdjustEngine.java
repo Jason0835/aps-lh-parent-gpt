@@ -25,11 +25,13 @@ import org.springframework.stereotype.Service;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -56,7 +58,11 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureIn> onIncrementAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> incrementAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> trialAdjustList = new ArrayList<>();
-        List<String> onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
+        List<String> onMaterialCodeList = Optional.ofNullable(mpProdFinalList)
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(x -> x.getMaterialCode())
+                .collect(Collectors.toList());
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
