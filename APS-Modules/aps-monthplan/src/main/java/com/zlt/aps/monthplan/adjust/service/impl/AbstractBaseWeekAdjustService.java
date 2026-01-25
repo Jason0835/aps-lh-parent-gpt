@@ -430,7 +430,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 实际调整
             adjustDetailVo.setActualAdjustQty(adjustResult.getTotalPlanQty());
             // 调整原因 TODO
-            adjustDetailVo.setAdjustReason("");
+//            adjustDetailVo.setAdjustReason("");
         }
         // 更新调整明细
         try {
@@ -512,7 +512,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
                 String dayFieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + i;
-                monthPlanVo.setFieldValueByFieldName(dayFieldName, adjustResult.getFieldValueByFieldName(dayFieldName));
+                monthPlanVo.setFieldValueByFieldName(dayFieldName, Convert.toInt(adjustResult.getFieldValueByFieldName(dayFieldName),0));
             }
             // 重算开始日期和结束日期
             if (adjustResult.getBeginDay() != null) {
@@ -1180,6 +1180,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         version.setPlanType("01");
         version.setYear(contextDTO.getMpYear());
         version.setMonth(contextDTO.getMpMonth());
+        version.setIsFinal(ApsConstant.TRUE);
 
         LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
         buildVersionCondition(wrapper, version);

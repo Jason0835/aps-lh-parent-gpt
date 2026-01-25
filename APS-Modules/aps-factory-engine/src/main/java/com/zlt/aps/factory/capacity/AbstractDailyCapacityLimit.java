@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.capacity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.ruoyi.common.text.Convert;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -67,8 +68,8 @@ public abstract class AbstractDailyCapacityLimit {
         int iMaxEmbryoTypes = 0;
         for (MpStructureAllocation strutAllocVo: mpStructAllocList){
             if (iDay >= strutAllocVo.getBeginDay() && iDay <= strutAllocVo.getEndDay()){
-                iMaxLhMachines += strutAllocVo.getMaxLhMachineCount();
-                iMaxEmbryoTypes += strutAllocVo.getMaxEmbryoCodeCount();
+                iMaxLhMachines += Convert.toInt(strutAllocVo.getMaxLhMachineCount(), 0);
+                iMaxEmbryoTypes += Convert.toInt(strutAllocVo.getMaxEmbryoCodeCount(), 0);
             }
         }
         dailyCapacityLimitVo.setMaxLhMachines(iMaxLhMachines);

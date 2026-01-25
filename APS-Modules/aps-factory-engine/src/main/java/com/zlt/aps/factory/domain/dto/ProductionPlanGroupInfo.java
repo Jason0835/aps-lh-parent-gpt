@@ -514,46 +514,6 @@ public class ProductionPlanGroupInfo {
             preSelected.updateProductionDateRange(null, null);
             return;
         }
-//        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
-//        //说明达到胎胚种类数限制
-//        if (CollectionUtils.isEmpty(hasAddSkuList)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
-//        //取得与胎胚种类数范围的交集
-//        Set<Integer> effectiveDaySet = getEffectiveDay(context, preSelected, hasAddSkuList);
-//        if (CollectionUtils.isEmpty(effectiveDaySet)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
-//        //取得与模具排产范围的交集
-//        Set<Integer> effectiveMouldSet = getEffectiveDay(effectiveDaySet, selectedMould);
-//        if (CollectionUtils.isEmpty(effectiveMouldSet)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
-//        //20260116 取得与模壳排产范围的交集
-//        Set<Integer> mouldShellSet = productionContext.getMouldShellRange(selectedMould.get(BigDecimal.ZERO.intValue()));
-//        if (CollectionUtils.isEmpty(mouldShellSet)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
-//        Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
-//        if (CollectionUtils.isEmpty(intersectionSet)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
-//        //20260617 取得与模具分配比例排产范围的交集
-//        Set<Integer> mouldAllocationSet = productionContext.getMouldAllocationRange(addSkuInfo);
-//        if (CollectionUtils.isEmpty(mouldAllocationSet)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
-//        intersectionSet = intersectionSet.stream().filter(mouldAllocationSet::contains).collect(Collectors.toSet());
-//        if (CollectionUtils.isEmpty(intersectionSet)) {
-//            preSelected.updateProductionDateRange(null, null);
-//            return;
-//        }
         List<Integer> sortList = new ArrayList<>(effectiveRangeSet);
         Collections.sort(sortList);
         int size = sortList.size();
