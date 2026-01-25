@@ -49,6 +49,9 @@ public class PredictionAllocationHelper {
     int productionQty;
     int completionQty;
     for (Map.Entry<String, List<DpOrderOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
+      if(productionQtyMap.containsKey(entry.getKey()) && productionQtyMap.get(entry.getKey()) == 0) {
+        continue;
+      }
       productionQty = productionQtyMap.getOrDefault(entry.getKey(),0);
       completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
       stockQty = BigDecimal.valueOf(productionQty - completionQty);
