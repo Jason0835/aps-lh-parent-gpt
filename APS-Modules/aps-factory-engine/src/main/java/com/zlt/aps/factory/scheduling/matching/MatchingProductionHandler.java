@@ -334,7 +334,7 @@ public class MatchingProductionHandler {
                 LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupInfo, cxMachineInfoSet,
                         cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
                 CxLhMouldProductionCalculator.lhProductionByGroupHandler(productionContext, lhProductionQtyHelper,
-                        usedBeginDate, usedEndDate, newDoubleMouldList, needProductionInfo.getNeedProductionList());
+                        usedBeginDate, usedEndDate, newDoubleMouldList, needProductionInfo.getNeedProductionList(), false);
                 newSkuQtyMap.put(materialDesc, lhProductionQtyHelper.getRealSumProductionQty()); // 累计已排量
             }
         }
