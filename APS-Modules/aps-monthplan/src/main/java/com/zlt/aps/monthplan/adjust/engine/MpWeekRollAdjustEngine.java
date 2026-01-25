@@ -58,11 +58,10 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureIn> onIncrementAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> incrementAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> trialAdjustList = new ArrayList<>();
-        List<String> onMaterialCodeList = Optional.ofNullable(mpProdFinalList)
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(x -> x.getMaterialCode())
-                .collect(Collectors.toList());
+        if (PubUtil.isEmpty(mpProdFinalList)) {
+            mpProdFinalList = new ArrayList<>();
+        }
+        List<String> onMaterialCodeList = mpProdFinalList.stream().map(x -> x.getMaterialCode()).collect(Collectors.toList());
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
