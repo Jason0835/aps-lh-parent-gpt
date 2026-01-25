@@ -78,7 +78,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
@@ -1203,7 +1202,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setConventionReserveQty(statistics.conventionReserveQty);
 
         // 计算派生数量
-        calculateDerivedQuantities(demandPlan, statistics);
+        calculateDerivedQuantities(demandPlan);
 
         // 设置生产和优先级标识
         setProductionAndPriorityFlags(demandPlan, minProductionQty, demandPlan.getNetQty());
@@ -1309,14 +1308,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 计算派生数量
      */
-    private void calculateDerivedQuantities(DpDemandPlan demandPlan, QuantityStatistics statistics) {
+    private void calculateDerivedQuantities(DpDemandPlan demandPlan) {
         // (8)净需求(含暂缓) = 高优先级净需求量 + 中优先级净需求量+暂缓订单需求量
-        demandPlan.setPostponeNetQty(statistics.heightQty + statistics.midQty + statistics.postponeQty);
+        demandPlan.setPostponeNetQty(demandPlan.getHeightQty() + demandPlan.getMidQty() + demandPlan.getPostponeQty());
 
         // (9)净需求(不含暂缓) = 高优先级净需求量 + 中优先级净需求量
-        demandPlan.setUnPostponeNetQty(statistics.heightQty + statistics.midQty);
+        demandPlan.setUnPostponeNetQty(demandPlan.getHeightQty() + demandPlan.getMidQty());
         // 实单高优先级+实单中优先级+周期排产储备
-        demandPlan.setNetQty(statistics.heightQty + statistics.midQty + statistics.cycleReserveQty);
+        demandPlan.setNetQty(demandPlan.getHeightQty() + demandPlan.getMidQty() + demandPlan.getCycleReserveQty());
     }
 
     /**
