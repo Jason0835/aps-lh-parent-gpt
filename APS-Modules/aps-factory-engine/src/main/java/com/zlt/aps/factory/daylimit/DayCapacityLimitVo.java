@@ -2,6 +2,7 @@ package com.zlt.aps.factory.daylimit;
 
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
@@ -95,6 +96,60 @@ public class DayCapacityLimitVo implements Serializable {
             return;
         }
         dayCapacityLimitMap.forEach((productionDay, dayLimit) -> dayLimit.resetUsedQty());
+    }
+
+    /**
+     * 获取还有剩余产能可分配的排产日集合
+     * 分配使用量 < 日产能上限的排产日集合
+     *
+     * @return
+     */
+    public Set<Integer> getHasCapacityProductionDayInfo() {
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return Collections.emptySet();
+        }
+        List<DayCapacityLimitHelper> hasAllocationCapacityList = dayCapacityLimitMap.values().stream().filter(singleDay -> singleDay.isAllocationCapacity()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasAllocationCapacityList)) {
+            return Collections.emptySet();
+        }
+        return hasAllocationCapacityList.stream().map(DayCapacityLimitHelper::getProductionDay).collect(Collectors.toSet());
+    }
+
+    /**
+     * 增加分组产能分配使用量信息
+     *
+     * @param context           排产上下文
+     * @param allocationDay     分配日
+     * @param addAllocationPlan 分配信息
+     */
+    public void addCxMachineGroupNameAllocationUsedQty(Context context, Integer allocationDay, CxMachineAllocationPlanHelper addAllocationPlan) {
+        if (!isEffectiveParam(allocationDay, addAllocationPlan)) {
+            return;
+        }
+        DayCapacityLimitHelper dayLimit = dayCapacityLimitMap.get(allocationDay);
+        if (null == dayLimit) {
+            return;
+        }
+        dayLimit.addCxMachineAllocationQty(context, allocationDay, addAllocationPlan);
+    }
+
+    /**
+     * 减少分组产能分配使用量信息
+     * 在结构提前收尾时，需将占用量释放
+     *
+     * @param context        排产上下文
+     * @param allocationDay  分配日
+     * @param allocationInfo 分配信息
+     */
+    public void deductionCxMachineGroupNameAllocationUsedQty(Context context, Integer allocationDay, CxMachineAllocationPlanHelper allocationInfo) {
+        if (!isEffectiveParam(allocationDay, allocationInfo)) {
+            return;
+        }
+        DayCapacityLimitHelper dayLimit = dayCapacityLimitMap.get(allocationDay);
+        if (null == dayLimit) {
+            return;
+        }
+        dayLimit.deductionCxMachineAllocationQty(context, allocationDay, allocationInfo);
     }
 
     /**
@@ -303,6 +358,25 @@ public class DayCapacityLimitVo implements Serializable {
             return;
         }
         dayLimit.deductionChangeMouldUsedQty(context, materialDesc, mouldCode);
+    }
+
+    /**
+     * 是否有效参数
+     * <p>
+     * true 有效 false 无效
+     *
+     * @param allocationDay     分配日
+     * @param addAllocationPlan 分配信息
+     * @return
+     */
+    private boolean isEffectiveParam(Integer allocationDay, CxMachineAllocationPlanHelper addAllocationPlan) {
+        if (null == allocationDay || null == addAllocationPlan) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return false;
+        }
+        return true;
     }
 
     /**

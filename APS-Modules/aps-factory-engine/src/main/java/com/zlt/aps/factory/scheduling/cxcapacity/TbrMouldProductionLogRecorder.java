@@ -3,7 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
-import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
+import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;

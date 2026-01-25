@@ -3,6 +3,7 @@ package com.zlt.aps.factory.daylimit;
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,10 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     private Integer minCapacity;
     /**
+     * 每日分配产能上限--用于结构产能分配
+     */
+    private Integer maxAllocationCapacity;
+    /**
      * 每日切换结构次数上限
      */
     private Integer maxChangeCxMachineCount;
@@ -60,9 +65,17 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     private Integer usedChangeLhMachineCount;
     /**
+     * 成型分配量
+     */
+    private Integer cxMachineAllocationQty;
+    /**
      * 总的排产量(包含换模等导致的损耗)
      */
     private Integer sumProductionCapacityQty;
+    /**
+     * 存储分组分配-占用产能信息
+     */
+    private Set<String> groupAllocationInfo;
     /**
      * 存储切换：机台-分组信息
      * 机台|*|分组
@@ -95,6 +108,7 @@ public class DayCapacityLimitHelper implements Serializable {
         if (null != dayMaxCapacity) {
             Integer realDayMaxCapacity = BigDecimal.valueOf(dayMaxCapacity).multiply(BigDecimal.valueOf(ProductionConstant.PERCENTAGE)).divide(BigDecimal.valueOf(ratio), 0, RoundingMode.UP).intValue();
             initLimit.maxCapacity = realDayMaxCapacity;
+            initLimit.maxAllocationCapacity = dayMaxCapacity;
         }
         Integer dayMinCapacity = paramConfiguration.getDayMinCapacity();
         if (null != dayMinCapacity) {
@@ -117,6 +131,61 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     public void resetUsedQty() {
         initUsedInfo();
+    }
+
+    /**
+     * 是否还有剩余产能可分配
+     * cxMachineAllocationQty < maxAllocationCapacity
+     *
+     * @return
+     */
+    public boolean isAllocationCapacity() {
+        return cxMachineAllocationQty < maxAllocationCapacity;
+    }
+
+    /**
+     * 增加成型分配产能-天产能占用量
+     *
+     * @param context           排产上下文
+     * @param productionDay     排产日
+     * @param addAllocationPlan 分配信息
+     */
+    public void addCxMachineAllocationQty(Context context, Integer productionDay, CxMachineAllocationPlanHelper addAllocationPlan) {
+        if (!checkBeforeOperateResult(productionDay, addAllocationPlan)) {
+            return;
+        }
+        String allocationKey = addAllocationPlan.getDayAllocationKey();
+        if (groupAllocationInfo.contains(allocationKey)) {
+            return;
+        }
+        groupAllocationInfo.add(allocationKey);
+        Integer allocationQty = addAllocationPlan.getDayMinAllocationQty();
+        cxMachineAllocationQty = cxMachineAllocationQty + allocationQty;
+        log.info(DayLimitLogRecorder.addCxMachineGroupUsedLog(context, productionDay, allocationKey, allocationQty, cxMachineAllocationQty));
+    }
+
+    /**
+     * 释放成型分配产能-天产能占用量
+     *
+     * @param context        排产上下文
+     * @param productionDay  排产日
+     * @param allocationInfo 分配信息
+     */
+    public void deductionCxMachineAllocationQty(Context context, Integer productionDay, CxMachineAllocationPlanHelper allocationInfo) {
+        if (!checkBeforeOperateResult(productionDay, allocationInfo)) {
+            return;
+        }
+        String allocationKey = allocationInfo.getDayAllocationKey();
+        if (!groupAllocationInfo.contains(allocationKey)) {
+            return;
+        }
+        groupAllocationInfo.remove(allocationKey);
+        Integer allocationQty = allocationInfo.getDayMinAllocationQty();
+        cxMachineAllocationQty = cxMachineAllocationQty - allocationQty;
+        if (cxMachineAllocationQty <= BigDecimal.ZERO.intValue()) {
+            cxMachineAllocationQty = BigDecimal.ZERO.intValue();
+        }
+        log.info(DayLimitLogRecorder.addDeductionCxMachineGroupUsedLog(context, productionDay, allocationKey, allocationQty, cxMachineAllocationQty));
     }
 
     /**
@@ -261,6 +330,29 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
+     * 操作前的检查结果
+     * 检查排产日 是否与当前日符合
+     * 检查productionDay与allocationInfo是否为空对象
+     * 检查allocationInfo是否有分组信息和成型机台信息
+     *
+     * @param productionDay  排产日
+     * @param allocationInfo 分配信息
+     * @return
+     */
+    private boolean checkBeforeOperateResult(Integer productionDay, CxMachineAllocationPlanHelper allocationInfo) {
+        if (null == allocationInfo || null == productionDay) {
+            return false;
+        }
+        if (!productionDay.equals(this.productionDay)) {
+            return false;
+        }
+        if (null == allocationInfo.getProductionPlanInfo() || StringUtils.isBlank(allocationInfo.getCxMachineCode())) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * 构建初始的
      *
      * @param productionDay
@@ -268,6 +360,7 @@ public class DayCapacityLimitHelper implements Serializable {
     private DayCapacityLimitHelper(Integer productionDay) {
         this.productionDay = productionDay;
         this.maxCapacity = Integer.MAX_VALUE;
+        this.maxAllocationCapacity = Integer.MAX_VALUE;
         this.minCapacity = BigDecimal.ZERO.intValue();
         this.capacityRatio = ProductionConstant.PERCENTAGE;
         this.maxChangeCxMachineCount = Integer.MAX_VALUE;
@@ -279,9 +372,11 @@ public class DayCapacityLimitHelper implements Serializable {
      * 初始化使用量信息
      */
     private void initUsedInfo() {
+        this.cxMachineAllocationQty = BigDecimal.ZERO.intValue();
         this.usedChangeCxMachineCount = BigDecimal.ZERO.intValue();
         this.usedChangeLhMachineCount = BigDecimal.ZERO.intValue();
         this.sumProductionCapacityQty = BigDecimal.ZERO.intValue();
+        this.groupAllocationInfo = new HashSet<>();
         this.changeCxMachineInfo = new HashSet<>();
         this.changeMouldInfo = new HashSet<>();
     }

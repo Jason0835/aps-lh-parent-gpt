@@ -302,7 +302,7 @@ public class CxCapacityAllocationHandler {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
         }
-        //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓
+        //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
         List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> {
             Set<Integer> hasProductionDaySet = singleMachine.confirmProductionRange(context, workWeakProductionInfo);
             if (CollectionUtils.isEmpty(hasProductionDaySet)) {
@@ -438,7 +438,7 @@ public class CxCapacityAllocationHandler {
                 //todo 记录日志
                 return;
             }
-            //20260120 真实可排产日，成型工装-成型鼓
+            //20260120 真实可排产日，成型工装-成型鼓 日产能上限控制
             Set<Integer> hasProductionSet = cxMachineInfo.confirmProductionRange(context, groupPlan);
             if (CollectionUtils.isEmpty(hasProductionSet)) {
                 return;

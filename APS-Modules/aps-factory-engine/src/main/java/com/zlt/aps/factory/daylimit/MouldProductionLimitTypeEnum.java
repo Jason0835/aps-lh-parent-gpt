@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.enums;
+package com.zlt.aps.factory.daylimit;
 
 import lombok.Getter;
 

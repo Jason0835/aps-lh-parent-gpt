@@ -1,10 +1,16 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.zlt.aps.factory.daylimit.*;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.monthplan.api.enums.WorkWearTypeEnum;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -20,6 +26,7 @@ import java.util.stream.Collectors;
  * @date 20251221
  */
 @Data
+@Slf4j
 public class BaseDataContainer implements Serializable {
     /**
      * 排产参数配置信息
@@ -72,7 +79,6 @@ public class BaseDataContainer implements Serializable {
     Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
     /**
      * 日产能限制控制对象
-     *
      */
     DayCapacityLimitVo dayCapacityLimit;
     /**
@@ -142,6 +148,44 @@ public class BaseDataContainer implements Serializable {
         //取得工装类型中剩余量最低的
         Optional<Map.Entry<String, Integer>> minEntry = workWeakTypeLimitQtyMap.entrySet().stream().min(Map.Entry.comparingByValue());
         return minEntry.get().getValue();
+    }
+
+    /**
+     * 根据分组计划信息，获取符合条件的可排产日集合
+     * 1、日产能还有可分配量
+     * 2、成型工装数量
+     *
+     * @param selectedGroupInfo 选中的分组计划
+     * @return
+     */
+    public GroupCapacityProductionLimitHelper getLeftOverProductionDayInfo(Context context, ProductionPlanGroupInfo selectedGroupInfo, CxMachineBaseInfoVo selectedCxMachineInfo) {
+        if (null == selectedGroupInfo) {
+            return GroupCapacityProductionLimitHelper.createNoLimitEmptyProductionSet();
+        }
+        String proSize = selectedGroupInfo.getProSizeInfo();
+        String groupName = selectedGroupInfo.getGroupName();
+        GroupAllocationCapacityLimitTypeEnum limitType;
+        //取得还有产能的天集合
+        Set<Integer> dayCapacitySet = dayCapacityLimit.getHasCapacityProductionDayInfo();
+        if (CollectionUtils.isEmpty(dayCapacitySet)) {
+            limitType = GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_LIMIT;
+            log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
+            return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
+        }
+        Set<Integer> workWeakProductionSet = getLeftOverProductionDayInfo(proSize);
+        if (CollectionUtils.isEmpty(workWeakProductionSet)) {
+            limitType = GroupAllocationCapacityLimitTypeEnum.TIRE_DRUM_LIMIT;
+            log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
+            return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
+        }
+        Set<Integer> intersectionSet = dayCapacitySet.stream().filter(workWeakProductionSet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            limitType = GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_TIRE_DRUM_LIMIT;
+            log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
+            return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
+        }
+        limitType = GroupAllocationCapacityLimitTypeEnum.NO_LIMIT;
+        return new GroupCapacityProductionLimitHelper(intersectionSet, limitType);
     }
 
     /**
