@@ -142,7 +142,6 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     @TableField(value = "YEAR_WEEK")
     private String yearWeek;
     /** 供应链优先级 1 优先 0 不优先 */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.isPrioritize", dictType = "biz_yes_no")
     @ApiModelProperty(value = "供应链优先级 1 优先 0 不优先", name = "isPrioritize")
     @TableField(value = "IS_PRIORITIZE")
     private String isPrioritize;
