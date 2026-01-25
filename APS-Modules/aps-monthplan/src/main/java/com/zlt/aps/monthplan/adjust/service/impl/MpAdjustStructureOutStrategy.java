@@ -209,11 +209,6 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
-        //2.月计划定稿数据空检查
-        if (PubUtil.isEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
-                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
-        }
 
         //4.按结构序列化分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));

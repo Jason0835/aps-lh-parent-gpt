@@ -401,7 +401,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
     }
 
-
     /**
      * 更新调整明细
      * 将本次调整的量，回填到"调整明细".实际调整；置换过程回填到“调整明细".调整原因
@@ -1172,7 +1171,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      *
      * @param contextDTO
      */
-    private void initVersion(MpRollAdjustContextDTO contextDTO) {
+    @Override
+    public void initVersion(MpRollAdjustContextDTO contextDTO) {
         // 查询排产版本
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(contextDTO.getFactoryCode());
