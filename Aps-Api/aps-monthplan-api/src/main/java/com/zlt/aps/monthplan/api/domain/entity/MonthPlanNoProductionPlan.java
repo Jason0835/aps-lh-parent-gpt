@@ -107,9 +107,9 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
 
-    /** 主物料(胎胚号) */
+    /** 胎胚描述 */
     @Excel(name = "ui.data.column.monthPlanNoProductionPlan.mainMaterialDesc")
-    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")
     private String mainMaterialDesc;
 
