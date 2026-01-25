@@ -355,7 +355,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
         if(CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
             return Collections.emptyList();
