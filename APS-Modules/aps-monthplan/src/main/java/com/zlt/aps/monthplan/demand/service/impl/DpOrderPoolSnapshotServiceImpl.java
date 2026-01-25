@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -104,6 +105,24 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
     }
 
     @Override
+    public List<DpOrderOffsetDetail> loadSupplyOrder(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion) {
+        LambdaQueryWrapper<DpOrderPoolSnapshot> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpOrderPoolSnapshot::getFactoryCode, finalVersion.getFactoryCode());
+        wrapper.eq(DpOrderPoolSnapshot::getYear, finalVersion.getYear());
+        wrapper.eq(DpOrderPoolSnapshot::getMonth, finalVersion.getMonth());
+        wrapper.eq(DpOrderPoolSnapshot::getMonthPlanVersion,finalVersion.getMonthPlanVersion());
+        wrapper.in(DpOrderPoolSnapshot::getOrderPriority,Lists.newArrayList(ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP,ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP));
+        wrapper.eq(DpOrderPoolSnapshot::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<DpOrderPoolSnapshot> list =  this.dpOrderPoolSnapshotEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyList();
+        }
+        List<DpOrderOffsetDetail> result = Lists.newArrayList();
+        list.forEach(orderPoolSnapshot -> result.add(buildSupplyOrderPool(createCondition,orderPoolSnapshot)));
+        return result;
+    }
+
+    @Override
     public List<SupplyOrderPool> fetchSupplyOrder(MpFactoryProductionVersion finalVersion) {
         LambdaQueryWrapper<DpOrderPoolSnapshot> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DpOrderPoolSnapshot::getFactoryCode, finalVersion.getFactoryCode());
@@ -123,15 +142,26 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
 
     private SupplyOrderPool buildSupplyOrderPool(DpOrderPoolSnapshot orderPoolSnapshot) {
         SupplyOrderPool supplyOrderPool = new SupplyOrderPool();
-        supplyOrderPool.setFactoryCode(orderPoolSnapshot.getFactoryCode());
-        supplyOrderPool.setYear(orderPoolSnapshot.getYear());
-        supplyOrderPool.setMonth(orderPoolSnapshot.getMonth());
-        supplyOrderPool.setBrand(orderPoolSnapshot.getBrand());
+        BeanUtils.copyProperties(orderPoolSnapshot,supplyOrderPool);
+        supplyOrderPool.setId(null);
+        supplyOrderPool.setBaseVale(null);
         supplyOrderPool.setOrderType(orderPoolSnapshot.getOrderPriority());
-        supplyOrderPool.setMaterialCode(orderPoolSnapshot.getMaterialCode());
-        supplyOrderPool.setMaterialDesc(orderPoolSnapshot.getMaterialDesc());
         supplyOrderPool.setQty(orderPoolSnapshot.getDemandQty());
-        supplyOrderPool.setSaleArea(orderPoolSnapshot.getAreaCode());
+        return supplyOrderPool;
+    }
+
+    private DpOrderOffsetDetail buildSupplyOrderPool(DpDemandPlan createCondition,DpOrderPoolSnapshot orderPoolSnapshot) {
+        DpOrderOffsetDetail supplyOrderPool = new DpOrderOffsetDetail();
+        BeanUtils.copyProperties(orderPoolSnapshot,supplyOrderPool);
+        supplyOrderPool.setId(null);
+        supplyOrderPool.setBaseVale(null);
+        supplyOrderPool.setFactoryCode(createCondition.getFactoryCode());
+        supplyOrderPool.setYear(createCondition.getYear());
+        supplyOrderPool.setMonth(createCondition.getMonth());
+        supplyOrderPool.setMonthPlanVersion(createCondition.getMonthPlanVersion());
+        supplyOrderPool.setOrderQty(orderPoolSnapshot.getDemandQty());
+        supplyOrderPool.setProduceQtyDue(orderPoolSnapshot.getDemandQty());
+        supplyOrderPool.setScmPriority(orderPoolSnapshot.getOrderPriority());
         return supplyOrderPool;
     }
 
@@ -199,6 +229,7 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         entity.setMonth(createCondition.getMonth());
         entity.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         entity.setOrderPriority(supplyOrder.getOrderType());
+        entity.setScmPriority(supplyOrder.getOrderType());
         // entity.setAreaCode();
         // entity.setCustomCode();
         // entity.setCustomName();

@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -39,7 +40,14 @@ public interface IDpOrderPoolSnapshotService  extends IDocService<DpOrderPoolSna
    */
   void saveOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth,  List<SupplyOrderPool> allStockUpOrders);
   /**
-   *  获取供应链订单
+   * 获取供应链订单
+   * @param createCondition
+   * @param finalVersion
+   * @return
+   */
+  List<DpOrderOffsetDetail> loadSupplyOrder(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion);
+  /**
+   * 获取定稿快照
    * @param finalVersion
    * @return
    */

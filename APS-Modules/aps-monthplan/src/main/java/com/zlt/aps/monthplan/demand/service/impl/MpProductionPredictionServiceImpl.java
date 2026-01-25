@@ -124,7 +124,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         param.setPrefix(PREFIX);
         List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
         // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-        List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion,predictionContext);
+        List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(monthRangeResult.getTPlus1Month(),param,finalVersion,predictionContext);
         List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
         // 排产汇总
         if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
@@ -132,7 +132,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             productionSchedulingService.executeSchedulingInNewTransaction(param,context);
             MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(context,tPlus1MonthDemands);
             productionVersions.put(monthRangeResult.getTPlus1Month(),finalVersionByTplus1Month);
-            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month,predictionContext);
+            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(monthRangeResult.getTPlus2Month(),param,finalVersionByTplus1Month,predictionContext);
         }
         if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
             Context context = buildContext(tPlus2MonthDemands);

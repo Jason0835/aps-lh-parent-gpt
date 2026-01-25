@@ -7,6 +7,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.bill.common.service.IDocService;
 
+import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -45,12 +46,15 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      */
     List<DpDemandPlan> createAdjustRequire(DpDemandPlan createCondition);
     /**
-     *  生成预测需求计划
+     * 生成预测需求计划
+     * @param currentMonth
      * @param createCondition
      * @param finalVersion
+     * @param predictionContext
      * @return
+     * @throws InterruptedException
      */
-    List<DpDemandPlan> createPredictionRequire(DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException;
+    List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext) throws InterruptedException;
     /**
      *  列表查询数据
      * @param queryWrapper
