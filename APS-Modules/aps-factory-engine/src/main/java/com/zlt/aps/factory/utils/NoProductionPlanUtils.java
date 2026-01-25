@@ -11,6 +11,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -24,46 +25,41 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class NoProductionPlanUtils {
-  public static List<MonthPlanNoProductionPlan> buildNoProductionPlanList(Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap, List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
-    List<MonthPlanNoProductionPlan> list = Lists.newArrayList();
-    Map<String,FactoryMonthPlanMouldDayResult> mouldDayResultMap =  convertToMaterialDescMap(dayResultList);
+  public static List<MonthPlanNoProductionPlan> buildNoProductionPlanList(Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap, Map<Long, MonthPlanNoProductionPlan> noProductionRecordMap, Map<Long, Integer> sumProductionMap) {
+    List<MonthPlanNoProductionPlan> noProductionPlanList = Lists.newArrayList();
     productionPlanMap.forEach((key, productionPlan) -> {
         Long monthPlanId = productionPlan.getMonthPlanId();
-        String unProductionReason = productionPlan.getNoProductionReason();
-        MonthPlanNoProductionPlan noProductionPlan = new MonthPlanNoProductionPlan();
-        BeanUtils.copyProperties(productionPlan, noProductionPlan);
-        noProductionPlan.setBaseVale(null);
-        noProductionPlan.setId(null);
-        noProductionPlan.setReason(unProductionReason);
-        Integer needProductionQty = productionPlan.getCxCapacityRequireQty();
-        Integer plannedQty = sumProductionMap.getOrDefault(monthPlanId,0);
+      String unProductionReason = productionPlan.getNoProductionReason();
+      MonthPlanNoProductionPlan noProductionPlan = new MonthPlanNoProductionPlan();
+      BeanUtils.copyProperties(productionPlan, noProductionPlan);
+      noProductionPlan.setId(null);
+      noProductionPlan.setReason(unProductionReason);
+      Integer needProductionQty = productionPlan.getCxCapacityRequireQty();
+      //有排产计划，则取排产数量
+      if (sumProductionMap.containsKey(monthPlanId)) {
+        Integer plannedQty = sumProductionMap.get(monthPlanId);
         int unProductionQty = needProductionQty - plannedQty;
-        noProductionPlan.setUnProductionQty(unProductionQty);
-        if(unProductionQty == 0) {
-          return;
-        }
-        if(StringUtils.isBlank(productionPlan.getMaterialDesc()) || !mouldDayResultMap.containsKey(productionPlan.getMaterialDesc())){
-          list.add(noProductionPlan);
-          return;
-        }
-        FactoryMonthPlanMouldDayResult mouldDayResult = mouldDayResultMap.get(productionPlan.getMaterialDesc());
-        if(null != mouldDayResult.getDifferenceQty() && mouldDayResult.getDifferenceQty() == 0){
-            return;
-        }
         if (!needProductionQty.equals(plannedQty)) {
-          list.add(noProductionPlan);
-          return;
+          noProductionPlan.setUnProductionQty(unProductionQty);
+          noProductionPlanList.add(noProductionPlan);
         }
-        if(hasNoProduction(productionPlan)) {
-            list.add(noProductionPlan);
-            return;
-        }
-        //即没有排产计划，又不是不排产计划
-        if (StringUtils.isNotBlank(unProductionReason) &&  unProductionQty >= BigDecimal.ZERO.longValue()) {
-          list.add(noProductionPlan);
-        }
+        return;
+      }
+      //不排产计划
+      if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
+        noProductionPlan.setUnProductionQty(needProductionQty);
+        noProductionPlanList.add(noProductionPlan);
+        return;
+      }
+      //即没有排产计划，又不是不排产计划
+      Integer plannedQty = productionPlan.getProductionQty();
+      int unProductionQty = needProductionQty - plannedQty;
+      if (StringUtils.isNotBlank(unProductionReason)  && unProductionQty >= BigDecimal.ZERO.longValue()) {
+        noProductionPlan.setUnProductionQty(unProductionQty);
+        noProductionPlanList.add(noProductionPlan);
+      }
     });
-    return list;
+    return noProductionPlanList;
   }
 
   public static Map<String, FactoryMonthPlanMouldDayResult> convertToMaterialDescMap(
@@ -102,4 +98,15 @@ public class NoProductionPlanUtils {
     return productionQty <= BigDecimal.ZERO.intValue();
   }
 
+  public static List<MonthPlanNoProductionPlan> createNoProductionRecordData(List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    List<MonthPlanNoProductionPlan> factoryNoProductionPlanList = new ArrayList<>();
+    requirePlanList.stream().filter(monthPlanInit -> hasNoProduction(monthPlanInit)).forEach(monthPlanInit -> {
+      MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
+      BeanUtils.copyProperties(monthPlanInit, noProductionRecord);
+      noProductionRecord.setId(null);
+      noProductionRecord.setReason(monthPlanInit.getNoProductionReason());
+      factoryNoProductionPlanList.add(noProductionRecord);
+    });
+    return factoryNoProductionPlanList;
+  }
 }

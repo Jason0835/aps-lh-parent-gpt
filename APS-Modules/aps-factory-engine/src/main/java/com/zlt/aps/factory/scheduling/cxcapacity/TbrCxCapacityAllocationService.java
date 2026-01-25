@@ -146,7 +146,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
-        saveMouldProductionInfo(productionContext);
+        Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext);
+        //保存未排计划明细
+        saveNoProductionPlanResult(productionContext, sumProductionMap);
     }
 
     /**
@@ -576,28 +578,27 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      *
      * @param productionContext
      */
-    private void saveMouldProductionInfo(TbrProductionContext productionContext) {
+    private Map<Long, Integer> saveMouldProductionInfo(TbrProductionContext productionContext) {
         //模具排产明细日志
         List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler.getMouldProductionResult(productionContext);
         if (CollectionUtils.isEmpty(detailLogList)) {
-            return;
+            return Collections.emptyMap();
         }
         getDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
         Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
-        //保存未排计划明细
-        saveNoProductionPlanResult(productionContext, dayResultList, sumProductionMap);
         getDataService().saveMouldProductionResult(dayResultList);
+        return sumProductionMap;
     }
 
-    private void saveNoProductionPlanResult(TbrProductionContext productionContext, List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
+    private void saveNoProductionPlanResult(TbrProductionContext productionContext,  Map<Long, Integer> sumProductionMap) {
         Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(productionPlanMap)) {
             return;
         }
-        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, dayResultList, sumProductionMap);
+        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, productionContext.getNoProductionRecordMap(), sumProductionMap);
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
