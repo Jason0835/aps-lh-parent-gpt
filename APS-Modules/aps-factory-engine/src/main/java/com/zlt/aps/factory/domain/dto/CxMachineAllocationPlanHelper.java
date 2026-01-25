@@ -133,16 +133,27 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
-     * 增加排产计划
-     * 模具排产后，需增加
+     * 获取日分配Key
      *
-     * @param productionPlan 排产计划
+     * @return
      */
-    public void addProductionPlan(MonthPlanProductionRequirePlanVo productionPlan) {
-        if (null == productionPlan) {
-            return;
+    public String getDayAllocationKey() {
+        String allocationKeyFormat = "%s|*|%s";
+        return String.format(allocationKeyFormat, productionPlanInfo.getGroupName(), cxMachineCode);
+    }
+
+    /**
+     * 获取分配的最小日排产量
+     * = 硫化机台配比 * Sku日最小硫化量
+     */
+    public Integer getDayMinAllocationQty() {
+        if (null == productionPlanInfo) {
+            return BigDecimal.ZERO.intValue();
         }
-        realProductionPlanList.add(productionPlan);
+        if (null == maxRatio) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return productionPlanInfo.getDayMinCapacityByLhRatio(maxRatio);
     }
 
 }

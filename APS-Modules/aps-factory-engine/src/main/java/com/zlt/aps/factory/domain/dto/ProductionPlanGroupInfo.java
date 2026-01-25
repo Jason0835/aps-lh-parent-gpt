@@ -9,7 +9,7 @@ import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
-import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
+import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -1165,6 +1165,24 @@ public class ProductionPlanGroupInfo {
             daySummary.setLhGroupCount(lhProductionLimit.getUsedLhMachineCount());
         });
         return summaryList;
+    }
+
+    /**
+     * 根据硫化配比，计算成型单日最小产能
+     * = 最小日硫化量(单模) * 2 * lhRatio
+     *
+     * @param lhRatio 成型硫化配比
+     * @return
+     */
+    public Integer getDayMinCapacityByLhRatio(Integer lhRatio) {
+        if (null == lhRatio || lhRatio <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        BigDecimal minCapacity = getDayCapacityByLhRatio(lhRatio);
+        if (null == minCapacity) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return minCapacity.setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
     }
 
     /**
