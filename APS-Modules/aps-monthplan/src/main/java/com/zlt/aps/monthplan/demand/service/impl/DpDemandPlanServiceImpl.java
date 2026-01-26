@@ -383,16 +383,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
         List<DpOrderOffsetDetail>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.loadSupplyOrder(createCondition,finalVersion);
         List<DpOrderOffsetDetail>  netDemands =   predictionContext.getPredictOffsetDetails();
-        netDemands.forEach(predictionOffsetDetail -> {
-            predictionOffsetDetail.setFactoryCode(createCondition.getFactoryCode());
-            predictionOffsetDetail.setYear(createCondition.getYear());
-            predictionOffsetDetail.setMonth(createCondition.getMonth());
-            predictionOffsetDetail.setMonthPlanVersion(createCondition.getMonthPlanVersion());
-        });
         if(!CollectionUtils.isEmpty(fetchSupplyOrders)) {
             netDemands.addAll(fetchSupplyOrders);
         }
-        List<DpOrderOffsetDetail>  leftDemands = PredictionAllocationHelper.calculateSaleOrder(netDemands,productionFinalResults,mpMonthPlanMonitors);
+        List<DpOrderOffsetDetail>  leftDemands = PredictionAllocationHelper.calculateSaleOrder(createCondition,netDemands,productionFinalResults,mpMonthPlanMonitors);
         if(CollectionUtils.isEmpty(leftDemands)){
             predictionContext.setPredictOffsetDetails(Collections.emptyList());
             return Collections.emptyList();
@@ -428,18 +422,19 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     }
 
-    private static DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition, DpOrderOffsetDetail netDemand) {
+
+    private  DpDemandPlan buildDemandPlanFromAllocation(DpDemandPlan createCondition,DpOrderOffsetDetail netDemand) {
         DpDemandPlan demandPlan = new DpDemandPlan();
         BeanUtils.copyProperties(netDemand, demandPlan);
-        demandPlan.setBaseVale(null);
-        demandPlan.setId(null);
         demandPlan.setFactoryCode(createCondition.getFactoryCode());
         demandPlan.setYear(createCondition.getYear());
         demandPlan.setMonth(createCondition.getMonth());
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setPlanType(createCondition.getPlanType());
+        demandPlan.setOrderQty(netDemand.getOrderQty());
         demandPlan.setIsDynamicBalance(YesOrNoEnum.YES.getCode().equals(netDemand.getIsDynamicBalance())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+        demandPlan.setNetQty(netDemand.getProduceQtyDue());
         demandPlan.setYearWeek(StringUtils.isBlank(netDemand.getWeekYear())?ZERO_YEAR_WEEK:netDemand.getWeekYear());
         return demandPlan;
     }

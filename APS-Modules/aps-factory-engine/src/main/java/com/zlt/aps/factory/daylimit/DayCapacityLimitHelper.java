@@ -195,6 +195,22 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
+     * 是否可增加Sku排产
+     * true表示可以， false表示不可以
+     *
+     * @return
+     */
+    public boolean isAddSkuProduction() {
+        if (maxCapacity <= BigDecimal.ZERO.intValue()) {
+            return false;
+        }
+        if (sumProductionCapacityQty <= BigDecimal.ZERO.intValue()) {
+            return true;
+        }
+        return sumProductionCapacityQty < maxCapacity;
+    }
+
+    /**
      * 增加排产量
      *
      * @param context        上下文

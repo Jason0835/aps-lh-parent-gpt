@@ -129,6 +129,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.setReverseFindSet(new HashSet<>());
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
+        //todo 共用模具的续作SKu的中优先级量和在机结构续作部分排产
+
         //在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //7、对收尾成型机台，反向匹配待排结构
@@ -405,6 +407,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
+            //todo 增加续作部分重新排产过
+
             //首先设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();
             //在机结构-新增Sku模拟排产
@@ -483,8 +487,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         startDay = realChangeDay;
         Set<Integer> realProductionDaySet = hasProductionDaySet.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
         Integer remainingDays = realProductionDaySet.size();
-//        Integer realRemainingDays = hasProductionDaySet.size();
-//        remainingDays = Math.min(remainingDays, realRemainingDays);
         //分配产能
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
         Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
