@@ -162,8 +162,13 @@ export default {
           width:120,
         },
         {
+          prop: "scheduleQty",
+          label: this.$t("plan.productionSchedule.unscheduleQtc"),
+          width:120,
+        },
+        {
           prop: "onboardDate",
-          label: this.$t("ui.data.column.monthplan.boardingDate"),
+          label: this.$t("上机日期"),
           width:120,
         },
         {

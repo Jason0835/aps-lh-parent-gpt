@@ -288,7 +288,7 @@
   "ui.data.vulcanizationTable.lhMachine":"硫化机台",
   "ui.data.vulcanizationTable.cxMachine":"成型机台",
   "ui.data.vulcanizationTable.netDemandQty":"净需求量",
-  "ui.data.vulcanizationTable.unqualifiedQty":"不合格数量",
+  "ui.data.vulcanizationTable.unqualifiedQty":"不合格数据量",
   "ui.data.vulcanizationTable.productionQty":"累计生产量(合格品)",
   "ui.data.vulcanizationTable.lhMargin":"硫化余量",
   "ui.data.vulcanizationTable.expectedCloseDay":"预计收尾天数",
@@ -316,7 +316,9 @@
 
   "ui.data.material.mesMaterialCategory":"MES物料大类",
   "ui.data.material.mesMaterialSubcategory":"MES物料细类",
-  "ui.data.rawMaterialRequirement.isSpringFestivalMonth":"是否春节月份"
+  "ui.data.rawMaterialRequirement.isSpringFestivalMonth":"是否春节月份",
+  "ui.data.vulcanizationTable.onboardDate":"上机日期"
+
 
 
 
