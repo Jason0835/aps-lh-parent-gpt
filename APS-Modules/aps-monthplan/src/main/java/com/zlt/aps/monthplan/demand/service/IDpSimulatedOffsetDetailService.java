@@ -4,9 +4,6 @@ package com.zlt.aps.monthplan.demand.service;
 import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.bill.common.service.IDocService;
 
-import java.util.List;
-import java.util.Set;
-
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IDpSimulatedOffsetDetailService.java
@@ -21,10 +18,5 @@ import java.util.Set;
  *     修改内容：...
  */
 public interface IDpSimulatedOffsetDetailService  extends IDocService<DpSimulatedOffsetDetail>{
-  /**
-   *  获取预测冲减详情
-   * @param monthPlanVersions
-   * @return
-   */
-  List<DpSimulatedOffsetDetail> findPredictOffsetDetail(Set<String> monthPlanVersions);
+
 }
