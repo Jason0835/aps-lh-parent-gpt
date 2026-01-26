@@ -7,7 +7,6 @@ import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.IDocService;
 
-import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 
@@ -31,24 +30,11 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    * @param monthPlanVersion 需求版本号
    * @param finishedProductStockMap 成品库存记录
    */
-  void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
-  /**
-   *  将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
-   * @param predictionVersion 预测版本号
-   * @param yearMonth 年月
-   * @param finishedProductStockMap 库存
-   */
-  void insertBatchData(String predictionVersion,
-                       YearMonth yearMonth, Map<String, List<MdmProductStock>> finishedProductStockMap);
+  List<DpStockVersion> insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
 
   /**
    *  汇总库存
    * @return
    */
   Map<String, Map<String, Integer>> calculateStockQty();
-  /**
-   *  汇总库存
-   * @return
-   */
-  Map<String, Map<String, Integer>> calculateStockQty(String monthPlanVersion);
 }

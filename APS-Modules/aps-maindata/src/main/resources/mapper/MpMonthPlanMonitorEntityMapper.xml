@@ -17,7 +17,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		       v.LH_MARGIN,
 		       v.EXPECTED_CLOSE_DAY,
 		       v.EXPECTED_CLOSE_DATE,
-		       v.EXPECTED_CLOSE_DATE,
 		       v.DIFF_DAY,
 		       r.CX_MACHINE_CODE AS CX_MACHINE,
 		       GROUP_CONCAT(distinct LH_MACHINE_CODE) AS LH_MACHINE
@@ -33,6 +32,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		 WHERE v.year = #{year}
 		   AND v.month = #{month}
 		   AND v.factory_code = #{factoryCode}
+           <if test="cxMachine != null and cxMachine != ''">
+           AND r.CX_MACHINE_CODE like concat('%', #{cxMachine}, '%')
+           </if>
+           <if test="structureName != null and structureName != ''">
+           AND v.STRUCTURE_NAME = #{structureName}
+           </if>
+		   <if test="lhMachine != null and lhMachine != ''">
+		   AND LH_MACHINE_CODE like concat('%', #{lhMachine}, '%')
+		   </if>
 		   <if test="materialCode != null and materialCode != ''">
 		   AND v.MATERIAL_CODE like concat('%', #{materialCode}, '%')
 		   </if>
@@ -52,7 +60,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		       v.PRODUCTION_QTY,
 		       v.LH_MARGIN,
 		       v.EXPECTED_CLOSE_DAY,
-               v.EXPECTED_CLOSE_DATE,
                v.EXPECTED_CLOSE_DATE,
                v.DIFF_DAY,
 		       r.CX_MACHINE_CODE
