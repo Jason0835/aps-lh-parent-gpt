@@ -9,6 +9,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.Constant;
+import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -419,7 +420,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
             String weekYear = detail.getWeekYear();
             // 判断是否为EudR：年周号大于3725
-            if (isEudrPlan(weekYear)) {
+            if (StringConstant.ONE.equals(detail.getIsEudr())) {
                 // EudR数量
                 quantities[1] += productionQty;
             } else {

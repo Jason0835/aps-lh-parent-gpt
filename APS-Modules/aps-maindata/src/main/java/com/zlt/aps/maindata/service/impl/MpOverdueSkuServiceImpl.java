@@ -44,37 +44,12 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
         return "MDM0218";
     }
 
+
     @Override
     public Set<String> excludeOverdueCycleProduction() {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         // 构建查询条件
-        QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized();
         queryWrapper.eq("IS_OVERDUE_CYCLE", YesOrNoEnum.YES.getValue());
-        // 方法1：使用复杂条件构造
-        // 方法1：使用复杂条件构造
-        queryWrapper.and(wrapper -> {
-            // 起始年月之后的数据
-            wrapper.or(w -> w
-                .eq("year", startYearMonth.getYear())
-                .ge("month", startYearMonth.getMonthValue())
-            );
-
-            // 中间完整年份
-            for (int year = startYearMonth.getYear() + 1;
-                 year < currentYearMonth.getYear();
-                 year++) {
-                int finalYear = year;
-                wrapper.or(w -> w.eq("year", finalYear));
-            }
-
-            // 结束年月之前的数据
-            wrapper.or(w -> w
-                .eq("year", currentYearMonth.getYear())
-                .le("month", currentYearMonth.getMonthValue())
-            );
-        });
         List<MpOverdueSku> list = this.mpOverdueSkuEntityMapper.selectList(queryWrapper);
         if(CollectionUtils.isEmpty(list)){
             return Sets.newHashSet();
@@ -84,35 +59,9 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
 
     @Override
     public Set<String> excludeOverduePrecedentProduction() {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         // 构建查询条件
-        QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized();
         queryWrapper.eq("IS_OVERDUE_REGULAR", YesOrNoEnum.YES.getValue());
-        // 方法1：使用复杂条件构造
-        // 方法1：使用复杂条件构造
-        queryWrapper.and(wrapper -> {
-            // 起始年月之后的数据
-            wrapper.or(w -> w
-                .eq("year", startYearMonth.getYear())
-                .ge("month", startYearMonth.getMonthValue())
-            );
-
-            // 中间完整年份
-            for (int year = startYearMonth.getYear() + 1;
-                 year < currentYearMonth.getYear();
-                 year++) {
-                int finalYear = year;
-                wrapper.or(w -> w.eq("year", finalYear));
-            }
-
-            // 结束年月之前的数据
-            wrapper.or(w -> w
-                .eq("year", currentYearMonth.getYear())
-                .le("month", currentYearMonth.getMonthValue())
-            );
-        });
         List<MpOverdueSku> list = this.mpOverdueSkuEntityMapper.selectList(queryWrapper);
         if(CollectionUtils.isEmpty(list)){
             return Sets.newHashSet();
@@ -122,11 +71,8 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
 
     @Override
     public boolean checkOverdue(SupplyOrderPool supplyOrderPool) {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
         // 构建查询条件
-        QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized();
         queryWrapper.eq("FACTORY_CODE",supplyOrderPool.getFactoryCode());
         queryWrapper.eq("MATERIAL_CODE",supplyOrderPool.getMaterialCode());
         if(ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(supplyOrderPool.getOrderType())) {
@@ -134,29 +80,24 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
         }else{
             queryWrapper.eq("IS_OVERDUE_CYCLE", YesOrNoEnum.YES.getValue());
         }
-        // 方法1：使用复杂条件构造
-        // 方法1：使用复杂条件构造
-        queryWrapper.and(wrapper -> {
-            // 起始年月之后的数据
-            wrapper.or(w -> w
-                .eq("year", startYearMonth.getYear())
-                .ge("month", startYearMonth.getMonthValue())
-            );
-
-            // 中间完整年份
-            for (int year = startYearMonth.getYear() + 1;
-                 year < currentYearMonth.getYear();
-                 year++) {
-                int finalYear = year;
-                wrapper.or(w -> w.eq("year", finalYear));
-            }
-
-            // 结束年月之前的数据
-            wrapper.or(w -> w
-                .eq("year", currentYearMonth.getYear())
-                .le("month", currentYearMonth.getMonthValue())
-            );
-        });
         return this.mpOverdueSkuEntityMapper.selectCount(queryWrapper) > 0;
+    }
+
+    /**
+     * 优化的实现：使用数值比较（性能更好）
+     */
+    public QueryWrapper<MpOverdueSku> buildExtendedRangeQueryOptimized() {
+        QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
+        YearMonth current = YearMonth.now();
+        // 计算最近N个月的起始点
+        YearMonth recentStart = current.minusMonths(13);
+        // 将年月转换为数值
+        int recentStartValue = recentStart.getYear() * 100 + recentStart.getMonthValue();
+        int currentValue = current.getYear() * 100 + current.getMonthValue();
+        // 使用数据库表达式
+        String expression = "year * 100 + month";
+        // 构建条件：expression < recentStartValue OR expression BETWEEN recentStartValue AND currentValue
+        queryWrapper.and(w -> w.apply(expression + " BETWEEN {0} AND {1}", recentStartValue, currentValue));
+        return queryWrapper;
     }
 }

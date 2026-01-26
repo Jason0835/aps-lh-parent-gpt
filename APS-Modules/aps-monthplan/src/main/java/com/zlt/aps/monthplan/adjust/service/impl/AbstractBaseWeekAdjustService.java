@@ -401,7 +401,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
     }
 
-
     /**
      * 更新调整明细
      * 将本次调整的量，回填到"调整明细".实际调整；置换过程回填到“调整明细".调整原因
@@ -431,7 +430,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 实际调整
             adjustDetailVo.setActualAdjustQty(adjustResult.getTotalPlanQty());
             // 调整原因 TODO
-            adjustDetailVo.setAdjustReason("");
+//            adjustDetailVo.setAdjustReason("");
         }
         // 更新调整明细
         try {
@@ -513,7 +512,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
                 String dayFieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + i;
-                monthPlanVo.setFieldValueByFieldName(dayFieldName, adjustResult.getFieldValueByFieldName(dayFieldName));
+                monthPlanVo.setFieldValueByFieldName(dayFieldName, Convert.toInt(adjustResult.getFieldValueByFieldName(dayFieldName),0));
             }
             // 重算开始日期和结束日期
             if (adjustResult.getBeginDay() != null) {
@@ -1172,7 +1171,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      *
      * @param contextDTO
      */
-    private void initVersion(MpRollAdjustContextDTO contextDTO) {
+    @Override
+    public void initVersion(MpRollAdjustContextDTO contextDTO) {
         // 查询排产版本
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(contextDTO.getFactoryCode());
@@ -1180,6 +1180,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         version.setPlanType("01");
         version.setYear(contextDTO.getMpYear());
         version.setMonth(contextDTO.getMpMonth());
+        version.setIsFinal(ApsConstant.TRUE);
 
         LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
         buildVersionCondition(wrapper, version);
@@ -1566,6 +1567,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 型腔数量、活块数量
             adjustDetailVo.setMouldCavityQty(0);
             adjustDetailVo.setTypeBlockQty(0);
+            adjustDetailVo.setHeightQty(0);
+            adjustDetailVo.setMidQty(0);
+            adjustDetailVo.setPostponeQty(0);
+            adjustDetailVo.setCycleReserveQty(0);
+            adjustDetailVo.setConventionReserveQty(0);
             return;
         }
         // 有月度生产计划时，赋值关联字段
@@ -1585,11 +1591,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setDayVulcanizationQty(monthPlan.getDayVulcanizationQty());
         adjustDetailVo.setCuringTime(monthPlan.getCuringTime());
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
-        adjustDetailVo.setHeightQty(monthPlan.getHeightProductionQty());
-        adjustDetailVo.setMidQty(monthPlan.getMidProductionQty());
-        adjustDetailVo.setPostponeQty(monthPlan.getPostponeProductionQty());
-        adjustDetailVo.setCycleReserveQty(monthPlan.getCycleProductionQty());
-        adjustDetailVo.setConventionReserveQty(monthPlan.getConventionProductionQty());
+        adjustDetailVo.setHeightQty(Convert.toInt(monthPlan.getHeightProductionQty(),0));
+        adjustDetailVo.setMidQty(Convert.toInt(monthPlan.getMidProductionQty(),0));
+        adjustDetailVo.setPostponeQty(Convert.toInt(monthPlan.getPostponeProductionQty(),0));
+        adjustDetailVo.setCycleReserveQty(Convert.toInt(monthPlan.getCycleProductionQty(),0));
+        adjustDetailVo.setConventionReserveQty(Convert.toInt(monthPlan.getConventionProductionQty(),0));
     }
 
     /**

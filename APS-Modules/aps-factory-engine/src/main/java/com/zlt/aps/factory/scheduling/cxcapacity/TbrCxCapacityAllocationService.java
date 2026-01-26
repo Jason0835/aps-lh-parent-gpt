@@ -146,7 +146,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
-        saveMouldProductionInfo(productionContext);
+        Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext);
+        //保存未排计划明细
+        saveNoProductionPlanResult(productionContext, sumProductionMap);
     }
 
     /**
@@ -437,22 +439,24 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
             return;
         }
-        //20260120 判断成型鼓是否符合条件
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        String proSize = addNewGroupPlan.getProSizeInfo();
         String groupName = addNewGroupPlan.getGroupName();
+        /**
+         * 20260120 判断成型鼓是否符合条件
+         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
+         */
+        GroupCapacityProductionLimitHelper limitResult = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
         //获取成型工装的排产日集合
-        Set<Integer> workWeakProductionInfo = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(proSize);
-        if (CollectionUtils.isEmpty(workWeakProductionInfo)) {
-            log.info(TbrProductionGroupLogRecorder.addNoWorkWeakMatchPlanLog(productionContext, null, groupName, proSize));
-            //20260120 标记分配完成--没有成型工装，说明后面也找不到
+        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
+        if (CollectionUtils.isEmpty(limitResult.getProductionDaySet())) {
+            //20260120 标记分配完成--没有成型工装,没有日产能，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
         }
         //对挑选出的结构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, workWeakProductionInfo);
+        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, productionDayInfo);
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, groupName));
@@ -574,28 +578,27 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      *
      * @param productionContext
      */
-    private void saveMouldProductionInfo(TbrProductionContext productionContext) {
+    private Map<Long, Integer> saveMouldProductionInfo(TbrProductionContext productionContext) {
         //模具排产明细日志
         List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler.getMouldProductionResult(productionContext);
         if (CollectionUtils.isEmpty(detailLogList)) {
-            return;
+            return Collections.emptyMap();
         }
         getDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
         Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
-        //保存未排计划明细
-        saveNoProductionPlanResult(productionContext, dayResultList, sumProductionMap);
         getDataService().saveMouldProductionResult(dayResultList);
+        return sumProductionMap;
     }
 
-    private void saveNoProductionPlanResult(TbrProductionContext productionContext, List<FactoryMonthPlanMouldDayResult> dayResultList, Map<Long, Integer> sumProductionMap) {
+    private void saveNoProductionPlanResult(TbrProductionContext productionContext,  Map<Long, Integer> sumProductionMap) {
         Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(productionPlanMap)) {
             return;
         }
-        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, dayResultList, sumProductionMap);
+        List<MonthPlanNoProductionPlan> noProductionPlanList = NoProductionPlanUtils.buildNoProductionPlanList(productionPlanMap, productionContext.getNoProductionRecordMap(), sumProductionMap);
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
@@ -937,14 +940,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
             dayCapacityLimitMap.put(productionDay, dayInitLimit);
         });
-//        if (CollectionUtils.isEmpty(startProductionRatioMap)) {
-//            baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
-//            return;
-//        }
-//        startProductionRatioMap.forEach((productionDay, ratio) -> {
-//            DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
-//            dayCapacityLimitMap.put(productionDay, dayInitLimit);
-//        });
         dayCapacityLimit.updateWholeDayLimitInfo(dayCapacityLimitMap);
         baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
     }

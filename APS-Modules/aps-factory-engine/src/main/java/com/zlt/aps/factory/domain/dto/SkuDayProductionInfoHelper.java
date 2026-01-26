@@ -83,7 +83,7 @@ public class SkuDayProductionInfoHelper implements Serializable {
      *
      * @param productionQty 需要增加的排产量
      */
-    public void addProductionDayQty(Integer productionQty) {
+    public void addProductionDayQty(Integer productionQty, Integer lossQty) {
         if (null == sumProductionQty) {
             sumProductionQty = BigDecimal.ZERO.intValue();
         }
@@ -91,6 +91,13 @@ public class SkuDayProductionInfoHelper implements Serializable {
             productionQty = BigDecimal.ZERO.intValue();
         }
         sumProductionQty = sumProductionQty + productionQty;
+        if (null == lossQty) {
+            lossQty = BigDecimal.ZERO.intValue();
+        }
+        if (null == this.lossQty) {
+            this.lossQty = BigDecimal.ZERO.intValue();
+        }
+        this.lossQty = this.lossQty + lossQty;
     }
 
     /**

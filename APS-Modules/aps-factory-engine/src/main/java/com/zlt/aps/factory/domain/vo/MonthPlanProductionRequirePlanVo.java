@@ -9,6 +9,7 @@ import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.common.utils.PubUtil;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
  * @author ZLT
  * @date 20251209
  */
+@Slf4j
 @Data
 public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
 
@@ -90,10 +92,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 本轮次是否参与排产 1 是 0 否
      */
     private Integer isThisRound;
-    /**
-     * 订单量
-     */
-    private Integer orderQty;
     /**
      * 初始的排产数据设置
      * 标记初始的排产标记
@@ -218,6 +216,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         plan.setMonthPlanId(require.getId());
         //默认可生产
         plan.setCantProduce(YesOrNoEnum.NO.getCode());
+        plan.setIsPrioritize(require.getScmPriority());
         //排产为空，则默认可排产
         if (StringUtils.isBlank(require.getIsProduction())) {
             plan.setIsProduction(YesOrNoEnum.YES.getCode());

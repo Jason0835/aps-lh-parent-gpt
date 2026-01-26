@@ -123,25 +123,27 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         param.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
         param.setPrefix(PREFIX);
         List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
-        // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-        List<DpDemandPlan> tPlus1MonthDemands =  dpDemandPlanService.createPredictionRequire(param,finalVersion,predictionContext);
-        List<DpDemandPlan> tPlus2MonthDemands = Lists.newArrayList();
-        // 排产汇总
-        if(!CollectionUtils.isEmpty(tPlus1MonthDemands)) {
-            Context context = buildContext(tPlus1MonthDemands);
-            productionSchedulingService.executeSchedulingInNewTransaction(param,context);
-            MpFactoryProductionVersion finalVersionByTplus1Month = createProductionVersion(context,tPlus1MonthDemands);
-            productionVersions.put(monthRangeResult.getTPlus1Month(),finalVersionByTplus1Month);
-            tPlus2MonthDemands = dpDemandPlanService.createPredictionRequire(param,finalVersionByTplus1Month,predictionContext);
-        }
-        if(!CollectionUtils.isEmpty(tPlus2MonthDemands)) {
-            Context context = buildContext(tPlus2MonthDemands);
-            productionSchedulingService.executeSchedulingInNewTransaction(param,context);
-            MpFactoryProductionVersion finalVersionByTplus2Month = createProductionVersion(context,tPlus2MonthDemands);
-            productionVersions.put(monthRangeResult.getTPlus2Month(),finalVersionByTplus2Month);
+        // 定义要处理的所有月份
+        YearMonth[] monthsToProcess = {
+            monthRangeResult.getTPlus1Month(),
+            monthRangeResult.getTPlus2Month()
+        };
+        MpFactoryProductionVersion currentFinalVersion = finalVersion;
+        List<DpDemandPlan> currentMonthDemands;
+        // 对应的历史数据偏移量（从5开始递减）
+        for (YearMonth currentMonth : monthsToProcess) {
+            // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
+            currentMonthDemands =  dpDemandPlanService.createPredictionRequire(currentMonth,param,currentFinalVersion,predictionContext);
+            // 排产汇总
+            if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
+                Context context = buildContext(currentMonthDemands);
+                productionSchedulingService.executeSchedulingInNewTransaction(param,context);
+                currentFinalVersion = createProductionVersion(context,currentMonthDemands);
+                productionVersions.put(currentMonth,currentFinalVersion);
+            }
         }
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
-        List<MpProductionPrediction> list = buildProductionPrediction(monthRangeResult,tMonthDemands,productionVersions,materialInfoMap);
+        List<MpProductionPrediction> list = buildProductionPrediction(monthRangeResult,productionVersions,tMonthDemands,materialInfoMap);
         if(!CollectionUtils.isEmpty(list)) {
             this.baseDao.insertBatch(list);
         }
@@ -190,7 +192,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
 
-    private List<MpProductionPrediction> buildProductionPrediction(MonthCalculator.MonthRangeResult monthRangeResult,List<DpDemandPlan> tMonthDemands,Map<YearMonth,MpFactoryProductionVersion> productionVersions, Map<String, MdmMaterialInfo> materialInfoMap) {
+    private List<MpProductionPrediction> buildProductionPrediction(MonthCalculator.MonthRangeResult monthRangeResult,Map<YearMonth,MpFactoryProductionVersion> productionVersions,List<DpDemandPlan> tMonthDemands, Map<String, MdmMaterialInfo> materialInfoMap) {
         MpFactoryProductionVersion currentFinalVersion = productionVersions.get(monthRangeResult.getTMonth());
         Set<String> monthPlanVersions = productionVersions.values().stream().map(MpFactoryProductionVersion::getMonthPlanVersion).filter(monthPlanVersion -> !currentFinalVersion.getMonthPlanVersion().equals(monthPlanVersion)).collect(Collectors.toSet());
         List<FactoryMonthPlanMouldDayResult> list = this.factoryMonthPlanProductionFinalResultService.findProductionFinalResult(currentFinalVersion,monthPlanVersions);
@@ -198,11 +200,9 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             return Collections.emptyList();
         }
         Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
-
         List<MpProductionPrediction> result = Lists.newArrayList();
-        YearMonth yearMonth = YearMonth.now();
+        YearMonth yearMonth = monthRangeResult.getTMonth();
         DpDemandPlan demandPlan = tMonthDemands.get(0);
-
         map.forEach((materialCode, value) -> {
                 if(!materialInfoMap.containsKey(materialCode)) {
                     return;

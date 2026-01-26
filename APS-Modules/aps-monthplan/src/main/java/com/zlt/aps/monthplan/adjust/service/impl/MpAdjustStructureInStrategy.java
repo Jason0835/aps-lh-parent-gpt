@@ -97,11 +97,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
-        //2.月计划定稿数据空检查
-        if (PubUtil.isEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
-                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
-        }
+
 
         //4.按结构序列化分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
@@ -128,7 +124,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             weekRollAdjustEngine.structureInAdjustForOne(contextDTO,entry.getValue(), mpProdFinalMap.get(entry.getKey()));
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
-            newFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
+            if (PubUtil.isNotEmpty(mpProdFinalMap.get(entry.getKey()))) {
+                newFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
+            }
             //4.3 保存调整日志
             saveMpAdjustLog(contextDTO);
         }

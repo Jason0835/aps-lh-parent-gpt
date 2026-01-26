@@ -107,7 +107,7 @@ public class CxContinueGroupAllocationHandler {
          */
         //如果在产机台数只有一台的情形下，直接分配
         if (BigDecimal.ONE.intValue() == productionCount) {
-            List<CxMachineAllocationPlanHelper> buildResult = buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
+            List<CxMachineAllocationPlanHelper> buildResult = buildNeedProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
             if (groupPlanInfo.getLeftOverNeedAllocationDays() <= BigDecimal.ZERO.intValue()) {
                 groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             }
@@ -116,12 +116,13 @@ public class CxContinueGroupAllocationHandler {
         //在产机台数有多台情形下
         if (needCount.compareTo(BigDecimal.valueOf(productionCount)) >= BigDecimal.ZERO.intValue()) {
             //在机分组还需要增加机台
+            List<CxMachineAllocationPlanHelper> buildResult = buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
             if (needCount.compareTo(BigDecimal.valueOf(productionCount)) > BigDecimal.ZERO.intValue()) {
-                return buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
+                return buildResult;
             }
             //20260109 标记结构成型产能分配完成
             groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            return buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
+            return buildResult;
         }
         //2、最后确定在产机台各自收尾时间点及分配
         return buildContinueCxMachineAllocationResult(context, groupPlanInfo, groupContinueInfo);
@@ -168,6 +169,26 @@ public class CxContinueGroupAllocationHandler {
     }
 
     /**
+     * 构建在产机台分配估算的分组计划
+     *
+     * @param groupPlanInfo     分组计划信息
+     * @param groupContinueInfo 分组计划对应的在产信息
+     * @return
+     */
+    private static List<CxMachineAllocationPlanHelper> buildNeedProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+        Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
+        if (CollectionUtils.isEmpty(productionCxMachineCodeSet) || productionCxMachineCodeSet.size() > BigDecimal.ONE.intValue()) {
+            return Collections.emptyList();
+        }
+        List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
+        productionCxMachineCodeSet.forEach(cxMachineCode -> {
+            CxMachineAllocationPlanHelper allocationHelper = buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineCode, groupPlanInfo.getTheoryDays());
+            allocationList.add(allocationHelper);
+        });
+        return allocationList;
+    }
+
+    /**
      * 构建所有在产机台分配给分组计划
      *
      * @param groupPlanInfo     分组计划信息
@@ -175,23 +196,52 @@ public class CxContinueGroupAllocationHandler {
      * @return
      */
     private static List<CxMachineAllocationPlanHelper> buildAllProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
-        Integer monthDays = context.getMonthDays();
+        if (CollectionUtils.isEmpty(productionCxMachineCodeSet) || productionCxMachineCodeSet.size() == BigDecimal.ONE.intValue()) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+//        Integer monthDays = context.getMonthDays();
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
-        Map<String, ProductGroupCxCapacityInfo> groupCxCapacityInfoMap = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, Function.identity()));
+//        List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
+//        Map<String, ProductGroupCxCapacityInfo> groupCxCapacityInfoMap = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, Function.identity()));
         List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
         productionCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
             Integer allocationDays = cxMachineInfo.getMaxProductionDays();
-            groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
-            ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
-            CxMachineAllocationPlanHelper helper = new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
-            cxMachineInfo.addAllocationPlanInfo(context, helper);
-            allocationList.add(helper);
+//            groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
+//            ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
+//            CxMachineAllocationPlanHelper helper = new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
+//            cxMachineInfo.addAllocationPlanInfo(context, helper);
+            allocationList.add(buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineCode, allocationDays));
         });
         return allocationList;
+    }
+
+    /**
+     * 构建所有在产机台分配给分组计划
+     *
+     * @param groupPlanInfo     分组计划信息
+     * @param groupContinueInfo 分组计划对应的在产信息
+     * @param cxMachineCode     机台
+     * @param allocationDays    分配天数
+     * @return
+     */
+    private static CxMachineAllocationPlanHelper buildAllocationProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, String cxMachineCode, Integer allocationDays) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer monthDays = context.getMonthDays();
+        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
+        Map<String, ProductGroupCxCapacityInfo> groupCxCapacityInfoMap = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, Function.identity()));
+        CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
+        //更新分组剩余分配量
+        groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
+        ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
+        CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, capacityInfo, groupPlanInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
+//                new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
+        //机台增加分配信息
+        cxMachineInfo.addAllocationPlanInfo(context, helper);
+        return helper;
     }
 
     /**

@@ -4,15 +4,11 @@ import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.CxMachineFixedPriorityEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
-import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
-import com.zlt.aps.factory.daylimit.LhGroupProductionRangeCalculator;
-import com.zlt.aps.factory.daylimit.MouldProductionDayLimitHelper;
+import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
@@ -203,10 +199,15 @@ public class CxMachineBaseInfoVo implements Serializable {
             return Collections.emptySet();
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        String proSize = selectedGroup.getProSizeInfo();
-        //获取成型工装的排产日集合
-        Set<Integer> workWeakProductionInfo = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(proSize);
-        if (CollectionUtils.isEmpty(workWeakProductionInfo)) {
+        /**
+         * 日控制限制：
+         * 1、日成型工装数量限制
+         * 2、日产能上限限制
+         * 获取成型工装的排产日集合
+         */
+        GroupCapacityProductionLimitHelper limitResult = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(context, selectedGroup, this);
+        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
+        if (CollectionUtils.isEmpty(productionDayInfo)) {
             return Collections.emptySet();
         }
         //最后下一个分配日
@@ -217,7 +218,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return Collections.emptySet();
         }
         //取得交集
-        Set<Integer> intersectionSet = localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+        Set<Integer> intersectionSet = localProductionInfo.stream().filter(productionDayInfo::contains).collect(Collectors.toSet());
         //取得最早的一段连续时间
         Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRangeResultExcludeStop(intersectionSet, stopDayInfo);
         if (CollectionUtils.isEmpty(earliestContinuousSet)) {
@@ -227,14 +228,14 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
-     * 获取确认的排产日范围，与workWeakProductionInfo取交集
+     * 获取确认的排产日范围，与workProductionInfo取交集
      *
-     * @param context                排产上下文
-     * @param workWeakProductionInfo 成型工装可排产日集合
+     * @param context            排产上下文
+     * @param workProductionInfo 可排产日集合(含成型工装、日产能上限控制)
      * @return
      */
-    public Set<Integer> confirmProductionRange(Context context, Set<Integer> workWeakProductionInfo) {
-        if (null == context || CollectionUtils.isEmpty(workWeakProductionInfo)) {
+    public Set<Integer> confirmProductionRange(Context context, Set<Integer> workProductionInfo) {
+        if (null == context || CollectionUtils.isEmpty(workProductionInfo)) {
             return Collections.emptySet();
         }
         //成型机本身的排产日
@@ -243,7 +244,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return Collections.emptySet();
         }
         //取得交集
-        Set<Integer> intersectionSet = localProductionInfo.stream().filter(workWeakProductionInfo::contains).collect(Collectors.toSet());
+        Set<Integer> intersectionSet = localProductionInfo.stream().filter(workProductionInfo::contains).collect(Collectors.toSet());
         //取得最早的一段连续时间
         Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRangeResultExcludeStop(intersectionSet, stopDayInfo);
         if (CollectionUtils.isEmpty(earliestContinuousSet)) {
@@ -533,13 +534,17 @@ public class CxMachineBaseInfoVo implements Serializable {
         String proSize = addAllocationPlan.getProductionPlanInfo().getProSizeInfo();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
         for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
             if (stopDayInfo.contains(productionDay)) {
                 continue;
             }
             //20260123 成型已分配日
             allocationDaySet.add(productionDay);
+            //20260120 成型工装占用量
             baseDataContainer.addUsedCount(productionDay, proSize, cxMachineCode);
+            //20260125 分组占用每日产能
+            dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, productionDay, addAllocationPlan);
         }
         //20260121 切换结构
         if (isChangeGroup(lastAllocation, addAllocationPlan)) {
@@ -582,13 +587,21 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
+        //释放 成型工装使用占用量、日分配产能占用量
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
         deductionDaySet.forEach(beforeConclusionDay -> {
             if (stopDayInfo.contains(beforeConclusionDay)) {
                 return;
             }
             allocationDaySet.remove(beforeConclusionDay);
-            productionContext.getBaseDataContainer().releaseUsedCount(beforeConclusionDay, proSize, cxMachineCode);
+            //20260120 释放成型工装使用量占用
+            baseDataContainer.releaseUsedCount(beforeConclusionDay, proSize, cxMachineCode);
+            //20260125 释放成型产能分配量占用
+            if (null != dayCapacityLimit) {
+                dayCapacityLimit.deductionCxMachineGroupNameAllocationUsedQty(context, beforeConclusionDay, allocationInfo);
+            }
         });
     }
 

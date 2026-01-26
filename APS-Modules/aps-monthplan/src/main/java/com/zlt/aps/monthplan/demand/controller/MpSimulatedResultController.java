@@ -148,7 +148,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     @PostMapping("/createVmMonthPrediction")
     public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws Exception {
         this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
-        return AjaxResult.success();
+        return AjaxResult.success("操作成功，等待数据生成通知");
     }
 
     @Override

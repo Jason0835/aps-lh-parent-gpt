@@ -358,31 +358,6 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
-     * 增加没有找到工装类型(成型鼓)数日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 没有找到可用成型鼓数量====
-     *
-     * @param context       排程上下文
-     * @param cxMachineInfo 机台信息
-     * @param groupName     分组名
-     * @param proSize       英寸
-     * @return
-     */
-    public static String addNoWorkWeakMatchPlanLog(Context context, CxMachineBaseInfoVo cxMachineInfo, String groupName, String proSize) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 没有找到可用成型鼓数量====";
-        String cxMachineCode = "";
-        if (null != cxMachineInfo) {
-            cxMachineCode = cxMachineInfo.getCxMachineCode();
-        }
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                cxMachineCode, groupName, proSize);
-        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
-        return logContent;
-    }
-
-
-    /**
      * 增加可排产天数小于最小上机天数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产天数[%s] < 最低上机天数[%s]====
      *

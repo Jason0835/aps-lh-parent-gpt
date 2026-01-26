@@ -153,7 +153,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 产品状态
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productStatus")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productStatus", dictType = "trial_status")
     @ApiModelProperty(value = "产品状态", name = "productStatus")
     @TableField(value = "PRODUCT_STATUS")
     private String productStatus;
@@ -300,6 +300,8 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @TableField(value = "INVENTORY_SALES_RATIO")
     private BigDecimal inventorySalesRatio;
 
+
+
     /**
      * 日硫化量
      */
@@ -327,7 +329,6 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 动平衡数量
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dynamicBalanceQty")
     @ApiModelProperty(value = "动平衡数量", name = "dynamicBalanceQty")
     @TableField(value = "DYNAMIC_BALANCE_QTY")
     private String dynamicBalanceQty;
@@ -335,7 +336,6 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     /**
      * 均匀性数量
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.uniformityQty")
     @ApiModelProperty(value = "均匀性数量", name = "uniformityQty")
     @TableField(value = "UNIFORMITY_QTY")
     private Integer uniformityQty;
@@ -767,6 +767,13 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @ApiModelProperty(value = "发布状态，0--未发布，1--已发布，2-发布失败，3-发布中，4-超时失败，5-待发布。对应数据字典为：IS_RELEASE", name = "isRelease")
     @TableField(value = "IS_RELEASE")
     private String isRelease;
+
+    public Integer getDayVulcanizationQty() {
+        if(null == this.dayVulcanizationQty) {
+            return 0;
+        }
+        return dayVulcanizationQty * 2;
+    }
 
     /**
      *  月底计划剩余量key

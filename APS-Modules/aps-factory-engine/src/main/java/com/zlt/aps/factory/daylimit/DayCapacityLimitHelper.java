@@ -3,6 +3,9 @@ package com.zlt.aps.factory.daylimit;
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +43,10 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     private Integer minCapacity;
     /**
+     * 每日分配产能上限--用于结构产能分配
+     */
+    private Integer maxAllocationCapacity;
+    /**
      * 每日切换结构次数上限
      */
     private Integer maxChangeCxMachineCount;
@@ -60,9 +67,21 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     private Integer usedChangeLhMachineCount;
     /**
+     * 成型分配量
+     */
+    private Integer cxMachineAllocationQty;
+    /**
      * 总的排产量(包含换模等导致的损耗)
      */
     private Integer sumProductionCapacityQty;
+    /**
+     * 存储分组分配-占用产能信息
+     */
+    private Set<String> groupAllocationInfo;
+    /**
+     * 存储Sku排产信息
+     */
+    private Map<String, DayProductionCapacityDetailHelper> skuProductionInfo;
     /**
      * 存储切换：机台-分组信息
      * 机台|*|分组
@@ -95,6 +114,7 @@ public class DayCapacityLimitHelper implements Serializable {
         if (null != dayMaxCapacity) {
             Integer realDayMaxCapacity = BigDecimal.valueOf(dayMaxCapacity).multiply(BigDecimal.valueOf(ProductionConstant.PERCENTAGE)).divide(BigDecimal.valueOf(ratio), 0, RoundingMode.UP).intValue();
             initLimit.maxCapacity = realDayMaxCapacity;
+            initLimit.maxAllocationCapacity = dayMaxCapacity;
         }
         Integer dayMinCapacity = paramConfiguration.getDayMinCapacity();
         if (null != dayMinCapacity) {
@@ -117,6 +137,123 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     public void resetUsedQty() {
         initUsedInfo();
+    }
+
+    /**
+     * 是否还有剩余产能可分配
+     * cxMachineAllocationQty < maxAllocationCapacity
+     *
+     * @return
+     */
+    public boolean isAllocationCapacity() {
+        return cxMachineAllocationQty < maxAllocationCapacity;
+    }
+
+    /**
+     * 增加成型分配产能-天产能占用量
+     *
+     * @param context           排产上下文
+     * @param productionDay     排产日
+     * @param addAllocationPlan 分配信息
+     */
+    public void addCxMachineAllocationQty(Context context, Integer productionDay, CxMachineAllocationPlanHelper addAllocationPlan) {
+        if (!checkBeforeOperateResult(productionDay, addAllocationPlan)) {
+            return;
+        }
+        String allocationKey = addAllocationPlan.getDayAllocationKey();
+        if (groupAllocationInfo.contains(allocationKey)) {
+            return;
+        }
+        groupAllocationInfo.add(allocationKey);
+        Integer allocationQty = addAllocationPlan.getDayMinAllocationQty();
+        cxMachineAllocationQty = cxMachineAllocationQty + allocationQty;
+        log.info(DayLimitLogRecorder.addCxMachineGroupUsedLog(context, productionDay, allocationKey, allocationQty, cxMachineAllocationQty));
+    }
+
+    /**
+     * 释放成型分配产能-天产能占用量
+     *
+     * @param context        排产上下文
+     * @param productionDay  排产日
+     * @param allocationInfo 分配信息
+     */
+    public void deductionCxMachineAllocationQty(Context context, Integer productionDay, CxMachineAllocationPlanHelper allocationInfo) {
+        if (!checkBeforeOperateResult(productionDay, allocationInfo)) {
+            return;
+        }
+        String allocationKey = allocationInfo.getDayAllocationKey();
+        if (!groupAllocationInfo.contains(allocationKey)) {
+            return;
+        }
+        groupAllocationInfo.remove(allocationKey);
+        Integer allocationQty = allocationInfo.getDayMinAllocationQty();
+        cxMachineAllocationQty = cxMachineAllocationQty - allocationQty;
+        if (cxMachineAllocationQty <= BigDecimal.ZERO.intValue()) {
+            cxMachineAllocationQty = BigDecimal.ZERO.intValue();
+        }
+        log.info(DayLimitLogRecorder.addDeductionCxMachineGroupUsedLog(context, productionDay, allocationKey, allocationQty, cxMachineAllocationQty));
+    }
+
+    /**
+     * 增加排产量
+     *
+     * @param context        上下文
+     * @param productionDay  排产日
+     * @param productionPlan 排产计划
+     * @param doubleMould    排产模具
+     * @param productionQty  排产量
+     * @param lossQty        损耗量
+     */
+    public void addSkuDayProductionQty(Context context, Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan, List<ProductionMouldInfoVo> doubleMould, Integer productionQty, Integer lossQty) {
+        if (!checkBeforeOperateResult(productionDay, productionPlan, doubleMould, productionQty, lossQty)) {
+            return;
+        }
+        Integer realProductionQty = getRealProductionQty(productionQty, lossQty);
+        sumProductionCapacityQty = sumProductionCapacityQty + realProductionQty;
+        String materialDesc = productionPlan.getMaterialDesc();
+        DayProductionCapacityDetailHelper skuInfo = skuProductionInfo.get(materialDesc);
+        if (null == skuInfo) {
+            skuInfo = DayProductionCapacityDetailHelper.createInitEmpty(productionDay, materialDesc);
+            skuProductionInfo.put(materialDesc, skuInfo);
+        }
+        Set<String> doubleMouldCode = doubleMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        String mouldCodeInfo = String.join(StringConstant.COMMA, doubleMouldCode);
+        skuInfo.addProductionQty(doubleMouldCode, productionQty, lossQty);
+        log.info(DayLimitLogRecorder.addDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty));
+    }
+
+    /**
+     * 释放-排产量
+     *
+     * @param context       上下文
+     * @param productionDay 排产日
+     * @param materialDesc  排产计划
+     * @param usedMouldSet  排产模具
+     * @param productionQty 排产量
+     * @param lossQty       损耗量
+     */
+    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty) {
+        if (null == productionDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(usedMouldSet)) {
+            return;
+        }
+        Integer realProductionQty = getRealProductionQty(productionQty, lossQty);
+        if (realProductionQty <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        DayProductionCapacityDetailHelper skuInfo = skuProductionInfo.get(materialDesc);
+        if (null == skuInfo) {
+            return;
+        }
+        String mouldCodeInfo = String.join(StringConstant.COMMA, usedMouldSet);
+        sumProductionCapacityQty = sumProductionCapacityQty - realProductionQty;
+        if (sumProductionCapacityQty <= BigDecimal.ZERO.intValue()) {
+            sumProductionCapacityQty = BigDecimal.ZERO.intValue();
+        }
+        skuInfo.deductionProductionQty(usedMouldSet, productionQty, lossQty);
+        log.info(DayLimitLogRecorder.addDeductionDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty));
+        if (skuInfo.getLossQty() == BigDecimal.ZERO.intValue() && skuInfo.getProductionQty() == BigDecimal.ZERO.intValue()) {
+            skuProductionInfo.remove(materialDesc);
+        }
     }
 
     /**
@@ -261,6 +398,72 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
+     * 操作前的检查结果
+     * 检查排产日 是否与当前日符合
+     * 检查productionDay与allocationInfo是否为空对象
+     * 检查allocationInfo是否有分组信息和成型机台信息
+     *
+     * @param productionDay  排产日
+     * @param allocationInfo 分配信息
+     * @return
+     */
+    private boolean checkBeforeOperateResult(Integer productionDay, CxMachineAllocationPlanHelper allocationInfo) {
+        if (null == allocationInfo || null == productionDay) {
+            return false;
+        }
+        if (!productionDay.equals(this.productionDay)) {
+            return false;
+        }
+        if (null == allocationInfo.getProductionPlanInfo() || StringUtils.isBlank(allocationInfo.getCxMachineCode())) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 是否有效参数
+     * <p>
+     * true 有效 false 无效
+     *
+     * @param productionDay  排产日
+     * @param productionPlan 排产计划(不关注具体的计划ID)
+     * @param doubleMould    排产模具
+     * @param productionQty  排产量
+     * @param lossQty        损耗量
+     * @return
+     */
+    private boolean checkBeforeOperateResult(Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan, List<ProductionMouldInfoVo> doubleMould, Integer productionQty, Integer lossQty) {
+        if (null == productionDay || null == productionPlan || CollectionUtils.isEmpty(doubleMould)) {
+            return false;
+        }
+        Set<String> mouldCodeSet = doubleMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        if (StringUtils.isBlank(productionPlan.getMaterialDesc()) || CollectionUtils.isEmpty(mouldCodeSet) || ProductionConstant.DOUBLE_MOULD_PRODUCTION != mouldCodeSet.size()) {
+            return false;
+        }
+        Integer realProductionQty = getRealProductionQty(productionQty, lossQty);
+        return realProductionQty > BigDecimal.ZERO.intValue();
+    }
+
+    /**
+     * 获取实际排产量
+     * 实际排产量 = 排产量 + 损耗量
+     *
+     * @param productionQty 排产量
+     * @param lossQty       损耗量
+     * @return
+     */
+    private Integer getRealProductionQty(Integer productionQty, Integer lossQty) {
+        Integer realProductionQty = BigDecimal.ZERO.intValue();
+        if (null != productionQty && productionQty > BigDecimal.ZERO.intValue()) {
+            realProductionQty = realProductionQty + productionQty;
+        }
+        if (null != lossQty && lossQty > BigDecimal.ZERO.intValue()) {
+            realProductionQty = realProductionQty + lossQty;
+        }
+        return realProductionQty;
+    }
+
+    /**
      * 构建初始的
      *
      * @param productionDay
@@ -268,6 +471,7 @@ public class DayCapacityLimitHelper implements Serializable {
     private DayCapacityLimitHelper(Integer productionDay) {
         this.productionDay = productionDay;
         this.maxCapacity = Integer.MAX_VALUE;
+        this.maxAllocationCapacity = Integer.MAX_VALUE;
         this.minCapacity = BigDecimal.ZERO.intValue();
         this.capacityRatio = ProductionConstant.PERCENTAGE;
         this.maxChangeCxMachineCount = Integer.MAX_VALUE;
@@ -279,9 +483,12 @@ public class DayCapacityLimitHelper implements Serializable {
      * 初始化使用量信息
      */
     private void initUsedInfo() {
+        this.cxMachineAllocationQty = BigDecimal.ZERO.intValue();
+        this.sumProductionCapacityQty = BigDecimal.ZERO.intValue();
         this.usedChangeCxMachineCount = BigDecimal.ZERO.intValue();
         this.usedChangeLhMachineCount = BigDecimal.ZERO.intValue();
-        this.sumProductionCapacityQty = BigDecimal.ZERO.intValue();
+        this.groupAllocationInfo = new HashSet<>();
+        this.skuProductionInfo = new HashMap<>();
         this.changeCxMachineInfo = new HashSet<>();
         this.changeMouldInfo = new HashSet<>();
     }

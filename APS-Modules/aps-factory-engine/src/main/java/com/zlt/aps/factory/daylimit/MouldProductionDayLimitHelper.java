@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.daylimit;
 
-import com.zlt.aps.factory.enums.MouldProductionLimitTypeEnum;
 import lombok.Getter;
 
 import java.io.Serializable;
