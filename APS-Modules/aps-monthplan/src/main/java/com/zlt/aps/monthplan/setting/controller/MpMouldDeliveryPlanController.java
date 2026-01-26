@@ -173,4 +173,16 @@ public class MpMouldDeliveryPlanController extends AbstractDocBizController<MpMo
     public AjaxResult getBoardingDate(@RequestBody MpMouldDeliveryPlan entity) {
         return mpMouldDeliveryPlanService.getBoardingDate(entity);
     }
+
+    /**
+     * 更新主花纹到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新主花纹到物料表")
+    @PostMapping("/updateMainPatternToMaterial")
+    public AjaxResult updateMainPatternToMaterial(@RequestBody MpMouldDeliveryPlan queryVO) {
+        return mpMouldDeliveryPlanService.updateMainPatternToMaterial(queryVO);
+    }
 }

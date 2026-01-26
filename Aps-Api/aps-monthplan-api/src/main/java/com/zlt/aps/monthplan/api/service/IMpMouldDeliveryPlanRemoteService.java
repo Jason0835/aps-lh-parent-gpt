@@ -87,4 +87,14 @@ public interface IMpMouldDeliveryPlanRemoteService {
     @ApiOperation("根据计划发货日期获取计划上机日期")
     @PostMapping("/mpMouldDeliveryPlan/getBoardingDate")
     AjaxResult getBoardingDate(@RequestBody MpMouldDeliveryPlan entity);
+
+    /**
+     * 更新主花纹到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新主花纹到物料表")
+    @PostMapping("/mpMouldDeliveryPlan/updateMainPatternToMaterial")
+    public AjaxResult updateMainPatternToMaterial(@RequestBody MpMouldDeliveryPlan queryVO);
 }
