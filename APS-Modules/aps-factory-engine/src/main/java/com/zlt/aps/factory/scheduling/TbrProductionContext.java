@@ -11,6 +11,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -282,6 +283,33 @@ public class TbrProductionContext extends Context {
             return;
         }
         allMouldShellMap.forEach((mouldSetCode, mouldShellInfo) -> mouldShellInfo.clearDayUsed());
+    }
+
+    /**
+     * 获取还有可排产量的日期集合
+     *
+     * @return
+     */
+    public Set<Integer> getDayCapacityLimitRange() {
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return Collections.emptySet();
+        }
+        Set<Integer> hasDayCapacitySet = dayCapacityLimit.getEnableDoubleMouldProductionRange();
+        if (CollectionUtils.isEmpty(hasDayCapacitySet)) {
+            return Collections.emptySet();
+        }
+        if (hasDayCapacitySet.size() == BigDecimal.ONE.intValue()) {
+            List<Integer> dayList = new ArrayList<>(hasDayCapacitySet);
+            Integer productionDay = dayList.get(BigDecimal.ZERO.intValue());
+            if (productionDay.equals(getProductionEndDay())) {
+                return hasDayCapacitySet;
+            }
+            return Collections.emptySet();
+        }
+        //取得一段连续的时间范围
+        Set<Integer> continueRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(hasDayCapacitySet, getStopDays());
+        return continueRangeSet;
     }
 
     /**

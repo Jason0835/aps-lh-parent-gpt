@@ -318,7 +318,7 @@ public class CxCapacityAllocationHandler {
         if (CollectionUtils.isEmpty(hasProductionDayList)) {
             return null;
         }
-        //可排产天数多的优先
+        //可排产天数多的优先 todo 产能最合适
         Integer maxProductionDays = hasProductionDayList.stream().mapToInt(CxMachineBaseInfoVo::getSelectedProductionDys).max().getAsInt();
         List<CxMachineBaseInfoVo> maxCapacityList = hasProductionDayList.stream().filter(cxMachineInfo -> maxProductionDays.equals(cxMachineInfo.getSelectedProductionDys())).collect(Collectors.toList());
         if (maxCapacityList.size() == BigDecimal.ONE.intValue()) {
