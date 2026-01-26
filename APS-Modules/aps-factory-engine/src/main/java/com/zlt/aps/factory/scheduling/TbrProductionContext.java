@@ -316,11 +316,11 @@ public class TbrProductionContext extends Context {
      * 清空所有的换模使用量
      */
     public void clearAllDayLimitUsed() {
-        DayCapacityLimitVo dayCapacityLimitHandler = baseDataContainer.getDayCapacityLimit();
-        if (null == dayCapacityLimitHandler) {
+        DayCapacityLimitVo dayCapacityLimitVo = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimitVo) {
             return;
         }
-        dayCapacityLimitHandler.resetUsedQty();
+        dayCapacityLimitVo.resetUsedQty();
     }
 
     /**
