@@ -71,7 +71,7 @@ public class MdmModelInfoController extends AbstractDocBizController<MdmModelInf
         QueryWrapper<MdmModelInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
         List<MdmModelInfo> list = mdmModelInfoEntityMapper.selectList(wrapper);
-        mdmModelInfoService.setProSize(list);
+//        mdmModelInfoService.setProSize(list);
         return getDataTable(list);
     }
 
