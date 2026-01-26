@@ -1,6 +1,5 @@
 package com.zlt.aps.monthplan.setting.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -10,18 +9,14 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
-import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -30,16 +25,13 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Date;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -88,48 +80,6 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
         QueryWrapper<MdmSkuMouldRel> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
         List<MdmSkuMouldRel> list = entityMapper.selectList(wrapper);
-        if (CollectionUtils.isNotEmpty(list)) {
-            // 根据物料号、规格代码查询施工表，取成型法
-            Map<String, String> productConstructionMap = new HashMap<>(16);
-            Map<String, MdmModelInfo> modelMap = new HashMap<>(16);
-            List<MdmProductConstruction> productConstructionList = new ArrayList<>();
-            List<MdmModelInfo> modelList = new ArrayList<>();
-            List<List<MdmSkuMouldRel>> splitList = ScmListUtils.getSplitList(list, 500);
-            for (List<MdmSkuMouldRel> relationList : splitList) {
-                List<String> uniqueKeyList = relationList.stream().map(item -> String.join("|", item.getMaterialCode(), item.getSpecCode())).collect(Collectors.toList());
-                List<String> mouldCodeList = relationList.stream().map(MdmSkuMouldRel::getMouldCode).collect(Collectors.toList());
-                LambdaQueryWrapper<MdmProductConstruction> queryWrapper = new LambdaQueryWrapper<>();
-                queryWrapper.apply(" CONCAT(PRODUCT_CODE, '|', SPEC_CODE) IN('{0}')", String.join("','", uniqueKeyList));
-                productConstructionList.addAll(mdmProductConstructionEntityMapper.queryByProductCodeAndSpecCodes(queryVO.getFactoryCode(), uniqueKeyList));
-
-                LambdaQueryWrapper<MdmModelInfo> mouldQueryWrapper = new LambdaQueryWrapper<>();
-                mouldQueryWrapper.eq(MdmModelInfo::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE);
-                mouldQueryWrapper.in(MdmModelInfo::getMouldCode, mouldCodeList);
-                modelList.addAll(mdmModelInfoEntityMapper.selectList(mouldQueryWrapper));
-            }
-            if (CollectionUtils.isNotEmpty(productConstructionList)) {
-                productConstructionMap = productConstructionList.stream().collect(Collectors
-                        .toMap(item -> String.join("|", StringUtils.defaultIfBlank(item.getProductCode(), ""),
-                                        StringUtils.defaultIfBlank(item.getSpecCode(), "")),
-                                item -> StringUtils.defaultIfBlank(item.getMouldMethod(), ""), (v1, v2) -> v1));
-            }
-            if (CollectionUtils.isNotEmpty(modelList)) {
-                modelMap = modelList.stream().collect(Collectors.toMap(MdmModelInfo::getMouldCode, Function.identity(), (v1, v2) -> v1));
-            }
-            for (MdmSkuMouldRel MdmSkuMouldRel : list) {
-                String mapKey = String.join("|", StringUtils.defaultIfBlank(MdmSkuMouldRel.getMaterialCode(), "")
-                        , StringUtils.defaultIfBlank(MdmSkuMouldRel.getSpecCode(), ""));
-                if (productConstructionMap.containsKey(mapKey)) {
-                    String mouldMethod = productConstructionMap.get(mapKey);
-                    MdmSkuMouldRel.setMouldMethod(mouldMethod);
-                }
-                String mouldCode = MdmSkuMouldRel.getMouldCode();
-                if (modelMap.containsKey(mouldCode)) {
-                    MdmModelInfo mdmModelInfo = modelMap.get(mouldCode);
-                    MdmSkuMouldRel.setMouldNo(mdmModelInfo.getMouldNo());
-                }
-            }
-        }
         return getDataTable(list);
     }
 
