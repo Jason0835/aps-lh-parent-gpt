@@ -21,4 +21,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MpMouldDeliveryPlanEntityMapper extends CommBaseMapper<MpMouldDeliveryPlan> {
 
+    /**
+     * 更新主花纹到物料
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    int updateMainPatternToMaterial(MpMouldDeliveryPlan queryVO);
 }

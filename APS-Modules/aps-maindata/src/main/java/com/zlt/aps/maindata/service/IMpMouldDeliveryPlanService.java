@@ -27,4 +27,12 @@ public interface IMpMouldDeliveryPlanService extends IDocService<MpMouldDelivery
      * @return 结果
      */
     AjaxResult getBoardingDate(MpMouldDeliveryPlan entity);
+
+    /**
+     * 更新主花纹到物料
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    AjaxResult updateMainPatternToMaterial(MpMouldDeliveryPlan queryVO);
 }
