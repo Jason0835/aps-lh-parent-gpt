@@ -7,7 +7,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateMainMaterialDescToMaterialInfo">
         UPDATE T_MDM_MATERIAL_INFO t1
             JOIN (
-            SELECT t.FACTORY_CODE, t.MATERIAL_CODE, MAX (t.MAIN_MATERIAL_DESC) AS MAIN_PATTERN
+            SELECT t.FACTORY_CODE, t.MATERIAL_CODE, MAX(t.MAIN_MATERIAL_DESC) AS MAIN_PATTERN
             FROM T_MDM_SKU_CONSTRUCTION_REF t
             WHERE t.IS_DELETE = 0
             GROUP BY t.FACTORY_CODE, t.MATERIAL_CODE
