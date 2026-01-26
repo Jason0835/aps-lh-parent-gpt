@@ -2,13 +2,14 @@ package com.zlt.aps.monthplan.api.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
-import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 
 
 /**
@@ -85,5 +86,13 @@ public interface IMdmSkuConstructionRefRemoteService {
     @PostMapping("/mdmSkuConstructionRef/mesCapture")
     AjaxResult mesCapture();
 
-
+    /**
+     * 更新胎胚描述到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新胎胚描述到物料表")
+    @PostMapping("/mdmSkuConstructionRef/updateMainMaterialDescToMaterialInfo")
+    public AjaxResult updateMainMaterialDescToMaterialInfo(@RequestBody MdmSkuConstructionRef queryVO);
 }

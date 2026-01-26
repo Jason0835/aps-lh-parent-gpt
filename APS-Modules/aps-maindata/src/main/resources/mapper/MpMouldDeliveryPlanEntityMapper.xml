@@ -4,4 +4,17 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper">
 
+    <update id="updateMainPatternToMaterial">
+        UPDATE T_MDM_MATERIAL_INFO t1
+        JOIN T_MDM_MOULD_DELIVERY_PLAN t2
+        ON t1.FACTORY_CODE = t2.FACTORY_CODE AND t1.MATERIAL_CODE = t2.MATERIAL_CODE AND t2.IS_DELETE = 0
+        SET t1.MAIN_PATTERN = t2.MAIN_PATTERN, t1.UPDATE_BY = #{updateBy}, t1.UPDATE_TIME = #{updateTime}
+        WHERE t1.IS_DELETE = 0
+        <if test="params != null and params.idList != null and params.idList.size() > 0">
+            AND t1.ID IN
+            <foreach collection="params.idList" item="item" separator="," open="(" close=")">
+                #{item}
+            </foreach>
+        </if>
+    </update>
 </mapper>

@@ -1,13 +1,16 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuConstructionRefService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,10 @@ import java.util.List;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MdmSkuConstructionRefServiceImpl extends AbstractDocService<MdmSkuConstructionRef>  implements IMdmSkuConstructionRefService {
+
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "MDM0123";
@@ -57,5 +64,18 @@ public class MdmSkuConstructionRefServiceImpl extends AbstractDocService<MdmSkuC
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "materialCode", "trialStatus"));
+    }
+
+    /**
+     * 更新胎胚描述到物料表
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult updateMainMaterialDescToMaterialInfo(MdmSkuConstructionRef queryVO) {
+        queryVO.setBaseVale(null);
+        skuConstructionRefEntityMapper.updateMainMaterialDescToMaterialInfo(queryVO);
+        return AjaxResult.success();
     }
 }

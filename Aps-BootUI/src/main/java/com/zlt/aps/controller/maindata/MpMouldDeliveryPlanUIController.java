@@ -212,4 +212,18 @@ public class MpMouldDeliveryPlanUIController extends BaseUIController<MpMouldDel
     public AjaxResult getBoardingDate(MpMouldDeliveryPlan entity) {
         return iMpMouldDeliveryPlanService.getBoardingDate(entity);
     }
+
+    /**
+     * 更新主花纹到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @RequiresPermissions("monthplan:mpMouldDeliveryPlan:updateMainPattern")
+    @ApiOperation("更新主花纹到物料表")
+    @PostMapping("/updateMainPatternToMaterial")
+    @ResponseBody
+    public AjaxResult updateMainPatternToMaterial(MpMouldDeliveryPlan queryVO) {
+        return iMpMouldDeliveryPlanService.updateMainPatternToMaterial(queryVO);
+    }
 }

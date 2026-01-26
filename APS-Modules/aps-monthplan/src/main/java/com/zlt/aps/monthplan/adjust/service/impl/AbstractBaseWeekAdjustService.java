@@ -529,13 +529,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     log.error("更新月度生产计划：物料:{}的结束日期转换失败，跳过", materialCode, e);
                 }
             }
-            // 获取业务数据对应的周数
-            int week = 0;
-//            if (adjustResult.getBeginDay() != null) {
-////                week = DateUtil.weekOfMonth(adjustResult.getBeginDay());
-//            } else {
-                week = DateUtil.weekOfMonth(new Date());
-//            }
+            // 获取周数
+            int week = getWeekNumber(new Date());
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustResult.getTotalPlanQty());
         }
         // 更新月度生产计划
@@ -549,6 +544,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     }
 
+    protected int getWeekNumber(Date date) {
+        int dayOfMonth = DateUtil.dayOfMonth(date);
+        int baseWeek = (dayOfMonth - 1) / 7 + 1;
+        return Math.min(baseWeek, 4);
+    }
 
     /**
      * 查询周程调整结果
@@ -1629,7 +1629,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 获取上周的周数
-        int week = DateUtil.weekOfMonth(new Date()) - 1;
+        int week = getWeekNumber(new Date()) - 1;
         Integer previousNetQty = Convert.toInt(monthPlan.getTotalQty(),0);
         Integer adjustQty = Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week),0);
         if (adjustQty != 0 && week > 0) {

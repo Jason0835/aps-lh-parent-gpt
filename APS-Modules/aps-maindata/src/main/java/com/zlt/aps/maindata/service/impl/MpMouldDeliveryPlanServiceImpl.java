@@ -11,6 +11,7 @@ import com.tlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MpMouldDeliveryPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMpMouldDeliveryPlanService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
@@ -48,6 +49,9 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpMouldDeliveryPlanServiceImpl extends AbstractDocService<MpMouldDeliveryPlan> implements IMpMouldDeliveryPlanService {
+
+    @Autowired
+    private MpMouldDeliveryPlanEntityMapper mouldDeliveryPlanEntityMapper;
 
     @Autowired
     private FactoryParamMapper factoryParamMapper;
@@ -171,5 +175,18 @@ public class MpMouldDeliveryPlanServiceImpl extends AbstractDocService<MpMouldDe
         String defaultValue = factoryParam.getDefauleValue();
         String paramValue = StringUtils.defaultIfBlank(factoryParam.getParamValue(), defaultValue);
         return DateUtils.addDays(shipmentDate, Integer.parseInt(paramValue));
+    }
+
+    /**
+     * 更新主花纹到物料
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult updateMainPatternToMaterial(MpMouldDeliveryPlan queryVO) {
+        queryVO.setBaseVale(null);
+        mouldDeliveryPlanEntityMapper.updateMainPatternToMaterial(queryVO);
+        return AjaxResult.success();
     }
 }

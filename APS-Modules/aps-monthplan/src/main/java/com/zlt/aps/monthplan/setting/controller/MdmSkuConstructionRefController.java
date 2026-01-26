@@ -1,33 +1,27 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuConstructionRefService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.log.annotation.Log;
-import com.ruoyi.common.log.enums.BusinessType;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -184,4 +178,15 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
         return AjaxResult.success();
     }
 
+    /**
+     * 更新胎胚描述到物料表
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("更新胎胚描述到物料表")
+    @PostMapping("/updateMainMaterialDescToMaterialInfo")
+    public AjaxResult updateMainMaterialDescToMaterialInfo(@RequestBody MdmSkuConstructionRef queryVO) {
+        return mdmSkuConstructionRefService.updateMainMaterialDescToMaterialInfo(queryVO);
+    }
 }

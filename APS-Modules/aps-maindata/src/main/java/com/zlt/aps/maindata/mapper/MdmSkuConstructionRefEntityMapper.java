@@ -20,4 +20,10 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmSkuConstructionRefEntityMapper extends CommBaseMapper<MdmSkuConstructionRef> {
 
+    /**
+     * 更新主物料(胎胚号)到物料信息表
+     *
+     * @return 结果
+     */
+    int updateMainMaterialDescToMaterialInfo(MdmSkuConstructionRef queryVO);
 }
