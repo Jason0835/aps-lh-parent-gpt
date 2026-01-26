@@ -259,4 +259,20 @@ public class MdmAreaCapaAllocationController extends AbstractDocBizController<Md
     public AjaxResult checkBeforeCopy(@RequestBody MdmAreaCapaAllocation entity) {
         return mdmAreaCapaAllocationService.checkBeforeCopy(entity);
     }
+
+    /**
+     * 获取总产能分配
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("获取总产能分配")
+    @PostMapping("/getSumCapacityAllocation")
+    public AjaxResult getSumCapacityAllocation(@RequestBody MdmAreaCapaAllocation entity) {
+        QueryWrapper<MdmAreaCapaAllocation> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, entity);
+        List<MdmAreaCapaAllocation> list = entityMapper.selectList(wrapper);
+        int sum = list.stream().map(MdmAreaCapaAllocation::getCapacityAllocation).mapToInt(BigDecimal::intValue).sum();
+        return AjaxResult.success(sum);
+    }
 }
