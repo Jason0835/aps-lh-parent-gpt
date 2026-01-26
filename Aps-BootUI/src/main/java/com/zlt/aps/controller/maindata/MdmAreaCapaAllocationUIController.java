@@ -226,4 +226,17 @@ public class MdmAreaCapaAllocationUIController extends BaseUIController<MdmAreaC
     public AjaxResult checkBeforeCopy(MdmAreaCapaAllocation entity) {
         return iMdmAreaCapaAllocationService.checkBeforeCopy(entity);
     }
+
+    /**
+     * 获取总产能分配
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("获取总产能分配")
+    @PostMapping("/getSumCapacityAllocation")
+    @ResponseBody
+    public AjaxResult getSumCapacityAllocation(MdmAreaCapaAllocation entity) {
+        return iMdmAreaCapaAllocationService.getSumCapacityAllocation(entity);
+    }
 }
