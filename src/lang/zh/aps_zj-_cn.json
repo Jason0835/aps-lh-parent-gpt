@@ -321,7 +321,16 @@
   "ui.data.factoryParam.paramCode":"参数编码",
   "ui.data.factoryParam.paramValue":"参数值",
   "ui.data.factoryParam.defauleValue":"默认值",
-  "ui.data.factoryNoProduction.materialCode":"SKU代码"
+  "ui.data.factoryNoProduction.materialCode":"SKU代码",
+  "ui.data.orderInventoryWriteDown.stockQty":"库存总数",
+  "ui.data.orderInventoryWriteDown.allocationQty":"库存分配量",
+  "ui.data.orderInventoryWriteDown.plannedSurplus":"月底计划余量分配量",
+  "ui.data.regionalCapacityAllocation.sumTotal":"区域产能分配总和",
+  "ui.data.productionMonthPlanInit.productionVersion":"排产版本号",
+  "ui.data.productionMonthPlanInit.maxEmbryoCodeCount":"最大胎胚种类数",
+  "ui.data.productionMonthPlanInit.maxLhMachineCount":"最大硫化机台数",
+  "ui.data.productionMonthPlanInit.lossQty":"排产净需求(含损耗)",
+  "ui.data.productionMonthPlanInit.allotDays":"分配天数"
 
 
 

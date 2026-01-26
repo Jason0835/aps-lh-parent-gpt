@@ -86,23 +86,23 @@ export default {
         },
         {
           prop: "year",
-          label: this.$t("年份"),
+          label: this.$t("ui.data.colume.year"),
           width: 120,
         },
         {
           prop: "month",
-          label: this.$t("月份"),
+          label: this.$t("ui.data.colume.month"),
           width: 120,
         },
 
         {
           prop: "monthPlanVersion",
-          label: this.$t("需求版本号"),
+          label: this.$t("ui.data.column.finishStock.requireVersion"),
           width: 180,
         },
         {
           prop: "productTypeCode",
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -118,33 +118,33 @@ export default {
         },
         {
           prop: "areaCode",
-          label: this.$t("区域"),
+          label: this.$t("common.area"),
           width: 120,
         },
         {
           prop: "customName",
-          label: this.$t("客户"),
+          label: this.$t("ui.data.column.monthplan.salCode"),
           width: 120,
         },
         {
           prop: "customNationCode",
-          label: this.$t("客户国别"),
+          label: this.$t("ui.data.column.monthplan.salNCode"),
           width: 120,
         },
         {
           prop: "destinationNationCode",
-          label: this.$t("目的国"),
+          label: this.$t("ui.data.column.monthplan.natCode"),
           width: 120,
         },
         {
           prop: "poNumber",
-          label: this.$t("PO号"),
+          label: this.$t("ui.data.column.monthplan.salCodePo"),
           width: 240,
         },
 
         {
           prop: "brand",
-          label: this.$t("品牌"),
+          label: this.$t("common.brand"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
@@ -152,17 +152,17 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.defectiveStock.materialCode"),
           width: 120,
         },
         {
           prop: "materialDesc",
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           width: 320,
         },
         {
           prop: "orderQty",
-          label: this.$t("订单数量"),
+          label: this.$t("book.deliveryOrder.orderNum"),
           width: 120,
         },
 
@@ -189,7 +189,7 @@ export default {
         {
           prop: "weekYear",
           width: 120,
-          label: this.$t("年周号"),
+          label: this.$t("ui.data.column.monthplan.weekYear"),
         },
         // {
         //   prop: "isUniformity",
@@ -231,14 +231,14 @@ export default {
         },
         {
           prop: "orderPriority",
-          label: this.$t("订单优先级"),
+          label: this.$t("ui.data.column.monthplan.orderPriority"),
           type: "select",
           dictData: this.dict.type.biz_order_type,
         },
         {
           width: 180,
           prop: "updateTime",
-          label: this.$t("更新日期"),
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
         },
       ];
 
@@ -262,7 +262,7 @@ export default {
         },
 
         {
-          label: this.$t("需求版本号"),
+          label: this.$t("ui.data.column.finishStock.requireVersion"),
           prop: "monthPlanVersion",
         },
         {
@@ -272,7 +272,7 @@ export default {
           dictData: this.dict.type.biz_product_type,
         },
         {
-          label: this.$t("区域"),
+          label: this.$t("common.area"),
           prop: "areaCode",
           type: "select",
           filterable: true,
@@ -280,19 +280,19 @@ export default {
           special:true
         },
         {
-          label: this.$t("客户"),
+          label: this.$t("ui.data.column.monthplan.salCode"),
           prop: "customName",
         },
         {
-          label: this.$t("PO号"),
+          label: this.$t("ui.data.column.monthplan.salCodePo"),
           prop: "poNumber",
         },
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.defectiveStock.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
         },
       ];

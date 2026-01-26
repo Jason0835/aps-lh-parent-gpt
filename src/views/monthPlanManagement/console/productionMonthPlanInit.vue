@@ -139,7 +139,7 @@ export default {
         },
         {
           prop: "monthPlanVersion",
-          label: this.$t("需求计划版本"),
+          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
           width: 180,
         },
         {
@@ -149,7 +149,7 @@ export default {
         },
         {
           prop: "planType",
-          label: this.$t("计划类型"),
+          label: this.$t("ui.data.monthlyProductionPlan.planType"),
           with: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_plan_type, value);
@@ -158,12 +158,12 @@ export default {
 
         {
           prop: "structureName",
-          label: this.$t("产品结构"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
           width: 220,
         },
         {
           prop: "cxMachineCode",
-          label: this.$t("成型机编码"),
+          label: this.$t("ui.data.monthlyProductionPlan.cxMachineCode"),
           width: 120,
         },
         {
@@ -183,7 +183,7 @@ export default {
         },
         {
           prop: "netQty",
-          label: this.$t("排产净需求"),
+          label: this.$t("ui.data.DemandPlan.netQty"),
           with: 120,
         },
         {
@@ -193,12 +193,12 @@ export default {
         },
         {
           prop: "beginDay",
-          label: this.$t("开始日期"),
+          label: this.$t("common.startDate"),
           width: 180,
         },
         {
           prop: "endDay",
-          label: this.$t("结束日期"),
+          label: this.$t("common.endDate"),
           width: 180,
         },
         {
@@ -208,7 +208,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("common.remark"),
           with: 120,
         },
       ];
@@ -226,7 +226,7 @@ export default {
         },
         {
           prop: "cxMachineCode",
-          label: this.$t("成型机编码"),
+          label: this.$t("ui.data.monthlyProductionPlan.cxMachineCode"),
         },
       ];
     },
