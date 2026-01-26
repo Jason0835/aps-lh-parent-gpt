@@ -317,7 +317,11 @@
   "ui.data.material.mesMaterialCategory":"MES物料大类",
   "ui.data.material.mesMaterialSubcategory":"MES物料细类",
   "ui.data.rawMaterialRequirement.isSpringFestivalMonth":"是否春节月份",
-  "ui.data.vulcanizationTable.onboardDate":"上机日期"
+  "ui.data.vulcanizationTable.onboardDate":"上机日期",
+  "ui.data.factoryParam.paramCode":"参数编码",
+  "ui.data.factoryParam.paramValue":"参数值",
+  "ui.data.factoryParam.defauleValue":"默认值",
+  "ui.data.factoryNoProduction.materialCode":"SKU代码"
 
 
 

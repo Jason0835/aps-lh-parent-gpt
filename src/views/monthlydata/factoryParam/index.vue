@@ -125,14 +125,14 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("工厂"),
+          label: this.$t("common.factory"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
           prop: "productTypeCode",
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_product_type, value);
           },
@@ -144,7 +144,7 @@ export default {
         },
         {
           prop: "paramName",
-          label: this.$t("参数名称"),
+          label: this.$t("common.api.config.columnname.name"),
           width: 300,
         },
         {
@@ -157,7 +157,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("common.remark"),
           minWidth: 100,
         },
         {
@@ -201,7 +201,7 @@ export default {
         },
         {
           prop: "paramName",
-          label: this.$t("参数名称"),
+          label: this.$t("common.api.config.columnname.name"),
         },
       ];
     },

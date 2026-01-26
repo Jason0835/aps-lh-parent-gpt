@@ -237,7 +237,7 @@ export default {
                 <div>
                   <text-button
                     onClick={() => {
-                      this.showDetail(row.versionMap[`T`]);
+                      this.showDetail(row.versionMap[`T`],'T');
                     }}
                   >
                     {row[`month1`]}
@@ -388,16 +388,16 @@ export default {
     },
   },
   methods: {
-    showDetail(row) {
+    showDetail(row,isT) {
       console.log(row)
       if(!row)return
       let query={
-        monthPlanVersion:row.predictionVersion,
+        monthPlanVersion:row.monthPlanVersion,
         sourceType:row.planType,
-        productionVersion:row.predictionProductionVersion,
+        productionVersion:row.productionVersion,
         year:row.year,
         month:row.month<10? "0" + row.month : row.month,
-        // planType:row.planType,
+        requireVersion:isT?row.batchNumber:row.monthPlanVersion,
       }
       this.$router.push({
         path: `./insertOrderDetail/` + row.id,

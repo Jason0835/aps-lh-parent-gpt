@@ -42,3 +42,10 @@ export function areaList(query) {
     data: query
   })
 }
+export function getSumCapacityAllocation(query) {
+  return request({
+    url: '/monthplan/mdmAreaCapaAllocation/getSumCapacityAllocation',
+    method: 'post',
+    data: query
+  })
+}

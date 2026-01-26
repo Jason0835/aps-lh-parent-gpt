@@ -52,6 +52,14 @@
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
       </template>
+      <template slot="headerRight">
+        <span class="stat-info">
+          <span
+            >区域产能分配总和:
+            <span class="stat-value"> {{ stat }} </span></span
+          >
+        </span>
+      </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <!-- <tlt-upload
@@ -81,6 +89,7 @@ import { downloadLink } from "@/utils/request";
 import {
   listAreaCapaInfo,
   removeAreaCapaInfo,
+  getSumCapacityAllocation
 } from "@/api/monthplan/mdmAreaCapaAllocation";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -139,6 +148,7 @@ export default {
       },
       importDefaultValue: {},
       importRules: {},
+      stat:0
     };
   },
   computed: {
@@ -363,11 +373,19 @@ export default {
 
       return params;
     },
+    async statistics(params) {
+      try {
+        const res = await getSumCapacityAllocation(params);
+        this.stat = res.data == undefined?res:res.data;
+      } catch (error) {
+        this.stat = 0;
+      }
+    },
     // api
     async getList() {
       try {
         this.loading = true;
-
+        this.statistics(this.formatParams());
         const data = await listAreaCapaInfo(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;

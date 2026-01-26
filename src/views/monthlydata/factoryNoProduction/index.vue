@@ -118,11 +118,11 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "year",
-          label: this.$t("年"),
+          label: this.$t("ui.data.colume.year"),
         },
         {
           prop: "month",
-          label: this.$t("月"),
+          label: this.$t("ui.data.colume.month"),
         },
         {
           prop: "factoryCode",
@@ -137,7 +137,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("common.remark"),
           minWidth: 100,
         },
         // {
@@ -174,7 +174,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: "年月",
+          label: this.$t("ui.data.colume.yearMonth"),
           prop: "yearMonth",
           type: "date",
           dateType: "month",

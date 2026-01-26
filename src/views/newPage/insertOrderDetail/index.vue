@@ -889,6 +889,7 @@ export default {
     },
 
     formatParams(hasPage = true) {
+      console.log('数据处理')
       const params = {
         ...this.query,
         ...this.sort,
@@ -909,6 +910,10 @@ export default {
         params.year = arr[0];
         params.month = arr[1];
         params.yearMonth = "";
+      }
+      if(this.activeName=='first' || this.activeName=='second'){
+        params.monthPlanVersion=params.requireVersion
+
       }
       return params;
     },

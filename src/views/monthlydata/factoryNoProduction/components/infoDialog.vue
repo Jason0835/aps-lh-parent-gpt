@@ -79,7 +79,7 @@ export default {
       return [
         {
           prop: "yearMonth",
-          label: this.$t("年月"),
+          label: this.$t("ui.data.colume.yearMonth"),
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",
@@ -96,7 +96,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("common.remark"),
           type: "textarea",
           maxlength: "300",
         },
