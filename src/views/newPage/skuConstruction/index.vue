@@ -58,6 +58,13 @@
           v-hasPermi="['monthplan:mdmSkuConstructionRef:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="handleUpdate"
+           :loading="updateLoading"
+          type="primary"
+          v-hasPermi="['monthplan:mdmSkuConstructionRef:updateMainMaterialDesc']"
+          >{{ $t("更新胎胚描述到物料信息") }}</el-button
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -86,7 +93,7 @@ import moment from "moment";
 import { downloadLink } from "@/utils/request";
 //interface
 import {
-  listMdmProductConstruction,mesCapture
+  listMdmProductConstruction,mesCapture,updateMaterial
 } from "@/api/maindata/mdmProductConstruction";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -141,6 +148,7 @@ export default {
       },
       importDefaultValue: {},
       importRules: {},
+      updateLoading:false
     };
   },
   computed: {
@@ -327,6 +335,19 @@ export default {
     },
   },
   methods: {
+    async handleUpdate() {
+      try {
+        this.updateLoading=true
+        let res = await updateMaterial();
+        this.$modal.msgSuccess(res.msg);
+        // this.$set(this.page, "current", 1);
+        // this.getList();
+        this.updateLoading=false
+      } catch (err) {
+        console.log(err);
+        this.updateLoading=false
+      }
+    },
     async mesCaptureing(){
       try {
         this.loading = true;

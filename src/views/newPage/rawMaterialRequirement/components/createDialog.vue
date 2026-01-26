@@ -34,6 +34,7 @@ import {
   generateMdmProductConstruction,
   removeMdmProductConstruction
 } from "@/api/maindata/rawMaterialRequirePlan​";
+import { values } from "lodash";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -81,7 +82,13 @@ export default {
           label: this.$t("是否春节月份"),
           type: "select",
           clearable: false,
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: [{
+            label:'T+1',
+            value:'0'
+          },{
+            label:'T+2',
+            value:'1'
+          },],
         },
 
       ],

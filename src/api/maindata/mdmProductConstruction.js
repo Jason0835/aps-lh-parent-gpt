@@ -33,3 +33,10 @@ export function mesCapture(query) {
     data: query
   })
 }
+export function updateMaterial(query) {
+  return request({
+    url: '/monthplan/mdmSkuConstructionRef/updateMainMaterialDescToMaterialInfo',
+    method: 'post',
+    data: query
+  })
+}
