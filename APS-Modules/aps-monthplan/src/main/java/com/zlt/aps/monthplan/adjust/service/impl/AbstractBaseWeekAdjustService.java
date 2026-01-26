@@ -1567,6 +1567,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 型腔数量、活块数量
             adjustDetailVo.setMouldCavityQty(0);
             adjustDetailVo.setTypeBlockQty(0);
+            adjustDetailVo.setHeightQty(0);
+            adjustDetailVo.setMidQty(0);
+            adjustDetailVo.setPostponeQty(0);
+            adjustDetailVo.setCycleReserveQty(0);
+            adjustDetailVo.setConventionReserveQty(0);
             return;
         }
         // 有月度生产计划时，赋值关联字段
@@ -1586,11 +1591,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setDayVulcanizationQty(monthPlan.getDayVulcanizationQty());
         adjustDetailVo.setCuringTime(monthPlan.getCuringTime());
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
-        adjustDetailVo.setHeightQty(monthPlan.getHeightProductionQty());
-        adjustDetailVo.setMidQty(monthPlan.getMidProductionQty());
-        adjustDetailVo.setPostponeQty(monthPlan.getPostponeProductionQty());
-        adjustDetailVo.setCycleReserveQty(monthPlan.getCycleProductionQty());
-        adjustDetailVo.setConventionReserveQty(monthPlan.getConventionProductionQty());
+        adjustDetailVo.setHeightQty(Convert.toInt(monthPlan.getHeightProductionQty(),0));
+        adjustDetailVo.setMidQty(Convert.toInt(monthPlan.getMidProductionQty(),0));
+        adjustDetailVo.setPostponeQty(Convert.toInt(monthPlan.getPostponeProductionQty(),0));
+        adjustDetailVo.setCycleReserveQty(Convert.toInt(monthPlan.getCycleProductionQty(),0));
+        adjustDetailVo.setConventionReserveQty(Convert.toInt(monthPlan.getConventionProductionQty(),0));
     }
 
     /**
