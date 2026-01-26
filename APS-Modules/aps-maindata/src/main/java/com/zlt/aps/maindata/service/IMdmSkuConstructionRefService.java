@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.service.IDocService;
 /**
@@ -18,4 +19,11 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMdmSkuConstructionRefService  extends IDocService<MdmSkuConstructionRef>{
 
+    /**
+     * 更新胎胚描述到物料表
+     *
+     * @param queryVO 查询条件
+     * @return 结果
+     */
+    AjaxResult updateMainMaterialDescToMaterialInfo(MdmSkuConstructionRef queryVO);
 }

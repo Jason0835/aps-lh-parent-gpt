@@ -3,4 +3,17 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper">
+
+    <update id="updateMainMaterialDescToMaterialInfo">
+        UPDATE T_MDM_MATERIAL_INFO t1
+            JOIN (
+            SELECT t.FACTORY_CODE, t.MATERIAL_CODE, MAX (t.MAIN_MATERIAL_DESC) AS MAIN_PATTERN
+            FROM T_MDM_SKU_CONSTRUCTION_REF t
+            WHERE t.IS_DELETE = 0
+            GROUP BY t.FACTORY_CODE, t.MATERIAL_CODE
+            ) t2
+        ON t1.FACTORY_CODE = t2.FACTORY_CODE AND t1.MATERIAL_CODE = t2.MATERIAL_CODE
+            SET t1.MAIN_PATTERN = t2.MAIN_PATTERN, t1.UPDATE_BY = #{updateBy}, t1.UPDATE_TIME = #{updateTime}
+        WHERE t1.IS_DELETE = 0
+    </update>
 </mapper>

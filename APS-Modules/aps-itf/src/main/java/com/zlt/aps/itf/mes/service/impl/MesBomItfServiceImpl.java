@@ -77,6 +77,10 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
 					baseDao.saveBatch(saveList);
 				}
+				// 更新胎胚描述到物料信息
+				MdmSkuConstructionRef queryVO = new MdmSkuConstructionRef();
+				queryVO.setBaseVale(null);
+				mdmSkuConstructionRefEntityMapper.updateMainMaterialDescToMaterialInfo(queryVO);
 			} finally {
 				DynamicDataSourceContextHolder.clear();
 				/** 切换APS数据源 end **/
