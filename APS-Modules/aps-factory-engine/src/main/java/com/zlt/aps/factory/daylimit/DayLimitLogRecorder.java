@@ -141,22 +141,6 @@ public class DayLimitLogRecorder {
     }
 
     /**
-     * 增加达到日产能上限限制日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已达到日产限制====
-     *
-     * @param context 排程上下文
-     * @return
-     */
-    public static String addReachDayCapacityLimitLog(Context context) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已达到日产限制====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
-        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
-        return logContent;
-    }
-
-    /**
      * 增加达到日控制限制日志信息记录
      * 1、日产能上限
      * 2、成型工装数量上限
@@ -184,24 +168,50 @@ public class DayLimitLogRecorder {
     }
 
     /**
-     * 增加没有找到即有日产能又有工装类型(成型鼓)数量日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 没有找到在日产能范围内可用成型鼓数量====
+     * 增加释放-日排产量日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在[%s]日使用[%s]模具排产Sku[%s]-排产量[%s]，其中需生产量[%s]损耗量[%s]后，日总排产量 %s====
      *
-     * @param context       排程上下文
-     * @param cxMachineInfo 机台信息
-     * @param groupName     分组名
-     * @param proSize       英寸
+     * @param context           排程上下文
+     * @param productionDay     排产日
+     * @param mouldCode         排产模具
+     * @param materialDesc      排产Sku
+     * @param realProductionQty 实际排产量
+     * @param productionQty     需生产量
+     * @param lossQty           损耗量
+     * @param sumQty            总排产量
      * @return
      */
-    public static String addNoFindWorkWeakQtyAndDayCapacityLog(Context context, CxMachineBaseInfoVo cxMachineInfo, String groupName, String proSize) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 没有找到在日产能范围内可用成型鼓数量====";
-        String cxMachineCode = "";
-        if (null != cxMachineInfo) {
-            cxMachineCode = cxMachineInfo.getCxMachineCode();
-        }
+    public static String addDayProductionInfoLog(Context context, Integer productionDay, String mouldCode, String materialDesc, Integer realProductionQty, Integer productionQty, Integer lossQty, Integer sumQty) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在[%s]日使用[%s]模具排产Sku[%s]-排产量[%s]，其中需生产量[%s]损耗量[%s]后，日总排产量 %s====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                cxMachineCode, groupName, proSize);
+                productionDay, mouldCode, materialDesc,
+                realProductionQty, productionQty, lossQty, sumQty);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加日排产量日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在[%s]日使用[%s]模具排产Sku[%s]-因结构提前收尾，收尾量[%s]，其中排产量[%s]损耗量[%s]后，日总排产占用量 %s====
+     *
+     * @param context           排程上下文
+     * @param productionDay     排产日
+     * @param mouldCodeInfo     排产模具
+     * @param materialDesc      排产Sku
+     * @param realProductionQty 实际排产量
+     * @param productionQty     需生产量
+     * @param lossQty           损耗量
+     * @param sumQty            总排产量
+     * @return
+     */
+    public static String addDeductionDayProductionInfoLog(Context context, Integer productionDay, String mouldCodeInfo, String materialDesc, Integer realProductionQty, Integer productionQty, Integer lossQty, Integer sumQty) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在[%s]日使用[%s]模具排产Sku[%s]-因结构提前收尾，释放占用量[%s]，其中排产量[%s]损耗量[%s]后，日总排产占用量 %s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                productionDay, mouldCodeInfo, materialDesc,
+                realProductionQty, productionQty, lossQty, sumQty);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
         return logContent;

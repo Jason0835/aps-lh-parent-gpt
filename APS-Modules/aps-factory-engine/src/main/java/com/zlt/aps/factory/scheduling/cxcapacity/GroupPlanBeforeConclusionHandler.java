@@ -2,6 +2,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
@@ -223,8 +224,9 @@ public class GroupPlanBeforeConclusionHandler {
         if (CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
-        //20260119 释放，成型工装使用量，切换结构使用量、分配日
+        //20260119 释放，成型工装使用量，切换结构使用量、分配日产能
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
+        DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
         //已排产的模具信息？
         if (isSingleMachine) {
@@ -265,6 +267,10 @@ public class GroupPlanBeforeConclusionHandler {
                     });
                     mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
                 });
+                //20260125 释放，日产能占用量
+                if (null != dayCapacityLimit) {
+                    dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, usedMouldSet, skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+                }
             });
         });
     }

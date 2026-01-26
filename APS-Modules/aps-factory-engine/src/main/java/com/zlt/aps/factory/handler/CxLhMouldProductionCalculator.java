@@ -607,25 +607,8 @@ public class CxLhMouldProductionCalculator {
             //胶囊卡盘使用量 + 1
             updateCapsuleChuckInfoByMould(capsuleChuckInfo, productionDay, singleMould, YesOrNoEnum.YES.getValue());
         });
-
-
-//        //模壳的使用量 更新
-//        doubleMouldList.forEach(singleMould -> {
-//            String mouldSetCode = singleMould.getMouldSetCode();
-//            if (StringUtils.isBlank(mouldSetCode)) {
-//                return;
-//            }
-//            MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(singleMould);
-//            if (null == mouldShellInfo) {
-//                return;
-//            }
-//            mouldShellInfo.addUsedCount(productionDay, singleMould.getMouldCode());
-//        });
-//        //模具分配使用量更新
-//        if (null == mouldAllocationControlInfo) {
-//            return;
-//        }
-//        doubleMouldList.forEach(singleMould -> mouldAllocationControlInfo.addUsedCount(productionDay, singleMould.getMouldCode()));
+        //双模排产量-增加日产能使用量
+        addDayCapacityQtyByMould(productionContext, productionDay, productionPlan, updateInfo, doubleMouldList);
     }
 
     /**
@@ -660,6 +643,30 @@ public class CxLhMouldProductionCalculator {
         //更新生胎及模具
         dayLimit.getProductionEmbryoCodeSet().add(productionSkuInfo.getEmbryoCode());
         dayLimit.getProductionMouldSet().addAll(usedMouldSet);
+    }
+
+    /**
+     * 更新日产能排产量，以模具+Sku维度
+     *
+     * @param productionContext 排产上下文
+     * @param productionDay     排产日
+     * @param productionPlan    排产计划(不关注具体ID)
+     * @param updateInfo        排产信息
+     * @param doubleMould       使用模具
+     */
+    private static void addDayCapacityQtyByMould(TbrProductionContext productionContext, Integer productionDay, MonthPlanProductionRequirePlanVo productionPlan, UpdateDayProductionInfoHelper updateInfo, List<ProductionMouldInfoVo> doubleMould) {
+        if (null == productionDay || null == productionPlan || CollectionUtils.isEmpty(doubleMould) || null == updateInfo) {
+            return;
+        }
+        Set<String> doubleMouldCode = doubleMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(doubleMouldCode) || ProductionConstant.DOUBLE_MOULD_PRODUCTION != doubleMouldCode.size()) {
+            return;
+        }
+        DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return;
+        }
+        dayCapacityLimit.addSkuDayProductionQty(productionContext, productionDay, productionPlan, doubleMould, updateInfo.getRealDayProductionQty(), updateInfo.getLossQty());
     }
 
     /**

@@ -9,7 +9,6 @@ import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
-import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -1051,7 +1050,7 @@ public class ProductionPlanGroupInfo {
         //更新使用模具
         planned.getUsedMouldSet().addAll(currentUsedMouldSet);
         //更新数量
-        planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty());
+        planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
     }
 
     /**
