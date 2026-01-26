@@ -87,7 +87,7 @@
 //lib
 import moment from "moment";
 //utils
-import { mapGetters} from "vuex";
+import { mapGetters } from "vuex";
 import { downloadLink } from "@/utils/request";
 //interface
 import {
@@ -118,7 +118,7 @@ export default {
     "biz_plan_type",
     "biz_construction_stage",
     "trial_status",
-    "product_category"
+    "product_category",
   ],
   provide() {
     return {
@@ -147,7 +147,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    ...mapGetters("globalList", ["structureList"]),
     columns() {
       let columns = [
         {
@@ -362,8 +362,8 @@ export default {
           label: this.$t("ui.data.column.finishStock.structureName"),
           prop: "structureName",
           type: "select",
-          dictData:this.structureList,
-          filterable: true
+          dictData: this.structureList,
+          filterable: true,
         },
         // {
         //   prop: "productStatus",
@@ -372,6 +372,12 @@ export default {
         //   dictData: this.dict.type.trial_status,
 
         // },
+        {
+          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
+          prop: "productCategory",
+          type: "select",
+          dictData: this.dict.type.product_category,
+        },
         {
           label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
@@ -412,7 +418,6 @@ export default {
           label: this.$t("common.remark"),
           prop: "remark",
         },
-
       ];
     },
   },
@@ -611,9 +616,7 @@ export default {
     }
     this.getList();
   },
-  activated() {
-
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

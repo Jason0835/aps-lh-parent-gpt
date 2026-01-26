@@ -97,6 +97,7 @@
     />
     <infoDialog ref="infoRef" @success="getList" />
     <addDialog ref="addRef" @success="getList" />
+    <checkDialog ref="checkRef" @success="getList" />
     <noVersionList ref="noVersionListRef" @success="getList" />
 
     <finalizedDialog ref="finRef" @success="getList" />
@@ -126,6 +127,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 import addDialog from "./components/addDialog.vue";
+import checkDialog from "./components/checkDialog.vue";
 import finalizedDialog from "./components/finalizedDialog.vue";
 import noVersionList from "./components/noVersionList.vue";
 import cos from "highlight.js/lib/languages/cos";
@@ -139,6 +141,7 @@ export default {
     infoDialog,
     finalizedDialog,
     noVersionList,
+    checkDialog
   },
   dicts: [
     "biz_factory_name",
@@ -604,6 +607,11 @@ export default {
       }
     },
     handleGenerate(row) {
+
+      {/* if (this.$refs.checkRef) {
+        this.$refs.checkRef.show();
+      }
+    return */}
       this.$confirm("确定生成？").then(() => {
         this.loading = true;
         factoryWholeCourseProduction({

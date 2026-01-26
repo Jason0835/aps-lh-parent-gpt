@@ -391,7 +391,8 @@ export default {
     };
     this.getList();
   },
-  activated() {},
+  activated() {
+  },
 };
 </script>
 <style lang="scss" scoped>
