@@ -97,4 +97,14 @@ public interface IMdmAreaCapaAllocationRemoteService {
     @ApiOperation("复制前校验")
     @PostMapping("/mdmAreaCapaAllocation/checkBeforeCopy")
     AjaxResult checkBeforeCopy(@RequestBody MdmAreaCapaAllocation entity);
+
+    /**
+     * 获取总产能分配
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("获取总产能分配")
+    @PostMapping("/mdmAreaCapaAllocation/getSumCapacityAllocation")
+    public AjaxResult getSumCapacityAllocation(@RequestBody MdmAreaCapaAllocation entity);
 }

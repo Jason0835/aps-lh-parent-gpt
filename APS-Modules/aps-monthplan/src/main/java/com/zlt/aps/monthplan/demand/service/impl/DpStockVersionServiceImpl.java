@@ -81,9 +81,9 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
     }
 
     @Override
-    public void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap) {
-        if (org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
-            return;
+    public List<DpStockVersion> insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap) {
+        if (CollectionUtils.isEmpty(finishedProductStockMap)) {
+            return Collections.emptyList();
         }
         List<DpStockVersion> list = Lists.newArrayList();
         List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
@@ -92,21 +92,7 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
             list.add(requireStock);
         });
         this.baseDao.insertBatch(list);
-    }
-
-    @Override
-    public void insertBatchData(String predictionVersion,
-                                YearMonth yearMonth, Map<String, List<MdmProductStock>> finishedProductStockMap) {
-        if (org.springframework.util.CollectionUtils.isEmpty(finishedProductStockMap)) {
-            return;
-        }
-        List<DpStockVersion> list = Lists.newArrayList();
-        List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
-        finishedProductStocks.forEach(finishedProductStock -> {
-            DpStockVersion requireStock = this.buildRequireStock(predictionVersion,yearMonth,finishedProductStock);
-            list.add(requireStock);
-        });
-        this.baseDao.insertBatch(list);
+        return list;
     }
 
     @Override
@@ -133,39 +119,6 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
             result.put(key, map);
         });
         return result;
-    }
-
-    @Override
-    public Map<String, Map<String, Integer>> calculateStockQty(String monthPlanVersion) {
-        List<DpStockVersion> list = this.findCurrentStockVersion(monthPlanVersion);
-        if(CollectionUtils.isEmpty(list)){
-            return Collections.emptyMap();
-        }
-        YearMonth now = YearMonth.now();
-        YearMonth lastOneYear = now.minusYears(BigDecimal.ONE.intValue());
-        YearMonth lastTwoYear = now.minusYears(BigDecimal.ONE.intValue() + BigDecimal.ONE.intValue());
-        Map<String, Map<String, Integer>> result = new HashMap<>();
-        Map<String,List<DpStockVersion>> stockMap =   list.stream().collect(Collectors.groupingBy(DpStockVersion::getMonthPlanVersionKey));
-        stockMap.forEach((key,value)->{
-            Map<String, Integer> map = Maps.newHashMap();
-            int totalStockQty = value.stream().filter(item -> null != item.getStockQty()).mapToInt(DpStockVersion::getStockQty).sum();
-            int currentStockQty = value.stream().filter(item -> filter(item,now)).mapToInt(DpStockVersion::getStockQty).sum();
-            int lastOneYearStockQty = value.stream().filter(item -> filter(item,lastOneYear)).mapToInt(DpStockVersion::getStockQty).sum();
-            int lastTwoYearStockQty = value.stream().filter(item -> filter(item,lastTwoYear)).mapToInt(DpStockVersion::getStockQty).sum();
-            map.put(StringConstant.ZERO,totalStockQty);
-            map.put(StringConstant.ONE,currentStockQty);
-            map.put(StringConstant.TWO,lastOneYearStockQty);
-            map.put(StringConstant.THREE,lastTwoYearStockQty);
-            result.put(key, map);
-        });
-        return result;
-    }
-
-    private List<DpStockVersion> findCurrentStockVersion(String monthPlanVersion) {
-        LambdaQueryWrapper<DpStockVersion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DpStockVersion::getRequireVersion, monthPlanVersion);
-        wrapper.eq(DpStockVersion::getIsDelete, YesOrNoEnum.NO.getValue());
-        return this.dpStockVersionEntityMapper.selectList(wrapper);
     }
 
     private List<DpStockVersion> findCurrentStockVersion() {
@@ -197,20 +150,6 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
         String transformed = item.getWeekYear().substring(2) + item.getWeekYear().substring(0,2);
         int yearWeek = Integer.parseInt(transformed);
         return yearWeek < Integer.parseInt(currentYearMonthStr);
-    }
-
-    private DpStockVersion buildRequireStock(String predictionVersion,
-                                             YearMonth yearMonth, MdmProductStock finishedProductStock) {
-        DpStockVersion requireStock = new DpStockVersion();
-        BeanUtils.copyProperties(finishedProductStock, requireStock);
-        requireStock.setId(null);
-        requireStock.setRequireVersion(predictionVersion);
-        requireStock.setIsDelete(YesOrNoEnum.NO.getValue());
-        requireStock.setRemainingQty(finishedProductStock.getLeftOverQty());
-        requireStock.setBaseVale(null);
-        requireStock.setYear(yearMonth.getYear());
-        requireStock.setMonth(yearMonth.getMonthValue());
-        return requireStock;
     }
 
     private DpStockVersion buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MdmProductStock finishedProductStock) {
