@@ -1,10 +1,15 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,8 +36,10 @@ import com.ruoyi.common.exception.ServiceException;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 public class DpOrderOffsetDetailServiceImpl extends AbstractDocService<DpOrderOffsetDetail>  implements IDpOrderOffsetDetailService {
+    private final DpOrderOffsetDetailEntityMapper dpOrderOffsetDetailEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2025123011";
@@ -58,5 +65,14 @@ public class DpOrderOffsetDetailServiceImpl extends AbstractDocService<DpOrderOf
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<DpOrderOffsetDetail> findPredictOffsetDetail(String monthPlanVersion) {
+        LambdaQueryWrapper<DpOrderOffsetDetail> wrapper =
+            Wrappers.lambdaQuery(DpOrderOffsetDetail.class)
+                .eq(DpOrderOffsetDetail::getMonthPlanVersion, monthPlanVersion)
+                .eq(DpOrderOffsetDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
+        return dpOrderOffsetDetailEntityMapper.selectList(wrapper);
     }
 }

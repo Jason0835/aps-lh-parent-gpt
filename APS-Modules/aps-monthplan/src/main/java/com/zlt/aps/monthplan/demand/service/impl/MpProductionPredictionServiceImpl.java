@@ -13,6 +13,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.maindata.service.*;
@@ -21,6 +22,7 @@ import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.common.utils.ProductionSchedulingService;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
+import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
@@ -70,6 +72,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final IMpPredictionDetailService mpPredictionDetailService;
 
     private final ProductionSchedulingService productionSchedulingService;
+    private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
 
 
     @Override
@@ -199,15 +202,18 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         if(CollectionUtils.isEmpty(list)) {
             return Collections.emptyList();
         }
+        DpDemandPlan demandPlan = tMonthDemands.get(0);
         Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
+        List<DpOrderOffsetDetail> predictOffsetDetails = dpOrderOffsetDetailService.findPredictOffsetDetail(demandPlan.getMonthPlanVersion());
+        Map<String,List<DpOrderOffsetDetail>> netDemandsGroupByMaterialCode = predictOffsetDetails.stream().collect(Collectors.groupingBy(DpOrderOffsetDetail::getMaterialCode));
         List<MpProductionPrediction> result = Lists.newArrayList();
         YearMonth yearMonth = monthRangeResult.getTMonth();
-        DpDemandPlan demandPlan = tMonthDemands.get(0);
         map.forEach((materialCode, value) -> {
                 if(!materialInfoMap.containsKey(materialCode)) {
                     return;
                 }
                 List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode = map.get(materialCode);
+                List<DpOrderOffsetDetail> netDemands = netDemandsGroupByMaterialCode.get(materialCode);
                 MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
                 MpProductionPrediction productionPrediction = new MpProductionPrediction();
                 BeanUtils.copyProperties(materialInfo,productionPrediction);
@@ -222,8 +228,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
                 productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
                 productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));
-                productionPrediction.setNetQty(calculateNetQty(listGroupByMaterialCode));
-                productionPrediction.setHeightQty(calculateHeightQty(listGroupByMaterialCode));
+                productionPrediction.setNetQty(calculateNetQty(netDemands));
+                productionPrediction.setHeightQty(calculateHeightQty(netDemands));
                 productionPrediction.setProductionQty(calculateProductionQty(listGroupByMaterialCode));
                 productionPrediction.setMonth1(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTMonth()));
                 productionPrediction.setMonth2(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTPlus1Month()));
@@ -241,18 +247,18 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         return listGroupByMaterialCode.stream().filter(item -> null != item.getTotalQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTotalQty).sum();
     }
 
-    private int calculateHeightQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
-        if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
+    private int calculateHeightQty(List<DpOrderOffsetDetail> netDemands) {
+        if(org.apache.commons.collections.CollectionUtils.isEmpty(netDemands)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getHeightQty()).mapToInt(FactoryMonthPlanMouldDayResult::getHeightQty).sum();
+        return netDemands.stream().filter(item -> ApsConstant.SAL_PRIORITY_HIGHT.equals(item.getScmPriority()) && null != item.getProduceQtyDue()).mapToInt(DpOrderOffsetDetail::getProduceQtyDue).sum();
     }
 
-    private int calculateNetQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {
-        if(org.apache.commons.collections.CollectionUtils.isEmpty(listGroupByMaterialCode)){
+    private int calculateNetQty(List<DpOrderOffsetDetail> netDemands) {
+        if(org.apache.commons.collections.CollectionUtils.isEmpty(netDemands)){
             return 0;
         }
-        return listGroupByMaterialCode.stream().filter(item -> null != item.getProdReqPlan()).mapToInt(FactoryMonthPlanMouldDayResult::getProdReqPlan).sum();
+        return netDemands.stream().filter(item -> null != item.getProduceQtyDue()).mapToInt(DpOrderOffsetDetail::getProduceQtyDue).sum();
     }
 
     private int calculateTypeBlockQty(List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode) {

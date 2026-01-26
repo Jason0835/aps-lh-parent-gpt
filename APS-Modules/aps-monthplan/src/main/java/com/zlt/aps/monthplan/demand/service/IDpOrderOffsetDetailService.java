@@ -3,6 +3,9 @@ package com.zlt.aps.monthplan.demand.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IDpOrderOffsetDetailService.java
@@ -17,5 +20,11 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface IDpOrderOffsetDetailService  extends IDocService<DpOrderOffsetDetail>{
+  /**
+   *  获取预测冲减详情
+   * @param monthPlanVersion
+   * @return
+   */
+  List<DpOrderOffsetDetail> findPredictOffsetDetail(String monthPlanVersion);
 
 }

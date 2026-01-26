@@ -16,6 +16,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		       v.PRODUCTION_QTY,
 		       v.LH_MARGIN,
 		       v.EXPECTED_CLOSE_DAY,
+		       v.EXPECTED_CLOSE_DATE,
+		       v.EXPECTED_CLOSE_DATE,
+		       v.DIFF_DAY,
 		       r.CX_MACHINE_CODE AS CX_MACHINE,
 		       GROUP_CONCAT(distinct LH_MACHINE_CODE) AS LH_MACHINE
 		  FROM t_mp_month_plan_monitor v
@@ -49,6 +52,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		       v.PRODUCTION_QTY,
 		       v.LH_MARGIN,
 		       v.EXPECTED_CLOSE_DAY,
+               v.EXPECTED_CLOSE_DATE,
+               v.EXPECTED_CLOSE_DATE,
+               v.DIFF_DAY,
 		       r.CX_MACHINE_CODE
     </select>
 </mapper>
