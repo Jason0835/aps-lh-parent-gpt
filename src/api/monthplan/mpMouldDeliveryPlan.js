@@ -27,3 +27,10 @@ export function getBoardingDate(query) {
     data: query
   })
 }
+export function updateMaterial(query) {
+  return request({
+    url: '/monthplan/mpMouldDeliveryPlan/updateMainPatternToMaterial',
+    method: 'post',
+    data: query
+  })
+}

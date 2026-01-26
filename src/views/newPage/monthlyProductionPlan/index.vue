@@ -58,6 +58,7 @@ export default {
     "product_category",
     "biz_schedule_type",
     "biz_yes_no",
+    "trial_status"
   ],
   data() {
     return {
@@ -164,6 +165,9 @@ export default {
           prop: "productStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           width: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
         },
         {
           prop: "productionType",
@@ -272,16 +276,16 @@ export default {
           label: this.$t("ui.data.monthlyProductionPlan.mouldChangeInfo"),
           width: 120,
         },
-        {
-          prop: "dynamicBalanceQty",
-          label: this.$t("ui.data.monthlyProductionPlan.dynamicBalanceQty"),
-          width: 120,
-        },
-        {
-          prop: "uniformityQty",
-          label: this.$t("ui.data.monthlyProductionPlan.uniformityQty"),
-          width: 120,
-        },
+        // {
+        //   prop: "dynamicBalanceQty",
+        //   label: this.$t("ui.data.monthlyProductionPlan.dynamicBalanceQty"),
+        //   width: 120,
+        // },
+        // {
+        //   prop: "uniformityQty",
+        //   label: this.$t("ui.data.monthlyProductionPlan.uniformityQty"),
+        //   width: 120,
+        // },
         {
           prop: "curingTime",
           label: this.$t("ui.data.monthlyProductionPlan.curingTime"),

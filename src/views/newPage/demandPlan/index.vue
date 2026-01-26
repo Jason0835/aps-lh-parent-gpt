@@ -683,7 +683,8 @@ export default {
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
-      this.getList();
+      // this.getList();
+      this.getVersionList(true);
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);

@@ -213,11 +213,11 @@ export default {
           prop: "reason",
           minWidth: 240,
         },
-        {
-          label: this.$t("ui.data.DemandPlan.orderQty"),
-          prop: "orderQty",
-          minWidth: 120,
-        },
+        // {
+        //   label: this.$t("ui.data.DemandPlan.orderQty"),
+        //   prop: "orderQty",
+        //   minWidth: 120,
+        // },
         {
           label: this.$t("ui.data.DemandPlan.netQty"),
           prop: "netQty",

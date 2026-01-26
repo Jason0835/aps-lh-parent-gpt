@@ -107,8 +107,8 @@ export default {
     }),
     title: function () {
       return this.isEdit
-        ? this.$t("common.button.edit")
-        : this.$t("common.button.add");
+        ? this.$t("ui.data.column.rawMaterial.monthGen")
+        : this.$t("ui.data.column.rawMaterial.monthGen");
     },
     columns() {
       return [
@@ -154,14 +154,21 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      const now = new Date();
+      now.setMonth(now.getMonth() + 1);
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
+
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
+          yearMonth: `${year}-${month}`,
         };
       } else {
         this.form = {
           factoryCode: "116",
+          yearMonth: `${year}-${month}`,
         };
       }
     },

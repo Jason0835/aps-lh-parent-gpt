@@ -50,6 +50,13 @@
           v-hasPermi="['monthplan:mpMouldDeliveryPlan:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="handleUpdate"
+          :loading="updateLoading"
+          type="primary"
+          v-hasPermi="['monthplan:mpMouldDeliveryPlan:updateMainPattern']"
+          >{{ $t("ui.data.productmodelrelation.updateMainPattern") }}</el-button
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -80,6 +87,7 @@ import { downloadLink } from "@/utils/request";
 import {
   listMpMouldShellInfo,
   removeMpMouldShellInfo,
+  updateMaterial
 } from "@/api/monthplan/mpMouldDeliveryPlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 //components
@@ -102,6 +110,7 @@ export default {
   },
   data() {
     return {
+      updateLoading:false,
       importColumns: [
         {
           label: "",
@@ -245,6 +254,19 @@ export default {
     },
   },
   methods: {
+    async handleUpdate() {
+      try {
+        this.updateLoading=true
+        let res = await updateMaterial();
+        this.$modal.msgSuccess(res.msg);
+        // this.$set(this.page, "current", 1);
+        // this.getList();
+        this.updateLoading=false
+      } catch (err) {
+        console.log(err);
+        this.updateLoading=false
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
