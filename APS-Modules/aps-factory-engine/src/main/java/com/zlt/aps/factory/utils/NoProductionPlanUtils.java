@@ -3,7 +3,6 @@ package com.zlt.aps.factory.utils;
 import com.google.common.collect.Lists;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -12,12 +11,8 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 不排产计划工具类
@@ -34,16 +29,19 @@ public class NoProductionPlanUtils {
       BeanUtils.copyProperties(productionPlan, noProductionPlan);
       noProductionPlan.setId(null);
       noProductionPlan.setReason(unProductionReason);
-      Integer needProductionQty = productionPlan.getCxCapacityRequireQty();
+      int needProductionQty = productionPlan.getFactProdReqQty();
+      int plannedQty = sumProductionMap.getOrDefault(monthPlanId, 0);
+      int unProductionQty = needProductionQty - plannedQty;
+      if(unProductionQty == 0) {
+        return;
+      }
+      String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
+      noProductionPlan.setIsProduction(isProduction);
       //有排产计划，则取排产数量
       if (sumProductionMap.containsKey(monthPlanId)) {
-        Integer plannedQty = sumProductionMap.get(monthPlanId);
-        int unProductionQty = needProductionQty - plannedQty;
-        if (!needProductionQty.equals(plannedQty)) {
           noProductionPlan.setUnProductionQty(unProductionQty);
           noProductionPlanList.add(noProductionPlan);
-        }
-        return;
+          return;
       }
       //不排产计划
       if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
@@ -51,30 +49,12 @@ public class NoProductionPlanUtils {
         noProductionPlanList.add(noProductionPlan);
         return;
       }
-      //即没有排产计划，又不是不排产计划
-      Integer plannedQty = productionPlan.getProductionQty();
-      int unProductionQty = needProductionQty - plannedQty;
-      if (StringUtils.isNotBlank(unProductionReason)  && unProductionQty >= BigDecimal.ZERO.longValue()) {
+      if (StringUtils.isNotBlank(unProductionReason)) {
         noProductionPlan.setUnProductionQty(unProductionQty);
         noProductionPlanList.add(noProductionPlan);
       }
     });
     return noProductionPlanList;
-  }
-
-  public static Map<String, FactoryMonthPlanMouldDayResult> convertToMaterialDescMap(
-      List<FactoryMonthPlanMouldDayResult> dayResultList) {
-    if(CollectionUtils.isEmpty(dayResultList)) {
-      return Collections.emptyMap();
-    }
-    return dayResultList.stream()
-        .filter(Objects::nonNull)
-        .filter(result -> !StringUtils.isEmpty(result.getMaterialDesc()))
-        .collect(Collectors.toMap(
-            FactoryMonthPlanMouldDayResult::getMaterialCode,
-            Function.identity(),
-            (existing, replacement) -> existing
-        ));
   }
 
   /**
