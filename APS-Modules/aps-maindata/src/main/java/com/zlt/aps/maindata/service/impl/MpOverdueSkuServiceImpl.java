@@ -6,7 +6,6 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MpOverdueSkuEntityMapper;
 import com.zlt.aps.maindata.service.IMpOverdueSkuService;
-import com.zlt.aps.maindata.utils.YearMonthRange;
 import com.zlt.aps.monthplan.api.domain.entity.MpOverdueSku;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -48,10 +47,9 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
 
     @Override
     public Set<String> excludeOverdueCycleProduction() {
-        // 1. 计算时间范围
-        YearMonthRange range = calculateExtendedYearMonthRange();
         // 构建查询条件
-        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized(range);
+        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized();
+        queryWrapper.eq("IS_OVERDUE_CYCLE", YesOrNoEnum.YES.getValue());
         List<MpOverdueSku> list = this.mpOverdueSkuEntityMapper.selectList(queryWrapper);
         if(CollectionUtils.isEmpty(list)){
             return Sets.newHashSet();
@@ -61,10 +59,8 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
 
     @Override
     public Set<String> excludeOverduePrecedentProduction() {
-        // 1. 计算时间范围
-        YearMonthRange range = calculateExtendedYearMonthRange();
         // 构建查询条件
-        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized(range);
+        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized();
         queryWrapper.eq("IS_OVERDUE_REGULAR", YesOrNoEnum.YES.getValue());
         List<MpOverdueSku> list = this.mpOverdueSkuEntityMapper.selectList(queryWrapper);
         if(CollectionUtils.isEmpty(list)){
@@ -75,10 +71,8 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
 
     @Override
     public boolean checkOverdue(SupplyOrderPool supplyOrderPool) {
-        // 1. 计算时间范围
-        YearMonthRange range = calculateExtendedYearMonthRange();
         // 构建查询条件
-        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized(range);
+        QueryWrapper<MpOverdueSku> queryWrapper = buildExtendedRangeQueryOptimized();
         queryWrapper.eq("FACTORY_CODE",supplyOrderPool.getFactoryCode());
         queryWrapper.eq("MATERIAL_CODE",supplyOrderPool.getMaterialCode());
         if(ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(supplyOrderPool.getOrderType())) {
@@ -92,46 +86,18 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
     /**
      * 优化的实现：使用数值比较（性能更好）
      */
-    public QueryWrapper<MpOverdueSku> buildExtendedRangeQueryOptimized(
-        YearMonthRange range) {
-
+    public QueryWrapper<MpOverdueSku> buildExtendedRangeQueryOptimized() {
         QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
-        YearMonth recentStart = range.getRecentStartYearMonth();
-        YearMonth current = range.getCurrentYearMonth();
-
+        YearMonth current = YearMonth.now();
+        // 计算最近N个月的起始点
+        YearMonth recentStart = current.minusMonths(13);
         // 将年月转换为数值
         int recentStartValue = recentStart.getYear() * 100 + recentStart.getMonthValue();
         int currentValue = current.getYear() * 100 + current.getMonthValue();
-
         // 使用数据库表达式
         String expression = "year * 100 + month";
-
         // 构建条件：expression < recentStartValue OR expression BETWEEN recentStartValue AND currentValue
-        queryWrapper.and(wrapper -> {
-            wrapper.or(w -> w.apply(expression + " < {0}", recentStartValue));
-            wrapper.or(w -> w.apply(expression + " BETWEEN {0} AND {1}",
-                recentStartValue, currentValue));
-        });
-
+        queryWrapper.and(w -> w.apply(expression + " BETWEEN {0} AND {1}", recentStartValue, currentValue));
         return queryWrapper;
-    }
-
-    /**
-     * 计算扩展的时间范围（包含之前所有数据）
-     */
-    private YearMonthRange calculateExtendedYearMonthRange() {
-        YearMonth currentYearMonth = YearMonth.now().minusMonths(1);
-
-        // 计算最近N个月的起始点
-        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
-
-        // 注意：我们不需要设置最早的时间限制，因为要包含之前所有数据
-        // 返回一个包含特殊标志的范围对象
-        return YearMonthRange.builder()
-            .currentYearMonth(currentYearMonth)
-            .recentStartYearMonth(startYearMonth)
-            .includeAllHistoricalData(true)
-            .monthsBack(12)
-            .build();
     }
 }
