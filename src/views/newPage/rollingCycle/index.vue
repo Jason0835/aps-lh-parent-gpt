@@ -223,7 +223,7 @@
 </template>
 <script>
 //lib
-import { mapState,mapGetters } from "vuex";
+import { mapState, mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
@@ -320,7 +320,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    ...mapGetters("globalList", ["structureList"]),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -410,7 +410,7 @@ export default {
                     placeholder="请输入内容"
                     onInput={(value) => {
                       // 移除小数点和小数部分
-                      row.confirmAdjustQty = value.replace(/\./g, '')
+                      row.confirmAdjustQty = value.replace(/\./g, "");
                     }}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
@@ -438,8 +438,8 @@ export default {
                       // 将值设置为正整数
 
                       row.adjustPriority = value.replace(/[^\d]/g, "");
-                      if(value>99999){
-                        row.adjustPriority=99999
+                      if (value > 99999) {
+                        row.adjustPriority = 99999;
                       }
                     }}
                     placeholder="请输入"
@@ -765,7 +765,7 @@ export default {
                       placeholder="请输入内容"
                       onInput={(value) => {
                         // 移除小数点和小数部分
-                        row.confirmAdjustQty = value.replace(/\./g, '')
+                        row.confirmAdjustQty = value.replace(/\./g, "");
                       }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
@@ -797,9 +797,9 @@ export default {
                         // ^[1-9]\d*$ 匹配正整数，不包括0
                         // 将值设置为正整数
                         row.adjustPriority = value.replace(/[^\d]/g, "");
-                        if(value>99999){
-                        row.adjustPriority=99999
-                      }
+                        if (value > 99999) {
+                          row.adjustPriority = 99999;
+                        }
                       }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
@@ -878,8 +878,8 @@ export default {
           prop: "structureName",
           label: this.$t("产品结构"),
           type: "select",
-          dictData:this.structureList,
-          filterable: true
+          dictData: this.structureList,
+          filterable: true,
         },
         {
           prop: this.activeName == "second" ? "productionVersion" : "version",
@@ -1182,7 +1182,7 @@ export default {
             this.$set(this.query, "productionVersion", list[0].value);
           }
         } else {
-          if (this.activeName!= "second") {
+          if (this.activeName != "second") {
             this.$set(this.search, "version", "");
             this.$set(this.query, "version", "");
           } else {
@@ -1191,9 +1191,9 @@ export default {
           }
         }
         // if (isGet) {
-          // this.$nextTick(() => {
-          //   this.getList();
-          // });
+        // this.$nextTick(() => {
+        //   this.getList();
+        // });
         // }
       } catch (err) {
         console.log(err);
@@ -1274,6 +1274,9 @@ export default {
     },
     //确认调整结果
     async confirmResult() {
+
+
+
       try {
         this.show = false;
         this.loading = true;
@@ -1298,10 +1301,14 @@ export default {
         //   params.isMove = this.formInline.isMove;
         // }
         let res = await confirmAdjust(params);
-        this.show = false;
+        // this.show = false;
         this.$modal.msgSuccess(res.msg);
-        this.backPlan();
-        console.log(res);
+        // this.backPlan();
+        this.showOutResult = true;
+        this.isShowFoot = false;
+        this.isEdit = false;
+        this.data = [];
+        this.outResultData = [];
       } catch (err) {
         this.loading = false;
         this.show = true;
@@ -1528,7 +1535,6 @@ export default {
         params.startDay = params.beginDay;
         params.scheduledMachines = params.cxMachineCode;
         let res = await autoAdjust(params);
-        console.log(res);
         this.outResultData = res;
         this.showConfirmResult = true;
         // this.data = res;
@@ -1717,9 +1723,9 @@ export default {
           params.yearMonth = "";
         }
         params.productionVersion = productionVersion;
-        params.structureName=this.formInline.structureName
+        params.structureName = this.formInline.structureName;
         let res = await getStructureDetail(params);
-        this.outResultData=res.rows
+        this.outResultData = res.rows;
         console.log("初始化");
         console.log(res);
       } catch (err) {
@@ -1816,7 +1822,7 @@ export default {
         let arr = params.yearMonth.split("-");
         params.year = arr[0];
         params.month = arr[1];
-        params.yearMonth=''
+        params.yearMonth = "";
       }
 
       return params;
@@ -1836,7 +1842,6 @@ export default {
           }
           data = await listResult(this.formatParams());
         } else {
-
           return;
         }
         this.data = data.rows;
@@ -1876,8 +1881,8 @@ export default {
           this.isShowFoot = false;
           this.isEdit = false;
           this.formInline = res;
-          this.data=[]
-          this.outResultData=[]
+          this.data = [];
+          this.outResultData = [];
         } else {
           this.$modal.msgWarning("已经是最后一个结构");
         }

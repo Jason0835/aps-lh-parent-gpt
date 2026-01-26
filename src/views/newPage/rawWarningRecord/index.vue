@@ -135,13 +135,13 @@ export default {
         //   prop: "warningData",
         //   label: this.$t("预警数据"),
         // },
-        {
-          prop: "warningLevel",
-          label: this.$t("ui.data.column.rawMaterial.warningLevel"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.warn_level, value);
-          },
-        },
+        // {
+        //   prop: "warningLevel",
+        //   label: this.$t("ui.data.column.rawMaterial.warningLevel"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.warn_level, value);
+        //   },
+        // },
         {
           prop: "warningTitle",
           label: this.$t("ui.data.column.rawMaterial.warningTitle"),

@@ -498,6 +498,7 @@ export default {
     },
     // api
     async getList() {
+    this.loading=true
       try {
         const data = await getSalesList(this.formatParams());
         // console.log(data);

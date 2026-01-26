@@ -197,23 +197,23 @@ export default {
           dictData: this.parentDict.type.warn_type,
 
         },
-        {
-          prop: "enabled",
-          label: this.$t("ui.data.column.rawMaterial.enabled"),
-          type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
-        },
+        // {
+        //   prop: "enabled",
+        //   label: this.$t("ui.data.column.rawMaterial.enabled"),
+        //   type: "select",
+        //   dictData: this.parentDict.type.biz_yes_no,
+        // },
 
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.rawMaterial.materialCode"),
-          maxlength: 50,
-        },
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.rawMaterial.materialName"),
-          maxlength: 50,
-        },
+        // {
+        //   prop: "materialCode",
+        //   label: this.$t("ui.data.column.rawMaterial.materialCode"),
+        //   maxlength: 50,
+        // },
+        // {
+        //   prop: "materialDesc",
+        //   label: this.$t("ui.data.column.rawMaterial.materialName"),
+        //   maxlength: 50,
+        // },
         // {
         //   prop: "deviationUpper",
         //   label: this.$t("ui.data.column.rawMaterial.deviationUpper"),

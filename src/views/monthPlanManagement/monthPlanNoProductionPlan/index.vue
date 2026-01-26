@@ -170,6 +170,11 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          prop: "structureName",
+          minWidth: 180,
+        },
+        {
           label: this.$t("ui.data.DemandPlan.productionType"),
           prop: "productionType",
           minWidth: 120,

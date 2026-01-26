@@ -38,6 +38,7 @@ import Big from "big.js";
 import { downloadLink } from "@/utils/request";
 //interface
 import { listOrderOffsetDetail } from "@/api/monthplan/report";
+import { areaList } from "@/api/monthplan/mdmAreaCapaAllocation";
 //components
 
 export default {
@@ -69,6 +70,7 @@ export default {
       search: {},
       query: {},
       stat: {},
+      areaDist:[],
     };
   },
   computed: {
@@ -189,28 +191,28 @@ export default {
           width: 120,
           label: this.$t("年周号"),
         },
-        {
-          prop: "isUniformity",
-          width: 120,
-          label: this.$t("均匀性"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(
-              this.dict.type.biz_deliver_goods_type,
-              value
-            );
-          },
-        },
-        {
-          prop: "isDynamicBalance",
-          width: 120,
-          label: this.$t("动平衡"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(
-              this.dict.type.biz_deliver_goods_type,
-              value
-            );
-          },
-        },
+        // {
+        //   prop: "isUniformity",
+        //   width: 120,
+        //   label: this.$t("均匀性"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(
+        //       this.dict.type.biz_deliver_goods_type,
+        //       value
+        //     );
+        //   },
+        // },
+        // {
+        //   prop: "isDynamicBalance",
+        //   width: 120,
+        //   label: this.$t("动平衡"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(
+        //       this.dict.type.biz_deliver_goods_type,
+        //       value
+        //     );
+        //   },
+        // },
         {
           prop: "deliverGoodsType",
           label: this.$t("common.shipType"),
@@ -272,6 +274,10 @@ export default {
         {
           label: this.$t("区域"),
           prop: "areaCode",
+          type: "select",
+          filterable: true,
+          dictData:this.areaDist,
+          special:true
         },
         {
           label: this.$t("客户"),
@@ -293,6 +299,29 @@ export default {
     },
   },
   methods: {
+    async getAreaList() {
+      try {
+        let res = await areaList({
+          pageSize: 1000,
+          pageNum: 1,
+          // factoryCode: '116',
+          status: 0,
+        });
+        let list=[]
+        for (let i = 0; i < res.rows.length; i++) {
+          let obj={
+            label:res.rows[i].areaNameI18n,
+            value:res.rows[i].areaCode
+          }
+          list.push(obj)
+
+        }
+        this.areaDist=list
+      } catch (error) {
+        console.error(error);
+      } finally {
+      }
+  },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -439,6 +468,7 @@ export default {
     },
   },
   created() {
+    this.getAreaList();
     const date = moment();
 
     this.search = {

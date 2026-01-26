@@ -365,13 +365,13 @@ export default {
           dictData:this.structureList,
           filterable: true
         },
-        {
-          prop: "productStatus",
-          label: this.$t("ui.data.column.trialPlan.trialStatus"),
-          type: "select",
-          dictData: this.dict.type.trial_status,
+        // {
+        //   prop: "productStatus",
+        //   label: this.$t("ui.data.column.trialPlan.trialStatus"),
+        //   type: "select",
+        //   dictData: this.dict.type.trial_status,
 
-        },
+        // },
         {
           label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",

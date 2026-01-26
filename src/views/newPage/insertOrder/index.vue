@@ -396,7 +396,8 @@ export default {
         sourceType:row.planType,
         productionVersion:row.predictionProductionVersion,
         year:row.year,
-        month:row.month<10? "0" + row.month : row.month
+        month:row.month<10? "0" + row.month : row.month,
+        planType:row.planType,
       }
       this.$router.push({
         path: `./insertOrderDetail/` + row.id,

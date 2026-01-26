@@ -59,6 +59,7 @@
 <script>
 //lib
 import moment from "moment";
+import { mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
@@ -110,6 +111,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters("globalList", ["structureList"]),
     columns() {
       let columns = [
         // { type: "selection", fixed: "left" },
@@ -215,9 +217,12 @@ export default {
     },
     searchColumns() {
       return [
-      {
+        {
           prop: "structureName",
-          label: this.$t("产品结构"),
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData: this.structureList,
+          filterable: true,
         },
         {
           prop: "cxMachineCode",
