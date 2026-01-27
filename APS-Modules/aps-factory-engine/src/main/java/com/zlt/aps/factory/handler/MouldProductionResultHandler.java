@@ -154,6 +154,7 @@ public class MouldProductionResultHandler {
                 if (null == detail) {
                     detail = createInitDetailLog(singlePlanProductionInfo);
                 }
+                detail.setCxMachineCode(singlePlanProductionInfo.getCxMachineCode());
                 setProductionDateQty(detail, singlePlanProductionInfo.getProductionDate(), singlePlanProductionInfo.getProductionQty());
                 productionLogMap.put(monthPlanId, detail);
             });
