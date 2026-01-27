@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.tlt.aps.enums.LocationTypeEnum;
+import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.itf.constant.DataSource;
@@ -602,6 +603,9 @@ public class MesItfServiceImpl implements MesItfService {
                     existsMap = existsList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getMaterialCode()), Function.identity(), (v1, v2) -> v1));
                 }
                 for (MdmMaterialInfo entity : saveList) {
+                    // 默认全钢
+                    entity.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+                    entity.setProductTypeName(ProductTypeEnum.WHOLE_STEEL.getName());
                     // 物料类型转换
                     String mesMaterialCategory = entity.getMesMaterialCategory();
                     MouldCategoryConvertEnum convertEnum = MouldCategoryConvertEnum.getByMesCode(mesMaterialCategory);
