@@ -272,7 +272,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 动平衡数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.dynamicBalanceQty")
     @ApiModelProperty(value = "动平衡数量", name = "dynamicBalanceQty")
     @TableField(value = "DYNAMIC_BALANCE_QTY")
     private String dynamicBalanceQty;
@@ -280,7 +279,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 均匀性数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.uniformityQty")
     @ApiModelProperty(value = "均匀性数量", name = "uniformityQty")
     @TableField(value = "UNIFORMITY_QTY")
     private Integer uniformityQty;
