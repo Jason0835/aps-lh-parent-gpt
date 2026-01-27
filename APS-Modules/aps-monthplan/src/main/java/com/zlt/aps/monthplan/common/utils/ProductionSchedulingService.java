@@ -5,6 +5,8 @@ import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * @author Yelq
@@ -15,6 +17,7 @@ public class ProductionSchedulingService {
   // 排产
   private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
 
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void executeSchedulingInNewTransaction(DpDemandPlan param,Context context) {
     monthPlanProductionSchedulingService.general(context);
   }

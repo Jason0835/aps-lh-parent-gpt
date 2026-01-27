@@ -78,6 +78,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
@@ -361,6 +362,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
         if(CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
             return Collections.emptyList();
