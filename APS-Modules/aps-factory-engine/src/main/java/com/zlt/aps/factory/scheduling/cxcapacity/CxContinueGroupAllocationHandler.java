@@ -201,18 +201,11 @@ public class CxContinueGroupAllocationHandler {
             return Collections.emptyList();
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-//        Integer monthDays = context.getMonthDays();
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-//        List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
-//        Map<String, ProductGroupCxCapacityInfo> groupCxCapacityInfoMap = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, Function.identity()));
         List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
         productionCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
             Integer allocationDays = cxMachineInfo.getMaxProductionDays();
-//            groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
-//            ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
-//            CxMachineAllocationPlanHelper helper = new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
-//            cxMachineInfo.addAllocationPlanInfo(context, helper);
             allocationList.add(buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineCode, allocationDays));
         });
         return allocationList;
@@ -238,7 +231,6 @@ public class CxContinueGroupAllocationHandler {
         groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
         ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
         CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, capacityInfo, groupPlanInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
-//                new CxMachineAllocationPlanHelper(cxMachineInfo.getCxMachineCode(), groupPlanInfo, capacityInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
         //机台增加分配信息
         cxMachineInfo.addAllocationPlanInfo(context, helper);
         return helper;

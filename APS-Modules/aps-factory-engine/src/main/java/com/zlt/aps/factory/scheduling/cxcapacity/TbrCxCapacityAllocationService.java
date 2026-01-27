@@ -129,8 +129,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         productionContext.setReverseFindSet(new HashSet<>());
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
-        //todo 共用模具的续作SKu的中优先级量和在机结构续作部分排产
-
         //在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //7、对收尾成型机台，反向匹配待排结构
@@ -395,10 +393,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             log.info(TbrProductionGroupLogRecorder.addContinueSkuNoContinueGroupProductionLog(context));
             return;
         }
-        Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        //在机结构-在产机台新增Sku排产
         allContinueMap.forEach((structureName, cxContinueInfo) -> {
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
@@ -407,9 +404,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
-            //todo 增加续作部分重新排产过
+            //1、todo 对测算成型产能分配的续作部分进行重排(先清空再重排-续作Sku一起排产)
 
-            //首先设置可排产的计划在本轮次可进行排产
+            //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();
             //在机结构-新增Sku模拟排产
             CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
@@ -473,8 +470,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
         Integer startDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         //20260121 切换结构控制
-        DayCapacityLimitVo dayCapacityLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer realChangeDay = dayCapacityLimitHandler.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
+        DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
         if (null == realChangeDay) {
             //记录日志
             Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
@@ -1231,38 +1228,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupMainPatternMouldMap.put(groupNameAndMainPattern, groupMainPatternList);
         });
         baseDataContainer.setGroupMainPatternMouldRelationMap(groupMainPatternMouldMap);
-    }
-
-    /**
-     * 对在机结构进行模具排产
-     *
-     * @param context               排产上下文
-     * @param continueAllocationMap 在机结构排产分配信息
-     * @param cxContinueInfoMap     在机结构续作信息
-     * @param mouldShellMap         模壳台账信息
-     */
-    @Deprecated
-    private void mouldProductionByCxMachine(Context context, Map<String, CxMachineAllocationPlanHelper> continueAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
-        if (CollectionUtils.isEmpty(continueAllocationMap)) {
-            return;
-        }
-        //todo 降膜排产？
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = ((TbrProductionContext) context).getBaseDataContainer().getSkuMouldRelationMap();
-        continueAllocationMap.forEach((cxMachineCode, productionGroupPlan) -> {
-            String structureName = productionGroupPlan.getProductionPlanInfo().getGroupName();
-            CxContinueInfoHelper cxContinueInfoHelper = cxContinueInfoMap.get(structureName);
-            if (null == cxContinueInfoHelper) {
-                //todo 记录日志
-                return;
-            }
-            Map<String, CxContinueProductInfoHelper> continueSkuMap = cxContinueInfoHelper.getCxMachineGroup().get(cxMachineCode);
-            if (CollectionUtils.isEmpty(continueSkuMap)) {
-                //todo 记录日志
-                return;
-            }
-            //在机结构在机机台排产
-            CxMouldProductionHandler.continueGroupPlanMouldProduction(context, cxMachineCode, productionGroupPlan, cxContinueInfoHelper, mouldInfoMap, mouldShellMap);
-        });
     }
 
     /**

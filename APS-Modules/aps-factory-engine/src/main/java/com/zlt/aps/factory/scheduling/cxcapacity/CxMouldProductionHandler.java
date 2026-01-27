@@ -23,46 +23,6 @@ import java.util.stream.Collectors;
 public class CxMouldProductionHandler {
 
     /**
-     * 在机结构，进行模具排产--按机台
-     * 1、先排续作规格
-     * 1.1、续作SKU
-     * 1.2、同规格同花纹
-     * 1.3、换活字块-共生胎同模具
-     * 2、收尾新增规格
-     *
-     * @param context        排产上下文
-     * @param cxMachineCode  成型机台
-     * @param productionPlan 排产计划信息
-     * @param mouldInfoMap   模具关系信息
-     * @param mouldShellMap  模壳信息
-     */
-    @Deprecated
-    public static void continueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan, CxContinueInfoHelper cxContinueInfo, Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, Map<String, MouldShellBaseInfoVo> mouldShellMap) {
-        List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlan.getProductionPlanInfo().getGroupPlanData();
-        if (CollectionUtils.isEmpty(groupPlanData)) {
-            //todo 记录日志
-            return;
-        }
-        List<MonthPlanProductionRequirePlanVo> hasProductionPlanList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(hasProductionPlanList)) {
-            //todo 记录日志
-            return;
-        }
-        //先续作排产： 续作SKU ->同规格同花纹 -> 换活字块共生胎同模具 cxContinueInfo.getCxMachineGroup().get(cxMachineCode);
-        Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
-        if (!CollectionUtils.isEmpty(continueSkuMap)) {
-            CxContinueSkuProductionHandler.productionContinue(context, cxMachineCode, hasProductionPlanList, productionPlan, mouldInfoMap, mouldShellMap);
-        }
-        //排产收尾新增规格-重新获取需求需排产计划信息
-        List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = hasProductionPlanList.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
-            //todo 记录日志
-            return;
-        }
-        CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, leftOverHasProductionList, productionPlan, mouldShellMap);
-    }
-
-    /**
      * 非在机结构，模具排产
      *
      * @param context

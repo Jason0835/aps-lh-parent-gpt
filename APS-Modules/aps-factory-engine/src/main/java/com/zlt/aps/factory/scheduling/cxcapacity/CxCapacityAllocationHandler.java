@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,76 +24,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class CxCapacityAllocationHandler {
-
-    /**
-     * 续作分组计划，采用续作成型产能进行分配
-     * 先确认续作分组计划延续的续作成型机台
-     * 1、如果续作分组计划需要的机台数减少，则成型机台对应硫化机台数多的优先下机，其次按编号大的优先下机
-     *
-     * @param context                      排产上下文
-     * @param estimateGroupCxAllocationMap 分组计划预估分配信息
-     * @param cxContinueInfoMap            续作信息
-     */
-    @Deprecated
-    public static Map<String, CxMachineAllocationPlanHelper> continueGroupPlanAllocation(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
-        //续作分组 --TBR按结构
-        if (CollectionUtils.isEmpty(cxContinueInfoMap)) {
-            return Collections.emptyMap();
-        }
-        Map<String, CxMachineAllocationPlanHelper> continueAllocationMap = new HashMap<>();
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Integer monthDays = productionContext.getMonthDays();
-        //成型基础信息
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        cxContinueInfoMap.forEach((structureName, cxContinueInfo) -> {
-            //预估成型机台的计划分组信息
-            ProductionPlanGroupInfo groupPlanInfo = estimateGroupCxAllocationMap.get(structureName);
-            //续作结构，没有需求
-            if (null == groupPlanInfo) {
-                return;
-            }
-            //实际需要的机台数
-            BigDecimal machineCount = groupPlanInfo.getNeedCxCapacityMachineCount();
-            //整数机台
-            BigDecimal integerPart = machineCount.setScale(0, RoundingMode.DOWN);
-            //向上取整，看续作机台是否需要空出机台
-            Integer wholeMachineCount = machineCount.setScale(0, RoundingMode.UP).intValue();
-            //todo 计算在机结构续作SKU的使用硫化机台数--在机结构机台数减量时，需要空出对应配比的硫化模具数
-            CxContinueSkuAllocationMouldHandler.allocationContinueSkuMouldNumber(context, groupPlanInfo, cxContinueInfo, wholeMachineCount);
-            List<ProductGroupCxCapacityInfo> cxCapacityInfoList = cxContinueInfo.getCxCapacityInfoList();
-            //按对应的硫化机台数少优先，成型机编号小的优先排序
-            cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.reverseOrder()).thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.reverseOrder()));
-            //先分整台
-            Integer wholeMachine = integerPart.intValue();
-            for (int allocationIndex = BigDecimal.ZERO.intValue(); allocationIndex < wholeMachine; allocationIndex++) {
-                ProductGroupCxCapacityInfo cxCapacityInfo = cxCapacityInfoList.get(allocationIndex);
-                CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
-                //续作Sku信息 cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
-                Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
-                Integer allocationDay = cxMachineBaseInfo.getMaxProductionDays();
-                CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
-                cxMachineBaseInfo.addAllocationPlanInfo(context, helper);
-                continueAllocationMap.put(cxCapacityInfo.getCxMachineCode(), helper);
-            }
-            //不是整台部分
-            ProductGroupCxCapacityInfo cxCapacityInfo = cxCapacityInfoList.get(wholeMachineCount - BigDecimal.ONE.intValue());
-            CxMachineBaseInfoVo cxMachineBaseInfo = cxMachineBaseInfoMap.get(cxCapacityInfo.getCxMachineCode());
-            //续作Sku信息 cxContinueInfo.getCxMachineGroup().get(cxMachineBaseInfo.getCxMachineCode());
-            Map<String, CxContinueSkuInfoHelper> continueSkuMap = cxContinueInfo.getContinueSkuMouldNumberMap();
-            //小数部分的天数
-            BigDecimal decimalPart = machineCount.subtract(integerPart);
-            Integer allocationDay = decimalPart.multiply(BigDecimal.valueOf(context.getMaxProductionDays())).setScale(0, RoundingMode.UP).intValue();
-            CxMachineAllocationPlanHelper helper = createAllocationPlanHelper(cxMachineBaseInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, BigDecimal.ONE.intValue(), monthDays);
-            cxMachineBaseInfo.addAllocationPlanInfo(context, helper);
-            continueAllocationMap.put(cxMachineBaseInfo.getCxMachineCode(), helper);
-            Integer newRemainingDays = cxMachineBaseInfo.getRemainingDays() - allocationDay;
-            //加入收尾匹配
-            if (newRemainingDays > BigDecimal.ZERO.intValue()) {
-                productionContext.addReverseMachine(cxMachineBaseInfo.getCxMachineCode());
-            }
-        });
-        return continueAllocationMap;
-    }
 
     /**
      * 对成型机台创建分配集合对象-按最小硫化配比分配
@@ -211,8 +140,8 @@ public class CxCapacityAllocationHandler {
         Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         startDay = Math.max(startDay, realStartDay);
         //20260121 切换结构的控制
-        DayCapacityLimitVo dayCapacityLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer realChangeDay = dayCapacityLimitHandler.confirmStartDayByChangeGroup(productionContext, startDay, groupName, cxMachineInfo, hasProductionDaySet);
+        DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, cxMachineInfo, hasProductionDaySet);
         if (null == realChangeDay) {
             //记录日志
             Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
@@ -552,37 +481,6 @@ public class CxCapacityAllocationHandler {
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
         fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(addNewGroupPlan, diffValue));
-    }
-
-
-    /**
-     * 获取需要月初就需要释放的续作成型机台
-     * 如果计划机台数超出或是等于在机机台数，则无需月初释放
-     * 如果计划机台数小于在机机台数，则按先最大硫化机台数的先释放
-     *
-     * @param wholeMachineCount    计划需要完整机台数
-     * @param continueMachineCount 在机机台数
-     * @param cxCapacityInfoList   在机机台数信息数据
-     * @return
-     */
-    private static Set<String> getNeedReleaseMachineInfo(Integer wholeMachineCount, Integer continueMachineCount, List<ProductGroupCxCapacityInfo> cxCapacityInfoList) {
-        if (wholeMachineCount >= continueMachineCount) {
-            return Collections.emptySet();
-        }
-        Set<String> needReleaseMachineSet = new HashSet<>();
-        //需要释放机台的数量
-        int needCount = continueMachineCount - wholeMachineCount;
-        //按对应的硫化机台数少，成型机编号小的排序
-        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getRealMaxLhMachineCount).thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode));
-        for (ProductGroupCxCapacityInfo canReleaseMachine : cxCapacityInfoList) {
-            //已经达到释放量
-            if (needCount <= BigDecimal.ZERO.intValue()) {
-                break;
-            }
-            needReleaseMachineSet.add(canReleaseMachine.getCxMachineCode());
-            needCount = needCount - 1;
-        }
-        return needReleaseMachineSet;
     }
 
 }
