@@ -108,7 +108,7 @@ public class MdmSkuMouldRel extends BaseEntity {
     /**
      * 主花纹
      */
-    @ImportExcelValidated(required = true, maxLength = 20)
+    @ImportExcelValidated(required = true, maxLength = 64)
     @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
