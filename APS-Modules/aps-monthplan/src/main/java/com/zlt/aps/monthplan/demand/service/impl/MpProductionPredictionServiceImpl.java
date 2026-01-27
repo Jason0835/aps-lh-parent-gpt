@@ -139,10 +139,15 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             currentMonthDemands =  dpDemandPlanService.createPredictionRequire(currentMonth,param,currentFinalVersion,predictionContext);
             // 排产汇总
             if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
-                Context context = buildContext(currentMonthDemands);
-                productionSchedulingService.executeSchedulingInNewTransaction(param,context);
-                currentFinalVersion = createProductionVersion(context,currentMonthDemands);
-                productionVersions.put(currentMonth,currentFinalVersion);
+                try{
+                    Context context = buildContext(currentMonthDemands);
+                    productionSchedulingService.executeSchedulingInNewTransaction(param,context);
+                    currentFinalVersion = createProductionVersion(context,currentMonthDemands);
+                    productionVersions.put(currentMonth,currentFinalVersion);
+                }catch (Exception e){
+                    DpDemandPlan demandPlan = currentMonthDemands.get(0);
+                    log.info("=====工厂{}, 计划年月：{}-{}, 需求计划版本：{},异常原因:{}====",demandPlan.getFactoryCode(),demandPlan.getYear(),demandPlan.getMonth(),demandPlan.getMonthPlanVersion(),e.getMessage());
+                }
             }
         }
         Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
