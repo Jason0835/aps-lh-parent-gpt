@@ -326,7 +326,7 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(productionPlanList) || StringUtils.isBlank(selectedMaterialDesc)) {
             return null;
         }
-        List<MonthPlanProductionRequirePlanVo> selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasThisRoundSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(selectedPlanList)) {
             return null;
         }
