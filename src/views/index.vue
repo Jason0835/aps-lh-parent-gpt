@@ -138,8 +138,8 @@ export default {
 
   },
   mounted() {
-    this.getMessageData()
-    this.getTaskData()
+    // this.getMessageData()
+    // this.getTaskData()
   },
   created() {
     // 组件创建时获取数据

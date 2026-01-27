@@ -159,6 +159,7 @@ export default {
         {
           prop: "mouldCode",
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
+          width:180
         },
         {
           prop: "mainPattern",
@@ -194,7 +195,7 @@ export default {
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
-
+          width:180,
           render: ({ row }) => {
             return (
               <div>

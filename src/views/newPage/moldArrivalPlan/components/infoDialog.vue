@@ -161,7 +161,7 @@ export default {
         {
           prop: "mainPattern",
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
-          maxlength:64
+          maxlength:60
         },
         {
           prop: "remark",
