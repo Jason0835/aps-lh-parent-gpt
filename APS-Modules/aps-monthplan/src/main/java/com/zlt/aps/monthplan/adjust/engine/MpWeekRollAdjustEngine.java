@@ -125,7 +125,7 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //7.其他SKU往前移动前，先重置下开始/结束日
-        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,false);
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
 
         //8.优化：其他SKU往前移动
         startTime = new Date();
@@ -144,7 +144,7 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //10.重置开始/结束日及计划量
-        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,true);
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
     }
 
     /**
@@ -255,7 +255,12 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureOut> deductAdjustList = new ArrayList<>();
         List<MpAdjustStructureOut> onIncrementAdjustList = new ArrayList<>();
         List<MpAdjustStructureOut> incrementAdjustList = new ArrayList<>();
-        List<String> onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
+        List<String> onMaterialCodeList = new ArrayList<>();
+        if (PubUtil.isNotEmpty(mpProdFinalList)){
+            onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
+        }else {
+            mpProdFinalList = new ArrayList<>();
+        }
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureOut adjustStructureOut:mpAdjustStructureOutList){
@@ -313,7 +318,7 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //7.重置开始/结束日
-        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,false);
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
 
         //8.优化：其他SKU往前移动
         startTime = new Date();
@@ -323,7 +328,7 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //10.重置开始/结束日
-        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,true);
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
     }
 
     /**
@@ -418,7 +423,7 @@ public class MpWeekRollAdjustEngine {
         if (PubUtil.isNotEmpty(finalVoList)){
             return finalVoList;
         }
-        if (secStartDay == FactoryConstant.MONTH_MAX_DAY){
+        if (secStartDay >= FactoryConstant.MONTH_MAX_DAY){
             //若第2天可开始日 已到月底最后1天，则退出
             return null;
         }
@@ -451,6 +456,7 @@ public class MpWeekRollAdjustEngine {
             if (mpFinalVo == null){
                 continue;
             }
+            mpFinalVo.setOriTotalQty(mpFinalVo.getTotalQty());
             mpFinalVo.setHasSpecialMaterial(deductAdjust.getHasSpecialMaterial());
             //剩余调整量绝对值
             reAdjustQty =  Math.abs(deductAdjust.getConfirmAdjustQty());
@@ -492,6 +498,7 @@ public class MpWeekRollAdjustEngine {
             if (mpFinalVo == null){
                 continue;
             }
+            mpFinalVo.setOriTotalQty(mpFinalVo.getTotalQty());
             //剩余调整量绝对值
             reAdjustQty =  Math.abs(deductAdjust.getConfirmAdjustQty());
             //2、先设置锁定量，再按高到中依次扣减排产量
@@ -743,6 +750,7 @@ public class MpWeekRollAdjustEngine {
                 // 非在机SKU，继续
                 continue;
             }
+            mpFinalVo.setOriTotalQty(mpFinalVo.getTotalQty());
             mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
 
             iOrder += 1;
@@ -827,6 +835,7 @@ public class MpWeekRollAdjustEngine {
                 // 非在机SKU，继续
                 continue;
             }
+            mpFinalVo.setOriTotalQty(mpFinalVo.getTotalQty());
             iOrder += 1;
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
             if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo,lockNextDay -1)){
@@ -1371,12 +1380,12 @@ public class MpWeekRollAdjustEngine {
      */
     private void resetTotalProductionQty(MpAdjustStructureIn adjustStructInVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int productionQty){
 
-        mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
+        /*mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
         mpFinalVo.setHeightProductionQty(mpFinalVo.getHeightProductionQty() == null ? 0:mpFinalVo.getHeightProductionQty());
         mpFinalVo.setCycleProductionQty(mpFinalVo.getCycleProductionQty() == null ? 0:mpFinalVo.getCycleProductionQty());
         mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
         mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
-
+*/
         if (adjustStructInVo.getPostponeQty()>=0 && productionQty >=0){
             //有暂缓需求
             mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
@@ -1406,12 +1415,12 @@ public class MpWeekRollAdjustEngine {
      */
     private void resetTotalProductionQty(MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int productionQty){
 
-        mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
+        /*mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
         mpFinalVo.setHeightProductionQty(mpFinalVo.getHeightProductionQty() == null ? 0:mpFinalVo.getHeightProductionQty());
         mpFinalVo.setCycleProductionQty(mpFinalVo.getCycleProductionQty() == null ? 0:mpFinalVo.getCycleProductionQty());
         mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
         mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
-
+*/
         if (adjustStructOutVo.getPostponeQty()>=0 && productionQty >=0){
             //有暂缓需求
             mpFinalVo.setPostponeProductionQty(adjustStructOutVo.getPostponeQty());
@@ -1460,11 +1469,11 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 定稿Vo列表
      * @return
      */
-    private void resetBegin2EndDay(int startDay,int endDay,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,boolean resetQty){
+    private void resetBegin2EndDay(int startDay,int endDay,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         String dayField;
         int accTotalQty;
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList){
-            int realBeginDay = FactoryConstant.MONTH_MAX_DAY;
+            int realBeginDay = FactoryConstant.MONTH_MAX_DAY+1;
             int realEndDay = 0;
             accTotalQty = 0;
             for (int i = startDay; i <= endDay; i++){
@@ -1480,14 +1489,12 @@ public class MpWeekRollAdjustEngine {
                     accTotalQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
                 }
             }
-            mpFinalVo.setBeginDay(realBeginDay);
+            mpFinalVo.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
             mpFinalVo.setEndDay(realEndDay);
-            if (resetQty){
-                //实际调整量 = 累计排产量 - 原实际排产量
-                int oriTotalQty = mpFinalVo.getTotalQty() == null ? 0:mpFinalVo.getTotalQty();
-                mpFinalVo.setActualAdjustQty(accTotalQty - oriTotalQty);
-                mpFinalVo.setTotalQty(accTotalQty);
-            }
+            mpFinalVo.setTotalQty(accTotalQty);
+            //实际调整量 = 累计排产量 - 原实际排产量
+            int oriTotalQty = mpFinalVo.getOriTotalQty()== null ? 0:mpFinalVo.getOriTotalQty();
+            mpFinalVo.setActualAdjustQty(accTotalQty - oriTotalQty);
         }
     }
 
@@ -1585,6 +1592,14 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setDayVulcanizationQty(adjustStructInVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructInVo.getCuringTime());
         mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
+
+        mpFinalVo.setPostponeProductionQty( 0);
+        mpFinalVo.setHeightProductionQty(0);
+        mpFinalVo.setCycleProductionQty(0);
+        mpFinalVo.setMidProductionQty(0);
+        mpFinalVo.setConventionProductionQty(0);
+        mpFinalVo.setTotalQty(0);
+        mpFinalVo.setOriTotalQty(0);
         return mpFinalVo;
     }
     /**
@@ -1620,6 +1635,14 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTypeBlockQty(adjustStructOutVo.getTypeBlockQty());
         mpFinalVo.setDayVulcanizationQty(adjustStructOutVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructOutVo.getCuringTime());
+
+        mpFinalVo.setPostponeProductionQty( 0);
+        mpFinalVo.setHeightProductionQty(0);
+        mpFinalVo.setCycleProductionQty(0);
+        mpFinalVo.setMidProductionQty(0);
+        mpFinalVo.setConventionProductionQty(0);
+        mpFinalVo.setTotalQty(0);
+        mpFinalVo.setOriTotalQty(0);
         return mpFinalVo;
     }
 }
