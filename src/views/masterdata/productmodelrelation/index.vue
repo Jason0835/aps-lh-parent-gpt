@@ -42,14 +42,14 @@
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
-        <el-button
+        <!-- <el-button
           type="primary"
           :loading="scmLoading"
           plain
           v-hasPermi="['maindata:relation:mesCapture']"
           @click="capture"
           >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['maindata:relation:import']"
           @click="$refs.tltUpload.handleImport()"

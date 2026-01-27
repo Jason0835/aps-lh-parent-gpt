@@ -193,7 +193,7 @@ export default {
         },
         {
           prop: "isEudr",
-          label: this.$t("eudr"),
+          label: this.$t("EUDR"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -310,7 +310,7 @@ export default {
         },
         {
           prop: "isEudr",
-          label: this.$t("eudr"),
+          label: this.$t("EUDR"),
           type: "select",
           dictData:this.dict.type.biz_yes_no,
 

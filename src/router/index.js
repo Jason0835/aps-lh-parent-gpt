@@ -127,12 +127,18 @@ constantRoutes.push(
   //   redirect: "noredirect",
   //   meta: { title: "管理" },
   //   children: [
-  //     {
-  //       path: "rollingCycle",
-  //       component: () => import("@/views/newPage/rollingCycle/index"),
-  //       name: "rollingCycle",
-  //       meta: { title: "周程滚动调整" },
+  //      {
+  //       path: "messageTemplate",
+  //       component: () => import("@/views/newPage/messageTemplate/index"),
+  //       name: "messageTemplate",
+  //       meta: { title: "消息模板" },
   //     },
+  //     // {
+  //     //   path: "rollingCycle",
+  //     //   component: () => import("@/views/newPage/rollingCycle/index"),
+  //     //   name: "rollingCycle",
+  //     //   meta: { title: "周程滚动调整" },
+  //     // },
   //     {
   //       path: "monthlyProductionPlan",
   //       component: () => import("@/views/newPage/monthlyProductionPlan/index"),
@@ -158,12 +164,12 @@ constantRoutes.push(
   //     //   name: "SkuInventoryWriteDown",
   //     //   meta: { title: "SKU层面的库存冲减报表" },
   //     // },
-  //     {
-  //       path: "orderInventoryWriteDown",
-  //       component: () => import("@/views/report/orderInventoryWriteDown/index"),
-  //       name: "OrderInventoryWriteDown",
-  //       meta: { title: "订单库存冲减" }, //订单层面的库存冲减报表
-  //     },
+  //     // {
+  //     //   path: "orderInventoryWriteDown",
+  //     //   component: () => import("@/views/report/orderInventoryWriteDown/index"),
+  //     //   name: "OrderInventoryWriteDown",
+  //     //   meta: { title: "订单库存冲减" }, //订单层面的库存冲减报表
+  //     // },
   //     {
   //       path: "skuWriteDownReplaceGroup",
   //       component: () => import("@/views/report/skuWriteDownReplaceGroup/index"),
@@ -194,12 +200,12 @@ constantRoutes.push(
   //     //   name: "orderPool",
   //     //   meta: { title: "销售订单池" },  //5个订单池-高优先级、中优先级、暂缓
   //     // },
-  //     {
-  //       path: "cyclicScheduling",
-  //       component: () => import("@/views/newPage/cyclicScheduling/index"),
-  //       name: "cyclicScheduling",
-  //       meta: { title: "供应链订单池" }, //5个订单池-储备订单、周期性排产
-  //     },
+  //     // {
+  //     //   path: "cyclicScheduling",
+  //     //   component: () => import("@/views/newPage/cyclicScheduling/index"),
+  //     //   name: "cyclicScheduling",
+  //     //   meta: { title: "供应链订单池" }, //5个订单池-储备订单、周期性排产
+  //     // },
   //     // {
   //     //   path: "moldArrivalPlan",
   //     //   component: () => import("@/views/newPage/moldArrivalPlan/index"),
@@ -352,18 +358,18 @@ constantRoutes.push(
   //     //   name: "MoldShellRegister",
   //     //   meta: { title: "模壳台账" },
   //     // },
-  //     {
-  //       path: "monthlyAverageSales",
-  //       component: () => import("@/views/newPage/monthlyAverageSales/index"),
-  //       name: "MonthlyAverageSales",
-  //       meta: { title: "月均销量" },
-  //     },
-  //     {
-  //       path: "demandPlan",
-  //       component: () => import("@/views/newPage/demandPlan/index"),
-  //       name: "DemandPlan",
-  //       meta: { title: "需求计划" },
-  //     },
+  //     // {
+  //     //   path: "monthlyAverageSales",
+  //     //   component: () => import("@/views/newPage/monthlyAverageSales/index"),
+  //     //   name: "MonthlyAverageSales",
+  //     //   meta: { title: "月均销量" },
+  //     // },
+  //     // {
+  //     //   path: "demandPlan",
+  //     //   component: () => import("@/views/newPage/demandPlan/index"),
+  //     //   name: "DemandPlan",
+  //     //   meta: { title: "需求计划" },
+  //     // },
   //     // {
   //     //   path: "fgInventory",
   //     //   component: () => import("@/views/newPage/fgInventory/index"),
@@ -448,12 +454,12 @@ constantRoutes.push(
   //     //   name: "moldAllocation",
   //     //   meta: { title: "模具分配比例" },
   //     // },
-  //     {
-  //       path: "insertOrder",
-  //       component: () => import("@/views/newPage/insertOrder/index"),
-  //       name: "insertOrder",
-  //       meta: { title: "实单模拟排产" },
-  //     },
+  //     // {
+  //     //   path: "insertOrder",
+  //     //   component: () => import("@/views/newPage/insertOrder/index"),
+  //     //   name: "insertOrder",
+  //     //   meta: { title: "实单模拟排产" },
+  //     // },
   //     // {
   //     //   path: "periodicSched",
   //     //   component: () => import("@/views/newPage/periodicSched/index"),
@@ -466,12 +472,12 @@ constantRoutes.push(
   //     //   name: "specialMaterial",
   //     //   meta: { title: "特殊材料清单" },
   //     // },
-  //     {
-  //       path: "vulcanizationTable",
-  //       component: () => import("@/views/newPage/vulcanizationTable/index"),
-  //       name: "vulcanizationTable",
-  //       meta: { title: "月计划硫化监控表" },
-  //     },
+  //     // {
+  //     //   path: "vulcanizationTable",
+  //     //   component: () => import("@/views/newPage/vulcanizationTable/index"),
+  //     //   name: "vulcanizationTable",
+  //     //   meta: { title: "月计划硫化监控表" },
+  //     // },
   //     {
   //       path: "weeklySchedule",
   //       component: () => import("@/views/newPage/weeklySchedule/index"),
