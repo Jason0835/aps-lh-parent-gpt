@@ -33,30 +33,30 @@ public class DpDemandPlanSum extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
      /** 工厂 */
-    @Excel(name = "ui.data.column.demandPlanSum.factoryCode")
+    @Excel(name = "ui.data.column.demandPlanSum.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 年份 */
-    @Excel(name = "ui.data.column.demandPlanSum.year")
+    @Excel(name = "ui.data.column.demandPlanSum.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
     /** 月份 */
-    @Excel(name = "ui.data.column.demandPlanSum.month")
+    @Excel(name = "ui.data.column.demandPlanSum.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
     /** 产品品类 */
-    @Excel(name = "ui.data.column.demandPlanSum.productTypeCode")
+    @Excel(name = "ui.data.column.demandPlanSum.productTypeCode", dictType = "biz_product_type")
     @ApiModelProperty(value = "产品品类", name = "productTypeCode")
     @TableField(value = "PRODUCT_TYPE_CODE")
     private String productTypeCode;
 
     /** 库位类别 */
-    @Excel(name = "ui.data.column.demandPlanSum.locationType")
+    @Excel(name = "ui.data.column.demandPlanSum.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "库位类别", name = "locationType")
     @TableField(value = "LOCATION_TYPE")
     private String locationType;
@@ -68,13 +68,13 @@ public class DpDemandPlanSum extends BaseEntity {
     private String monthPlanVersion;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.demandPlanSum.brand")
+    @Excel(name = "ui.data.column.demandPlanSum.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
 
     /** 供应链优先级 */
-    @Excel(name = "ui.data.column.demandPlanSum.scmPriority")
+    @Excel(name = "ui.data.column.demandPlanSum.scmPriority", dictType = "biz_yes_no")
     @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;
@@ -104,105 +104,105 @@ public class DpDemandPlanSum extends BaseEntity {
     private String materialDesc;
 
     /** 排产分类 */
-    @Excel(name = "ui.data.column.demandPlanSum.productionType")
+    @Excel(name = "ui.data.column.demandPlanSum.productionType", dictType = "biz_schedule_type")
     @ApiModelProperty(value = "排产分类", name = "productionType")
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
 
     /** 库存 */
-    @Excel(name = "ui.data.column.demandPlanSum.stockQty")
+    @Excel(name = "ui.data.column.demandPlanSum.stockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库存", name = "stockQty")
     @TableField(value = "STOCK_QTY")
     private Integer stockQty;
 
-    @Excel(name = "ui.data.column.demandPlanSum.sub2YearStockQty")
+    @Excel(name = "ui.data.column.demandPlanSum.sub2YearStockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "Y-2+", name = "sub2YearStockQty")
     @TableField(value = "SUB_2_YEAR_STOCK_QTY")
     private Integer sub2YearStockQty;
-    @Excel(name = "ui.data.column.demandPlanSum.sub1YearStockQty")
+    @Excel(name = "ui.data.column.demandPlanSum.sub1YearStockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "Y-1", name = "sub1YearStockQty")
     @TableField(value = "SUB_1_YEAR_STOCK_QTY")
     private Integer sub1YearStockQty;
-    @Excel(name = "ui.data.column.demandPlanSum.currentYearStockQty")
+    @Excel(name = "ui.data.column.demandPlanSum.currentYearStockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "Y", name = "currentYearStockQty")
     @TableField(value = "CURRENT_YEAR_STOCK_QTY")
     private Integer currentYearStockQty;
 
     /** 订单量 */
-    @Excel(name = "ui.data.column.demandPlanSum.orderQty")
+    @Excel(name = "ui.data.column.demandPlanSum.orderQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "订单量", name = "orderQty")
     @TableField(value = "ORDER_QTY")
     private Integer orderQty;
 
     /** 月底余量 */
-    @Excel(name = "ui.data.column.demandPlanSum.plannedSurplus")
+    @Excel(name = "ui.data.column.demandPlanSum.plannedSurplus", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月底余量", name = "plannedSurplus")
     @TableField(value = "PLANNED_SURPLUS")
     private Integer plannedSurplus;
 
 
     /** 排产净需求 */
-    @Excel(name = "ui.data.column.demandPlanSum.netQty")
+    @Excel(name = "ui.data.column.demandPlanSum.netQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "排产净需求", name = "netQty")
     @TableField(value = "NET_QTY")
     private Integer netQty;
 
     /** 是否排产 */
-    @Excel(name = "ui.data.column.demandPlanSum.isProduction")
+    @Excel(name = "ui.data.column.demandPlanSum.isProduction", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否排产", name = "isProduction")
     @TableField(value = "IS_PRODUCTION")
     private String isProduction;
 
     /** 净需求(含暂缓) */
-    @Excel(name = "ui.data.column.demandPlanSum.postponeNetQty")
+    @Excel(name = "ui.data.column.demandPlanSum.postponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(含暂缓)", name = "postponeNetQty")
     @TableField(value = "POSTPONE_NET_QTY")
     private Integer postponeNetQty;
 
     /** 净需求(不含暂缓) */
-    @Excel(name = "ui.data.column.demandPlanSum.unPostponeNetQty")
+    @Excel(name = "ui.data.column.demandPlanSum.unPostponeNetQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "净需求(不含暂缓)", name = "unPostponeNetQty")
     @TableField(value = "UN_POSTPONE_NET_QTY")
     private Integer unPostponeNetQty;
 
     /** 高优先级 */
-    @Excel(name = "ui.data.column.demandPlanSum.heightQty")
+    @Excel(name = "ui.data.column.demandPlanSum.heightQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
 
     /** 中优先级 */
-    @Excel(name = "ui.data.column.demandPlanSum.midQty")
+    @Excel(name = "ui.data.column.demandPlanSum.midQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级", name = "midQty")
     @TableField(value = "MID_QTY")
     private Integer midQty;
 
     /** 暂缓订单 */
-    @Excel(name = "ui.data.column.demandPlanSum.postponeQty")
+    @Excel(name = "ui.data.column.demandPlanSum.postponeQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
     @TableField(value = "POSTPONE_QTY")
     private Integer postponeQty;
 
     /** 周期排产储备 */
-    @Excel(name = "ui.data.column.demandPlanSum.cycleReserveQty")
+    @Excel(name = "ui.data.column.demandPlanSum.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
     @TableField(value = "CYCLE_RESERVE_QTY")
     private Integer cycleReserveQty;
 
     /** 常规储备 */
-    @Excel(name = "ui.data.column.demandPlanSum.conventionReserveQty")
+    @Excel(name = "ui.data.column.demandPlanSum.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
     @TableField(value = "CONVENTION_RESERVE_QTY")
     private Integer conventionReserveQty;
 
     /** 是否满足最小投产量 */
-    @Excel(name = "ui.data.column.demandPlanSum.isReachMinProductionQty")
+    @Excel(name = "ui.data.column.demandPlanSum.isReachMinProductionQty", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否满足最小投产量", name = "isReachMinProductionQty")
     @TableField(value = "IS_REACH_MIN_PRODUCTION_QTY")
     private String isReachMinProductionQty;
 
     /** 最小投产量值 */
-    @Excel(name = "ui.data.column.demandPlanSum.minProductionQty")
+    @Excel(name = "ui.data.column.demandPlanSum.minProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "最小投产量值", name = "minProductionQty")
     @TableField(value = "MIN_PRODUCTION_QTY")
     private Integer minProductionQty;
