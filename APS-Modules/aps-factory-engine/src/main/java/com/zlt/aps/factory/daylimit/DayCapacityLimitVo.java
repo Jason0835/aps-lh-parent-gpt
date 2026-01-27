@@ -174,7 +174,7 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
-     * 增加分组产能分配使用量信息
+     * 增加Sku排产日产能占用量
      *
      * @param context        排产上下文
      * @param productionDay  排产日
@@ -195,7 +195,7 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
-     * 释放分组产能分配使用量信息
+     * 释放排产Sku日产能占用量
      *
      * @param context       排产上下文
      * @param productionDay 排产日

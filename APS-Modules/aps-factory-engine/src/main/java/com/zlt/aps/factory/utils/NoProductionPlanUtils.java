@@ -5,7 +5,6 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -32,25 +31,19 @@ public class NoProductionPlanUtils {
       int needProductionQty = productionPlan.getFactProdReqQty();
       int plannedQty = sumProductionMap.getOrDefault(monthPlanId, 0);
       int unProductionQty = needProductionQty - plannedQty;
+      String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
+      noProductionPlan.setIsProduction(isProduction);
       if(unProductionQty == 0) {
         return;
       }
-      String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
-      noProductionPlan.setIsProduction(isProduction);
-      //有排产计划，则取排产数量
-      if (sumProductionMap.containsKey(monthPlanId)) {
-          noProductionPlan.setUnProductionQty(unProductionQty);
-          noProductionPlanList.add(noProductionPlan);
-          return;
+      if(!sumProductionMap.containsKey(monthPlanId)) {
+        noProductionPlan.setUnProductionQty(unProductionQty);
+        noProductionPlanList.add(noProductionPlan);
+        return;
       }
       //不排产计划
       if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
         noProductionPlan.setUnProductionQty(needProductionQty);
-        noProductionPlanList.add(noProductionPlan);
-        return;
-      }
-      if (StringUtils.isNotBlank(unProductionReason)) {
-        noProductionPlan.setUnProductionQty(unProductionQty);
         noProductionPlanList.add(noProductionPlan);
       }
     });
