@@ -134,7 +134,9 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
         //10、第二轮排产
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
-        new ClearProductionInfoHandler().clearProductionData(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, allAllocationList);
+        //清除模拟排产信息
+        new ClearProductionInfoHandler().clearProductionData(productionContext);
+        //重新构建分组计划的硫化组限制信息
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
         FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);

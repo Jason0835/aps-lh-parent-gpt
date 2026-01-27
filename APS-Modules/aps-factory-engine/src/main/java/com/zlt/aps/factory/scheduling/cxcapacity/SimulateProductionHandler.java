@@ -67,6 +67,7 @@ public class SimulateProductionHandler {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        //todo 对测算成型产能分配的续作部分进行重排-先清空已排信息
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         allContinueMap.forEach((structureName, cxContinueInfo) -> {
@@ -77,7 +78,7 @@ public class SimulateProductionHandler {
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
-            //1、todo 对测算成型产能分配的续作部分进行重排(先清空再重排-续作Sku一起排产)
+            //todo 1、在机结构-在产机台-续作Sku排产
 
             //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();
