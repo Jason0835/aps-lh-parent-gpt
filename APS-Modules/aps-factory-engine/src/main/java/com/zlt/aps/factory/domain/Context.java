@@ -96,6 +96,10 @@ public class Context {
      * 排产产能比例 1~100的值，需除以100
      */
     private Map<Integer, Integer> capacityRatioMap;
+    /**
+     * 停产日后的首日即为开产
+     */
+    private Set<Integer> productionDayAfterStop;
 
     /**
      * 判断排产日是否为排产周期的第一天
@@ -140,6 +144,17 @@ public class Context {
             return true;
         }
         return false;
+    }
+
+    /**
+     * 设置整体周期内的停工日
+     * 并根据停工日，得到开产日：排产日停工后的首日
+     *
+     * @param stopDays
+     */
+    public void setStopDays(Set<Integer> stopDays) {
+        this.stopDays = stopDays;
+        setProductionDayAfterStopByStopDays();
     }
 
     /**
@@ -268,5 +283,29 @@ public class Context {
         List<Integer> dayList = new ArrayList<>(allProductionDaySet);
         dayList.sort(Comparator.comparing(Integer::intValue));
         return dayList.get(dayList.size() - BigDecimal.ONE.intValue());
+    }
+
+    /**
+     * 根据停产日，设置停产后的开产信息
+     */
+    private void setProductionDayAfterStopByStopDays() {
+        if (CollectionUtils.isEmpty(stopDays)) {
+            productionDayAfterStop = Collections.emptySet();
+            return;
+        }
+        Set<Integer> productionDays = getProductionDay();
+        if (CollectionUtils.isEmpty(productionDays)) {
+            productionDayAfterStop = Collections.emptySet();
+            return;
+        }
+        List<Integer> productionDayList = new ArrayList<>(productionDays);
+        productionDayList.sort(Comparator.comparing(Integer::intValue));
+        productionDayAfterStop = new HashSet<>();
+        productionDayList.forEach(singleProductionDay -> {
+            Integer beforeDay = singleProductionDay - BigDecimal.ONE.intValue();
+            if (stopDays.contains(beforeDay)) {
+                productionDayAfterStop.add(singleProductionDay);
+            }
+        });
     }
 }

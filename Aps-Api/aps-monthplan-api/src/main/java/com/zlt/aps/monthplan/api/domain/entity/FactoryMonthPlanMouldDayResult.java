@@ -730,6 +730,20 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @TableField(exist = false)
     private Integer postponeQty;
 
+    /**
+     * eudr数量
+     */
+    @ApiModelProperty(value = "eudr数量", name = "eudrQty")
+    @TableField(exist = false)
+    private Integer eudrQty;
+
+    /**
+     * 非eudr数量
+     */
+    @ApiModelProperty(value = "非eudr数量", name = "nonEudrQty")
+    @TableField(exist = false)
+    private Integer nonEudrQty;
+
 
     /**
      * 根据优先级顺序分配生产数量

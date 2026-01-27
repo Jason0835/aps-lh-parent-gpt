@@ -13,7 +13,10 @@ import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.vo.PredictionVersionInfoVo;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
+import com.zlt.aps.monthplan.demand.mapper.MpPredictionDetailEntityMapper;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -74,7 +77,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private RawWeekUsageGenerateServiceImpl rawWeekUsageGenerateService;
 
     @Autowired
-    private MdmHolidayEntityMapper mdmHolidayMapper;
+    private MpProductionPredictionEntityMapper mpProductionPredictionMapper;
+
+    @Autowired
+    private MpPredictionDetailEntityMapper mpPredictionDetailMapper;
+
+    @Autowired
+    private FactoryMonthPlanMouldDayResultEntityMapper factoryMonthPlanMouldDayResultMapper;
 
     @Autowired
     private DpOrderOffsetDetailEntityMapper orderOffsetDetailMapper;
@@ -152,10 +161,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 }
 
                 // 4. 检查订单预测生产计划
-//                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
-//                if (isSuccess(predictionCheck)) {
-//                    return predictionCheck;
-//                }
+                AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
+                if (isSuccess(predictionCheck)) {
+                    return predictionCheck;
+                }
 
                 // 5. 查询特殊材料清单
                 List<RawSpecialMaterialRecord> specialMaterialRecordsList = getSpecialMaterialRecords(factoryCode);
@@ -173,9 +182,14 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 // 7.1.1 计算当月原材料采购批次
                 calculateSpecialMaterialBatches(year, month, currentMonthRequirements);
 
-                // 8. 获取预测计划并计算需求 todo 叶工来源会进行调整
-                Map<String, RawMaterialRequirePlan> t1Requirements = new HashMap<>();
+                // 8. 获取预测计划并计算需求
+                Map<String, RawMaterialRequirePlan> t1Requirements = calculateT1MonthRequirements(
+                        factoryCode, year, month, specialMaterialCodes);
                 Map<String, RawMaterialRequirePlan> t2Requirements = new HashMap<>();
+                if (isSpringFestivalMonth) {
+                    t2Requirements = calculateT2MonthRequirements(
+                            factoryCode, year, month, specialMaterialCodes);
+                }
 
                 // 9. 汇总并保存需求计划
                 saveRawMaterialRequirePlan(year, month, currentMonthRequirements,
@@ -331,23 +345,6 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             );
             return AjaxResult.error(message);
         }
-
-        // 如果是春节，检查T+2月
-        if (isSpringFestivalMonth) {
-            QueryWrapper<MpProductionPrediction> t2QueryWrapper = new QueryWrapper<>();
-            LocalDate t2Date = date.plusMonths(2);
-            t2QueryWrapper.eq("YEAR", t2Date.getYear())
-                    .eq("MONTH", t2Date.getMonthValue());
-            Long t2Count = mpOrderPredictionMapper.selectCount(t2QueryWrapper);
-
-            if (t2Count == 0) {
-                String message = StringUtils.format(
-                        I18nUtil.getMessage("raw.material.require.plan.prediction.plan.not.generated"),
-                        t2Date.getYear(), String.format("%02d", t2Date.getMonthValue())
-                );
-                return AjaxResult.error(message);
-            }
-        }
         return AjaxResult.success();
     }
 
@@ -418,8 +415,6 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             // 获取冲减分配数量
             int productionQty = detail.getProductionQty() != null ? detail.getProductionQty() : 0;
 
-            String weekYear = detail.getWeekYear();
-            // 判断是否为EudR：年周号大于3725
             if (StringConstant.ONE.equals(detail.getIsEudr())) {
                 // EudR数量
                 quantities[1] += productionQty;
@@ -550,192 +545,374 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         });
     }
 
-    /**
-     * 判断是否为EudR计划
-     */
-    private boolean isEudrPlan(String weekYear) {
-        if (StringUtils.isEmpty(weekYear) || weekYear.length() != 4) {
-            return false;
-        }
-
-        // 快速检查是否为纯数字
-        for (int i = 0; i < weekYear.length(); i++) {
-            if (!Character.isDigit(weekYear.charAt(i))) {
-                return false;
-            }
-        }
-
-        try {
-            // 解析周数和年份
-            int weekNum = Integer.parseInt(weekYear.substring(0, 2));
-            int yearNum = Integer.parseInt(weekYear.substring(2));
-
-            // 基本验证
-            if (weekNum < 1 || weekNum > 53) {
-                log.warn("周数超出合理范围: {}", weekYear);
-                return false;
-            }
-
-            if (yearNum < 0 || yearNum > 99) {
-                log.warn("年份超出合理范围: {}", weekYear);
-                return false;
-            }
-
-            // 逻辑比较：2025年第37周之后
-            // 1. 年份大于25（2025年之后）
-            // 2. 年份等于25且周数大于37（2025年第38周及以后）
-            if (yearNum > 25) {
-                // 2026年及以后的所有周都是EudR
-                return true; 
-            } else if (yearNum == 25) {
-                // 2025年第38周及以后是EudR
-                return weekNum > 37; 
-            } else {
-                // 2025年第37周及以前不是EudR
-                return false;
-            }
-
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
 
     /**
      * 计算T+1月需求
      */
-    private Map<String, RawMaterialRequirePlan> calculateT1MonthRequirements(Integer year, Integer month,
-                                                                             Set<String> specialMaterialCodes) {
-        LocalDate date = LocalDate.of(year, month, 1);
-        LocalDate t1Date = date.plusMonths(1);
-        return calculatePredictionRequirements(t1Date.getYear(), t1Date.getMonthValue(), "T1", specialMaterialCodes);
+    private Map<String, RawMaterialRequirePlan> calculateT1MonthRequirements(
+            String factoryCode, Integer year, Integer month,
+            Set<String> specialMaterialCodes) {
+
+        // 1. 获取最大预测版本的数据
+        List<MpProductionPrediction> predictionList = getMaxPredictionVersionData(
+                factoryCode, year, month);
+
+        if (CollectionUtils.isEmpty(predictionList)) {
+            log.warn("未找到预测数据，工厂: {}, 年月: {}-{}", factoryCode, year, month);
+            return Collections.emptyMap();
+        }
+
+        LocalDate t1Date = LocalDate.of(year, month, 1).plusMonths(1);
+
+        return calculatePredictionRequirements(
+                factoryCode, t1Date.getYear(), t1Date.getMonthValue(),
+                specialMaterialCodes, "t1MonthQty", "t1MonthEudrQty", predictionList);
     }
 
     /**
      * 计算T+2月需求
      */
-    private Map<String, RawMaterialRequirePlan> calculateT2MonthRequirements(Integer year, Integer month,
-                                                                             Set<String> specialMaterialCodes, boolean isSpringFestivalMonth) {
-        if (!isSpringFestivalMonth) {
+    private Map<String, RawMaterialRequirePlan> calculateT2MonthRequirements(
+            String factoryCode, Integer year, Integer month,
+            Set<String> specialMaterialCodes) {
+        // 1. 获取最大预测版本的数据
+        List<MpProductionPrediction> predictionList = getMaxPredictionVersionData(
+                factoryCode, year, month);
+
+        if (CollectionUtils.isEmpty(predictionList)) {
             return Collections.emptyMap();
         }
 
-        LocalDate date = LocalDate.of(year, month, 1);
-        LocalDate t2Date = date.plusMonths(2);
-        return calculatePredictionRequirements(t2Date.getYear(), t2Date.getMonthValue(), "T2", specialMaterialCodes);
+        LocalDate t2Date = LocalDate.of(year, month, 1).plusMonths(2);
+
+        return calculatePredictionRequirements(
+                factoryCode, t2Date.getYear(), t2Date.getMonthValue(),
+                specialMaterialCodes, "t2MonthQty", "t2MonthEudrQty", predictionList);
     }
 
-    /**
-     * 计算预测需求（优化版）
-     */
-    private Map<String, RawMaterialRequirePlan> calculatePredictionRequirements(Integer year, Integer month,
-                                                                                String type,
-                                                                                Set<String> specialMaterialCodes) {
-        // 获取预测计划
-        QueryWrapper<MpProductionPrediction> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("YEAR", year)
-                .eq("MONTH", month);
-        List<MpProductionPrediction> predictions = mpOrderPredictionMapper.selectList(queryWrapper);
 
-        if (CollectionUtils.isEmpty(predictions)) {
+    /**
+     * 计算预测需求（通用方法）
+     */
+    private Map<String, RawMaterialRequirePlan> calculatePredictionRequirements(
+            String factoryCode, Integer year, Integer month,
+            Set<String> specialMaterialCodes, String qtyField, String eudrQtyField, List<MpProductionPrediction> predictionList) {
+
+        try {
+            log.info("开始计算预测需求，工厂: {}, 年月: {}-{}", factoryCode, year, month);
+
+            // 2. 获取预测版本（所有记录的预测版本相同）
+            String predictionVersion = predictionList.get(0).getPredictionVersion();
+
+            // 3. 获取统一的预测版本信息
+            Map<String, PredictionVersionInfoVo> versionMap = getPredictionVersionMap(
+                    factoryCode, year, month, predictionList, predictionVersion);
+
+            if (versionMap.isEmpty()) {
+                log.warn("未找到版本信息，工厂: {}, 年月: {}-{}", factoryCode, year, month);
+                return Collections.emptyMap();
+            }
+
+            // 4. 获取统一的版本信息
+            PredictionVersionInfoVo commonVersionInfo = versionMap.values().iterator().next();
+            String productionVersion = commonVersionInfo.getProductionVersion();
+            String monthPlanVersion = commonVersionInfo.getMonthPlanVersion();
+
+            if (StringUtils.isEmpty(productionVersion)) {
+                log.warn("生产版本为空，工厂: {}, 年月: {}-{}", factoryCode, year, month);
+                return Collections.emptyMap();
+            }
+
+            // 查询排产结果
+            QueryWrapper<FactoryMonthPlanMouldDayResult> resultQuery = new QueryWrapper<>();
+            resultQuery.eq("FACTORY_CODE", factoryCode)
+                    .eq("YEAR", year)
+                    .eq("MONTH", month)
+                    .eq("PRODUCTION_VERSION", productionVersion)
+                    .eq("MONTH_PLAN_VERSION", monthPlanVersion);
+
+            List<FactoryMonthPlanMouldDayResult> resultList =
+                    factoryMonthPlanMouldDayResultMapper.selectList(resultQuery);
+
+            if (CollectionUtils.isEmpty(resultList)) {
+                log.warn("未找到排产结果，工厂: {}, 年月: {}-{}, 生产版本: {}",
+                        factoryCode, year, month, productionVersion);
+                return Collections.emptyMap();
+            }
+
+            // 5. 获取排产结果数据
+            Map<String, Integer[]> eudrMap = getProductionResultEudrQuantities(
+                    factoryCode, year, month, productionVersion, monthPlanVersion, resultList);
+
+            // 6. 计算原材料需求
+            Map<String, RawMaterialRequirePlan> requirements = calculateMaterialRequirementsFromPredictions(
+                    resultList, specialMaterialCodes, qtyField, eudrQtyField);
+
+            log.info("预测需求计算完成，工厂: {}, 年月: {}-{}, 物料数量: {}",
+                    factoryCode, year, month, requirements.size());
+            return requirements;
+
+        } catch (Exception e) {
+            log.error("计算预测需求失败，工厂: {}, 年月: {}-{}", factoryCode, year, month, e);
+            return Collections.emptyMap();
+        }
+    }
+
+
+    /**
+     * 获取最大预测版本的数据
+     */
+    private List<MpProductionPrediction> getMaxPredictionVersionData(
+            String factoryCode, Integer year, Integer month) {
+
+        // 先查询最大版本
+        QueryWrapper<MpProductionPrediction> maxVersionQuery = new QueryWrapper<>();
+        maxVersionQuery.select("MAX(PREDICTION_VERSION) as maxVersion")
+                .eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month);
+
+        List<Map<String, Object>> maxVersionResult = mpProductionPredictionMapper.selectMaps(maxVersionQuery);
+        if (CollectionUtils.isEmpty(maxVersionResult) ||
+                maxVersionResult.get(0).get("maxVersion") == null) {
+            return Collections.emptyList();
+        }
+
+        String maxVersion = maxVersionResult.get(0).get("maxVersion").toString();
+
+        // 查询最大版本的数据
+        QueryWrapper<MpProductionPrediction> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("PREDICTION_VERSION", maxVersion);
+
+        return mpProductionPredictionMapper.selectList(queryWrapper);
+    }
+
+
+    /**
+     * 获取预测版本信息
+     */
+    private Map<String, PredictionVersionInfoVo> getPredictionVersionMap(
+            String factoryCode, Integer year, Integer month,
+            List<MpProductionPrediction> predictionList,
+            String predictionVersion) {
+
+        if (CollectionUtils.isEmpty(predictionList)) {
             return Collections.emptyMap();
         }
 
-        // 1. 收集所有不重复的物料编码
-        List<String> materialCodes = predictions.stream()
-                .map(MpProductionPrediction::getMaterialCode)
+        // 由于同一预测版本下所有物料的MonthPlanVersion和ProductionVersion一致，
+        // 只需查询一条记录获取版本信息即可
+        QueryWrapper<MpPredictionDetail> detailQuery = new QueryWrapper<>();
+        detailQuery.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("BATCH_NUMBER", predictionVersion)
+                .last("LIMIT 1");  // 只需要一条记录
+
+        MpPredictionDetail detail = mpPredictionDetailMapper.selectOne(detailQuery);
+
+        if (detail == null) {
+            log.warn("未找到预测明细数据，工厂: {}, 年月: {}-{}, 版本: {}",
+                    factoryCode, year, month, predictionVersion);
+            return Collections.emptyMap();
+        }
+
+        // 构建物料到版本信息的映射（所有物料使用相同的版本信息）
+        Map<String, PredictionVersionInfoVo> versionMap = new HashMap<>();
+        PredictionVersionInfoVo commonVersionInfo = new PredictionVersionInfoVo();
+        commonVersionInfo.setMonthPlanVersion(detail.getMonthPlanVersion());
+        commonVersionInfo.setProductionVersion(detail.getProductionVersion());
+
+        // 为每个物料分配相同的版本信息
+        for (MpProductionPrediction prediction : predictionList) {
+            String materialCode = prediction.getMaterialCode();
+            if (materialCode != null) {
+                versionMap.put(materialCode, commonVersionInfo);
+            }
+        }
+
+        log.info("获取预测版本信息完成，工厂: {}, 年月: {}-{}, 版本: {}, 物料数量: {}",
+                factoryCode, year, month, predictionVersion, versionMap.size());
+        return versionMap;
+    }
+
+
+    /**
+     * 获取排产结果的EudR数量
+     */
+    private Map<String, Integer[]> getProductionResultEudrQuantities(
+            String factoryCode, Integer year, Integer month, String productionVersion, String monthPlanVersion, List<FactoryMonthPlanMouldDayResult> resultList) {
+
+        Map<String, Integer[]> eudrMap = new HashMap<>();
+
+        // 查询订单冲减详情
+        QueryWrapper<DpOrderOffsetDetail> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("MONTH_PLAN_VERSION", monthPlanVersion);
+
+        List<DpOrderOffsetDetail> offsetDetails = orderOffsetDetailMapper.selectList(queryWrapper);
+
+        if (!CollectionUtils.isEmpty(offsetDetails)) {
+            for (DpOrderOffsetDetail detail : offsetDetails) {
+                String materialCode = detail.getMaterialCode();
+                if (materialCode == null) {
+                    continue;
+                }
+
+                // 初始化物料编码的EudR和非EudR数量
+                Integer[] quantities = eudrMap.computeIfAbsent(materialCode, k -> new Integer[]{0, 0});
+
+                // 获取冲减分配数量
+                int productionQty = detail.getProductionQty() != null ? detail.getProductionQty() : 0;
+
+                if (StringConstant.ONE.equals(detail.getIsEudr())) {
+                    // EudR数量
+                    quantities[1] += productionQty;
+                }else {
+                    quantities[0] += productionQty;
+                }
+            }
+        }
+
+
+        for (FactoryMonthPlanMouldDayResult plan : resultList) {
+            String materialCode = plan.getMaterialCode();
+            if (materialCode == null) {
+                continue;
+            }
+
+            Integer[] quantities = eudrMap.get(plan.getMaterialCode());
+            if (quantities != null) {
+                // 设置非EudR和EudR数量
+                plan.setNonEudrQty(plan.getTotalQty() != null ? plan.getTotalQty() : 0);
+                plan.setEudrQty(quantities[1]);
+
+                log.debug("物料[{}] EudR分解：非EudR={}, EudR={}, 总计={}",
+                        plan.getMaterialCode(), quantities[0],
+                        quantities[1],  quantities[0] + quantities[1]);
+            } else {
+                // 对于计划中有但订单冲减中没有的物料，设置为非EudR
+                plan.setEudrQty(0);
+                plan.setNonEudrQty(plan.getTotalQty() != null ? plan.getTotalQty() : 0);
+
+                log.info("物料[{}]在订单冲减数据中未找到，按非EudR处理", plan.getMaterialCode());
+            }
+        }
+
+        log.info("获取排产结果EudR数量完成，工厂: {}, 年月: {}-{}, 版本: {}, 物料数量: {}",
+                factoryCode, year, month, productionVersion, eudrMap.size());
+        return eudrMap;
+    }
+
+
+    /**
+     * 从预测数据计算物料需求
+     */
+    private Map<String, RawMaterialRequirePlan> calculateMaterialRequirementsFromPredictions(
+            List<FactoryMonthPlanMouldDayResult> resultList,
+            Set<String> specialMaterialCodes,
+            String qtyField, String eudrQtyField) {
+
+        Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
+
+        // 1. 收集所有不重复的胎胚代码
+        List<String> embryoCodes = resultList.stream()
+                .map(FactoryMonthPlanMouldDayResult::getEmbryoCode)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
 
         // 2. 批量查询所有BOM结构
-        Map<String, List<MdmMaterialConsumeDetail>> bomMap = getBomDetailsByMaterialCodes(materialCodes);
+        Map<String, List<MdmMaterialConsumeDetail>> bomMap = getBomDetailsByEmbryoCodes(embryoCodes);
 
-        // 3. 计算需求
-        Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
-
-        predictions.forEach(prediction -> {
-            Integer productionQty = prediction.getProductionQty();
-            if (productionQty == null || productionQty == 0) {
-                return;
+        // 3. 计算每个物料的需求
+        for (FactoryMonthPlanMouldDayResult prediction : resultList) {
+            String embryoCode = prediction.getEmbryoCode();
+            if (embryoCode == null) {
+                continue;
             }
 
-            String materialCode = prediction.getMaterialCode();
-            List<MdmMaterialConsumeDetail> bomDetails = bomMap.get(materialCode);
+            if (prediction.getTotalQty() == null || prediction.getTotalQty() == 0) {
+                continue;
+            }
+
+
+            int nonEudrQty = prediction.getTotalQty();
+            int eudrQty = prediction.getEudrQty();
+
+            // 获取BOM详情
+            List<MdmMaterialConsumeDetail> bomDetails = bomMap.get(embryoCode);
             if (CollectionUtils.isEmpty(bomDetails)) {
-                return;
+                continue;
             }
 
-            // 计算每种物料的需求
-            calculatePredictionMaterialRequirements(requirements, bomDetails, productionQty,
-                    specialMaterialCodes, type);
-        });
+            // 计算原材料需求
+            calculatePredictionMaterialRequirements(requirements, bomDetails,
+                    nonEudrQty, eudrQty, specialMaterialCodes, qtyField, eudrQtyField);
+        }
 
         return requirements;
     }
 
-    /**
-     * 批量根据物料编码获取BOM结构（优化数据库查询）
-     */
-    private Map<String, List<MdmMaterialConsumeDetail>> getBomDetailsByMaterialCodes(List<String> materialCodes) {
-        if (CollectionUtils.isEmpty(materialCodes)) {
-            return Collections.emptyMap();
-        }
-
-        QueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new QueryWrapper<>();
-        queryWrapper.in("EMBRYO_CODE", materialCodes)
-                .eq("IS_DELETE", 0);
-
-        List<MdmMaterialConsumeDetail> allBomDetails = mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
-
-        return allBomDetails.stream()
-                .collect(Collectors.groupingBy(MdmMaterialConsumeDetail::getEmbryoCode));
-    }
 
     /**
      * 计算预测物料需求
      */
-    private void calculatePredictionMaterialRequirements(Map<String, RawMaterialRequirePlan> requirements,
-                                                         List<MdmMaterialConsumeDetail> bomDetails,
-                                                         Integer productionQty,
-                                                         Set<String> specialMaterialCodes,
-                                                         String type) {
+    private void calculatePredictionMaterialRequirements(
+            Map<String, RawMaterialRequirePlan> requirements,
+            List<MdmMaterialConsumeDetail> bomDetails,
+            int nonEudrQty, int eudrQty,
+            Set<String> specialMaterialCodes,
+            String qtyField, String eudrQtyField) {
 
-        bomDetails.forEach(detail -> {
+        for (MdmMaterialConsumeDetail detail : bomDetails) {
             String materialCode = detail.getChildMaterialCode();
             String materialDesc = detail.getChildMaterialName();
-            String materialType = specialMaterialCodes.contains(materialCode) ? "02" : "01";
             BigDecimal dosage = detail.getDosage() != null ? detail.getDosage() : BigDecimal.ZERO;
-
-            BigDecimal requiredQty = BigDecimal.valueOf(productionQty).multiply(dosage);
+            String materialType = specialMaterialCodes.contains(materialCode) ? "02" : "01";
 
             RawMaterialRequirePlan requirement = requirements.computeIfAbsent(materialCode,
                     k -> new RawMaterialRequirePlan(materialCode, materialDesc, materialType));
 
-            // 根据预测月份设置不同的字段
-            //todo 预测表增加年周号区分
-            if ("T1".equals(type)) {
-                requirement.setT1MonthQty(requiredQty);
-            } else if ("T2".equals(type)) {
-                requirement.setT2MonthQty(requiredQty);
+            // 计算需求数量
+            if (nonEudrQty > 0) {
+                BigDecimal nonEudrRequiredQty = BigDecimal.valueOf(nonEudrQty).multiply(dosage);
+                setPredictionQty(requirement, qtyField, nonEudrRequiredQty);
             }
-        });
+
+            if (eudrQty > 0) {
+                BigDecimal eudrRequiredQty = BigDecimal.valueOf(eudrQty).multiply(dosage);
+                setPredictionQty(requirement, eudrQtyField, eudrRequiredQty);
+            }
+        }
     }
 
     /**
-     * 计算EudR需求
+     * 设置预测需求数量
      */
-    private void calculateEudrRequirements(Map<String, RawMaterialRequirePlan>... requirementMaps) {
-        // 合并所有需求并计算EudR
-        // 实现EudR区分逻辑，这里简化处理
-        for (Map<String, RawMaterialRequirePlan> requirementMap : requirementMaps) {
-            requirementMap.values().forEach(requirement -> {
-                BigDecimal totalQty = requirement.getCurMonthQty();
-                if (totalQty != null && totalQty.compareTo(BigDecimal.ZERO) > 0) {
-                    requirement.setCurMonthRudrQty(totalQty.multiply(new BigDecimal("0.5")));
-                }
-            });
+    private void setPredictionQty(RawMaterialRequirePlan requirement,
+                                  String fieldName, BigDecimal qty) {
+        switch (fieldName) {
+            case "t1MonthQty":
+                requirement.setT1MonthQty(qty);
+                break;
+            case "t1MonthEudrQty":
+                requirement.setT1MonthEudrQty(qty);
+                break;
+            case "t2MonthQty":
+                requirement.setT2MonthQty(qty);
+                break;
+            case "t2MonthEudrQty":
+                requirement.setT2MonthEudrQty(qty);
+                break;
         }
     }
+
 
     /**
      * 保存原材料需求计划（优化版，批量插入）
