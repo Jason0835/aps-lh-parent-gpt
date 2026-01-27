@@ -35,7 +35,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 工厂编号
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.factoryCode")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -320,7 +320,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 成型机编码 多个以,分隔
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.cxMachineCode")
     @ApiModelProperty(value = "成型机编码 多个以,分隔", name = "cxMachineCode")
     @TableField(value = "CX_MACHINE_CODE")
     private String cxMachineCode;
@@ -328,7 +327,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 模具使用变化信息如2-4-2,或是2-4或是2
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mouldChangeInfo")
     @ApiModelProperty(value = "模具使用变化信息如2-4-2,或是2-4或是2", name = "mouldChangeInfo")
     @TableField(value = "MOULD_CHANGE_INFO")
     private String mouldChangeInfo;
@@ -336,7 +334,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 是否EXCEL导入（0：默认不是，1：是）
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.isImport", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
@@ -352,7 +349,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 单条硫化时间(包含增加间隔)-调整时使用
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.curingTime")
     @ApiModelProperty(value = "单条硫化时间(包含增加间隔)-调整时使用", name = "curingTime")
     @TableField(value = "CURING_TIME")
     private Integer curingTime;
@@ -444,7 +440,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "开始日期", name = "beginDay")
     @TableField(value = "BEGIN_DAY")
     private Integer beginDay;
-
     /**
      * 结束日期
      */
@@ -452,7 +447,10 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "结束日期", name = "endDay")
     @TableField(value = "END_DAY")
     private Integer endDay;
-
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
     /**
      * DAY_1
      */
