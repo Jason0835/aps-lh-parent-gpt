@@ -1,10 +1,13 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,7 @@ import java.util.stream.Collectors;
  * @date 20251217
  */
 @Slf4j
+@Deprecated
 public class CxContinueSkuProductionHandler {
 
     /**

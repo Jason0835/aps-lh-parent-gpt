@@ -43,6 +43,7 @@ public class MatchingPlanLimitHelper {
 		Integer mouldQty = Optional.ofNullable(this.mouldQty).orElse(0);
 		Integer maxPlanQty = Optional.ofNullable(this.maxPlanQty).orElse(0);
 		Integer maxMouldQty = Optional.ofNullable(this.maxMouldQty).orElse(0);
-		return maxPlanQty > planQty && maxMouldQty > mouldQty;
+//		return maxPlanQty > planQty && maxMouldQty > mouldQty;
+        return maxPlanQty > planQty || maxMouldQty > mouldQty;
 	}
 }

@@ -126,11 +126,12 @@ public abstract class AbstractDailyCapacityLimit {
                     (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) >= dayPlanQty) {
                 // 若次日计划量 比 当日计划量 大，说明在增模
                 // 日计划量 / 日单台硫化量 向上取整
-                intPart += Math.ceil((double) dayPlanQty / dailyLhQty);
-
+                //intPart += Math.ceil((double) dayPlanQty / dailyLhQty);
+                intPart += dayPlanQty / dailyLhQty;
                 // 计算主花纹向下的硫化机台数
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
-                    patternIntPart += Math.ceil((double) dayPlanQty / dailyLhQty);
+                    //patternIntPart += Math.ceil((double) dayPlanQty / dailyLhQty);
+                    patternIntPart += dayPlanQty / dailyLhQty;
                 }
 
             }else {

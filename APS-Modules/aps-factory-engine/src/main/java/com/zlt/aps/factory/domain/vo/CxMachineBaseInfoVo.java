@@ -675,31 +675,6 @@ public class CxMachineBaseInfoVo implements Serializable {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, addSkuInfo.getStructureName(), cxMachineCode, addSkuInfo.getMaterialDesc(), limitHelper.getLimitType()));
             return null;
         }
-//        List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
-//        //说明达到胎胚种类数限制
-//        if (CollectionUtils.isEmpty(hasAddSkuList)) {
-//            return null;
-//        }
-//        //取得与胎胚种类数范围的交集
-//        Set<Integer> productionDaySet = getEffectiveDay(context, selectedLhGroup.getProductionDay(), endDay, hasAddSkuList);
-//        if (CollectionUtils.isEmpty(productionDaySet)) {
-//            return null;
-//        }
-//        //取得与模具排产范围的交集
-//        Set<Integer> effectiveMouldSet = getEffectiveDay(productionDaySet, selectedMould);
-//        if (CollectionUtils.isEmpty(effectiveMouldSet)) {
-//            return null;
-//        }
-//        //取得模壳排产范围
-//        Set<Integer> mouldShellSet = productionContext.getMouldShellRange(selectedMould.get(BigDecimal.ZERO.intValue()));
-//        if (CollectionUtils.isEmpty(mouldShellSet)) {
-//            return null;
-//        }
-//        //20260116 取得与模壳排产范围的交集
-//        Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
-//        if (CollectionUtils.isEmpty(intersectionSet)) {
-//            return null;
-//        }
         //拷贝，否则数据丢失
         CxLhProductionHelper newLhGroup = new CxLhProductionHelper();
         BeanUtils.copyProperties(selectedLhGroup, newLhGroup);
@@ -859,7 +834,6 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (null == afterAllocation) {
             return false;
         }
-
         Integer startDay = afterAllocation.getStartDay();
         String groupName = afterAllocation.getAllocationGroup();
         return isChangeGroup(beforeAllocation, startDay, groupName);
@@ -889,43 +863,4 @@ public class CxMachineBaseInfoVo implements Serializable {
         return !beforeAllocation.getAllocationGroup().equals(changeGroupName);
     }
 
-    /**
-     * 根据preSelected的排产日范围，取得与productionDaySet的交集排产范围
-     *
-     * @param context       排产上下文
-     * @param preClosingDay 预计开始排产日
-     * @param preEndDay     预计结束排产日
-     * @param effectiveList 有效排产集合
-     */
-    private Set<Integer> getEffectiveDay(Context context, Integer preClosingDay, Integer preEndDay, List<GroupPlanCxLhCapacityLimitHelper> effectiveList) {
-        Set<Integer> productionDaySet = effectiveList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
-        Set<Integer> effectiveDaySet = new HashSet<>(context.getMonthDays());
-        for (Integer effectiveDay = preClosingDay; effectiveDay <= preEndDay; effectiveDay++) {
-            if (productionDaySet.contains(effectiveDay)) {
-                effectiveDaySet.add(effectiveDay);
-            }
-        }
-        return effectiveDaySet;
-    }
-
-    /**
-     * 获取取得的有效排产日与模具可排产日的交集
-     *
-     * @param limitProductionDaySet 符合条件的排产日范围(硫化组、胎胚种类数)
-     * @param selectedMould         选中的模具
-     * @return
-     */
-    private Set<Integer> getEffectiveDay(Set<Integer> limitProductionDaySet, List<ProductionMouldInfoVo> selectedMould) {
-        Set<Integer> firstProductionDaySet = selectedMould.get(BigDecimal.ZERO.intValue()).getProductionDaySet();
-        Set<Integer> secondProductionDaySet = selectedMould.get(BigDecimal.ONE.intValue()).getProductionDaySet();
-        if (CollectionUtils.isEmpty(firstProductionDaySet) || CollectionUtils.isEmpty(secondProductionDaySet)) {
-            return Collections.emptySet();
-        }
-        //取两个模具的排产日交集
-        Set<Integer> intersectionSet = firstProductionDaySet.stream().filter(secondProductionDaySet::contains).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(intersectionSet)) {
-            return Collections.emptySet();
-        }
-        return limitProductionDaySet.stream().filter(intersectionSet::contains).collect(Collectors.toSet());
-    }
 }
