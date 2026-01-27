@@ -172,7 +172,7 @@ export default {
     return {
       availableHeight:500,
       // 遮罩层
-      loading: true,
+      loading: false,
       // 选中数组
       ids: [],
       // 非单个禁用
@@ -211,7 +211,7 @@ export default {
     };
   },
   created() {
-    this.getList();
+    // this.getList();
   },
   // mounted() {
   //   this.$nextTick(() => {

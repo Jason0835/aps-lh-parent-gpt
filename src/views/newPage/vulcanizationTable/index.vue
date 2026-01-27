@@ -271,7 +271,7 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
         {
-          prop: "mesMaterialCode",
+          prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
 

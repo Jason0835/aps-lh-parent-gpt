@@ -134,10 +134,12 @@ export default {
     }
   },
   computed: {
-    ...mapGetters(['sidebarRouters', 'collectMenu']),
+    // ...mapGetters(['sidebarRouters', 'collectMenu']),
+    ...mapGetters(["sidebarRouters", "collectMenu", "name"]),
 
   },
   mounted() {
+    console.log(this.name)
     // this.getMessageData()
     // this.getTaskData()
   },
@@ -148,11 +150,11 @@ export default {
   methods: {
 
     async getMessageData() {
-      const messageData = await messageListNoticeMessage({ 'receivedBy': 'admin' })
+      const messageData = await messageListNoticeMessage({  receivedBy: this.name,})
       this.messageList = messageData?.rows || []
     },
     async getTaskData() {
-      const taskData = await messageListTaskMessage({ 'receivedBy': 'admin' })
+      const taskData = await messageListTaskMessage({  receivedBy: this.name,})
       this.taskList = taskData?.rows || []
     },
     resolvePath(routePath, routeQuery) {
