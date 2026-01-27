@@ -126,21 +126,16 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //6、对续作结构进行在产成型机台分配(在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
-        productionContext.setReverseFindSet(new HashSet<>());
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
-        //在机结构对在产成型机台进行模拟模具排产
-        mouldProductionByContinueGroup(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
-        //7、对收尾成型机台，反向匹配待排结构
-        CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, estimateGroupCxAllocationMap);
-        //8、对还需排产结构，获取优先级最高的结构--结构新增
-        addNewGroupPlanHandler(productionContext, estimateGroupCxAllocationMap);
-        //todo 记录日志
+        //7、进行模拟模具排产
+        new SimulateProductionHandler().productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
         //10、第二轮排产
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
-        resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, allAllocationList);
+        new ClearProductionInfoHandler().clearProductionData(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, allAllocationList);
+        resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
         FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //11、最后搭配排产 TODO 报错，先注释掉
@@ -381,135 +376,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
-     * 6.2：对在机结构进行新增Sku的模具排产
-     *
-     * @param context                排产上下文
-     * @param allGroupPlanMap        所有分组排产计划
-     * @param continueAllocationList 在机机台产能分配
-     * @param allContinueMap         续作信息
-     */
-    private void mouldProductionByContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
-        if (CollectionUtils.isEmpty(allContinueMap)) {
-            log.info(TbrProductionGroupLogRecorder.addContinueSkuNoContinueGroupProductionLog(context));
-            return;
-        }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
-        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        allContinueMap.forEach((structureName, cxContinueInfo) -> {
-            ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
-            List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
-            if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null));
-                return;
-            }
-            groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
-            //1、todo 对测算成型产能分配的续作部分进行重排(先清空再重排-续作Sku一起排产)
-
-            //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
-            groupPlanInfo.setThisRoundCanProduction();
-            //在机结构-新增Sku模拟排产
-            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
-            //再次设置可排产的计划在本轮次可进行排产
-            groupPlanInfo.setThisRoundCanProduction();
-            //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
-            GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
-            //设置收尾机台
-            continueCxMachineAllocation.forEach(cxMachineAllocation -> {
-                String cxMachineCode = cxMachineAllocation.getCxMachineCode();
-                CxMachineBaseInfoVo machineInfo = allCxMachineInfo.get(cxMachineCode);
-                Integer newRemainingDays = machineInfo.getRemainingDays();
-                //加入收尾匹配
-                if (newRemainingDays > BigDecimal.ZERO.intValue()) {
-                    productionContext.addReverseMachine(machineInfo.getCxMachineCode());
-                }
-            });
-        });
-    }
-
-    /**
-     * 8：对还需排产的结构，获取优先级最高的结构进行机台匹配排产
-     *
-     * @param context                      排产上下文
-     * @param estimateGroupCxAllocationMap 分组计划需求量
-     */
-    private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
-        ProductionPlanGroupInfo addNewGroupPlan = CxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap);
-        if (null == addNewGroupPlan) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
-            return;
-        }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        String groupName = addNewGroupPlan.getGroupName();
-        /**
-         * 20260120 判断成型鼓是否符合条件
-         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
-         */
-        GroupCapacityProductionLimitHelper limitResult = productionContext.getBaseDataContainer().getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
-        //获取成型工装的排产日集合
-        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
-        if (CollectionUtils.isEmpty(limitResult.getProductionDaySet())) {
-            //20260120 标记分配完成--没有成型工装,没有日产能，说明后面也找不到
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-            return;
-        }
-        //对挑选出的结构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, productionDayInfo);
-        if (null == selectedCxMachine) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, groupName));
-            //20260109 标记分配完成--没有找到合适，说明后面也找不到
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-            return;
-        }
-        Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
-        Integer startDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
-        //20260121 切换结构控制
-        DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectedCxMachine, hasProductionDaySet);
-        if (null == realChangeDay) {
-            //记录日志
-            Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
-            log.info(TbrProductionGroupLogRecorder.addChangeGroupLimitCxMachineLog(context, selectedCxMachine.getCxMachineCode(), maxChangeLimit));
-            //20260109 标记分配完成--没有找到合适，说明后面也找不到
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-        }
-        startDay = realChangeDay;
-        Set<Integer> realProductionDaySet = hasProductionDaySet.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
-        Integer remainingDays = realProductionDaySet.size();
-        //分配产能
-        ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
-        Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
-        Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
-        //更新剩余天数
-        Integer leftOver1 = remainingDays - realAllocationDays;
-        addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
-        CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
-        selectedCxMachine.addAllocationPlanInfo(context, addHelper);
-        //对成型机台进行模拟模具排产
-        CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
-        if (needAllocationDays <= remainingDays) {
-            //20260108 标记分配完成
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-        }
-        //重新获取机台的剩余日 提前收尾
-        Integer leftOver = selectedCxMachine.getRemainingDays();
-        //反向机台匹配结构计划
-        if (leftOver > BigDecimal.ZERO.intValue()) {
-            CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
-        }
-        //下一新增结构
-        addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-    }
-
-    /**
      * 9：根据成型信息，得到结构排产结果
      * 即结构转产信息
      *
@@ -525,15 +391,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     }
 
     /**
-     * 10：在正式排产前进行重置数据处理
+     * 10：在正式排产前重新构建分组限制信息
      *
-     * @param context            排产上下文
-     * @param allGroupPlanInfo   所有分组计划对象
-     * @param allContinueSkuInfo 所有续作计划信息
-     * @param allAllocationList  分组转产配置
+     * @param context           排产上下文
+     * @param allGroupPlanInfo  所有分组计划对象
+     * @param allAllocationList 分组转产配置
      */
-    private void resetBeforeFormalProduction(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueSkuInfo, List<MpStructureAllocation> allAllocationList) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
+    private void resetBeforeFormalProduction(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
         //根据分组转产配置，重新构建分组的限制信息
         allGroupPlanInfo.forEach((groupName, groupProductionInfo) -> {
             List<MpStructureAllocation> groupAllocationList;
@@ -547,29 +411,30 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
-        //物料已排产量及损耗量清空
-        productionContext.resetSkuProductionAndWastageQty();
-        //处理计划的待排产量及排产标记重置
-        Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
-        if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
-            allSinglePlanMap.forEach((monthPlanId, singlePlan) -> singlePlan.resetProductionDataInfo());
-        }
-        //重新构建模具排产信息，全部清空
-        Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
-        if (!CollectionUtils.isEmpty(allMouldInfoMap)) {
-            allMouldInfoMap.forEach((mouldCode, singleMouldInfo) -> {
-                singleMouldInfo.setFinishDaySet(new HashSet<>());
-                singleMouldInfo.setDayProductionInfo(new HashMap<>());
-            });
-        }
-        //清除模壳使用量
-        productionContext.clearAllMouldShellUsed();
-        //清除模具分配使用量
-        productionContext.clearAllMouldAllocationUsed();
-        //清除胶囊卡盘使用量
-        productionContext.clearAllCapsuleChuckUsed();
-        //清除日排产限制使用量
-        productionContext.clearAllDayLimitUsed();
+//        TbrProductionContext productionContext = (TbrProductionContext) context;
+//        //物料已排产量及损耗量清空
+//        productionContext.resetSkuProductionAndWastageQty();
+//        //处理计划的待排产量及排产标记重置
+//        Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
+//        if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
+//            allSinglePlanMap.forEach((monthPlanId, singlePlan) -> singlePlan.resetProductionDataInfo());
+//        }
+//        //重新构建模具排产信息，全部清空
+//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
+//        if (!CollectionUtils.isEmpty(allMouldInfoMap)) {
+//            allMouldInfoMap.forEach((mouldCode, singleMouldInfo) -> {
+//                singleMouldInfo.setFinishDaySet(new HashSet<>());
+//                singleMouldInfo.setDayProductionInfo(new HashMap<>());
+//            });
+//        }
+//        //清除模壳使用量
+//        productionContext.clearAllMouldShellUsed();
+//        //清除模具分配使用量
+//        productionContext.clearAllMouldAllocationUsed();
+//        //清除胶囊卡盘使用量
+//        productionContext.clearAllCapsuleChuckUsed();
+//        //清除日排产限制使用量
+//        productionContext.clearAllDayLimitUsed();
     }
 
     /**
@@ -592,7 +457,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         return sumProductionMap;
     }
 
-    private void saveNoProductionPlanResult(TbrProductionContext productionContext,  Map<Long, Integer> sumProductionMap) {
+    private void saveNoProductionPlanResult(TbrProductionContext productionContext, Map<Long, Integer> sumProductionMap) {
         Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(productionPlanMap)) {
             return;
@@ -885,8 +750,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<ProductionDayInfoVo> productionDayInfoList = getDataService().getProductCalendar(context);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
-            context.setStopDays(Collections.emptySet());
             context.setCapacityRatioMap(Collections.emptyMap());
+            context.setStopDays(Collections.emptySet());
             throw new BusinessException(I18nUtil.getMessage("alg.data.production.noConfigurationCalendar"));
         }
         //排产开始日
@@ -916,6 +781,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             stopDaySet.add(stopDay);
         });
         context.setStopDays(stopDaySet);
+
     }
 
     /**
