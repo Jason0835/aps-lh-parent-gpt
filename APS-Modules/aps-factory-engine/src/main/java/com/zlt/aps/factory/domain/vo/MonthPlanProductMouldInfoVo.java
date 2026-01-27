@@ -98,4 +98,9 @@ public class MonthPlanProductMouldInfoVo implements Serializable {
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, structureName, mainPattern);
     }
+
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, factoryCode, materialDesc,baseMouldCode);
+    }
 }

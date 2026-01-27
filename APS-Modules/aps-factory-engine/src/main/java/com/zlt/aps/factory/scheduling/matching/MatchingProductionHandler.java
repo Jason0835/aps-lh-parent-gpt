@@ -30,6 +30,7 @@ import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
@@ -1452,19 +1453,11 @@ public class MatchingProductionHandler {
      * @return
      */
     private Map<String, List<MonthPlanProductMouldInfoVo>> getProductionMouldInfo(TbrProductionContext productionContext) {
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = new ArrayList<>();
         // 已有模具的配置关系
-        List<MonthPlanProductMouldInfoVo> productMouldInfoList = this.getDataService()
-                .getEnableProductionMouldInfo(productionContext);
-        if (!CollectionUtils.isEmpty(productMouldInfoList)) {
-            allMouldRelationInfoList.addAll(productMouldInfoList);
-        }
+        List<MonthPlanProductMouldInfoVo> productMouldInfoList = this.getDataService().getEnableProductionMouldInfo(productionContext);
         // 新模具到货计划关系
-        List<MonthPlanProductMouldInfoVo> mouldDeliveryList = this.getDataService()
-                .getEnableProductionMouldDeliveryInfo(productionContext);
-        if (!CollectionUtils.isEmpty(mouldDeliveryList)) {
-            allMouldRelationInfoList.addAll(mouldDeliveryList);
-        }
+        List<MonthPlanProductMouldInfoVo> mouldDeliveryList = this.getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
+        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
