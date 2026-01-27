@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
 import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
@@ -486,5 +487,30 @@ public class TbrProductionContext extends Context {
             effectiveList.add(mouldInfo);
         });
         return effectiveList;
+    }
+
+
+    /**
+     *  根据SKU获取模具信息列表
+     * @param materialDesc SKU
+     * @return 模具信息列表
+     */
+    public List<ProductionMouldInfoVo> findMouldInfoByMaterialDesc(String materialDesc) {
+        List<ProductionMouldInfoVo> mouldInfos = Lists.newArrayList();
+        if (StringUtils.isBlank(materialDesc)) {
+            return mouldInfos;
+        }
+        List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
+        if (CollectionUtils.isEmpty(skuRelationList)) {
+            return mouldInfos;
+        }
+        skuRelationList.forEach(skuRelation -> {
+            ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(skuRelation.getMouldCode());
+            if (null == mouldInfo) {
+                return;
+            }
+            mouldInfos.add(mouldInfo);
+        });
+        return mouldInfos.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION?Collections.emptyList():mouldInfos;
     }
 }
