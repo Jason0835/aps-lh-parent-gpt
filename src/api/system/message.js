@@ -8,7 +8,8 @@ import request from "@/utils/request";
 // 查询通知消息接口
 export function messageListNoticeMessage(data) {
   return request({
-    url: '/message/messageCenter/listNoticeMessage',
+    // url: '/message/messageCenter/listNoticeMessage',
+    url: '/message/messageList/list',
     method: 'post',
     headers: {
       'Content-Type': 'application/json;charset=UTF-8'

@@ -62,13 +62,11 @@
 </template>
 <script>
 //lib
-import { mapState ,mapGetters} from "vuex";
+import { mapState, mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-import {
-  listVulcanizationTable,
-} from "@/api/monthplan/vulcanizationTable";
+import { listVulcanizationTable } from "@/api/monthplan/vulcanizationTable";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -105,7 +103,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    ...mapGetters("globalList", ["structureList"]),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
@@ -114,115 +112,124 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "onboardDate",
-          label: this.$t("financialManagement.averageAccountsReceivable.updateTime"),
-          width:180,
-          align:'center'
+          label: this.$t(
+            "financialManagement.averageAccountsReceivable.updateTime"
+          ),
+          width: 180,
+          align: "center",
         },
 
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:180,
-            align:'center'
+          width: 180,
+          align: "center",
         },
 
         {
           prop: "lhMachine",
           label: this.$t("ui.data.vulcanizationTable.lhMachine"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "cxMachine",
           label: this.$t("ui.data.vulcanizationTable.cxMachine"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.colume.wms.unused.productCode"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
 
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:320,
-            align:'center'
+          width: 320,
+          align: "center",
         },
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width:320,
-            align:'center'
+          width: 320,
+          align: "center",
         },
 
         {
           prop: "mouldQty",
           label: this.$t("ui.data.vulcanizationTable.mouldQty"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "netDemandQty",
           label: this.$t("ui.data.vulcanizationTable.netDemandQty"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "scheduleQty",
           label: this.$t("plan.productionSchedule.unscheduleQtc"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "onboardDate",
           label: this.$t("上机日期"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "unqualifiedQty",
           label: this.$t("ui.data.vulcanizationTable.unqualifiedQty"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "productionQty",
           label: this.$t("ui.data.vulcanizationTable.productionQty"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "lhMargin",
           label: this.$t("ui.data.vulcanizationTable.lhMargin"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "expectedCloseDay",
           label: this.$t("ui.data.vulcanizationTable.expectedCloseDay"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "expectedCloseDate",
           label: this.$t("ui.data.vulcanizationTable.expectedCloseDate"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "planCloseDate",
           label: this.$t("ui.data.vulcanizationTable.planCloseDate"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
         },
         {
           prop: "diffDay",
           label: this.$t("ui.data.vulcanizationTable.diffDay"),
-          width:120,
-            align:'center'
+          width: 120,
+          align: "center",
+          render: ({ row }) => {
+            return (
+              <div style={{background:row.diffDay>0?'yellow':''}}>
+                {row.diffDay}
+              </div>
+            );
+          },
         },
       ];
 
@@ -230,13 +237,12 @@ export default {
     },
     searchColumns() {
       return [
-      {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
-
         },
         {
           prop: "yearMonth",
@@ -245,14 +251,13 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
-
         },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
-          dictData:this.structureList,
-          filterable: true
+          dictData: this.structureList,
+          filterable: true,
         },
         {
           prop: "cxMachine",
@@ -274,7 +279,6 @@ export default {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
-
       ];
     },
   },
@@ -354,7 +358,7 @@ export default {
         let arr = params.yearMonth.split("-");
         params.year = arr[0];
         params.month = arr[1];
-        params.yearMonth=''
+        params.yearMonth = "";
       }
       return params;
     },

@@ -150,6 +150,38 @@ export default {
     ...mapGetters("globalList", ["structureList"]),
     columns() {
       let columns = [
+      {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          align: "center",
+
+          formatter: (row) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_factory_name,
+              row.factoryCode
+            );
+          },
+        },
+        {
+          prop: "year",
+          label: this.$t("ui.data.colume.year"),
+          width: 120,
+        },
+        {
+          prop: "month",
+          label: this.$t("ui.data.colume.month"),
+          width: 120,
+        },
+        {
+          prop: "monthPlanVersion",
+          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
+          width: 180,
+        },
+        {
+          prop: "productionVersion",
+          label: this.$t("排产版本号"),
+          width: 180,
+        },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
