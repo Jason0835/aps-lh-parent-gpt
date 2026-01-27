@@ -125,7 +125,7 @@ public class MdmAreaCapaAllocationServiceImpl extends AbstractDocService<MdmArea
     protected Boolean serviceCheckAndDataHandle(MdmAreaCapaAllocation importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
         if (serviceCheckParams.containsKey("areaMap")) {
             Map<String, String> areaMap = (Map<String, String>) serviceCheckParams.get("areaMap");
-            String areaCodeNameI18n = importDocEntity.getAreaCodeNameI18n();
+            String areaCodeNameI18n = importDocEntity.getAreaCode();
             if (areaMap.containsKey(areaCodeNameI18n)) {
                 String areaCode = areaMap.get(areaCodeNameI18n);
                 importDocEntity.setAreaCode(areaCode);

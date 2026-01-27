@@ -140,7 +140,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //重新构建分组计划的硫化组限制信息
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
-        FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        new FormalProductionHandler().productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
