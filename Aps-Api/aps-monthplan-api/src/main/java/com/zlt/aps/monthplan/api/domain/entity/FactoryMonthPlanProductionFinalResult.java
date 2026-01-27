@@ -768,7 +768,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 
-    public Integer getDayVulcanizationQty() {
+    public Integer getDayLhQty() {
         if(null == this.dayVulcanizationQty) {
             return 0;
         }

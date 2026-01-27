@@ -48,28 +48,6 @@ public class CxAddSkuProductionHandler {
         String groupName = groupPlanInfo.getGroupName();
         String onLineMachineInfo = String.join(StringConstant.COMMA, groupPlanInfo.getAllocationCxMachineCodeSet());
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
-//        if (CollectionUtils.isEmpty(groupPlanData)) {
-//            //记录日志
-//            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo));
-//            return;
-//        }
-//        List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
-//        if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
-//            //记录日志
-//            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo));
-//            return;
-//        }
-//        //获取最先收尾的硫化组
-//        EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext, excludeDays);
-//        if (null == lhGroup) {
-//            //记录日志
-//            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo));
-//            return;
-//        }
-//        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
-//        if (startDay > endDay) {
-//            return;
-//        }
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
@@ -113,7 +91,7 @@ public class CxAddSkuProductionHandler {
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), lhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
-        //开始排产 CxLhMouldProductionCalculator.lhProductionHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
+        //开始排产
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList(), false);
         //递归：重新获取下一组
         productionAddSkuByContinueCxMachine(context, groupPlanInfo, excludeDays);

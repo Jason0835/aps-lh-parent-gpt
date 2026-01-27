@@ -58,50 +58,6 @@ public class CxLhMouldProductionCalculator {
     }
 
     /**
-     * 续作硫化排产同规格同花纹
-     * 同生胎共模具，此时不判断限制
-     * -选中一组
-     *
-     * @param context                   排产上下文
-     * @param earliestConclusionLhGroup 收尾的硫化组信息对象
-     * @param lhProductionQtyHelper     硫化排产数量对象
-     * @param startDay                  开始排产日
-     * @param endDay                    收尾日
-     * @param doubleMouldList           选中的模具
-     * @param skuProductionPlanList     排产的物料计划集合
-     */
-    public static void lhProductionByLhGroupHandler(Context context, EarliestConclusionLhGroupHelper earliestConclusionLhGroup, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
-        Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
-        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
-        Set<Integer> stopDay = context.getStopDays();
-        //进行排产
-        for (int day = startDay; day <= endDay; day++) {
-            if (sumProductionQty <= BigDecimal.ZERO.longValue()) {
-                break;
-            }
-            //停工日跳过
-            if (stopDay.contains(day)) {
-                continue;
-            }
-            //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
-            realSumProductionQty = realSumProductionQty + realDayProductionQty;
-            sumProductionQty = sumProductionQty - realDayProductionQty;
-            //todo 判断模具是否排产完毕
-            boolean isDayFinish = true;
-            //更新日产信息
-            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, lhProductionQtyHelper.getCxMachineInfo(), BigDecimal.ZERO.intValue());
-            updateDayProductionInfo(productionContext, productionPlanInfo, doubleMouldList, skuProductionPlanList, updateInfo);
-        }
-        //更新还需排产量及实际排产量
-        lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
-        lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
-    }
-
-    /**
      * 采用双模，在startDay~endDay进行排产
      * 此时为在机结构对在产机台进行新增Sku排产的场景
      * 以结构为维度，忽略机台进行排产
@@ -240,10 +196,6 @@ public class CxLhMouldProductionCalculator {
             Integer dayProductionQty = dayProductionInfo.getProductionQty();
             Integer realDayProductionQty = Math.min(sumProductionQty, dayProductionQty);
             Integer theoryProductionQty = dayProductionQty;
-//            //首日换模排产
-//            if (firstDay.equals(day)) {
-//                realDayProductionQty = Math.min(realDayProductionQty, paramConfiguration.getChangeMouldFirstQty());
-//            }
             Integer lossQtyDiffValue = theoryProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {
@@ -422,36 +374,6 @@ public class CxLhMouldProductionCalculator {
         updateCapsuleChuckInfoByMould(capsuleChuckInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
         //20260122 换模次数 -1
         updateChangeMouldInfoByMould(context, beforeConclusionDay, productionPlan.getMaterialDesc(), singleMould);
-    }
-
-    /**
-     * 续作Sku使用续作模具进行排产
-     *
-     * @param context         排产上下文
-     * @param groupPlanInfo   分组排产计划
-     * @param continueSkuInfo 续作Sku信息
-     * @param productionDay   排产日
-     * @param productionQty   日排产量
-     * @param lhGroupInfo     硫化组信息
-     */
-    public static void continueSkuLhProductionHandler(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueSkuInfoHelper continueSkuInfo, Integer productionDay, Integer productionQty, CxLhProductionHelper lhGroupInfo) {
-        Set<Integer> stopDay = context.getStopDays();
-        if (stopDay.contains(productionDay)) {
-            return;
-        }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<ProductionMouldInfoVo> doubleMouldList = new ArrayList<>();
-        Set<String> productionMouldSet = lhGroupInfo.getProductionMouldSet();
-        Map<String, ProductionMouldInfoVo> mouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
-        productionMouldSet.forEach(mouldCode -> doubleMouldList.add(mouldInfoMap.get(mouldCode)));
-        Integer dayMaxProductionQty = continueSkuInfo.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        boolean isDayFinish = productionQty >= dayMaxProductionQty ? true : false;
-        String cxMachineCode = String.join(StringConstant.COMMA, continueSkuInfo.getOnLineCxMachineSet());
-        doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlanInfo, lhGroupInfo, isDayFinish, productionQty, dayMaxProductionQty, cxMachineCode, continueSkuInfo.getContinueSkuPlanList()));
-        //更新硫化组日期和日排产量
-        lhGroupInfo.setProductionQty(productionQty);
-        lhGroupInfo.setProductionDay(productionDay);
-        lhGroupInfo.setDayMaxProductionQty(dayMaxProductionQty);
     }
 
     /**

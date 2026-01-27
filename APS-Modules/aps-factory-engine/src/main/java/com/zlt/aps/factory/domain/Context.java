@@ -254,4 +254,19 @@ public class Context {
         }
         return productionDaySet;
     }
+
+    /**
+     * 排产周期最后一天
+     *
+     * @return
+     */
+    public Integer getProductionEndDay() {
+        Set<Integer> allProductionDaySet = getProductionDay();
+        if (CollectionUtils.isEmpty(allProductionDaySet)) {
+            return null;
+        }
+        List<Integer> dayList = new ArrayList<>(allProductionDaySet);
+        dayList.sort(Comparator.comparing(Integer::intValue));
+        return dayList.get(dayList.size() - BigDecimal.ONE.intValue());
+    }
 }

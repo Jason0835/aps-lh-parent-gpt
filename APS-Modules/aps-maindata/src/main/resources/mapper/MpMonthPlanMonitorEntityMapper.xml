@@ -17,6 +17,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		       v.LH_MARGIN,
 		       v.EXPECTED_CLOSE_DAY,
 		       v.EXPECTED_CLOSE_DATE,
+		       v.PLAN_CLOSE_DATE,
 		       v.DIFF_DAY,
 		       r.CX_MACHINE_CODE AS CX_MACHINE,
 		       GROUP_CONCAT(distinct LH_MACHINE_CODE) AS LH_MACHINE
@@ -61,6 +62,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		       v.LH_MARGIN,
 		       v.EXPECTED_CLOSE_DAY,
                v.EXPECTED_CLOSE_DATE,
+               v.PLAN_CLOSE_DATE,
                v.DIFF_DAY,
 		       r.CX_MACHINE_CODE
     </select>

@@ -154,8 +154,27 @@ public class DayCapacityLimitVo implements Serializable {
         dayLimit.deductionCxMachineAllocationQty(context, allocationDay, allocationInfo);
     }
 
+
     /**
-     * 增加分组产能分配使用量信息
+     * 获取可安排两副模具排产的排产日集合
+     * 当天剩余可排产量 > 0
+     *
+     * @return
+     */
+    public Set<Integer> getEnableDoubleMouldProductionRange() {
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return new HashSet<>();
+        }
+        List<DayCapacityLimitHelper> dayLimitList = dayCapacityLimitMap.values().stream().collect(Collectors.toList());
+        List<DayCapacityLimitHelper> enableList = dayLimitList.stream().filter(singleDay -> singleDay.isAddSkuProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(enableList)) {
+            return new HashSet<>();
+        }
+        return enableList.stream().map(DayCapacityLimitHelper::getProductionDay).collect(Collectors.toSet());
+    }
+
+    /**
+     * 增加Sku排产日产能占用量
      *
      * @param context        排产上下文
      * @param productionDay  排产日
@@ -176,7 +195,7 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
-     * 释放分组产能分配使用量信息
+     * 释放排产Sku日产能占用量
      *
      * @param context       排产上下文
      * @param productionDay 排产日
