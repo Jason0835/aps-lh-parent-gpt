@@ -308,6 +308,13 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
         },
+        {
+          prop: "isEudr",
+          label: this.$t("eudr"),
+          type: "select",
+          dictData:this.dict.type.biz_yes_no,
+
+        },
       ];
     },
   },

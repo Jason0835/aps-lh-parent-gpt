@@ -148,12 +148,12 @@ export default {
   methods: {
 
     async getMessageData() {
-      // const messageData = await messageListNoticeMessage({ 'receivedBy': 'admin' })
-      // this.messageList = messageData?.rows || []
+      const messageData = await messageListNoticeMessage({ 'receivedBy': 'admin' })
+      this.messageList = messageData?.rows || []
     },
     async getTaskData() {
-      // const taskData = await messageListTaskMessage({ 'receivedBy': 'admin' })
-      // this.taskList = taskData?.rows || []
+      const taskData = await messageListTaskMessage({ 'receivedBy': 'admin' })
+      this.taskList = taskData?.rows || []
     },
     resolvePath(routePath, routeQuery) {
       if (isExternal(routePath)) {

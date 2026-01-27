@@ -116,95 +116,113 @@ export default {
           prop: "onboardDate",
           label: this.$t("financialManagement.averageAccountsReceivable.updateTime"),
           width:180,
+          align:'center'
         },
 
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           width:180,
+            align:'center'
         },
 
         {
           prop: "lhMachine",
           label: this.$t("ui.data.vulcanizationTable.lhMachine"),
           width:120,
+            align:'center'
         },
         {
           prop: "cxMachine",
           label: this.$t("ui.data.vulcanizationTable.cxMachine"),
           width:120,
+            align:'center'
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.colume.wms.unused.productCode"),
           width:120,
+            align:'center'
         },
 
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           width:320,
+            align:'center'
         },
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
           width:320,
+            align:'center'
         },
 
         {
           prop: "mouldQty",
           label: this.$t("ui.data.vulcanizationTable.mouldQty"),
           width:120,
+            align:'center'
         },
         {
           prop: "netDemandQty",
           label: this.$t("ui.data.vulcanizationTable.netDemandQty"),
           width:120,
+            align:'center'
         },
         {
           prop: "scheduleQty",
           label: this.$t("plan.productionSchedule.unscheduleQtc"),
           width:120,
+            align:'center'
         },
         {
           prop: "onboardDate",
           label: this.$t("上机日期"),
           width:120,
+            align:'center'
         },
         {
           prop: "unqualifiedQty",
           label: this.$t("ui.data.vulcanizationTable.unqualifiedQty"),
           width:120,
+            align:'center'
         },
         {
           prop: "productionQty",
           label: this.$t("ui.data.vulcanizationTable.productionQty"),
           width:120,
+            align:'center'
         },
         {
           prop: "lhMargin",
           label: this.$t("ui.data.vulcanizationTable.lhMargin"),
           width:120,
+            align:'center'
         },
         {
           prop: "expectedCloseDay",
           label: this.$t("ui.data.vulcanizationTable.expectedCloseDay"),
           width:120,
+            align:'center'
         },
         {
           prop: "expectedCloseDate",
           label: this.$t("ui.data.vulcanizationTable.expectedCloseDate"),
           width:120,
+            align:'center'
         },
         {
           prop: "planCloseDate",
           label: this.$t("ui.data.vulcanizationTable.planCloseDate"),
           width:120,
+            align:'center'
         },
         {
           prop: "diffDay",
           label: this.$t("ui.data.vulcanizationTable.diffDay"),
           width:120,
+            align:'center'
         },
       ];
 
