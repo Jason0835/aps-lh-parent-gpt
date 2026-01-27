@@ -788,11 +788,16 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
             return;
         }
+        Set<Integer> openDay = productionContext.getProductionDayAfterStop();
         ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
         Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(productionDayList.size());
         Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
         productionDayList.forEach(productionDay -> {
             Integer ratio = startProductionRatioMap.get(productionDay);
+            //20260127 开产时，只是量放一半，日产限制还是放大到100
+            if (openDay.contains(productionDay)) {
+                ratio = ProductionConstant.PERCENTAGE;
+            }
             DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
             dayCapacityLimitMap.put(productionDay, dayInitLimit);
         });
