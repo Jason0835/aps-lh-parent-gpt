@@ -1,5 +1,6 @@
-package com.zlt.aps.factory.daylimit;
+package com.zlt.aps.factory.logrecorder;
 
+import com.zlt.aps.factory.daylimit.GroupAllocationCapacityLimitTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;

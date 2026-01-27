@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.scheduling.cxcapacity;
+package com.zlt.aps.factory.logrecorder;
 
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;

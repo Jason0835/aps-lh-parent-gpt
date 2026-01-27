@@ -2,17 +2,16 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
-import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.ProductionStageEnum;
+import com.zlt.aps.factory.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 开始正式排产，按结构进行排产
@@ -22,6 +21,7 @@ import java.util.Set;
  * @date 20260101
  */
 @Slf4j
+@Component
 public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
     /**
      * 正式排产，对结构按已经分配好的机台产能进行排产
