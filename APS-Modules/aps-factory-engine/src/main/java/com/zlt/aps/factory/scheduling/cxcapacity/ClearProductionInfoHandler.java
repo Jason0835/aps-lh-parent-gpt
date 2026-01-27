@@ -5,6 +5,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import java.util.Map;
  * @date 20260127
  */
 @Slf4j
+@Component
 public class ClearProductionInfoHandler {
 
     /**

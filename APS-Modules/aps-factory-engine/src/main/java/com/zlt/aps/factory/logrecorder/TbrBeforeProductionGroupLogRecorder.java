@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.scheduling.cxcapacity;
+package com.zlt.aps.factory.logrecorder;
 
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
@@ -9,6 +9,7 @@ import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
+import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;

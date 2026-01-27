@@ -10,9 +10,13 @@ import com.zlt.aps.factory.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.enums.ProductionStageEnum;
+import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -35,6 +39,7 @@ import java.util.stream.Collectors;
  * @date 20260127
  */
 @Slf4j
+@Component
 public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
     /**
      * 模拟排产计划

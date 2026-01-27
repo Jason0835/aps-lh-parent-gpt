@@ -15,6 +15,10 @@ import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
+import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrMouldFormalProductionLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
@@ -58,9 +62,20 @@ import java.util.stream.Collectors;
 @Service(value = "tbrCxCapacityAllocationService")
 public class TbrCxCapacityAllocationService extends AbstractProductionBusinessService {
 
+    private final FormalProductionHandler formalProductionHandler;
 
-    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService) {
+    private final SimulateProductionHandler simulateProductionHandler;
+
+    private final ClearProductionInfoHandler clearProductionInfoHandler;
+
+    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
+                                          FormalProductionHandler formalProductionHandler,
+                                          SimulateProductionHandler simulateProductionHandler,
+                                          ClearProductionInfoHandler clearProductionInfoHandler) {
         super(dataService);
+        this.formalProductionHandler = formalProductionHandler;
+        this.simulateProductionHandler = simulateProductionHandler;
+        this.clearProductionInfoHandler = clearProductionInfoHandler;
     }
 
     /**
@@ -130,17 +145,17 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
         //7、进行模拟模具排产
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
-        new SimulateProductionHandler().productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
+        simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
         //10、第二轮排产
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
         //清除模拟排产信息
-        new ClearProductionInfoHandler().clearProductionData(productionContext);
+        clearProductionInfoHandler.clearProductionData(productionContext);
         //重新构建分组计划的硫化组限制信息
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
-        new FormalProductionHandler().productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        formalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
