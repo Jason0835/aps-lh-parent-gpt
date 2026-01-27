@@ -77,6 +77,11 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     private Integer productionQty;
     /**
+     * 原有的排产量
+     * 数据备份
+     */
+    private Integer originProductionQty;
+    /**
      * 是否含有特殊材料 1 含有 0 不含有
      */
     private String isSpecialMaterials;
