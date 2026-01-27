@@ -70,8 +70,8 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 区域
      */
-//    @ImportExcelValidated(required = true, maxLength = 10)
-//    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.areaCode")
+    @ImportExcelValidated(required = true)
+    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.areaCode", type = Excel.Type.IMPORT)
     @ApiModelProperty(value = "区域", name = "areaCode")
     @TableField(value = "AREA_CODE")
     private String areaCode;
@@ -137,8 +137,7 @@ public class MdmAreaCapaAllocation extends BaseEntity {
     /**
      * 区域名称国际化
      */
-    @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.areaCode")
+    @Excel(name = "ui.data.column.mdmAreaCapaAllocation.areaCode", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "区域名称国际化", name = "areaCodeName")
     @TableField(exist = false)
     private String areaCodeNameI18n;
