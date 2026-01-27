@@ -191,6 +191,14 @@ export default {
           width: 120,
           label: this.$t("ui.data.column.monthplan.weekYear"),
         },
+        {
+          prop: "isEudr",
+          label: this.$t("eudr"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
+        },
         // {
         //   prop: "isUniformity",
         //   width: 120,
@@ -227,13 +235,18 @@ export default {
           prop: "scmPriority",
           label: this.$t("ui.data.column.monthplan.scmPriority"),
           type: "select",
-          dictData: this.dict.type.biz_yes_no,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
           prop: "orderPriority",
           label: this.$t("ui.data.column.monthplan.orderPriority"),
           type: "select",
-          dictData: this.dict.type.biz_order_type,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_order_type, value);
+          },
+
         },
         {
           width: 180,

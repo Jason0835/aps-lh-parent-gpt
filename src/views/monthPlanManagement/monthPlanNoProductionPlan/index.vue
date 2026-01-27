@@ -275,7 +275,7 @@ export default {
           minWidth: 120,
         },
 
-        ,
+
         {
           label: this.$t("common.remark"),
           prop: "remark",

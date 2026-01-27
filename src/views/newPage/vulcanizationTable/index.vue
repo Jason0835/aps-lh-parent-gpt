@@ -146,9 +146,9 @@ export default {
           width:320,
         },
         {
-          prop: "mesMaterialCode",
+          prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width:120,
+          width:320,
         },
 
         {
