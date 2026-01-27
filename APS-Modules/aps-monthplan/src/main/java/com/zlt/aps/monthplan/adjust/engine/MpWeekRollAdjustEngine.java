@@ -124,14 +124,17 @@ public class MpWeekRollAdjustEngine {
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //7.优化：其他SKU往前移动
+        //7.其他SKU往前移动前，先重置下开始/结束日
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,false);
+
+        //8.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         otherSkuForwardMove(contextDTO,lockNextDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //8.试制
+        //9.试制
         //1）试制不受胎胚种类数\机台数的限制；
         //2）试制是紧急的，可以在锁定期内插单；普通的，在锁定期外1天插单；
         startTime = new Date();
@@ -140,8 +143,8 @@ public class MpWeekRollAdjustEngine {
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //9.重置开始/结束日
-        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
+        //10.重置开始/结束日及计划量
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,true);
     }
 
     /**
@@ -309,15 +312,18 @@ public class MpWeekRollAdjustEngine {
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //7.优化：其他SKU往前移动
+        //7.重置开始/结束日
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,false);
+
+        //8.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
         otherSkuForwardMove(contextDTO,lockNextDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //9.重置开始/结束日
-        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
+        //10.重置开始/结束日
+        resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList,true);
     }
 
     /**
@@ -1454,7 +1460,7 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 定稿Vo列表
      * @return
      */
-    private void resetBegin2EndDay(int startDay,int endDay,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
+    private void resetBegin2EndDay(int startDay,int endDay,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,boolean resetQty){
         String dayField;
         int accTotalQty;
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList){
@@ -1476,12 +1482,15 @@ public class MpWeekRollAdjustEngine {
             }
             mpFinalVo.setBeginDay(realBeginDay);
             mpFinalVo.setEndDay(realEndDay);
-            //实际调整量 = 累计排产量 - 原实际排产量
-            int oriTotalQty = mpFinalVo.getTotalQty() == null ? 0:mpFinalVo.getTotalQty();
-            mpFinalVo.setActualAdjustQty(accTotalQty - oriTotalQty);
-            mpFinalVo.setTotalQty(accTotalQty);
+            if (resetQty){
+                //实际调整量 = 累计排产量 - 原实际排产量
+                int oriTotalQty = mpFinalVo.getTotalQty() == null ? 0:mpFinalVo.getTotalQty();
+                mpFinalVo.setActualAdjustQty(accTotalQty - oriTotalQty);
+                mpFinalVo.setTotalQty(accTotalQty);
+            }
         }
     }
+
 
     /**
      * 结构调整：新增SKU
