@@ -414,30 +414,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
-//        TbrProductionContext productionContext = (TbrProductionContext) context;
-//        //物料已排产量及损耗量清空
-//        productionContext.resetSkuProductionAndWastageQty();
-//        //处理计划的待排产量及排产标记重置
-//        Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
-//        if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
-//            allSinglePlanMap.forEach((monthPlanId, singlePlan) -> singlePlan.resetProductionDataInfo());
-//        }
-//        //重新构建模具排产信息，全部清空
-//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
-//        if (!CollectionUtils.isEmpty(allMouldInfoMap)) {
-//            allMouldInfoMap.forEach((mouldCode, singleMouldInfo) -> {
-//                singleMouldInfo.setFinishDaySet(new HashSet<>());
-//                singleMouldInfo.setDayProductionInfo(new HashMap<>());
-//            });
-//        }
-//        //清除模壳使用量
-//        productionContext.clearAllMouldShellUsed();
-//        //清除模具分配使用量
-//        productionContext.clearAllMouldAllocationUsed();
-//        //清除胶囊卡盘使用量
-//        productionContext.clearAllCapsuleChuckUsed();
-//        //清除日排产限制使用量
-//        productionContext.clearAllDayLimitUsed();
     }
 
     /**
