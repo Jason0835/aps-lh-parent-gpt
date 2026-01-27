@@ -40,7 +40,6 @@ public class CxContinueProductionHandler {
      * @param context            排产上下文
      * @param productionPlanInfo 分组排产计划
      * @param continueType       续作类型 同规格同花纹 共生胎同模具
-     * @param endDay             分组计划收尾日(理论)
      * @param continueSkuMap     分组计划中续作Sku信息集合
      */
     public static void productionContinueByType(Context context, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {

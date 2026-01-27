@@ -267,6 +267,10 @@ public enum TbrMouldProductionLogType {
      */
     START_CX_MACHINE_GROUP_MOULD_PRODUCTION("30-01-00", "开始分组计划模具排产"),
     /**
+     * 30-01 分组计划模拟模具排产
+     */
+    SIMULATE_MOULD_PRODUCTION("30-01", "分组计划模拟模具排产"),
+    /**
      * 30-01-01 非在机结构模具排产没有排产计划数据
      */
     GROUP_MOULD_NO_PLAN_DATA_CX_MACHINE("30-01-01", "非在机结构模具排产没有排产计划数据"),
