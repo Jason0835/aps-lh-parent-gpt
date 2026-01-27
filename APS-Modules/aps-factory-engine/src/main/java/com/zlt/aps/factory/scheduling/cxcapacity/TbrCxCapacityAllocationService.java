@@ -129,6 +129,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
         //7、进行模拟模具排产
+        log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
         new SimulateProductionHandler().productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);

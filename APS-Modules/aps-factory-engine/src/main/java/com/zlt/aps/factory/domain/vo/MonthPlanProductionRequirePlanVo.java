@@ -97,6 +97,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 本轮次是否参与排产 1 是 0 否
      */
     private Integer isThisRound;
+
     /**
      * 初始的排产数据设置
      * 标记初始的排产标记
@@ -337,6 +338,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return false;
         }
         return hasProduction();
+    }
+
+    /**
+     * 匹配的sku在本轮次是否还有需排产的计划
+     *
+     * @param selectedMaterialDesc 物料描述
+     * @return
+     */
+    public boolean hasThisRoundSelectedProduction(String selectedMaterialDesc) {
+        if (StringUtils.isBlank(selectedMaterialDesc)) {
+            return false;
+        }
+        if (!selectedMaterialDesc.equals(getMaterialDesc())) {
+            return false;
+        }
+        if (YesOrNoEnum.YES.getValue().equals(isThisRound)) {
+            return hasProduction();
+        }
+        return false;
     }
 
     /**

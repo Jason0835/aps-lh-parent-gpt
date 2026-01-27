@@ -20,7 +20,7 @@ public enum ProductionQtyModelEnum {
     /**
      * 1 总净需求量
      */
-    NET_QTY(1, "常规储备量"),
+    NET_QTY(1, "总净需求量"),
     /**
      * 2 总净需求量
      */

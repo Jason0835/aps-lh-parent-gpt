@@ -8,6 +8,7 @@ import com.tlt.aps.enums.LocationTypeEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
@@ -606,6 +607,10 @@ public class MesItfServiceImpl implements MesItfService {
                     // 默认全钢
                     entity.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
                     entity.setProductTypeName(ProductTypeEnum.WHOLE_STEEL.getName());
+                    // 是否不可生产，默认否
+                    if (entity.getCantProduce() == null) {
+                        entity.setCantProduce(ApsConstant.APS_YES_NO_0);
+                    }
                     // 物料类型转换
                     String mesMaterialCategory = entity.getMesMaterialCategory();
                     MouldCategoryConvertEnum convertEnum = MouldCategoryConvertEnum.getByMesCode(mesMaterialCategory);
