@@ -662,7 +662,7 @@ public class TbrProductionGroupLogRecorder {
      * @return
      */
     public static String addGroupNoReachMinAllocationDayLog(Context context, String groupName, Integer maxLeftOverDays, Integer minAllocationDays) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 因成型工装、日产能最打排产天数[%s]不满足最小排产天数[%s]====";
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 因成型工装、日产能最大可排产天数[%s]不满足最小排产天数[%s]====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, maxLeftOverDays, minAllocationDays);
