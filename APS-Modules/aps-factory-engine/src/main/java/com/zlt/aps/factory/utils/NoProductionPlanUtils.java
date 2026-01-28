@@ -75,7 +75,7 @@ public class NoProductionPlanUtils {
 
   public static List<MonthPlanNoProductionPlan> createNoProductionRecordData(List<MonthPlanProductionRequirePlanVo> requirePlanList) {
     List<MonthPlanNoProductionPlan> factoryNoProductionPlanList = new ArrayList<>();
-    requirePlanList.stream().filter(monthPlanInit -> hasNoProduction(monthPlanInit)).forEach(monthPlanInit -> {
+    requirePlanList.stream().filter(NoProductionPlanUtils::hasNoProduction).forEach(monthPlanInit -> {
       MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
       BeanUtils.copyProperties(monthPlanInit, noProductionRecord);
       noProductionRecord.setId(null);
