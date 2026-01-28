@@ -147,6 +147,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 }catch (Exception e){
                     DpDemandPlan demandPlan = currentMonthDemands.get(0);
                     log.info("=====工厂{}, 计划年月：{}-{}, 需求计划版本：{},异常原因:{}====",demandPlan.getFactoryCode(),demandPlan.getYear(),demandPlan.getMonth(),demandPlan.getMonthPlanVersion(),e.getMessage());
+                    break;
                 }
             }
         }
