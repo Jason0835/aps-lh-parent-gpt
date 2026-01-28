@@ -104,9 +104,9 @@ public enum MonthPlanEnums {
      */
     HEIGHT_DIFF_QTY("SYS0204002", "SKU高优先级与总净需求量的差值<=该值，SKU一次性排产"),
     /**
-     * SYS0204003 模具二次上机的间隔时间
+     * SYS0204003 SKU二次上机的间隔时间
      */
-    MOULD_SECOND_PRODUCTION("SYS0204003", "模具二次上机的间隔时间"),
+    SKU_SECOND_PRODUCTION("SYS0204003", "SKU二次上机的间隔时间"),
     /**
      * SYS0204004 SKU排产分类为主销、常规，月均销量>=该值时，月底1-2天可直接补量
      */
