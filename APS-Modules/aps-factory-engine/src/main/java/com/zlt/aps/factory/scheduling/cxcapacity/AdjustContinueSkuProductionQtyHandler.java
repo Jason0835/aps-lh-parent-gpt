@@ -163,6 +163,7 @@ public class AdjustContinueSkuProductionQtyHandler {
                                            CxContinueInfoHelper cxContinueInfo,
                                            TbrProductionContext productionContext) {
 
+    log.info("adjustMaterialProductionQty: materialDesc={},key={},maxAllocationDay={}",materialDesc, plansByMaterial.keySet(),maxAllocationDay);
     // 前置条件检查
     if (!validateAdjustmentConditions(materialDesc, requirePlans, productionContext)) {
       log.info("前置条件检查不通过，无需调整: materialDesc={}", materialDesc);
