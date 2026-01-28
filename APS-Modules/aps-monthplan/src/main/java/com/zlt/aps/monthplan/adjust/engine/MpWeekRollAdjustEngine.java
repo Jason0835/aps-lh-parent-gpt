@@ -226,7 +226,7 @@ public class MpWeekRollAdjustEngine {
                     }
                 }
             }
-            if (iCount <= upLimit){
+            if (iCount < upLimit){
                 return i;
             }
         }
