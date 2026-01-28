@@ -358,12 +358,14 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
 
         List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
         List<String> materialCodeList = last12MonthHistorySaleList.stream().map(MpHistorySaleRecord::getMaterialCode).collect(Collectors.toList());
-        List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000);
-        for (List<String> codeList : materialCodeSplitList) {
-            LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.in(MdmMaterialInfo::getMaterialCode, codeList);
-            List<MdmMaterialInfo> selectList = materialInfoEntityMapper.selectList(queryWrapper);
-            materialInfoList.addAll(selectList);
+        if (CollectionUtils.isNotEmpty(materialCodeList)) {
+            List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000);
+            for (List<String> codeList : materialCodeSplitList) {
+                LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.in(MdmMaterialInfo::getMaterialCode, codeList);
+                List<MdmMaterialInfo> selectList = materialInfoEntityMapper.selectList(queryWrapper);
+                materialInfoList.addAll(selectList);
+            }
         }
 
         Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
