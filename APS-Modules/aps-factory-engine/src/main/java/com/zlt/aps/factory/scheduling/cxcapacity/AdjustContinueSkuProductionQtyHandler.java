@@ -165,11 +165,13 @@ public class AdjustContinueSkuProductionQtyHandler {
 
     // 前置条件检查
     if (!validateAdjustmentConditions(materialDesc, requirePlans, productionContext)) {
+      log.info("前置条件检查不通过，无需调整: materialDesc={}", materialDesc);
       return;
     }
     // 计算调整相关的高优先级产量
     int adjustHeightProductionQty = calculateAdjustHeightProductionQty(materialDesc, plansByMaterial, productionContext);
     if (adjustHeightProductionQty == 0) {
+      log.info("计算调整相关的高优先级产量=0，无需调整: materialDesc={}, adjustHeightProductionQty={}", materialDesc, adjustHeightProductionQty);
       return;
     }
 
