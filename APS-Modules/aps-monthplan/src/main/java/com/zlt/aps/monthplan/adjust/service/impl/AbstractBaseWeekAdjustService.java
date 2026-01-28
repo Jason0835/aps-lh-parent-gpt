@@ -437,7 +437,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 新增月度生产计划
         try {
-            baseDao.saveBatch(factoryMonthPlanProdFinalList);
+            baseDao.insertBatch(factoryMonthPlanProdFinalList);
             log.info("新增月度生产计划成功，共新增:{}条记录", factoryMonthPlanProdFinalList.size());
         } catch (Exception e) {
             log.error("新增月度生产计划批量操作异常", e);
