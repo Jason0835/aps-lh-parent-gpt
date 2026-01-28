@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
+import com.ruoyi.common.core.utils.SpringUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.enums.ProductTypeEnum;
@@ -140,7 +141,15 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //6、对续作结构进行在产成型机台分配(在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
-        //7、进行模拟模具排产
+        // 7、详设:
+        //      （5）特别场景：在排产时，我们的原则是续作优先，若共用模具情况下，续作高优先级的已没有，
+        //                   存在续作中优先级的，但有高优先级。这时，续作中优先级的要先排？
+        //             		   处理方案：首先，需要算一下模具的产能，如果能把高优先级+续作的中优先级全部能包过来，那么就续作优先；
+        //                   如果不能包过来，就需要把中优先级中途下机，下机的时间点是，剩余的模具产能，正好能把高优先级产完。
+
+        AdjustContinueSkuProductionQtyHandler  adjustContinueSkuProductionQtyHandler = SpringUtils.getBean(AdjustContinueSkuProductionQtyHandler.class);
+        adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap,continueAllocationList,cxContinueInfoMap,productionContext);
+        //8、进行模拟模具排产
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
         simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
