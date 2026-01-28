@@ -568,7 +568,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.MOULD_SECOND_PRODUCTION.getCode());
+        paramCodeList.add(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_AVERAGE_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
@@ -603,7 +603,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setBoostAverageValue((Integer) paramConfigurationMap.get(MonthPlanEnums.BOOST_AVERAGE_VALUE.getCode()));
-        configuration.setMouldSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.MOULD_SECOND_PRODUCTION.getCode()));
+        configuration.setMouldSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
         configuration.setHeightDiffQty((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode()));
         configuration.setSumProductionQty((Integer) paramConfigurationMap.get(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode()));
         //日排产相关

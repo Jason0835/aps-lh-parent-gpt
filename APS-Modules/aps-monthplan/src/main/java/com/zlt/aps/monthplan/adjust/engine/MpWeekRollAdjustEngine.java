@@ -226,7 +226,7 @@ public class MpWeekRollAdjustEngine {
                     }
                 }
             }
-            if (iCount <= upLimit){
+            if (iCount < upLimit){
                 return i;
             }
         }
@@ -1285,7 +1285,7 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         //1.排序(量试->正式),量试中按紧急程度升序，正式中按用户调整优先级升序
-        List<MpAdjustStructureIn> incAdjustBatchTrailList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.MEASUREMENT.getStage().equals(x.getConstructionStage()))
+        List<MpAdjustStructureIn> incAdjustBatchTrailList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(x.getConstructionStage()))
                 .sorted(Comparator.comparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
         List<MpAdjustStructureIn> incAdjustFormalList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(x.getConstructionStage()))
                 .sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
