@@ -9,6 +9,8 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -40,6 +42,15 @@ public interface IMdmMsgTemplateUserRelRemoteService {
     @ApiOperation("消息模板绑定用户")
     @PostMapping("/msgTemplateUserRel/bindUsers")
     AjaxResult bindUsers(@RequestBody MdmMsgTemplateUserRel mdmMsgTemplateUserRel);
+
+    /**
+     * 消息模板绑定用户
+     */
+    @ApiOperation("消息模板绑定用户")
+    @PostMapping("/msgTemplateUserRel/batchGetAssociatedUsers")
+    Map<String, String> batchGetAssociatedUsers(@RequestBody List<String> templateCodes);
+
+
 
     /**
     * 新增消息模板关联用户
