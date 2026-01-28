@@ -153,11 +153,11 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             String cxMachineCode = machineFixed.getCxMachineCode();
             machineCodeList.add(cxMachineCode);
 
-            List<String> fixedMaterialCodeList = machineFixed.getSplitFixedMaterialCode();
-            List<String> disableMaterialCodeList = machineFixed.getSplitDisableFixedMaterialCode();
+            List<String> fixedMaterialDescList = machineFixed.getSplitFixedMaterialDesc();
+            List<String> disableMaterialDescList = machineFixed.getSplitDisableFixedMaterialDesc();
 
-            materialDescList.addAll(fixedMaterialCodeList);
-            materialDescList.addAll(disableMaterialCodeList);
+            materialDescList.addAll(fixedMaterialDescList);
+            materialDescList.addAll(disableMaterialDescList);
         }
         if (CollectionUtils.isNotEmpty(machineCodeList)) {
             LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
@@ -189,11 +189,11 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
         if (serviceCheckParams.containsKey("materialInfoMap")) {
             Map<String, MdmMaterialInfo> materialInfoMap = (Map<String, MdmMaterialInfo>) serviceCheckParams.get("materialInfoMap");
 
-            List<String> splitFixedMaterialCode = importDocEntity.getSplitFixedMaterialCode();
-            List<String> splitDisableFixedMaterialCode = importDocEntity.getSplitDisableFixedMaterialCode();
+            List<String> splitFixedMaterialDesc = importDocEntity.getSplitFixedMaterialDesc();
+            List<String> splitDisableFixedMaterialDesc = importDocEntity.getSplitDisableFixedMaterialDesc();
 
             List<String> fixedMaterialCodeList = new ArrayList<>();
-            for (String materialDesc : splitFixedMaterialCode) {
+            for (String materialDesc : splitFixedMaterialDesc) {
                 String key = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), materialDesc);
                 if (materialInfoMap.containsKey(key)) {
                     fixedMaterialCodeList.add(materialInfoMap.get(key).getMaterialCode());
@@ -205,7 +205,7 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             importDocEntity.setFixedMaterialCode(StringUtils.join(fixedMaterialCodeList, ","));
 
             List<String> disableFixedMaterialCodeList = new ArrayList<>();
-            for (String materialDesc : splitDisableFixedMaterialCode) {
+            for (String materialDesc : splitDisableFixedMaterialDesc) {
                 String key = GenerageMapKeyUtils.createMapKey(importDocEntity.getFactoryCode(), materialDesc);
                 if (materialInfoMap.containsKey(key)) {
                     disableFixedMaterialCodeList.add(materialInfoMap.get(key).getMaterialCode());

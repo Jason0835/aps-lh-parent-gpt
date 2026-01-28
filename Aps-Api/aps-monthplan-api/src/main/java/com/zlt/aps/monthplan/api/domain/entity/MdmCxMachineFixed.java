@@ -91,6 +91,15 @@ public class MdmCxMachineFixed extends BaseEntity {
     private String fixedMaterialCode;
 
     /**
+     * 固定物料描述  多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedMaterialDesc")
+    @ApiModelProperty(value = "固定物料描述  多个以,分隔拼接", name = "fixedMaterialDesc")
+    @TableField(value = "FIXED_MATERIAL_DESC", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedMaterialDesc;
+
+    /**
      * 不可作业结构  多个以,分隔拼接
      */
     @ImportExcelValidated(maxLength = 500)
@@ -108,6 +117,15 @@ public class MdmCxMachineFixed extends BaseEntity {
     @TableField(value = "DISABLE_MATERIAL_CODE", updateStrategy = FieldStrategy.IGNORED)
     private String disableMaterialCode;
 
+    /**
+     * 不可作业物料描述  多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.disableMaterialDesc")
+    @ApiModelProperty(value = "不可作业物料描述  多个以,分隔拼接", name = "disableMaterialDesc")
+    @TableField(value = "DISABLE_MATERIAL_DESC", updateStrategy = FieldStrategy.IGNORED)
+    private String disableMaterialDesc;
+
     public List<String> getSplitFixedMaterialCode() {
         String fixedMaterialCode = StringUtils.defaultIfBlank(this.fixedMaterialCode, "");
         return Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
@@ -118,4 +136,13 @@ public class MdmCxMachineFixed extends BaseEntity {
         return Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
     }
 
+    public List<String> getSplitFixedMaterialDesc() {
+        String fixedMaterialDesc = StringUtils.defaultIfBlank(this.fixedMaterialDesc, "");
+        return Arrays.stream(fixedMaterialDesc.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitDisableFixedMaterialDesc() {
+        String disableMaterialDesc = StringUtils.defaultIfBlank(this.disableMaterialDesc, "");
+        return Arrays.stream(disableMaterialDesc.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+    }
 }
