@@ -24,6 +24,8 @@ public class InitNoProductionRecordService {
     }
     //生成不排产数据
     MonthPlanNoProductionPlan  noProductionRecord = NoProductionPlanUtils.createNoProductionRecordData(requirePlan);
-    noProductionRecordMap.put(noProductionRecord.getMonthPlanId(), noProductionRecord);
+    if(noProductionRecord != null) {
+      noProductionRecordMap.put(noProductionRecord.getMonthPlanId(), noProductionRecord);
+    }
   }
 }
