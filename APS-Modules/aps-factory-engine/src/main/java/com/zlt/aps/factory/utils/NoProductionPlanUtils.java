@@ -45,7 +45,7 @@ public class NoProductionPlanUtils {
         return;
       }
       // 即没有排产计划，又不是不排产计划
-      if (unProductionQty > BigDecimal.ZERO.longValue()) {
+      if (unProductionQty > BigDecimal.ZERO.intValue()) {
         noProductionPlanList.add(noProductionPlan);
       }
     });
