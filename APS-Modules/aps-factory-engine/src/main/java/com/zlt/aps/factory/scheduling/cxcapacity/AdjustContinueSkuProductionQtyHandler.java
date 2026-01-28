@@ -257,8 +257,10 @@ public class AdjustContinueSkuProductionQtyHandler {
     List<ProductionMouldInfoVo> mouldInfos = productionContext.findMouldInfoByMaterialDesc(materialDesc);
     Set<String> intersectionMaterials = getIntersectionOfMaterialSets(mouldInfos);
     if (CollectionUtils.isEmpty(intersectionMaterials)) {
+      log.info("calculateAdjustHeightProductionQty: materialDesc={},没有交集", materialDesc);
       return 0;
     }
+    log.info("calculateAdjustHeightProductionQty: materialDesc={}, intersectionMaterials={}", materialDesc, intersectionMaterials);
     return plansByMaterial.entrySet().stream()
         .filter(entry -> !materialDesc.equals(entry.getKey()))
         .filter(entry -> intersectionMaterials.contains(entry.getKey()))
