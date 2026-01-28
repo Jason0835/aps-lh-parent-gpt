@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.domain.SysUser;
 import com.ruoyi.api.gateway.system.service.ISysUserService;
-import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.SecurityUtils;
-import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -72,16 +70,16 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
     @Override
     public String checkUnique(MpTrialPlan docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
-        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+        /*if (UserConstants.NOT_UNIQUE.equals(unique)) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpTrialPlan.notUnique"));
-        }
+        }*/
         return unique;
     }
 
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "materialCode", "trialType", "trialStatus"));
+        return new ArrayList<>();
     }
 
     @Override
