@@ -53,7 +53,7 @@ export default {
       isEdit: false,
       editType: null,
       form: {},
-      oldFixedStructure1:[],
+      oldFixedStructure1: [],
       rules: {
         factoryCode: [
           {
@@ -201,6 +201,11 @@ export default {
           },
         },
         {
+          prop: "fixedMaterialDesc",
+          label: this.$t("固定物料描述"),
+          disabled: true,
+        },
+        {
           prop: "disableMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
           maxlength: 500,
@@ -213,6 +218,11 @@ export default {
               />
             );
           },
+        },
+        {
+          prop: "disableMaterialDesc",
+          label: this.$t("不可作业物料描述"),
+          disabled: true,
         },
       ];
     },
@@ -268,9 +278,9 @@ export default {
         // const merged = [...odlList, ...newList];
         // const unique = [...new Set(merged)];
         // let resultList = unique.join(",");
-       this.oldFixedStructure1=row
+        this.oldFixedStructure1 = row;
       } else {
-       this.oldFixedStructure1=[]
+        this.oldFixedStructure1 = [];
       }
     },
   },

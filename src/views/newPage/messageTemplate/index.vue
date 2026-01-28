@@ -162,6 +162,12 @@ export default {
         {
           prop: "content",
           label: this.$t("内容"),
+          width: 400,
+        },
+        {
+          prop: "userName",
+          label: this.$t("关联用户"),
+          width: 200,
         },
         {
           prop: "remark",

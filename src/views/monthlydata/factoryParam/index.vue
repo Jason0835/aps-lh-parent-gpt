@@ -203,6 +203,10 @@ export default {
           prop: "paramName",
           label: this.$t("common.api.config.columnname.name"),
         },
+        {
+          prop: "paramCode",
+          label: this.$t("参数编码"),
+        },
       ];
     },
   },

@@ -1064,10 +1064,10 @@ export default {
 
     addSuccessFun() {
       this.$set(this.page, "current", 1);
-      this.$set(this.search, "productionVersion", "");
-      this.$set(this.query, "productionVersion", "");
-
-      this.getList();
+      // this.$set(this.search, "productionVersion", "");
+      // this.$set(this.query, "productionVersion", "");
+      this.getVersionList(true);
+      // this.getList();
     },
     handleRowClick(row) {
       if (this.expands.includes(row.id)) {
@@ -1274,9 +1274,6 @@ export default {
     },
     //确认调整结果
     async confirmResult() {
-
-
-
       try {
         this.show = false;
         this.loading = true;
@@ -1301,14 +1298,19 @@ export default {
         //   params.isMove = this.formInline.isMove;
         // }
         let res = await confirmAdjust(params);
-        // this.show = false;
+
         this.$modal.msgSuccess(res.msg);
-        // this.backPlan();
-        this.showOutResult = true;
-        this.isShowFoot = false;
-        this.isEdit = false;
-        this.data = [];
-        this.outResultData = [];
+        if (this.activeName == "singleResult") {
+          this.showOutResult = true;
+          this.isShowFoot = false;
+          this.isEdit = false;
+          this.data = [];
+          this.outResultData = [];
+          this.loading = false;
+        } else {
+          this.show = false;
+          this.backPlan();
+        }
       } catch (err) {
         this.loading = false;
         this.show = true;

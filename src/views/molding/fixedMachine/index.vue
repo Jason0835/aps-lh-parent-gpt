@@ -30,7 +30,7 @@
           type="danger"
           v-hasPermi="['monthplan:mdmCxMachineFixed:remove']"
           @click="handleDeleteAll"
-          :disabled="selection.length==0"
+          :disabled="selection.length == 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
@@ -85,9 +85,15 @@ export default {
   components: {
     tltUpload,
     infoDialog,
-    TltUploadForm
+    TltUploadForm,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_class_type','biz_machine_brand'],
+  dicts: [
+    "LINE_TYPE",
+    "JOB_TYPE",
+    "biz_factory_name",
+    "biz_class_type",
+    "biz_machine_brand",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -139,47 +145,57 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-          width:120,
+          width: 120,
         },
         {
           prop: "cxMachineCode",
           label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
-          width:120,
+          width: 120,
         },
         {
           prop: "fixedStructure1",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
-          width:300
+          width: 300,
         },
         {
           prop: "fixedStructure2",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
-          width:300
+          width: 300,
         },
         {
           prop: "fixedStructure3",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
-          width:300
+          width: 300,
         },
         {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
-          width:300
+          width: 300,
+        },
+        {
+          prop: "fixedMaterialDesc",
+          label: this.$t("固定物料描述"),
+          width: 300,
         },
         {
           prop: "disableStructure",
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),
-          width:300
+          width: 300,
         },
-      {
+        {
           prop: "disableMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
-          width:300
+          width: 300,
+        },
+        {
+          prop: "disableMaterialDesc",
+          label: this.$t("不可作业物料描述"),
+          width: 300,
         },
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
-          width:200,
+          width: 200,
           render: ({ row }) => {
             return (
               <div>
@@ -209,8 +225,7 @@ export default {
     },
     searchColumns() {
       return [
-
-      {
+        {
           label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
@@ -219,22 +234,18 @@ export default {
         {
           label: this.$t("ui.data.column.workWearInfo.cxMachineCode"),
           prop: "cxMachineCode",
-
         },
         {
           prop: "fixedStructure1",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
-
         },
         {
           prop: "fixedStructure2",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
-
         },
         {
           prop: "fixedStructure3",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
-
         },
         {
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),
@@ -275,7 +286,7 @@ export default {
         if (i == this.selection.length - 1) {
           ids = ids + this.selection[i].id;
         } else {
-          ids = ids +  this.selection[i].id + ",";
+          ids = ids + this.selection[i].id + ",";
         }
       }
       this.$confirm(this.$t("common.confirm.delete"), {
@@ -317,7 +328,10 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/monthplan/mdmCxMachineFixed/export", this.formatParams(false));
+      downloadLink(
+        "/monthplan/mdmCxMachineFixed/export",
+        this.formatParams(false)
+      );
     },
 
     formatParams(hasPage = true) {
@@ -345,8 +359,8 @@ export default {
         this.loading = true;
 
         const data = await listCxMachineFixed(this.formatParams());
-        this.data =data.rows;
-        this.page.total =data.total;
+        this.data = data.rows;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {

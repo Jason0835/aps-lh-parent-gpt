@@ -46,13 +46,13 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <!-- <tlt-upload
+    <tlt-upload
       ref="tltUpload"
       downloadUrl="/monthplan/mpTrialPlan/importTemplate"
       uploadUrl="/monthplan/mpTrialPlan/importData"
       @uploadSuccess="getList"
-    /> -->
-    <tlt-upload-form
+    />
+    <!-- <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
       downloadUrl="/monthplan/mpTrialPlan/importTemplate"
@@ -60,7 +60,7 @@
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
-    ></tlt-upload-form>
+    ></tlt-upload-form> -->
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>

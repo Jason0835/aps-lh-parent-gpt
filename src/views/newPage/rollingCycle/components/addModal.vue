@@ -223,10 +223,13 @@ export default {
         };
       }
       this.$nextTick(()=>{
-        this.yearMonthChange()
+        let arr = this.form.yearMonth.split("-");
+      this.daysNum=this.getDaysInMonth(arr[0],arr[1])
       })
     },
     yearMonthChange() {
+      this.$set(this.form,'beginDay','')
+      this.$set(this.form,'endDay','')
       let arr = this.form.yearMonth.split("-");
       this.daysNum=this.getDaysInMonth(arr[0],arr[1])
     },

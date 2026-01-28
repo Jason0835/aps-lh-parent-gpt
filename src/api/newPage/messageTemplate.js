@@ -26,3 +26,13 @@ export function removeTemplate(query) {
 
   })
 }
+
+
+export function bindUserTemplate(query) {
+  return request({
+    url: '/monthplan/msgTemplateUserRel/bindUsers',
+    method: 'post',
+    data: query,
+
+  })
+}

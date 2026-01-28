@@ -42,8 +42,8 @@
 <script>
 
 
-import { listTemplate, removeTemplate } from "@/api/newPage/messageTemplate";
-import {addUser, changeUserStatus, delUser, deptTreeSelect, getUser, listUser, resetUserPwd, updateUser,} from "@/api/system/user";
+import {  bindUserTemplate } from "@/api/newPage/messageTemplate";
+import {listUser,} from "@/api/system/user";
 //components
 
 export default {
@@ -70,6 +70,7 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      actionData:{}
     };
   },
   computed: {
@@ -121,6 +122,7 @@ export default {
   methods: {
     show(data) {
       this.visible = true;
+      this.actionData=data
       this.getList()
     },
     hide() {
@@ -173,11 +175,26 @@ export default {
       return params;
     },
     async handleConfirm() {
+      if(this.selection.length==0){
+        return this.$modal.msgWarning('请先选择用户');
+      }
+      let params={
+        ...this.actionData
+      }
       try {
         this.loading = true;
+        let userList=''
+        for (let i = 0; i < this.selection.length; i++) {
+         if(i==this.selection.length-1){
+          userList+=this.selection[i].userName
+         }else{
+          userList+=this.selection[i].userName+','
+         }
 
-        // const res = await editTemplate(params);
-        // this.$modal.msgSuccess(res.msg);
+        }
+        params.userName=userList
+        const res = await bindUserTemplate(params);
+        this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
 
