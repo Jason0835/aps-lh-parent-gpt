@@ -2,12 +2,13 @@
   <el-dialog
     title="关联用户"
     :visible="visible"
-    width="800px"
+    width="900px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
     :append-to-body="true"
   >
+  <div style="height:400px;">
     <page-table
       :calcHeight="true"
       tableRef="cxFixedMachineMainTable"
@@ -27,6 +28,8 @@
       :toolbar="false"
     >
     </page-table>
+  </div>
+
     <template slot="footer">
       <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{
@@ -40,7 +43,7 @@
 
 
 import { listTemplate, removeTemplate } from "@/api/newPage/messageTemplate";
-
+import {addUser, changeUserStatus, delUser, deptTreeSelect, getUser, listUser, resetUserPwd, updateUser,} from "@/api/system/user";
 //components
 
 export default {
@@ -76,20 +79,20 @@ export default {
         { type: "selection", fixed: "left" },
 
         {
-          prop: "登录账号",
+          prop: "userName",
           label: this.$t("登录账号"),
         },
 
         {
-          prop: "用户名称",
+          prop: "nickName",
           label: this.$t("用户名称"),
         },
         {
-          prop: "部门名称",
+          prop: "deptName",
           label: this.$t("部门名称"),
         },
         {
-          prop: "手机号码",
+          prop: "phonenumber",
           label: this.$t("手机号码"),
         },
       ];
@@ -99,17 +102,17 @@ export default {
     searchColumns() {
       return [
         {
-          prop: "登录账号",
+          prop: "userName",
           label: this.$t("登录账号"),
         },
 
         {
-          prop: "用户名称",
+          prop: "nickName",
           label: this.$t("用户名称"),
         },
 
         {
-          prop: "手机号码",
+          prop: "phonenumber",
           label: this.$t("手机号码"),
         },
       ];
@@ -118,6 +121,7 @@ export default {
   methods: {
     show(data) {
       this.visible = true;
+      this.getList()
     },
     hide() {
       this.visible = false;
@@ -187,7 +191,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listTemplate(this.formatParams());
+        const data = await listUser(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

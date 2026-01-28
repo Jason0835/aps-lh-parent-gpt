@@ -17,7 +17,7 @@
       <el-form-item :label="$t('common.messageTask.msgSource')" prop="msgSource">
         <el-select v-model="queryParams.msgSource" :placeholder="$t('common.messageTask.msgSource')" clearable>
           <el-option
-            v-for="dict in dict.type.msg_channel"
+            v-for="dict in dict.type.msg_source"
             :key="dict.value"
             :label="dict.label"
             :value="dict.value"
@@ -69,7 +69,7 @@
           <dict-tag :options="dict.type.msg_source" :value="scope.row.msgSource"/>
         </template>
       </t-table-column>
-      <t-table-column :label="$t('common.messageTask.msgSource')" align="center" prop="msgStatus" width="100">
+      <t-table-column :label="$t('common.messageTask.msgStatus')" align="center" prop="msgStatus" width="100">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.msg_status" :value="scope.row.msgStatus"/>
         </template>
@@ -196,7 +196,7 @@ export default {
     };
   },
   created() {
-    // this.getList();
+    this.getList();
   },
   activated(){
     this.$nextTick(() => {

@@ -51,14 +51,14 @@ export default {
       form: {},
       rules: {
 
-        模板编码: [
+        templateCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        模板名称: [
+        templateName: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -94,19 +94,19 @@ export default {
     columns() {
       return [
         {
-          prop: "模板编码",
+          prop: "templateCode",
           label: this.$t("模板编码"),
         },
         {
-          prop: "模板名称",
+          prop: "templateName",
           label: this.$t("模板名称"),
         },
         {
-          prop: "标题",
+          prop: "title",
           label: this.$t("标题"),
         },
         {
-          prop: "内容",
+          prop: "content",
           label: this.$t("内容"),
         },
 

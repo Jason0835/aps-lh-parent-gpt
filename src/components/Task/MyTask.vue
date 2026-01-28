@@ -17,7 +17,7 @@
       <el-form-item :label="$t('common.messageTask.msgSource')" prop="msgSource">
         <el-select v-model="queryParams.msgSource" :placeholder="$t('common.messageTask.msgSource')" clearable>
           <el-option
-            v-for="dict in dict.type.msg_channel"
+            v-for="dict in dict.type.msg_source"
             :key="dict.value"
             :label="dict.label"
             :value="dict.value"
@@ -211,7 +211,7 @@ export default {
     };
   },
   created() {
-    // this.getList();
+    this.getList();
   },
   // mounted() {
   //   this.$nextTick(() => {

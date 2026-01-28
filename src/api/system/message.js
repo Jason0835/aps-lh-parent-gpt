@@ -21,7 +21,8 @@ export function messageListNoticeMessage(data) {
 // 查询待办任务消息接口
 export function messageListTaskMessage(data) {
   return request({
-    url: '/message/messageCenter/listTaskMessage',
+    // url: '/message/messageCenter/listTaskMessage',
+    url: '/message/messageTaskList/list',
     method: 'post',
     headers: {
       'Content-Type': 'application/json;charset=UTF-8'

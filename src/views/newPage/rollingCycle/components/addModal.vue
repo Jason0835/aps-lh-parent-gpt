@@ -43,7 +43,7 @@ import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue"
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm, formingCapacitySelect,structureSelect },
+  components: { infoForm, formingCapacitySelect, structureSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -52,8 +52,8 @@ export default {
       isEdit: false,
       editType: null,
       form: {
-        beginDay:'',
-        endDay:''
+        beginDay: "",
+        endDay: "",
       },
       rules: {
         cxMachineCode: [
@@ -99,6 +99,7 @@ export default {
           },
         ],
       },
+      daysNum:0
     };
   },
   computed: {
@@ -125,7 +126,7 @@ export default {
             return (
               <formingCapacitySelect
                 factoryCode={form.cxMachineCode}
-                key='formCxMachineCode'
+                key="formCxMachineCode"
                 v-model={form.cxMachineCode}
               />
             );
@@ -138,7 +139,7 @@ export default {
           render: (form) => {
             return (
               <structureSelect
-                key='formStructureName'
+                key="formStructureName"
                 v-model={form.structureName}
               />
             );
@@ -151,13 +152,15 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.yearMonthChange,
+          },
         },
         {
           prop: "beginDay",
           label: this.$t("开始日期"),
           render: (form) => {
-
-            const days = Array.from({ length: 31 }, (_, i) => i + 1);
+            const days = Array.from({ length: this.daysNum }, (_, i) => i + 1);
             return (
               <el-select v-model={form.beginDay}>
                 {days.map((item) => (
@@ -171,7 +174,7 @@ export default {
           prop: "endDay",
           label: this.$t("结束日期"),
           render: (form) => {
-            const days = Array.from({ length: 31 }, (_, i) => i + 1);
+            const days = Array.from({ length: this.daysNum }, (_, i) => i + 1);
             return (
               <el-select v-model={form.endDay}>
                 {days.map((item) => (
@@ -219,6 +222,18 @@ export default {
           factoryCode: "116",
         };
       }
+      this.$nextTick(()=>{
+        this.yearMonthChange()
+      })
+    },
+    yearMonthChange() {
+      let arr = this.form.yearMonth.split("-");
+      this.daysNum=this.getDaysInMonth(arr[0],arr[1])
+    },
+    getDaysInMonth(year, month) {
+      // 月份从0开始（0=1月，11=12月）
+      // 下个月的第0天就是本月的最后一天
+      return new Date(year, month, 0).getDate();
     },
     hide() {
       this.form = {};

@@ -69,7 +69,7 @@ import {
 } from "@/api/monthplan/monthPlanNoProductionPlan.js";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import { mapState,mapGetters} from "vuex";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -115,6 +115,7 @@ export default {
     };
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     columns() {
       let columns = [
         {
@@ -351,6 +352,13 @@ export default {
         {
           label: this.$t("ui.data.column.confMinProd.pattern"),
           prop: "pattern",
+        },
+        {
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData:this.structureList,
+          filterable: true
         },
         // {
         //   label: this.$t("ui.data.column.mouldingDayResult.mouldNo"),

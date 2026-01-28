@@ -101,6 +101,12 @@ export default {
           label: this.$t("产品品类"),
           prop: "productTypeCode",
           align: "center",
+          formatter: (row) => {
+            return this.selectDictLabel(
+              this.parentDict.type.biz_product_type,
+              row.productTypeCode
+            );
+          },
 
           // render: ({ row }) => {
           //   return (
