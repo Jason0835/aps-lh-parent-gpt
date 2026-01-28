@@ -33,17 +33,19 @@ public class NoProductionPlanUtils {
       int unProductionQty = needProductionQty - plannedQty;
       String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
       noProductionPlan.setIsProduction(isProduction);
-      if(unProductionQty == 0) {
-        return;
-      }
-      if(!sumProductionMap.containsKey(monthPlanId)) {
-        noProductionPlan.setUnProductionQty(unProductionQty);
+      noProductionPlan.setUnProductionQty(unProductionQty);
+      //有排产计划，则取排产数量
+      if (sumProductionMap.containsKey(monthPlanId) && unProductionQty > BigDecimal.ZERO.intValue()) {
         noProductionPlanList.add(noProductionPlan);
         return;
       }
       //不排产计划
       if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
-        noProductionPlan.setUnProductionQty(needProductionQty);
+         noProductionPlanList.add(noProductionPlan);
+        return;
+      }
+      // 即没有排产计划，又不是不排产计划
+      if (unProductionQty > BigDecimal.ZERO.intValue()) {
         noProductionPlanList.add(noProductionPlan);
       }
     });
@@ -73,7 +75,7 @@ public class NoProductionPlanUtils {
 
   public static List<MonthPlanNoProductionPlan> createNoProductionRecordData(List<MonthPlanProductionRequirePlanVo> requirePlanList) {
     List<MonthPlanNoProductionPlan> factoryNoProductionPlanList = new ArrayList<>();
-    requirePlanList.stream().filter(monthPlanInit -> hasNoProduction(monthPlanInit)).forEach(monthPlanInit -> {
+    requirePlanList.stream().filter(NoProductionPlanUtils::hasNoProduction).forEach(monthPlanInit -> {
       MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
       BeanUtils.copyProperties(monthPlanInit, noProductionRecord);
       noProductionRecord.setId(null);

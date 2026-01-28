@@ -87,6 +87,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
+import static com.zlt.aps.common.core.utils.ApsCommonUtil.getIntOrDefault;
 
 /**
  * 周程滚动调整通用抽象类
@@ -461,20 +462,32 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 调整结果按照物料编号分组
-        Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
+        Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
+        // 月度生产计划列表
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanProdList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 生产计划列表按照物料编码进行分组
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap = monthPlanProdList.stream()
+                .collect(Collectors.groupingBy(FactoryMonthPlanFinalAdjustVo::getMaterialCode));
         // 遍历调整明细列表匹配调整结果(更新实际调整、调整原因)
         for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
             String materialCode = adjustDetailVo.getMaterialCode();
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
             if (adjustResult == null) {
                 log.warn("更新调整明细：物料编号:{}未查询到对应调整结果，跳过", materialCode);
                 continue;
             }
-            // 实际调整
-            adjustDetailVo.setActualAdjustQty(adjustResult.getTotalPlanQty());
+            Integer totalPlanQty = Convert.toInt(adjustResult.getTotalPlanQty(), 0);
+            Integer actualAdjustQty = totalPlanQty;
+            if (totalPlanQty > 0 && !ApsConstant.TRUE.equals(adjustDetailVo.getIsSkuAdd())) {
+                List<FactoryMonthPlanFinalAdjustVo> monthPLanList = monthPlanMap.getOrDefault(materialCode, new ArrayList<>());
+                Integer totalQty = monthPLanList.stream().mapToInt(v -> getIntOrDefault(v.getTotalQty())).sum();
+                actualAdjustQty = totalPlanQty - totalQty;
+            }
+            // 设置实际调整
+            adjustDetailVo.setActualAdjustQty(actualAdjustQty);
             // 调整原因 TODO
 //            adjustDetailVo.setAdjustReason("");
         }

@@ -1,7 +1,9 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
+import com.ruoyi.common.core.utils.SpringUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
+import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
@@ -36,6 +38,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 工厂TBR业务轮胎成型产能分配
@@ -65,14 +68,18 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
+    private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
+
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
                                           FormalProductionHandler formalProductionHandler,
                                           SimulateProductionHandler simulateProductionHandler,
-                                          ClearProductionInfoHandler clearProductionInfoHandler) {
+                                          ClearProductionInfoHandler clearProductionInfoHandler,
+                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService);
         this.formalProductionHandler = formalProductionHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
+        this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
     }
 
     /**
@@ -140,7 +147,13 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //6、对续作结构进行在产成型机台分配(在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
-        //7、进行模拟模具排产
+        // 7、详设:
+        //      （5）特别场景：在排产时，我们的原则是续作优先，若共用模具情况下，续作高优先级的已没有，
+        //                   存在续作中优先级的，但有高优先级。这时，续作中优先级的要先排？
+        //             		   处理方案：首先，需要算一下模具的产能，如果能把高优先级+续作的中优先级全部能包过来，那么就续作优先；
+        //                   如果不能包过来，就需要把中优先级中途下机，下机的时间点是，剩余的模具产能，正好能把高优先级产完。
+        adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap, productionContext);
+        //8、进行模拟模具排产
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
         simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
@@ -550,6 +563,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.MOULD_SECOND_PRODUCTION.getCode());
+        paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_AVERAGE_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
@@ -575,6 +589,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         configuration.setMinProductionDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode()));
         configuration.setMinAllocationDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode()));
         configuration.setNoCycleProductionMinLhMachineNumber((Integer) paramConfigurationMap.get(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode()));
+        String boostProductionTypeValue = (String) paramConfigurationMap.get(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
+        if (StringUtils.isBlank(boostProductionTypeValue)) {
+            configuration.setBoostProductionType(Collections.emptySet());
+        } else {
+            configuration.setBoostProductionType(Stream.of(boostProductionTypeValue.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setBoostAverageValue((Integer) paramConfigurationMap.get(MonthPlanEnums.BOOST_AVERAGE_VALUE.getCode()));
         configuration.setMouldSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.MOULD_SECOND_PRODUCTION.getCode()));
@@ -740,9 +760,10 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private void setMonthProductionDays(Context context) {
         List<ProductionDayInfoVo> productionDayInfoList = getDataService().getProductCalendar(context);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
+        Integer maxBoostDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMaxBoostDay();
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
             context.setCapacityRatioMap(Collections.emptyMap());
-            context.setStopDays(Collections.emptySet());
+            context.setStopDays(Collections.emptySet(), maxBoostDays);
             throw new BusinessException(I18nUtil.getMessage("alg.data.production.noConfigurationCalendar"));
         }
         //排产开始日
@@ -762,7 +783,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderStopCalendarLog(context, stopDays));
         if (CollectionUtils.isEmpty(stopDays)) {
-            context.setStopDays(Collections.emptySet());
+            context.setStopDays(Collections.emptySet(), maxBoostDays);
             return;
         }
         Set<Integer> stopDaySet = new HashSet<>(context.getMonthDays());
@@ -771,8 +792,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             Integer stopDay = com.zlt.aps.factory.utils.DateUtils.getIntervalDays(productionStartDate, stopProduction);
             stopDaySet.add(stopDay);
         });
-        context.setStopDays(stopDaySet);
-
+        context.setStopDays(stopDaySet, maxBoostDays);
     }
 
     /**

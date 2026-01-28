@@ -101,6 +101,10 @@ public class Context {
      * 停产日后的首日即为开产
      */
     private Set<Integer> productionDayAfterStop;
+    /**
+     * 可进行月底补量的天数
+     */
+    private Set<Integer> replenishmentDay;
 
     /**
      * 判断排产日是否为排产周期的第一天
@@ -152,10 +156,12 @@ public class Context {
      * 并根据停工日，得到开产日：排产日停工后的首日
      *
      * @param stopDays
+     * @param maxBoostDay 最大可补量天数
      */
-    public void setStopDays(Set<Integer> stopDays) {
+    public void setStopDays(Set<Integer> stopDays, Integer maxBoostDay) {
         this.stopDays = stopDays;
         setProductionDayAfterStopByStopDays();
+        setReplenishmentDay(maxBoostDay);
     }
 
     /**
@@ -333,5 +339,30 @@ public class Context {
                 productionDayAfterStop.add(singleProductionDay);
             }
         });
+    }
+
+    /**
+     * 设置实际可补量的天数信息
+     *
+     * @param maxBoostDay 可补量天数
+     */
+    private void setReplenishmentDay(Integer maxBoostDay) {
+        if (null == maxBoostDay || maxBoostDay <= BigDecimal.ZERO.intValue()) {
+            replenishmentDay = Collections.emptySet();
+            return;
+        }
+        Set<Integer> allProductionDay = getProductionDay();
+        if (CollectionUtils.isEmpty(allProductionDay)) {
+            replenishmentDay = Collections.emptySet();
+            return;
+        }
+        List<Integer> sortList = new ArrayList<>(allProductionDay);
+        sortList.sort(Comparator.comparing(Integer::intValue, Comparator.reverseOrder()));
+        Set<Integer> replenishmentDay = new HashSet<>();
+        Integer maxDays = allProductionDay.size();
+        for (Integer index = BigDecimal.ZERO.intValue(); index < maxBoostDay && index < maxDays; index++) {
+            replenishmentDay.add(sortList.get(index));
+        }
+        this.replenishmentDay = replenishmentDay;
     }
 }

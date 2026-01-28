@@ -2,6 +2,8 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import lombok.Data;
 
+import java.util.Set;
+
 /**
  * 排产产能控制参数配置
  *
@@ -38,6 +40,10 @@ public class ProductionCapacityParamConfiguration {
      * 模具二次上机
      */
     private Integer mouldSecondProduction;
+    /**
+     * 可补量的排产分类集合
+     */
+    private Set<String> boostProductionType;
     /**
      * 主销产品或常规产品月均补量值
      */

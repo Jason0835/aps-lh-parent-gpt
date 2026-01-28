@@ -235,6 +235,8 @@ public class CxLhMouldProductionCalculator {
             updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, day, dayMaxProductionQty, realDayProductionQty);
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
+            //todo 月底补量
+
         }
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
@@ -397,6 +399,33 @@ public class CxLhMouldProductionCalculator {
         updateCapsuleChuckInfoByMould(capsuleChuckInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
         //20260122 换模次数 -1
         updateChangeMouldInfoByMould(context, beforeConclusionDay, productionPlan.getMaterialDesc(), singleMould);
+    }
+
+    /**
+     * 在起始补量进行补量
+     *
+     * @param productionContext 排产上下文
+     * @param productionSkuInfo 补量计划
+     * @param cxLhGroup         硫化组
+     * @param startBoostDay     起始补量天数
+     * @param endBoostDay       结束补量天数
+     * @param doubleMouldList   使用的模具
+     */
+    private static void boostQtyByNextBoostDay(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo productionSkuInfo, CxLhProductionHelper cxLhGroup, Integer startBoostDay, Integer endBoostDay, List<ProductionMouldInfoVo> doubleMouldList) {
+        Set<Integer> replenishmentDay = productionContext.getReplenishmentDay();
+        if (CollectionUtils.isEmpty(replenishmentDay)) {
+            return;
+        }
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        if (!productionSkuInfo.hasBoostQty(paramConfiguration.getBoostAverageValue(), paramConfiguration.getBoostProductionType())) {
+            return;
+        }
+        for (Integer singleReplenishmentDay = startBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
+            if (!replenishmentDay.contains(singleReplenishmentDay)) {
+                continue;
+            }
+            //可补量
+        }
     }
 
     /**

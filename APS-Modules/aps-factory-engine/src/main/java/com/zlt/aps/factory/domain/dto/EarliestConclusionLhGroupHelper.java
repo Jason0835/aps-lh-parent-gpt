@@ -1,10 +1,8 @@
 package com.zlt.aps.factory.domain.dto;
 
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -136,5 +134,20 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
     public void updateProductionDateRange(Integer closingDay, Integer endDay) {
         this.closingDay = closingDay;
         this.endDay = endDay;
+    }
+
+    /**
+     * 更新排产前Sku信息
+     *
+     * @param beforeMaterialDesc  前Sku物料描述
+     * @param beforeMaterialCode  前Sku编码
+     * @param beforeProductionQty 前Sku排产量
+     * @param beforeDayMaxQty     前Sku日硫化量
+     */
+    public void updateBeforeSkuInfo(String beforeMaterialDesc, String beforeMaterialCode, Integer beforeProductionQty, Integer beforeDayMaxQty) {
+        this.beforeMaterialDesc = beforeMaterialDesc;
+        this.beforeMaterialCode = beforeMaterialCode;
+        this.beforeProductionQty = beforeProductionQty;
+        this.beforeDayMaxQty = beforeDayMaxQty;
     }
 }

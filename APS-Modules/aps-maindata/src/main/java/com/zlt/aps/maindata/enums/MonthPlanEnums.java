@@ -108,21 +108,25 @@ public enum MonthPlanEnums {
      */
     BOOST_AVERAGE_VALUE("SYS0204004", "SKU排产分类为主销、常规，月均销量>=该值时，月底1-2天可直接补量"),
     /**
-     * SYS0204005 SKU符合SYS0204004时，收尾日离月底可补量的天数
+     * SYS0204005 SKU可月底补量的排产分类
      */
-    MAX_BOOST_DAY("SYS0204005", "SKU符合SYS0204004时，收尾日离月底可补量的天数"),
+    BOOST_PRODUCTION_TYPE_VALUE("SYS0204005", "SKU可月底补量的排产分类"),
     /**
-     * SYS0204006 结构需求量最小排产天数，<该值则不进行结构排产
+     * SYS0204006 SKU符合SYS0204004和SYS0204005时，收尾日离月底可补量的天数
      */
-    MIN_PRODUCTION_DAYS("SYS0204006", "结构需求量最小排产天数，<该值则不进行结构排产"),
+    MAX_BOOST_DAY("SYS0204006", "SKU符合SYS0204004和SYS0204005时，收尾日离月底可补量的天数"),
     /**
-     * SYS0204007 结构需求量满足SYS0204006时，结构上机最短天数
+     * SYS0204009 结构需求量最小排产天数，<该值则不进行结构排产
      */
-    MIN_ALLOCATION_DAYS("SYS0204007", "结构需求量满足SYS0204006时，结构上机最短天数"),
+    MIN_PRODUCTION_DAYS("SYS0204009", "结构需求量最小排产天数，<该值则不进行结构排产"),
     /**
-     * SYS0204008 常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾
+     * SYS0204010 结构需求量满足SYS0204009时，结构上机最短天数
      */
-    NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER("SYS0204008", "常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾"),
+    MIN_ALLOCATION_DAYS("SYS0204010", "结构需求量满足SYS0204009时，结构上机最短天数"),
+    /**
+     * SYS0204012 常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾
+     */
+    NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER("SYS0204012", "常规结构实单最低供应硫化机台数，<该值则结构需要强制收尾"),
     /**
      * SYS0101001 超期常规储备排产月数
      */
@@ -143,7 +147,6 @@ public enum MonthPlanEnums {
      * SYS0206001 单台成型机的月度生产计划锁定期天数
      */
     SINGLE_CX_MACHINE_LOCK_DAYS("SYS0206001", "单台成型机的月度生产计划锁定期天数"),
-
     /**
      * SYS0206002 多台成型机的月度生产计划锁定期天数
      */

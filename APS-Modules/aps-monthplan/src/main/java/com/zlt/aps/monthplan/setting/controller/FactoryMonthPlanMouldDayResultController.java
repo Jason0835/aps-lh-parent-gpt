@@ -1,7 +1,10 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
+import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanMouldDayResultService;
@@ -26,7 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 
@@ -157,7 +162,29 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         this.builderCondition(wrapper, obj);
         List<FactoryMonthPlanMouldDayResult> list = entityMapper.selectList(wrapper);
         calculateDayVulcanizationQty(list);
+        this.translationList(list);
         return list;
+    }
+
+    private void translationList(List<FactoryMonthPlanMouldDayResult> list) {
+        Locale locale = I18nUtil.getLocaleFromRedis();
+        list.forEach(mouldDayResult -> {
+            String reason = mouldDayResult.getReason();
+            if (StringUtils.isNotBlank(reason)) {
+                if (reason.contains("|")) {
+                    String[] split = reason.split("\\|");
+                    List<String> reasonList = new ArrayList<>(split.length);
+                    for (String reasonI18n : split) {
+                        String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
+                        reasonList.add(convertValue);
+                    }
+                    mouldDayResult.setReason(String.join(",", reasonList));
+                } else {
+                    String convertValue = JsonI18nConvertUtils.getConvertValue(reason, locale);
+                    mouldDayResult.setReason(convertValue);
+                }
+            }
+        });
     }
 
     @Override
