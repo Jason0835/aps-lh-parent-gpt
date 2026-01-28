@@ -67,4 +67,8 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private Integer matchQtyDay29;
     private Integer matchQtyDay30;
     private Integer matchQtyDay31;
+    /**
+     * 记录原始的总量
+     */
+    private Integer oriTotalQty;
 }

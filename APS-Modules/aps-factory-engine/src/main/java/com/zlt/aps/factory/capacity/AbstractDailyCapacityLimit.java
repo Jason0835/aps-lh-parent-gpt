@@ -465,6 +465,10 @@ public abstract class AbstractDailyCapacityLimit {
         //余量
         int remainQty = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) % dailyLhQty;
         int[] resultArr = {0,0,0};
+        if (remainQty == 0){
+            //没有余量，直接退回
+            return resultArr;
+        }
         if (remainQty == changeMouldFirstQty){
             //若余数 == 换模起排量，则视新增机台数
             resultArr[0] = 1;

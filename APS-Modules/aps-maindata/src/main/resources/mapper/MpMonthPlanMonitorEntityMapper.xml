@@ -48,6 +48,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
            <if test="materialDesc != null and materialDesc != ''">
 		   AND v.MATERIAL_DESC like concat('%', #{materialDesc}, '%')
            </if>
+           <if test="mainMaterialDesc != null and mainMaterialDesc != ''">
+           AND v.MAIN_MATERIAL_DESC like concat('%', #{mainMaterialDesc}, '%')
+           </if>
+           
 		   AND v.IS_DELETE = 0
 		 GROUP BY v.STRUCTURE_NAME,
 		       v.MATERIAL_CODE,
