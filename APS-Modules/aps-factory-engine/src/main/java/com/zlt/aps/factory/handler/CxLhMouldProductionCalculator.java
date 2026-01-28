@@ -9,6 +9,7 @@ import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
@@ -69,7 +70,7 @@ public class CxLhMouldProductionCalculator {
     /**
      * 采用双模，在startDay~endDay进行排产
      * 此时为在机结构对在产机台进行新增Sku排产的场景
-     * 以结构为维度，忽略机台进行排产
+     * 以结构为维度，(多台成型机台-忽略机台)进行排产
      *
      * @param context                 排产上下文
      * @param lhProductionQtyHelper   排产基础信息
@@ -88,6 +89,7 @@ public class CxLhMouldProductionCalculator {
         MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         Set<Integer> stopDay = context.getStopDays();
         Set<Integer> openDay = context.getProductionDayAfterStop();
+        Set<Integer> replenishmentDay = context.getReplenishmentDay();
         Integer dayLhQty = productionPlan.getMaxDaySingleLhMachineQty();
         //非续作需要重新判断胎胚种类数及配比限制
         if (!isContinueSkuProduction) {
@@ -147,8 +149,13 @@ public class CxLhMouldProductionCalculator {
             //判断模具是否排产完毕，首日排产则排产完毕，否则看排产量
             boolean isDayFinish = dayProductionInfo.isFinish() ? true : theoryProductionQty.equals(dayProductionQty);
             //更新日产信息
-            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, lhProductionQtyHelper.getCxMachineInfo(), lossQty);
+            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty, isDayFinish, lhProductionQtyHelper.getCxMachineInfo(), lossQty);
             updateDayProductionInfo(productionContext, productionPlanInfo, doubleMouldList, skuProductionPlanList, updateInfo);
+            //20260128 月底补量
+            if (isBoostQtyHandler(replenishmentDay, day, sumProductionQty)) {
+                BoostProductionInfoHelper boostInfo = BoostProductionInfoHelper.builder(productionPlan, doubleMouldList, productionPlanInfo, null, null, lhProductionQtyHelper.getCxMachineInfo(), day, realDayProductionQty, isDayFinish, endDay);
+                boostQtyByNextBoostDay(productionContext, boostInfo);
+            }
         }
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
@@ -158,7 +165,7 @@ public class CxLhMouldProductionCalculator {
     /**
      * 采用双模，在startDay~endDay进行排产
      * 在新增结构(结构本身是新增或是在机结构增机台场景)
-     * 此时是固定到一台
+     * 此时是固定到一台，只在模拟排产阶段使用
      *
      * @param context               排产上下文
      * @param lhProductionQtyHelper 排产基础信息
@@ -181,6 +188,7 @@ public class CxLhMouldProductionCalculator {
         String skuMaterialDesc = productionSkuInfo.getMaterialDesc();
         Set<Integer> stopDay = context.getStopDays();
         Set<Integer> openDay = context.getProductionDayAfterStop();
+        Set<Integer> replenishmentDay = context.getReplenishmentDay();
         Integer dayLhQty = productionSkuInfo.getMaxDaySingleLhMachineQty();
         Integer firstDay = null;
         //进行排产
@@ -229,14 +237,17 @@ public class CxLhMouldProductionCalculator {
             //判断模具是否排产完毕，首日排产则排产完毕，否则看排产量
             boolean isDayFinish = dayProductionInfo.isFinish() ? true : theoryProductionQty.equals(dayProductionQty);
             //更新模具日产信息
-            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty.intValue(), isDayFinish, cxMachineInfoSet, lossQty);
+            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty, isDayFinish, cxMachineInfoSet, lossQty);
             updateMouldDayProductionInfo(productionContext, doubleMouldList, skuProductionPlanList, updateInfo);
             //更新硫化组日期和日排产量
             updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, day, dayMaxProductionQty, realDayProductionQty);
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
-            //todo 月底补量
-
+            //月底补量
+            if (isBoostQtyHandler(replenishmentDay, day, sumProductionQty)) {
+                BoostProductionInfoHelper boostInfo = BoostProductionInfoHelper.builder(productionSkuInfo, doubleMouldList, null, cxMachineInfo, cxLhGroup, cxMachineInfoSet, day, realDayProductionQty, isDayFinish, endDay);
+                boostQtyByNextBoostDay(productionContext, boostInfo);
+            }
         }
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
@@ -402,29 +413,114 @@ public class CxLhMouldProductionCalculator {
     }
 
     /**
-     * 在起始补量进行补量
+     * 更新日排产信息
+     * 1、更新模具的日排产信息
+     * 2、更新分组计划的日排产信息
+     * 3、更新计划的排产量信息
+     *
+     * @param productionContext     排产上下文
+     * @param groupPlanInfo         分组排产计划对象
+     * @param doubleMouldList       选中的排产模具
+     * @param skuProductionPlanList 排产的Sku计划集合
+     * @param updateInfo            日更新信息对象
+     */
+    private static void updateDayProductionInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, UpdateDayProductionInfoHelper updateInfo) {
+        Integer productionDay = updateInfo.getProductionDay();
+        Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
+        Integer lossQty = updateInfo.getLossQty();
+        Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        String skuMaterialDesc = productionPlan.getMaterialDesc();
+        //分组-日排产信息
+        SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionPlan, realDayProductionQty, lossQty, usedMouldSet);
+        groupPlanInfo.addDayProductionInfo(skuDayProductionInfo);
+        //模具排产信息-计划分配
+        updateMouldDayProductionInfo(productionContext, doubleMouldList, skuProductionPlanList, updateInfo);
+        //记录已排产量及损耗量
+        productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, lossQty);
+    }
+
+    /**
+     * 判断是否需要进行补量处理
+     * 如果还有待排产量，则不用补量
+     * 如果productionDay不再补量天数集合replenishmentDay中也不用补量
+     *
+     * @param replenishmentDay  可补量的天数
+     * @param productionDay     排产日
+     * @param needProductionQty 还需排产量
+     * @return
+     */
+    private static boolean isBoostQtyHandler(Set<Integer> replenishmentDay, Integer productionDay, Integer needProductionQty) {
+        if (needProductionQty > BigDecimal.ZERO.intValue()) {
+            return false;
+        }
+        if (null == productionDay || CollectionUtils.isEmpty(replenishmentDay)) {
+            return false;
+        }
+        if (!replenishmentDay.contains(productionDay)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 从起始天开始，进行补量
      *
      * @param productionContext 排产上下文
-     * @param productionSkuInfo 补量计划
-     * @param cxLhGroup         硫化组
-     * @param startBoostDay     起始补量天数
-     * @param endBoostDay       结束补量天数
-     * @param doubleMouldList   使用的模具
+     * @param boostInfo         补量信息
      */
-    private static void boostQtyByNextBoostDay(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo productionSkuInfo, CxLhProductionHelper cxLhGroup, Integer startBoostDay, Integer endBoostDay, List<ProductionMouldInfoVo> doubleMouldList) {
+    private static void boostQtyByNextBoostDay(TbrProductionContext productionContext, BoostProductionInfoHelper boostInfo) {
         Set<Integer> replenishmentDay = productionContext.getReplenishmentDay();
         if (CollectionUtils.isEmpty(replenishmentDay)) {
             return;
         }
+        MonthPlanProductionRequirePlanVo productionSkuInfo = boostInfo.getProductionSkuInfo();
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         if (!productionSkuInfo.hasBoostQty(paramConfiguration.getBoostAverageValue(), paramConfiguration.getBoostProductionType())) {
             return;
+        }
+        Set<String> cxMachineInfoSet = boostInfo.getCxMachineInfoSet();
+        Integer startBoostDay = boostInfo.getStartBoostDay();
+        Integer endBoostDay = boostInfo.getEndBoostDay();
+        Integer maxLhQty = productionSkuInfo.getMaxDaySingleLhMachineQty();
+        String skuMaterialDesc = productionSkuInfo.getMaterialDesc();
+        CxLhProductionHelper cxLhGroup = boostInfo.getCxLhGroup();
+        boolean isSingleCxMachine = boostInfo.isSingleCxMachine();
+        ProductionPlanGroupInfo productionPlanInfo = boostInfo.getProductionPlanInfo();
+        CxMachineBaseInfoVo cxMachineInfo = boostInfo.getCxMachineInfo();
+        List<ProductionMouldInfoVo> doubleMouldList = boostInfo.getDoubleMouldList();
+        Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        //如果是开产日，跳过从下一天开始
+        Set<Integer> openDay = productionContext.getProductionDayAfterStop();
+        if (openDay.contains(startBoostDay) || boostInfo.isStartFinish()) {
+            startBoostDay = startBoostDay + BigDecimal.ONE.intValue();
         }
         for (Integer singleReplenishmentDay = startBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
             if (!replenishmentDay.contains(singleReplenishmentDay)) {
                 continue;
             }
-            //可补量
+            //补量值
+            Integer boostDayQty;
+            if (singleReplenishmentDay.equals(startBoostDay)) {
+                boostDayQty = maxLhQty - boostInfo.getStartPlannedQty();
+            } else {
+                boostDayQty = maxLhQty;
+            }
+            log.info(TbrBoostQtyProductionLogRecorder.addBoostQtyProductionPlanLog(productionContext, productionSkuInfo, singleReplenishmentDay, boostDayQty, usedMouldSet));
+            if (!isSingleCxMachine && null != productionPlanInfo) {
+                //分组-日排产信息
+                SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(singleReplenishmentDay, productionSkuInfo, boostDayQty, BigDecimal.ZERO.intValue(), usedMouldSet);
+                productionPlanInfo.addDayProductionInfo(skuDayProductionInfo);
+            }
+            //更新模具日产信息
+            UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(singleReplenishmentDay, boostDayQty, true, cxMachineInfoSet, BigDecimal.ZERO.intValue());
+            updateMouldDayProductionInfo(productionContext, doubleMouldList, productionSkuInfo, updateInfo);
+            if (isSingleCxMachine && null != cxMachineInfo && null != cxLhGroup) {
+                //更新硫化组日期和日排产量
+                updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, singleReplenishmentDay, maxLhQty, boostDayQty);
+            }
+            //记录已排产量及损耗量
+            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, boostDayQty, BigDecimal.ZERO.intValue());
         }
     }
 
@@ -500,34 +596,6 @@ public class CxLhMouldProductionCalculator {
     }
 
     /**
-     * 更新日排产信息
-     * 1、更新模具的日排产信息
-     * 2、更新分组计划的日排产信息
-     * 3、更新计划的排产量信息
-     *
-     * @param productionContext     排产上下文
-     * @param groupPlanInfo         分组排产计划对象
-     * @param doubleMouldList       选中的排产模具
-     * @param skuProductionPlanList 排产的Sku计划集合
-     * @param updateInfo            日更新信息对象
-     */
-    private static void updateDayProductionInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, UpdateDayProductionInfoHelper updateInfo) {
-        Integer productionDay = updateInfo.getProductionDay();
-        Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
-        Integer lossQty = updateInfo.getLossQty();
-        Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
-        String skuMaterialDesc = productionPlan.getMaterialDesc();
-        //分组-日排产信息
-        SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionPlan, realDayProductionQty, lossQty, usedMouldSet);
-        groupPlanInfo.addDayProductionInfo(skuDayProductionInfo);
-        //模具排产信息-计划分配
-        updateMouldDayProductionInfo(productionContext, doubleMouldList, skuProductionPlanList, updateInfo);
-        //记录已排产量及损耗量
-        productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, lossQty);
-    }
-
-    /**
      * 更新模具的日排产信息，并更新计划的待排产量
      * 更新使用模具的日排产信息
      * 需要对排产量按计划集合的优先级进行分配到具体的计划Id
@@ -583,6 +651,41 @@ public class CxLhMouldProductionCalculator {
         });
         //双模排产量-增加日产能使用量
         addDayCapacityQtyByMould(productionContext, productionDay, productionPlan, updateInfo, doubleMouldList);
+    }
+
+    /**
+     * 补量时，更新模具的日排产信息
+     * 更新使用模具的日信息
+     * 1、模壳标准的占用
+     * 2、模具分配比例占用
+     * 3、胶囊卡盘的占用
+     * 4、日产能的占用
+     *
+     * @param productionContext 排产上下文
+     * @param doubleMouldList   选中的排产模具
+     * @param singlePlan        排产的Sku计划
+     * @param updateInfo        日更新信息对象
+     */
+    private static void updateMouldDayProductionInfo(TbrProductionContext productionContext, List<ProductionMouldInfoVo> doubleMouldList, MonthPlanProductionRequirePlanVo singlePlan, UpdateDayProductionInfoHelper updateInfo) {
+        Integer productionDay = updateInfo.getProductionDay();
+        Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
+        boolean isDayFinish = updateInfo.isDayFinish();
+        Set<String> cxMachineInfo = updateInfo.getUsedCxMachineInfo();
+        doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, singlePlan, isDayFinish, realDayProductionQty, cxMachineInfo));
+        //模具分配比例控制对象
+        MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(singlePlan);
+        //胶囊卡盘数量控制对象
+        CapsuleChuckInfoVo capsuleChuckInfo = productionContext.getCapsuleChuckInfo(singlePlan);
+        doubleMouldList.forEach(singleMould -> {
+            //模壳标准使用量 + 1
+            updateMouldShellInfoByMould(productionContext, productionDay, singleMould, YesOrNoEnum.YES.getValue());
+            //模具分配比例使用量 + 1
+            updateMouldAllocationRatioInfoByMould(mouldAllocationControlInfo, productionDay, singleMould, YesOrNoEnum.YES.getValue());
+            //胶囊卡盘使用量 + 1
+            updateCapsuleChuckInfoByMould(capsuleChuckInfo, productionDay, singleMould, YesOrNoEnum.YES.getValue());
+        });
+        //双模排产量-增加日产能使用量
+        addDayCapacityQtyByMould(productionContext, productionDay, singlePlan, updateInfo, doubleMouldList);
     }
 
     /**
