@@ -53,7 +53,31 @@ public class NoProductionPlanUtils {
     return noProductionPlanList;
   }
 
+  /**
+   * 提取不排产计划条件
+   * isProduction = 0 或是 可排产量为0
+   *
+   * @param monthPlanInit
+   * @return
+   */
+  private static boolean hasNoProduction(MonthPlanProductionRequirePlanVo monthPlanInit) {
+    if (null == monthPlanInit) {
+      return false;
+    }
+    if (YesOrNoEnum.NO.getCode().equals(monthPlanInit.getIsProduction())) {
+      return true;
+    }
+    Integer productionQty = monthPlanInit.getProductionQty();
+    if (null == productionQty) {
+      productionQty = BigDecimal.ZERO.intValue();
+    }
+    return productionQty <= BigDecimal.ZERO.intValue();
+  }
+
   public static MonthPlanNoProductionPlan createNoProductionRecordData(MonthPlanProductionRequirePlanVo monthPlanInit) {
+    if(!hasNoProduction(monthPlanInit)) {
+       return null;
+    }
     MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
     BeanUtils.copyProperties(monthPlanInit, noProductionRecord);
     noProductionRecord.setId(null);
