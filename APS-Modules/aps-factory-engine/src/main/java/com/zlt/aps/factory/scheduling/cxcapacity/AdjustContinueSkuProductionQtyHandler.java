@@ -163,6 +163,15 @@ public class AdjustContinueSkuProductionQtyHandler {
                                            CxContinueInfoHelper cxContinueInfo,
                                            TbrProductionContext productionContext) {
 
+    requirePlans.forEach(item -> {
+         log.info("adjustMaterialProductionQty:materialDesc={},materialCode={}, heightProductionQty={},originHeightProductionQty={},productionQty={},originProductionQty={}",
+             materialDesc,
+             item.getMaterialCode(),
+             item.getHeightProductionQty() ,
+             item.getOriginHeightProductionQty(),
+             item.getProductionQty(),
+             item.getOriginProductionQty());
+    });
     log.info("adjustMaterialProductionQty: materialDesc={},key={},maxAllocationDay={}",materialDesc, plansByMaterial.keySet(),maxAllocationDay);
     // 前置条件检查
     if (!validateAdjustmentConditions(materialDesc, requirePlans, productionContext)) {
