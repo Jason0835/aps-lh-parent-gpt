@@ -42,6 +42,7 @@ public class NoProductionPlanUtils {
       //不排产计划
       if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
          noProductionPlanList.add(noProductionPlan);
+        return;
       }
       // 即没有排产计划，又不是不排产计划
       if (unProductionQty > BigDecimal.ZERO.longValue()) {
