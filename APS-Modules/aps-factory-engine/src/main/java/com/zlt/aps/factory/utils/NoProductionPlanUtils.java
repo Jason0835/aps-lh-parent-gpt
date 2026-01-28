@@ -9,7 +9,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -41,8 +40,10 @@ public class NoProductionPlanUtils {
       }
       //不排产计划
       if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
+         MonthPlanNoProductionPlan  existNoNoProductionPlan =  noProductionRecordMap.get(monthPlanId);
+         noProductionPlan.setReason(existNoNoProductionPlan.getReason());
          noProductionPlanList.add(noProductionPlan);
-        return;
+         return;
       }
       // 即没有排产计划，又不是不排产计划
       if (unProductionQty > BigDecimal.ZERO.intValue()) {
@@ -52,36 +53,11 @@ public class NoProductionPlanUtils {
     return noProductionPlanList;
   }
 
-  /**
-   * 提取不排产计划条件
-   * isProduction = 0 或是 可排产量为0
-   *
-   * @param monthPlanInit
-   * @return
-   */
-  private static boolean hasNoProduction(MonthPlanProductionRequirePlanVo monthPlanInit) {
-    if (null == monthPlanInit) {
-      return false;
-    }
-    if (YesOrNoEnum.NO.getCode().equals(monthPlanInit.getIsProduction())) {
-      return true;
-    }
-    Integer productionQty = monthPlanInit.getProductionQty();
-    if (null == productionQty) {
-      productionQty = BigDecimal.ZERO.intValue();
-    }
-    return productionQty <= BigDecimal.ZERO.intValue();
-  }
-
-  public static List<MonthPlanNoProductionPlan> createNoProductionRecordData(List<MonthPlanProductionRequirePlanVo> requirePlanList) {
-    List<MonthPlanNoProductionPlan> factoryNoProductionPlanList = new ArrayList<>();
-    requirePlanList.stream().filter(NoProductionPlanUtils::hasNoProduction).forEach(monthPlanInit -> {
-      MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
-      BeanUtils.copyProperties(monthPlanInit, noProductionRecord);
-      noProductionRecord.setId(null);
-      noProductionRecord.setReason(monthPlanInit.getNoProductionReason());
-      factoryNoProductionPlanList.add(noProductionRecord);
-    });
-    return factoryNoProductionPlanList;
+  public static MonthPlanNoProductionPlan createNoProductionRecordData(MonthPlanProductionRequirePlanVo monthPlanInit) {
+    MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
+    BeanUtils.copyProperties(monthPlanInit, noProductionRecord);
+    noProductionRecord.setId(null);
+    noProductionRecord.setReason(monthPlanInit.getNoProductionReason());
+    return noProductionRecord;
   }
 }

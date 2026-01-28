@@ -12,10 +12,8 @@ import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
-import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -130,21 +128,8 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //保存初始化结果
         saveInitInfo(productionContext, requirePlanList);
         log.info(TbrProductionInitLogRecorder.addSaveInitDataLog(productionContext));
-        //需要推迟到模具产能预占后检查
-        initNoProductionRecord(productionContext, requirePlanList);
     }
 
-    private void initNoProductionRecord(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
-        //生成不排产数据
-        List<MonthPlanNoProductionPlan> factoryNoProductionPlanList = NoProductionPlanUtils.createNoProductionRecordData(requirePlanList);
-        //放入排产上下文，后续使用
-        if (!CollectionUtils.isEmpty(factoryNoProductionPlanList)) {
-            Map<Long, MonthPlanNoProductionPlan> noProductionRecordMap = factoryNoProductionPlanList.stream().collect(Collectors.toMap(MonthPlanNoProductionPlan::getMonthPlanId, record -> record));
-            productionContext.setNoProductionRecordMap(noProductionRecordMap);
-        } else {
-            productionContext.setNoProductionRecordMap(Collections.emptyMap());
-        }
-    }
 
     /**
      * 在版本表中，保存工厂排产记录

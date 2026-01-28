@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
-import com.ruoyi.common.core.utils.SpringUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.StringConstant;
@@ -23,6 +22,7 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.utils.InitNoProductionRecordService;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -70,16 +70,20 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
+    private final InitNoProductionRecordService initNoProductionRecordService;
+
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
                                           FormalProductionHandler formalProductionHandler,
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
-                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
+                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
+                                          InitNoProductionRecordService initNoProductionRecordService) {
         super(dataService);
         this.formalProductionHandler = formalProductionHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
+        this.initNoProductionRecordService = initNoProductionRecordService;
     }
 
     /**
@@ -124,6 +128,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         requirePlanList.forEach(singlePlan -> {
             log.info(TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan));
             singlePlan.initProductionDataInfo();
+            this.initNoProductionRecordService.initNoProductionRecord(productionContext,singlePlan);
         });
         //2、初始排产需要的基础数据，成型、模具关系、成型硫化配比、计划初始库销比
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
