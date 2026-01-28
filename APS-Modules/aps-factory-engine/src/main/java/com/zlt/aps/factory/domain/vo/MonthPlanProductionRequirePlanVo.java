@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -522,6 +523,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     public String getMouldAllocationControlDimensionKey() {
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, getStructureName(), getMainPattern());
+    }
+
+    /**
+     * 根据补量的值，判断是否可进行月底补量
+     *
+     * @param boostAverageValue 月均销量值
+     * @return
+     */
+    public boolean hasBoostQty(Integer boostAverageValue, Set<String> boostScheduleTypeSet) {
+        if (null == boostAverageValue && boostAverageValue < BigDecimal.ZERO.intValue()) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(boostScheduleTypeSet)) {
+            return false;
+        }
+        if (!boostScheduleTypeSet.contains(getProductionType())) {
+            return false;
+        }
+        return getAverageSaleQty() >= boostAverageValue;
     }
 
     /**
