@@ -267,6 +267,10 @@ public enum TbrMouldProductionLogType {
      */
     START_CX_MACHINE_GROUP_MOULD_PRODUCTION("30-01-00", "开始分组计划模具排产"),
     /**
+     * 30-39 补量排产
+     */
+    BOOST_QTY_PRODUCTION("30-39", "补量排产"),
+    /**
      * 30-01 分组计划模拟模具排产
      */
     SIMULATE_MOULD_PRODUCTION("30-01", "分组计划模拟模具排产"),
