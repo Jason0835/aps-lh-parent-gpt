@@ -65,6 +65,9 @@ public class MpWeekRollAdjustEngine {
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
+            //4.1 检查日硫化量
+            checkDayLhQty(sbError,adjustStructureIn);
+
             if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustStructureIn.getConstructionStage())){
                 if (adjustStructureIn.getConfirmAdjustQty() > 0){
                     trialAdjustList.add(adjustStructureIn);
@@ -85,8 +88,7 @@ public class MpWeekRollAdjustEngine {
                     incrementAdjustList.add(adjustStructureIn);
                 }
             }
-            //4.1 检查日硫化量
-            checkDayLhQty(sbError,adjustStructureIn);
+
         }
         if (!StringUtil.isEmptyWithTrim(sbError.toString())){
             throw new BusinessException(sbError.toString());
