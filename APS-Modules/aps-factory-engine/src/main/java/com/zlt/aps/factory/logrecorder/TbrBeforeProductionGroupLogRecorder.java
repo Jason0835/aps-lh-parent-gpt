@@ -14,6 +14,7 @@ import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -446,6 +447,47 @@ public class TbrBeforeProductionGroupLogRecorder {
                     context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                     previousMonth.getYear(), previousMonth.getMonthValue(), previousVersion.getMonthPlanVersion(), previousVersion.getProductionVersion());
         }
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加读取近n个月机台生产历史没有排产定稿信息日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有成型机台近n个月定稿数据====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addReaderNoCxMachineHistoryFinalVersionInfoLog(Context context) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有成型机台近n个月定稿数据====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加读取近n个月机台生产历史日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到成型机台近n个月[%s]的生产历史为空====
+     * 或是
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到成型机台近n个月[%s]的生产历史数据====
+     *
+     * @param context          排程上下文
+     * @param allocationList   排产历史
+     * @param finalVersionList 定稿版本
+     * @return
+     */
+    public static String addReaderCxMachineHistoryInfoLog(Context context, List<MpStructureAllocation> allocationList, List<String> finalVersionList) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，读取到成型机台近n个月的生产历史为空====";
+        if (!CollectionUtils.isEmpty(allocationList)) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，已读取到成型机台近n个月的生产历史数据====";
+        }
+        String productionVersionInfo = String.join(StringConstant.COMMA, finalVersionList);
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                productionVersionInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.BEFORE_PRODUCTION_DATA_LOADING, logContent);
         return logContent;

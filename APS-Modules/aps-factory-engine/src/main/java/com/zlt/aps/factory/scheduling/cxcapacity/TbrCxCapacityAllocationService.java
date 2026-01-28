@@ -8,6 +8,9 @@ import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.factory.basedata.history.CxMachineProductionHistoryInfo;
+import com.zlt.aps.factory.basedata.history.GroupPlanProductionHistoryInfo;
+import com.zlt.aps.factory.basedata.history.ProductionHistoryHandler;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
@@ -65,6 +68,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final FormalProductionHandler formalProductionHandler;
 
+    private final ProductionHistoryHandler productionHistoryHandler;
+
     private final SimulateProductionHandler simulateProductionHandler;
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
@@ -75,12 +80,14 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
                                           FormalProductionHandler formalProductionHandler,
+                                          ProductionHistoryHandler productionHistoryHandler,
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
                                           InitNoProductionRecordService initNoProductionRecordService) {
         super(dataService);
         this.formalProductionHandler = formalProductionHandler;
+        this.productionHistoryHandler = productionHistoryHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
@@ -129,7 +136,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         requirePlanList.forEach(singlePlan -> {
             log.info(TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan));
             singlePlan.initProductionDataInfo();
-            this.initNoProductionRecordService.initNoProductionRecord(productionContext,singlePlan);
+            this.initNoProductionRecordService.initNoProductionRecord(productionContext, singlePlan);
         });
         //2、初始排产需要的基础数据，成型、模具关系、成型硫化配比、计划初始库销比
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
@@ -243,6 +250,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //13、获取结构的硫化配比
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         productionContext.getBaseDataContainer().setStructureLhRatioList(structureLhRatioList);
+        //16、机台近3个月的生产历史信息
+        List<MpStructureAllocation> historyAllocationList = getDataService().getHistoryStructureAllocationInfo(productionContext);
+        Map<String, CxMachineProductionHistoryInfo> cxMachineProductionHistoryInfo = productionHistoryHandler.buildCxMachineProductionHistory(productionContext, historyAllocationList);
+        productionContext.getBaseDataContainer().setCxMachineProductionHistoryInfo(cxMachineProductionHistoryInfo);
+        Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap = productionHistoryHandler.buildGroupPlanProductionHistory(productionContext, historyAllocationList);
+        productionContext.getBaseDataContainer().setGroupPlanHistoryInfoMap(groupPlanHistoryInfoMap);
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return;
         }
@@ -874,7 +887,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldDeliveryLog(productionContext, mouldDeliveryList));
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList,mouldDeliveryList);
+        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
