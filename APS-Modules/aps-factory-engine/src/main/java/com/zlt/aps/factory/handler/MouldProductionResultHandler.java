@@ -13,6 +13,7 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +46,7 @@ public class MouldProductionResultHandler {
         if (CollectionUtils.isEmpty(mouldProductionList)) {
             return Collections.emptyList();
         }
+        Map<Long, MonthPlanNoProductionPlan> noProductionRecordMap = productionContext.getNoProductionRecordMap();
         List<FactoryMonthPlanMouldDayDetail> detailLogList = new ArrayList<>();
         mouldProductionList.forEach((mouldCode, productionMouldInfo) -> {
             Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = productionMouldInfo.getDayProductionInfo();
@@ -59,7 +61,7 @@ public class MouldProductionResultHandler {
             }
             mouldProductionLogMap.forEach((monthPlanId, planMouldInfo) -> {
                 MonthPlanProductionRequirePlanVo planInfo = productionContext.getAllProductionPlan().get(monthPlanId);
-                if (null == planInfo) {
+                if (null == planInfo || noProductionRecordMap.containsKey(monthPlanId)) {
                     return;
                 }
                 //补充计划信息
