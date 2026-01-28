@@ -69,7 +69,7 @@ public class AdjustContinueSkuProductionQtyHandler {
                                              Map<String, CxContinueInfoHelper> allContinueMap,
                                              TbrProductionContext productionContext) {
     if (invalidInputs(allGroupPlanMap, continueAllocationList, allContinueMap)) {
-      log.debug("不合法输入参数,跳过调整");
+      log.info("不合法输入参数,跳过调整");
       return;
     }
 
@@ -183,14 +183,14 @@ public class AdjustContinueSkuProductionQtyHandler {
 
     // 判断是否需要调整
     if (totalMouldCapacity >= totalProductionQty) {
-      log.debug("模具产能足够，无需调整: materialDesc={}, totalMouldCapacity={}, totalProductionQty={}", materialDesc, totalMouldCapacity, totalProductionQty);
+      log.info("模具产能足够，无需调整: materialDesc={}, totalMouldCapacity={}, totalProductionQty={}", materialDesc, totalMouldCapacity, totalProductionQty);
       return;
     }
 
     // 计算并分配剩余产量
     int leftProductionQty = totalMouldCapacity - adjustHeightProductionQty;
     if (leftProductionQty <= 0) {
-      log.warn("计算出的剩余产量异常: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty);
+      log.info("计算出的剩余产量异常: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty);
       return;
     }
     // 执行分配
@@ -212,14 +212,14 @@ public class AdjustContinueSkuProductionQtyHandler {
     // 检查日硫化量
     Integer dayVulcanizationQty = requirePlans.get(0).getDayVulcanizationQty();
     if (dayVulcanizationQty == null) {
-      log.debug("日硫化量为空，跳过调整: materialDesc={}", materialDesc);
+      log.info("日硫化量为空，跳过调整: materialDesc={}", materialDesc);
       return false;
     }
 
     // 检查高优先级产量
     int totalHeightProductionQty = sumHeightProductionQty(requirePlans);
     if (totalHeightProductionQty > 0) {
-      log.debug("高优先级产量大于0，跳过调整: materialDesc={}, totalHeightProductionQty={}",
+      log.info("高优先级产量大于0，跳过调整: materialDesc={}, totalHeightProductionQty={}",
           materialDesc, totalHeightProductionQty);
       return false;
     }
@@ -227,14 +227,14 @@ public class AdjustContinueSkuProductionQtyHandler {
     // 检查可排产量
     int totalProductionQty = sumProductionQty(requirePlans);
     if (totalProductionQty == 0) {
-      log.debug("可排产量为0，跳过调整: materialDesc={}", materialDesc);
+      log.info("可排产量为0，跳过调整: materialDesc={}", materialDesc);
       return false;
     }
 
     // 检查模具数量
     List<ProductionMouldInfoVo> mouldInfos = productionContext.findMouldInfoByMaterialDesc(materialDesc);
     if (mouldInfos.size() != DOUBLE_MOULD_COUNT) {
-      log.debug("模具数量不符合要求: materialDesc={}, mouldCount={}", materialDesc, mouldInfos.size());
+      log.info("模具数量不符合要求: materialDesc={}, mouldCount={}", materialDesc, mouldInfos.size());
       return false;
     }
 
@@ -304,7 +304,7 @@ public class AdjustContinueSkuProductionQtyHandler {
       updateIsProductionBySum(requirePlans);
       log.info("成功调整续作SKU排产量: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty);
     } catch (Exception e) {
-      log.error("分配产量失败: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty, e);
+      log.info("分配产量失败: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty, e);
       throw new BusinessException("分配产量失败", e);
     }
   }
@@ -394,7 +394,7 @@ public class AdjustContinueSkuProductionQtyHandler {
 
     if (CollectionUtils.isEmpty(continueSkuMap) ||
         !continueSkuMap.containsKey(materialDesc)) {
-      log.warn("续作SKU映射中未找到对应物料: materialDesc={}", materialDesc);
+      log.info("续作SKU映射中未找到对应物料: materialDesc={}", materialDesc);
       return;
     }
 
