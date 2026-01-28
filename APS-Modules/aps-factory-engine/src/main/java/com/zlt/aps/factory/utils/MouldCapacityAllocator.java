@@ -80,6 +80,7 @@ public class MouldCapacityAllocator {
     for (int i = 0; i < planCount; i++) {
       int allocation = baseAllocation + (i < remainder ? 1 : 0);
       plans.get(i).setProductionQty(allocation);
+      plans.get(i).setOriginProductionQty(allocation);
     }
   }
 
@@ -132,6 +133,7 @@ public class MouldCapacityAllocator {
     for (PlanAllocationData data : allocationData) {
       log.info("allocateProportionally:monthPlanId={},productionQty={}",plans.get(data.index).getMonthPlanId(),data.finalAllocation);
       plans.get(data.index).setProductionQty(data.finalAllocation);
+      plans.get(data.index).setOriginProductionQty(data.finalAllocation);
     }
   }
 

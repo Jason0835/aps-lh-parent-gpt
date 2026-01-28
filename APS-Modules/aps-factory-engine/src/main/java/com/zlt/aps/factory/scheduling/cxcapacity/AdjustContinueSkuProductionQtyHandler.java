@@ -205,6 +205,7 @@ public class AdjustContinueSkuProductionQtyHandler {
       log.info("计算出的剩余产量异常: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty);
       requirePlans.forEach(item -> {
             item.setProductionQty(BigDecimal.ZERO.intValue());
+            item.setOriginProductionQty(BigDecimal.ZERO.intValue());
       });
       updatePlanDemandQty(cxContinueInfo, materialDesc, BigDecimal.ZERO.intValue());
       updateIsProductionBySum(requirePlans);
