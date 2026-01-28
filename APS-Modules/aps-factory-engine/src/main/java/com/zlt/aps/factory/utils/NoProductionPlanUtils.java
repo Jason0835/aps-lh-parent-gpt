@@ -33,17 +33,18 @@ public class NoProductionPlanUtils {
       int unProductionQty = needProductionQty - plannedQty;
       String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
       noProductionPlan.setIsProduction(isProduction);
-      if(unProductionQty == 0) {
-        return;
-      }
-      if(!sumProductionMap.containsKey(monthPlanId)) {
-        noProductionPlan.setUnProductionQty(unProductionQty);
+      noProductionPlan.setUnProductionQty(unProductionQty);
+      //有排产计划，则取排产数量
+      if (sumProductionMap.containsKey(monthPlanId) && unProductionQty > BigDecimal.ZERO.intValue()) {
         noProductionPlanList.add(noProductionPlan);
         return;
       }
       //不排产计划
       if (!CollectionUtils.isEmpty(noProductionRecordMap) && noProductionRecordMap.containsKey(monthPlanId)) {
-        noProductionPlan.setUnProductionQty(needProductionQty);
+         noProductionPlanList.add(noProductionPlan);
+      }
+      // 即没有排产计划，又不是不排产计划
+      if (unProductionQty > BigDecimal.ZERO.longValue()) {
         noProductionPlanList.add(noProductionPlan);
       }
     });
