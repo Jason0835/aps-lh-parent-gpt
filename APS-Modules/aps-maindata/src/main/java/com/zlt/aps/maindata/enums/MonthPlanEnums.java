@@ -48,6 +48,10 @@ public enum MonthPlanEnums {
      */
     SCM_ORDER_MATRAL_CODE_PREFIX("SYS0102004", "从供应链同步的订单物料信息只需要符合指定前缀的数据"),
     /**
+     * SYS0102005 查询近12个月的月均销量大于零的月份数
+     */
+    MONTH_SALE_QTY_MONTH("SYS0102005", "查询近12个月的月均销量大于零的月份数"),
+    /**
      *  SYS0103001 最小投产量
      */
     MIN_PRODUCTION_QTY("SYS0103001", "最小投产量"),

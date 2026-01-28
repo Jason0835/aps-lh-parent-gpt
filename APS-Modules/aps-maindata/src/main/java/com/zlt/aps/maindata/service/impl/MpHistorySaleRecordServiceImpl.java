@@ -15,12 +15,10 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,9 +50,8 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class MpHistorySaleRecordServiceImpl extends AbstractDocService<MpHistorySaleRecord> implements IMpHistorySaleRecordService {
-    private static final int MIN_MONTH_THRESHOLD = 8;
 
-    private final MpHistorySaleRecordEntityMapper mpHistorySaleRecordEntityMapper;
+  private final MpHistorySaleRecordEntityMapper mpHistorySaleRecordEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "MP1215";
@@ -83,7 +80,7 @@ public class MpHistorySaleRecordServiceImpl extends AbstractDocService<MpHistory
     }
 
     @Override
-    public Set<String> findSkuInLastTwelveMonth() {
+    public Set<String> findSkuInLastTwelveMonth(int months) {
         // 获取当前年月
         YearMonth currentYearMonth = YearMonth.now();
         YearMonth startYearMonth = currentYearMonth.minusMonths(12);
@@ -96,42 +93,11 @@ public class MpHistorySaleRecordServiceImpl extends AbstractDocService<MpHistory
         if(CollectionUtils.isEmpty(historySaleRecords)){
             return Sets.newHashSet();
         }
-        return getMaterialCodesWithBitSet(historySaleRecords);
+        return getMaterialCodesWithBitSet(historySaleRecords,months);
     }
 
-    @Override
-    public Map<String, Integer> calculateMonthSaleQty(int months) {
-        // 获取当前年月
-        YearMonth currentYearMonth = YearMonth.now();
-        YearMonth lastYearMonth =  currentYearMonth.minusMonths(months);
-        String yearMonth = String.format("%s%02d", lastYearMonth.getYear(), lastYearMonth.getMonthValue());
-        LambdaQueryWrapper<MpHistorySaleRecord> queryWrapper = Wrappers.lambdaQuery(MpHistorySaleRecord.class)
-            .ge(MpHistorySaleRecord::getYearMonth, Integer.valueOf(yearMonth))
-            .ge(MpHistorySaleRecord::getSaleQty, BigDecimal.ZERO.intValue())
-            .eq(MpHistorySaleRecord::getIsDelete, ApsConstant.APS_YES_NO_0);
-        List<MpHistorySaleRecord>  historySaleRecords = this.mpHistorySaleRecordEntityMapper.selectList(queryWrapper);
-        if(CollectionUtils.isEmpty(historySaleRecords)){
-            return Collections.emptyMap();
-        }
-        return historySaleRecords.stream()
-            .filter(Objects::nonNull)
-            .filter(record -> StringUtils.isNotBlank(record.getMaterialCode())
-                && record.getSaleQty() != null)
-            .collect(Collectors.groupingBy(
-                MpHistorySaleRecord::getMaterialCode,
-                Collectors.summingLong(MpHistorySaleRecord::getSaleQty)
-            ))
-            .entrySet()
-            .stream()
-            .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> BigDecimal.valueOf(entry.getValue())
-                    .divide(BigDecimal.valueOf(months), 0, RoundingMode.HALF_UP).intValue()
-            ));
-    }
-
-    private Set<String> getMaterialCodesWithBitSet(
-        List<MpHistorySaleRecord> historySaleRecords) {
+  private Set<String> getMaterialCodesWithBitSet(
+        List<MpHistorySaleRecord> historySaleRecords,int months) {
 
         if (CollectionUtils.isEmpty(historySaleRecords)) {
             return Collections.emptySet();
@@ -172,7 +138,7 @@ public class MpHistorySaleRecordServiceImpl extends AbstractDocService<MpHistory
         // 第三步：筛选结果
         Set<String> result = new HashSet<>();
         for (Map.Entry<String, BitSet> entry : materialBitSets.entrySet()) {
-            if (entry.getValue().cardinality() > MIN_MONTH_THRESHOLD) {
+            if (entry.getValue().cardinality() > months) {
                 result.add(entry.getKey());
             }
         }

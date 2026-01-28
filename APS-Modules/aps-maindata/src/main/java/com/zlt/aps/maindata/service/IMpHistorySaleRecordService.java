@@ -3,7 +3,6 @@ package com.zlt.aps.maindata.service;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.bill.common.service.IDocService;
 
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -21,14 +20,9 @@ import java.util.Set;
  */
 public interface IMpHistorySaleRecordService extends IDocService<MpHistorySaleRecord> {
   /**
-   *  查询近12个月的月均销量大于零的月份数 > 8 的“SKU列表2”
-   * @return
-   */
-  Set<String> findSkuInLastTwelveMonth();
-  /**
-   *  获取过去months个月的月均销量
+   * 查询近12个月的月均销量大于零的月份数 > months 的“SKU列表2”
    * @param months 月份数
-   * @return 月均销量
+   * @return SKU列表2
    */
-  Map<String,Integer> calculateMonthSaleQty(int months);
+  Set<String> findSkuInLastTwelveMonth(int months);
 }

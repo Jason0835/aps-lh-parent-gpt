@@ -503,7 +503,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
             return Collections.emptySet();
         }
         // 2. 获取近12个月销售活跃的SKU
-        Set<String> activeSalesSkus = historySaleRecordService.findSkuInLastTwelveMonth();
+        Set<String> activeSalesSkus = historySaleRecordService.findSkuInLastTwelveMonth(context.getMonths());
         if (activeSalesSkus.isEmpty()) {
             return Collections.emptySet();
         }
@@ -536,13 +536,14 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     private PrecedentStockUpContext buildContext(YearMonth yearMonth) {
         List<MdmMaterialInfo> materialInfos = findAllActive();
         List<MdmMonCycleSchStruConf> cycleSchStruConfs = this.mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(yearMonth);
-
+        int months = getMonthSaleQtyMonths();
         return PrecedentStockUpContext.builder()
             .materialInfos(materialInfos)
             .cycleSchStruConfs(cycleSchStruConfs)
             .structureNames(extractStructureNames(cycleSchStruConfs))
             .materialCodeToInfoMap(buildMaterialCodeMap(materialInfos))
             .turnOverDays(getTurnOverDays())
+            .months(months)
             .build();
     }
 
@@ -729,6 +730,24 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return checkOverDue?AjaxResult.error(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.overdue")):AjaxResult.success();
     }
 
+    /**
+     * 获取配置信息
+     *
+     * @return 周转天数
+     */
+    private int getMonthSaleQtyMonths() {
+        FactoryParam factoryParam = new FactoryParam();
+        factoryParam.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        factoryParam.setParamCode(MonthPlanEnums.MONTH_SALE_QTY_MONTH.getCode());
+        factoryParam.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        FactoryParam param = iFactoryParamService.getFacParamSingle(factoryParam);
+        String paramValue;
+        if (param == null) {
+            return BigDecimal.ZERO.intValue();
+        }
+        paramValue = StringUtils.isNotEmpty(param.getParamValue()) ? param.getParamValue() : param.getDefauleValue();
+        return Integer.parseInt(paramValue);
+    }
 
     /**
      * 获取配置信息
@@ -1031,5 +1050,6 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         private Set<String> structureNames;
         private Map<String, MdmMaterialInfo> materialCodeToInfoMap;
         private BigDecimal turnOverDays;
+        private Integer months;
     }
 }
