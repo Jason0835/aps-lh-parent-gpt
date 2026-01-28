@@ -68,14 +68,18 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
+    private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
+
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
                                           FormalProductionHandler formalProductionHandler,
                                           SimulateProductionHandler simulateProductionHandler,
-                                          ClearProductionInfoHandler clearProductionInfoHandler) {
+                                          ClearProductionInfoHandler clearProductionInfoHandler,
+                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService);
         this.formalProductionHandler = formalProductionHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
+        this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
     }
 
     /**
@@ -148,8 +152,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //                   存在续作中优先级的，但有高优先级。这时，续作中优先级的要先排？
         //             		   处理方案：首先，需要算一下模具的产能，如果能把高优先级+续作的中优先级全部能包过来，那么就续作优先；
         //                   如果不能包过来，就需要把中优先级中途下机，下机的时间点是，剩余的模具产能，正好能把高优先级产完。
-
-        AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler = SpringUtils.getBean(AdjustContinueSkuProductionQtyHandler.class);
         adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap, productionContext);
         //8、进行模拟模具排产
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
