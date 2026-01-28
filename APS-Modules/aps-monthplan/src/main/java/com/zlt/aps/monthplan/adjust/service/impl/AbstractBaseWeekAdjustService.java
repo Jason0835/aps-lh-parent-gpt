@@ -68,12 +68,6 @@ import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.StopWatch;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -88,6 +82,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StopWatch;
 
 /**
  * 周程滚动调整通用抽象类
@@ -389,17 +388,64 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             queryMonthPlanList(contextDTO);
             // 3、更新月度生产计划
             updateMonthPlanList(contextDTO);
-            // 4、查询调整明细
+            // 4、新增月度生产计划
+            insertMonthPlanList(contextDTO);
+            // 5、查询调整明细
             queryAdjustDetailList(contextDTO);
-            // 5、更新调整明细
+            // 6、更新调整明细
             updateAdjustDetailList(contextDTO);
-            // 6、记录调整操作日志 TODO
+            // 7、记录调整操作日志 TODO
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
             throw new BusinessException("周程调整确认失败：" + e.getMessage());
         }
     }
+
+    /**
+     * 新增月度生产计划
+     *
+     * @param contextDTO
+     */
+    private void insertMonthPlanList(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
+        if (PubUtil.isEmpty(adjustDetailList) || PubUtil.isEmpty(adjustResultList)) {
+            log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
+            return;
+        }
+        // 调整结果按照物料编码分组
+        Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
+        // 月度生产计划排程结果
+        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = new ArrayList<>();
+        // 遍历调整明细，获取新增的SKU并新增到月度生产计划
+        for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
+            String isSkuAdd = adjustDetailVo.getIsSkuAdd();
+            if (!ApsConstant.TRUE.equals(isSkuAdd)) {
+                continue;
+            }
+            String materialCode = adjustDetailVo.getMaterialCode();
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            if (adjustResult == null) {
+                continue;
+            }
+            FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
+            BeanUtils.copyProperties(adjustResult, monthPlan);
+            monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
+            monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
+            factoryMonthPlanProdFinalList.add(monthPlan);
+        }
+        // 新增月度生产计划
+        try {
+            baseDao.insertBatch(factoryMonthPlanProdFinalList);
+            log.info("新增月度生产计划成功，共新增:{}条记录", factoryMonthPlanProdFinalList.size());
+        } catch (Exception e) {
+            log.error("新增月度生产计划批量操作异常", e);
+            throw new RuntimeException("新增月度生产计划失败", e);
+        }
+
+    }
+
 
     /**
      * 更新调整明细
@@ -1695,7 +1741,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected Map<String, Object> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(), new Date(), null);
+                contextDTO.getFactoryCode(), new Date(), contextDTO.getMonthPlanVersion());
     }
 
     /**

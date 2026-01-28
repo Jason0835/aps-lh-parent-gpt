@@ -8,6 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -283,6 +284,31 @@ public class Context {
         List<Integer> dayList = new ArrayList<>(allProductionDaySet);
         dayList.sort(Comparator.comparing(Integer::intValue));
         return dayList.get(dayList.size() - BigDecimal.ONE.intValue());
+    }
+
+    /**
+     * 根据排产日及日硫化量，得到开产日放置的最大量
+     *
+     * @param productionDay 排产日
+     * @param dayLhQty      日硫化量
+     * @return
+     */
+    public Integer getOpenDayMaxQty(Integer productionDay, Integer dayLhQty) {
+        if (null == productionDay || null == dayLhQty) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (!productionDayAfterStop.contains(productionDay)) {
+            return dayLhQty;
+        }
+        Integer ratio = capacityRatioMap.get(productionDay);
+        if (null == ratio) {
+            return dayLhQty;
+        }
+        Integer maxQty = BigDecimal.valueOf(dayLhQty).multiply(BigDecimal.valueOf(ratio)).divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), 0, RoundingMode.UP).intValue();
+        if (maxQty % ProductionConstant.DOUBLE_MOULD_PRODUCTION == BigDecimal.ONE.intValue()) {
+            maxQty = maxQty + BigDecimal.ONE.intValue();
+        }
+        return maxQty;
     }
 
     /**

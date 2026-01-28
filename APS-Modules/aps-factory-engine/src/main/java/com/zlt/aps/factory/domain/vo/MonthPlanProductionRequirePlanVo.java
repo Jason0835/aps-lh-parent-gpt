@@ -77,8 +77,13 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     private Integer productionQty;
     /**
-     * 原有的排产量
-     * 数据备份
+     * 高优先级需求量
+     * 数据备份-模拟排产后需要用它还原heightProductionQty
+     */
+    private Integer originHeightProductionQty;
+    /**
+     * 总的排产净需求量
+     * 数据备份-模拟排产后需要用它还原productionQty
      */
     private Integer originProductionQty;
     /**
@@ -107,9 +112,11 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public void initProductionDataInfo() {
         productionFlag = getIsProduction();
-        cxCapacityRequireQty = this.getCxCapacityRequireQty();
         heightProductionQty = getHeightLossQty();
+        cxCapacityRequireQty = this.getCxCapacityRequireQty();
         productionQty = cxCapacityRequireQty;
+        originHeightProductionQty = heightProductionQty;
+        originProductionQty = productionQty;
     }
 
     /**
@@ -121,7 +128,9 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 初始的库销比
      */
     public void resetProductionDataInfo() {
-        initProductionDataInfo();
+        productionFlag = getIsProduction();
+        heightProductionQty = originHeightProductionQty;
+        productionQty = originProductionQty;
         calculateInventorySalesRatio(BigDecimal.ZERO.intValue());
     }
 
@@ -735,8 +744,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         }
     }
 
+    /**
+     * 产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
+     *
+     * @return
+     */
     public int getCxCapacityRequireQty() {
-        //产能需求量 = 高优先级(含损耗量) + 非高优先级(含损耗量)
         Integer heightLossQty = getHeightLossQty() - getHeightQty();
         Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
         Integer sumLossQty = heightLossQty + noHeightLossQty;

@@ -18,6 +18,7 @@ import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Async;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
  * 异步任务执行
  * @author Yelq
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class AsyncService {
@@ -95,10 +97,16 @@ public class AsyncService {
       currentMonthDemands =  dpDemandPlanService.createPredictionRequire(currentMonth,param,currentFinalVersion,predictionContext);
       // 排产汇总
       if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
-        Context context = buildContext(currentMonthDemands);
-        productionSchedulingService.executeSchedulingInNewTransaction(param,context);
-        currentFinalVersion = createProductionVersion(context,currentMonthDemands);
-        productionVersions.put(currentMonth,currentFinalVersion);
+        try{
+          Context context = buildContext(currentMonthDemands);
+          productionSchedulingService.executeSchedulingInNewTransaction(param,context);
+          currentFinalVersion = createProductionVersion(context,currentMonthDemands);
+          productionVersions.put(currentMonth,currentFinalVersion);
+        }catch (Exception e){
+            DpDemandPlan demandPlan = currentMonthDemands.get(0);
+            log.info("=====工厂{}, 计划年月：{}-{}, 需求计划版本：{},异常原因:{}====",demandPlan.getFactoryCode(),demandPlan.getYear(),demandPlan.getMonth(),demandPlan.getMonthPlanVersion(),e.getMessage());
+            break;
+        }
       }
     }
     Map<String, MdmMaterialInfo> materialInfoMap = predictionContext.getMaterialInfoMap();

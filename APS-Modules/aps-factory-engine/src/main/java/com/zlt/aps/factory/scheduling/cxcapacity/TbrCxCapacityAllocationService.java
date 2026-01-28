@@ -15,6 +15,7 @@ import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
+import com.zlt.aps.factory.logrecorder.*;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
@@ -58,9 +59,20 @@ import java.util.stream.Collectors;
 @Service(value = "tbrCxCapacityAllocationService")
 public class TbrCxCapacityAllocationService extends AbstractProductionBusinessService {
 
+    private final FormalProductionHandler formalProductionHandler;
 
-    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService) {
+    private final SimulateProductionHandler simulateProductionHandler;
+
+    private final ClearProductionInfoHandler clearProductionInfoHandler;
+
+    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
+                                          FormalProductionHandler formalProductionHandler,
+                                          SimulateProductionHandler simulateProductionHandler,
+                                          ClearProductionInfoHandler clearProductionInfoHandler) {
         super(dataService);
+        this.formalProductionHandler = formalProductionHandler;
+        this.simulateProductionHandler = simulateProductionHandler;
+        this.clearProductionInfoHandler = clearProductionInfoHandler;
     }
 
     /**
@@ -130,17 +142,17 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
         //7、进行模拟模具排产
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
-        new SimulateProductionHandler().productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
+        simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
         //10、第二轮排产
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
         //清除模拟排产信息
-        new ClearProductionInfoHandler().clearProductionData(productionContext);
+        clearProductionInfoHandler.clearProductionData(productionContext);
         //重新构建分组计划的硫化组限制信息
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
-        FormalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        formalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
@@ -414,30 +426,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
         });
-//        TbrProductionContext productionContext = (TbrProductionContext) context;
-//        //物料已排产量及损耗量清空
-//        productionContext.resetSkuProductionAndWastageQty();
-//        //处理计划的待排产量及排产标记重置
-//        Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();
-//        if (!CollectionUtils.isEmpty(allSinglePlanMap)) {
-//            allSinglePlanMap.forEach((monthPlanId, singlePlan) -> singlePlan.resetProductionDataInfo());
-//        }
-//        //重新构建模具排产信息，全部清空
-//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
-//        if (!CollectionUtils.isEmpty(allMouldInfoMap)) {
-//            allMouldInfoMap.forEach((mouldCode, singleMouldInfo) -> {
-//                singleMouldInfo.setFinishDaySet(new HashSet<>());
-//                singleMouldInfo.setDayProductionInfo(new HashMap<>());
-//            });
-//        }
-//        //清除模壳使用量
-//        productionContext.clearAllMouldShellUsed();
-//        //清除模具分配使用量
-//        productionContext.clearAllMouldAllocationUsed();
-//        //清除胶囊卡盘使用量
-//        productionContext.clearAllCapsuleChuckUsed();
-//        //清除日排产限制使用量
-//        productionContext.clearAllDayLimitUsed();
     }
 
     /**
@@ -800,11 +788,16 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
             return;
         }
+        Set<Integer> openDay = productionContext.getProductionDayAfterStop();
         ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
         Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(productionDayList.size());
         Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
         productionDayList.forEach(productionDay -> {
             Integer ratio = startProductionRatioMap.get(productionDay);
+            //20260127 开产时，只是量放一半，日产限制还是放大到100
+            if (openDay.contains(productionDay)) {
+                ratio = ProductionConstant.PERCENTAGE;
+            }
             DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
             dayCapacityLimitMap.put(productionDay, dayInitLimit);
         });

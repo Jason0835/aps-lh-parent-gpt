@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.scheduling;
 
+import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
@@ -7,6 +8,7 @@ import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.monthplan.api.enums.WorkWearTypeEnum;
 import lombok.Data;
@@ -172,12 +174,16 @@ public class BaseDataContainer implements Serializable {
             log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
             return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
         }
+        String dayInfo = dayCapacitySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        log.info(DayLimitLogRecorder.addLeftOverDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_LIMIT, dayInfo));
         Set<Integer> workWeakProductionSet = getLeftOverProductionDayInfo(proSize);
         if (CollectionUtils.isEmpty(workWeakProductionSet)) {
             limitType = GroupAllocationCapacityLimitTypeEnum.TIRE_DRUM_LIMIT;
             log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
             return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
         }
+        dayInfo = workWeakProductionSet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        log.info(DayLimitLogRecorder.addLeftOverDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, GroupAllocationCapacityLimitTypeEnum.TIRE_DRUM_LIMIT, dayInfo));
         Set<Integer> intersectionSet = dayCapacitySet.stream().filter(workWeakProductionSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
             limitType = GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_TIRE_DRUM_LIMIT;

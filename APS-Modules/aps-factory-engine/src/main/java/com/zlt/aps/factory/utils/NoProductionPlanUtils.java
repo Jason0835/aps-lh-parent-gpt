@@ -28,7 +28,7 @@ public class NoProductionPlanUtils {
       BeanUtils.copyProperties(productionPlan, noProductionPlan);
       noProductionPlan.setId(null);
       noProductionPlan.setReason(unProductionReason);
-      int needProductionQty = productionPlan.getFactProdReqQty();
+      int needProductionQty = productionPlan.getCxCapacityRequireQty();
       int plannedQty = sumProductionMap.getOrDefault(monthPlanId, 0);
       int unProductionQty = needProductionQty - plannedQty;
       String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();

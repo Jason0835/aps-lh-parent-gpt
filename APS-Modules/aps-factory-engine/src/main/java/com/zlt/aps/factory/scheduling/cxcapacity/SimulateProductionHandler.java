@@ -9,9 +9,14 @@ import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.enums.ProductionStageEnum;
+import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -34,7 +39,8 @@ import java.util.stream.Collectors;
  * @date 20260127
  */
 @Slf4j
-public class SimulateProductionHandler {
+@Component
+public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
     /**
      * 模拟排产计划
      *
@@ -47,8 +53,8 @@ public class SimulateProductionHandler {
         //设置收尾机台信息-空
         productionContext.setReverseFindSet(new HashSet<>());
         //1、模拟排产前的数据处理
-//        beforeSimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
-//        log.info(TbrSimulateProductionLogRecorder.addResetDataFinishLog(productionContext));
+        beforeSimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        log.info(TbrSimulateProductionLogRecorder.addResetDataFinishLog(productionContext));
         //1、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         //2、对在产机台-收尾成型机台，反向匹配待排结构
@@ -102,7 +108,7 @@ public class SimulateProductionHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //1、在机结构-在产机台-续作Sku排产
-//        productionContinue(productionContext, allContinueMap, allGroupPlanMap);
+        productionContinue(ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         allContinueMap.forEach((structureName, cxContinueInfo) -> {
@@ -112,7 +118,6 @@ public class SimulateProductionHandler {
                 log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null));
                 return;
             }
-            groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
             //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
             groupPlanInfo.setThisRoundCanProduction();
             //在机结构-新增Sku模拟排产

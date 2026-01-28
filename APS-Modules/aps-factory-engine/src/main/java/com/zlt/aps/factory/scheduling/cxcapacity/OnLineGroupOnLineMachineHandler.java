@@ -6,6 +6,8 @@ import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.ProductionStageEnum;
+import com.zlt.aps.factory.logrecorder.TbrMouldFormalProductionLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
