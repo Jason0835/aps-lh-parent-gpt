@@ -12,6 +12,7 @@ import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -259,21 +260,11 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      * @return
      */
     private Map<String, List<MonthPlanProductMouldInfoVo>> getProductionMouldInfo(TbrProductionContext productionContext) {
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = new ArrayList<>();
         //已有模具的配置关系
         List<MonthPlanProductMouldInfoVo> productMouldInfoList = getDataService().getProductionMouldInfo(productionContext);
-        if (CollectionUtils.isEmpty(productMouldInfoList)) {
-            log.info(TbrProductionInitLogRecorder.addMouldRelationEmptyLog(productionContext));
-        } else {
-            allMouldRelationInfoList.addAll(productMouldInfoList);
-        }
         //新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getProductionMouldDeliveryInfo(productionContext);
-        if (CollectionUtils.isEmpty(mouldDeliveryList)) {
-            log.info(TbrProductionInitLogRecorder.addMouldDeliveryEmptyLog(productionContext));
-        } else {
-            allMouldRelationInfoList.addAll(mouldDeliveryList);
-        }
+        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
