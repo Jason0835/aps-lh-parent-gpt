@@ -91,7 +91,7 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
         //2025-01~2026-01
         YearMonth current = YearMonth.now().minusMonths(1);
         // 计算最近N个月的起始点
-        YearMonth recentStart = current.minusMonths(12);
+        YearMonth recentStart = current.minusMonths(11);
         // 将年月转换为数值
         // 2025-01
         int recentStartValue = recentStart.getYear() * 100 + recentStart.getMonthValue();
