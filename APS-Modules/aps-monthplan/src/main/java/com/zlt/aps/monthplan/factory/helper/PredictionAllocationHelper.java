@@ -60,11 +60,14 @@ public class PredictionAllocationHelper {
       productionQty = productionQtyMap.getOrDefault(entry.getKey(),0);
       completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
       totalProductionQty = productionQty - completionQty;
+      totalOrderQty = calculateTotalOrderQty(entry.getValue());
+      if(totalOrderQty == 0) {
+        continue;
+      }
       if(totalProductionQty == 0) {
         result.addAll(entry.getValue());
         continue;
       }
-      totalOrderQty = calculateTotalOrderQty(entry.getValue());
       if(totalOrderQty <= totalProductionQty) {
          continue;
       }
