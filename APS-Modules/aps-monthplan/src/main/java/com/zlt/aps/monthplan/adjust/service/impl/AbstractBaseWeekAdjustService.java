@@ -347,13 +347,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     protected Comparator<MpAdjustDetailVo> getSortComparator() {
-        return Comparator
-                .comparing(MpAdjustDetailVo::getStructureName,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(MpAdjustDetailVo::getPendingQty,
-                        Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(MpAdjustDetailVo::getMaterialCode,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
+        // 定义施工阶段自定义排序权重：正式(03) -> 试制(01) -> 量试(02) -> 无工艺(00)，空值排最后
+        Map<String, Integer> stageSortWeights = new HashMap<>();
+        // 正式：权重1
+        stageSortWeights.put(ConstructionStageEnum.FORMAL_PRODUCTION.getStage(), 1);
+        // 试制：权重2
+        stageSortWeights.put(ConstructionStageEnum.MEASUREMENT.getStage(), 2);
+        // 量试：权重3
+        stageSortWeights.put(ConstructionStageEnum.TRIAL_PRODUCTION.getStage(), 3);
+        // 无施工：权重4
+        stageSortWeights.put(ConstructionStageEnum.NO_CONSTRUCTION.getStage(), 4);
+        // 一级排序：结构名称升序，空值排最后
+        return Comparator.comparing(MpAdjustDetailVo::getStructureName, Comparator.nullsLast(String::compareTo))
+                // 二级排序：施工阶段按自定义权重升序（权重小排前）
+                .thenComparing(vo -> stageSortWeights.getOrDefault(vo.getConstructionStage(), 5))
+                // 三级排序：待调整量按绝对值从大到小（降序）
+                .thenComparing((MpAdjustDetailVo vo) -> Math.abs(Optional.ofNullable(vo.getPendingQty()).orElse(0)), Comparator.reverseOrder());
     }
 
     @Override
@@ -1860,8 +1869,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
         if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
-            // 当为试制量试时，设置为订单量
-            adjustDetailVo.setPreviousNetQty(adjustDetailVo.getOrdQty());
+            // 当为试制量试时，设置为空
+            adjustDetailVo.setPreviousNetQty(null);
             return;
         }
         if (monthPlan == null) {

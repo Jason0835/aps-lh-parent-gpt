@@ -1,17 +1,20 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -124,6 +127,24 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		return iScmItfService.lockSalesOrderPool(planedNotShipParamVo);
 	}
 
+	@Override
+	public List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode, Set<String> skus) {
+		List<SalesOrderPool> result = Lists.newArrayList();
+		final int batchSize = 1000;
+		List<String> skuList = new ArrayList<>(skus);
+		for (int i = 0; i < skus.size(); i += batchSize) {
+			int end = Math.min(i + batchSize, skus.size());
+			List<String> batchSkus = skuList.subList(i, end);
+			LambdaQueryWrapper<SalesOrderPool> wrapper =
+					Wrappers.lambdaQuery(SalesOrderPool.class)
+							.eq(SalesOrderPool::getFactoryCode, factoryCode)
+							.in(SalesOrderPool::getOriMaterialCode, batchSkus)
+							.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
+			result.addAll(salesOrderPoolEntityMapper.selectList(wrapper));
+		}
+		return result;
+	}
+
 	/**
 	 * 批量修改同PO号的销售优先级
 	 *
@@ -220,8 +241,11 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	}
 
 	@Override
-	public List<SalesOrderPool> findCurrentSalesOrderPool() {
+	public List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode) {
 		LambdaQueryWrapper<SalesOrderPool> wrapper = Wrappers.lambdaQuery();
+		if(StringUtils.isNotBlank(factoryCode)){
+			wrapper.eq(SalesOrderPool::getFactoryCode,factoryCode);
+		}
 		wrapper.eq(SalesOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
 		return salesOrderPoolEntityMapper.selectList(wrapper);
 	}

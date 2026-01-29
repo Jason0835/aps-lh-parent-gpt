@@ -10,6 +10,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
@@ -161,6 +162,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         // 计划类型
         mpStructureAllocation.setPlanType("01");
+        // 数据来源
+        mpStructureAllocation.setDataSource(DataSourceEnum.HAND.getCode());
         return baseDao.save(mpStructureAllocation);
     }
 

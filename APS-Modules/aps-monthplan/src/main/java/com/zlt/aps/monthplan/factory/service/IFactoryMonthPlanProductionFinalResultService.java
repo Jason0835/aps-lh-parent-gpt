@@ -107,4 +107,11 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @return
      */
     List<FactoryMonthPlanProductionFinalResult> listMonthProdFinalPlans(FactoryMonthPlanProductionFinalResult param);
+    /**
+     * 库存抓取日~（同月）月底的月度计划量汇总不保存
+     * @param factoryCode 分厂
+     * @param skus 物料
+     * @return 月度计划量汇总
+     */
+    Map<String, Integer> calculateStructureFrequency(String factoryCode, Set<String> skus);
 }

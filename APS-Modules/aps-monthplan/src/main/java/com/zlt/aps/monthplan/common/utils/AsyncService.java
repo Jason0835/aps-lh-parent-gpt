@@ -50,8 +50,8 @@ public class AsyncService {
   private final BaseDao baseDao;
 
   @Async("taskExecutor")
-  public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange) throws Exception {
-    PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
+  public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange){
+    PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
     Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
     productionVersions.put(monthRange.getTMonth(),finalVersion);
     // 生成T月模拟需求计划

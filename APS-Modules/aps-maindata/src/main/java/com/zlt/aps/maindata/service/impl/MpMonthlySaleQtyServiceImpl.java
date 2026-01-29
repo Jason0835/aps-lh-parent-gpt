@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -258,10 +259,21 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     @Override
-    public List<MpMonthlySaleQty> findCurrentMonthlySaleQty() {
-        LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
-        return entityMapper.selectList(wrapper);
+    public List<MpMonthlySaleQty> findCurrentMonthlySaleQty(String factoryCode,Set<String> skus) {
+        List<MpMonthlySaleQty> result = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(skus);
+        for (int i = 0; i < skus.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, skus.size());
+            List<String> batchSkus = skuList.subList(i, end);
+            LambdaQueryWrapper<MpMonthlySaleQty> wrapper =
+                Wrappers.lambdaQuery(MpMonthlySaleQty.class)
+                    .eq(MpMonthlySaleQty::getFactoryCode, factoryCode)
+                    .in(MpMonthlySaleQty::getMaterialCode, batchSkus)
+                    .eq(MpMonthlySaleQty::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(entityMapper.selectList(wrapper));
+        }
+        return result;
     }
 
     @Override
@@ -274,8 +286,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     @Override
-    public Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode() {
-        List<MpMonthlySaleQty> list = this.findCurrentMonthlySaleQty();
+    public Map<String, Integer> findCurrentMonthlySaleQty(String factoryCode) {
+        List<MpMonthlySaleQty> list = this.findCurrentMonthlySaleQtyByFactoryCode(factoryCode);
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptyMap();
         }
@@ -283,6 +295,13 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             .filter(Objects::nonNull)
             .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
             .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
+    }
+
+    private List<MpMonthlySaleQty> findCurrentMonthlySaleQtyByFactoryCode(String factoryCode) {
+        LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MpMonthlySaleQty::getFactoryCode, factoryCode);
+        wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
+        return entityMapper.selectList(wrapper);
     }
 
     /**

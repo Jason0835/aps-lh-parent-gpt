@@ -1,9 +1,9 @@
 package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
-import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -25,5 +25,5 @@ public interface IMdmMonCycleSchStruConfService extends IDocService<MdmMonCycleS
    *  查询当前周期性排产结构配置
    * @return 当前周期性排产结构配置
    */
-  List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf(YearMonth yearMonth);
+  List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf(SupplyOrderPool supplyOrderPool);
 }

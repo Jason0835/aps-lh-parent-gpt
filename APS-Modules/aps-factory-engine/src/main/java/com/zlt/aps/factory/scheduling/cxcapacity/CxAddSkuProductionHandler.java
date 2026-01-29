@@ -405,7 +405,16 @@ public class CxAddSkuProductionHandler {
             if (CollectionUtils.isEmpty(allDayProductionInfo)) {
                 return;
             }
+            boolean isAddProductionQty = true;
             List<CxMouldDayProductionHelper> dayProductionList = allDayProductionInfo.get(startDay);
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                isAddProductionQty = false;
+                Integer previousDay = context.getPreviousDay(startDay);
+                if (null == previousDay) {
+                    return;
+                }
+                dayProductionList = allDayProductionInfo.get(previousDay);
+            }
             if (CollectionUtils.isEmpty(dayProductionList)) {
                 return;
             }
@@ -415,8 +424,10 @@ public class CxAddSkuProductionHandler {
             }
             materialDescSet.add(lastProduction.getMaterialDesc());
             List<CxMouldDayProductionHelper> materialAllProductionInfo = dayProductionList.stream().filter(single -> single.getMaterialDesc().equals(lastProduction.getMaterialDesc())).collect(Collectors.toList());
-            Integer sumProductionQty = materialAllProductionInfo.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
-            productionQtyList.add(sumProductionQty);
+            if (isAddProductionQty) {
+                Integer sumProductionQty = materialAllProductionInfo.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+                productionQtyList.add(sumProductionQty);
+            }
         });
         if (CollectionUtils.isEmpty(materialDescSet) || materialDescSet.size() > BigDecimal.ONE.intValue()) {
             return;
@@ -432,7 +443,10 @@ public class CxAddSkuProductionHandler {
         }
         MonthPlanProductionRequirePlanVo planInfo = planList.get(BigDecimal.ZERO.intValue());
         Integer dayLhQty = planInfo.getMaxDaySingleLhMachineQty();
-        Integer productionQty = productionQtyList.stream().mapToInt(Integer::intValue).sum();
+        Integer productionQty = BigDecimal.ZERO.intValue();
+        if (!CollectionUtils.isEmpty(productionQtyList)) {
+            productionQty = productionQtyList.stream().mapToInt(Integer::intValue).sum();
+        }
         lhGroup.updateBeforeSkuInfo(materialDesc, planInfo.getMaterialCode(), productionQty, dayLhQty);
     }
 }

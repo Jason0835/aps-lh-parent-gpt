@@ -543,5 +543,35 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         return getDataList(param);
     }
 
-
+    @Override
+    public Map<String, Integer> calculateStructureFrequency(String factoryCode, Set<String> skus) {
+        // 获取当前年月
+        YearMonth currentYearMonth = YearMonth.now();
+        YearMonth startYearMonth = currentYearMonth.minusMonths(12);
+        String yearMonth = String.format("%s%02d", startYearMonth.getYear(), startYearMonth.getMonthValue());
+        List<FactoryMonthPlanProductionFinalResult> list = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(skus);
+        for (int i = 0; i < skus.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, skus.size());
+            List<String> batchSkus = skuList.subList(i, end);
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper =
+                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                    .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)
+                    .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, batchSkus)
+                    .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            list.addAll(finalMapper.selectList(wrapper));
+        }
+        if (CollectionUtils.isEmpty(list)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> structureFrequencyMap = Maps.newHashMap();
+        Map<String, List<FactoryMonthPlanProductionFinalResult>> map = list.stream().collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
+        map.forEach((materialCode, value) -> {
+            Set<Integer> yearMonths = value.stream().map(FactoryMonthPlanProductionFinalResult::getYearMonth).collect(Collectors.toSet());
+            structureFrequencyMap.put(materialCode, yearMonths.size());
+        });
+        return structureFrequencyMap;
+    }
 }

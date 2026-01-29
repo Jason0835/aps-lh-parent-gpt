@@ -6,6 +6,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -47,10 +48,17 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @return
 	 */
 	AjaxResult lockSalesOrderPool(SalesOrderPool billVO);
-	
 	/**
-	 *  查询当前销售订单
-	 * @return 当前销售订单
+	 * 获取销售订单
+	 * @param factoryCode
+	 * @return
 	 */
-	List<SalesOrderPool> findCurrentSalesOrderPool();
+	List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode);
+	/**
+	 * 获取销售订单
+	 * @param factoryCode
+	 * @param eligibleSkus
+	 * @return
+	 */
+	List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode, Set<String> eligibleSkus);
 }

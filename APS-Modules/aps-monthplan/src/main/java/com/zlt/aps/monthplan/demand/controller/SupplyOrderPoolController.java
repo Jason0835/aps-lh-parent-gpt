@@ -13,6 +13,8 @@ import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.AreaConvertVo;
+import com.zlt.aps.monthplan.common.utils.CycleStockUpService;
+import com.zlt.aps.monthplan.common.utils.PrecedentStockUpService;
 import com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISupplyOrderPoolService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -22,9 +24,9 @@ import com.zlt.common.utils.PubUtil;
 import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,15 +50,18 @@ import java.util.stream.Collectors;
 */
 @Slf4j
 @Api(tags = "供应链订单池")
+@AllArgsConstructor
 @RestController
 @RequestMapping("/supplyOrderPool")
 public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOrderPool> {
 
-    @Autowired
-    private ISupplyOrderPoolService supplyOrderPoolService;
+    private final ISupplyOrderPoolService supplyOrderPoolService;
 
-    @Autowired
-    private SupplyOrderPoolEntityMapper entityMapper;
+    private final SupplyOrderPoolEntityMapper entityMapper;
+
+    private final CycleStockUpService cycleStockUpService;
+
+    private final PrecedentStockUpService precedentStockUpService;
     /**
      * 查询供应链订单池列表
      */
@@ -204,8 +209,8 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         leaseTime = 300
     )
     @PostMapping("/createCycleStockUp")
-    public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool) throws InterruptedException {
-        supplyOrderPoolService.createCycleStockUp(supplyOrderPool);
+    public AjaxResult createCycleStockUp(@RequestBody SupplyOrderPool supplyOrderPool){
+        cycleStockUpService.createCycleStockUp(supplyOrderPool,true);
         return AjaxResult.success();
     }
 
@@ -217,7 +222,7 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     )
     @PostMapping("/createPrecedentStockUp")
     public AjaxResult createPrecedentStockUp(@RequestBody SupplyOrderPool supplyOrderPool){
-        supplyOrderPoolService.createPrecedentStockUp(supplyOrderPool);
+        precedentStockUpService.createPrecedentStockUp(supplyOrderPool,true);
         return AjaxResult.success();
     }
 

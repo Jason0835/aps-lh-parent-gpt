@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.demand.service.impl;
+package com.zlt.aps.monthplan.common.utils;
 
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class StockAllocationServiceImpl {
+public class StockAllocationService {
 
     private static final String QUALITY_YES = "1";
     private static final String QUALITY_NO = "0";

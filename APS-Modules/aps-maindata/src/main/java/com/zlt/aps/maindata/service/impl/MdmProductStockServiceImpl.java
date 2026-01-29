@@ -1,10 +1,13 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
@@ -16,8 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -84,5 +89,23 @@ public class MdmProductStockServiceImpl extends AbstractDocService<MdmProductSto
         wrapper.eq(MdmProductStock::getMaterialCode, materialCode);
         wrapper.eq(MdmProductStock::getIsDelete, YesOrNoEnum.NO.getValue());
         return this.mdmProductStockEntityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<MdmProductStock> findCurrentFinishStock(String factoryCode, Set<String> skus) {
+        List<MdmProductStock> result = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(skus);
+        for (int i = 0; i < skus.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, skus.size());
+            List<String> batchSkus = skuList.subList(i, end);
+            LambdaQueryWrapper<MdmProductStock> wrapper =
+                Wrappers.lambdaQuery(MdmProductStock.class)
+                    .eq(MdmProductStock::getFactoryCode, factoryCode)
+                    .in(MdmProductStock::getMaterialCode, batchSkus)
+                    .eq(MdmProductStock::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(mdmProductStockEntityMapper.selectList(wrapper));
+        }
+        return result;
     }
 }

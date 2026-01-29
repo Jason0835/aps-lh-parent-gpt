@@ -180,5 +180,32 @@ public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
      * 获取SKU对应的物料信息
      * @return 物料信息
      */
-    Map<String,MdmMaterialInfo>  skuToMaterialInfo();
+    Map<String,MdmMaterialInfo>  skuToMaterialInfo(String structureName);
+    /**
+     *  查找物料信息
+     * @param factoryCode
+     * @param skus
+     * @return
+     */
+    List<MdmMaterialInfo> findMaterialInfo(String factoryCode, Set<String> skus);
+    /**
+     * 查找物料信息
+     * @param factoryCode
+     * @return
+     */
+    List<MdmMaterialInfo> findMaterialInfo(String factoryCode);
+    /**
+     * 查找物料信息
+     * @param factoryCode
+     * @param materialCode
+     * @return
+     */
+    MdmMaterialInfo getMaterialInfoByMaterialCode(String factoryCode, String materialCode);
+    /**
+     * 根据结构查找物料信息
+     * @param factoryCode
+     * @param structureNames
+     * @return
+     */
+    List<MdmMaterialInfo> findMaterialInfoByStructureNames(String factoryCode, Set<String> structureNames);
 }
