@@ -1625,15 +1625,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
-            adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
+            // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+                // 施工阶段
+                adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+                // 产品状态
                 adjustDetailVo.setProductStatus(trialPlan.getTrialStatus());
+                // 紧急程度
+                adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
+                // 制造示方书号
+                adjustDetailVo.setEmbryoNo(trialPlan.getEmbryoNo());
             }
-            String constructionStage = ConstructionStageEnum.FORMAL_PRODUCTION.getStage();
-            if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
-                constructionStage = trialPlan.getTrialStatus();
-            }
-            adjustDetailVo.setConstructionStage(constructionStage);
+            adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
+            adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
             // 型腔数量、活块数量
             adjustDetailVo.setMouldCavityQty(0);
             adjustDetailVo.setTypeBlockQty(0);
@@ -1661,6 +1665,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setDayVulcanizationQty(monthPlan.getDayVulcanizationQty());
         adjustDetailVo.setCuringTime(monthPlan.getCuringTime());
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
+        // 制造示方书号
+        adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
         adjustDetailVo.setHeightQty(Convert.toInt(monthPlan.getHeightProductionQty(),0));
         adjustDetailVo.setMidQty(Convert.toInt(monthPlan.getMidProductionQty(),0));
         adjustDetailVo.setPostponeQty(Convert.toInt(monthPlan.getPostponeProductionQty(),0));
