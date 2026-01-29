@@ -42,22 +42,40 @@ public class MdmMaterialInfo extends BaseEntity {
     private String factoryCode;
 
     /**
-     * MES物料大类
+     * MES物料大类编码
      */
     @ImportExcelValidated(maxLength = 10)
-    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCategory", dictType = "mes_material_category")
-    @ApiModelProperty(value = "MES物料大类", name = "materialCategory")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCategory")
+    @ApiModelProperty(value = "MES物料大类编码", name = "materialCategory")
     @TableField(value = "MES_MATERIAL_CATEGORY")
     private String mesMaterialCategory;
 
     /**
-     * MES物料细类
+     * MES物料细类编码
      */
     @ImportExcelValidated(maxLength = 10)
-    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialSubcategory", dictType = "mes_material_subcategory")
-    @ApiModelProperty(value = "MES物料细类", name = "mesMaterialSubcategory")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialSubcategory")
+    @ApiModelProperty(value = "MES物料细类编码", name = "mesMaterialSubcategory")
     @TableField(value = "MES_MATERIAL_SUBCATEGORY")
     private String mesMaterialSubcategory;
+
+    /**
+     * MES物料大类名称
+     */
+    @ImportExcelValidated(maxLength = 100)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialCateName")
+    @ApiModelProperty(value = "MES物料大类名称", name = "mesMaterialCateName")
+    @TableField(value = "MES_MATERIAL_CATE_NAME")
+    private String mesMaterialCateName;
+
+    /**
+     * MES物料细类名称
+     */
+    @ImportExcelValidated(maxLength = 100)
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mesMaterialSubcatName")
+    @ApiModelProperty(value = "MES物料细类名称", name = "mesMaterialSubcatName")
+    @TableField(value = "MES_MATERIAL_SUBCAT_NAME")
+    private String mesMaterialSubcatName;
 
     /**
      * 物料类型

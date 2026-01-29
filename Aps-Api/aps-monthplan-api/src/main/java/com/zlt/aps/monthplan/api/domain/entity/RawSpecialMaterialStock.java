@@ -74,11 +74,18 @@ public class RawSpecialMaterialStock extends BaseEntity {
     private String materialCode;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.rawSpecialMaterialStock.materialDesc")
-    @ImportExcelValidated(required = true, maxLength = 100)
+//    @Excel(name = "ui.data.column.rawSpecialMaterialStock.materialDesc")
+//    @ImportExcelValidated(required = true, maxLength = 100)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
+
+    /** 物料名称 */
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.materialName")
+    @ImportExcelValidated(required = true, maxLength = 100)
+    @ApiModelProperty(value = "物料名称", name = "materialName")
+    @TableField(value = "MATERIAL_NAME")
+    private String materialName;
 
     /** 标准长 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.standardLength")

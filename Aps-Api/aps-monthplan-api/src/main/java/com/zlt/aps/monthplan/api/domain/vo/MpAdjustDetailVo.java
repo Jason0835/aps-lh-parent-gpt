@@ -13,11 +13,11 @@ import lombok.Data;
 @Data
 public class MpAdjustDetailVo extends MpAdjustStructureIn {
 
-    @ApiModelProperty(value = "计划剩余排产量", name = "monthUnScheduledQty")
+    @ApiModelProperty(value = "计划剩余排产量")
     @TableField(exist = false)
     private Integer monthUnScheduledQty;
 
-    @ApiModelProperty(value = "订单量", name = "ordQty")
+    @ApiModelProperty(value = "订单量")
     @TableField(exist = false)
     private Integer ordQty;
 

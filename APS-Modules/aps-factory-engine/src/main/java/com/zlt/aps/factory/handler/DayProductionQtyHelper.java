@@ -48,6 +48,7 @@ public class DayProductionQtyHelper implements Serializable {
      * @param productionQty       排产量
      * @param lossQty             损耗量
      * @param nextDayLossQty      隔天损耗量
+     * @param isFinish            是否排产完毕
      */
     public DayProductionQtyHelper(Integer productionDay, boolean isProductionNextDay, Integer productionQty, Integer lossQty, Integer nextDayLossQty, boolean isFinish) {
         this.productionDay = productionDay;

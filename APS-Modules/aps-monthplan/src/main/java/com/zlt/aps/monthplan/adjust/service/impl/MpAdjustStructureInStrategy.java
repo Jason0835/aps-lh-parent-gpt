@@ -172,7 +172,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         checkFieldMap.put("structureName", "结构名称");
         checkFieldMap.put("mainPattern", "主花纹");
         checkFieldMap.put("curingTime", "硫化时间");
-        checkFieldMap.put("productTypeCode", "产品分类");
         return Collections.unmodifiableMap(checkFieldMap);
     }
 
