@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 import java.util.List;
+import java.util.Map;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel;
@@ -44,6 +45,14 @@ public interface IMdmMsgTemplateUserRelService extends IService<MdmMsgTemplateUs
      * @param mdmMsgTemplateUserRel
      */
     public int bindUsers(MdmMsgTemplateUserRel mdmMsgTemplateUserRel);
+
+    /**
+     * 批量获取模板对应用户数据
+     *
+     * @param templateCodes
+     * @return
+     */
+    Map<String, String> batchGetAssociatedUsers(List<String> templateCodes);
 
     /**
      * 新增消息模板关联用户

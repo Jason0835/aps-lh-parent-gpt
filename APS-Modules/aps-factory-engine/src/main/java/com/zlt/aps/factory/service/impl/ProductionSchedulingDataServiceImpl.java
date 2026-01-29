@@ -15,9 +15,9 @@ import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.CxDevicePlanShutInfoHelper;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.service.*;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -61,9 +62,13 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final MdmCapsuleChuckEntityMapper capsuleChuckEntityMapper;
 
+    private final MdmProductStockEntityMapper mdmProductStockEntityMapper;
+
     private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
 
     private final FactoryProductionInitMapper factoryProductionInitMapper;
+
+    private final MpStructureAllocationMapper mpStructureAllocationMapper;
 
     private final FactoryMonthPlanCxInfoMapper factoryMonthPlanCxInfoMapper;
 
@@ -82,8 +87,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final FactoryMonthPlanSpecialMaterialInfoMapper factoryMonthPlanSpecialMaterialInfoMapper;
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
-
-    private final MdmProductStockEntityMapper mdmProductStockEntityMapper;
 
     private final BaseDao baseDao;
 
@@ -492,6 +495,28 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
+    public List<MpStructureAllocation> getHistoryStructureAllocationInfo(Context context) {
+        //往前取3个月的定稿版本
+        List<String> finalVersionList = getLatestMonthFinalVersion(context, 3);
+        if (CollectionUtils.isEmpty(finalVersionList)) {
+            log.info(TbrBeforeProductionGroupLogRecorder.addReaderNoCxMachineHistoryFinalVersionInfoLog(context));
+            return Collections.emptyList();
+        }
+        //获取定稿的结构排产信息
+        QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        queryWrapper.in("PRODUCTION_VERSION", finalVersionList);
+        queryWrapper.eq("PLAN_TYPE", ProductionPlanType.NORMAL.getPlanType());
+        List<MpStructureAllocation> allocationList = mpStructureAllocationMapper.selectList(queryWrapper);
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxMachineHistoryInfoLog(context, allocationList, finalVersionList));
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return Collections.emptyList();
+        }
+        return allocationList;
+    }
+
+    @Override
     public Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month) {
         List<FactoryNoProduction> noProductionList = factoryProductionSchedulingMapper.getFactoryNoProductionConfiguration(factoryCode, year, month);
         if (CollectionUtils.isEmpty(noProductionList)) {
@@ -525,13 +550,11 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     //先使用独立事务，看数据
     @Override
-//    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void saveMonthPlanInit(List<MonthPlanProductionRequirePlanVo> monthPlanInitList) {
         if (CollectionUtils.isEmpty(monthPlanInitList)) {
             return;
         }
         List<ProductionMonthPlanInit> saveMonthPlanInitList = BeanCopyUtils.copyBeanList(monthPlanInitList, ProductionMonthPlanInit.class);
-//        baseDao.insertBatch(saveMonthPlanInitList);
         factoryProductionMonthPlanInitService.saveBatch(saveMonthPlanInitList);
     }
 
@@ -778,4 +801,28 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         return StringUtils.isBlank(context.getFactoryCode());
     }
 
+    /**
+     * 构建获取当前排产月往前months月份的定稿版本信息
+     *
+     * @param context 当前排产信息
+     * @param months  月份数
+     * @return
+     */
+    private List<String> getLatestMonthFinalVersion(Context context, int months) {
+        if (months <= BigDecimal.ZERO.intValue()) {
+            return Collections.emptyList();
+        }
+        List<String> productionVersionList = new ArrayList<>();
+        LocalDate currentProductionMonth = LocalDate.of(context.getYear(), context.getMonth(), ProductionConstant.MONTH_START_DAY);
+        for (int index = BigDecimal.ZERO.intValue(); index < months; index++) {
+            LocalDate previousMonth = currentProductionMonth.minusMonths(BigDecimal.ONE.intValue());
+            MpFactoryProductionVersion previousMonthVersion = getFinalVersion(context.getFactoryCode(), previousMonth.getYear(), previousMonth.getMonthValue());
+            //赋值当前月
+            currentProductionMonth = previousMonth;
+            if (null != previousMonthVersion) {
+                productionVersionList.add(previousMonthVersion.getProductionVersion());
+            }
+        }
+        return productionVersionList;
+    }
 }

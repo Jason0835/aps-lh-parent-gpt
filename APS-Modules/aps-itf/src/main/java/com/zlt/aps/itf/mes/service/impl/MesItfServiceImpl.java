@@ -231,7 +231,6 @@ public class MesItfServiceImpl implements MesItfService {
             Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
             for (MdmProductStock stock : productStockList) {
                 // 默认外销
-                stock.setLocationType(LocationTypeEnum.FOREIGN_LOCATION.getValue());
                 String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
@@ -393,7 +392,13 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmProductStock> getProductStock(MdmProductStock productStockMonth) {
         // 查询视图
-        return mesViewMapper.selectProductStock(productStockMonth);
+        List<MdmProductStock> mdmProductStockList = mesViewMapper.selectProductStock(productStockMonth);
+        for (MdmProductStock productStock : mdmProductStockList) {
+            // 默认外销、全钢
+            productStock.setLocationType(LocationTypeEnum.FOREIGN_LOCATION.getValue());
+            productStock.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        }
+        return mdmProductStockList;
     }
 
     /**

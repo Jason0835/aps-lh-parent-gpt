@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IntSummaryStatistics;
@@ -163,6 +164,15 @@ public class AdjustContinueSkuProductionQtyHandler {
                                            CxContinueInfoHelper cxContinueInfo,
                                            TbrProductionContext productionContext) {
 
+    requirePlans.forEach(item -> {
+         log.info("adjustMaterialProductionQty:materialDesc={},materialCode={}, heightProductionQty={},originHeightProductionQty={},productionQty={},originProductionQty={}",
+             materialDesc,
+             item.getMaterialCode(),
+             item.getHeightProductionQty() ,
+             item.getOriginHeightProductionQty(),
+             item.getProductionQty(),
+             item.getOriginProductionQty());
+    });
     log.info("adjustMaterialProductionQty: materialDesc={},key={},maxAllocationDay={}",materialDesc, plansByMaterial.keySet(),maxAllocationDay);
     // 前置条件检查
     if (!validateAdjustmentConditions(materialDesc, requirePlans, productionContext)) {
@@ -189,11 +199,16 @@ public class AdjustContinueSkuProductionQtyHandler {
       log.info("模具产能足够，无需调整: materialDesc={}, totalMouldCapacity={}, totalProductionQty={}", materialDesc, totalMouldCapacity, totalProductionQty);
       return;
     }
-
     // 计算并分配剩余产量
     int leftProductionQty = totalMouldCapacity - adjustHeightProductionQty;
     if (leftProductionQty <= 0) {
-      log.info("计算出的剩余产量异常: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty);
+      log.info("计算出的剩余产量异常: materialDesc={},dayVulcanizationQty={}, totalMouldCapacity={}, adjustHeightProductionQty={}, leftProductionQty={}", materialDesc,dayVulcanizationQty,totalMouldCapacity,adjustHeightProductionQty,leftProductionQty);
+      requirePlans.forEach(item -> {
+            item.setProductionQty(BigDecimal.ZERO.intValue());
+            item.setOriginProductionQty(BigDecimal.ZERO.intValue());
+      });
+      updatePlanDemandQty(cxContinueInfo, materialDesc, BigDecimal.ZERO.intValue());
+      updateIsProductionBySum(requirePlans);
       return;
     }
     // 执行分配

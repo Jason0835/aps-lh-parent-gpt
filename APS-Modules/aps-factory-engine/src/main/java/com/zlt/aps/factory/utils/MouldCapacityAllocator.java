@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.utils;
 
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.List;
  * 模具产能分配器 - 将总模具产能按比例分配到需求计划中
  * @author Yelq
  */
+@Slf4j
 @Component
 public class MouldCapacityAllocator {
 
@@ -27,7 +29,7 @@ public class MouldCapacityAllocator {
 
     // 1. 计算原始需求总量
     int originalTotal = calculateOriginalTotal(requirePlansByMaterialDesc);
-
+    log.info("allocateProductionQty:originalTotal={},totalMouldCapacity={}",originalTotal,totalMouldCapacity);
     // 2. 根据情况采用不同的分配策略
     if (originalTotal == 0) {
       // 情况A: 原始总量为0，采用平均分配策略
@@ -78,6 +80,7 @@ public class MouldCapacityAllocator {
     for (int i = 0; i < planCount; i++) {
       int allocation = baseAllocation + (i < remainder ? 1 : 0);
       plans.get(i).setProductionQty(allocation);
+      plans.get(i).setOriginProductionQty(allocation);
     }
   }
 
@@ -128,7 +131,9 @@ public class MouldCapacityAllocator {
 
     // 4. 将最终分配结果设置回原计划
     for (PlanAllocationData data : allocationData) {
+      log.info("allocateProportionally:monthPlanId={},productionQty={}",plans.get(data.index).getMonthPlanId(),data.finalAllocation);
       plans.get(data.index).setProductionQty(data.finalAllocation);
+      plans.get(data.index).setOriginProductionQty(data.finalAllocation);
     }
   }
 

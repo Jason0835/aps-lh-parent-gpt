@@ -162,18 +162,19 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         baseDao.updateBatch(mpAdjustStructureInList);
     }
 
-    //    /**
-//     * 获取检查为空的字段
-//     * @return
-//     */
-//    @Override
-//    protected Map<String, String> getCheckEmptyFieldMap() {
-//        Map<String, String> checkFieldMap = new HashMap<>();
-//        checkFieldMap.put("structureName", "结构名称");
-//        checkFieldMap.put("productTypeCode", "产品分类");
-//        checkFieldMap.put("dayVulcanizationQty", "日硫化量");
-//        return Collections.unmodifiableMap(checkFieldMap);
-//    }
+    /**
+     * 获取检查为空的字段
+     * @return
+     */
+    @Override
+    protected Map<String, String> getCheckEmptyFieldMap() {
+        Map<String, String> checkFieldMap = new HashMap<>();
+        checkFieldMap.put("structureName", "结构名称");
+        checkFieldMap.put("mainPattern", "主花纹");
+        checkFieldMap.put("curingTime", "硫化时间");
+        checkFieldMap.put("productTypeCode", "产品分类");
+        return Collections.unmodifiableMap(checkFieldMap);
+    }
 
     /**
      * 通过结构过滤调整明细

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 
@@ -63,6 +64,11 @@ public class MdmMsgTemplateUserRelController extends BaseController<MdmMsgTempla
     @PostMapping("/bindUsers")
     AjaxResult bindUsers(@RequestBody MdmMsgTemplateUserRel mdmMsgTemplateUserRel) {
         return toAjax(mdmMsgTemplateUserRelService.bindUsers(mdmMsgTemplateUserRel));
+    }
+
+    @PostMapping("/batchGetAssociatedUsers")
+    public Map<String, String> batchGetAssociatedUsers(@RequestBody List<String> templateCodes) {
+        return  mdmMsgTemplateUserRelService.batchGetAssociatedUsers(templateCodes);
     }
 
 

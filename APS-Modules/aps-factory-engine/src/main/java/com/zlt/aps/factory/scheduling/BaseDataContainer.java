@@ -1,6 +1,8 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.tlt.aps.constant.StringConstant;
+import com.zlt.aps.factory.basedataassemble.history.CxMachineProductionHistoryInfo;
+import com.zlt.aps.factory.basedataassemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
@@ -33,66 +35,76 @@ public class BaseDataContainer implements Serializable {
     /**
      * 排产参数配置信息
      */
-    ProductionCapacityParamConfiguration paramConfiguration;
+    private ProductionCapacityParamConfiguration paramConfiguration;
     /**
      * 成型产能信息集合
      * key=cxMachineCode : value=成型机信息
      */
-    Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo;
+    private Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo;
     /**
      * 成型鼓(工装台账)信息集合
      * key=鼓类型 ：value=鼓类型台账信息{key=鼓groupId ：value=数量}
      */
-    Map<String, Map<String, TireDrumInfoVo>> tireDrumInfoMap;
+    private Map<String, Map<String, TireDrumInfoVo>> tireDrumInfoMap;
     /**
      * 模具信息
      * key=型腔模号 : value=模具信息
      */
-    Map<String, ProductionMouldInfoVo> mouldInfoMap;
+    private Map<String, ProductionMouldInfoVo> mouldInfoMap;
     /**
      * Sku与模具关系
      * key=materialDesc : value=关系列表
      */
-    Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap;
+    private Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap;
     /**
      * 结构+主花纹的模具关系
      * key=group+主花纹 : value=模具关系列表
      */
-    Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap;
+    private Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap;
     /**
      * 结构+主花纹的模具配比配置
      * key=group+主花纹 ：value=配比配置，同时需转化成每天的量信息
      */
-    Map<String, MouldAllocationInfoVo> groupMainPatternAllocationLimitMap;
+    private Map<String, MouldAllocationInfoVo> groupMainPatternAllocationLimitMap;
     /**
      * 模壳总数信息
      * key=模壳标准 : value=模壳标准数量
      */
-    Map<String, MouldShellBaseInfoVo> mouldShellMap;
+    private Map<String, MouldShellBaseInfoVo> mouldShellMap;
     /**
      * 胶囊卡盘总数信息
      * key=胶囊卡盘GroupId : value=胶囊卡盘总数信息
      */
-    Map<String, CapsuleChuckInfoVo> capsuleChuckInfoMap;
+    private Map<String, CapsuleChuckInfoVo> capsuleChuckInfoMap;
     /**
      * 生胎对应的特殊原材料配置信息
      * key=胎胚号 : value={ key=特殊原材料编码 : value=比例}
      */
-    Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
+    private Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap;
     /**
      * 日产能限制控制对象
      */
-    DayCapacityLimitVo dayCapacityLimit;
+    private DayCapacityLimitVo dayCapacityLimit;
     /**
      * 分组(结构)成型硫化配比
      */
-    List<MonthPlanStructureLhRatioVo> structureLhRatioList;
+    private List<MonthPlanStructureLhRatioVo> structureLhRatioList;
 
     /**
      * 所有模具信息--用于记录模具日志
      * key=型腔模号 : value=模具信息
      */
-    Map<String, ProductionMouldInfoVo> allMouldInfoMap;
+    private Map<String, ProductionMouldInfoVo> allMouldInfoMap;
+    /**
+     * 机台近n个月生产历史信息
+     * key=机台编号 ：value=排产分组历史
+     */
+    private Map<String, CxMachineProductionHistoryInfo> cxMachineProductionHistoryInfo;
+    /**
+     * 分组近n个月生产历史信息
+     * key=分组名 ： value=机台排产历史
+     */
+    private Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap;
 
     /**
      * 判断同结构下前后两个Sku是否共用模具
