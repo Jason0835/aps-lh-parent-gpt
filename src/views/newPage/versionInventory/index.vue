@@ -61,7 +61,9 @@
 import { downloadLink } from "@/utils/request";
 import { getFinishList } from "@/api/monthplan/finishStock";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import {
+  getVersionSelect,
+} from "@/api/monthplan/demandPlan";
 // import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -79,6 +81,7 @@ export default {
   data() {
     return {
       loading: false,
+      versionList: [],
       data: [],
       selection: [],
       page: {
@@ -127,6 +130,7 @@ export default {
           prop: "requireVersion",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
           width:150
+
         },
 
         {
@@ -204,6 +208,9 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -211,10 +218,16 @@ export default {
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           prop: "requireVersion",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
+          type: "select",
+          filterable: true,
+          dictData: this.versionList,
         },
         {
           prop: "productTypeCode",
@@ -235,6 +248,64 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.getVersionList();
+    },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
+    },
+    async getVersionList(isGet) {
+      if (isGet) {
+        this.loading = true;
+      }
+      try {
+        const data = await getVersionSelect(this.formatParams());
+        let list = [];
+        for (let i = 0; i < data.length; i++) {
+          let obj = {
+            label: data[i],
+            value: data[i],
+          };
+          list.push(obj);
+        }
+        this.versionList = list;
+        if (list.length > 0) {
+          this.$set(this.search, "requireVersion", list[0].value);
+          this.$set(this.query, "requireVersion", list[0].value);
+        } else {
+          this.$set(this.search, "requireVersion", "");
+          this.$set(this.query, "requireVersion", "");
+        }
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+      } finally {
+        if (isGet) {
+          this.page = {
+            current: 1,
+            pageSize: 20,
+            total: 0,
+          };
+          this.getList();
+        }
+      }
+    },
     tableRowClassName({ row, rowIndex }) {
       if (row.isExceedNineMonth == 1) {
         return "deep-yellow";
@@ -363,7 +434,8 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    // this.getList();
+    this.getVersionList(true)
   },
   activated() {
     // this.getList();

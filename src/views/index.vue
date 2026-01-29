@@ -7,15 +7,32 @@
   <div class="page flex flex-col">
     <div class="flex w-100">
       <div class="flex-1 flex flex-col flex-shrink-0 mr-13 h-396 border-box">
-        <div class="title w-100 flex align-items-center justify-content-between">
-          <div class="flex align-items-center"><svg-icon class="icon job-2-icon" class-name="job-2-icon" icon-class="job-2" />{{$t("common.todayTask")}}</div>
-          <div class="more" @click="$router.push('/messagetask')">{{$t("common.button.more")}}</div>
+        <div
+          class="title w-100 flex align-items-center justify-content-between"
+        >
+          <div class="flex align-items-center">
+            <svg-icon
+              class="icon job-2-icon"
+              class-name="job-2-icon"
+              icon-class="job-2"
+            />{{ $t("common.todayTask") }}
+          </div>
+          <!-- <div class="more" @click="$router.push('/messagetask')"> -->
+          <div class="more" @click="goTask">
+            {{ $t("common.button.more") }}
+          </div>
         </div>
         <div class="flex-1 list w-100">
-          <div v-for="item in taskList" :key="item.id" class="item flex justify-content-between">
+          <div
+            v-for="item in taskList"
+            :key="item.id"
+            class="item flex justify-content-between"
+          >
             <div class="flex-1 text-truncate w-0">
               <span class="status success">待办</span>
-              <app-link v-if="item.billUrl" :to="item.billUrl">{{ item.msgContent }}</app-link>
+              <app-link v-if="item.billUrl" :to="item.billUrl">{{
+                item.msgContent
+              }}</app-link>
               <span v-else>{{ item.msgContent }}</span>
             </div>
             <div class="right flex-shrink-0">{{ item.sendTime }}</div>
@@ -24,14 +41,31 @@
         </div>
       </div>
       <div class="flex-1 flex flex-col flex-shrink-0 h-396 border-box">
-        <div class="title w-100 flex align-items-center justify-content-between">
-          <div class="flex align-items-center"><svg-icon class="icon mes-icon" class-name="mes-icon" icon-class="mes" />{{$t("common.messageCenter")}}</div>
-          <div class="more" @click="$router.push('/messageList')">{{$t("common.button.more")}}</div>
+        <div
+          class="title w-100 flex align-items-center justify-content-between"
+        >
+          <div class="flex align-items-center">
+            <svg-icon
+              class="icon mes-icon"
+              class-name="mes-icon"
+              icon-class="mes"
+            />{{ $t("common.messageCenter") }}
+          </div>
+          <!-- <div class="more" @click="$router.push('/messageList')"> -->
+            <div class="more" @click="goMessage">
+            {{ $t("common.button.more") }}
+          </div>
         </div>
         <div class="flex-1 list w-100">
-          <div v-for="item in messageList" :key="item.id" class="item flex justify-content-between">
+          <div
+            v-for="item in messageList"
+            :key="item.id"
+            class="item flex justify-content-between"
+          >
             <div class="flex-1 text-truncate w-0 no-read">
-              <app-link v-if="item.billUrl" :to="item.billUrl">{{ item.msgContent }}</app-link>
+              <app-link v-if="item.billUrl" :to="item.billUrl">{{
+                item.msgContent
+              }}</app-link>
               <span v-else>{{ item.msgContent }}</span>
             </div>
             <div class="right flex-shrink-0">{{ item.sendTime }}</div>
@@ -42,7 +76,13 @@
     </div>
     <div class="flex-1 flex flex-col flex-shrink-0 border-box w-100 mt-15">
       <div class="title w-100 flex align-items-center justify-content-between">
-        <div class="flex align-items-center"><svg-icon class="icon mr-5" class-name="menu-icon" icon-class="menu" />{{$t("common.commonFunctionNavigation")}}</div>
+        <div class="flex align-items-center">
+          <svg-icon
+            class="icon mr-5"
+            class-name="menu-icon"
+            icon-class="menu"
+          />{{ $t("common.commonFunctionNavigation") }}
+        </div>
       </div>
       <div class="flex-1 menu-list w-100">
         <app-link
@@ -50,9 +90,21 @@
           :key="item.menuId"
           :to="item.fullPath"
         >
-          <div class="item flex flex-col justify-content-center align-items-center">
-            <i class="el-icon el-icon-close close-btn" @click.prevent="removeCollectMenu(item)" />
-            <svg-icon class="icon" :icon-class="item.meta.icon && item.meta.icon !='#'  ? item.meta.icon : 'example'" />
+          <div
+            class="item flex flex-col justify-content-center align-items-center"
+          >
+            <i
+              class="el-icon el-icon-close close-btn"
+              @click.prevent="removeCollectMenu(item)"
+            />
+            <svg-icon
+              class="icon"
+              :icon-class="
+                item.meta.icon && item.meta.icon != '#'
+                  ? item.meta.icon
+                  : 'example'
+              "
+            />
             <div class="text">{{ item.meta.title }}</div>
           </div>
         </app-link>
@@ -63,11 +115,14 @@
 </template>
 
 <script>
-import path from 'path'
-import { mapGetters } from 'vuex'
-import { messageListNoticeMessage, messageListTaskMessage } from '@/api/system/message'
-import { isExternal } from '@/utils/validate'
-import AppLink from '@/layout/components/Sidebar/Link'
+import path from "path";
+import { mapGetters } from "vuex";
+import {
+  messageListNoticeMessage,
+  messageListTaskMessage,
+} from "@/api/system/message";
+import { isExternal } from "@/utils/validate";
+import AppLink from "@/layout/components/Sidebar/Link";
 
 export default {
   components: { AppLink },
@@ -79,101 +134,125 @@ export default {
       storeKey: null, // 缓存的local Key
       menuList: [
         {
-          text: '内销管理',
-          icon: 'domestic'
+          text: "内销管理",
+          icon: "domestic",
         },
         {
-          text: '外销管理',
-          icon: 'export_sales'
+          text: "外销管理",
+          icon: "export_sales",
         },
         {
-          text: '计划管理',
-          icon: 'plan'
+          text: "计划管理",
+          icon: "plan",
         },
         {
-          text: '订舱管理',
-          icon: 'booking'
+          text: "订舱管理",
+          icon: "booking",
         },
         {
-          text: '汇总报表',
-          icon: 'summary'
+          text: "汇总报表",
+          icon: "summary",
         },
         {
-          text: '出口操作',
-          icon: 'export'
+          text: "出口操作",
+          icon: "export",
         },
         {
-          text: '派车单',
-          icon: 'dispatch'
+          text: "派车单",
+          icon: "dispatch",
         },
         {
-          text: '单证制作',
-          icon: 'singly_document'
+          text: "单证制作",
+          icon: "singly_document",
         },
         {
-          text: '财务管理',
-          icon: 'finance'
+          text: "财务管理",
+          icon: "finance",
         },
         {
-          text: '客户信贷',
-          icon: 'credit'
+          text: "客户信贷",
+          icon: "credit",
         },
         {
-          text: '基础资料',
-          icon: 'basic_data'
+          text: "基础资料",
+          icon: "basic_data",
         },
         {
-          text: '系统管理',
-          icon: 'manage'
+          text: "系统管理",
+          icon: "manage",
         },
         {
-          text: '系统监控',
-          icon: 'monitor-2'
-        }
-      ]
-    }
+          text: "系统监控",
+          icon: "monitor-2",
+        },
+      ],
+    };
   },
   computed: {
     // ...mapGetters(['sidebarRouters', 'collectMenu']),
     ...mapGetters(["sidebarRouters", "collectMenu", "name"]),
-
   },
   mounted() {
-    this.getMessageData()
-    this.getTaskData()
+    if (this.hasPermission("message:messageTaskList:list")) {
+      this.getTaskData();
+    }
+    if (this.hasPermission("message:messageList:list")) {
+      this.getMessageData();
+    }
   },
   created() {
     // 组件创建时获取数据
-
   },
   methods: {
-
+    goMessage() {
+      if (this.hasPermission("message:messageTaskList:list")) {
+        this.$router.push("/messageList");
+      }
+    },
+    goTask() {
+      if (this.hasPermission("message:messageTaskList:list")) {
+        this.$router.push("/messagetask");
+      }
+    },
+    hasPermission(permission) {
+      const permissions = this.$store.state.user.permissions || [];
+      if (Array.isArray(permission)) {
+        return permission.some((perm) => permissions.includes(perm));
+      }
+      return permissions.includes(permission);
+    },
     async getMessageData() {
-      const messageData = await messageListNoticeMessage({  receivedBy: this.name,msgType:0})
-      this.messageList = messageData?.rows || []
+      const messageData = await messageListNoticeMessage({
+        receivedBy: this.name,
+        msgType: 0,
+      });
+      this.messageList = messageData?.rows || [];
     },
     async getTaskData() {
-      const taskData = await messageListTaskMessage({  receivedBy: this.name,msgType:1})
-      this.taskList = taskData?.rows || []
+      const taskData = await messageListTaskMessage({
+        receivedBy: this.name,
+        msgType: 1,
+      });
+      this.taskList = taskData?.rows || [];
     },
     resolvePath(routePath, routeQuery) {
       if (isExternal(routePath)) {
-        return routePath
+        return routePath;
       }
       if (isExternal(this.basePath)) {
-        return this.basePath
+        return this.basePath;
       }
       if (routeQuery) {
-        const query = JSON.parse(routeQuery)
-        return { path: path.resolve(this.basePath, routePath), query: query }
+        const query = JSON.parse(routeQuery);
+        return { path: path.resolve(this.basePath, routePath), query: query };
       }
-      return path.resolve(this.basePath, routePath)
+      return path.resolve(this.basePath, routePath);
     },
     removeCollectMenu(item) {
-      this.$store.dispatch('handleREMOVECollectMenu', item.fullPath)
-    }
-  }
-}
+      this.$store.dispatch("handleREMOVECollectMenu", item.fullPath);
+    },
+  },
+};
 </script>
 
 <style lang="sass" scoped>
@@ -278,5 +357,4 @@ export default {
         color: #333333
         line-height: initial
         margin-top: 15px
-
 </style>
