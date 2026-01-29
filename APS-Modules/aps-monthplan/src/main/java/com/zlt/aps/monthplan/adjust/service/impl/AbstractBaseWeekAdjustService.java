@@ -208,15 +208,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     protected void postCheck(MpRollAdjustContextDTO contextDTO) {
+        // 错误信息列表
+        List<String> errorMsgList = new ArrayList<>();
         // 检查调整明细列表中的必填字段是否为空
-        List<String> errorMsgList = checkEmptyFields(contextDTO.getAdjustDetailList());
-        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
-            return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, errorMsgList));
-        });
+        errorMsgList.addAll(checkEmptyFields(contextDTO.getAdjustDetailList()));
         // 检查sku与施工示方书关系是否有数据
-        List<String> notExistMsgList = checkExistSkuConstructionRef(contextDTO);
-        Assert.isFalse(PubUtil.isNotEmpty(notExistMsgList), () -> {
-            return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, notExistMsgList));
+        errorMsgList.addAll(checkExistSkuConstructionRef(contextDTO));
+        // 格式化错误信息（换行）
+        String errorMsg = Optional.ofNullable(errorMsgList)
+                .orElse(Collections.emptyList())
+                .stream()
+                .collect(Collectors.joining(System.lineSeparator()));
+        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+            return new BusinessException(errorMsg);
         });
     }
 
