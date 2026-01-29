@@ -501,10 +501,11 @@ public class CxLhMouldProductionCalculator {
         Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         //如果是开产日，跳过从下一天开始
         Set<Integer> openDay = productionContext.getProductionDayAfterStop();
+        Integer realStartBoostDay = startBoostDay;
         if (openDay.contains(startBoostDay) || boostInfo.isStartFinish()) {
-            startBoostDay = startBoostDay + BigDecimal.ONE.intValue();
+            realStartBoostDay = realStartBoostDay + BigDecimal.ONE.intValue();
         }
-        for (Integer singleReplenishmentDay = startBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
+        for (Integer singleReplenishmentDay = realStartBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
             if (!replenishmentDay.contains(singleReplenishmentDay)) {
                 continue;
             }
