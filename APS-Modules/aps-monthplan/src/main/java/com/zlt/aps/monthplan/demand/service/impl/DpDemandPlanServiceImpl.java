@@ -706,6 +706,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         param.setFactoryCode(createCondition.getFactoryCode());
         param.setYear(yearMonth.getYear());
         param.setMonth(yearMonth.getMonthValue());
+        param.setSourceType(createCondition.getPlanType());
         param.setPredictionVersion(createCondition.getMonthPlanVersion());
         // 生成周期排产储备
         List<SupplyOrderPool> cycleStockUpOrders =  cycleStockUpService.createCycleStockUp(param,false);
