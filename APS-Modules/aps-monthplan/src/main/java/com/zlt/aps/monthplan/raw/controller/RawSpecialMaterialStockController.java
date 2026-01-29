@@ -154,6 +154,10 @@ public class RawSpecialMaterialStockController extends AbstractDocBizController<
         if (PubUtil.isNotEmpty(materialDesc)) {
             queryWrapper.like("MATERIAL_DESC", materialDesc.trim());
         }
+        String materialName = queryVO.getMaterialName();
+        if (PubUtil.isNotEmpty(materialName)) {
+            queryWrapper.like("MATERIAL_NAME", materialName.trim());
+        }
     }
 
 

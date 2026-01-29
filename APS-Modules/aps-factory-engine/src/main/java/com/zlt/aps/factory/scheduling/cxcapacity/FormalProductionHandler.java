@@ -4,6 +4,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.enums.ProductionStageEnum;
+import com.zlt.aps.factory.handler.SkuProductionCounter;
 import com.zlt.aps.factory.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,8 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        //初始化排产计数器
+        productionContext.setProductionCounter(SkuProductionCounter.buildInit());
         allGroupPlanInfo.forEach((structureName, groupPlanInfo) -> groupPlanInfo.setThisRoundCanProduction());
         log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupLog(productionContext));
         //续作部分排产 1、续作Sku 2、续作Sku同规格同花纹高优先级量 3、续作Sku同生胎共模具高优先级量

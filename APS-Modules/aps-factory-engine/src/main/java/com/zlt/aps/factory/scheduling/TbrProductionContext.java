@@ -13,6 +13,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
 import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.factory.handler.SkuProductionCounter;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -37,43 +38,45 @@ public class TbrProductionContext extends Context {
     /**
      * 排产计划信息-按Sku分组
      */
-    Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuProductionPlan;
+    private Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuProductionPlan;
     /**
      * 所有排产计划，以计划Id为key
      */
-    Map<Long, MonthPlanProductionRequirePlanVo> allProductionPlan;
+    private Map<Long, MonthPlanProductionRequirePlanVo> allProductionPlan;
     /**
      * sku的已排产量统计
      */
-    Map<String, Integer> skuPlannedQtyMap;
+    private Map<String, Integer> skuPlannedQtyMap;
     /**
      * sku损耗量统计(因换模、换活字块导致)
      */
-    Map<String, Integer> skuWastageQtyMap;
+    private Map<String, Integer> skuWastageQtyMap;
     /**
      * 分组排产计划
      * key 结构名 value 排产计划集合
      */
-    Map<String, ProductionPlanGroupInfo> groupProductionInfo;
-
+    private Map<String, ProductionPlanGroupInfo> groupProductionInfo;
     /**
      * 特殊原材料信息
      * key=特殊原材料编码 ： value={key=标准长 ：value=特殊原材料库存对象实例 }
      */
-    Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap;
+    private Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap;
     /**
      * 反向匹配成型机台
      */
-    Set<String> reverseFindSet;
-
+    private Set<String> reverseFindSet;
     /**
      * 超6个月库存量
      */
-    Map<String, Integer> overSixMonthStockMap;
+    private Map<String, Integer> overSixMonthStockMap;
     /**
      * 不排产记录，用于未排计划使用
      */
     private Map<Long, MonthPlanNoProductionPlan> noProductionRecordMap;
+    /**
+     * 排产计数器
+     */
+    private SkuProductionCounter productionCounter;
 
     /**
      * 加入收尾，方向匹配结构集合
@@ -491,7 +494,8 @@ public class TbrProductionContext extends Context {
 
 
     /**
-     *  根据SKU获取模具信息列表
+     * 根据SKU获取模具信息列表
+     *
      * @param materialDesc SKU
      * @return 模具信息列表
      */
@@ -511,6 +515,6 @@ public class TbrProductionContext extends Context {
             }
             mouldInfos.add(mouldInfo);
         });
-        return mouldInfos.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION?Collections.emptyList():mouldInfos;
+        return mouldInfos.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION ? Collections.emptyList() : mouldInfos;
     }
 }
