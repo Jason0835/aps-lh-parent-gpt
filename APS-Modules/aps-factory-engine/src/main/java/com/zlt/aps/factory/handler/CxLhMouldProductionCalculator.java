@@ -320,7 +320,7 @@ public class CxLhMouldProductionCalculator {
         //前Sku排产量与前Sku日硫化量的差值
         Integer beforeSkuDiffValue = Math.abs(beforeSkuDayMaxQty - beforeSkuProductionQty);
         //差值 > 参数值，表示可以当天换活字块，排量 = changeTypeBlockMaxQty
-        if (beforeSkuDiffValue > changeTypeBlockQtyDiff) {
+        if (beforeSkuDiffValue >= changeTypeBlockQtyDiff) {
             Integer afterSkuProductionQty = paramConfiguration.getChangeTypeBlockMaxQty();
             //损耗量 = 日硫化量 - 前Sku排产量 - 自己排产量
             lossQty = lossQty - afterSkuProductionQty;
