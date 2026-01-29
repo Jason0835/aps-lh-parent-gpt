@@ -13,12 +13,12 @@ public interface IRawWarningService extends IService<RawWarningRecord> {
     /**
      * 执行用量偏差预警
      */
-    AjaxResult executeUsageDeviationWarning(String factoryCode, Integer year, Integer week, Integer month);
+    int executeUsageDeviationWarning(String factoryCode, Integer year, Integer week, Integer month);
 
     /**
      * 执行新材料预警
      */
-    AjaxResult executeNewMaterialWarning(String factoryCode, Integer currentYear, Integer currentMonth);
+    int executeNewMaterialWarning(String factoryCode, Integer currentYear, Integer currentMonth);
 
     /**
      * 同步周维度实际用量数据

@@ -1,13 +1,20 @@
 package com.zlt.aps.monthplan.raw.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.SecurityUtils;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.maindata.mapper.RawWarningRecordEntityMapper;
 import com.zlt.aps.maindata.service.IRawWarningRecordService;
 import com.zlt.aps.monthplan.api.domain.entity.RawWarningRecord;
 import com.zlt.aps.monthplan.raw.service.IRawWarningService;
 import com.zlt.common.utils.PubUtil;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.msg.message.domain.vo.MessageContext;
+import com.zlt.msg.message.enums.MsgChannelEnums;
+import com.zlt.msg.message.enums.MsgTypeEnums;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
@@ -21,7 +28,6 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 
@@ -55,6 +61,13 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
 
     @Autowired
     private IRawWarningService rawWarningService;
+
+    @Autowired
+    private MessageServiceUtils messageServiceAdapter;
+
+    @Autowired
+    private ISysDictDataCacheService iSysDictDataCacheService;
+
 
     /**
      * 查询原材料预警记录列表
@@ -144,7 +157,72 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
                                           @RequestParam("year") Integer year,
                                           @RequestParam("week") Integer week,
                                           @RequestParam("month") Integer month){
-        return rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
+        try {
+            int warningCount = rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
+            if (warningCount >= 0) {
+                String resultMessage = StringUtils.format(
+                        I18nUtil.getMessage("raw.warning.usage.deviation.result"),
+                        warningCount
+                );
+                // 2. 发送预警通知
+                sendUsageWarningNotification(factoryCode, year, week, month, warningCount, resultMessage);
+                return AjaxResult.success(resultMessage);
+            }
+        }catch (Exception e) {
+            String errorMessage = StringUtils.format(
+                    I18nUtil.getMessage("raw.warning.usage.deviation.exception"),
+                    e.getMessage()
+            );
+            return AjaxResult.error(errorMessage);
+        }
+        return AjaxResult.error();
+    }
+
+    /**
+     * 发送用量偏差预警通知
+     * @param factoryCode 工厂
+     * @param year 年份
+     * @param week 周次
+     * @param month 月份
+     * @param warningCount 预警数量
+     * @param resultMessage 结果消息
+     */
+    private void sendUsageWarningNotification(String factoryCode, Integer year, Integer week, Integer month, int warningCount, String resultMessage) {
+        // 构建跳转路径
+        String billUrl = messageServiceAdapter.buildFrontendUrl("/rawMaterial/rawWarningRecord",
+                "factoryCode", factoryCode,
+                "year", year.toString(),
+                "week", week.toString(),
+                "month", month.toString());
+
+        // 构建完整上下文
+        MessageContext context = messageServiceAdapter.buildMessageContext(
+                null,
+                 this.getTypeCode(),
+                 I18nUtil.getMessage("ui.data.column.rawWarningRecord.modelName"),
+                null,
+                 billUrl,
+                 resultMessage,
+                 SecurityUtils.getUsername(),
+                 null
+        );
+
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(factoryCode)).findFirst().get().getDictLabel();
+
+        // 发送消息
+        messageServiceAdapter.sendMessage(
+                "RAW_WARNING_RECORD",
+                 MsgTypeEnums.NOTICE.getCode(),
+                 MsgChannelEnums.SYSTEM.getCode(),
+                 null,
+                 context,
+                 factoryName,
+                 year,
+                 month,
+                 week,
+                 warningCount
+        );
     }
 
     @PostMapping("/execute-new-material-warning")
@@ -152,8 +230,48 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
     public AjaxResult executeNewMaterialWarning(@RequestParam("factoryCode") String factoryCode,
                                                 @RequestParam("year") Integer year,
                                                 @RequestParam("month") Integer month) {
-        return rawWarningService.executeNewMaterialWarning(factoryCode, year, month);
+        try{
+            int warningCount = rawWarningService.executeNewMaterialWarning(factoryCode, year, month);
+            if (warningCount >= 0) {
+                String resultMessage = StringUtils.format(
+                        I18nUtil.getMessage("raw.warning.new.material.result"),
+                        warningCount
+                );
+                // 2. 发送预警通知
+                sendNewMaterialWarningNotification(factoryCode, year, month, warningCount, resultMessage);
+                return AjaxResult.success(resultMessage);
+            }
+        }catch (Exception e) {
+            String errorMessage = StringUtils.format(
+                    I18nUtil.getMessage("raw.warning.new.material.exception"),
+                    e.getMessage()
+            );
+            return AjaxResult.error(errorMessage);
+        }
+        return AjaxResult.error();
     }
+
+
+    /**
+     * 发送新材料预警通知
+     * @param factoryCode 工厂
+     * @param year 年份
+     * @param month 月份
+     * @param warningCount  预警数量
+     * @param resultMessage 结果消息
+     */
+    private void sendNewMaterialWarningNotification(String factoryCode, Integer year, Integer month, int warningCount, String resultMessage) {
+        //1.获取工厂国际化
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(factoryCode)).findFirst().get().getDictLabel();
+
+        // 2.发送消息
+        messageServiceAdapter.sendNotice("RAW_WARNING_RECORD","", factoryName,
+                year,
+                month,
+                warningCount);
+    }
+
 
     @PostMapping("/sync-actual-usage")
     @ApiOperation("同步周维度原材料实际用量数据")
