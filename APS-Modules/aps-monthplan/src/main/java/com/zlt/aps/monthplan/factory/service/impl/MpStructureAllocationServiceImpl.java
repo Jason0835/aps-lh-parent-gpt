@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -8,6 +9,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
@@ -22,12 +24,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -132,7 +137,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         mpStructureAllocation.setBaseVale(null);
         this.checkUnique(mpStructureAllocation);
-
+        // 获取结构转产
+        MpStructureAllocation queryParam = new MpStructureAllocation();
+        queryParam.setFactoryCode(factoryCode);
+        queryParam.setYear(year);
+        queryParam.setMonth(month);
+        queryParam.setProductionVersion(mpStructureAllocation.getProductionVersion());
+        List<MpStructureAllocation> structureAllocationList = getDataList(queryParam);
+        // 判断时间是否有交叉，若有则抛出异常
+        List<String> dateCrossedErrorMsgList = getDateCrossedErrorMsgList(mpStructureAllocation, structureAllocationList);
+        if (PubUtil.isNotEmpty(dateCrossedErrorMsgList)) {
+            throw new BusinessException(String.join("</br>", dateCrossedErrorMsgList));
+        }
         // 获取成型结构硫化配比
         LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, factoryCode)
@@ -149,6 +165,62 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
 
+    /**
+     * 判断开始时间和结束时间是否有交叉
+     * @param targetAlloc
+     * @param structureAllocationList
+     * @return
+     */
+    private List<String> getDateCrossedErrorMsgList(MpStructureAllocation targetAlloc,
+                                                        List<MpStructureAllocation> structureAllocationList) {
+        if (PubUtil.isEmpty(structureAllocationList)) {
+            return Collections.emptyList();
+        }
+        if (Objects.isNull(targetAlloc.getBeginDay()) || Objects.isNull(targetAlloc.getEndDay())
+                || Objects.isNull(targetAlloc.getStructureName())
+                || targetAlloc.getBeginDay() > targetAlloc.getEndDay()) {
+            return Collections.emptyList();
+        }
+        String targetMachineCode = targetAlloc.getCxMachineCode();
+        // 错误信息
+        List<String> errorList = new ArrayList<>();
+        // 过滤同机台结构
+        List<MpStructureAllocation> sameMachineList = structureAllocationList.stream()
+                .filter(alloc ->
+                        targetMachineCode.equals(alloc.getCxMachineCode())
+                        && Objects.nonNull(alloc.getStructureName())
+                        && Objects.nonNull(alloc.getBeginDay())
+                        && Objects.nonNull(alloc.getEndDay())
+                        && alloc.getBeginDay() <= alloc.getEndDay())
+                .collect(Collectors.toList());
+
+        // 遍历集合，判断交叉
+        for (MpStructureAllocation alloc : sameMachineList) {
+            if (targetAlloc.getStructureName().equals(alloc.getStructureName())) {
+                continue;
+            }
+            if (isTimeCrossed(targetAlloc, alloc)) {
+                String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.dateCrossed"),
+                        targetAlloc.getStructureName(), alloc.getStructureName());
+                errorList.add(errorMsg);
+            }
+        }
+        return errorList;
+    }
+
+    /**
+     * 判断时间是否有交叉
+     * @param
+     * @param
+     * @return
+     */
+    private boolean isTimeCrossed(MpStructureAllocation a, MpStructureAllocation b) {
+        int aBegin = a.getBeginDay();
+        int aEnd = a.getEndDay();
+        int bBegin = b.getBeginDay();
+        int bEnd = b.getEndDay();
+        return !(aEnd < bBegin || bEnd < aBegin);
+    }
 
 
     /**

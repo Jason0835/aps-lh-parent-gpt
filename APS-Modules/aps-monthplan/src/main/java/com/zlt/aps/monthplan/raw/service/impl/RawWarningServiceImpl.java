@@ -309,7 +309,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             // 3. 获取新材料预警配置
             List<RawWarningConfig> warningConfigs = getNewMaterialWarningConfigs(factoryCode);
             Map<String, RawWarningConfig> warningMaterialCodes = extractWarningMaterialCodes(warningConfigs);
-            boolean warnAll = CollectionUtils.isEmpty(warningConfigs);
+            boolean warnAll = !CollectionUtils.isEmpty(warningConfigs);
 
             // 4. 创建预警记录
             List<RawWarningRecord> warningRecords = createNewMaterialWarnings(

@@ -1,16 +1,16 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.constant.Constant;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.RawWarningConfig;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.aps.maindata.service.IRawWarningConfigService;
@@ -53,7 +53,7 @@ public class RawWarningConfigServiceImpl extends AbstractDocService<RawWarningCo
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.rawWarningConfig.notUnique"));
         }
         //materialCode 不能含有空格
-        if (docEntityVO.getMaterialCode().contains(" ")) {
+        if (Objects.equals(docEntityVO.getWarningType(), ApsConstant.APS_STRING_1) && docEntityVO.getMaterialCode().contains(" ")) {
             throw new ServiceException(I18nUtil.getMessage("ui.data.alert.rawWarningConfig.notUnique1"));
         }
         return unique;
