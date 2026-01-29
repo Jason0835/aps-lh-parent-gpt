@@ -299,13 +299,17 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return;
         }
+        List<MonthPlanProductionRequirePlanVo> hasProductionQtyList = requirePlanList.stream().filter(singlePlan -> singlePlan.getNetQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionQtyList)) {
+            return;
+        }
         //采用损耗率方式计算损耗
         if (FactoryConstant.YES_VALUE.equalsIgnoreCase(openLevelRatio)) {
             //TODO 损耗率方式计算
             return;
         }
         //对物料描述为空的进行过滤
-        List<MonthPlanProductionRequirePlanVo> effectiveList = requirePlanList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> effectiveList = hasProductionQtyList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getMaterialDesc())).collect(Collectors.toList());
         //按SKU汇总需求，双数 +2 单数 +3。放置在第一条记录
         Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         productGroupMap.forEach((materialDesc, planList) -> {
@@ -315,13 +319,22 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             }
             Integer addLossQty = getAddLossQtyUnRatio(planList);
             log.info(TbrProductionInitLogRecorder.addInitLossQtyLog(context, materialDesc, addLossQty));
+            //单条计划的处理
+            if (planList.size() == BigDecimal.ONE.intValue()) {
+                addLossQtyUnRatioBySingle(planList.get(BigDecimal.ZERO.intValue()), addLossQty);
+                return;
+            }
             //排序，高优先级值高的在前，排产净需求值高的在前
             planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(MonthPlanProductionRequirePlanVo::getNetQty, Comparator.nullsLast(Comparator.reverseOrder())));
+            int index = BigDecimal.ZERO.intValue();
+            int planSize = planList.size();
             for (MonthPlanProductionRequirePlanVo singlePlan : planList) {
-                addLossQty = addLossQtyUnRatio(singlePlan, addLossQty);
+                boolean isLast = index == planSize;
+                addLossQty = addLossQtyUnRatio(singlePlan, addLossQty, isLast);
                 if (addLossQty == BigDecimal.ZERO.intValue()) {
                     break;
                 }
+                index = index + BigDecimal.ZERO.intValue();
             }
         });
         requirePlanList.forEach(singlePlan -> {
@@ -348,15 +361,42 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         }
         //汇总排产净需求量
         Integer sumQty = hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
-        if (sumQty <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
+        return getLossQty(sumQty);
+    }
+
+    /**
+     * 对计划增加损耗值
+     * 只有一条计划的处理
+     *
+     * @param plan       计划
+     * @param addLossQty 需要增加的损耗值
+     * @return
+     */
+    private void addLossQtyUnRatioBySingle(MonthPlanProductionRequirePlanVo plan, Integer addLossQty) {
+        if (null == addLossQty || addLossQty == BigDecimal.ZERO.intValue()) {
+            plan.setHeightLossQty(plan.getHeightQty());
+            plan.setFactProdReqQty(plan.getNetQty());
+            return;
         }
-        //偶数+2
-        if (sumQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
-            return ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+        //有高优先级需求，则加在高优先级上
+        Integer heightQty = plan.getHeightQty();
+        if (null == heightQty) {
+            heightQty = BigDecimal.ZERO.intValue();
         }
-        //奇数+3
-        return ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+        Integer addHeightLossQty = getLossQty(heightQty);
+        //高优先级损耗值
+        plan.setHeightLossQty(heightQty + addHeightLossQty);
+        Integer netQty = plan.getNetQty();
+        if (null == netQty) {
+            netQty = BigDecimal.ZERO.intValue();
+        }
+        Integer sumNetQty = netQty + addHeightLossQty;
+        //剩余损耗值
+        Integer otherLossQty = addLossQty - addHeightLossQty;
+        if (otherLossQty != BigDecimal.ZERO.intValue()) {
+            sumNetQty = sumNetQty + otherLossQty;
+        }
+        plan.setFactProdReqQty(sumNetQty);
     }
 
     /**
@@ -364,8 +404,9 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      *
      * @param plan       计划
      * @param addLossQty 增加的损耗量
+     * @param isLast     是否最后一条
      */
-    private Integer addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Integer addLossQty) {
+    private Integer addLossQtyUnRatio(MonthPlanProductionRequirePlanVo plan, Integer addLossQty, boolean isLast) {
         if (null == addLossQty || addLossQty == BigDecimal.ZERO.intValue()) {
             plan.setHeightLossQty(plan.getHeightQty());
             plan.setFactProdReqQty(plan.getNetQty());
@@ -379,6 +420,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             }
             return addLossQty;
         }
+        //多出1条
         if (addLossQty == BigDecimal.ONE.intValue()) {
             return addLossQtyNoFirst(plan, addLossQty);
         }
@@ -396,10 +438,10 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         if (null == plan || null == addLossQty || addLossQty <= BigDecimal.ZERO.intValue()) {
             return addLossQty;
         }
-        //首次处理
         if (addLossQty == BigDecimal.ONE.intValue()) {
             return addLossQty;
         }
+        //首次处理
         Integer heightQty = plan.getHeightQty();
         if (null == heightQty) {
             heightQty = BigDecimal.ZERO.intValue();
@@ -408,25 +450,31 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         if (null == netQty) {
             netQty = BigDecimal.ZERO.intValue();
         }
-        Integer addHeightLossQty = BigDecimal.ZERO.intValue();
         //有高优先级需求，则加在高优先级上
-        if (heightQty > BigDecimal.ZERO.intValue()) {
-            if (heightQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
-                addHeightLossQty = ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
-            } else {
-                addHeightLossQty = ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
-            }
-        }
+        Integer addHeightLossQty = getLossQty(heightQty);
+        Integer sumNetQty = netQty + addHeightLossQty;
         //高优先级损耗值
         plan.setHeightLossQty(heightQty + addHeightLossQty);
-        //除高优先级的损耗值
-        Integer otherLossQty = addLossQty - addHeightLossQty;
-        if (otherLossQty < BigDecimal.ZERO.intValue()) {
-            plan.setFactProdReqQty(netQty);
-            return otherLossQty;
+        if (addHeightLossQty != BigDecimal.ZERO.intValue()) {
+            Integer leftLossQty = addLossQty - addHeightLossQty;
+            //如果是偶数，不处理
+            if (sumNetQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
+                plan.setFactProdReqQty(sumNetQty);
+                return leftLossQty;
+            }
+            //奇数
+            if (leftLossQty < BigDecimal.ZERO.intValue()) {
+                plan.setFactProdReqQty(sumNetQty + leftLossQty);
+                return BigDecimal.ZERO.intValue();
+            }
+            plan.setFactProdReqQty(sumNetQty + leftLossQty);
+            return BigDecimal.ZERO.intValue();
         }
-        plan.setFactProdReqQty(netQty + otherLossQty);
-        return BigDecimal.ZERO.intValue();
+        //没有高优先级
+        Integer addNoHeightLossQty = getLossQty(sumNetQty);
+        sumNetQty = sumNetQty + addHeightLossQty;
+        plan.setFactProdReqQty(sumNetQty);
+        return addLossQty - addNoHeightLossQty;
     }
 
     /**
@@ -457,7 +505,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             plan.setHeightLossQty(heightQty + addLossQty);
         }
         if (isHandler) {
-            plan.setFactProdReqQty(plan.getNetQty());
+            plan.setFactProdReqQty(plan.getNetQty() + addLossQty);
             return BigDecimal.ZERO.intValue();
         }
         Integer netQty = plan.getNetQty();
@@ -488,34 +536,71 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         if (null == plan || null == addLossQty || addLossQty != -BigDecimal.ONE.intValue()) {
             return false;
         }
-        boolean isHandler = false;
+        boolean isHandler = handlerHeightQty(plan, addLossQty);
+        if (isHandler) {
+            return true;
+        }
+        return handlerNetQty(plan, addLossQty);
+    }
+
+    /**
+     * 处理高优先级的量±1，并标记是否处理
+     * 偶数值不处理
+     *
+     * @param plan       计划
+     * @param addLossQty 处理的值
+     * @return
+     */
+    private boolean handlerHeightQty(MonthPlanProductionRequirePlanVo plan, Integer addLossQty) {
         Integer heightQty = plan.getHeightQty();
         if (null == heightQty) {
             heightQty = BigDecimal.ZERO.intValue();
         }
-        //高优先级为偶数，则不处理减 损耗值 = 高优级的量，否则-1
+        //高优先级为偶数，则不处理加减 损耗值 = 高优级的量，否则±1
         if (heightQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
             plan.setHeightLossQty(heightQty);
-        } else {
-            isHandler = true;
-            plan.setHeightLossQty(heightQty + addLossQty);
-        }
-        if (isHandler) {
-            plan.setFactProdReqQty(plan.getNetQty());
             return false;
         }
+        plan.setHeightLossQty(heightQty + addLossQty);
+        plan.setFactProdReqQty(heightQty + addLossQty);
+        return true;
+    }
+
+    /**
+     * 处理排产净需求的量±1，并标记是否处理
+     * 偶数值不处理
+     *
+     * @param plan       计划
+     * @param addLossQty 处理的值
+     */
+    private boolean handlerNetQty(MonthPlanProductionRequirePlanVo plan, Integer addLossQty) {
         Integer netQty = plan.getNetQty();
         if (null == netQty) {
             netQty = BigDecimal.ZERO.intValue();
         }
-        //净需求为偶数，则不处理减 损耗值 = 净需求量，否则-1
+        //净需求为偶数，则不处理减 损耗值 = 净需求量，否则±1
         if (netQty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
             plan.setFactProdReqQty(netQty);
-        } else {
-            isHandler = true;
-            plan.setFactProdReqQty(netQty + addLossQty);
+            return false;
         }
-        return isHandler;
+        plan.setFactProdReqQty(netQty + addLossQty);
+        return true;
+    }
+
+    /**
+     * 根据量，得到损耗量 偶数 + 2； 奇数 + 3
+     *
+     * @param qty
+     * @return
+     */
+    private Integer getLossQty(Integer qty) {
+        if (null == qty || qty <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (qty % ProductionConstant.EVEN_NUMBER == BigDecimal.ZERO.intValue()) {
+            return ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+        }
+        return ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
     }
 
     /**
