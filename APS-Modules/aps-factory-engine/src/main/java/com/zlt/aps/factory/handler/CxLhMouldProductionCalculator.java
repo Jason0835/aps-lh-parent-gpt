@@ -610,6 +610,12 @@ public class CxLhMouldProductionCalculator {
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         boolean isDayFinish = updateInfo.isDayFinish();
         Set<String> cxMachineInfo = updateInfo.getUsedCxMachineInfo();
+        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        //20260129 排产顺序计数器
+        SkuProductionCounter productionCounter = productionContext.getProductionCounter();
+        if (null != productionCounter) {
+            productionCounter.addProductionSku(productionPlan.getMaterialDesc());
+        }
         //模具排产信息-计划分配
         Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = skuProductionPlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
         Map<Long, Integer> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(realDayProductionQty, skuProductionPlanList);
@@ -636,7 +642,6 @@ public class CxLhMouldProductionCalculator {
                 }
             }
         });
-        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         //模具分配比例控制对象
         MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
         //胶囊卡盘数量控制对象
