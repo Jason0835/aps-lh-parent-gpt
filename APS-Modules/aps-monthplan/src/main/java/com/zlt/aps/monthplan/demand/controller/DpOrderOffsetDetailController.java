@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
@@ -67,6 +68,12 @@ public class DpOrderOffsetDetailController extends AbstractDocBizController<DpOr
         List<DpOrderOffsetDetail> list = (List<DpOrderOffsetDetail>) tableDataInfo.getRows();
         JsonI18nConvertUtils.conventJsonI18n(list, DpOrderOffsetDetail.class);
         return tableDataInfo;
+    }
+
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    public AjaxResult findMonthPlanVersion(@RequestBody DpOrderOffsetDetail queryCondition){
+        return AjaxResult.success(dpOrderOffsetDetailService.getOffsetVersion(queryCondition));
     }
 
     @Override

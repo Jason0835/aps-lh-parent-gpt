@@ -8,6 +8,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.api.service.IDpOrderOffsetDetailRemoteService;
 import io.swagger.annotations.Api;
@@ -69,6 +70,15 @@ public class DpOrderOffsetDetailUIController extends BaseUIController<DpOrderOff
         return iDpOrderOffsetDetailService.list(dpOrderOffsetDetail);
     }
 
+    /**
+     * 查询需求计划版本号
+     */
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    @ResponseBody
+    public AjaxResult findMonthPlanVersion(DpOrderOffsetDetail queryCondition) {
+        return iDpOrderOffsetDetailService.findMonthPlanVersion(queryCondition);
+    }
 
 
     /**
