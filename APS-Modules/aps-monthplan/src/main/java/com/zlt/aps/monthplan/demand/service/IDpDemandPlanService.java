@@ -54,7 +54,7 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @return
      * @throws InterruptedException
      */
-    List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext) throws InterruptedException;
+    List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext) ;
     /**
      *  列表查询数据
      * @param queryWrapper
@@ -65,7 +65,7 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * 构建预测上下文
      * @return 预测上下文
      */
-    PredictionContext buildPredictionContext();
+    PredictionContext buildPredictionContext(String factoryCode);
     /**
      *  生成T月需求计划
      * @param param

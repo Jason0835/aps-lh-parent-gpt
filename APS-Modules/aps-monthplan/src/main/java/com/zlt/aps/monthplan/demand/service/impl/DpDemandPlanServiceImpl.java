@@ -39,9 +39,12 @@ import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.common.utils.CycleStockUpService;
 import com.zlt.aps.monthplan.common.utils.DemandPlanGrouper;
+import com.zlt.aps.monthplan.common.utils.PrecedentStockUpService;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
+import com.zlt.aps.monthplan.common.utils.SalesOrderFilterUtils;
 import com.zlt.aps.monthplan.common.utils.SummaryDemandPlanService;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
@@ -143,6 +146,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final IFactoryParamService iFactoryParamService;
     // 汇总净需求
     private final SummaryDemandPlanService summaryDemandPlanService;
+    // 周期排产储备
+    private final CycleStockUpService cycleStockUpService;
+    // 常规储备
+    private final PrecedentStockUpService precedentStockUpService;
 
     @Override
     protected String getDocTypeCode() {
@@ -198,7 +205,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
         createCondition.setMonthPlanVersion(monthPlanVersion);
         // 3. 并行获取数据
-        PredictionContext data = fetchRequiredDataInParallel(monthPlanVersion);
+        PredictionContext data = fetchRequiredDataInParallel(createCondition);
         // 4. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
@@ -342,7 +349,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setIncludePostpone(true);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());
         // 3. 并行获取数据
-        PredictionContext data = fetchRequiredDataInParallel(monthPlanVersion);
+        PredictionContext data = fetchRequiredDataInParallel(createCondition);
         data.setPostponeOrders(null);
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 4. 处理销售订单分配
@@ -363,7 +370,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) throws InterruptedException {
+    public List<DpDemandPlan> createPredictionRequire(YearMonth currentMonth,DpDemandPlan createCondition,MpFactoryProductionVersion finalVersion,PredictionContext predictionContext) {
         if(CollectionUtils.isEmpty(predictionContext.getPredictOffsetDetails())) {
             return Collections.emptyList();
         }
@@ -491,19 +498,19 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     @Override
-    public PredictionContext buildPredictionContext() {
+    public PredictionContext buildPredictionContext(String factoryCode) {
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
-            CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
+            CompletableFuture.supplyAsync(() -> this.fetchSalesOrderPool(factoryCode));
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
         CompletableFuture<Map<String, String>> productionTypeFuture =
             CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
         CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
-            CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
+            CompletableFuture.supplyAsync(() -> this.findCurrentMonthlySaleQty(factoryCode));
         CompletableFuture<Integer> minProductionQtyFuture =
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
-            CompletableFuture.supplyAsync(this::fetchMaterialInfo);
+            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(null));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
             CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
         // 等待所有任务完成
@@ -692,13 +699,18 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey, Collectors.summingInt(DpDemandPlan::getPostponeNetQty)));
     }
 
-    private List<SupplyOrderPool> createSupplyOrder(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException {
+    private List<SupplyOrderPool> createSupplyOrder(DpDemandPlan createCondition,YearMonth yearMonth)  {
         // 8、按【生成周期排产】、【生成储备排产】的逻辑得到T+1月的周期排产储备和常规储备数据(此时T月的月度计划已有，故而结构最新排产月份会有变化)
         // 13、按【生成周期排产】、【生成储备排产】的逻辑得到T+2月的周期排产储备和常规储备数据(此时T+1月的月度计划已预测，故而结构最新排产月份会有变化)
+        SupplyOrderPool param = new SupplyOrderPool();
+        param.setFactoryCode(createCondition.getFactoryCode());
+        param.setYear(yearMonth.getYear());
+        param.setMonth(yearMonth.getMonthValue());
+        param.setPredictionVersion(createCondition.getMonthPlanVersion());
         // 生成周期排产储备
-        List<SupplyOrderPool> cycleStockUpOrders =  supplyOrderPoolService.createCycleStockUp(createCondition,yearMonth);
+        List<SupplyOrderPool> cycleStockUpOrders =  cycleStockUpService.createCycleStockUp(param,false);
         // 生成常规储备
-        List<SupplyOrderPool>  precedentStockUpOrders =  supplyOrderPoolService.createPrecedentStockUp(createCondition,yearMonth);
+        List<SupplyOrderPool>  precedentStockUpOrders =  precedentStockUpService.createPrecedentStockUp(param,false);
         List<SupplyOrderPool> allStockUpOrders = Lists.newArrayList();
         if(!CollectionUtils.isEmpty(cycleStockUpOrders)){
             allStockUpOrders.addAll(cycleStockUpOrders);
@@ -728,8 +740,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
 
-    private Map<String, MdmMaterialInfo> fetchMaterialInfo() {
-        return materialInfoService.skuToMaterialInfo();
+    private Map<String, MdmMaterialInfo> fetchMaterialInfo(String structureName) {
+        return materialInfoService.skuToMaterialInfo(structureName);
     }
 
     private void validateFinalizedForAdjust(DpDemandPlan createCondition) {
@@ -800,9 +812,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 并行获取所有必要数
      */
-    private PredictionContext fetchRequiredDataInParallel(String monthPlanVersion) {
+    private PredictionContext fetchRequiredDataInParallel(DpDemandPlan createCondition) {
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
-            CompletableFuture.supplyAsync(this::fetchSalesOrderPool);
+            CompletableFuture.supplyAsync(() ->  this.fetchSalesOrderPool(createCondition.getFactoryCode()));
 
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
@@ -814,12 +826,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(this::fetchSupplyOrderPool);
 
         CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
-            CompletableFuture.supplyAsync(this::findMonthlySaleQtyGroupByMaterialCode);
+            CompletableFuture.supplyAsync(() -> this.findCurrentMonthlySaleQty(createCondition.getFactoryCode()));
 
         CompletableFuture<Integer> minProductionQtyFuture =
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
-            CompletableFuture.supplyAsync(this::fetchMaterialInfo);
+            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(createCondition.getStructureName()));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
             CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
 
@@ -840,6 +852,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
 
+            if(StringUtils.isNotBlank(createCondition.getStructureName())) {
+                salesOrders = SalesOrderFilterUtils.filterSalesOrdersOptimized(salesOrders,materialInfoMap);
+
+            }
+
             if(!CollectionUtils.isEmpty(finishedProductStocks)){
                 finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
             }
@@ -849,7 +866,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(monthPlanVersion,finishedProductStocks);
+            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks);
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
@@ -975,8 +992,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 获取销售订单池
      */
-    private List<SalesOrderPool> fetchSalesOrderPool() {
-        return this.salesOrderPoolService.findCurrentSalesOrderPool();
+    private List<SalesOrderPool> fetchSalesOrderPool(String factoryCode) {
+        return this.salesOrderPoolService.findCurrentSalesOrderPool(factoryCode);
     }
 
     /**
@@ -1001,8 +1018,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
 
-    private Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode() {
-        return  this.mpMonthlySaleQtyService.findMonthlySaleQtyGroupByMaterialCode();
+    private Map<String, Integer> findCurrentMonthlySaleQty(String factoryCode) {
+        return  this.mpMonthlySaleQtyService.findCurrentMonthlySaleQty(factoryCode);
     }
 
     /**

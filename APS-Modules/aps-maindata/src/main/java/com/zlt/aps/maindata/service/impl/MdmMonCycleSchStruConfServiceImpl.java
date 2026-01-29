@@ -9,6 +9,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -69,10 +69,11 @@ public class MdmMonCycleSchStruConfServiceImpl extends AbstractDocService<MdmMon
     }
 
     @Override
-    public List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf(YearMonth yearMonth) {
+    public List<MdmMonCycleSchStruConf> findCurrentCycleSchStruConf(SupplyOrderPool supplyOrderPool) {
         LambdaQueryWrapper<MdmMonCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(MdmMonCycleSchStruConf::getYear, yearMonth.getYear());
-        wrapper.eq(MdmMonCycleSchStruConf::getMonth, yearMonth.getMonthValue());
+        wrapper.eq(MdmMonCycleSchStruConf::getFactoryCode, supplyOrderPool.getFactoryCode());
+        wrapper.eq(MdmMonCycleSchStruConf::getYear, supplyOrderPool.getYear());
+        wrapper.eq(MdmMonCycleSchStruConf::getMonth, supplyOrderPool.getMonth());
         wrapper.eq(MdmMonCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmMonCycleSchStruConfEntityMapper.selectList(wrapper);
     }

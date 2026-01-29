@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
@@ -670,8 +671,11 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
     }
 
     @Override
-    public Map<String, MdmMaterialInfo> skuToMaterialInfo() {
+    public Map<String, MdmMaterialInfo> skuToMaterialInfo(String structureName) {
         LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        if(StringUtils.isNotBlank(structureName)){
+            wrapper.eq(MdmMaterialInfo::getStructureName, structureName);
+        }
         wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MdmMaterialInfo> materialInfos =  mdmMaterialInfoEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(materialInfos)){
@@ -684,6 +688,60 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
                 material -> material,
                 (existing, replacement) -> existing
             ));
+    }
+
+    @Override
+    public List<MdmMaterialInfo> findMaterialInfo(String factoryCode, Set<String> skus) {
+        List<MdmMaterialInfo> result = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(skus);
+        for (int i = 0; i < skus.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, skus.size());
+            List<String> batchSkus = skuList.subList(i, end);
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper =
+                Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                    .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
+                    .in(MdmMaterialInfo::getMaterialCode, batchSkus)
+                    .eq(MdmMaterialInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
+        }
+        return result;
+    }
+
+    @Override
+    public List<MdmMaterialInfo> findMaterialInfo(String factoryCode) {
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+        wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+        return mdmMaterialInfoEntityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public MdmMaterialInfo getMaterialInfoByMaterialCode(String factoryCode, String materialCode) {
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+        wrapper.eq(MdmMaterialInfo::getMaterialCode, materialCode);
+        wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmMaterialInfo> materialInfos = mdmMaterialInfoEntityMapper.selectList(wrapper);
+        return CollectionUtils.isEmpty(materialInfos)?null:materialInfos.get(0);
+    }
+
+    @Override
+    public List<MdmMaterialInfo> findMaterialInfoByStructureNames(String factoryCode, Set<String> structureNames) {
+        List<MdmMaterialInfo> result = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> structureNameList = new ArrayList<>(structureNames);
+        for (int i = 0; i < structureNameList.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, structureNameList.size());
+            List<String> batchStructureNames = structureNameList.subList(i, end);
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper =
+                Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                    .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
+                    .in(MdmMaterialInfo::getStructureName, batchStructureNames)
+                    .eq(MdmMaterialInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
+        }
+        return result;
     }
 }
 

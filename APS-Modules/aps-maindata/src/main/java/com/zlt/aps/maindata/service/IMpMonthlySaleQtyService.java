@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -36,7 +37,7 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      * 查询当前月均销量
      * @return 查询当前月均销量
      */
-    List<MpMonthlySaleQty> findCurrentMonthlySaleQty();
+    List<MpMonthlySaleQty> findCurrentMonthlySaleQty(String factoryCode, Set<String> skus);
     /**
      * 根据物料编码获取月均销量
      * @param materialCode
@@ -47,5 +48,5 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      * 根据编码获取月均销量
      * @return
      */
-    Map<String, Integer> findMonthlySaleQtyGroupByMaterialCode();
+    Map<String, Integer> findCurrentMonthlySaleQty(String factoryCode);
 }
