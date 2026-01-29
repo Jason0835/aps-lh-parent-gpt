@@ -37,9 +37,9 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer heightDiffQty;
     /**
-     * 模具二次上机
+     * SKU二次上机
      */
-    private Integer mouldSecondProduction;
+    private Integer skuSecondProduction;
     /**
      * 可补量的排产分类集合
      */
