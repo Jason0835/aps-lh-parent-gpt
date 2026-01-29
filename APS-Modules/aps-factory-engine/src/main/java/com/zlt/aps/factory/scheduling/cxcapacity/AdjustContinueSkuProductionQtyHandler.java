@@ -202,7 +202,7 @@ public class AdjustContinueSkuProductionQtyHandler {
     // 计算并分配剩余产量
     int leftProductionQty = totalMouldCapacity - adjustHeightProductionQty;
     if (leftProductionQty <= 0) {
-      log.info("计算出的剩余产量异常: materialDesc={}, leftProductionQty={}", materialDesc, leftProductionQty);
+      log.info("计算出的剩余产量异常: materialDesc={},dayVulcanizationQty={}, totalMouldCapacity={}, adjustHeightProductionQty={}, leftProductionQty={}", materialDesc,dayVulcanizationQty,totalMouldCapacity,adjustHeightProductionQty,leftProductionQty);
       requirePlans.forEach(item -> {
             item.setProductionQty(BigDecimal.ZERO.intValue());
             item.setOriginProductionQty(BigDecimal.ZERO.intValue());

@@ -1,4 +1,4 @@
-package com.zlt.aps.controller.monthplan;
+package com.zlt.aps.controller.maindata;
 
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -51,7 +51,7 @@ import javax.servlet.http.HttpServletResponse;
 @Slf4j
 @Api(tags = "消息模板关联用户")
 @Controller
-@RequestMapping("/monthplan/msgTemplateUserRel")
+@RequestMapping("/maindata/msgTemplateUserRel")
 public class MdmMsgTemplateUserRelUIController extends BaseUIController<MdmMsgTemplateUserRel> {
 
     @Autowired
@@ -61,7 +61,7 @@ public class MdmMsgTemplateUserRelUIController extends BaseUIController<MdmMsgTe
      * 根据条件查询消息模板关联用户列表
      */
     @ApiOperation("根据条件查询消息模板关联用户列表")
-    @RequiresPermissions("maindata:msgTemplateUserRel:list")
+//    @RequiresPermissions("maindata:msgTemplateUserRel:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MdmMsgTemplateUserRel entity) {
@@ -72,6 +72,7 @@ public class MdmMsgTemplateUserRelUIController extends BaseUIController<MdmMsgTe
      * 消息模板绑定用户
      */
     @ApiOperation("消息模板绑定用户")
+    @RequiresPermissions("maindata:msgTemplateUserRel:bindUsers")
     @PostMapping("/bindUsers")
     @ResponseBody
     public AjaxResult bindUsers(MdmMsgTemplateUserRel entity) {
