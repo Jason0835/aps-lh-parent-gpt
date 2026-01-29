@@ -344,6 +344,13 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "EMBRYO_NO")
     private String embryoNo;
 
+    /**
+     * 试制量试ID
+     */
+    @ApiModelProperty(value = "试制量试ID", name = "trialPlanId")
+    @TableField(value = "TRIAL_PLAN_ID")
+    private Long trialPlanId;
+
 
     /**
      * 获取分组key

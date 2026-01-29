@@ -451,12 +451,113 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             insertMonthPlanList(contextDTO);
             // 6、更新调整明细
             updateAdjustDetailList(contextDTO);
-            // 7、记录调整操作日志 TODO
+            // 7、更新试制量制计划
+            updateTrialPlanList(contextDTO);
+            // 8、记录调整操作日志 TODO
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
             throw new BusinessException("周程调整确认失败：" + e.getMessage());
         }
+    }
+
+
+    /**
+     * 更新试制量制计划
+     *
+     * @param contextDTO
+     */
+    protected void updateTrialPlanList(MpRollAdjustContextDTO contextDTO) {
+        // 调整结果列表
+        List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
+        // 调整明细列表
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(adjustDetailList)) {
+            log.warn("更新试制量制计划：调整结果列表或调整明细列表为空，直接返回");
+            return;
+        }
+        // 调整明细按照物料编码分组并提取试制量试ID列表
+        Map<String, List<Long>> adjustDetailMap = adjustDetailList.stream()
+                .filter(obj -> StringUtils.isNotEmpty(obj.getMaterialCode())
+                        && obj.getTrialPlanId() != null)
+                .collect(Collectors.groupingBy(
+                        MpAdjustDetailVo::getMaterialCode,
+                        Collectors.mapping(
+                                MpAdjustDetailVo::getTrialPlanId,
+                                Collectors.toList()
+                        )
+                ));
+        if (PubUtil.isEmpty(adjustDetailMap)) {
+            log.warn("更新试制量制计划：分组后调整明细为空，直接返回");
+            return;
+        }
+        // 试制量试计划列表
+        List<MpTrialPlan> trialPlanList = new ArrayList<>();
+        // 遍历调整结果设置试制量制系统排程日期
+        for (MpAdjustResult adjustResult : adjustResultList) {
+            String materialCode = adjustResult.getMaterialCode();
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            if (!adjustDetailMap.containsKey(materialCode)) {
+                continue;
+            }
+            List<Long> trialPlanIdList = adjustDetailMap.get(materialCode);
+            if (PubUtil.isEmpty(trialPlanIdList)) {
+                continue;
+            }
+            // 获取最早有值的日期
+            Integer day = getFirstHasValueDay(adjustResult);
+            // 获取当前日期
+            Date productionDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
+            for (Long trialPlanId : trialPlanIdList) {
+                MpTrialPlan trialPlan = new MpTrialPlan();
+                trialPlan.setId(trialPlanId);
+                trialPlan.setProductionDate(productionDate);
+                trialPlanList.add(trialPlan);
+            }
+        }
+        // 更新试制量制计划
+        try {
+            baseDao.updateBatch(trialPlanList);
+            log.info("更新试制量制计划成功，共更新:{}条记录", trialPlanList.size());
+        } catch (Exception e) {
+            log.error("更新试制量制计划批量操作异常", e);
+            throw new RuntimeException("更新试制量制计划失败", e);
+        }
+    }
+
+    /**
+     * 获取当前日期
+     * @param year
+     * @param month
+     * @param day
+     * @return
+     */
+    protected Date getCurrentDate(Integer year, Integer month, Integer day) {
+        return DateUtil.parseDate(String.format("%d-%02d-%02d", year, month, day));
+    }
+
+    /**
+     * 获取最早有值的日期
+     * @param adjustResult
+     * @return
+     */
+    protected Integer getFirstHasValueDay(MpAdjustResult adjustResult) {
+        if (adjustResult == null) {
+            return null;
+        }
+        // 按1~31顺序遍历，保证找到最早有值的字段
+        for (int day = 1; day <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; day++) {
+            // 拼接字段名：day1、day2...day31
+            String dayFieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day;
+            Integer fieldValue = Convert.toInt(adjustResult.getFieldValueByFieldName(dayFieldName), 0);
+            if (fieldValue != 0) {
+                return day;
+            }
+        }
+        // 所有day1~day31均无值，返回null
+        return null;
     }
 
     /**
@@ -1691,6 +1792,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
                 // 制造示方书号
                 adjustDetailVo.setEmbryoNo(trialPlan.getEmbryoNo());
+                // 试制量试ID
+                adjustDetailVo.setTrialPlanId(trialPlan.getId());
             }
             adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
             adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
