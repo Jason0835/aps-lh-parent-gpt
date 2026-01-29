@@ -1869,8 +1869,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
         if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
-            // 当为试制量试时，设置为订单量
-            adjustDetailVo.setPreviousNetQty(adjustDetailVo.getOrdQty());
+            // 当为试制量试时，设置为空
+            adjustDetailVo.setPreviousNetQty(null);
             return;
         }
         if (monthPlan == null) {
