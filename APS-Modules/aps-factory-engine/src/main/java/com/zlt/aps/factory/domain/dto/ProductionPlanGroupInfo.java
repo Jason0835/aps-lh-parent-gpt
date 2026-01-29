@@ -9,11 +9,11 @@ import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
-import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
@@ -1142,6 +1142,32 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return minCapacity.setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
+    }
+
+    /**
+     * 获取当前sku已排产日期集合
+     *
+     * @param materialDesc 物料描述
+     * @return
+     */
+    public List<Integer> getProductionDaySetBySku(String materialDesc) {
+        if (StringUtils.isEmpty(materialDesc)) {
+            return Collections.emptyList();
+        }
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return Collections.emptyList();
+        }
+        List<Integer> productionDayList = new ArrayList<>(64);
+        dayProductionLimitInfo.forEach((day, dayProductionLimit) -> {
+            Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = dayProductionLimit.getProductionSkuQtyInfo();
+            if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+                return;
+            }
+            if (productionSkuQtyInfo.containsKey(materialDesc)) {
+                productionDayList.add(day);
+            }
+        });
+        return productionDayList;
     }
 
     /**
