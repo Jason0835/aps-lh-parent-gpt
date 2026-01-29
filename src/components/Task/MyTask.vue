@@ -71,8 +71,8 @@
       />
       <t-table-column :label="$t('common.messageTask.msgContent')" align="center" prop="msgContent" :show-overflow-tooltip="true">
         <template slot-scope="scope">
-          <app-link v-if="scope.row.billUrl" :to="scope.row.billUrl">{{ scope.row.msgContent }}</app-link>
-          <span v-else>{{ scope.row.msgContent }}</span>
+          <app-link v-if="scope.row.billUrl" :to="scope.row.billUrl"  @click.native="handleClick(scope.row)">{{ scope.row.msgContent }}</app-link>
+          <span v-else @click="handleClick(scope.row)">{{ scope.row.msgContent }}</span>
         </template>
       </t-table-column>
       <t-table-column :label="$t('common.messageTask.msgSource')" align="center" prop="msgStatus" width="100">
@@ -157,7 +157,7 @@
 <script>
 import { debounce } from "@/utils";
 import { getNotice, delNotice, addNotice, updateNotice } from "@/api/system/notice";
-import {messageListTaskMessage} from "@/api/system/message";
+import {messageListTaskMessage,readMessageTask} from "@/api/system/message";
 import { mapGetters } from 'vuex'
 export default {
   name: "Task",
@@ -243,6 +243,13 @@ export default {
     window.removeEventListener("resize", this._resizeHandler, false);
   },
   methods: {
+    handleClick(row){
+      readMessageTask(row.id).then(response => {
+        this.getList()
+
+      });
+
+    },
     setTableHeight() {
       let formHeight = this.$refs.queryForm.$el.clientHeight;
       // console.log(formHeight);

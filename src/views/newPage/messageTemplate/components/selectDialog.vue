@@ -81,20 +81,20 @@ export default {
 
         {
           prop: "userName",
-          label: this.$t("登录账号"),
+          label: this.$t("common.api.user.columnname.username"),
         },
 
         {
           prop: "nickName",
-          label: this.$t("用户名称"),
+          label: this.$t("common.api.logininfo.columnname.userName"),
         },
-        {
-          prop: "deptName",
-          label: this.$t("部门名称"),
-        },
+        // {
+        //   prop: "deptName",
+        //   label: this.$t("部门名称"),
+        // },
         {
           prop: "phonenumber",
-          label: this.$t("手机号码"),
+          label: this.$t("common.api.user.columnname.telphone"),
         },
       ];
 
@@ -104,17 +104,17 @@ export default {
       return [
         {
           prop: "userName",
-          label: this.$t("登录账号"),
+          label: this.$t("common.api.user.columnname.username"),
         },
 
         {
           prop: "nickName",
-          label: this.$t("用户名称"),
+          label: this.$t("common.api.logininfo.columnname.userName"),
         },
 
         {
           prop: "phonenumber",
-          label: this.$t("手机号码"),
+          label: this.$t("common.api.user.columnname.telphone"),
         },
       ];
     },

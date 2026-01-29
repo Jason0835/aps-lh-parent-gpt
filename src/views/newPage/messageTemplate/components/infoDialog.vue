@@ -96,10 +96,12 @@ export default {
         {
           prop: "templateCode",
           label: this.$t("模板编码"),
+          maxlength:30
         },
         {
           prop: "templateName",
           label: this.$t("模板名称"),
+          maxlength:30
         },
         {
           prop: "title",
@@ -107,7 +109,7 @@ export default {
         },
         {
           prop: "content",
-          label: this.$t("内容"),
+          label: this.$t("common.messageTask.msgContent"),
         },
 
         {

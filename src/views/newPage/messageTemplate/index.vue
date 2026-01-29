@@ -164,7 +164,7 @@ export default {
         },
         {
           prop: "content",
-          label: this.$t("内容"),
+          label: this.$t("common.messageTask.msgContent"),
           width: 400,
         },
         {

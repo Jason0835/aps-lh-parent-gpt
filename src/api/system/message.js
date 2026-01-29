@@ -17,6 +17,13 @@ export function messageListNoticeMessage(data) {
     data
   })
 }
+// 消息已读
+export function readMessage(id) {
+  return request({
+    url: '/message/messageList/changeMsgStatus/' + id,
+    method: 'get'
+  })
+}
 
 // 查询待办任务消息接口
 export function messageListTaskMessage(data) {
@@ -28,5 +35,12 @@ export function messageListTaskMessage(data) {
     //   'Content-Type': 'application/json;charset=UTF-8'
     // },
     data
+  })
+}
+// 查询待办任务消息已读
+export function readMessageTask(id) {
+  return request({
+    url: '/message/messageTaskList/changeMsgStatus/' + id,
+    method: 'get'
   })
 }

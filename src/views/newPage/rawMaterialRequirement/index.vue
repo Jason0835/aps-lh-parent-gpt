@@ -205,6 +205,13 @@ export default {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width: 200,
+          render: ({ row }) => {
+            return (
+              <div>
+                {row.updateTime?row.updateTime:row.createTime}
+              </div>
+            );
+          },
         },
         {
           align: "center",

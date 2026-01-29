@@ -30,10 +30,10 @@
           >
             <div class="flex-1 text-truncate w-0">
               <span class="status success">待办</span>
-              <app-link v-if="item.billUrl" :to="item.billUrl">{{
+              <app-link v-if="item.billUrl" :to="item.billUrl"  @click.native="handleTaskClick(item)">{{
                 item.msgContent
               }}</app-link>
-              <span v-else>{{ item.msgContent }}</span>
+              <span v-else @click="handleTaskClick(item)">{{ item.msgContent }}</span>
             </div>
             <div class="right flex-shrink-0">{{ item.sendTime }}</div>
           </div>
@@ -52,7 +52,7 @@
             />{{ $t("common.messageCenter") }}
           </div>
           <!-- <div class="more" @click="$router.push('/messageList')"> -->
-            <div class="more" @click="goMessage">
+          <div class="more" @click="goMessage">
             {{ $t("common.button.more") }}
           </div>
         </div>
@@ -63,10 +63,10 @@
             class="item flex justify-content-between"
           >
             <div class="flex-1 text-truncate w-0 no-read">
-              <app-link v-if="item.billUrl" :to="item.billUrl">{{
+              <app-link v-if="item.billUrl" :to="item.billUrl"  @click.native="handleMessageClick(item)">{{
                 item.msgContent
               }}</app-link>
-              <span v-else>{{ item.msgContent }}</span>
+              <span v-else  @click="handleMessageClick(item)">{{ item.msgContent }}</span>
             </div>
             <div class="right flex-shrink-0">{{ item.sendTime }}</div>
           </div>
@@ -120,6 +120,8 @@ import { mapGetters } from "vuex";
 import {
   messageListNoticeMessage,
   messageListTaskMessage,
+  readMessage,
+  readMessageTask
 } from "@/api/system/message";
 import { isExternal } from "@/utils/validate";
 import AppLink from "@/layout/components/Sidebar/Link";
@@ -192,18 +194,47 @@ export default {
     // ...mapGetters(['sidebarRouters', 'collectMenu']),
     ...mapGetters(["sidebarRouters", "collectMenu", "name"]),
   },
-  mounted() {
-    if (this.hasPermission("message:messageTaskList:list")) {
-      this.getTaskData();
-    }
-    if (this.hasPermission("message:messageList:list")) {
-      this.getMessageData();
-    }
+  mounted() {},
+  watch: {
+    // 也可以监听权限变化
+    "$store.state.user.permissions": {
+      handler(permissions) {
+        if (permissions && permissions.length > 0) {
+          this.loadData();
+        }
+      },
+      immediate: true,
+    },
   },
-  created() {
+  created() {},
+  activated() {
+    console.log("activeated");
+
     // 组件创建时获取数据
   },
   methods: {
+    handleTaskClick(row){
+      readMessageTask(row.id).then(response => {
+        // this.getTaskData()
+
+      });
+
+    },
+    handleMessageClick(row){
+      readMessage(row.id).then(response => {
+        // this.getMessageData()
+
+      });
+
+    },
+    loadData() {
+      if (this.hasPermission("message:messageTaskList:list")) {
+        this.getTaskData();
+      }
+      if (this.hasPermission("message:messageList:list")) {
+        this.getMessageData();
+      }
+    },
     goMessage() {
       if (this.hasPermission("message:messageTaskList:list")) {
         this.$router.push("/messageList");

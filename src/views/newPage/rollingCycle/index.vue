@@ -394,7 +394,7 @@ export default {
           },
           {
             prop: "pendingQty",
-            label: this.$t("待调整量（降序）"),
+            label: this.$t("待调整量"),
             width: 120,
           },
           {
@@ -749,7 +749,7 @@ export default {
           },
           {
             prop: "pendingQty",
-            label: this.$t("待调整量（降序）"),
+            label: this.$t("待调整量"),
             width: 120,
           },
           {

@@ -337,7 +337,10 @@
   "ui.data.console.productNoDetail":"未排产明细",
   "ui.data.console.nextGenerate":"生成下一步",
   "ui.data.console.moldArrangement":"排模具",
-  "ui.data.console.rankStructure":"排结构"
+  "ui.data.console.rankStructure":"排结构",
+  "ui.data.messageTemplate.templateCode":"模板编码",
+  "ui.data.messageTemplate.templateName":"模板名称",
+  "ui.data.messageTemplate.title":"标题"
 
 
 
