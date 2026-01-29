@@ -550,6 +550,7 @@ export default {
                   <el-button
                     class="minus"
                     type="danger"
+                    disabled={row.dataSource!='01'}
                     onClick={() => this.handleStructureDelete(row)}
                   >
                     {this.$t("ui.frame.btn.delete")}
