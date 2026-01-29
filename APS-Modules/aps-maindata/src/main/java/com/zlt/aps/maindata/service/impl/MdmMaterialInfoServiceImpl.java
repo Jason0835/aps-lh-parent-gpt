@@ -719,7 +719,9 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
     @Override
     public MdmMaterialInfo getMaterialInfoByMaterialCode(String factoryCode, String materialCode) {
         LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+        if(StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+        }
         wrapper.eq(MdmMaterialInfo::getMaterialCode, materialCode);
         wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MdmMaterialInfo> materialInfos = mdmMaterialInfoEntityMapper.selectList(wrapper);
