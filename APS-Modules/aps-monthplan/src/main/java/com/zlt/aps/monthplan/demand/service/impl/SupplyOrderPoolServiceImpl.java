@@ -105,7 +105,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode","year","month"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode","year","month","sourceType"));
     }
 
 
