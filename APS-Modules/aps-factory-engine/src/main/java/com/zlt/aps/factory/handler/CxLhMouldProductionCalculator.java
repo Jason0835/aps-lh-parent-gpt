@@ -314,23 +314,32 @@ public class CxLhMouldProductionCalculator {
             //换模
             return buildByChangeMould(productionDay, lhProductionQtyHelper, paramConfiguration);
         }
-        //换活字块的后Sku排产量
-        Integer afterSkuProductionQty;
+        Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
+        //当天损耗量
+        Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
         //前Sku排产量与前Sku日硫化量的差值
         Integer beforeSkuDiffValue = Math.abs(beforeSkuDayMaxQty - beforeSkuProductionQty);
-        if (beforeSkuDiffValue <= paramConfiguration.getChangeTypeBlockQtyDiff()) {
-            //差值<参数值
-            afterSkuProductionQty = paramConfiguration.getChangeTypeBlockQty();
-        } else {
-            afterSkuProductionQty = paramConfiguration.getChangeTypeBlockMaxQty();
+        //差值 > 参数值，表示可以当天换活字块，排量 = changeTypeBlockMaxQty
+        if (beforeSkuDiffValue > changeTypeBlockQtyDiff) {
+            Integer afterSkuProductionQty = paramConfiguration.getChangeTypeBlockMaxQty();
+            //损耗量 = 日硫化量 - 前Sku排产量 - 自己排产量
+            lossQty = lossQty - afterSkuProductionQty;
+            if (lossQty < BigDecimal.ZERO.intValue()) {
+                lossQty = BigDecimal.ZERO.intValue();
+            }
+            return new DayProductionQtyHelper(productionDay, false, afterSkuProductionQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
-        //损耗量 = 日硫化量 - 前Sku排产量 - 自己排产量
-        Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
-        lossQty = lossQty - afterSkuProductionQty;
+        //差值 <= 参数值，表示隔天换活字块，排量 = changeTypeBlockQty
         if (lossQty < BigDecimal.ZERO.intValue()) {
             lossQty = BigDecimal.ZERO.intValue();
         }
-        return new DayProductionQtyHelper(productionDay, false, afterSkuProductionQty, lossQty, BigDecimal.ZERO.intValue(), false);
+        //隔天换活字块，则隔天损耗量 = 日硫化量 - 排产量
+        Integer afterSkuProductionQty = paramConfiguration.getChangeTypeBlockQty();
+        Integer nextDayLossQty = lhProductionQtyHelper.getDayMaxProductionQty() - afterSkuProductionQty;
+        if (lossQty < BigDecimal.ZERO.intValue()) {
+            lossQty = BigDecimal.ZERO.intValue();
+        }
+        return new DayProductionQtyHelper(productionDay, true, afterSkuProductionQty, lossQty, nextDayLossQty, true);
     }
 
     @Deprecated
@@ -492,10 +501,11 @@ public class CxLhMouldProductionCalculator {
         Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         //如果是开产日，跳过从下一天开始
         Set<Integer> openDay = productionContext.getProductionDayAfterStop();
+        Integer realStartBoostDay = startBoostDay;
         if (openDay.contains(startBoostDay) || boostInfo.isStartFinish()) {
-            startBoostDay = startBoostDay + BigDecimal.ONE.intValue();
+            realStartBoostDay = realStartBoostDay + BigDecimal.ONE.intValue();
         }
-        for (Integer singleReplenishmentDay = startBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
+        for (Integer singleReplenishmentDay = realStartBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
             if (!replenishmentDay.contains(singleReplenishmentDay)) {
                 continue;
             }

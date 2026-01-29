@@ -42,6 +42,10 @@ public interface BusiConstant {
          * 分隔符：换行
          */
         String SPLIT_NEW_LINE = "\n";
+        /**
+         * 分隔符：前端换行
+         */
+        String SPLIT_FRONT_NEW_LINE = "</br>";
     }
 
 
