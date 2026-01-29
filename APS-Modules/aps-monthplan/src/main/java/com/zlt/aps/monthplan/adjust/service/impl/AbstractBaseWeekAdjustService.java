@@ -1786,6 +1786,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
+            adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
+            adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
                 // 施工阶段
@@ -1799,8 +1801,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 试制量试ID
                 adjustDetailVo.setTrialPlanId(trialPlan.getId());
             }
-            adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
-            adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
             // 型腔数量、活块数量
             adjustDetailVo.setMouldCavityQty(0);
             adjustDetailVo.setTypeBlockQty(0);
