@@ -1,12 +1,12 @@
 package com.zlt.aps.factory.service;
 
+import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
@@ -320,6 +320,14 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(Context context);
+
+    /**
+     * 获取历史分组排产数据信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MpStructureAllocation> getHistoryStructureAllocationInfo(Context context);
 
     /**
      * 获取分厂在指定年份、月份的不排产物料信息，并按物料分组

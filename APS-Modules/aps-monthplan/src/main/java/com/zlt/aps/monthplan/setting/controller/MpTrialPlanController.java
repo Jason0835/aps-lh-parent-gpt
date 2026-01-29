@@ -8,6 +8,7 @@ import com.ruoyi.api.gateway.system.service.ISysUserService;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
@@ -102,12 +103,21 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
             }
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
-                billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
-                billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
-                billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
-                billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
-                billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
+                // 为空才关联更新
+                String embryoNo = billVO.getEmbryoNo();
+                if (StringUtils.isBlank(embryoNo)) {
+                    billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+                    billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
+                    billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
+                    billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
+                    billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
+                    billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
+                } else {
+                    if (!embryoNo.equals(mdmSkuConstructionRef.getEmbryoNo())) {
+                        String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
+                        throw new RuntimeException(message);
+                    }
+                }
             }
         }
         return super.save(billVO);

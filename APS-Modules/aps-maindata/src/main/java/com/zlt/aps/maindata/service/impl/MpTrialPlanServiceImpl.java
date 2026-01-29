@@ -19,6 +19,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -131,6 +132,12 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
             Map<String, MdmSkuConstructionRef> skuConstructionRefMap = (Map<String, MdmSkuConstructionRef>) serviceCheckParams.get("skuConstructionRefMap");
             if (skuConstructionRefMap.containsKey(materialCode)) {
                 MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
+                String embryoNo = importDocEntity.getEmbryoNo();
+                if (StringUtils.isNotBlank(embryoNo) && !embryoNo.equals(mdmSkuConstructionRef.getEmbryoNo())) {
+                    String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+                    return Boolean.FALSE;
+                }
                 importDocEntity.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
                 importDocEntity.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
                 importDocEntity.setTextNo(mdmSkuConstructionRef.getTextNo());
