@@ -213,7 +213,43 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
             return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, errorMsgList));
         });
+        // 检查sku与施工示方书关系是否有数据
+        List<String> notExistMsgList = checkExistSkuConstructionRef(contextDTO);
+        Assert.isFalse(PubUtil.isNotEmpty(notExistMsgList), () -> {
+            return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, notExistMsgList));
+        });
     }
+
+    /**
+     * 检查sku与施工示方书关系是否有数据
+     * @param contextDTO
+     * @return
+     */
+    protected List<String> checkExistSkuConstructionRef(MpRollAdjustContextDTO contextDTO) {
+        // 调整明细列表
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        // SKU与施工（示方书）关系列表
+        List<MdmSkuConstructionRef> skuConstructionRefList = contextDTO.getMdmSkuConstructionRefList();
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return Collections.emptyList();
+        }
+        // 错误信息列表
+        List<String> notExistMsgList = new ArrayList<>();
+        // 收集物料编码
+        Set<String> collect = skuConstructionRefList.stream().map(MdmSkuConstructionRef::getMaterialCode).collect(Collectors.toSet());
+        // 循环检查sku与施工示方书关系是否有数据
+        for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
+            if (collect.contains(adjustDetailVo.getMaterialCode())) {
+                continue;
+            }
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkNotExistConstructionRef"),
+                    adjustDetailVo.getMaterialCode());
+            notExistMsgList.add(errorMsg);
+        }
+        return notExistMsgList;
+    }
+
+
 
     /**
      * 检查调整明细列表中的必填字段是否为空
