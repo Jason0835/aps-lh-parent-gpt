@@ -1,8 +1,8 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.tlt.aps.constant.StringConstant;
-import com.zlt.aps.factory.basedata.history.CxMachineProductionHistoryInfo;
-import com.zlt.aps.factory.basedata.history.GroupPlanProductionHistoryInfo;
+import com.zlt.aps.factory.basedataassemble.history.CxMachineProductionHistoryInfo;
+import com.zlt.aps.factory.basedataassemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;

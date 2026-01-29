@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.basedata.history;
+package com.zlt.aps.factory.basedataassemble.history;
 
 import lombok.Getter;
 

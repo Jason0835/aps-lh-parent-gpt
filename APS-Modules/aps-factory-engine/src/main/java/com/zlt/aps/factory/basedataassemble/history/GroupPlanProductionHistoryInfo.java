@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.basedata.history;
+package com.zlt.aps.factory.basedataassemble.history;
 
 import lombok.Data;
 
@@ -6,18 +6,18 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * 机台生产历史信息对象
- * 从机台的视角看
+ * 分组生产历史对象
+ * 以分组的视角看
  *
  * @author ZLT
  * @date 20260128
  */
 @Data
-public class CxMachineProductionHistoryInfo implements Serializable {
+public class GroupPlanProductionHistoryInfo implements Serializable {
     /**
      * 成型机台
      */
-    private String cxMachineCode;
+    private String groupName;
     /**
      * 近1个月最近排产日
      */
