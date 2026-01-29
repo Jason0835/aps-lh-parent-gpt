@@ -3,8 +3,11 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
@@ -15,11 +18,13 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.util.CollectionUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -74,5 +79,25 @@ public class DpOrderOffsetDetailServiceImpl extends AbstractDocService<DpOrderOf
                 .eq(DpOrderOffsetDetail::getMonthPlanVersion, monthPlanVersion)
                 .eq(DpOrderOffsetDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
         return dpOrderOffsetDetailEntityMapper.selectList(wrapper);
+    }
+
+    /**
+     * 获取订单冲减的版本号
+     * @param queryCondition 查询条件
+     * @return 版本集合
+     */
+    @Override
+    public List<String> getOffsetVersion(DpOrderOffsetDetail queryCondition) {
+        LambdaQueryWrapper<DpOrderOffsetDetail> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpOrderOffsetDetail::getFactoryCode, queryCondition.getFactoryCode());
+        wrapper.eq(DpOrderOffsetDetail::getYear, queryCondition.getYear());
+        wrapper.eq(DpOrderOffsetDetail::getMonth, queryCondition.getMonth());
+        wrapper.eq(DpOrderOffsetDetail::getIsDelete, YesOrNoEnum.NO.getValue());
+        wrapper.orderByDesc(DpOrderOffsetDetail::getCreateTime);
+        List<DpOrderOffsetDetail> list =  this.dpOrderOffsetDetailEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyList();
+        }
+        return list.stream().map(DpOrderOffsetDetail::getMonthPlanVersion).distinct().collect(Collectors.toList());
     }
 }

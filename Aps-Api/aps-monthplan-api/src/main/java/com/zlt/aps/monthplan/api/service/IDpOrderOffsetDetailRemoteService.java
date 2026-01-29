@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.api.service;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
@@ -77,4 +78,10 @@ public interface IDpOrderOffsetDetailRemoteService {
     @PostMapping("/dpOrderOffsetDetail/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 查询需求计划版本号
+     */
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/dpOrderOffsetDetail/findMonthPlanVersion")
+    AjaxResult findMonthPlanVersion(@RequestBody DpOrderOffsetDetail queryCondition);
 }
