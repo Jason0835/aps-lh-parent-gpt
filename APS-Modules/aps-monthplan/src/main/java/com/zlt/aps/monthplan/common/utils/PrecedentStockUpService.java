@@ -120,6 +120,7 @@ public class PrecedentStockUpService {
         if(validateFlag) {
           throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
         }
+        return Collections.emptyList();
       }
       // 4. 重新创建供应链订单池
       return recreateSupplyOrderPoolsForCycleStockUp(supplyOrderPool, eligibleSkus,context);
@@ -650,32 +651,6 @@ public class PrecedentStockUpService {
   }
 
   /**
-   * 获取符合条件的SKU集合
-   */
-  private Set<String> getEligibleSkus(String factoryCode, Set<String> validStructures) {
-    log.debug("开始获取符合条件的SKU, 工厂: {}, 结构数量: {}", factoryCode, validStructures.size());
-    // 2.1 根据结构筛选SKU
-    List<MdmMaterialInfo> materialInfos = materialInfoService.findMaterialInfoByStructureNames(factoryCode, validStructures);
-    if (CollectionUtils.isEmpty(materialInfos)) {
-      log.warn("未找到指定结构的物料信息, 工厂: {}, 结构: {}", factoryCode, validStructures);
-      return Collections.emptySet();
-    }
-    Set<String> structureSkus = materialInfos.stream()
-        .map(MdmMaterialInfo::getMaterialCode)
-        .filter(StringUtils::isNotBlank)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
-    if (CollectionUtils.isEmpty(structureSkus)) {
-      log.warn("物料信息中的物料编码为空, 工厂: {}", factoryCode);
-      return Collections.emptySet();
-    }
-    log.debug("根据结构筛选到的SKU数量: {}", structureSkus.size());
-    // 2.2 排除超期SKU
-    Set<String> eligibleSkus = excludeOverdueCycleProduction(structureSkus);
-    log.debug("排除超期SKU后剩余数量: {}", eligibleSkus.size());
-    return eligibleSkus;
-  }
-
-  /**
    * 解析工厂编码
    */
   private String resolveFactoryCode(SupplyOrderPool supplyOrderPool) {
@@ -683,29 +658,6 @@ public class PrecedentStockUpService {
     return StringUtils.isNotBlank(factoryCode) ? factoryCode : DEFAULT_FACTORY_CODE;
   }
 
-  /**
-   * 验证符合条件的SKU集合
-   */
-  private void validateEligibleSkus(Set<String> eligibleSkus) {
-    if (CollectionUtils.isEmpty(eligibleSkus)) {
-      log.warn("未找到符合条件的SKU");
-      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
-    }
-    log.debug("找到符合条件的SKU数量: {}", eligibleSkus.size());
-  }
-
-  /**
-   * 排除超期SKU
-   */
-  private Set<String> excludeOverdueCycleProduction(Set<String> skus) {
-    Set<String> overdueSkus = overdueSkuService.excludeOverdueCycleProduction();
-    if (CollectionUtils.isEmpty(overdueSkus)) {
-      return skus;
-    }
-    return skus.stream()
-        .filter(sku -> !overdueSkus.contains(sku))
-        .collect(Collectors.toSet());
-  }
 
   // ====================== 上下文对象 ======================
   @Data
