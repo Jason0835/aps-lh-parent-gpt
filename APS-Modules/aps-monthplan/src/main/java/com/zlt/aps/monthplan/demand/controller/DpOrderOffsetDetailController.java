@@ -203,7 +203,6 @@ public class DpOrderOffsetDetailController extends AbstractDocBizController<DpOr
     protected String[] getQueryFormulas() {
         return new String[]{
                 "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
-
         };
     }
 
