@@ -98,7 +98,7 @@ export default {
           },
         },
         {
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
           align: "center",
           formatter: (row) => {
@@ -132,12 +132,12 @@ export default {
         // },
 
         {
-          label: this.$t("版本号"),
+          label: this.$t("plan.planProduction.planVersion"),
           prop: "monthPlanVersion",
           align: "center",
         },
         {
-          label: this.$t("创建时间"),
+          label: this.$t("common.createTime"),
           prop: "createTime",
           align: "center",
         },

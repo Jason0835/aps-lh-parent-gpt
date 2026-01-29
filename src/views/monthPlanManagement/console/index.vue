@@ -181,7 +181,7 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("需求计划版本"),
+          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
           prop: "monthPlanVersion",
           align: "center",
           render: ({ row }) => {
@@ -192,7 +192,7 @@ export default {
                   <text-button
                     onClick={() => this.handleRouterMonthPlanVersion(row)}
                   >
-                    {"明细"}
+                  {this.$t("plan.planProduction.detail")}
                   </text-button>
                   <text-button
                     onClick={() => {
@@ -231,7 +231,7 @@ export default {
           },
         },
         {
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
           align: "center",
 
@@ -250,7 +250,7 @@ export default {
                       this.handleGenerate(row);
                     }}
                   >
-                    {this.$t("生成")}
+                    {this.$t("common.button.generate")}
                   </text-button>
                 </div>
               </div>
@@ -280,7 +280,7 @@ export default {
                 </div>
                 <div>
                   <text-button onClick={() => this.handleInitDetail(row)}>
-                    {this.$t("明细")}
+                    {this.$t("plan.planProduction.detail")}
                   </text-button>
                 </div>
               </div>
@@ -329,14 +329,14 @@ export default {
                 <text-button
                   onClick={() => this.handleRouterProductionVersions(row)}
                 >
-                  {"排产明细"}
+                  { this.$t("排产明细")}
                 </text-button>
                 <text-button
                   onClick={() =>
                     this.handleRouterMonthPlanNoProductionPlan(row)
                   }
                 >
-                  {"未排产明细"}
+                  { this.$t("未排产明细")}
                 </text-button>
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
@@ -412,13 +412,13 @@ export default {
           clearable: false,
         },
         {
-          label: this.$t("产品品类"),
+          label: this.$t("ui.data.column.monthplan.productType"),
           prop: "productTypeCode",
           type: "select",
           dictData: this.dict.type.biz_product_type,
         },
         {
-          label: this.$t("需求计划版本"),
+          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
           prop: "monthPlanVersion",
           type: "select",
           dictData: this.planVersionList,
@@ -428,7 +428,7 @@ export default {
           },
         },
         {
-          label: this.$t("月度生产计划版本"),
+          label: this.$t("ui.data.monthlyProductionPlan.productionVersion"),
           prop: "productionVersion",
           type: "select",
           dictData: this.productionVersionList,

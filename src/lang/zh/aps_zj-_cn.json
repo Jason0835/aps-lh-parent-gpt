@@ -330,7 +330,14 @@
   "ui.data.productionMonthPlanInit.maxEmbryoCodeCount":"最大胎胚种类数",
   "ui.data.productionMonthPlanInit.maxLhMachineCount":"最大硫化机台数",
   "ui.data.productionMonthPlanInit.lossQty":"排产净需求(含损耗)",
-  "ui.data.productionMonthPlanInit.allotDays":"分配天数"
+  "ui.data.productionMonthPlanInit.allotDays":"分配天数",
+  "ui.data.console.noVersionList":"选择需求计划版本",
+  "ui.data.console.finalizedDialog":"定稿",
+  "ui.data.console.productDetail":"排产明细",
+  "ui.data.console.productNoDetail":"未排产明细",
+  "ui.data.console.nextGenerate":"生成下一步",
+  "ui.data.console.moldArrangement":"排模具",
+  "ui.data.console.rankStructure":"排结构"
 
 
 

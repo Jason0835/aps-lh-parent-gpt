@@ -259,7 +259,7 @@ service.interceptors.response.use(
       if (res.config.url.indexOf('/monthplan/supplyOrderPool/checkOverdue') != -1) {
         return Promise.reject(msg)
       } else {
-        Message({ message: msg, type: 'error' })
+        Message({ message: msg, type: 'error' ,dangerouslyUseHTMLString:true})
         return Promise.reject(new Error(msg))
       }
 
@@ -292,6 +292,7 @@ service.interceptors.response.use(
       message = '系统接口' + message.substr(message.length - 3) + '异常'
     }
     if (message != "redirect") {
+      console.log('ssss')
       Message({ message: message, type: 'error', duration: 5 * 1000, dangerouslyUseHTMLString: true })
 
     }

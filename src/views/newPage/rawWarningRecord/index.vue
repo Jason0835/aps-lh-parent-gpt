@@ -21,12 +21,14 @@
       <template slot="header">
         <el-button
           @click="handleAdd('month')"
-             v-hasPermi="['maindata:rawWarningRecord:executeNewMaterialWarning']"
-          >{{ $t("ui.data.rawWarningRecord.executeNewMaterialWarning") }}</el-button
+          v-hasPermi="['maindata:rawWarningRecord:executeNewMaterialWarning']"
+          >{{
+            $t("ui.data.rawWarningRecord.executeNewMaterialWarning")
+          }}</el-button
         >
         <el-button
           @click="handleAdd('week')"
-             v-hasPermi="['maindata:rawWarningRecord:executeUsageWarning']"
+          v-hasPermi="['maindata:rawWarningRecord:executeUsageWarning']"
           >{{ $t("ui.data.rawWarningRecord.executeUsageWarning") }}</el-button
         >
         <!-- <el-button
@@ -52,14 +54,13 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-import {
-  listRawWarningRecord,
-} from "@/api/maindata/rawWarningRecord";
+import { listRawWarningRecord } from "@/api/maindata/rawWarningRecord";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
+import { el } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "RawWarningRecord",
@@ -67,7 +68,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["warn_type", "biz_yes_no", "biz_factory_name",'warn_level'],
+  dicts: ["warn_type", "biz_yes_no", "biz_factory_name", "warn_level"],
   provide() {
     return {
       parentDict: this.dict,
@@ -104,7 +105,6 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
-
 
         {
           prop: "materialCode",
@@ -154,7 +154,6 @@ export default {
             return this.selectDictLabel(this.dict.type.warn_type, value);
           },
           width: 160,
-
         },
 
         {
@@ -167,14 +166,13 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width: 180,
         },
-
       ];
 
       return columns;
     },
     searchColumns() {
       return [
-      {
+        {
           label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
@@ -194,12 +192,26 @@ export default {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
         },
-
-
       ];
     },
   },
   methods: {
+    getQueryParams() {
+      const queryString = window.location.search;
+      const params = {};
+
+      if (queryString) {
+        queryString
+          .substring(1)
+          .split("&")
+          .forEach((param) => {
+            const [key, value] = param.split("=");
+            params[key] = decodeURIComponent(value);
+          });
+      }
+
+      return params;
+    },
     handleAdd(type) {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show(type);
@@ -289,7 +301,13 @@ export default {
     },
   },
   created() {
+    console.log();
+  },
+  activated() {
+    let propData = this.getQueryParams();
+
     let defaultParams = {
+      ...propData,
       factoryCode: "116",
     };
     this.search = {
@@ -299,8 +317,6 @@ export default {
       ...defaultParams,
     };
     this.getList();
-  },
-  activated() {
   },
 };
 </script>
