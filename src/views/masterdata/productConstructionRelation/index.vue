@@ -19,12 +19,12 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           type="primary"
           @click="mesCaptureing"
           plain
           >{{ $t("ui.data.column.moldLedger.mes") }}</el-button
-        >
+        > -->
         <!-- <el-button
           type="primary"
           plain

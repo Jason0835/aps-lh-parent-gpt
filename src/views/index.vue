@@ -149,11 +149,11 @@ export default {
   methods: {
 
     async getMessageData() {
-      const messageData = await messageListNoticeMessage({  receivedBy: this.name,})
+      const messageData = await messageListNoticeMessage({  receivedBy: this.name,msgType:0})
       this.messageList = messageData?.rows || []
     },
     async getTaskData() {
-      const taskData = await messageListTaskMessage({  receivedBy: this.name,})
+      const taskData = await messageListTaskMessage({  receivedBy: this.name,msgType:1})
       this.taskList = taskData?.rows || []
     },
     resolvePath(routePath, routeQuery) {

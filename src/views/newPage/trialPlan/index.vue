@@ -95,7 +95,9 @@ export default {
     "biz_trial_type",
     "biz_construction_stage",
     "biz_urgency_type",
-    "trial_construction_stage"
+    "trial_construction_stage",
+    "trial_status",
+    "biz_yes_no"
   ],
   provide() {
     return {
@@ -213,8 +215,8 @@ export default {
           },
         },
         {
-          prop: "lhNo",
-          label: this.$t("ui.data.column.trialPlan.lhNo"),
+          prop: "embryoNo",
+          label: this.$t("ui.data.column.trialPlan.embryoNo"),
           width: 180,
         },
         {

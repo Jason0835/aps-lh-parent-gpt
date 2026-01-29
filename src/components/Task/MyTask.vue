@@ -158,7 +158,7 @@
 import { debounce } from "@/utils";
 import { getNotice, delNotice, addNotice, updateNotice } from "@/api/system/notice";
 import {messageListTaskMessage} from "@/api/system/message";
-
+import { mapGetters } from 'vuex'
 export default {
   name: "Task",
   dicts: ['msg_channel', 'msg_source', 'msg_status', 'msg_type'],
@@ -167,6 +167,11 @@ export default {
     type: {
       type: String
     }
+  },
+  computed: {
+    // ...mapGetters(['sidebarRouters', 'collectMenu']),
+    ...mapGetters(["sidebarRouters", "collectMenu", "name"]),
+
   },
   data() {
     return {
@@ -193,9 +198,10 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        receivedBy: 'admin',
+        receivedBy:'',
         msgTitle: undefined,
         msgStatus: undefined,
+        msgType:1
       },
       // 表单参数
       form: {},
@@ -246,6 +252,7 @@ export default {
     /** 查询待办列表 */
     getList() {
       this.loading = true;
+      this.$set(this.queryParams,'receivedBy',this.name)
       messageListTaskMessage(this.queryParams).then(response => {
         this.messageList = response.rows;
         this.total = response.total;

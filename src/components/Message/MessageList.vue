@@ -148,11 +148,16 @@ import { debounce } from "@/utils";
 import { getNotice, delNotice, addNotice, updateNotice } from "@/api/system/notice";
 import { messageListNoticeMessage } from "@/api/system/message";
 import AppLink from "@/components/AppLink";
-
+import { mapGetters } from 'vuex'
 export default {
   name: "Notice",
   dicts: ['msg_channel', 'msg_source', 'msg_status', 'msg_type'],
   components: { AppLink },
+  computed: {
+    // ...mapGetters(['sidebarRouters', 'collectMenu']),
+    ...mapGetters(["sidebarRouters", "collectMenu", "name"]),
+
+  },
   data() {
     return {
       availableHeight: 500,
@@ -178,9 +183,10 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        receivedBy: 'admin',
+        receivedBy: '',
         msgTitle: undefined,
         msgStatus: undefined,
+        msgType:0
       },
       // 表单参数
       form: {},
@@ -225,6 +231,7 @@ export default {
     /** 查询消息列表 */
     getList() {
       this.loading = true;
+      this.$set(this.queryParams,'receivedBy',this.name)
       messageListNoticeMessage(this.queryParams).then(response => {
         this.messageList = response.rows;
         this.total = response.total;

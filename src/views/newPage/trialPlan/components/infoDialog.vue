@@ -34,10 +34,11 @@ import {
   saveMpTrialPlan
 } from "@/api/monthplan/mpTrialPlan";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
+import embryoNoSelect from "@/views/components/embryoNoSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm,materialCodeSelect },
+  components: { infoForm,materialCodeSelect,embryoNoSelect},
   inject: ["parentDict"],
   data() {
     const validatePositiveInteger = (rule, value, callback) => {
@@ -56,8 +57,7 @@ export default {
         );
       }
       const lastDigit = parseInt(strValue[strValue.length - 1]);
-      console.log(lastDigit)
-      console.log([0, 2, 4, 6, 8].includes(lastDigit))
+
 
       if (![0, 2, 4, 6, 8].includes(lastDigit)) {
         return callback(
@@ -245,8 +245,22 @@ export default {
           maxlength:50
         },
         {
-          prop: "embryoReleaseDate",
+          prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
+          render: (form) => {
+            return (
+              <embryoNoSelect
+                key={form.embryoNo}
+                v-model={form.embryoNo}
+                onChange={this.handleEmBryNoChange}
+                materialCode={form.materialCode}
+              />
+            );
+          },
+        },
+        {
+          prop: "embryoReleaseDate",
+          label: this.$t("ui.data.column.trialPlan.madeInfo"),
           disabled:true,
         },
         // {
@@ -261,7 +275,7 @@ export default {
         // },
         {
           prop: "textReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.textNo"),
+          label: this.$t("ui.data.column.trialPlan.moldingInfo"),
           disabled:true,
         },
         // {
@@ -276,7 +290,7 @@ export default {
         // },
         {
           prop: "lhReleaseDate",
-          label: this.$t("ui.data.column.trialPlan.lhNo"),
+          label: this.$t("ui.data.column.trialPlan.vulcanizationInfo"),
           disabled:true,
         },
         // {
@@ -322,7 +336,6 @@ export default {
       let list=this.parentDict.type.biz_construction_stage
       let distList=[]
       for (let index = 0; index < list.length; index++) {
-        console.log(list[index].value)
         if(list[index].value=="1" ||list[index].value=="2"){
           distList.push(list[index])
         }
@@ -351,6 +364,9 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleEmBryNoChange(){
+
     },
     handleMaterialCodeChange(val, row) {
       if (val) {

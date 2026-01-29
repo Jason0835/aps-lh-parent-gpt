@@ -347,8 +347,15 @@ export default {
     },
   },
   created() {
+    const now = new Date();
+    // const year = now.getFullYear();
+    // const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const year = nextMonth.getFullYear();
+      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
     let defaultParams = {
       factoryCode: "116",
+      yearMonth: `${year}-${month}`,
     };
     this.search = {
       ...defaultParams,
@@ -356,10 +363,10 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    // this.getList();
+    this.getList();
   },
   activated() {
-    this.getList();
+    // this.getList();
   },
 };
 </script>

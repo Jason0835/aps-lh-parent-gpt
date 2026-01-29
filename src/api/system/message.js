@@ -11,9 +11,9 @@ export function messageListNoticeMessage(data) {
     // url: '/message/messageCenter/listNoticeMessage',
     url: '/message/messageList/list',
     method: 'post',
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    },
+    // headers: {
+    //   'Content-Type': 'application/json;charset=UTF-8'
+    // },
     data
   })
 }
@@ -24,9 +24,9 @@ export function messageListTaskMessage(data) {
     // url: '/message/messageCenter/listTaskMessage',
     url: '/message/messageTaskList/list',
     method: 'post',
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    },
+    // headers: {
+    //   'Content-Type': 'application/json;charset=UTF-8'
+    // },
     data
   })
 }
