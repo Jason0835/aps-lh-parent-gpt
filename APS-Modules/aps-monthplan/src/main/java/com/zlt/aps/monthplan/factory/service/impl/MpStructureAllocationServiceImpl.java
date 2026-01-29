@@ -1,13 +1,16 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
@@ -48,6 +51,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     private final MpStructureAllocationEntityMapper entityMapper;
     private final FactoryMonthPlanProductionFinalResultServiceImpl monthPlanProductionFinalResultService;
+    private final MdmStructureLhRatioEntityMapper mdmStructureLhRatioEntityMapper;
 
     @Override
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
@@ -112,12 +116,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Integer year = mpStructureAllocation.getYear();
         // 月
         Integer month = mpStructureAllocation.getMonth();
+        // 产品结构
+        String structureName = mpStructureAllocation.getStructureName();
+
         // 获取定稿的月度计划
         FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
         param.setFactoryCode(factoryCode);
         param.setYear(year);
         param.setMonth(month);
-
         List<FactoryMonthPlanProductionFinalResult>  monthPlanProductionFinalResultList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
         if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
             FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
@@ -126,6 +132,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         mpStructureAllocation.setBaseVale(null);
         this.checkUnique(mpStructureAllocation);
+
+        // 获取成型结构硫化配比
+        LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, factoryCode)
+                .eq(MdmStructureLhRatio::getStructureName, structureName);
+        List<MdmStructureLhRatio> structureLhRatioList = mdmStructureLhRatioEntityMapper.selectList(queryWrapper);
+        if (PubUtil.isNotEmpty(structureLhRatioList)) {
+            MdmStructureLhRatio mdmStructureLhRatio = structureLhRatioList.get(0);
+            mpStructureAllocation.setMaxEmbryoCodeCount(mdmStructureLhRatio.getMaxEmbryoQty());
+            mpStructureAllocation.setMaxLhMachineCount(mdmStructureLhRatio.getLhMachineMaxQty());
+        }
+        // 计划类型
+        mpStructureAllocation.setPlanType("01");
         return baseDao.save(mpStructureAllocation);
     }
 
