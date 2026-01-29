@@ -218,7 +218,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String errorMsg = Optional.ofNullable(errorMsgList)
                 .orElse(Collections.emptyList())
                 .stream()
-                .collect(Collectors.joining(System.lineSeparator()));
+                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
         Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
             return new BusinessException(errorMsg);
         });
