@@ -6,6 +6,7 @@ import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.maindata.mapper.RawWarningRecordEntityMapper;
 import com.zlt.aps.maindata.service.IRawWarningRecordService;
@@ -212,7 +213,7 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
 
         // 发送消息
         messageServiceAdapter.sendMessage(
-                "RAW_WARNING_RECORD",
+                 MsgTemplateEnums.RAW_WARNING_RECORD.getCode(),
                  MsgTypeEnums.NOTICE.getCode(),
                  MsgChannelEnums.SYSTEM.getCode(),
                  null,
@@ -266,7 +267,7 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(factoryCode)).findFirst().get().getDictLabel();
 
         // 2.发送消息
-        messageServiceAdapter.sendNotice("RAW_WARNING_RECORD","", factoryName,
+        messageServiceAdapter.sendNotice(MsgTemplateEnums.RAW_NEW_WARNING.getCode() ,"" , factoryName,
                 year,
                 month,
                 warningCount);
