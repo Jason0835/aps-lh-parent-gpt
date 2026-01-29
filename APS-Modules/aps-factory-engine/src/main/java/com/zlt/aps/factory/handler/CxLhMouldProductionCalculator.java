@@ -107,6 +107,7 @@ public class CxLhMouldProductionCalculator {
 
             //SKU二次上机检查 sandy+ 20260129
             if (!checkSecOnline(productionPlanInfo,productionContext,productionPlan,realStartDay)){
+                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 return;
             }
         }
