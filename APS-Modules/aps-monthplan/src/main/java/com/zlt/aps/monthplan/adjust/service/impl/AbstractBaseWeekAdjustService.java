@@ -213,7 +213,63 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
             return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, errorMsgList));
         });
+        // 检查sku与施工示方书关系是否有数据
+        List<String> notExistMsgList = checkExistSkuConstructionRef(contextDTO);
+        Assert.isFalse(PubUtil.isNotEmpty(notExistMsgList), () -> {
+            return new BusinessException(String.join(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE, notExistMsgList));
+        });
     }
+
+    /**
+     * 检查sku与施工示方书关系是否有数据
+     * @param contextDTO
+     * @return
+     */
+    protected List<String> checkExistSkuConstructionRef(MpRollAdjustContextDTO contextDTO) {
+        // 调整明细列表
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        // SKU与施工（示方书）关系列表
+        List<MdmSkuConstructionRef> skuConstructionRefList = contextDTO.getMdmSkuConstructionRefList();
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return Collections.emptyList();
+        }
+        // 按照物料编码分组
+        Map<String, List<String>> skuConstructionRefMap = skuConstructionRefList.stream()
+                .filter(obj -> StringUtils.isNotEmpty(obj.getMaterialCode()) && StringUtils.isNotEmpty(obj.getEmbryoNo()))
+                .collect(Collectors.groupingBy(
+                        MdmSkuConstructionRef::getMaterialCode,
+                        Collectors.mapping(
+                                MdmSkuConstructionRef::getEmbryoNo,
+                                Collectors.toList()
+                        )
+                ));
+        // 错误信息列表
+        List<String> notExistMsgList = new ArrayList<>();
+        // 循环检查sku与施工示方书关系是否有数据
+        for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
+            String materialCode = adjustDetailVo.getMaterialCode();
+            String isTrial = adjustDetailVo.getIsTrial();
+            List<String> embryoNoList = skuConstructionRefMap.getOrDefault(materialCode, new ArrayList<>());
+            // 构建错误信息
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkNotExistConstructionRef"), materialCode);
+            // 无论是否试制量试，列表为空则直接添加错误信息
+            if (PubUtil.isEmpty(embryoNoList)) {
+                notExistMsgList.add(errorMsg);
+                continue;
+            }
+            // 试制量试需要额外校验是否在列表中
+            if (ApsConstant.TRUE.equals(isTrial)) {
+                String embryoNo = adjustDetailVo.getEmbryoNo();
+                // 非空时，校验是否存在于列表中
+                if (StringUtils.isNotEmpty(embryoNo) && !embryoNoList.contains(embryoNo)) {
+                    notExistMsgList.add(errorMsg);
+                }
+            }
+        }
+        return notExistMsgList;
+    }
+
+
 
     /**
      * 检查调整明细列表中的必填字段是否为空

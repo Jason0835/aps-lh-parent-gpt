@@ -1087,7 +1087,7 @@ public class MpWeekRollAdjustEngine {
         int structureDeadLine = contextDTO.getStructureDeadLine();
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         int startMould = getStartMould(newOnLineDay,mpFinalVo);
-        //int dayVulcanizationQty = getDayVulcanizationQty(mpFinalVo);
+        int dailyQty = getDayVulcanizationQty(mpFinalVo);
         int dayVulcanizationQty = 0;
         while (newPlanQty > 0){
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
@@ -1102,11 +1102,11 @@ public class MpWeekRollAdjustEngine {
                 }
                 dayField = FactoryConstant.DAY_FIELD + i;
                 dayValue = mpFinalVo.getFieldValueByFieldName(dayField) == null ? 0 : (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
-                if (i == newOnLineDay){
-                    //首日
+                if (isIncMouldFirstDay(mpFinalVo,i,dayValue,dailyQty)){
+                    //增模首日
                     dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,newOnLineDay, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
                 }else {
-                    dayVulcanizationQty = getDayVulcanizationQty(mpFinalVo);
+                    dayVulcanizationQty = dailyQty;
                 }
                 //若剩余计划量 < 日硫化量，则按剩余计划量累加
                 dayVulcanizationQty = newPlanQty < dayVulcanizationQty ? newPlanQty : dayVulcanizationQty;
@@ -1139,6 +1139,27 @@ public class MpWeekRollAdjustEngine {
             startMould += 2;
         }
         return newPlanQty < 0 ? 0:newPlanQty;
+    }
+
+    /**
+     * 增模首日
+     * @param mpFinalVo 定稿Vo
+     * @param iDay 今日
+     * @param dayValue 今日值
+     * @param dailyValue 日硫化量
+     * @return true-增模首日，false-非增模首日
+     */
+    private boolean isIncMouldFirstDay(FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay,int dayValue,int dailyValue){
+        if (FactoryConstant.MONTH_START_DAY == iDay){
+            return true;
+        }
+        String preDayField = FactoryConstant.DAY_FIELD + (iDay-1);
+        int preDayValue = mpFinalVo.getFieldValueByFieldName(preDayField) == null ? 0 : (Integer) mpFinalVo.getFieldValueByFieldName(preDayField);
+        //前日机台数
+        int preMachines = preDayValue / dailyValue;
+        //今日已有机台数
+        int dayMachines = dayValue / dailyValue;
+        return dayMachines >= preMachines;
     }
 
     /**
