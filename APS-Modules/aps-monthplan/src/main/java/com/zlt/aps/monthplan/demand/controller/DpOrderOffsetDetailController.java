@@ -2,6 +2,8 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.utils.JsonI18nConvertUtils;
+import com.zlt.aps.monthplan.api.domain.entity.DpArea;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
@@ -61,7 +63,10 @@ public class DpOrderOffsetDetailController extends AbstractDocBizController<DpOr
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody DpOrderOffsetDetail queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        List<DpOrderOffsetDetail> list = (List<DpOrderOffsetDetail>) tableDataInfo.getRows();
+        JsonI18nConvertUtils.conventJsonI18n(list, DpOrderOffsetDetail.class);
+        return tableDataInfo;
     }
 
     @Override
@@ -193,5 +198,13 @@ public class DpOrderOffsetDetailController extends AbstractDocBizController<DpOr
         return "S1-0604";
     }
 
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return new String[]{
+                "areaCodeName->getcolvaluewithcondition(t_dp_area, area_name, area_code, areaCode, is_delete = 0)",
+
+        };
+    }
 
 }

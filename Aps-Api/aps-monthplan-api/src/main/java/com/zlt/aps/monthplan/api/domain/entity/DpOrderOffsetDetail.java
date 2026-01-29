@@ -68,10 +68,22 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String locationType;
 
     /** 区域 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.areaCode")
     @ApiModelProperty(value = "区域", name = "areaCode")
     @TableField(value = "AREA_CODE")
     private String areaCode;
+
+    /**
+     * 区域名称国际化字符串
+     */
+    @TableField(exist = false)
+    private String areaCodeName;
+
+    /**
+     * 区域名称国际化
+     */
+    @Excel(name = "ui.data.column.orderOffsetDetail.areaCode")
+    @TableField(exist = false)
+    private String areaCodeNameI18n;
 
     /** 客户编号 */
     @Excel(name = "ui.data.column.orderOffsetDetail.customCode")
