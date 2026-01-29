@@ -824,7 +824,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
 
         CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
-            CompletableFuture.supplyAsync(this::fetchSupplyOrderPool);
+            CompletableFuture.supplyAsync(() -> this.fetchSupplyOrderPool(createCondition));
 
         CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
             CompletableFuture.supplyAsync(() -> this.findCurrentMonthlySaleQty(createCondition.getFactoryCode()));
@@ -1014,8 +1014,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 获取供应链订单池
      */
-    private List<SupplyOrderPool> fetchSupplyOrderPool() {
-        return this.supplyOrderPoolService.findCurrentSupplyOrderPool();
+    private List<SupplyOrderPool> fetchSupplyOrderPool(DpDemandPlan createCondition) {
+        return this.supplyOrderPoolService.findCurrentSupplyOrderPool(createCondition);
     }
 
 
