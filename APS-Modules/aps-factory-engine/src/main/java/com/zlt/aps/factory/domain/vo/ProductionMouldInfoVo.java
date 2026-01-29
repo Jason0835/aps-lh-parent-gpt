@@ -329,6 +329,7 @@ public class ProductionMouldInfoVo implements Serializable {
             return;
         }
         if (null == boardingDate) {
+            productionDaySet.addAll(context.getProductionDay());
             return;
         }
         //可用时间 = 上机日期 + 1

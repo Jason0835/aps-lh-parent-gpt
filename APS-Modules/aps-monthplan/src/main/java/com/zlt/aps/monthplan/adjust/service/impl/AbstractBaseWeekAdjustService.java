@@ -87,7 +87,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
-import static com.zlt.aps.common.core.utils.ApsCommonUtil.getIntOrDefault;
 
 /**
  * 周程滚动调整通用抽象类
@@ -769,6 +768,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     log.error("更新月度生产计划：物料:{}的结束日期转换失败，跳过", materialCode, e);
                 }
             }
+            monthPlanVo.setTotalQty(adjustResult.getTotalQty());
+            monthPlanVo.setHeightProductionQty(adjustResult.getHeightProductionQty());
+            monthPlanVo.setMidProductionQty(adjustResult.getMidProductionQty());
+            monthPlanVo.setCycleProductionQty(adjustResult.getCycleProductionQty());
+            monthPlanVo.setConventionProductionQty(adjustResult.getConventionProductionQty());
+            monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
+            monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
+            monthPlanVo.setDifferenceQty(adjustResult.getDifferenceQty());
             // 获取周数
             int week = getWeekNumber(new Date());
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustResult.getTotalPlanQty());
