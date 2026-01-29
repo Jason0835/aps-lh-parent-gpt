@@ -804,6 +804,7 @@ public class MpWeekRollAdjustEngine {
         }
     }
 
+
     /**
      * 结构调整：在机SKU增量
      * @param contextDTO 周程滚动调整上下文
@@ -1156,9 +1157,10 @@ public class MpWeekRollAdjustEngine {
         String preDayField = FactoryConstant.DAY_FIELD + (iDay-1);
         int preDayValue = mpFinalVo.getFieldValueByFieldName(preDayField) == null ? 0 : (Integer) mpFinalVo.getFieldValueByFieldName(preDayField);
         //前日机台数
-        int preMachines = preDayValue / dailyValue;
+        int preMachines = (int)Math.ceil((double) preDayValue / dailyValue);
         //今日已有机台数
-        int dayMachines = dayValue / dailyValue;
+        int dayMachines = (int)Math.ceil((double) dayValue / dailyValue);
+
         return dayMachines >= preMachines;
     }
 
