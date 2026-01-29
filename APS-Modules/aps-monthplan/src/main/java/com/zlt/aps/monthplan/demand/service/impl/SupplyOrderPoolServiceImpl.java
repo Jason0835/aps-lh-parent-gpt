@@ -251,11 +251,11 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
 
 
     @Override
-    public List<SupplyOrderPool> findCurrentSupplyOrderPool() {
-        YearMonth yearMonth = YearMonth.now();
+    public List<SupplyOrderPool> findCurrentSupplyOrderPool(DpDemandPlan createCondition) {
         LambdaQueryWrapper<SupplyOrderPool> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(SupplyOrderPool::getYear, yearMonth.getYear());
-        wrapper.eq(SupplyOrderPool::getMonth, yearMonth.getMonthValue());
+        wrapper.eq(SupplyOrderPool::getFactoryCode,createCondition.getFactoryCode());
+        wrapper.eq(SupplyOrderPool::getYear, createCondition.getYear());
+        wrapper.eq(SupplyOrderPool::getMonth, createCondition.getMonth());
         wrapper.eq(SupplyOrderPool::getSourceType,ProductionPlanType.NORMAL.getPlanType());
         wrapper.eq(SupplyOrderPool::getIsDelete, YesOrNoEnum.NO.getValue());
         return this.supplyOrderPoolEntityMapper.selectList(wrapper);
