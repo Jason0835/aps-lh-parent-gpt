@@ -184,6 +184,7 @@ public class MpWeekRollAdjustEngine {
             mpFinalVo = createMpFinalAdjustVo(contextDTO, structureIn);
             dayField = FactoryConstant.DAY_FIELD + newOnlineDay;
             mpFinalVo.setFieldValueByFieldName(dayField,structureIn.getConfirmAdjustQty());
+            mpFinalVo.setTrialProductionQty(structureIn.getConfirmAdjustQty());
             mpProdFinalList.add(mpFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,排产上机日:%s,排产量:%s!",contextDTO.getStructureName(), structureIn.getMaterialCode(), newOnlineDay,structureIn.getConfirmAdjustQty())).append(ApsConstant.DIVISION);
         }
@@ -1440,24 +1441,28 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
         mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
 */
-        if (adjustStructInVo.getPostponeQty()>=0 && productionQty >=0){
-            //有暂缓需求
-            mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
-            productionQty -= adjustStructInVo.getPostponeQty();
-        }
-        if (adjustStructInVo.getHeightQty()>=0 && productionQty >=0){
-            //有高优先级需求
-            mpFinalVo.setHeightProductionQty(adjustStructInVo.getHeightQty());
-            productionQty -= adjustStructInVo.getHeightQty();
-        }
-        if (adjustStructInVo.getCycleReserveQty()>=0 && productionQty >=0){
-            //有周期性需求
-            mpFinalVo.setCycleProductionQty(adjustStructInVo.getCycleReserveQty());
-            productionQty -= adjustStructInVo.getCycleReserveQty();
-        }
-        //其他全归到 中优先级需求
-        if (productionQty >=0){
-            mpFinalVo.setMidProductionQty(productionQty);
+        if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(adjustStructInVo.getConstructionStage())){
+            mpFinalVo.setTrialProductionQty(productionQty);
+        }else{
+            if (adjustStructInVo.getPostponeQty()>=0 && productionQty >=0){
+                //有暂缓需求
+                mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
+                productionQty -= adjustStructInVo.getPostponeQty();
+            }
+            if (adjustStructInVo.getHeightQty()>=0 && productionQty >=0){
+                //有高优先级需求
+                mpFinalVo.setHeightProductionQty(adjustStructInVo.getHeightQty());
+                productionQty -= adjustStructInVo.getHeightQty();
+            }
+            if (adjustStructInVo.getCycleReserveQty()>=0 && productionQty >=0){
+                //有周期性需求
+                mpFinalVo.setCycleProductionQty(adjustStructInVo.getCycleReserveQty());
+                productionQty -= adjustStructInVo.getCycleReserveQty();
+            }
+            //其他全归到 中优先级需求
+            if (productionQty >=0){
+                mpFinalVo.setMidProductionQty(productionQty);
+            }
         }
     }
 
@@ -1653,6 +1658,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setCycleProductionQty(0);
         mpFinalVo.setMidProductionQty(0);
         mpFinalVo.setConventionProductionQty(0);
+        mpFinalVo.setTrialProductionQty(0);
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         return mpFinalVo;
