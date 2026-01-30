@@ -649,6 +649,11 @@ public class MpWeekRollAdjustEngine {
                 return;
             }
             dayField = FactoryConstant.DAY_FIELD+iDay;
+            if (prodFinal.getFieldValueByFieldName(dayField) == null ||
+                    (Integer) prodFinal.getFieldValueByFieldName(dayField) == 0){
+                //前1天为空，退出
+                return;
+            }
         }
         int dayQty = (Integer) prodFinal.getFieldValueByFieldName(dayField);
         //1、根据计划量测算硫化机台数,有余数加1；
