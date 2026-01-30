@@ -14,12 +14,12 @@
         PATTERN,
         -- MAIN_PATTERN,
         REMARK,
-        DEL_FLAG,
+        DEL_FLAG AS IS_DELETE,
         DATA_VERSION,
         IS_SAME_PATTER_PANEL,
         MOULD_TYPE
         FROM PRODUCT_MOD_RELATION
-        WHERE DEL_FLAG = 0
+        WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="mouldCode != null and mouldCode != ''">AND MOULD_CODE = #{mouldCode}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
@@ -49,10 +49,10 @@
         MOULD_REMARK,
         MOULD_SLEEVE,
         MOULD_AIR_TYPE,
-        DEL_FLAG,
+        DEL_FLAG AS IS_DELETE,
         DATA_VERSION
         FROM TIRE_MOD_INFO
-        WHERE DEL_FLAG = 0
+        WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="mouldCode != null and mouldCode != ''">AND MOULD_CODE = #{mouldCode}</if>
         <if test="mouldStatus != null and mouldStatus != ''">AND MOULD_STATUS = #{mouldStatus}</if>
@@ -87,7 +87,8 @@
         MES_MATERIAL_SUBCATEGORY,
         MES_MATERIAL_CATE_NAME,
         MES_MATERIAL_SUBCAT_NAME,
-        SINGLE_TIRE_WEIGHT
+        SINGLE_TIRE_WEIGHT,
+        DEL_FLAG AS IS_DELETE
         FROM MES_BAS_MATERIAL
         WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
@@ -106,7 +107,8 @@
         FORCE_OUT_NUM AS FORCE_OUT_BOUND_QTY,
         DATA_VERSION,
         COMPANY_CODE,
-        FACTORY_CODE
+        FACTORY_CODE,
+        DEL_FLAG AS IS_DELETE
         FROM MOLD_SHELL_SYNC
         WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
@@ -122,7 +124,8 @@
         STOCK_NUM AS OUTBOUND_QTY,
         UNIT,
         DATA_VERSION,
-        FACTORY_CODE
+        FACTORY_CODE,
+        DEL_FLAG AS IS_DELETE
         FROM ORI_MATERIAL_OUT_SYNC
         WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>

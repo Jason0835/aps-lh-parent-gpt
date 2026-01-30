@@ -282,7 +282,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int executeNewMaterialWarning(String factoryCode, Integer currentYear, Integer currentMonth) {
-        try {
+
             log.info(StringUtils.format(
                     I18nUtil.getMessage("raw.warning.start.new.material"),
                     factoryCode, currentYear, currentMonth
@@ -327,9 +327,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             }
             return warningRecords.size();
 
-        } catch (Exception e) {
-           throw new BusinessException(I18nUtil.getMessage("raw.warning.new.material.error"), e);
-        }
+
     }
 
     /**
@@ -425,10 +423,15 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
             if (!warnAll && !warningMaterialCodes.containsKey(diff.getMaterialCode())) {
                 continue;
             }
+            RawWarningConfig rawWarningConfig = warningMaterialCodes.get(diff.getMaterialCode());
+            if (warnAll){
+                rawWarningConfig = new RawWarningConfig();
+                rawWarningConfig.setWarningLevel("3");
+            }
 
             warnings.add(createSingleMaterialWarningRecord(
                     factoryCode, currentYear, currentMonth, previousYear, previousMonth,
-                    diff, currentMonthStr, previousMonthStr, isNewMaterial, warningMaterialCodes.get(diff.getMaterialCode())
+                    diff, currentMonthStr, previousMonthStr, isNewMaterial, rawWarningConfig
             ));
         }
 
