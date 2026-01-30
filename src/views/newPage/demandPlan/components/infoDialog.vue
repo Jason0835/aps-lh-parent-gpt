@@ -134,7 +134,7 @@ export default {
       }
     },
     hide() {
-      this.$refs.form.triggerResetForm();
+      // this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;

@@ -16,6 +16,11 @@ export default {
         return {};
       },
     },
+     //是否手动重置
+     isReset:{
+      type: Boolean,
+      default: false,
+    }
   },
   data() {
     return {
@@ -62,6 +67,7 @@ export default {
       this.$emit("search", data);
     },
     handleReset() {
+      if(this.isReset){   this.$emit("reset"); return}
       this.form = deepClone(this.defaultValue);
       if (this.batchSearchColumns) {
         this.$refs.batchSearch.resetForm();

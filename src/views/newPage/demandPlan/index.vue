@@ -9,12 +9,13 @@
       :data="data"
       :page="page"
       :search="search"
-      @refresh="getList"
+      @reset="refreshSearch"
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
       :showSummary="false"
+      :isReset="true"
       :selectArea="false"
     >
       <template slot="header">
@@ -515,12 +516,12 @@ export default {
           dictData: this.structureList,
           filterable: true,
         },
-        {
-          prop: "orderPriority",
-          label: this.$t("ui.data.DemandPlan.order"),
-          type: "select",
-          dictData: this.dict.type.biz_order_type,
-        },
+        // {
+        //   prop: "orderPriority",
+        //   label: this.$t("ui.data.DemandPlan.order"),
+        //   type: "select",
+        //   dictData: this.dict.type.biz_order_type,
+        // },
         {
           prop: "isAlternateMaterial",
           label: this.$t("ui.data.demandPlan.isAlternateMaterial"),
@@ -557,6 +558,19 @@ export default {
     },
   },
   methods: {
+    refreshSearch(){
+      this.search={
+        factoryCode:this.search.factoryCode,
+        yearMonth:this.search.yearMonth,
+        monthPlanVersion:this.search.monthPlanVersion
+      }
+      this.query={
+        factoryCode:this.search.factoryCode,
+        yearMonth:this.search.yearMonth,
+        monthPlanVersion:this.search.monthPlanVersion
+      }
+      this.getList()
+    },
     getListResize() {
       this.search = {
         ...this.query,

@@ -158,22 +158,23 @@ export default {
           width:120,
         },
         {
-          prop: "mesMaterialCode",
+          prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width:350,
+
         },
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width:180,
-        },
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
+        // {
+        //   prop: "materialCode",
+        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        //   width:180,
+        // },
+        // {
+        //   prop: "materialDesc",
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        // },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          width:350,
         },
         {
           align: "center",
@@ -216,17 +217,22 @@ export default {
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          prop: "mainMaterialDesc",
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+
         },
+        // {
+        //   prop: "materialCode",
+        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        // },
         // {
         //   prop: "胚胎",
         //   label: this.$t("胚胎"),
         // },
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
+        // {
+        //   prop: "materialDesc",
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        // },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),

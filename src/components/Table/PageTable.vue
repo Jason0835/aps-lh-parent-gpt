@@ -58,6 +58,11 @@ export default {
       type: Boolean,
       default: true,
     },
+    //是否手动重置
+    isReset:{
+      type: Boolean,
+      default: false,
+    }
   },
   data() {
     return {
@@ -378,6 +383,7 @@ export default {
             batchSearchColumns={this.batchSearchColumns}
             onSearch={this.onSearch}
             onReset={this.onReset}
+            isReset={this.isReset}
           />
         ) : (
           ""

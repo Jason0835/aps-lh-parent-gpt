@@ -31,12 +31,12 @@
 <script>
 import { mapState } from "vuex";
 import { editSkuStructure } from "@/api/monthplan/skuStructure";
-
+import structureSelect from "@/views/components/structureSelect.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm, materialCodeSelect },
+  components: { infoForm, materialCodeSelect,structureSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -109,31 +109,39 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          prop: "mesMaterialCode",
+          prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          render: (form) => {
-            return (
-              <materialCodeSelect
-                key={form.materialCode}
-                v-model={form.materialCode}
-                onChange={this.handleMaterialCodeChange}
-              />
-            );
-          },
-        },
-        {
-          prop: "materialDesc",
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          disabled: true,
-        },
+        // {
+        //   prop: "materialCode",
+        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        //   render: (form) => {
+        //     return (
+        //       <materialCodeSelect
+        //         key={form.materialCode}
+        //         v-model={form.materialCode}
+        //         onChange={this.handleMaterialCodeChange}
+        //       />
+        //     );
+        //   },
+        // },
+        // {
+        //   prop: "materialDesc",
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        //   disabled: true,
+        // },
 
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.structureName}
+                v-model={form.structureName}
+              />
+            );
+          },
 
         },
       ];
