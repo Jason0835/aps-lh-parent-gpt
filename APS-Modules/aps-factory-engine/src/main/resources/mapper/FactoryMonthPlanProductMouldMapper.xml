@@ -91,7 +91,9 @@
                           AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND mpi.YEAR = #{year,jdbcType=DECIMAL}
                           AND mpi.MONTH = #{month,jdbcType=DECIMAL}
-                          AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                            <if test="monthPlanVersion != null and monthPlanVersion != ''">
+                                AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                            </if>
                           AND msm.MATERIAL_DESC = mpi.MATERIAL_DESC
                           AND msm.FACTORY_CODE = mpi.FACTORY_CODE)
     </select>
@@ -119,7 +121,9 @@
                         AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                         AND mpi.YEAR = #{year,jdbcType=DECIMAL}
                         AND mpi.MONTH = #{month,jdbcType=DECIMAL}
-                        AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                        <if test="monthPlanVersion != null and monthPlanVersion != ''">
+                            AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                        </if>
                         AND mdp.MATERIAL_DESC = mpi.MATERIAL_DESC
                         AND mdp.FACTORY_CODE = mpi.FACTORY_CODE)
     </select>
