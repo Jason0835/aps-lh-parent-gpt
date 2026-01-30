@@ -12,6 +12,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.utils.MouldCapacityAllocator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -164,15 +165,13 @@ public class AdjustContinueSkuProductionQtyHandler {
                                            CxContinueInfoHelper cxContinueInfo,
                                            TbrProductionContext productionContext) {
 
-    requirePlans.forEach(item -> {
-         log.info("adjustMaterialProductionQty:materialDesc={},materialCode={}, heightProductionQty={},originHeightProductionQty={},productionQty={},originProductionQty={}",
-             materialDesc,
-             item.getMaterialCode(),
-             item.getHeightProductionQty() ,
-             item.getOriginHeightProductionQty(),
-             item.getProductionQty(),
-             item.getOriginProductionQty());
-    });
+    requirePlans.forEach(item -> log.info("adjustMaterialProductionQty:materialDesc={},materialCode={}, heightProductionQty={},originHeightProductionQty={},productionQty={},originProductionQty={}",
+        materialDesc,
+        item.getMaterialCode(),
+        item.getHeightProductionQty() ,
+        item.getOriginHeightProductionQty(),
+        item.getProductionQty(),
+        item.getOriginProductionQty()));
     log.info("adjustMaterialProductionQty: materialDesc={},key={},maxAllocationDay={}",materialDesc, plansByMaterial.keySet(),maxAllocationDay);
     // 前置条件检查
     if (!validateAdjustmentConditions(materialDesc, requirePlans, productionContext)) {
@@ -199,10 +198,12 @@ public class AdjustContinueSkuProductionQtyHandler {
       log.info("模具产能足够，无需调整: materialDesc={}, totalMouldCapacity={}, totalProductionQty={}", materialDesc, totalMouldCapacity, totalProductionQty);
       return;
     }
+    int lossHeightProductionQty = calculateHeightLossProductionQty(materialDesc,requirePlans.get(0),plansByMaterial,productionContext);
     // 计算并分配剩余产量
-    int leftProductionQty = totalMouldCapacity - adjustHeightProductionQty;
+    int leftProductionQty = totalMouldCapacity - adjustHeightProductionQty - lossHeightProductionQty;
+    log.info("计算并分配剩余产量: materialDesc={},dayVulcanizationQty={}, totalMouldCapacity={}, adjustHeightProductionQty={},lossHeightProductionQty={}, leftProductionQty={}", materialDesc,dayVulcanizationQty,totalMouldCapacity,adjustHeightProductionQty,lossHeightProductionQty,leftProductionQty);
     if (leftProductionQty <= 0) {
-      log.info("计算出的剩余产量异常: materialDesc={},dayVulcanizationQty={}, totalMouldCapacity={}, adjustHeightProductionQty={}, leftProductionQty={}", materialDesc,dayVulcanizationQty,totalMouldCapacity,adjustHeightProductionQty,leftProductionQty);
+      log.info("计算出的剩余产量异常: materialDesc={},dayVulcanizationQty={}, totalMouldCapacity={}, adjustHeightProductionQty={},lossHeightProductionQty={}, leftProductionQty={}", materialDesc,dayVulcanizationQty,totalMouldCapacity,adjustHeightProductionQty,lossHeightProductionQty,leftProductionQty);
       requirePlans.forEach(item -> {
             item.setProductionQty(BigDecimal.ZERO.intValue());
             item.setOriginProductionQty(BigDecimal.ZERO.intValue());
@@ -213,6 +214,54 @@ public class AdjustContinueSkuProductionQtyHandler {
     }
     // 执行分配
     executeProductionAllocation(requirePlans, leftProductionQty, cxContinueInfo, materialDesc);
+  }
+
+  private int calculateHeightLossProductionQty(String materialDesc, MonthPlanProductionRequirePlanVo currentRequirePlan, Map<String, List<MonthPlanProductionRequirePlanVo>> plansByMaterial, TbrProductionContext productionContext) {
+    int totalHeightLossProductionQty = 0;
+    ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+    Integer changeTypeBlockQty = paramConfiguration.getChangeTypeBlockQty();
+    if(null == changeTypeBlockQty) {
+      return totalHeightLossProductionQty;
+    }
+    List<ProductionMouldInfoVo> mouldInfos = productionContext.findMouldInfoByMaterialDesc(materialDesc);
+    Set<String> intersectionMaterials = getIntersectionOfMaterialSets(mouldInfos);
+    if (CollectionUtils.isEmpty(intersectionMaterials)) {
+      return totalHeightLossProductionQty;
+    }
+    Set<String> otherMaterialDescs =  plansByMaterial.entrySet().stream()
+        .filter(entry -> !materialDesc.equals(entry.getKey()))
+        .filter(entry -> intersectionMaterials.contains(entry.getKey()))
+        .filter(entry -> filterByMouldInfos(entry.getKey(),productionContext))
+        .flatMap(entry -> entry.getValue().stream())
+        .filter(HAS_HEIGHT_PRODUCTION_FILTER)
+        .map(MonthPlanProductionRequirePlanVo::getMaterialDesc)
+        .collect(Collectors.toSet());
+    if(CollectionUtils.isEmpty(otherMaterialDescs)) {
+      return totalHeightLossProductionQty;
+    }
+
+    for(String otherMaterialDesc : otherMaterialDescs) {
+          MonthPlanProductionRequirePlanVo otherHeightPriorityRequirePlan = plansByMaterial.get(otherMaterialDesc).get(0);
+          totalHeightLossProductionQty +=  calculateHeightLossProductionQty(currentRequirePlan,otherHeightPriorityRequirePlan,changeTypeBlockQty);
+    }
+    return totalHeightLossProductionQty;
+  }
+
+  private int calculateHeightLossProductionQty(MonthPlanProductionRequirePlanVo currentRequirePlan, MonthPlanProductionRequirePlanVo otherHeightPriorityRequirePlan,Integer changeTypeBlockQty) {
+    String specifications  = currentRequirePlan.getSpecifications();
+    String pattern = currentRequirePlan.getPattern();
+    if(StringUtils.isNotBlank(specifications)
+        && StringUtils.isNotBlank(pattern)
+        && specifications.equals(otherHeightPriorityRequirePlan.getSpecifications())
+        && pattern.equals(otherHeightPriorityRequirePlan.getPattern())) {
+        return 0;
+    }
+    // 检查日硫化量
+    Integer dayVulcanizationQty = otherHeightPriorityRequirePlan.getDayVulcanizationQty();
+    if(null == dayVulcanizationQty) {
+      return 0;
+    }
+    return dayVulcanizationQty*changeTypeBlockQty;
   }
 
   /**

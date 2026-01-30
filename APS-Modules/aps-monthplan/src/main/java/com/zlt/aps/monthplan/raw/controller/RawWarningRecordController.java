@@ -160,15 +160,15 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
                                           @RequestParam("month") Integer month){
         try {
             int warningCount = rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
-            if (warningCount >= 0) {
-                String resultMessage = StringUtils.format(
-                        I18nUtil.getMessage("raw.warning.usage.deviation.result"),
-                        warningCount
-                );
+            String resultMessage = StringUtils.format(
+                    I18nUtil.getMessage("raw.warning.usage.deviation.result"),
+                    warningCount
+            );
+            if (warningCount > 0) {
                 // 2. 发送预警通知
                 sendUsageWarningNotification(factoryCode, year, week, month, warningCount, resultMessage);
-                return AjaxResult.success(resultMessage);
             }
+            return AjaxResult.success(resultMessage);
         }catch (Exception e) {
             String errorMessage = StringUtils.format(
                     I18nUtil.getMessage("raw.warning.usage.deviation.exception"),
@@ -176,7 +176,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
             );
             return AjaxResult.error(errorMessage);
         }
-        return AjaxResult.error();
     }
 
     /**
@@ -233,15 +232,15 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
                                                 @RequestParam("month") Integer month) {
         try{
             int warningCount = rawWarningService.executeNewMaterialWarning(factoryCode, year, month);
-            if (warningCount >= 0) {
-                String resultMessage = StringUtils.format(
-                        I18nUtil.getMessage("raw.warning.new.material.result"),
-                        warningCount
-                );
+            String resultMessage = StringUtils.format(
+                    I18nUtil.getMessage("raw.warning.new.material.result"),
+                    warningCount
+            );
+            if (warningCount > 0) {
                 // 2. 发送预警通知
                 sendNewMaterialWarningNotification(factoryCode, year, month, warningCount, resultMessage);
-                return AjaxResult.success(resultMessage);
             }
+            return AjaxResult.success(resultMessage);
         }catch (Exception e) {
             String errorMessage = StringUtils.format(
                     I18nUtil.getMessage("raw.warning.new.material.exception"),
@@ -249,7 +248,6 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
             );
             return AjaxResult.error(errorMessage);
         }
-        return AjaxResult.error();
     }
 
 
