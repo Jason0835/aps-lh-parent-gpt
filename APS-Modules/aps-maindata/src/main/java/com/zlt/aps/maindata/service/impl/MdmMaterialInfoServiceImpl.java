@@ -27,6 +27,7 @@ import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
@@ -671,10 +672,11 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
     }
 
     @Override
-    public Map<String, MdmMaterialInfo> skuToMaterialInfo(String structureName) {
+    public Map<String, MdmMaterialInfo> skuToMaterialInfo(DpDemandPlan createCondition) {
         LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
-        if(StringUtils.isNotBlank(structureName)){
-            wrapper.eq(MdmMaterialInfo::getStructureName, structureName);
+        wrapper.eq(MdmMaterialInfo::getFactoryCode, createCondition.getFactoryCode());
+        if(StringUtils.isNotBlank(createCondition.getStructureName())){
+            wrapper.eq(MdmMaterialInfo::getStructureName, createCondition.getStructureName());
         }
         wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MdmMaterialInfo> materialInfos =  mdmMaterialInfoEntityMapper.selectList(wrapper);

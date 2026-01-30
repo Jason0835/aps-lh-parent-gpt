@@ -72,8 +72,9 @@ public class MdmSkuScheduleCategoryServiceImpl extends AbstractDocService<MdmSku
     }
 
     @Override
-    public Map<String, String> skuToProductionType() {
+    public Map<String, String> skuToProductionType(String factoryCode) {
         LambdaQueryWrapper<MdmSkuScheduleCategory> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmSkuScheduleCategory::getFactoryCode, factoryCode);
         wrapper.eq(MdmSkuScheduleCategory::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MdmSkuScheduleCategory>  list =   skuScheduleCategoryEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)) {

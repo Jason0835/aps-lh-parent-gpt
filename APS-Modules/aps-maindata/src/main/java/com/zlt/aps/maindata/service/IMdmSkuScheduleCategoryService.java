@@ -25,5 +25,5 @@ public interface IMdmSkuScheduleCategoryService extends IDocService<MdmSkuSchedu
    *  获取SKU对应的排产分类
    * @return SKU对应的排产分类
    */
-  Map<String,String> skuToProductionType();
+  Map<String,String> skuToProductionType(String factoryCode);
 }
