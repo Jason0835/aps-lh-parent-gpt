@@ -1,6 +1,7 @@
 package com.tlt.aps.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.support.atomic.RedisAtomicLong;
 import org.springframework.stereotype.Component;
@@ -18,7 +19,7 @@ public class IncrementService {
     @Resource
     private RedisTemplate redisTemplate;
 
-//    @Value("${rowNo.expire.minutes}")
+    @Value("${rowNo.expire.minutes}")
     private Integer defaultMins;
 
     /**

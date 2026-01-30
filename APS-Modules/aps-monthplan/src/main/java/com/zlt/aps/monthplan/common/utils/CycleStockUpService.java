@@ -33,10 +33,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -180,7 +181,7 @@ public class CycleStockUpService {
     order.setSaleArea(null != monthlySaleQty && StringUtils.isNotBlank(monthlySaleQty.getSaleArea())?monthlySaleQty.getSaleArea():StringUtils.EMPTY);
     int turnoverMonth = getTurnoverMonth(order.getStructureName(),data);
 
-    if (monthlySaleQty != null && turnoverMonth > 0) {
+    if (null  != monthlySaleQty && null != monthlySaleQty.getAverageSaleQty() && turnoverMonth > 0) {
       int averageSaleQty = monthlySaleQty.getAverageSaleQty();
       int notOrderStockQty = order.getNotOrderStockQty();
       // 周期性排产量 = 月均销量 × 周转月数 - 无订单库存
@@ -199,7 +200,7 @@ public class CycleStockUpService {
    * 获取周转月数
    */
   private int getTurnoverMonth(String structureName, CalculationData data) {
-    if(StringUtils.isBlank(structureName) || org.springframework.util.CollectionUtils.isEmpty(data.getStructure2TurnoverMonthMap())) {
+    if(StringUtils.isBlank(structureName) || CollectionUtils.isEmpty(data.getStructure2TurnoverMonthMap())) {
       return BigDecimal.ZERO.intValue();
     }
     return  data.getStructure2TurnoverMonthMap().getOrDefault(structureName,BigDecimal.ZERO.intValue());
@@ -257,6 +258,9 @@ public class CycleStockUpService {
    */
   private BigDecimal calculateStockLimit(MpMonthlySaleQty monthlySaleQty) {
     BigDecimal turnoverDays = getTurnOverDays();
+    if(null == turnoverDays || null == monthlySaleQty.getAverageSaleQty()) {
+      return BigDecimal.ZERO;
+    }
     return turnoverDays.multiply(BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
         .divide(BigDecimal.valueOf(DAYS_PER_MONTH), 0, RoundingMode.HALF_UP);
   }
