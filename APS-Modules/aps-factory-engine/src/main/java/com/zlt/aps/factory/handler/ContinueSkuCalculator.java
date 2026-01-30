@@ -168,7 +168,7 @@ public class ContinueSkuCalculator {
         Integer maxLhGroupNo = cxLhRatioMap.size();
         Integer mouldNumber = continueSkuInfo.getMouldNumber();
         Integer continueSkuMaxLhGroup = continueSkuInfo.getUsedLhMachineCountByMouldNumber();
-        List<ProductionMouldInfoVo> mouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, continueSkuInfo.getMaterialDesc(), mouldNumber);
+        List<ProductionMouldInfoVo> mouldList = new ArrayList<>(mouldNumber);
         List<CxLhProductionHelper> allocationGroupList = new ArrayList<>();
         int assignedCount = BigDecimal.ONE.intValue();
         for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= maxLhGroupNo; lhGroupNo++) {

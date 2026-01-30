@@ -11,6 +11,7 @@ import com.zlt.aps.factory.handler.GroupPlanCxMachineSelector;
 import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
  * @date 20251215
  */
 @Slf4j
+@Component
 public class CxCapacityAllocationHandler {
 
     /**
@@ -84,7 +86,7 @@ public class CxCapacityAllocationHandler {
      * @param context                      排产上下文
      * @param estimateGroupCxAllocationMap 分组结构需求
      */
-    public static void reverseMachineAllocation(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
+    public void reverseMachineAllocation(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
         if (CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
             //todo 记录日志
             return;
@@ -99,18 +101,18 @@ public class CxCapacityAllocationHandler {
         }
         List<CxMachineBaseInfoVo> reverseCxMachineList = new ArrayList<>();
         reverseFindSet.forEach(cxMachineCode -> reverseCxMachineList.add(productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode)));
-        //最先收尾的先-剩余天数多的
         if (CollectionUtils.isEmpty(reverseCxMachineList)) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoExistBaseInfoLog(context));
             return;
         }
-        //收尾机台
+        //收尾机台-剔除空出来的机台
         List<CxMachineBaseInfoVo> endingCxMachineList = reverseCxMachineList.stream().filter(cxMachineInfo -> !CollectionUtils.isEmpty(cxMachineInfo.getAllocationList())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(endingCxMachineList)) {
             //todo 记录日志
             return;
         }
+        //最先收尾的先-剩余天数多的
         endingCxMachineList.sort(Comparator.comparing(CxMachineBaseInfoVo::getRemainingDays, Comparator.reverseOrder()).thenComparing(CxMachineBaseInfoVo::getCxMachineCode));
         //一台一台反向挑选合适的结构分组计划
         endingCxMachineList.forEach(reverseCxMachineInfo -> selectedGroupPlanByCxMachine(productionContext, estimateGroupCxAllocationMap, reverseCxMachineInfo));
@@ -124,7 +126,7 @@ public class CxCapacityAllocationHandler {
      * @param estimateGroupCxAllocationMap 分组计划
      * @param cxMachineInfo                成型产能信息
      */
-    public static void selectedGroupPlanByCxMachine(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
+    public void selectedGroupPlanByCxMachine(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
         //获取合适优先级的一个结构
         ProductionPlanGroupInfo allocationGroupPlan = getSelectedGroup(context, estimateGroupCxAllocationMap, cxMachineInfo);
         if (null == allocationGroupPlan) {
@@ -180,7 +182,7 @@ public class CxCapacityAllocationHandler {
      * @param estimateGroupCxAllocationMap 分组计划集合
      * @return
      */
-    public static ProductionPlanGroupInfo getInsertNewGroupPlan(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
+    public ProductionPlanGroupInfo getInsertNewGroupPlan(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
         if (CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
             return null;
         }
@@ -217,7 +219,7 @@ public class CxCapacityAllocationHandler {
      * @param workWeakProductionInfo 可排产日集合
      * @return
      */
-    public static CxMachineBaseInfoVo selectedCxMachineForGroupPlan(Context context, ProductionPlanGroupInfo addNewGroupPlan, Set<Integer> workWeakProductionInfo) {
+    public CxMachineBaseInfoVo selectedCxMachineForGroupPlan(Context context, ProductionPlanGroupInfo addNewGroupPlan, Set<Integer> workWeakProductionInfo) {
         if (null == addNewGroupPlan) {
             return null;
         }
@@ -289,7 +291,7 @@ public class CxCapacityAllocationHandler {
      * @param cxMachineInfo                成型机台
      * @return
      */
-    private static ProductionPlanGroupInfo getSelectedGroup(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
+    private ProductionPlanGroupInfo getSelectedGroup(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
         if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
             //todo 记录日志
             return null;
@@ -333,7 +335,7 @@ public class CxCapacityAllocationHandler {
      * @param cxMachineInfo                成型机信息
      * @return
      */
-    private static Map<String, ProductionPlanGroupInfo> getProductionCapacityCoverage(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
+    private Map<String, ProductionPlanGroupInfo> getProductionCapacityCoverage(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo) {
         if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
             return Collections.emptyMap();
         }
@@ -392,7 +394,7 @@ public class CxCapacityAllocationHandler {
      * @param cxMachineInfo       收尾机台
      * @return
      */
-    private static Map<String, ProductionPlanGroupInfo> excludeDisable(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, CxMachineBaseInfoVo cxMachineInfo) {
+    private Map<String, ProductionPlanGroupInfo> excludeDisable(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, CxMachineBaseInfoVo cxMachineInfo) {
         if (CollectionUtils.isEmpty(capacityCoverageMap) || null == cxMachineInfo) {
             return Collections.emptyMap();
         }
@@ -420,7 +422,7 @@ public class CxCapacityAllocationHandler {
      * @param cxMachineInfo
      * @return
      */
-    private static ProductionPlanGroupInfo selectedOne(Context context, Map<String, ProductionPlanGroupInfo> enableGroupPlanMap, CxMachineBaseInfoVo cxMachineInfo) {
+    private ProductionPlanGroupInfo selectedOne(Context context, Map<String, ProductionPlanGroupInfo> enableGroupPlanMap, CxMachineBaseInfoVo cxMachineInfo) {
         if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
             return null;
         }
@@ -477,7 +479,7 @@ public class CxCapacityAllocationHandler {
      * @param fixedPriorityList 机台集合
      * @param addNewGroupPlan   新增结构
      */
-    private static void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo addNewGroupPlan) {
+    private void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo addNewGroupPlan) {
         //4、断面宽差值±10 断面宽差值范围参数
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
