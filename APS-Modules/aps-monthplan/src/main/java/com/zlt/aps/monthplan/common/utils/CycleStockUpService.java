@@ -614,6 +614,22 @@ public class CycleStockUpService {
         .collect(Collectors.toSet());
   }
 
+  public void validateEnableCreate(SupplyOrderPool supplyOrderPool) {
+    // 2. 验证前置条件
+    Set<String> validStructures = validatePrerequisites(supplyOrderPool);
+    if(CollectionUtils.isEmpty(validStructures)) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleProductionStructureConfig"));
+    }
+    // 3. 获取符合条件的SKU集合
+    Set<String> eligibleSkus = getEligibleSkus(supplyOrderPool.getFactoryCode(), validStructures);
+    if (CollectionUtils.isEmpty(eligibleSkus)) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
+    }
+    if(!eligibleSkus.contains(supplyOrderPool.getMaterialCode())) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
+    }
+  }
+
   /**
    * 计算数据容器类
    */

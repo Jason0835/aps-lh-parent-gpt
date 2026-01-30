@@ -610,6 +610,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
+            monthPlan.setId(null);
             monthPlan.setProductionNo(productionNo);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
@@ -663,7 +664,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             Integer actualAdjustQty = totalPlanQty;
             if (totalPlanQty > 0 && !ApsConstant.TRUE.equals(adjustDetailVo.getIsSkuAdd())) {
                 List<FactoryMonthPlanFinalAdjustVo> monthPLanList = monthPlanMap.getOrDefault(materialCode, new ArrayList<>());
-                Integer totalQty = monthPLanList.stream().mapToInt(v -> getIntOrDefault(v.getTotalQty())).sum();
+                Integer totalQty = monthPLanList.stream().mapToInt(v -> {
+                    return v.getTotalQty() == null ? 0: v.getTotalQty();
+                }).sum();
                 actualAdjustQty = totalPlanQty - totalQty;
             }
             // 设置实际调整

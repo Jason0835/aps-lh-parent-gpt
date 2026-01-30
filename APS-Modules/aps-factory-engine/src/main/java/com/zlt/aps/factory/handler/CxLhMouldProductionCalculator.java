@@ -2,6 +2,7 @@ package com.zlt.aps.factory.handler;
 
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.check.SkuSecondChecker;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
@@ -12,6 +13,9 @@ import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -100,6 +104,12 @@ public class CxLhMouldProductionCalculator {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 return;
             }
+
+            //SKU二次上机检查 sandy+ 20260129
+            if (!checkSecOnline(productionPlanInfo,productionContext,productionPlan,realStartDay)){
+                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+                return;
+            }
         }
         //逐日进行排产，从起始日到结构收尾日
         String skuMaterialDesc = productionPlan.getMaterialDesc();
@@ -160,6 +170,28 @@ public class CxLhMouldProductionCalculator {
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
         lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
+    }
+
+    /**
+     * 检查二次上机
+     * @param productionPlanInfo 排产计划信息
+     * @param productionContext 排产上下文
+     * @param productionPlan 排产计划信息
+     * @param realStartDay 上机日
+     * @return true-允许二次上机，false-不允许二次上机
+     */
+    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo,TbrProductionContext productionContext,
+                                   MonthPlanProductionRequirePlanVo productionPlan,Integer realStartDay){
+        List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(productionPlan.getMaterialDesc());
+        Integer lastCloseDay = null;
+        if (PubUtil.isNotEmpty(dayList)){
+            //降序,第一个元素最大
+            dayList.sort(Comparator.reverseOrder());
+            lastCloseDay = dayList.get(0);
+        }
+        int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
+        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay,lastCloseDay,skuSecondProductionDays);
+        return skuSecondChecker.doCheck();
     }
 
     /**

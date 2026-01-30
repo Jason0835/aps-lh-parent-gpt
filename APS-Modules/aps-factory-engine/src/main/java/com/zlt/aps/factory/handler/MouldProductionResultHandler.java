@@ -236,9 +236,9 @@ public class MouldProductionResultHandler {
         dayResult.setProdReqPlan(sumNetQty);
         //总需求(含损耗)
         Integer totalHeightLossQty = requireList.stream().filter(item -> null != item.getHeightLossQty()).mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Integer noHeightLossQty = requireList.stream().filter(item -> null != item.getFactProdReqQty()).mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        int lossQty = (totalHeightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
-        dayResult.setFactProdReqQty(sumNetQty + lossQty);
+        Integer sumNetLossQty = requireList.stream().filter(item -> null != item.getFactProdReqQty()).mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        dayResult.setFactProdReqQty(sumNetLossQty);
+        int lossQty = (sumNetLossQty - sumNetQty) - (totalHeightLossQty - heightNetQty);
 
         int sumCycleReserveQty = requireList.stream().filter(item -> null != item.getCycleReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
