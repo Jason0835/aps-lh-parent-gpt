@@ -570,17 +570,17 @@ public class TbrBeforeProductionGroupLogRecorder {
      * @param onLineMachineSet 续作在产机台
      * @return
      */
-    public static String addContinueGroupNoOnLineMachineLog(Context context, String groupName, Set<String> onLineMachineSet) {
+    public static String addContinueGroupNoOnLineMachineLog(Context context, String groupName, String materialDesc, Set<String> onLineMachineSet) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 没有在产机台====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
         if (!CollectionUtils.isEmpty(onLineMachineSet)) {
-            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 在产机台: %s====";
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机分组 %s 续作Sku %s 在产机台: %s====";
             String onLineMachineInfo = String.join(StringConstant.COMMA, onLineMachineSet);
             logContent = String.format(logContentFormat,
                     context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                    groupName, onLineMachineInfo);
+                    groupName, materialDesc, onLineMachineInfo);
         }
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_CX_MACHINE, logContent);

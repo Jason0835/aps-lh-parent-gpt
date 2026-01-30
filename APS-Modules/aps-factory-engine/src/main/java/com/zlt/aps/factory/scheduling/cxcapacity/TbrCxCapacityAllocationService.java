@@ -1197,7 +1197,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-            log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, onLineMachineSet));
+            log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet));
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }

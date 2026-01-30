@@ -91,7 +91,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
             if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null));
+                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null,null));
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
@@ -120,7 +120,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
             if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null));
+                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
                 return;
             }
             //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
