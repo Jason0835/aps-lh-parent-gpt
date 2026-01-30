@@ -608,10 +608,10 @@ export default {
     },
     handleGenerate(row) {
 
-      if (this.$refs.checkRef) {
+      {/* if (this.$refs.checkRef) {
         this.$refs.checkRef.show();
       }
-    return
+    return */}
       this.$confirm("确定生成？").then(() => {
         this.loading = true;
         factoryWholeCourseProduction({
