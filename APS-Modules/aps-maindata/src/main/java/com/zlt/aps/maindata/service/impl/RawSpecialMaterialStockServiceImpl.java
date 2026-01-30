@@ -63,6 +63,6 @@ public class RawSpecialMaterialStockServiceImpl extends AbstractDocService<RawSp
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode", "year", "month"));
     }
 }

@@ -8,6 +8,7 @@ import com.zlt.aps.monthplan.api.service.IMpWeekRollAdjustRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +38,7 @@ public class MpWeekRollAdjustUIController extends BaseController {
     /**
      * 获取调整明细列表
      */
+    @RequiresPermissions("monthplan:mpWeekRollAdjust:getAdjustDetailList")
     @ApiOperation("获取调整明细列表")
     @PostMapping("/getAdjustDetailList")
     @ResponseBody
@@ -47,6 +49,7 @@ public class MpWeekRollAdjustUIController extends BaseController {
     /**
      * 自动调整
      */
+    @RequiresPermissions("monthplan:mpWeekRollAdjust:autoAdjust")
     @ApiOperation("自动调整")
     @PostMapping("/autoAdjust")
     @ResponseBody
