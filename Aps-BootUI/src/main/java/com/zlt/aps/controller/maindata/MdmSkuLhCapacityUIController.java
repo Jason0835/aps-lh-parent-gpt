@@ -202,7 +202,7 @@ public class MdmSkuLhCapacityUIController extends BaseUIController<MdmSkuLhCapac
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmSkuLhCapacityService.importData(context,false);
+        AjaxResult ajaxResult = iMdmSkuLhCapacityService.importData(context,updateSupport);
         return ajaxResult;
     }
 }

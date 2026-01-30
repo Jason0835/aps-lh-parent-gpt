@@ -327,6 +327,10 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_GROUP_CONTINUE_SKU_FOR_MOULD_PRODUCTION("30-03-00", "在机结构续作Sku使用模具排产"),
     /**
+     * 30-03-00-01 在机结构续作Sku没有模具
+     */
+    CONTINUE_GROUP_CONTINUE_SKU_NO_MOULD("30-03-01-01", "在机结构续作Sku没有模具"),
+    /**
      * 30-03-01-01 在机结构续作Sku开始模具排产当前阶段没有排产量
      */
     CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY("30-03-01-01", "在机结构续作Sku开始模具排产当前阶段没有排产量"),
