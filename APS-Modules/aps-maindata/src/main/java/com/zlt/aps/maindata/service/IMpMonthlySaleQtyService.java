@@ -2,6 +2,7 @@ package com.zlt.aps.maindata.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,10 +41,10 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
     List<MpMonthlySaleQty> findCurrentMonthlySaleQty(String factoryCode, Set<String> skus);
     /**
      * 根据物料编码获取月均销量
-     * @param materialCode
-     * @return
+     * @param supplyOrderPool 参数
+     * @return  月均销量
      */
-    MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(String materialCode);
+    MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(SupplyOrderPool supplyOrderPool);
     /**
      * 根据编码获取月均销量
      * @return

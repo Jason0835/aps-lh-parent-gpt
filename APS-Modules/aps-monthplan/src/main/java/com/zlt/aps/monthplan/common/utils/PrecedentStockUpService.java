@@ -665,16 +665,28 @@ public class PrecedentStockUpService {
   }
 
   public void validateEnableCreate(SupplyOrderPool supplyOrderPool) {
-    PrecedentStockUpContext context = buildContext(supplyOrderPool);
-    // 2. 验证前置条件
-    Set<String> eligibleSkus = findEligibleSkus(context);
-    if (CollectionUtils.isEmpty(eligibleSkus)) {
+    MdmMaterialInfo  materialInfo = materialInfoService.getMaterialInfoByMaterialCode(supplyOrderPool.getFactoryCode(),supplyOrderPool.getMaterialCode());
+    if(null == materialInfo){
+      throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notFound.materialInfo"));
+    }
+    MpMonthlySaleQty monthlySaleQty = monthlySaleQtyService.getMpMonthlySaleQtyByMaterialCode(supplyOrderPool);
+    if(null == monthlySaleQty) {
+      return;
+    }
+    List<MdmCycleSchStruConf>  monCycleSchStruConfs =   mdmCycleSchStruConfService.findCycleSchStruConf(supplyOrderPool.getFactoryCode());
+    if(CollectionUtils.isEmpty(monCycleSchStruConfs)) {
+      return;
+    }
+    Set<String> structureNames = monCycleSchStruConfs.stream().map(MdmCycleSchStruConf::getStructureName).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
+    if(CollectionUtils.isEmpty(structureNames)) {
+      return;
+    }
+    if(StringUtils.isBlank(materialInfo.getStructureName())) {
+      return;
+    }
+    if(!structureNames.contains(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
     }
-    if(!eligibleSkus.contains(supplyOrderPool.getMaterialCode())) {
-      throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
-    }
-
   }
 
 

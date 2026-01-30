@@ -619,17 +619,26 @@ public class CycleStockUpService {
   }
 
   public void validateEnableCreate(SupplyOrderPool supplyOrderPool) {
-    // 2. 验证前置条件
-    Set<String> validStructures = validatePrerequisites(supplyOrderPool);
-    if(CollectionUtils.isEmpty(validStructures)) {
-      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleProductionStructureConfig"));
+    MdmMaterialInfo  materialInfo = materialInfoService.getMaterialInfoByMaterialCode(supplyOrderPool.getFactoryCode(),supplyOrderPool.getMaterialCode());
+    if(null == materialInfo){
+       throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notFound.materialInfo"));
     }
-    // 3. 获取符合条件的SKU集合
-    Set<String> eligibleSkus = getEligibleSkus(supplyOrderPool.getFactoryCode(), validStructures);
-    if (CollectionUtils.isEmpty(eligibleSkus)) {
-      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
+    MpMonthlySaleQty monthlySaleQty = monthlySaleQtyService.getMpMonthlySaleQtyByMaterialCode(supplyOrderPool);
+    if(null == monthlySaleQty) {
+      return;
     }
-    if(!eligibleSkus.contains(supplyOrderPool.getMaterialCode())) {
+    List<MdmMonCycleSchStruConf>  monCycleSchStruConfs =   mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(supplyOrderPool);
+    if(CollectionUtils.isEmpty(monCycleSchStruConfs)) {
+      return;
+    }
+    Set<String> structureNames = monCycleSchStruConfs.stream().map(MdmMonCycleSchStruConf::getStructureName).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
+    if(CollectionUtils.isEmpty(structureNames)) {
+      return;
+    }
+    if(StringUtils.isBlank(materialInfo.getStructureName())) {
+      return;
+    }
+    if(!structureNames.contains(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
     }
   }
