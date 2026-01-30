@@ -462,6 +462,8 @@ public abstract class AbstractDailyCapacityLimit {
         int changeMouldFirstQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
         //换活字块20条
         int changeMouldBlockQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
+        //换活字块X32条
+        int changeMouldXBlockQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
         //余量
         int remainQty = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) % dailyLhQty;
         int[] resultArr = {0,0,0};
@@ -475,7 +477,7 @@ public abstract class AbstractDailyCapacityLimit {
         }else if (remainQty == changeMouldBlockQty){
             //若余数 == 换活字块20条
             resultArr[1] = 1;
-        }else{
+        }else if (remainQty == changeMouldXBlockQty){
             resultArr[2] = 1;
         }
         if (mpFinalVo.getFieldValueByFieldName(day2Field) != null){
@@ -485,7 +487,9 @@ public abstract class AbstractDailyCapacityLimit {
             //8  46
             int afterMachines = (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) / dailyLhQty -
                     dayPlanQty / dailyLhQty;
-
+            if (afterMachines <=0){
+                return resultArr;
+            }
             //若今日的计划量<单日硫化量 且 今日计划量 >= 单模起排量*明日的硫化机台数，则今日的增模台数 = 明日的硫化机台数
             int tmpQty = afterMachines * changeMouldFirstQty;
             if (remainQty < dailyLhQty && remainQty>=tmpQty){

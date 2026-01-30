@@ -658,6 +658,19 @@ public class PrecedentStockUpService {
     return StringUtils.isNotBlank(factoryCode) ? factoryCode : DEFAULT_FACTORY_CODE;
   }
 
+  public void validateEnableCreate(SupplyOrderPool supplyOrderPool) {
+    PrecedentStockUpContext context = buildContext(supplyOrderPool);
+    // 2. 验证前置条件
+    Set<String> eligibleSkus = findEligibleSkus(context);
+    if (CollectionUtils.isEmpty(eligibleSkus)) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+    }
+    if(!eligibleSkus.contains(supplyOrderPool.getMaterialCode())) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
+    }
+
+  }
+
 
   // ====================== 上下文对象 ======================
   @Data
