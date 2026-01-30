@@ -13,9 +13,6 @@ import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
-import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -106,7 +103,7 @@ public class CxLhMouldProductionCalculator {
             }
 
             //SKU二次上机检查 sandy+ 20260129
-            if (!checkSecOnline(productionPlanInfo,productionContext,productionPlan,realStartDay)){
+            if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 return;
             }
@@ -174,23 +171,28 @@ public class CxLhMouldProductionCalculator {
 
     /**
      * 检查二次上机
+     *
      * @param productionPlanInfo 排产计划信息
-     * @param productionContext 排产上下文
-     * @param productionPlan 排产计划信息
-     * @param realStartDay 上机日
+     * @param productionContext  排产上下文
+     * @param productionPlan     排产计划信息
+     * @param realStartDay       上机日
      * @return true-允许二次上机，false-不允许二次上机
      */
-    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo,TbrProductionContext productionContext,
-                                   MonthPlanProductionRequirePlanVo productionPlan,Integer realStartDay){
+    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo, TbrProductionContext productionContext,
+                                          MonthPlanProductionRequirePlanVo productionPlan, Integer realStartDay) {
         List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(productionPlan.getMaterialDesc());
-        Integer lastCloseDay = null;
-        if (PubUtil.isNotEmpty(dayList)){
-            //降序,第一个元素最大
-            dayList.sort(Comparator.reverseOrder());
-            lastCloseDay = dayList.get(0);
+        if (CollectionUtils.isEmpty(dayList)) {
+            return true;
         }
+        Set<Integer> productionDaySet = dayList.stream().collect(Collectors.toSet());
+        if (productionDaySet.contains(realStartDay)) {
+            return true;
+        }
+        //降序,第一个元素最大
+        dayList.sort(Comparator.reverseOrder());
+        Integer lastCloseDay = dayList.get(0);
         int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
-        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay,lastCloseDay,skuSecondProductionDays);
+        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay, lastCloseDay, skuSecondProductionDays);
         return skuSecondChecker.doCheck();
     }
 
