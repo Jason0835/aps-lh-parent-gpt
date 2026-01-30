@@ -90,6 +90,7 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
     /**
      * 根据条件查询主表数据
      */
+    @RequiresPermissions("monthplan:mpAdjustResult:list")
     @ApiOperation("根据条件查询主表数据")
     @PostMapping("/list")
     @ResponseBody
