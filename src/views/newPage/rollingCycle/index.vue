@@ -24,13 +24,14 @@
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
           <el-tab-pane label="结构内" name="first">
-            <el-button @click="adjustOrder" :loading="getLoading">{{
+            <el-button @click="adjustOrder" :loading="getLoading"  v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']">{{
               $t("获取调整订单")
             }}</el-button>
             <el-button
               @click="handShowResult"
               :loading="autoLoading"
               :disabled="data.length == 0"
+              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
               >{{ $t("自动调整") }}</el-button
             >
           </el-tab-pane>
@@ -41,7 +42,7 @@
             <!-- <el-button @click="handleShowSpecial">{{
               $t("特殊材料生产情况")
             }}</el-button> -->
-            <el-button @click="handleAddSpecial">{{
+            <el-button @click="handleAddSpecial" v-hasPermi="['monthplan:mpStructureAllocation:save']">{{
               $t("新增结构")
             }}</el-button>
           </el-tab-pane>
@@ -118,6 +119,7 @@
 
               <el-form-item>
                 <el-button type="primary" @click="getOutList"
+                 v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
                   >获取调整订单</el-button
                 >
               </el-form-item>
@@ -153,6 +155,7 @@
             v-if="activeName != 'singleResult'"
             :loading="loading"
             :disabled="data.length == 0"
+
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
@@ -162,6 +165,7 @@
             v-if="activeName == 'singleResult'"
             :loading="loading"
             :disabled="data.length == 0"
+             v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
@@ -472,7 +476,7 @@ export default {
               return (
                 <div>
                   <el-button
-                    v-hasPermi={["monthplan:ProductMoldingLimit:remove"]}
+                    v-hasPermi={["monthplan:mpAdjustStructureIn:remove"]}
                     class="minus"
                     type="danger"
                     onClick={() => this.handleDelete(row)}
@@ -549,6 +553,7 @@ export default {
                   </el-button> */}
                   <el-button
                     class="minus"
+                    v-hasPermi={["monthplan:mpStructureAllocation:remove"]}
                     type="danger"
                     disabled={row.dataSource!='01'}
                     onClick={() => this.handleStructureDelete(row)}

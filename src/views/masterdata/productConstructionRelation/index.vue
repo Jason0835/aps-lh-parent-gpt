@@ -223,7 +223,7 @@ export default {
           width: 180,
         },
         {
-          prop: "rubberCore",
+          prop: "rubberCoreCode",
           label: this.$t("ui.data.column.construction.rubberCore"),
           width: 180,
         },

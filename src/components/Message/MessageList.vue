@@ -58,10 +58,22 @@
         prop="msgTitle"
         :show-overflow-tooltip="true"
       />
-      <t-table-column :label="$t('common.messageTask.msgContent')" align="center" prop="msgContent" :show-overflow-tooltip="true">
+      <t-table-column :label="$t('common.messageTask.msgContent')" align="center" prop="msgContent" >
         <template slot-scope="scope">
-          <app-link v-if="scope.row.billUrl" :to="scope.row.billUrl"  @click.native="handleClick(scope.row)">{{ scope.row.msgContent }}</app-link>
-          <span v-else @click="handleClick(scope.row)">{{ scope.row.msgContent }}</span>
+          <!-- <app-link v-if="scope.row.billUrl" :to="scope.row.billUrl"  @click.native="handleClick(scope.row)">{{ scope.row.msgContent }}</app-link>
+          <span v-else @click="handleClick(scope.row)">{{ scope.row.msgContent }}</span> -->
+          <el-popover
+                placement="bottom"
+                title="消息内容"
+                width="500"
+                trigger="click"
+                :content=scope.row.msgContent
+                 @show="handleClick(scope.row)"
+              >
+                <span slot="reference" style="cursor: pointer;">{{
+                 scope.row.msgContent
+                }}</span>
+              </el-popover>
         </template>
       </t-table-column>
       <t-table-column :label="$t('common.messageTask.msgSource')" align="center" prop="msgStatus" width="100">

@@ -30,10 +30,15 @@
           >
             <div class="flex-1 text-truncate w-0">
               <span class="status success">待办</span>
-              <app-link v-if="item.billUrl" :to="item.billUrl"  @click.native="handleTaskClick(item)">{{
+              <app-link
+                v-if="item.billUrl"
+                :to="item.billUrl"
+                @click.native="handleTaskClick(item)"
+                >{{ item.msgContent }}</app-link
+              >
+              <span v-else @click="handleTaskClick(item)">{{
                 item.msgContent
-              }}</app-link>
-              <span v-else @click="handleTaskClick(item)">{{ item.msgContent }}</span>
+              }}</span>
             </div>
             <div class="right flex-shrink-0">{{ item.sendTime }}</div>
           </div>
@@ -63,10 +68,22 @@
             class="item flex justify-content-between"
           >
             <div class="flex-1 text-truncate w-0 no-read">
-              <app-link v-if="item.billUrl" :to="item.billUrl"  @click.native="handleMessageClick(item)">{{
+              <el-popover
+                placement="bottom"
+                title="消息内容"
+                width="500"
+                trigger="click"
+                :content=item.msgContent
+                 @show="handleMessageClick(item)"
+              >
+                <span slot="reference" style="cursor: pointer;">{{
+                  item.msgContent
+                }}</span>
+              </el-popover>
+              <!-- <app-link v-if="item.billUrl" :to="item.billUrl"  @click.native="handleMessageClick(item)">{{
                 item.msgContent
               }}</app-link>
-              <span v-else  @click="handleMessageClick(item)">{{ item.msgContent }}</span>
+              <span v-else  @click="handleMessageClick(item)">{{ item.msgContent }}</span> -->
             </div>
             <div class="right flex-shrink-0">{{ item.sendTime }}</div>
           </div>
@@ -121,7 +138,7 @@ import {
   messageListNoticeMessage,
   messageListTaskMessage,
   readMessage,
-  readMessageTask
+  readMessageTask,
 } from "@/api/system/message";
 import { isExternal } from "@/utils/validate";
 import AppLink from "@/layout/components/Sidebar/Link";
@@ -213,19 +230,15 @@ export default {
     // 组件创建时获取数据
   },
   methods: {
-    handleTaskClick(row){
-      readMessageTask(row.id).then(response => {
+    handleTaskClick(row) {
+      readMessageTask(row.id).then((response) => {
         // this.getTaskData()
-
       });
-
     },
-    handleMessageClick(row){
-      readMessage(row.id).then(response => {
+    handleMessageClick(row) {
+      readMessage(row.id).then((response) => {
         // this.getMessageData()
-
       });
-
     },
     loadData() {
       if (this.hasPermission("message:messageTaskList:list")) {
