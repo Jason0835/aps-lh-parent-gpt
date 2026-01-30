@@ -278,16 +278,15 @@ export default {
         if (list.length != 0) {
           this.$set(this.search, "predictionVersion", list[0].value);
           this.$set(this.query, "predictionVersion", list[0].value);
-        }else{
-          this.$set(this.search, "predictionVersion", '');
-          this.$set(this.query, "predictionVersion", '');
+        } else {
+          this.$set(this.search, "predictionVersion", "");
+          this.$set(this.query, "predictionVersion", "");
         }
         this.$nextTick(() => {
-          if(isGet){
-          this.getList()
-        }
+          if (isGet) {
+            this.getList();
+          }
         });
-
       } catch (err) {}
     },
     getListResize() {
@@ -300,8 +299,25 @@ export default {
       //   this.$refs.infoRef.show(this.query);
       // }
       try {
+        const params = {
+          ...this.query,
+          ...this.sort,
+        };
+
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          params.year = arr[0];
+          params.month = arr[1];
+          params.yearMonth = undefined;
+        }
+        let objData = {
+          factoryCode: params.factoryCode,
+          year: params.year,
+          month: params.month,
+        };
+
         this.createLoading = true;
-        let res = await createOrderForecast(this.formatParams());
+        let res = await createOrderForecast(objData);
         this.$modal.msgSuccess(res.msg);
         // this.getList();
         this.getVersionList(true);
@@ -458,8 +474,8 @@ export default {
     // const year = now.getFullYear();
     // const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
+    const year = nextMonth.getFullYear();
+    const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
     let defaultParams = {
       factoryCode: "116",
       yearMonth: `${year}-${month}`,

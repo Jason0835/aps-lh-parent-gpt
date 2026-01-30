@@ -558,6 +558,12 @@ export default {
   },
   methods: {
     getListResize() {
+      this.search = {
+        ...this.query,
+      };
+      this.query = {
+        ...this.search,
+      };
       // this.getList();
       this.getVersionList(true);
     },
@@ -684,7 +690,7 @@ export default {
       this.query = data;
       this.$set(this.page, "current", 1);
       // this.getList();
-      this.getVersionList(true);
+      this.getVersionList(true,false);
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);
@@ -755,7 +761,7 @@ export default {
         this.loading = false;
       }
     },
-    async getVersionList(isGet) {
+    async getVersionList(isGet,isSet=true) {
       if (isGet) {
         this.loading = true;
       }
@@ -770,6 +776,7 @@ export default {
           list.push(obj);
         }
         this.versionList = list;
+        if(!isSet)return
         if (list.length > 0) {
           this.$set(this.search, "monthPlanVersion", list[0].value);
           this.$set(this.query, "monthPlanVersion", list[0].value);
@@ -782,11 +789,7 @@ export default {
         this.loading = false;
       } finally {
         if (isGet) {
-          this.page = {
-            current: 1,
-            pageSize: 20,
-            total: 0,
-          };
+          this.$set(this.page, "current", 1);
           this.getList();
         }
       }

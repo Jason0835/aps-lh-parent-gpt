@@ -121,8 +121,11 @@ export default {
       try {
         let res = await getVersion();
         this.form = {
-          ...data,
+          // ...data,
           monthPlanVersion: res.msg,
+          factoryCode:data.factoryCode,
+          yearMonth:data.yearMonth,
+
         };
       } catch (err) {
         this.form = {

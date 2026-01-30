@@ -406,6 +406,7 @@ export default {
 
     },
     async createVersion() {
+
       this.handleAdd();
       return;
 
@@ -421,7 +422,7 @@ export default {
     },
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show();
+        this.$refs.infoRef.show({'factoryCode':this.query.factoryCode,'yearMonth':this.query.yearMonth});
       }
     },
     handleEdit(row) {

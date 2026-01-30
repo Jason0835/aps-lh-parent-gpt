@@ -146,6 +146,7 @@ export default {
     //utils
     show(data) {
       this.visible = true;
+      console.log(data)
       if (data) {
         this.isEdit = true;
         this.form = {

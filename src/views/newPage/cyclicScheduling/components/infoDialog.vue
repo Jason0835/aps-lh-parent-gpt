@@ -299,9 +299,17 @@ export default {
       }
     },
     async blurMaterialCode() {
-      let res = await queryRelationByMaterialCode({
-        materialCode: this.form.materialCode,
-      });
+      let obj={
+        materialCode:this.form.materialCode,
+        factoryCode: this.form.factoryCode,
+
+      }
+      // if(this.form.yearMonth){
+      //   let arr = this.form.yearMonth.split("-");
+      //   obj.year=arr[0]
+      //   obj.month=arr[1]
+      // }
+      let res = await queryRelationByMaterialCode(obj);
       let defultdata = JSON.parse(JSON.stringify(this.form));
       this.form = {
         ...res.data,
