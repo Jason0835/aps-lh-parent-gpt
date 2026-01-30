@@ -89,7 +89,7 @@ public class MpAdjustStructureInUIController extends BaseUIController<MpAdjustSt
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-//    @RequiresPermissions("monthplan:mpAdjustStructureIn:list")
+    @RequiresPermissions("monthplan:mpAdjustStructureIn:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MpAdjustStructureIn mpAdjustStructureIn) {
@@ -115,7 +115,7 @@ public class MpAdjustStructureInUIController extends BaseUIController<MpAdjustSt
      * 删除调整-结构内调整记录
      */
     @ApiOperation("删除,id不为空")
-//    @RequiresPermissions("monthplan:mpAdjustStructureIn:remove")
+    @RequiresPermissions("monthplan:mpAdjustStructureIn:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
