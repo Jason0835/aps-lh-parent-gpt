@@ -583,7 +583,7 @@ public class TbrBeforeProductionGroupLogRecorder {
                     groupName, onLineMachineInfo);
         }
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_NO_ON_LINE_MACHINE_EMPTY, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_CX_MACHINE, logContent);
         return logContent;
     }
 

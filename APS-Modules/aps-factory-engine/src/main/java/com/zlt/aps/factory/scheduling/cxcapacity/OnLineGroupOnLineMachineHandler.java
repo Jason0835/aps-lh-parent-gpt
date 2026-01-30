@@ -115,13 +115,13 @@ public class OnLineGroupOnLineMachineHandler {
         }
         //续作Sku
         if (ContinueTypeEnum.SAME_SKU == type) {
-            CxContinueGroupAllocationHandler.productionContinueSku(productionContext, groupPlan, continueSkuInfoMap);
+            CxContinueGroupAllocationHandler.productionContinueSku(productionContext, productionStage, groupPlan, continueSkuInfoMap);
             return;
         }
         Integer deadLineDay = groupPlan.getContinueSkuDeadLineDay(context);
         //同规格同花纹 or 共生胎同模具
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == type || ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == type) {
-            CxContinueProductionHandler.productionContinueByType(context, groupPlan, type, deadLineDay, continueSkuInfoMap);
+            CxContinueProductionHandler.productionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap);
             return;
         }
     }

@@ -269,8 +269,9 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         if (CollectionUtils.isEmpty(cxMachineInfoList)) {
             return Collections.emptyMap();
         }
+        //20260130 月计划暂不考虑成型维修停机
         Map<String, CxMachineBaseInfoVo> cxMachineInfoMap = cxMachineInfoList.stream().collect(Collectors.toMap(CxMachineBaseInfoVo::getCxMachineCode, Function.identity()));
-        Map<String, CxDevicePlanShutInfoHelper> cxStopInfo = getCxMachineStopInfo(context);
+        Map<String, CxDevicePlanShutInfoHelper> cxStopInfo = Collections.emptyMap();
         cxMachineInfoMap.forEach((cxMachineCode, cxMachineInfo) -> setCxMachineDayInfo(cxStopInfo, context, cxMachineInfo));
         return cxMachineInfoMap;
     }
@@ -666,11 +667,13 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     /**
+     * 月度计划暂不考虑
      * 根据排产上下文，获取对应的月计划-成型维修停机信息
      *
      * @param context 排产上下文
      * @return
      */
+    @Deprecated
     private Map<String, CxDevicePlanShutInfoHelper> getCxMachineStopInfo(Context context) {
         String factoryCode = context.getFactoryCode();
         Date productionStartDate = context.getProductionStartDate();

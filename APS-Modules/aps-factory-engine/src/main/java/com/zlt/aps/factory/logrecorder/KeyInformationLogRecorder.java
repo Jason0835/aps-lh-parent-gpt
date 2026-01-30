@@ -150,6 +150,6 @@ public class KeyInformationLogRecorder {
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 continueGroupPlanInfo.getGroupName(), onLineMachineInfo, cxMachineAllocationInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SUMMARY_INFO_SUM, logContent);
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_CX_MACHINE_SUMMARY_INFO_SUM, logContent);
     }
 }
