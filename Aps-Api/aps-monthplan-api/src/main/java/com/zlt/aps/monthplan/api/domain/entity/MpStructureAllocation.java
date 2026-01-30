@@ -174,6 +174,13 @@ public class MpStructureAllocation extends BaseEntity {
     private Integer adjustEndDay;
 
     /**
+     * 数据来源 01-手工新增 02-自动生成 03-导入 04-接口同步
+     */
+    @ApiModelProperty(value = "数据来源", name = "dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
+
+    /**
      * 判断productionDay是否在beginDay与endDay范围内
      * true表示在，false表示不在
      *

@@ -330,5 +330,69 @@ public class MpAdjustResult extends BaseEntity {
     @TableField(value = "IS_LOCK_SCHEDULE")
     private String isLockSchedule;
 
+    /**
+     * 生产实际排产量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.totalQty")
+    @ApiModelProperty(value = "生产实际排产量", name = "totalQty")
+    @TableField(value = "TOTAL_QTY")
+    private Integer totalQty;
+
+    /**
+     * 高优先级排产数量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.heightProductionQty")
+    @ApiModelProperty(value = "高优先级排产数量", name = "heightProductionQty")
+    @TableField(value = "HEIGHT_PRODUCTION_QTY")
+    private Integer heightProductionQty;
+
+    /**
+     * 中优先级排产数量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.midProductionQty")
+    @ApiModelProperty(value = "中优先级排产数量", name = "midProductionQty")
+    @TableField(value = "MID_PRODUCTION_QTY")
+    private Integer midProductionQty;
+
+    /**
+     * 周期排产储备排产数量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.cycleProductionQty")
+    @ApiModelProperty(value = "周期排产储备排产数量", name = "cycleProductionQty")
+    @TableField(value = "CYCLE_PRODUCTION_QTY")
+    private Integer cycleProductionQty;
+
+    /**
+     * 常规储备排产数量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.conventionProductionQty")
+    @ApiModelProperty(value = "常规储备排产数量", name = "conventionProductionQty")
+    @TableField(value = "CONVENTION_PRODUCTION_QTY")
+    private Integer conventionProductionQty;
+
+    /**
+     * 暂缓订单排产数量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.postponeProductionQty")
+    @ApiModelProperty(value = "暂缓订单排产数量", name = "postponeProductionQty")
+    @TableField(value = "POSTPONE_PRODUCTION_QTY")
+    private Integer postponeProductionQty;
+
+    /**
+     * 试制量试排产量
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.trialProductionQty")
+    @ApiModelProperty(value = "试制量试排产量", name = "trialProductionQty")
+    @TableField(value = "TRIAL_PRODUCTION_QTY")
+    private Integer trialProductionQty;
+
+    /**
+     * 差异量(未排产数量)
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.differenceQty")
+    @ApiModelProperty(value = "差异量(未排产数量)", name = "differenceQty")
+    @TableField(value = "DIFFERENCE_QTY")
+    private Integer differenceQty;
+
 
 }

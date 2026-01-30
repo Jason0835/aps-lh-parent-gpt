@@ -103,7 +103,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     }
 
     @Override
-    public AjaxResult createMonthPrediction(MpProductionPrediction createCondition) throws InterruptedException {
+    public AjaxResult createMonthPrediction(MpProductionPrediction createCondition){
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
         MonthCalculator.MonthRangeResult monthRangeResult = MonthCalculator.calculateMonthRanges(tMonth);
@@ -116,7 +116,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
         Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
         productionVersions.put(tMonth,finalVersion);
-        PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext();
+        PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(createCondition.getFactoryCode());
         // 生成T月模拟需求计划
         // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
         // T+1月需求生成：T月需求-T月已排+T+1（周期+常规）
@@ -292,7 +292,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
 
 
     private Map<String, MdmMaterialInfo> fetchMaterialInfo() {
-        return materialInfoService.skuToMaterialInfo();
+        return materialInfoService.skuToMaterialInfo(null);
     }
 
     /**

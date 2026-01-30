@@ -6,9 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.YearMonth;
 import java.util.List;
 
 /**
@@ -25,18 +23,6 @@ import java.util.List;
  *     修改内容：...
  */
 public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
-  /**
-   * 生成周期排产储备
-   * @param supplyOrderPool
-   */
-  @Transactional
-  void createCycleStockUp(SupplyOrderPool supplyOrderPool) throws InterruptedException;
-  /**
-   *  生产常规储备
-   * @param supplyOrderPool
-   */
-  @Transactional
-  void createPrecedentStockUp(SupplyOrderPool supplyOrderPool);
 
   /**
    * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
@@ -54,15 +40,7 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
    *  查询当前年月供应链订单
    * @return 当前年月供应链订单
    */
-  List<SupplyOrderPool> findCurrentSupplyOrderPool();
-  /**
-   * 生成周期排产储备
-   */
-  List<SupplyOrderPool> createCycleStockUp(DpDemandPlan createCondition, YearMonth yearMonth) throws InterruptedException;
-  /**
-   * 生成周期排产储备
-   */
-  List<SupplyOrderPool> createPrecedentStockUp(DpDemandPlan createCondition,YearMonth yearMonth) throws InterruptedException;
+  List<SupplyOrderPool> findCurrentSupplyOrderPool(DpDemandPlan createCondition);
   /**
    *  超期校验
    * @param supplyOrderPool

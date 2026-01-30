@@ -2,6 +2,7 @@ package com.zlt.aps.factory.handler;
 
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.check.SkuSecondChecker;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
@@ -12,6 +13,9 @@ import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -100,6 +104,12 @@ public class CxLhMouldProductionCalculator {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 return;
             }
+
+            //SKU二次上机检查 sandy+ 20260129
+            if (!checkSecOnline(productionPlanInfo,productionContext,productionPlan,realStartDay)){
+                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+                return;
+            }
         }
         //逐日进行排产，从起始日到结构收尾日
         String skuMaterialDesc = productionPlan.getMaterialDesc();
@@ -160,6 +170,28 @@ public class CxLhMouldProductionCalculator {
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
         lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
+    }
+
+    /**
+     * 检查二次上机
+     * @param productionPlanInfo 排产计划信息
+     * @param productionContext 排产上下文
+     * @param productionPlan 排产计划信息
+     * @param realStartDay 上机日
+     * @return true-允许二次上机，false-不允许二次上机
+     */
+    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo,TbrProductionContext productionContext,
+                                   MonthPlanProductionRequirePlanVo productionPlan,Integer realStartDay){
+        List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(productionPlan.getMaterialDesc());
+        Integer lastCloseDay = null;
+        if (PubUtil.isNotEmpty(dayList)){
+            //降序,第一个元素最大
+            dayList.sort(Comparator.reverseOrder());
+            lastCloseDay = dayList.get(0);
+        }
+        int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
+        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay,lastCloseDay,skuSecondProductionDays);
+        return skuSecondChecker.doCheck();
     }
 
     /**
@@ -314,23 +346,32 @@ public class CxLhMouldProductionCalculator {
             //换模
             return buildByChangeMould(productionDay, lhProductionQtyHelper, paramConfiguration);
         }
-        //换活字块的后Sku排产量
-        Integer afterSkuProductionQty;
+        Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
+        //当天损耗量
+        Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
         //前Sku排产量与前Sku日硫化量的差值
         Integer beforeSkuDiffValue = Math.abs(beforeSkuDayMaxQty - beforeSkuProductionQty);
-        if (beforeSkuDiffValue <= paramConfiguration.getChangeTypeBlockQtyDiff()) {
-            //差值<参数值
-            afterSkuProductionQty = paramConfiguration.getChangeTypeBlockQty();
-        } else {
-            afterSkuProductionQty = paramConfiguration.getChangeTypeBlockMaxQty();
+        //差值 > 参数值，表示可以当天换活字块，排量 = changeTypeBlockMaxQty
+        if (beforeSkuDiffValue >= changeTypeBlockQtyDiff) {
+            Integer afterSkuProductionQty = paramConfiguration.getChangeTypeBlockMaxQty();
+            //损耗量 = 日硫化量 - 前Sku排产量 - 自己排产量
+            lossQty = lossQty - afterSkuProductionQty;
+            if (lossQty < BigDecimal.ZERO.intValue()) {
+                lossQty = BigDecimal.ZERO.intValue();
+            }
+            return new DayProductionQtyHelper(productionDay, false, afterSkuProductionQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
-        //损耗量 = 日硫化量 - 前Sku排产量 - 自己排产量
-        Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
-        lossQty = lossQty - afterSkuProductionQty;
+        //差值 <= 参数值，表示隔天换活字块，排量 = changeTypeBlockQty
         if (lossQty < BigDecimal.ZERO.intValue()) {
             lossQty = BigDecimal.ZERO.intValue();
         }
-        return new DayProductionQtyHelper(productionDay, false, afterSkuProductionQty, lossQty, BigDecimal.ZERO.intValue(), false);
+        //隔天换活字块，则隔天损耗量 = 日硫化量 - 排产量
+        Integer afterSkuProductionQty = paramConfiguration.getChangeTypeBlockQty();
+        Integer nextDayLossQty = lhProductionQtyHelper.getDayMaxProductionQty() - afterSkuProductionQty;
+        if (lossQty < BigDecimal.ZERO.intValue()) {
+            lossQty = BigDecimal.ZERO.intValue();
+        }
+        return new DayProductionQtyHelper(productionDay, true, afterSkuProductionQty, lossQty, nextDayLossQty, true);
     }
 
     @Deprecated
@@ -492,10 +533,11 @@ public class CxLhMouldProductionCalculator {
         Set<String> usedMouldSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         //如果是开产日，跳过从下一天开始
         Set<Integer> openDay = productionContext.getProductionDayAfterStop();
+        Integer realStartBoostDay = startBoostDay;
         if (openDay.contains(startBoostDay) || boostInfo.isStartFinish()) {
-            startBoostDay = startBoostDay + BigDecimal.ONE.intValue();
+            realStartBoostDay = realStartBoostDay + BigDecimal.ONE.intValue();
         }
-        for (Integer singleReplenishmentDay = startBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
+        for (Integer singleReplenishmentDay = realStartBoostDay; singleReplenishmentDay <= endBoostDay; singleReplenishmentDay++) {
             if (!replenishmentDay.contains(singleReplenishmentDay)) {
                 continue;
             }
@@ -610,6 +652,12 @@ public class CxLhMouldProductionCalculator {
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         boolean isDayFinish = updateInfo.isDayFinish();
         Set<String> cxMachineInfo = updateInfo.getUsedCxMachineInfo();
+        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        //20260129 排产顺序计数器
+        SkuProductionCounter productionCounter = productionContext.getProductionCounter();
+        if (null != productionCounter) {
+            productionCounter.addProductionSku(productionPlan.getMaterialDesc());
+        }
         //模具排产信息-计划分配
         Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = skuProductionPlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
         Map<Long, Integer> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(realDayProductionQty, skuProductionPlanList);
@@ -636,7 +684,6 @@ public class CxLhMouldProductionCalculator {
                 }
             }
         });
-        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         //模具分配比例控制对象
         MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
         //胶囊卡盘数量控制对象

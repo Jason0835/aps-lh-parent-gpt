@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.raw.service.IRawWarningService;
@@ -71,7 +72,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult executeUsageDeviationWarning(String factoryCode, Integer year, Integer week, Integer month) {
+    public int executeUsageDeviationWarning(String factoryCode, Integer year, Integer week, Integer month) {
         try {
             log.info(StringUtils.format(
                     I18nUtil.getMessage("raw.warning.start.usage.deviation"),
@@ -86,8 +87,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                         I18nUtil.getMessage("raw.warning.no.week.usage.data"),
                         factoryCode, year, week
                 );
-                log.warn(message);
-                return AjaxResult.error(message);
+                throw new RuntimeException(message);
             }
 
             // 2. 批量获取用量偏差预警配置
@@ -129,25 +129,12 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                 batchUpdateWeekUsages(usagesToUpdate);
             }
 
-            String logMessage = StringUtils.format(
-                    I18nUtil.getMessage("raw.warning.usage.deviation.complete"),
-                    factoryCode, year, week, warningCount
-            );
-            log.info(logMessage);
-
-            String resultMessage = StringUtils.format(
-                    I18nUtil.getMessage("raw.warning.usage.deviation.result"),
-                    warningCount
-            );
-            return AjaxResult.success(resultMessage);
-
+            if (warningCount > 0) {
+                return warningCount;
+            }
+            return -1;
         } catch (Exception e) {
-            log.error(I18nUtil.getMessage("raw.warning.usage.deviation.error"), e);
-            String errorMessage = StringUtils.format(
-                    I18nUtil.getMessage("raw.warning.usage.deviation.exception"),
-                    e.getMessage()
-            );
-            return AjaxResult.error(errorMessage);
+            throw new RuntimeException(e);
         }
     }
 
@@ -294,7 +281,7 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult executeNewMaterialWarning(String factoryCode, Integer currentYear, Integer currentMonth) {
+    public int executeNewMaterialWarning(String factoryCode, Integer currentYear, Integer currentMonth) {
         try {
             log.info(StringUtils.format(
                     I18nUtil.getMessage("raw.warning.start.new.material"),
@@ -316,13 +303,13 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                         factoryCode, currentYear, currentMonth
                 );
                 log.info(message);
-                return AjaxResult.success(message);
+                return 0;
             }
 
             // 3. 获取新材料预警配置
             List<RawWarningConfig> warningConfigs = getNewMaterialWarningConfigs(factoryCode);
             Map<String, RawWarningConfig> warningMaterialCodes = extractWarningMaterialCodes(warningConfigs);
-            boolean warnAll = CollectionUtils.isEmpty(warningConfigs);
+            boolean warnAll = !CollectionUtils.isEmpty(warningConfigs);
 
             // 4. 创建预警记录
             List<RawWarningRecord> warningRecords = createNewMaterialWarnings(
@@ -335,25 +322,13 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                 saveBatchWarningRecords(warningRecords);
             }
 
-            String logMessage = StringUtils.format(
-                    I18nUtil.getMessage("raw.warning.new.material.complete"),
-                    factoryCode, currentYear, currentMonth, warningRecords.size()
-            );
-            log.info(logMessage);
-
-            String resultMessage = StringUtils.format(
-                    I18nUtil.getMessage("raw.warning.new.material.result"),
-                    warningRecords.size()
-            );
-            return AjaxResult.success(resultMessage);
+            if (warningRecords.isEmpty()) {
+                return 0;
+            }
+            return warningRecords.size();
 
         } catch (Exception e) {
-            log.error(I18nUtil.getMessage("raw.warning.new.material.error"), e);
-            String errorMessage = StringUtils.format(
-                    I18nUtil.getMessage("raw.warning.new.material.exception"),
-                    e.getMessage()
-            );
-            return AjaxResult.error(errorMessage);
+           throw new BusinessException(I18nUtil.getMessage("raw.warning.new.material.error"), e);
         }
     }
 

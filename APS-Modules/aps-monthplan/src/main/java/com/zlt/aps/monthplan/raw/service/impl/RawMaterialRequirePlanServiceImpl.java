@@ -169,7 +169,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 // 5. 查询特殊材料清单
                 List<RawSpecialMaterialRecord> specialMaterialRecordsList = getSpecialMaterialRecords(factoryCode);
                 // 5.1. 对特殊材料进行材料编码SET去重
-                Set<String> specialMaterialCodes = extractSpecialMaterialCodes(specialMaterialRecordsList);
+                Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes = extractSpecialMaterialCodes(specialMaterialRecordsList);
 
                 // 6. 获取月度生产计划
                 List<FactoryMonthPlanProdFinal> monthPlans = getMonthProductionPlan(year, month, factoryCode);
@@ -234,13 +234,18 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 提取特殊材料编码集合
      */
-    private Set<String> extractSpecialMaterialCodes(List<RawSpecialMaterialRecord> records) {
+    private Map<String, List<RawSpecialMaterialRecord>> extractSpecialMaterialCodes(List<RawSpecialMaterialRecord> records) {
         if (CollectionUtils.isEmpty(records)) {
-            return Collections.emptySet();
+            return Collections.emptyMap();
         }
         return records.stream()
                 .map(RawSpecialMaterialRecord::getMaterialCode)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        materialCode -> materialCode,
+                        materialCode -> records.stream()
+                                .filter(record -> materialCode.equals(record.getMaterialCode()))
+                                .collect(Collectors.toList())
+                ));
     }
 
     /**
@@ -463,7 +468,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 计算当月原材料需求量
      */
     private Map<String, RawMaterialRequirePlan> calculateCurrentMonthRequirements(
-            List<FactoryMonthPlanProdFinal> monthPlans, Set<String> specialMaterialCodes) {
+            List<FactoryMonthPlanProdFinal> monthPlans, Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes) {
 
         // 1. 收集所有不重复的胎胚代码，批量查询所有BOM结构
         List<String> embryoCodes = monthPlans.stream()
@@ -516,7 +521,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private void calculateMaterialRequirements(Map<String, RawMaterialRequirePlan> requirements,
                                                List<MdmMaterialConsumeDetail> bomDetails,
                                                Integer totalQty,
-                                               Set<String> specialMaterialCodes,
+                                               Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes,
                                                FactoryMonthPlanProdFinal plan) {
         // 1.获取计划中已分解的EudR和非EudR数量
         int nonEudrQty = plan.getNonEudrQty() != null ? plan.getNonEudrQty() : 0;
@@ -526,7 +531,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             String materialCode = detail.getChildMaterialCode();
             String materialDesc = detail.getChildMaterialName();
             BigDecimal dosage = detail.getDosage() != null ? detail.getDosage() : BigDecimal.ZERO;
-            String materialType = specialMaterialCodes.contains(materialCode) ? "02" : "01";
+            String materialType;
+            List<RawSpecialMaterialRecord> specialMaterialRecords = specialMaterialCodes.get(materialCode);
+            if (!CollectionUtils.isEmpty(specialMaterialRecords)) {
+                materialType =  specialMaterialRecords.get(0).getMaterialType();
+            } else {
+                materialType = "01";
+            }
 
             RawMaterialRequirePlan requirement = requirements.computeIfAbsent(materialCode,
                     k -> new RawMaterialRequirePlan(materialCode, materialDesc, materialType));
@@ -551,7 +562,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private Map<String, RawMaterialRequirePlan> calculateT1MonthRequirements(
             String factoryCode, Integer year, Integer month,
-            Set<String> specialMaterialCodes) {
+            Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes) {
 
         // 1. 获取最大预测版本的数据
         List<MpProductionPrediction> predictionList = getMaxPredictionVersionData(
@@ -574,7 +585,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private Map<String, RawMaterialRequirePlan> calculateT2MonthRequirements(
             String factoryCode, Integer year, Integer month,
-            Set<String> specialMaterialCodes) {
+            Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes) {
         // 1. 获取最大预测版本的数据
         List<MpProductionPrediction> predictionList = getMaxPredictionVersionData(
                 factoryCode, year, month);
@@ -596,7 +607,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private Map<String, RawMaterialRequirePlan> calculatePredictionRequirements(
             String factoryCode, Integer year, Integer month,
-            Set<String> specialMaterialCodes, String qtyField, String eudrQtyField, List<MpProductionPrediction> predictionList) {
+            Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes, String qtyField, String eudrQtyField, List<MpProductionPrediction> predictionList) {
 
         try {
             log.info("开始计算预测需求，工厂: {}, 年月: {}-{}", factoryCode, year, month);
@@ -815,7 +826,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private Map<String, RawMaterialRequirePlan> calculateMaterialRequirementsFromPredictions(
             List<FactoryMonthPlanMouldDayResult> resultList,
-            Set<String> specialMaterialCodes,
+            Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes,
             String qtyField, String eudrQtyField) {
 
         Map<String, RawMaterialRequirePlan> requirements = new HashMap<>();
@@ -867,14 +878,20 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             Map<String, RawMaterialRequirePlan> requirements,
             List<MdmMaterialConsumeDetail> bomDetails,
             int nonEudrQty, int eudrQty,
-            Set<String> specialMaterialCodes,
+            Map<String, List<RawSpecialMaterialRecord>> specialMaterialCodes,
             String qtyField, String eudrQtyField) {
 
         for (MdmMaterialConsumeDetail detail : bomDetails) {
             String materialCode = detail.getChildMaterialCode();
             String materialDesc = detail.getChildMaterialName();
             BigDecimal dosage = detail.getDosage() != null ? detail.getDosage() : BigDecimal.ZERO;
-            String materialType = specialMaterialCodes.contains(materialCode) ? "02" : "01";
+            String materialType;
+            List<RawSpecialMaterialRecord> specialMaterialRecords = specialMaterialCodes.get(materialCode);
+            if (!CollectionUtils.isEmpty(specialMaterialRecords)) {
+                materialType =  specialMaterialRecords.get(0).getMaterialType();
+            } else {
+                materialType = "01";
+            }
 
             RawMaterialRequirePlan requirement = requirements.computeIfAbsent(materialCode,
                     k -> new RawMaterialRequirePlan(materialCode, materialDesc, materialType));

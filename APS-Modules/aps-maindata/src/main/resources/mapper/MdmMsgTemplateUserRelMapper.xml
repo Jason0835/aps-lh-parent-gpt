@@ -17,12 +17,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 
     <sql id="selectMdmMsgTemplateUserRelVo">
-        SELECT ID, TEMPLATE_CODE, USER_NAME, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK, FROM T_MDM_MSG_TEMPLATE_USER_REL
+        SELECT ID, TEMPLATE_CODE, USER_NAME, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK FROM T_MDM_MSG_TEMPLATE_USER_REL
     </sql>
 
     <select id="selectMdmMsgTemplateUserRelList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel" resultMap="MdmMsgTemplateUserRelResult">
         <include refid="selectMdmMsgTemplateUserRelVo"/>
-        WHERE NVL(IS_DELETE,0) = 0
+        WHERE IS_DELETE = 0
         <if test="templateCode != null  and templateCode != ''"> AND TEMPLATE_CODE = #{templateCode}</if>
         <if test="userName != null  and userName != ''"> AND USER_NAME LIKE CONCAT(CONCAT('%', #{userName}), '%')</if>
     </select>

@@ -89,9 +89,9 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
     public QueryWrapper<MpOverdueSku> buildExtendedRangeQueryOptimized() {
         QueryWrapper<MpOverdueSku> queryWrapper = new QueryWrapper<>();
         //2025-01~2026-01
-        YearMonth current = YearMonth.now();
+        YearMonth current = YearMonth.now().minusMonths(1);
         // 计算最近N个月的起始点
-        YearMonth recentStart = current.minusMonths(12);
+        YearMonth recentStart = current.minusMonths(11);
         // 将年月转换为数值
         // 2025-01
         int recentStartValue = recentStart.getYear() * 100 + recentStart.getMonthValue();
@@ -99,11 +99,8 @@ public class MpOverdueSkuServiceImpl extends AbstractDocService<MpOverdueSku> im
         // 使用数据库表达式
         String expression = "year * 100 + month";
         // 构建条件：expression < recentStartValue OR expression BETWEEN recentStartValue AND currentValue
-        queryWrapper.and(wrapper -> {
-            wrapper.or(w -> w.apply(expression + " = {0}", recentStartValue));
-            wrapper.or(w -> w.apply(expression + " BETWEEN {0} AND {1}",
-                recentStartValue, currentValue));
-        });
+        queryWrapper.and(wrapper -> wrapper.apply(expression + " BETWEEN {0} AND {1}",
+            recentStartValue, currentValue));
         return queryWrapper;
     }
 }

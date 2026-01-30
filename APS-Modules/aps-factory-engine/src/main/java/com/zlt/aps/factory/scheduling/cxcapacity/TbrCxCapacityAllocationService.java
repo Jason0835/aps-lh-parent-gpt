@@ -77,6 +77,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
     private final InitNoProductionRecordService initNoProductionRecordService;
+    
+    private final SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler;
 
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
                                           FormalProductionHandler formalProductionHandler,
@@ -84,7 +86,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
-                                          InitNoProductionRecordService initNoProductionRecordService) {
+                                          InitNoProductionRecordService initNoProductionRecordService,
+                                          SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler) {
         super(dataService);
         this.formalProductionHandler = formalProductionHandler;
         this.productionHistoryHandler = productionHistoryHandler;
@@ -92,6 +95,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
         this.initNoProductionRecordService = initNoProductionRecordService;
+        this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
     }
 
     /**
@@ -157,6 +161,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        // 结构特殊材料排产
+        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
@@ -616,7 +622,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setBoostAverageValue((Integer) paramConfigurationMap.get(MonthPlanEnums.BOOST_AVERAGE_VALUE.getCode()));
-        configuration.setMouldSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
+        configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
         configuration.setHeightDiffQty((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode()));
         configuration.setSumProductionQty((Integer) paramConfigurationMap.get(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode()));
         //日排产相关

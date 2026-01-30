@@ -86,6 +86,8 @@ public class CxAddSkuProductionHandler {
             retrieveNextSku(context, groupPlanInfo, needProductionInfo, excludeDays);
             return;
         }
+        //20260129 修正前排产Sku信息，可能因为模具排产日
+        correctBeforeSku(context, lhGroup, doubleMouldList, groupName, startDay);
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
@@ -381,5 +383,70 @@ public class CxAddSkuProductionHandler {
         needProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
         //递归：重新获取下一组
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
+    }
+
+    /**
+     * 修正当前排产的Sku信息
+     *
+     * @param context         排产上下文
+     * @param lhGroup         收尾硫化组
+     * @param doubleMouldList 排产模具
+     * @param groupName       分组名-TBR 结构
+     * @param startDay        起始排产日
+     */
+    private static void correctBeforeSku(Context context, EarliestConclusionLhGroupHelper lhGroup, List<ProductionMouldInfoVo> doubleMouldList, String groupName, Integer startDay) {
+        if (null == lhGroup || CollectionUtils.isEmpty(doubleMouldList) || StringUtils.isBlank(groupName) || null == startDay) {
+            return;
+        }
+        List<Integer> productionQtyList = new ArrayList<>();
+        Set<String> materialDescSet = new HashSet<>();
+        doubleMouldList.forEach(singleMould -> {
+            Map<Integer, List<CxMouldDayProductionHelper>> allDayProductionInfo = singleMould.getDayProductionInfo();
+            if (CollectionUtils.isEmpty(allDayProductionInfo)) {
+                return;
+            }
+            boolean isAddProductionQty = true;
+            List<CxMouldDayProductionHelper> dayProductionList = allDayProductionInfo.get(startDay);
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                isAddProductionQty = false;
+                Integer previousDay = context.getPreviousDay(startDay);
+                if (null == previousDay) {
+                    return;
+                }
+                dayProductionList = allDayProductionInfo.get(previousDay);
+            }
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                return;
+            }
+            CxMouldDayProductionHelper lastProduction = dayProductionList.get(dayProductionList.size() - BigDecimal.ONE.intValue());
+            if (!lastProduction.getStructureName().equals(groupName)) {
+                return;
+            }
+            materialDescSet.add(lastProduction.getMaterialDesc());
+            List<CxMouldDayProductionHelper> materialAllProductionInfo = dayProductionList.stream().filter(single -> single.getMaterialDesc().equals(lastProduction.getMaterialDesc())).collect(Collectors.toList());
+            if (isAddProductionQty) {
+                Integer sumProductionQty = materialAllProductionInfo.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+                productionQtyList.add(sumProductionQty);
+            }
+        });
+        if (CollectionUtils.isEmpty(materialDescSet) || materialDescSet.size() > BigDecimal.ONE.intValue()) {
+            return;
+        }
+        String materialDesc = materialDescSet.stream().findFirst().orElse(null);
+        if (StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<MonthPlanProductionRequirePlanVo> planList = productionContext.getAllSkuProductionPlan().get(materialDesc);
+        if (CollectionUtils.isEmpty(planList)) {
+            return;
+        }
+        MonthPlanProductionRequirePlanVo planInfo = planList.get(BigDecimal.ZERO.intValue());
+        Integer dayLhQty = planInfo.getMaxDaySingleLhMachineQty();
+        Integer productionQty = BigDecimal.ZERO.intValue();
+        if (!CollectionUtils.isEmpty(productionQtyList)) {
+            productionQty = productionQtyList.stream().mapToInt(Integer::intValue).sum();
+        }
+        lhGroup.updateBeforeSkuInfo(materialDesc, planInfo.getMaterialCode(), productionQty, dayLhQty);
     }
 }

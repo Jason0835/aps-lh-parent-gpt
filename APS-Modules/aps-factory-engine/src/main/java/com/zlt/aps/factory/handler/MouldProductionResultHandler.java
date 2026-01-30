@@ -83,6 +83,7 @@ public class MouldProductionResultHandler {
         if (CollectionUtils.isEmpty(detailLogList)) {
             return Collections.emptyList();
         }
+        SkuProductionCounter productionCounter = productionContext.getProductionCounter();
         List<MonthPlanProductionRequirePlanVo> allRequireList = productionContext.getAllProductionPlan().values().stream().collect(Collectors.toList());
         Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupRequireMap = allRequireList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         List<FactoryMonthPlanMouldDayResult> resultList = new ArrayList<>();
@@ -96,6 +97,10 @@ public class MouldProductionResultHandler {
                 return;
             }
             FactoryMonthPlanMouldDayResult dayResult = buildBaseInfo(requireList);
+            //20260129 得到排产顺序
+            if(null != productionCounter){
+                dayResult.setProductionSequence(Long.valueOf(productionCounter.getSkuProductionSort(materialDesc)));
+            }
             //未排原因
             mergeNoProductionReason(dayResult, requireList);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
@@ -231,9 +236,9 @@ public class MouldProductionResultHandler {
         dayResult.setProdReqPlan(sumNetQty);
         //总需求(含损耗)
         Integer totalHeightLossQty = requireList.stream().filter(item -> null != item.getHeightLossQty()).mapToInt(MonthPlanProductionRequirePlanVo::getHeightLossQty).sum();
-        Integer noHeightLossQty = requireList.stream().filter(item -> null != item.getFactProdReqQty()).mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
-        int lossQty = (totalHeightLossQty - heightNetQty) + (noHeightLossQty - sumNetQty);
-        dayResult.setFactProdReqQty(sumNetQty + lossQty);
+        Integer sumNetLossQty = requireList.stream().filter(item -> null != item.getFactProdReqQty()).mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+        dayResult.setFactProdReqQty(sumNetLossQty);
+        int lossQty = (sumNetLossQty - sumNetQty) - (totalHeightLossQty - heightNetQty);
 
         int sumCycleReserveQty = requireList.stream().filter(item -> null != item.getCycleReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
