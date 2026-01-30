@@ -1,9 +1,10 @@
 package com.zlt.aps.factory.logrecorder;
 
+import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
-import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
+import com.zlt.aps.factory.enums.ProductionStageEnum;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -94,12 +95,13 @@ public class TbrMouldProductionLogRecorder {
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s  没有找到续作Sku收尾的硫化组，无需排产同规格同花纹、共生胎同模具====
      *
      * @param context           排程上下文
+     * @param productionStage   排产阶段
      * @param groupName         分组名-结构
      * @param onLineMachineInfo 在产机台信息
      * @param continueType      排产类型
      * @return
      */
-    public static String addContinueGroupContinueSkuNoLhGroupLog(Context context, String groupName, String onLineMachineInfo, ContinueTypeEnum continueType) {
+    public static String addContinueGroupContinueSkuNoLhGroupLog(Context context, ProductionStageEnum productionStage, String groupName, String onLineMachineInfo, ContinueTypeEnum continueType) {
         String logContentFormat = " =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s  没有找到续作Sku收尾的硫化组，无需%s排产====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),

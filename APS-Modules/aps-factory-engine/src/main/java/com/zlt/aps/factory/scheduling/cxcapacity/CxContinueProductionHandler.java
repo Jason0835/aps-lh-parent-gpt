@@ -2,11 +2,15 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.*;
+import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
+import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
+import com.zlt.aps.factory.enums.ProductionStageEnum;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.handler.SkuMouldSelector;
@@ -38,11 +42,12 @@ public class CxContinueProductionHandler {
      * 2、共生胎、同模具
      *
      * @param context            排产上下文
+     * @param productionStage    排产阶段
      * @param productionPlanInfo 分组排产计划
      * @param continueType       续作类型 同规格同花纹 共生胎同模具
      * @param continueSkuMap     分组计划中续作Sku信息集合
      */
-    public static void productionContinueByType(Context context, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {
+    public static void productionContinueByType(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = productionPlanInfo.getGroupName();
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
@@ -51,7 +56,7 @@ public class CxContinueProductionHandler {
         EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfoByContinueSku(context, continueSkuMap);
         if (null == earliestConclusionLhGroup) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, groupName, onLineMachineInfo, continueType));
+            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
             return;
         }
         Integer startDay = earliestConclusionLhGroup.getClosingDay();
@@ -102,7 +107,7 @@ public class CxContinueProductionHandler {
         //逐日进行排产
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList, true);
         //迭代下一个硫化组
-        productionContinueByType(productionContext, productionPlanInfo, continueType, endDay, continueSkuMap);
+        productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap);
     }
 
     /**

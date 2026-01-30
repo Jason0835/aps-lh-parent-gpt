@@ -75,7 +75,7 @@ public class SpecialMaterialScheduleHandler {
 
         // 按指定顺序遍历特殊材料
         List<String> specialMaterialList = planMaterialGroupMap.keySet().stream()
-                .sorted(Comparator.comparing(Function.identity(), Comparator.reverseOrder())) // TODO 按编码倒序排序
+                .sorted(Comparator.comparing(String::valueOf, Comparator.reverseOrder())) // TODO 按编码倒序排序
                 .collect(Collectors.toList());
         for (String specialMaterialCode : specialMaterialList) {
             BigDecimal singleMachineDayCapacity = BigDecimalUtils.valueOf(300); // TODO 计算单台日产：硫化机台数*硫化最大日产

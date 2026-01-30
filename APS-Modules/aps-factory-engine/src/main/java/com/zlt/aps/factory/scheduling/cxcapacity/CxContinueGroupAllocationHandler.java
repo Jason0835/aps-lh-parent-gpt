@@ -11,6 +11,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.CxMachineLimitTypeEnum;
+import com.zlt.aps.factory.enums.ProductionStageEnum;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.handler.SkuMouldSelector;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
@@ -163,12 +164,12 @@ public class CxContinueGroupAllocationHandler {
             }
         });
         //1、先使用续作Sku的高优先级部分进行模拟排产
-        productionContinueSku(productionContext, groupPlanInfo, continueSkuInfoMap);
+        productionContinueSku(productionContext, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, continueSkuInfoMap);
         //2、接着进行同规格同花纹的续作高优先级部分进行模拟排产
         Integer monthDays = context.getMonthDays();
-        CxContinueProductionHandler.productionContinueByType(context, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap);
+        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap);
         //3、接着进行共生胎，同模具的续作高优级部分进行模拟排产
-        CxContinueProductionHandler.productionContinueByType(context, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap);
+        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap);
     }
 
     /**
@@ -313,10 +314,11 @@ public class CxContinueGroupAllocationHandler {
      * 可能需要进行降膜排产
      *
      * @param context            排产上下文
+     * @param productionStage    排产阶段
      * @param groupPlanInfo      分组计划信息对象
      * @param continueSkuInfoMap 续作Sku信息
      */
-    static void productionContinueSku(TbrProductionContext context, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
+    static void productionContinueSku(TbrProductionContext context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
         Set<Integer> stopDays = context.getStopDays();
         Integer continueSkuDeadLineDays = groupPlanInfo.getContinueSkuDeadLineDay(context);
         ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();

@@ -94,21 +94,29 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_MAIN_PATTERN_CAPACITY_INFO("20-06-01", "分组主花纹产能预算"),
     /**
-     * 20-06-02 分组总产能预算
+     * 20-06-02 分组(TBR结构)总产能预算
      */
-    GROUP_SUM_CAPACITY_INFO("20-06-02", "分组总产能预算"),
+    GROUP_SUM_CAPACITY_INFO("20-06-02", "分组(TBR结构)总产能预算"),
     /**
-     * 20-06-03 分组预算机台数
+     * 20-06-03 分组(TBR结构)预算机台数
      */
-    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-06-03", "分组预算机台数"),
+    GROUP_SUM_CAPACITY_CX_MACHINE_INFO("20-06-03", "分组(TBR结构)预算机台数"),
     /**
      * 20-06-04 汇总
      */
     SUMMARY_INFO_SUM("20-06-04", "汇总"),
     /**
-     * 20-14-00 分组计划为非在机分组(TBR结构)
+     * 20-06-05 在机分组在产机台汇总
      */
-    GROUP_NO_CONTINUE_GROUP_INFO("20-14-00", "分组计划为非在机分组(TBR结构)"),
+    CONTINUE_GROUP_CONTINUE_CX_MACHINE_SUMMARY_INFO_SUM("20-06-05", "在机分组在产机台汇总"),
+    /**
+     * 20-07 在机分组(TBR结构)在产机台情况
+     */
+    CONTINUE_GROUP_CONTINUE_CX_MACHINE("20-07", "在机分组(TBR结构)在产机台情况"),
+    /**
+     * 20-08 为非在机分组(TBR结构)
+     */
+    GROUP_NO_CONTINUE_GROUP_INFO("20-08", "非在机分组(TBR结构)情况"),
     /**
      * 20-14-01 分组计划为在机分组(TBR结构)数据设置
      */
