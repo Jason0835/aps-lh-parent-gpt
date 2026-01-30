@@ -50,12 +50,27 @@ public class PredictionAllocationHelper {
     List<FactoryMonthPlanMouldDayResult> productionResults;
     int productionQty;
     int completionQty;
+    int totalProductionQty;
+    // 计算该优先级的总订单数量
+    int totalOrderQty;
     for (Map.Entry<String, List<DpOrderOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
       if(productionQtyMap.containsKey(entry.getKey()) && productionQtyMap.get(entry.getKey()) == 0) {
         continue;
       }
       productionQty = productionQtyMap.getOrDefault(entry.getKey(),0);
       completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
+      totalProductionQty = productionQty - completionQty;
+      totalOrderQty = calculateTotalOrderQty(entry.getValue());
+      if(totalOrderQty == 0) {
+        continue;
+      }
+      if(totalProductionQty == 0) {
+        result.addAll(entry.getValue());
+        continue;
+      }
+      if(totalOrderQty <= totalProductionQty) {
+         continue;
+      }
       stockQty = BigDecimal.valueOf(productionQty - completionQty);
       productionResults = productionGroupMap.get(entry.getKey());
       allocations = processOrderGroup(createCondition,entry.getValue(), stockQty,productionResults);
@@ -136,11 +151,26 @@ public class PredictionAllocationHelper {
     if (CollectionUtils.isEmpty(saleOrdersByPriority)) {
       return;
     }
+    DpOrderOffsetDetail saleOrder = saleOrdersByPriority.get(0);
     // 计算该优先级的总订单数量
     int totalOrderQty = calculateTotalOrderQty(saleOrdersByPriority);
     // 计算该优先级的生产数量
     int productionQty = calculateProductionQty(context.getProductionResults(), processor.getProductionQtyExtractor());
-    DpOrderOffsetDetail saleOrder = saleOrdersByPriority.get(0);
+    if(context.getStockQty().intValue() >= totalOrderQty) {
+      context.setStockQty(context.getStockQty().subtract(BigDecimal.valueOf(totalOrderQty)));
+      totalOrderQty = BigDecimal.ZERO.intValue();
+    }else{
+      totalOrderQty = totalOrderQty  - context.getStockQty().intValue();
+      context.setStockQty(BigDecimal.ZERO);
+    }
+    log.info("materialCode: {},priority:{},totalOrderQty:{},productionQty:{},stockQty:{}",
+        saleOrder.getMaterialCode(),
+        processor.getPriority(),
+        totalOrderQty,productionQty,
+        context.getStockQty().intValue());
+    if(totalOrderQty <=0) {
+      return;
+    }
     DpDemandPlan createCondition =  context.getCreateCondition();
     saleOrder.setFactoryCode(createCondition.getFactoryCode());
     saleOrder.setYear(createCondition.getYear());
@@ -150,14 +180,6 @@ public class PredictionAllocationHelper {
     saleOrder.setStockQty(BigDecimal.ZERO.intValue());
     saleOrder.setAllocationQty(BigDecimal.ZERO.intValue());
     saleOrder.setPlannedSurplus(BigDecimal.ZERO.intValue());
-    log.info("materialCode: {},totalOrderQty:{},stockQty:{}",context.getSaleOrders().get(0).getMaterialCode(),totalOrderQty,context.getStockQty().intValue());
-    if(context.getStockQty().intValue() >= totalOrderQty) {
-      context.setStockQty(context.getStockQty().subtract(BigDecimal.valueOf(totalOrderQty)));
-      totalOrderQty = BigDecimal.ZERO.intValue();
-    }else{
-      totalOrderQty = totalOrderQty  - context.getStockQty().intValue();
-      context.setStockQty(BigDecimal.ZERO);
-    }
     saleOrder.setProduceQtyDue(totalOrderQty);
     saleOrder.setProductionQty(productionQty);
     saleOrder.setBaseVale(null);
