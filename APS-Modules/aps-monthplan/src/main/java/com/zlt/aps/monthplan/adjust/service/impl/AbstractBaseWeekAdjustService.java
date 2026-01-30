@@ -360,8 +360,26 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         return Comparator.comparing(MpAdjustDetailVo::getStructureName, Comparator.nullsLast(String::compareTo))
                 // 二级排序：施工阶段按自定义权重升序（权重小排前）
                 .thenComparing(vo -> stageSortWeights.getOrDefault(vo.getConstructionStage(), 5))
-                // 三级排序：待调整量按绝对值从大到小（降序）
-                .thenComparing((MpAdjustDetailVo vo) -> Math.abs(Optional.ofNullable(vo.getPendingQty()).orElse(0)), Comparator.reverseOrder());
+                // 三级排序：负数排前 -> 正数次之 -> 0（含null）最后，同组内绝对值从大到小
+                // 负数排前，非负数整体在后
+                .thenComparing(vo -> {
+                    // null统一视为0
+                    Integer qty = Optional.ofNullable(vo.getPendingQty()).orElse(0);
+                    // 负数返回0，非负数返回1，升序实现负数排前
+                    return qty < 0 ? 0 : 1;
+                })
+                // 非负数内部区分 正数排前，0最后
+                .thenComparing(vo -> {
+                    Integer qty = Optional.ofNullable(vo.getPendingQty()).orElse(0);
+                    // 正数返回0，0返回1，升序实现正数排前、0最后
+                    return qty > 0 ? 0 : 1;
+                })
+                // 同分组内（负数、正数、0）按绝对值降序（从大到小）
+                .thenComparing(vo -> {
+                    Integer qty = Optional.ofNullable(vo.getPendingQty()).orElse(0);
+                    return Math.abs(qty);
+                }, Comparator.reverseOrder());
+
     }
 
     @Override

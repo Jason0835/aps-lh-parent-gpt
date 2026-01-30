@@ -66,7 +66,8 @@
             RIGHT_REINFORCE BELT_CODE_RIGHT_CODE,
             TYPE_GLUE TYPE_ADHESIVE_CODE,
             DEL_FLAG IS_DELETE,
-            FACTORY_CODE
+            FACTORY_CODE,
+            TREAD_CODE
         FROM MES_CONSTRUCTION_INFO
         WHERE DEL_FLAG = 0
           AND FACTORY_CODE = #{factoryCode}

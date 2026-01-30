@@ -479,6 +479,8 @@ public abstract class AbstractDailyCapacityLimit {
             resultArr[1] = 1;
         }else if (remainQty == changeMouldXBlockQty){
             resultArr[2] = 1;
+        }else {
+            resultArr[0] = 1;
         }
         if (mpFinalVo.getFieldValueByFieldName(day2Field) != null){
             //例子：
