@@ -87,6 +87,13 @@ export default {
             trigger: "change",
           },
         ],
+        yearMonth: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         materialCode: [
           {
             required: true,
@@ -162,6 +169,15 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
+
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.masterdata.materialCode"),
           maxlength:10
@@ -208,6 +224,10 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        params.yearMonth=''
 
         const res = await saveSpecialInfo(params);
         this.$modal.msgSuccess(res.msg);
@@ -227,6 +247,7 @@ export default {
       if (data) {
         this.isEdit = true;
         this.form = {
+          yearMonth: data.year + "-" + (data.month < 10 ? "0" + data.month : data.month),
           ...data,
         };
       } else {
