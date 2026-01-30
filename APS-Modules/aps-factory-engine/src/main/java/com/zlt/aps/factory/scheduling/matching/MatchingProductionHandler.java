@@ -1911,7 +1911,7 @@ public class MatchingProductionHandler {
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, onLineMachineSet));
+            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet));
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }
