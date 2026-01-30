@@ -53,7 +53,7 @@ export default {
             trigger: "change",
           },
         ],
-        materialCode: [
+        mainMaterialDesc: [
           {
             required: true,
             message: this.$t("common.rule.input"),
