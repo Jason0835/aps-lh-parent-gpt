@@ -64,7 +64,7 @@ public class MdmSkuStructureRefServiceImpl extends AbstractDocService<MdmSkuStru
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Arrays.asList("factoryCode", "materialCode"));
+        return new ArrayList<>(Arrays.asList("factoryCode", "structureName","mainMaterialDesc"));
     }
 
     /**

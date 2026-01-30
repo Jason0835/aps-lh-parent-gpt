@@ -39,17 +39,19 @@ public class MdmSkuStructureRef extends BaseEntity {
 
     /** 物料编码 */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialCode", sort = 3)
+//    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialCode", sort = 3)
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
-    /** MES物料编号 */
+    /**
+     * 主物料(胎胚描述)
+     */
     @ImportExcelValidated(required = true)
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.mesMaterialCode", sort = 2)
-    @ApiModelProperty(value = "MES物料编号", name = "mesMaterialCode")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
+    @Excel(name = "ui.data.column.mdmSkuStructureRef.mainMaterialDesc", sort = 2)
+    @ApiModelProperty(value = "主物料(胎胚描述)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
 
     /** 结构 */
     @ImportExcelValidated(required = true)
@@ -59,7 +61,7 @@ public class MdmSkuStructureRef extends BaseEntity {
     private String structureName;
 
     /** 物料描述 */
-    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialDesc", sort = 4)
+//    @Excel(name = "ui.data.column.mdmSkuStructureRef.materialDesc", sort = 4)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(exist = false)
     private String materialDesc;
