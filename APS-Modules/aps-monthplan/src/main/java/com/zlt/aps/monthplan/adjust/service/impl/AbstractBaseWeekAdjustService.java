@@ -411,6 +411,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * List转换Map
+     * @param voList
+     * @return
+     */
+    protected Map<String, List<FactoryMonthPlanFinalAdjustVo>> convertToMap(List<FactoryMonthPlanFinalAdjustVo> voList) {
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> result = new HashMap<>();
+        for (FactoryMonthPlanFinalAdjustVo vo : voList) {
+            result.computeIfAbsent(vo.getStructureName(), k -> new ArrayList<>()).add(vo);
+        }
+        return result;
+    }
+
+    /**
      * 保存调整结果
      * @param contextDTO
      */

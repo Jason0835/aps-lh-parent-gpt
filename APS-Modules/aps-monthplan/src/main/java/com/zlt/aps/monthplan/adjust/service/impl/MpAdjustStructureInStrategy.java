@@ -134,18 +134,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         //contextDTO.setFactoryMonthPlanProdFinalList(newFinalList);
     }
 
-    /**
-     * List转换Map
-     * @param voList
-     * @return
-     */
-    private Map<String, List<FactoryMonthPlanFinalAdjustVo>> convertToMap(List<FactoryMonthPlanFinalAdjustVo> voList) {
-        Map<String, List<FactoryMonthPlanFinalAdjustVo>> result = new HashMap<>();
-        for (FactoryMonthPlanFinalAdjustVo vo : voList) {
-            result.computeIfAbsent(vo.getStructureName(), k -> new ArrayList<>()).add(vo);
-        }
-        return result;
-    }
+
 
     /**
      * 回填实际调整
