@@ -125,9 +125,10 @@ export default {
           render: (form) => {
             return (
               <formingCapacitySelect
-                factoryCode={form.cxMachineCode}
+                factoryCode={form.factoryCode}
                 key="formCxMachineCode"
                 v-model={form.cxMachineCode}
+
               />
             );
           },
