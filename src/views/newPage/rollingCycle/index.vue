@@ -134,7 +134,7 @@
             </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="调整结果" name="three"> </el-tab-pane>
+          <el-tab-pane label="调整结果" name="three" v-if="this.hasPermission('monthplan:mpAdjustResult:list')"> </el-tab-pane>
         </el-tabs>
       </template>
       <template slot="footer" v-if="isShowFoot">
@@ -1053,6 +1053,14 @@ export default {
     },
   },
   methods: {
+    //查询是否有权限
+    hasPermission(permission) {
+      const permissions = this.$store.state.user.permissions || [];
+      if (Array.isArray(permission)) {
+        return permission.some((perm) => permissions.includes(perm));
+      }
+      return permissions.includes(permission);
+    },
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
       saveAdjustResult(row)
