@@ -610,6 +610,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
+            monthPlan.setId(null);
             monthPlan.setProductionNo(productionNo);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
