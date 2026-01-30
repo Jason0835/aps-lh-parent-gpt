@@ -27,7 +27,7 @@ public interface IMdmProductStockService extends IDocService<MdmProductStock> {
      *
      * @return
      */
-    List<MdmProductStock> findCurrentFinishStock();
+    List<MdmProductStock> findCurrentFinishStock(String factoryCode);
 
     /**
      * 根据物料编号获取成品库存

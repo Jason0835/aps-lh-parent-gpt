@@ -499,20 +499,22 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     @Override
     public PredictionContext buildPredictionContext(String factoryCode) {
+        DpDemandPlan param = new DpDemandPlan();
+        param.setFactoryCode(factoryCode);
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
             CompletableFuture.supplyAsync(() -> this.fetchSalesOrderPool(factoryCode));
         CompletableFuture<List<MdmProductStock>> stocksFuture =
-            CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
+            CompletableFuture.supplyAsync(() ->  this.fetchFinishedProductStocks(factoryCode));
         CompletableFuture<Map<String, String>> productionTypeFuture =
-            CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
+            CompletableFuture.supplyAsync(() ->  this.fetchProductionTypeMap(factoryCode));
         CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
             CompletableFuture.supplyAsync(() -> this.findCurrentMonthlySaleQty(factoryCode));
         CompletableFuture<Integer> minProductionQtyFuture =
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
-            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(null));
+            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(param));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
-            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
+            CompletableFuture.supplyAsync(() -> mdmCycleSchStruConfService.findCycleSchStruConf(factoryCode));
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture,productionTypeFuture,minProductionQtyFuture,fetchMaterialInfoFuture,monthlySaleQtyFuture,
@@ -741,8 +743,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
 
-    private Map<String, MdmMaterialInfo> fetchMaterialInfo(String structureName) {
-        return materialInfoService.skuToMaterialInfo(structureName);
+    private Map<String, MdmMaterialInfo> fetchMaterialInfo(DpDemandPlan createCondition) {
+        return materialInfoService.skuToMaterialInfo(createCondition);
     }
 
     private void validateFinalizedForAdjust(DpDemandPlan createCondition) {
@@ -818,10 +820,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(() ->  this.fetchSalesOrderPool(createCondition.getFactoryCode()));
 
         CompletableFuture<List<MdmProductStock>> stocksFuture =
-            CompletableFuture.supplyAsync(this::fetchFinishedProductStocks);
+            CompletableFuture.supplyAsync(() ->  this.fetchFinishedProductStocks(createCondition.getFactoryCode()));
 
         CompletableFuture<Map<String, String>> productionTypeFuture =
-            CompletableFuture.supplyAsync(this::fetchProductionTypeMap);
+            CompletableFuture.supplyAsync(() -> this.fetchProductionTypeMap(createCondition.getFactoryCode()));
 
         CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
             CompletableFuture.supplyAsync(() -> this.fetchSupplyOrderPool(createCondition));
@@ -832,9 +834,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<Integer> minProductionQtyFuture =
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
-            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(createCondition.getStructureName()));
+            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(createCondition));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
-            CompletableFuture.supplyAsync(mdmCycleSchStruConfService::findCycleSchStruConf);
+            CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findCycleSchStruConf(createCondition.getFactoryCode()));
 
         // 等待所有任务完成
         CompletableFuture.allOf(
@@ -1000,15 +1002,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     /**
      * 获取成品库存
      */
-    private List<MdmProductStock> fetchFinishedProductStocks() {
-        return this.mdmProductStockService.findCurrentFinishStock();
+    private List<MdmProductStock> fetchFinishedProductStocks(String factoryCode) {
+        return this.mdmProductStockService.findCurrentFinishStock(factoryCode);
     }
 
     /**
      * 获取排产类型
      */
-    private Map<String, String> fetchProductionTypeMap() {
-        return mdmSkuScheduleCategoryService.skuToProductionType();
+    private Map<String, String> fetchProductionTypeMap(String factoryCode) {
+        return mdmSkuScheduleCategoryService.skuToProductionType(factoryCode);
     }
 
     /**

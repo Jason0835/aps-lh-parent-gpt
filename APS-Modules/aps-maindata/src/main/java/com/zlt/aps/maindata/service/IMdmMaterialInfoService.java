@@ -3,6 +3,7 @@ package com.zlt.aps.maindata.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
@@ -180,7 +181,7 @@ public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
      * 获取SKU对应的物料信息
      * @return 物料信息
      */
-    Map<String,MdmMaterialInfo>  skuToMaterialInfo(String structureName);
+    Map<String,MdmMaterialInfo>  skuToMaterialInfo(DpDemandPlan createCondition);
     /**
      *  查找物料信息
      * @param factoryCode
