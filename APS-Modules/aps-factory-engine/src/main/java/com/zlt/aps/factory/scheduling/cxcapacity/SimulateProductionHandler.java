@@ -15,6 +15,7 @@ import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -40,7 +41,11 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
-public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
+@RequiredArgsConstructor
+public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
+
+    private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
+
     /**
      * 模拟排产计划
      *
@@ -58,7 +63,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
         //1、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         //2、对在产机台-收尾成型机台，反向匹配待排结构
-        CxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
+        cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
         //3、对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, allGroupPlanMap);
     }
@@ -146,7 +151,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
      * @param estimateGroupCxAllocationMap 分组计划需求量
      */
     private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
-        ProductionPlanGroupInfo addNewGroupPlan = CxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap);
+        ProductionPlanGroupInfo addNewGroupPlan = cxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap);
         if (null == addNewGroupPlan) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
@@ -175,7 +180,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
             return;
         }
         //对挑选出的结构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = CxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, productionDayInfo);
+        CxMachineBaseInfoVo selectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, productionDayInfo);
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, groupName));
@@ -221,7 +226,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler{
         Integer leftOver = selectedCxMachine.getRemainingDays();
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
-            CxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
+            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
         }
         //下一新增结构
         addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
