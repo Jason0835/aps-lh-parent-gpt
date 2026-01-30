@@ -331,6 +331,13 @@ public class CxContinueGroupAllocationHandler {
                 return;
             }
             Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty();
+            //挑选的模具 本次使用最多模具数，不一定与续作模具数相等，但不会超
+            Integer theoryMaxMouldNumber = cxContinueSkuInfo.getMouldNumber();
+            List<ProductionMouldInfoVo> selectMouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, productionStage, materialDesc, theoryMaxMouldNumber);
+            if (CollectionUtils.isEmpty(selectMouldList)) {
+                return;
+            }
+            cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
             //1、降膜排产
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
@@ -340,9 +347,6 @@ public class CxContinueGroupAllocationHandler {
                 log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionResultLog(context, groupName, materialDesc));
                 return;
             }
-            //挑选的模具 本次使用最多模具数，不一定与续作模具数相等，但不会超
-            Integer maxMouldNumber = resultList.stream().mapToInt(DailyScheduleVo::getSkuMachines).max().getAsInt() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            List<ProductionMouldInfoVo> selectMouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, materialDesc, maxMouldNumber);
             String mouldInfo = selectMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
             log.info(TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo));
             //2、将排产结果，逐日分配到模具上，按排产日由小到大排序

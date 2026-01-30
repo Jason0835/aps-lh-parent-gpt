@@ -428,6 +428,26 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加在机结构续作Sku模具排产没有找到模具日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s [%s]模具排产因[%s]没有找到模具====
+     *
+     * @param context         排程上下文
+     * @param productionStage 排产阶段
+     * @param groupName       分组名-结构
+     * @param materialDesc    Sku信息
+     * @param limitType       限制类型
+     * @return
+     */
+    public static String addContinueSkuNoFindMouldLog(Context context, ProductionStageEnum productionStage, String groupName, String materialDesc, MouldProductionLimitTypeEnum limitType) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s [%s]模具排产因[%s]没有找到模具====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, productionStage.getStageDesc(), limitType.getLimitDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_NO_MOULD, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加在机结构续作Sku降膜排产没有结果日志记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 降膜排产没有结果====
      *

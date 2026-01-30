@@ -1,13 +1,16 @@
 package com.zlt.aps.factory.handler;
 
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
+import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
+import com.zlt.aps.factory.enums.ProductionStageEnum;
+import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -56,12 +59,13 @@ public class SkuMouldSelector {
      * 获取续作sku对应的模具信息，
      * 并按共用性差的在前，模具编号大的在前排序
      *
-     * @param context      排产上下文
-     * @param materialDesc 物料描述
-     * @param mouldNumber  模具数
+     * @param context         排产上下文
+     * @param productionStage 排产阶段
+     * @param materialDesc    物料描述
+     * @param mouldNumber     模具数
      * @return
      */
-    public static List<ProductionMouldInfoVo> getContinueSkuMouldNumberInit(Context context, String materialDesc, Integer mouldNumber) {
+    public static List<ProductionMouldInfoVo> getContinueSkuMouldNumberInit(Context context, ProductionStageEnum productionStage, String materialDesc, Integer mouldNumber) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         if (StringUtils.isBlank(materialDesc) || null == mouldNumber || mouldNumber <= BigDecimal.ZERO.intValue()) {
             return Collections.emptyList();
@@ -71,22 +75,25 @@ public class SkuMouldSelector {
         if (CollectionUtils.isEmpty(skuRelationList)) {
             return Collections.emptyList();
         }
+        MonthPlanProductionRequirePlanVo productionPlan = productionContext.getAllSkuProductionPlan().get(materialDesc).get(BigDecimal.ZERO.intValue());
         List<ProductionMouldInfoVo> effectiveList = getEffectiveContinueRelation(baseDataContainer, skuRelationList);
+        String groupName = productionPlan.getStructureName();
         Integer max = effectiveList.size();
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
         //20260116 得到模壳标准：理论只有一个模壳标准
-        MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(effectiveList.get(BigDecimal.ZERO.intValue()));
-        Integer mouldShellLimitQty = mouldShellInfo.getLeftOverUsedQtyByContinueSku();
+        Integer mouldShellLimitQty = getMouldShellQty(productionContext, productionStage, groupName, materialDesc, effectiveList.get(BigDecimal.ZERO.intValue()));
         max = Math.min(max, mouldShellLimitQty);
         //20260117 获取模具分配比例
-        MonthPlanProductionRequirePlanVo productionPlan = productionContext.getAllSkuProductionPlan().get(materialDesc).get(BigDecimal.ZERO.intValue());
-        Integer mouldAllocationLimitQty = productionContext.getMouldAllocationLimitQty(productionPlan);
+        Integer mouldAllocationLimitQty = getMouldAllocationQty(productionContext, productionStage, groupName, materialDesc, productionPlan);
         max = Math.min(max, mouldAllocationLimitQty);
         //20260119 获取胶囊卡盘的数量
-        Integer capsuleChuckLimitQty = productionContext.getCapsuleChuckLimitQty(productionPlan);
+        Integer capsuleChuckLimitQty = getCapsuleChuckQty(productionContext, productionStage, groupName, materialDesc, productionPlan);
         max = Math.min(max, capsuleChuckLimitQty);
+        if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            return Collections.emptyList();
+        }
         effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
                 .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
                 .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
@@ -235,5 +242,77 @@ public class SkuMouldSelector {
             enableSelectedList.add(mouldInfo);
         });
         return enableSelectedList;
+    }
+
+    /**
+     * 取得模壳数量
+     *
+     * @param productionContext 排产上下文
+     * @param productionStage   排产阶段
+     * @param groupName         分组名(TBR结构)
+     * @param materialDesc      物料描述
+     * @param mouldInfo         模具信息
+     * @return
+     */
+    private static Integer getMouldShellQty(TbrProductionContext productionContext,
+                                            ProductionStageEnum productionStage,
+                                            String groupName,
+                                            String materialDesc,
+                                            ProductionMouldInfoVo mouldInfo) {
+        MouldShellBaseInfoVo mouldShellInfo = productionContext.getMouldShellInfo(mouldInfo);
+        Integer mouldShellLimitQty;
+        if (null == mouldShellInfo) {
+            mouldShellLimitQty = BigDecimal.ZERO.intValue();
+        } else {
+            mouldShellLimitQty = mouldShellInfo.getLeftOverUsedQtyByContinueSku();
+        }
+        if (mouldShellLimitQty < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuNoFindMouldLog(productionContext, productionStage, groupName, materialDesc, MouldProductionLimitTypeEnum.MOULD_SHELL_LIMIT));
+        }
+        return mouldShellLimitQty;
+    }
+
+    /**
+     * 取得模具分配比例数量
+     *
+     * @param productionContext 排产上下文
+     * @param productionStage   排产阶段
+     * @param groupName         分组名(TBR结构)
+     * @param materialDesc      物料描述
+     * @param productionPlan    排产计划信息
+     * @return
+     */
+    private static Integer getMouldAllocationQty(TbrProductionContext productionContext,
+                                                 ProductionStageEnum productionStage,
+                                                 String groupName,
+                                                 String materialDesc,
+                                                 MonthPlanProductionRequirePlanVo productionPlan) {
+        Integer mouldAllocationLimitQty = productionContext.getMouldAllocationLimitQty(productionPlan);
+        if (mouldAllocationLimitQty < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuNoFindMouldLog(productionContext, productionStage, groupName, materialDesc, MouldProductionLimitTypeEnum.MOULD_ALLOCATION_LIMIT));
+        }
+        return mouldAllocationLimitQty;
+    }
+
+    /**
+     * 取得胶囊卡盘数量
+     *
+     * @param productionContext 排产上下文
+     * @param productionStage   排产阶段
+     * @param groupName         分组名(TBR结构)
+     * @param materialDesc      物料描述
+     * @param productionPlan    排产计划信息
+     * @return
+     */
+    private static Integer getCapsuleChuckQty(TbrProductionContext productionContext,
+                                              ProductionStageEnum productionStage,
+                                              String groupName,
+                                              String materialDesc,
+                                              MonthPlanProductionRequirePlanVo productionPlan) {
+        Integer capsuleChuckLimitQty = productionContext.getCapsuleChuckLimitQty(productionPlan);
+        if (capsuleChuckLimitQty < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuNoFindMouldLog(productionContext, productionStage, groupName, materialDesc, MouldProductionLimitTypeEnum.CAPSULE_CHUCK_LIMIT));
+        }
+        return capsuleChuckLimitQty;
     }
 }
