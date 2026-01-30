@@ -623,20 +623,16 @@ public class CycleStockUpService {
     if(null == materialInfo){
        throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notFound.materialInfo"));
     }
-    MpMonthlySaleQty monthlySaleQty = monthlySaleQtyService.getMpMonthlySaleQtyByMaterialCode(supplyOrderPool);
-    if(null == monthlySaleQty) {
-      return;
+    if(StringUtils.isBlank(materialInfo.getStructureName())) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
     }
     List<MdmMonCycleSchStruConf>  monCycleSchStruConfs =   mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(supplyOrderPool);
     if(CollectionUtils.isEmpty(monCycleSchStruConfs)) {
-      return;
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
     }
     Set<String> structureNames = monCycleSchStruConfs.stream().map(MdmMonCycleSchStruConf::getStructureName).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
     if(CollectionUtils.isEmpty(structureNames)) {
-      return;
-    }
-    if(StringUtils.isBlank(materialInfo.getStructureName())) {
-      return;
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
     }
     if(!structureNames.contains(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
