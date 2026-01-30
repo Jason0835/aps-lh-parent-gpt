@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -744,77 +745,116 @@ public class MpWeekRollAdjustEngine {
         int lockNextDay = contextDTO.getLockEndDay() + 1;
         //1、排序：在机SKU上机日期早的优先增量排产
         mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
+        Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap = convertToMapByMaterial(mpProdFinalList);
+
         Map<String, MpAdjustStructureIn> mpAdjustStructInMap = onIncrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
                  Collectors.collectingAndThen(Collectors.toList(),m-> {
                      return m.get(0);
                  })));
 
-        MpAdjustStructureIn adjustStructInVo;
-        Integer newOnLineDay,newPlanQty,newEndDay;
+        Integer newOnLineDay;
 
-        //2、先排实单->自带的搭配
+        Iterator<FactoryMonthPlanFinalAdjustVo> reLocateProdFinalIter;
+        FactoryMonthPlanFinalAdjustVo reLocateFinalVo;
         int iOrder = 0;
-        for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList) {
-            adjustStructInVo = mpAdjustStructInMap.get(mpFinalVo.getMaterialCode());
-            if (adjustStructInVo == null) {
-                // 非在机SKU，继续
-                continue;
-            }
-            mpFinalVo.setOriTotalQty(mpFinalVo.getTotalQty());
-            mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
-
-            iOrder += 1;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
-            if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo,lockNextDay -1)){
-                // 开始日 < 锁定日 且 锁定前日没有值,继续
-                contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,开始日小于锁定日且锁定日之前没有值,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-                continue;
-            }
-            //2.1、敲定在机SKU新的上机日期
-            newOnLineDay = getNewOnLineDay(contextDTO, lockNextDay, mpFinalVo);
+        //reLocateProdFinalList,用于重新定位
+        List<FactoryMonthPlanFinalAdjustVo> reLocateProdFinalList = mpProdFinalList.stream().sorted(Comparator.comparing(FactoryMonthPlanFinalAdjustVo::getBeginDay,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+        for (int i=lockNextDay; i<contextDTO.getStructureDeadLine();i++) {
+            //2.1、敲定SKU新的上机日期
+            newOnLineDay = getNewOnLineDay(contextDTO, i, null);
             if (newOnLineDay == null){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-                continue;
+                contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,没有获取到新的上机日期,退出！",contextDTO.getStructureName())).append(ApsConstant.DIVISION);
+                break;
             }
-            //2.2、检查SKU二次上机
-            if (!checkSecOnline(mpFinalVo,newOnLineDay, contextDTO.getParamMap())){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,新的上机日期:%s,不符二次上机条件,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
-                continue;
-            }
-            //2.3、计算新需要排产的计划量 = 实单量+自带的搭配量，其中，实单量：待调整量 + 锁定日之后的每日实单排产量
-            newPlanQty = getNewPlanQty(contextDTO,adjustStructInVo,mpFinalVo,lockNextDay);
-            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,排序:%s,物料编码:%s,新的上机日期:%s,新的排产量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
-            //2.4、清空定稿表日计划量
-            clearMpFinalDayValue(contextDTO,lockNextDay, mpFinalVo);
 
-            //2.5、增模排产
-            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,排序:%s,物料编码:%s,开始！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-            int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
-            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,排序:%s,物料编码:%s,结束！还有剩余排产计划量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
-            if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
-                // 若剩余量 > 搭配量，说明实单还有剩余
-                // 实单剩余  = 剩余量 - 搭配量
-                //remainPlanQty -= mpFinalVo.getConventionProductionQty();
-                // 去掉搭配量，将实单量排产
-                remainPlanQty = newPlanQty - mpFinalVo.getConventionProductionQty();
-                // 本身搭配被挤掉，置0
-                mpFinalVo.setConventionProductionQty(0);
-                // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
-                newEndDay = newOnLineDay == lockNextDay ? lockNextDay:newOnLineDay-1;
-                contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-开始！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-                deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,remainPlanQty,mpFinalVo,mpProdFinalList);
-                contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-结束！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-            }else {
-
-                if (mpFinalVo.getConventionProductionQty() >= remainPlanQty){
-                    mpFinalVo.setConventionProductionQty(remainPlanQty);
+            reLocateProdFinalIter = reLocateProdFinalList.iterator();
+            while (reLocateProdFinalIter.hasNext()){
+                //2、先排实单->自带的搭配
+                reLocateFinalVo = reLocateProdFinalIter.next();
+                if (doOnlineOneAdjust(contextDTO, mpProdFinalList, lockNextDay, mpAdjustStructInMap.get(reLocateFinalVo.getMaterialCode()),
+                        mpProdFinalMap.get(reLocateFinalVo.getMaterialCode()),newOnLineDay)){
+                    reLocateProdFinalIter.remove();
                 }
             }
-            //2.5、重置一下搭配排产量标识
-            if (mpFinalVo.getConventionProductionQty()>0){
-                splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
+        }
+
+    }
+
+    private boolean doOnlineOneAdjust(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
+                                  MpAdjustStructureIn adjustStructInVo,FactoryMonthPlanFinalAdjustVo mpFinalVo,int newOnLineDay) {
+        if (adjustStructInVo == null) {
+            // 非在机SKU，继续
+            return true;
+        }
+        if (mpFinalVo == null){
+            return true;
+        }
+        mpFinalVo.setOriTotalQty(mpFinalVo.getTotalQty());
+        mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
+
+        contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,原开始日:%s", contextDTO.getStructureName(), mpFinalVo.getMaterialCode(),newOnLineDay,mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
+        if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo, lockNextDay -1)){
+            // 开始日 < 锁定日 且 锁定前日没有值,则退出
+            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,开始日小于锁定日且锁定日之前没有值,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
+            return false;
+        }
+        if (newOnLineDay > mpFinalVo.getBeginDay()){
+            // 新的上机日比原开始日大，则退出
+            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,比原开始日大,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
+            return false;
+        }
+        //2.2、检查SKU二次上机
+        if (!checkSecOnline(mpFinalVo,newOnLineDay, contextDTO.getParamMap())){
+            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新的上机日期:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
+            return false;
+        }
+        //2.3、计算新需要排产的计划量 = 实单量+自带的搭配量，其中，实单量：待调整量 + 锁定日之后的每日实单排产量
+        Integer newPlanQty = getNewPlanQty(contextDTO,adjustStructInVo,mpFinalVo, lockNextDay);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新的上机日期:%s,新的排产量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
+        //2.4、清空定稿表日计划量
+        clearMpFinalDayValue(contextDTO, lockNextDay, mpFinalVo);
+
+        //2.5、增模排产
+        contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,开始！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+        int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
+        if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
+            // 若剩余量 > 搭配量，说明实单还有剩余
+            // 实单剩余  = 剩余量 - 搭配量
+            //remainPlanQty -= mpFinalVo.getConventionProductionQty();
+            // 去掉搭配量，将实单量排产
+            remainPlanQty = newPlanQty - mpFinalVo.getConventionProductionQty();
+            // 本身搭配被挤掉，置0
+            mpFinalVo.setConventionProductionQty(0);
+            // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
+            Integer newEndDay = newOnLineDay == lockNextDay ? lockNextDay :newOnLineDay-1;
+            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-开始！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+            deductMatchOtherSku(contextDTO, lockNextDay,newEndDay,remainPlanQty,mpFinalVo, mpProdFinalList);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-结束！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+        }else {
+            if (mpFinalVo.getConventionProductionQty() >= remainPlanQty){
+                mpFinalVo.setConventionProductionQty(remainPlanQty);
             }
         }
+        //2.5、重置一下搭配排产量标识
+        if (mpFinalVo.getConventionProductionQty()>0){
+            splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
+        }
+
+        return true;
+    }
+
+    /**
+     * List转换Map,按物料
+     * @param voList
+     * @return
+     */
+    private Map<String, FactoryMonthPlanFinalAdjustVo> convertToMapByMaterial(List<FactoryMonthPlanFinalAdjustVo> voList) {
+        Map<String, FactoryMonthPlanFinalAdjustVo> result = new HashMap<>();
+        for (FactoryMonthPlanFinalAdjustVo vo : voList) {
+            result.put(vo.getMaterialCode(),vo);
+        }
+        return result;
     }
 
     /**

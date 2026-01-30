@@ -411,7 +411,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * List转换Map
+     * List转换Map,按结构
      * @param voList
      * @return
      */
