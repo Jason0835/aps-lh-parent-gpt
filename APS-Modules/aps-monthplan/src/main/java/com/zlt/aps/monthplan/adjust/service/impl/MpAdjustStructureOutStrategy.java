@@ -213,7 +213,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         }
 
         //4.按结构序列化分组
-        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
+        //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Date startTime,endTime;
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         //结构内，按结构分别调整
@@ -237,7 +238,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //保存调整日志
         saveMpAdjustLog(contextDTO);
 
-        contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
+        //contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
     }
 
     @Override
