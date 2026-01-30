@@ -169,7 +169,6 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             }
             serviceCheckParams.put("moldingMachineMap", mdmMoldingMachineMap);
         }
-        // 因为固定SKU可能会填写物料描述，查询物料信息，转成对应SKU，找不到对应的SKU则保持原有数据不变
         if (CollectionUtils.isNotEmpty(materialDescList)) {
             LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
             wrapper.in(MdmMaterialInfo::getMaterialDesc, materialDescList);
