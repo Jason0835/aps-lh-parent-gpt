@@ -418,9 +418,12 @@ public class PrecedentStockUpService {
    * @return 排产量
    */
   private BigDecimal calculateProductionQty(
-      long monthlyAverageSale,
+      Integer monthlyAverageSale,
       BigDecimal turnOverDays,
       long stockWithoutOrder) {
+    if(null == turnOverDays || null == monthlyAverageSale) {
+      return BigDecimal.ZERO;
+    }
     // 排产量 = (周转天数/30) * 月均销量 - 无订单库存
     return turnOverDays.divide(BigDecimal.valueOf(DAYS_PER_MONTH),0,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(monthlyAverageSale))
         .subtract(BigDecimal.valueOf(stockWithoutOrder));
@@ -478,6 +481,9 @@ public class PrecedentStockUpService {
    */
   private BigDecimal calculateStockLimit(MpMonthlySaleQty monthlySaleQty, PrecedentStockUpContext context) {
     BigDecimal turnoverDays = context.turnOverDays;
+    if(null == turnoverDays || null == monthlySaleQty.getAverageSaleQty()) {
+      return BigDecimal.ZERO;
+    }
     return turnoverDays.multiply(BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
         .divide(BigDecimal.valueOf(DAYS_PER_MONTH), 0, RoundingMode.HALF_UP);
   }

@@ -113,7 +113,7 @@ public class DayCapacityLimitHelper implements Serializable {
         }
         Integer dayMaxCapacity = paramConfiguration.getDayMaxCapacity();
         if (null != dayMaxCapacity) {
-            Integer realDayMaxCapacity = BigDecimal.valueOf(dayMaxCapacity).multiply(BigDecimal.valueOf(ProductionConstant.PERCENTAGE)).divide(BigDecimal.valueOf(ratio), 0, RoundingMode.UP).intValue();
+            Integer realDayMaxCapacity = BigDecimal.valueOf(dayMaxCapacity).multiply(BigDecimal.valueOf(ratio)).divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), 0, RoundingMode.UP).intValue();
             initLimit.maxCapacity = realDayMaxCapacity;
             initLimit.maxAllocationCapacity = dayMaxCapacity;
         }
