@@ -669,8 +669,7 @@ public class PrecedentStockUpService {
     if(null == materialInfo){
       throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notFound.materialInfo"));
     }
-    MpMonthlySaleQty monthlySaleQty = monthlySaleQtyService.getMpMonthlySaleQtyByMaterialCode(supplyOrderPool);
-    if(null == monthlySaleQty) {
+    if(StringUtils.isBlank(materialInfo.getStructureName())) {
       return;
     }
     List<MdmCycleSchStruConf>  monCycleSchStruConfs =   mdmCycleSchStruConfService.findCycleSchStruConf(supplyOrderPool.getFactoryCode());
@@ -681,10 +680,7 @@ public class PrecedentStockUpService {
     if(CollectionUtils.isEmpty(structureNames)) {
       return;
     }
-    if(StringUtils.isBlank(materialInfo.getStructureName())) {
-      return;
-    }
-    if(!structureNames.contains(materialInfo.getStructureName())) {
+    if(structureNames.contains(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createPrecedentStockUp.notExist.precedentStockUpMaterial"));
     }
   }
