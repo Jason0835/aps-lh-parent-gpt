@@ -9,7 +9,6 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common4ui.constant.UserConstants;
-import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -20,9 +19,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -44,7 +41,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -82,7 +78,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     /**
      * 根据条件查询主表数据
      */
-//    @RequiresPermissions("monthplan:mpStructureAllocation:list")
+    @RequiresPermissions("monthplan:mpStructureAllocation:list")
     @ResponseBody
     @PostMapping("/list")
     @ApiOperation("根据条件查询结构排产信息")
@@ -255,7 +251,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     }
 
 
-//    @RequiresPermissions("monthplan:mpStructureAllocation:export")
+    @RequiresPermissions("monthplan:mpStructureAllocation:export")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
