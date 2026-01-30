@@ -293,6 +293,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
      */
     private BigDecimal calculateStockLimit(MpMonthlySaleQty monthlySaleQty) {
         BigDecimal turnoverDays = getTurnOverDays();
+        if(null == turnoverDays || null == monthlySaleQty || null == monthlySaleQty.getAverageSaleQty()) {
+            return BigDecimal.ZERO;
+        }
         return turnoverDays.multiply(BigDecimal.valueOf(monthlySaleQty.getAverageSaleQty()))
             .divide(BigDecimal.valueOf(DAYS_PER_MONTH), 0, RoundingMode.HALF_UP);
     }
