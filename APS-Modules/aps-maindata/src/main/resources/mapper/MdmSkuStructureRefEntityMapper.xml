@@ -13,7 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         IS_DELETE = 0 AND STRUCTURE_NAME IS NOT NULL
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
-        <if test="mesMaterialCode != null and mesMaterialCode != ''">AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
+        <if test="mainMaterialDesc != null and mainMaterialDesc != ''">AND MAIN_MATERIAL_DESC = #{mainMaterialDesc}</if>
         <if test="structureName != null and structureName != ''">AND STRUCTURE_NAME like
             concat(concat('%',#{structureName}), '%')
         </if>
@@ -30,10 +30,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="updateStructureToMaterial">
         UPDATE T_MDM_MATERIAL_INFO t1
+            JOIN T_MDM_SKU_CONSTRUCTION_REF t3
+        ON t1.MATERIAL_CODE = t3.MATERIAL_CODE
             JOIN T_MDM_SKU_STRUCTURE_REF t2
-        ON t1.FACTORY_CODE = t2.FACTORY_CODE AND t1.MATERIAL_CODE = t2.MATERIAL_CODE AND t2.IS_DELETE = 0
-            SET t1.STRUCTURE_NAME = t2.STRUCTURE_NAME, t1.UPDATE_BY = #{updateBy}, t1.UPDATE_TIME = #{updateTime}
+            ON t2.MAIN_MATERIAL_DESC = t3.MAIN_MATERIAL_DESC
+            SET t1.STRUCTURE_NAME = t2.STRUCTURE_NAME,
+                t1.UPDATE_BY = #{updateBy},
+                t1.UPDATE_TIME = #{updateTime}
         WHERE t1.IS_DELETE = 0
+          AND t2.IS_DELETE = 0
+          AND t3.IS_DELETE = 0
     </update>
 
 

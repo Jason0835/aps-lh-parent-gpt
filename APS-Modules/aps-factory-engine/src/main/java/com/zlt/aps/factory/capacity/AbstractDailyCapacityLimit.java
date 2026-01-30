@@ -452,7 +452,7 @@ public abstract class AbstractDailyCapacityLimit {
      * [2]--换活字块机台数X条(32)
      * @param mpFinalVo
      */
-    private int[] getAddMouldMachines(BaseEntity mpFinalVo,Map<String,Object> paramMap,String dayField,String day2Field) {
+    public int[] getAddMouldMachines(BaseEntity mpFinalVo,Map<String,Object> paramMap,String dayField,String day2Field) {
         //增模台数：有余数(日计划量/日单台硫化量)，记1台
         // 日计划量
         Integer dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
@@ -496,6 +496,8 @@ public abstract class AbstractDailyCapacityLimit {
             int tmpQty = afterMachines * changeMouldFirstQty;
             if (remainQty < dailyLhQty && remainQty>=tmpQty){
                 resultArr[0] = afterMachines + dayPlanQty / dailyLhQty;
+                resultArr[1] = 0;
+                resultArr[2] = 0;
             }
         }
        return resultArr;
@@ -509,7 +511,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @param day2Field 次日计划量字段
      * @return
      */
-    private boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field,String day2Field){
+    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field,String day2Field){
         if (mpFinalVo.getFieldValueByFieldName(dayField) == null){
             return false;
         }

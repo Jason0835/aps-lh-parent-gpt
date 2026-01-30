@@ -103,9 +103,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Override
     public List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO) {
         List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
-        if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+       /* if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
             mpFinalAdjustList = mpFinalAdjustList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
-        }
+        }*/
         return mpFinalAdjustList;
     }
 
@@ -125,6 +125,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
+        paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
