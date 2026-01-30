@@ -443,8 +443,10 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 monthlySaleQty.setSaleArea(area);
 
                 // 月均销量
-                BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
-                monthlySaleQty.setAverageSaleQty(result.intValue());
+                if (CollectionUtils.isNotEmpty(yearMonthCount)) {
+                    BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
+                    monthlySaleQty.setAverageSaleQty(result.intValue());
+                }
 
                 // 滚动月销量
                 if (rollMonthSaleQtyMap.containsKey(materialCode)) {
