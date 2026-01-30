@@ -1982,7 +1982,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected Map<String, Object> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(), new Date(), contextDTO.getMonthPlanVersion());
+                contextDTO.getFactoryCode(), new Date(), null);
     }
 
     /**
@@ -2006,8 +2006,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         log.info("计算型腔、活块可用量最大值完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
 
         if (PubUtil.isEmpty(moldCavityInsertMap)) {
-            log.warn("计算型腔、活块可用量最大值 ==> 根据工厂:[{}] 年月:[{}] 型腔、活块可用量最大值列表为空，返回", contextDTO.getFactoryCode(),
-                    contextDTO.getYearMonth());
+            log.warn("计算型腔、活块可用量最大值 ==> 根据工厂:[{}] 年月:[{}] 需求计划版本:[{}] 型腔、活块可用量最大值列表为空，返回", contextDTO.getFactoryCode(),
+                    contextDTO.getYearMonth(), contextDTO.getMonthPlanVersion());
             return;
         }
         // 调整明细列表

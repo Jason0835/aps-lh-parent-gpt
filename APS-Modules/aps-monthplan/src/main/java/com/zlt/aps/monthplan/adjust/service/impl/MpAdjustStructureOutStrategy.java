@@ -70,10 +70,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setAdjustDetailList(resultList);
         // 6、设置是否特殊材料
         setHasSpecialMaterial(contextDTO);
-        // 7、设置型腔、活块数量
-        setMoldCavityInsert(contextDTO);
-        // 8、设置净需求
+        // 7、设置净需求
         setCurrentNetQty(contextDTO);
+        // 8、设置型腔、活块数量
+        setMoldCavityInsert(contextDTO);
         // 9、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
         // 10、筛选：|净需求 - 计划已排产量| > 0的数据
