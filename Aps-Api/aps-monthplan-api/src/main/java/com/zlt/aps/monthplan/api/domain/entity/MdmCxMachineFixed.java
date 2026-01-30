@@ -128,21 +128,21 @@ public class MdmCxMachineFixed extends BaseEntity {
 
     public List<String> getSplitFixedMaterialCode() {
         String fixedMaterialCode = StringUtils.defaultIfBlank(this.fixedMaterialCode, "");
-        return Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        return Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
     public List<String> getSplitDisableFixedMaterialCode() {
         String disableMaterialCode = StringUtils.defaultIfBlank(this.disableMaterialCode, "");
-        return Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        return Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
     public List<String> getSplitFixedMaterialDesc() {
         String fixedMaterialDesc = StringUtils.defaultIfBlank(this.fixedMaterialDesc, "");
-        return Arrays.stream(fixedMaterialDesc.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        return Arrays.stream(fixedMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
     public List<String> getSplitDisableFixedMaterialDesc() {
         String disableMaterialDesc = StringUtils.defaultIfBlank(this.disableMaterialDesc, "");
-        return Arrays.stream(disableMaterialDesc.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        return Arrays.stream(disableMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 }
