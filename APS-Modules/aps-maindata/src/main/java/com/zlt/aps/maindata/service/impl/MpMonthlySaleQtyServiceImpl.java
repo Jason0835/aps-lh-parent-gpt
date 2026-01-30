@@ -465,6 +465,8 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 if (CollectionUtils.isNotEmpty(yearMonthCount)) {
                     BigDecimal result = BigDecimal.valueOf(totalSaleQty).divide(BigDecimal.valueOf(yearMonthCount.size()), 0, RoundingMode.UP);
                     monthlySaleQty.setAverageSaleQty(result.intValue());
+                } else {
+                    monthlySaleQty.setAverageSaleQty(0);
                 }
 
                 // 滚动月销量

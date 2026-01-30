@@ -8,6 +8,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
+import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
@@ -20,6 +21,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -39,14 +41,17 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MoldCavityInsertMaxValueCalculatorImpl {
 
-    @Resource
+    @Autowired
     private FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
 
-    @Resource
+    @Autowired
     private IFactoryParamService factoryParamService;
 
-    @Resource
+    @Autowired
     private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+
+    @Autowired
+    private  MonthPlanRequireMapper monthPlanRequireMapper;
 
     /**
      * 数据提供接口
@@ -82,14 +87,15 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                 createProductionMouldInfo(year, month, factoryCode, mouldRelationMap);
 
         // 3. 获取净需求计划，补充SKU模具关系的结构
-        Context context = new Context();
-        context.setFactoryCode(factoryCode);
-        context.setMonth(month);
-        context.setYear(year);
+        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode);
+        queryWrapper.eq("YEAR", year);
+        queryWrapper.eq("MONTH", month);
         if (StringUtils.isNotBlank(monthPlanVersion)) {
-            context.setMonthPlanVersion(monthPlanVersion);
+            queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         }
-        List<DpDemandPlan> demandPlanList = dataService.getFactoryMonthPlan(context);
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        List<DpDemandPlan> demandPlanList = monthPlanRequireMapper.selectList(queryWrapper);
 
         // 构建物料描述到结构名的映射
         Map<String, String> materialToStructureMap = new HashMap<>();
