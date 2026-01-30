@@ -100,11 +100,12 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
 
         //4.按结构序列化分组
-        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
+        //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Date startTime,endTime;
         List<MpStructureAllocation> structureAllocationList;
-        List<FactoryMonthPlanFinalAdjustVo> newFinalList = new ArrayList<>();
+        //List<FactoryMonthPlanFinalAdjustVo> newFinalList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //4.1 初始结构上下文
@@ -124,13 +125,26 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             weekRollAdjustEngine.structureInAdjustForOne(contextDTO,entry.getValue(), mpProdFinalMap.get(entry.getKey()));
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
-            if (PubUtil.isNotEmpty(mpProdFinalMap.get(entry.getKey()))) {
+            /*if (PubUtil.isNotEmpty(mpProdFinalMap.get(entry.getKey()))) {
                 newFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
-            }
+            }*/
             //4.3 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
-        contextDTO.setFactoryMonthPlanProdFinalList(newFinalList);
+        //contextDTO.setFactoryMonthPlanProdFinalList(newFinalList);
+    }
+
+    /**
+     * List转换Map
+     * @param voList
+     * @return
+     */
+    private Map<String, List<FactoryMonthPlanFinalAdjustVo>> convertToMap(List<FactoryMonthPlanFinalAdjustVo> voList) {
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> result = new HashMap<>();
+        for (FactoryMonthPlanFinalAdjustVo vo : voList) {
+            result.computeIfAbsent(vo.getStructureName(), k -> new ArrayList<>()).add(vo);
+        }
+        return result;
     }
 
     /**

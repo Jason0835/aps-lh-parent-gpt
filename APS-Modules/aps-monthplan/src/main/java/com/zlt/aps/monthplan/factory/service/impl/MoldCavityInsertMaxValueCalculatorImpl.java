@@ -500,10 +500,12 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         List<MoldCavityInsertMaxValueCalculatorVo> mouldDeliveryList =
                 factoryMonthPlanProductMouldMapper.getEnableMouldDeliveryInfoByNetDemand(factoryCode, year, month, monthPlanVersion, productionStartDate, productionEndDate);
 
-        // 按照工厂+型腔模号分组汇总
+        // 修复：将不可修改的keySet转换为可修改的HashSet
         mouldCodeSet = allMouldRelationInfoList.stream()
                 .collect(Collectors.groupingBy(item -> item.getMouldCode() + item.getFactoryCode()))
-                .keySet();
+                .keySet()
+                .stream()  // 添加这行：将Set转换为Stream
+                .collect(Collectors.toCollection(HashSet::new));  // 再收集到HashSet中
 
         for (MoldCavityInsertMaxValueCalculatorVo mouldInfo : mouldDeliveryList) {
             // 如果不存在，则添加
