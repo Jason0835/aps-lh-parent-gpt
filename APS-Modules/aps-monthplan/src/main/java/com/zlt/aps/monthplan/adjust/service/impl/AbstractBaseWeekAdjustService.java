@@ -664,7 +664,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (totalPlanQty > 0 && !ApsConstant.TRUE.equals(adjustDetailVo.getIsSkuAdd())) {
                 List<FactoryMonthPlanFinalAdjustVo> monthPLanList = monthPlanMap.getOrDefault(materialCode, new ArrayList<>());
                 Integer totalQty = monthPLanList.stream().mapToInt(v -> {
-                    return  v.getTotalQty() == null ? 0:v.getTotalQty();
+                    return v.getTotalQty() == null ? 0: v.getTotalQty();
                 }).sum();
                 actualAdjustQty = totalPlanQty - totalQty;
             }
