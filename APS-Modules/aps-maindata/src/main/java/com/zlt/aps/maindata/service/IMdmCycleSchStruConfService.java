@@ -36,7 +36,7 @@ public interface IMdmCycleSchStruConfService extends IDocService<MdmCycleSchStru
      *  查询当前周期性排产结构配置
      * @return 周期性排产结构配置
      */
-    List<MdmCycleSchStruConf> findCycleSchStruConf();
+    List<MdmCycleSchStruConf> findCycleSchStruConf(String factoryCode);
 
     /**
      * 异步导入

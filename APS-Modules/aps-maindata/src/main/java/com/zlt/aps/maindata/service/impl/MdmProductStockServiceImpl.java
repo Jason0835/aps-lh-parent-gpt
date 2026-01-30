@@ -77,8 +77,9 @@ public class MdmProductStockServiceImpl extends AbstractDocService<MdmProductSto
     }
 
     @Override
-    public List<MdmProductStock> findCurrentFinishStock() {
+    public List<MdmProductStock> findCurrentFinishStock(String factoryCode) {
         LambdaQueryWrapper<MdmProductStock> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmProductStock::getFactoryCode, factoryCode);
         wrapper.eq(MdmProductStock::getIsDelete, YesOrNoEnum.NO.getValue());
         return this.mdmProductStockEntityMapper.selectList(wrapper);
     }

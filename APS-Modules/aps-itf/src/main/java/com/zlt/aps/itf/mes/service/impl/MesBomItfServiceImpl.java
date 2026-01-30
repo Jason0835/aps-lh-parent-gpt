@@ -3,8 +3,10 @@ package com.zlt.aps.itf.mes.service.impl;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesBomItfMapper;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
@@ -15,14 +17,23 @@ import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.core.dao.basedao.BaseDao;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -164,6 +175,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	@Override
 	public AjaxResult syncBomInfo(AuxReqSyncDataLogs syncDataLogs) {
 		List<MdmBomInfo> syncList = mesBomItfMapper.selectMesBomInfo(syncDataLogs);
+//	    MdmBomInfo mdm = new MdmBomInfo();mdm.setId(-1L);
+//	    List<MdmBomInfo> syncList = Collections.singletonList(mdm);
 		if (CollectionUtils.isNotEmpty(syncList)) {
 			LambdaQueryWrapper<MdmBomInfo> queryWrapper = new LambdaQueryWrapper<>();
 			queryWrapper.eq(MdmBomInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
@@ -183,10 +196,18 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 						}
 					});
 				}
+				
 				List<List<MdmBomInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
 				for (List<MdmBomInfo> saveList : splitList) { // 分批保存，防止长度超出限制
 					baseDao.saveBatch(saveList);
 				}
+				
+                // 构建胎胚原料消耗量
+                List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList);
+                List<List<MdmMaterialConsumeDetail>> splitDetailList = ScmListUtils.getSplitList(detaiList, 1000);
+                for (List<MdmMaterialConsumeDetail> saveList : splitDetailList) { // 分批保存，防止长度超出限制
+                    baseDao.saveBatch(saveList);
+                }
 			} finally {
 				DynamicDataSourceContextHolder.clear();
 				/** 切换APS数据源 end **/
@@ -194,6 +215,82 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 		}
 		return AjaxResult.success();
 	}
+
+    /**
+     * 构建胎胚原料消耗量
+     * 
+     * @param mesDateList    接口同步的bom数据
+     * @param apsDataList aps库现有的bom数据
+     * @return
+     */
+    private List<MdmMaterialConsumeDetail> buildConsumeDetailLIst(List<MdmBomInfo> mesDateList,
+                                                                  List<MdmBomInfo> apsDataList) {
+        // 1、合并MES和aps的bom记录
+        Set<Long> updateIdSet = mesDateList.stream().map(MdmBomInfo::getId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<MdmBomInfo> bomList = apsDataList.stream().filter(bom -> !updateIdSet.contains(bom.getId()))
+                .collect(Collectors.toList());
+        bomList.addAll(mesDateList);
+
+        // 2、bom版本去重，仅留下版本号最高的
+        Map<String, MdmBomInfo> childMap = bomList.stream()
+                .filter(bom -> StringUtils.isNotEmpty(bom.getChildMaterialCode()))
+                .collect(Collectors.toMap(MdmBomInfo::getChildMaterialCode, Function.identity(), (b1, b2) -> {
+                    String version1 = Optional.of(b1.getChildMaterialVersion()).orElse("");
+                    String version2 = Optional.of(b2.getChildMaterialVersion()).orElse("");
+                    return version1.compareTo(version2) >= 0 ? b1 : b2; // 比较版本号，保留版本号较大的
+                }));
+
+        // 3、根据父节汇总
+        Map<String, List<MdmBomInfo>> parentMap = childMap.values().stream()
+                .filter(bom -> StringUtils.isNotEmpty(bom.getParentMaterialCode()))
+                .collect(Collectors.groupingBy(MdmBomInfo::getParentMaterialCode));
+        // 4、构建bom树
+        childMap.values().forEach(bom -> {
+            List<MdmBomInfo> children = parentMap.get(bom.getChildMaterialCode());
+            boolean isLeaf = CollectionUtils.isEmpty(children); // 如果没有子节点，判定为叶子节点
+            bom.setIsLeaf(isLeaf);
+            if (!isLeaf) { // 非叶子节点，关联父子节点的关系
+                bom.setChildren(children);
+                children.forEach(child -> child.setParent(bom));
+            }
+        });
+        // 5、构建物料消耗清单
+        List<MdmMaterialConsumeDetail> detaiList = new ArrayList<>();
+        childMap.values().stream().filter(bom -> bom.getIsLeaf()).forEach(bom -> {
+            // 5.1、构建bom树路径，从叶子节点开始向上
+            LinkedList<MdmBomInfo> pathList = new LinkedList<>();
+            MdmBomInfo currentNode = bom; // 当前节点
+            do {
+                if (currentNode == null || pathList.contains(currentNode)) { // 编号为空或者死循环了，结束
+                    break;
+                }
+                pathList.addLast(currentNode); // 倒序添加节点
+                currentNode = currentNode.getParent(); // 切换成父节点
+            } while (true);
+
+            // 5.2、判断如果路径上有任意一个节点是本次更新的bom，则需要新生成一笔消耗明细，
+            if (pathList.stream().anyMatch(b -> updateIdSet.contains(b.getId()))) {
+                // 5.2.1、初始化消耗量
+                MdmMaterialConsumeDetail consumeDetail = new MdmMaterialConsumeDetail();
+                consumeDetail.setChildMaterialCode(bom.getChildMaterialCode());
+                consumeDetail.setChildMaterialName(bom.getChildMaterialName());
+                consumeDetail.setChildMaterialVersion(bom.getChildMaterialVersion());
+                consumeDetail.setUnit(bom.getUnit());
+                // 5.2.2、取胎胚，必然是路径的最后一个元素
+                MdmBomInfo embryoBom = pathList.getLast();
+                consumeDetail.setEmbryoCode(embryoBom.getChildMaterialCode());
+                consumeDetail.setEmbryoVersion(embryoBom.getChildMaterialVersion());
+                // 5.2.3、计算用量，用量为每一层bom的用量乘数
+                BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
+                        .reduce(BigDecimal.ZERO, BigDecimal::multiply);
+                consumeDetail.setDosage(dosage);
+                detaiList.add(consumeDetail);
+            }
+        });
+
+        return detaiList;
+    }
 
 	/**
 	 * 获取分组key（SKU与施工关系表）

@@ -2,6 +2,8 @@ package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
@@ -160,4 +162,21 @@ public class MdmBomInfo extends BaseEntity {
     @TableField(value = "MES_UPDATE_DATE")
     private Date mesUpdateDate;
 
+    /**
+     * 父节点（仅用于构建树，默认空值）
+     */
+    @TableField(exist = false)
+    private MdmBomInfo parent;
+    
+    /**
+     * 叶子节点标记（仅用于构建树，默认空值）
+     */
+    @TableField(exist = false)
+    private Boolean isLeaf;
+
+    /**
+     * 子节点（仅用于构建树，默认空值）
+     */
+    @TableField(exist = false)
+    private List<MdmBomInfo> children;
 }

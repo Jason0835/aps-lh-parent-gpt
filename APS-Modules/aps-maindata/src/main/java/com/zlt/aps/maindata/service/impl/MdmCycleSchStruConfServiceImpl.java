@@ -162,8 +162,9 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
     }
 
     @Override
-    public List<MdmCycleSchStruConf> findCycleSchStruConf() {
+    public List<MdmCycleSchStruConf> findCycleSchStruConf(String factoryCode) {
         LambdaQueryWrapper<MdmCycleSchStruConf> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(MdmCycleSchStruConf::getFactoryCode,factoryCode);
         wrapper.eq(MdmCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmCycleSchStruConfEntityMapper.selectList(wrapper);
     }

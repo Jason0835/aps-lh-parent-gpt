@@ -11,15 +11,15 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.maindata.service.IMpOverdueSkuService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -71,7 +71,7 @@ public class PrecedentStockUpService {
   // 注入的依赖服务
   private final SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
 
-  private final IMdmMonCycleSchStruConfService mdmMonCycleSchStruConfService;
+  private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
   // 物料信息
   private final IMdmMaterialInfoService materialInfoService;
   // 月均销量
@@ -142,8 +142,8 @@ public class PrecedentStockUpService {
       CompletableFuture<Integer> monthSaleQtyMonthsFuture =
           executeAsync(this::getMonthSaleQtyMonths,
               "查询近12个月的月均销量大于零的月份数");
-      CompletableFuture<List<MdmMonCycleSchStruConf>> cycleSchStruConfFuture =
-          executeAsync(() -> mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(supplyOrderPool),
+      CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
+          executeAsync(() -> mdmCycleSchStruConfService.findCycleSchStruConf(supplyOrderPool.getFactoryCode()),
               "月周期结构配置");
       // 合并所有结果
       return CompletableFuture.allOf(
@@ -153,7 +153,7 @@ public class PrecedentStockUpService {
             try {
               List<MdmMaterialInfo> materialInfos = materialsFuture.get();
               Integer monthSaleQtyMonths = monthSaleQtyMonthsFuture.get();
-              List<MdmMonCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
+              List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
               return PrecedentStockUpContext.builder()
                   .materialInfos(materialInfos)
                   .cycleSchStruConfs(cycleSchStruConfs)
@@ -182,12 +182,12 @@ public class PrecedentStockUpService {
         ));
   }
 
-  private Set<String> extractStructureNames(List<MdmMonCycleSchStruConf> cycleSchStruConfs) {
+  private Set<String> extractStructureNames(List<MdmCycleSchStruConf> cycleSchStruConfs) {
     if (CollectionUtils.isEmpty(cycleSchStruConfs)) {
       return Collections.emptySet();
     }
     return cycleSchStruConfs.stream()
-        .map(MdmMonCycleSchStruConf::getStructureName)
+        .map(MdmCycleSchStruConf::getStructureName)
         .collect(Collectors.toSet());
   }
 
@@ -683,7 +683,7 @@ public class PrecedentStockUpService {
   @Builder
   private static  class PrecedentStockUpContext {
     private List<MdmMaterialInfo> materialInfos;
-    private List<MdmMonCycleSchStruConf> cycleSchStruConfs;
+    private List<MdmCycleSchStruConf> cycleSchStruConfs;
     private Set<String> structureNames;
     private Map<String, MdmMaterialInfo> materialCodeToInfoMap;
     private BigDecimal turnOverDays;

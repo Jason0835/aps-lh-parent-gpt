@@ -16,7 +16,6 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
-import com.zlt.aps.maindata.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.PredictionContext;
@@ -31,6 +30,7 @@ import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,8 +64,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
-    // 物料信息
-    private final IMdmMaterialInfoService materialInfoService;
     // 需求计划
     private final IDpDemandPlanService dpDemandPlanService;
     // 预测明细
@@ -122,7 +120,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         // T+1月需求生成：T月需求-T月已排+T+1（周期+常规）
         // 对冲规则：供应链优先级+提报日期逐笔扣除(先冲实单)
         DpDemandPlan param = new DpDemandPlan();
-        param.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        param.setFactoryCode(StringUtils.isNotBlank(createCondition.getFactoryCode())?createCondition.getFactoryCode():FactoryConstant.DEFAULT_FACTORY_CODE);
         param.setPlanType(ProductionPlanType.PREDICTION.getPlanType());
         param.setPrefix(PREFIX);
         List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
@@ -151,8 +149,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 }
             }
         }
-        Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfo();
-        List<MpProductionPrediction> list = buildProductionPrediction(monthRangeResult,productionVersions,tMonthDemands,materialInfoMap);
+        List<MpProductionPrediction> list = buildProductionPrediction(monthRangeResult,productionVersions,tMonthDemands,predictionContext.getMaterialInfoMap());
         if(!CollectionUtils.isEmpty(list)) {
             this.baseDao.insertBatch(list);
         }
@@ -288,11 +285,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             return 0;
         }
         return listGroupByMaterialCode.stream().filter(item -> yearMonth.getYear() == item.getYear() && yearMonth.getMonthValue() == item.getMonth() && null != item.getTotalQty()).mapToInt(FactoryMonthPlanMouldDayResult::getTotalQty).sum();
-    }
-
-
-    private Map<String, MdmMaterialInfo> fetchMaterialInfo() {
-        return materialInfoService.skuToMaterialInfo(null);
     }
 
     /**
