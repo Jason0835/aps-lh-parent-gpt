@@ -26,7 +26,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -150,6 +152,40 @@ public class MpWeekRollAdjustEngine {
 
         //10.重置开始/结束日及计划量
         resetBegin2EndDay(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
+    }
+
+    /**
+     * 检查是否自动补量
+     * @param paramMap 参数Map
+     * @param iDay 检查天
+     * @param mpFinalVo 定稿Vo
+     * @return true--自动补；false--不自动补
+     */
+    private boolean checkAutoReplenishment(Map<String,Object> paramMap,Integer iDay,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        //1. 检查排产分类，是否主销或常规，退出
+        String productionType = (String)paramMap.get(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
+        if (StringUtil.isEmptyWithTrim(productionType)){
+            return false;
+        }
+        List<String> productionTypeList = Arrays.asList(productionType.split(","));
+        if (productionTypeList.indexOf(mpFinalVo.getProductionType())<0){
+            return false;
+        }
+        //2. 检查自动补量天数
+        Integer boostDay = (Integer) paramMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
+        if (boostDay == null){
+            return false;
+        }
+        // 起始日 = 月底最后1天 - 补量天数;
+        int startDay = getLastDayNumberOfMonth(LocalDate.now()) - boostDay;
+        return iDay > startDay;
+    }
+
+    /**
+     * 获取指定日期的月份最后一天号数
+     */
+    private int getLastDayNumberOfMonth(LocalDate date) {
+        return date.with(TemporalAdjusters.lastDayOfMonth()).getDayOfMonth();
     }
 
     /**
@@ -1216,8 +1252,13 @@ public class MpWeekRollAdjustEngine {
                     }
                 }
 
-                //若剩余计划量 < 日硫化量，则按剩余计划量累加
-                dayVulcanizationQty = newPlanQty < dayVulcanizationQty ? newPlanQty : dayVulcanizationQty;
+                //检查是否自动补量
+                boolean isAutoReplenishment = checkAutoReplenishment(contextDTO.getParamMap(),i,mpFinalVo);
+                contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,自动补量标识:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,isAutoReplenishment ? "是":"否")).append(ApsConstant.DIVISION);
+                if (!isAutoReplenishment){
+                    //若剩余计划量 < 日硫化量，则按剩余计划量累加
+                    dayVulcanizationQty = newPlanQty < dayVulcanizationQty ? newPlanQty : dayVulcanizationQty;
+                }
                 dayValue += dayVulcanizationQty;
                 mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
                 adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
@@ -1239,7 +1280,7 @@ public class MpWeekRollAdjustEngine {
                     return newPlanQty < 0 ? 0:newPlanQty;
                 }
                 newPlanQty -= dayVulcanizationQty;
-                if (newPlanQty <=0){
+                if (newPlanQty <=0 && !isAutoReplenishment){
                     return 0;
                 }
                 bFirstAddMould = false;
