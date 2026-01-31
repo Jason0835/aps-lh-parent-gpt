@@ -74,10 +74,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
+    private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
+
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
     private final InitNoProductionRecordService initNoProductionRecordService;
-    
+
     private final SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler;
 
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
@@ -85,6 +87,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                                           ProductionHistoryHandler productionHistoryHandler,
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
+                                          ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
                                           InitNoProductionRecordService initNoProductionRecordService,
                                           SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler) {
@@ -93,6 +96,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         this.productionHistoryHandler = productionHistoryHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
+        this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
         this.initNoProductionRecordService = initNoProductionRecordService;
         this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
@@ -164,7 +168,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         // 结构特殊材料排产
         cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
-        List<CxMachineAllocationPlanHelper> continueAllocationList = CxContinueGroupAllocationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
         // 7、详设:
         //      （5）特别场景：在排产时，我们的原则是续作优先，若共用模具情况下，续作高优先级的已没有，
@@ -611,7 +615,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         }
         ProductionCapacityParamConfiguration configuration = new ProductionCapacityParamConfiguration();
         //排产控制相关
-        configuration.setMinProductionDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode()));
+        Object minProductionDaysValue = paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
+        if (null == minProductionDaysValue) {
+            configuration.setMinProductionDays(BigDecimal.ZERO.intValue());
+        } else {
+            configuration.setMinProductionDays((Integer) minProductionDaysValue);
+        }
         configuration.setMinAllocationDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode()));
         configuration.setNoCycleProductionMinLhMachineNumber((Integer) paramConfigurationMap.get(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode()));
         String boostProductionTypeValue = (String) paramConfigurationMap.get(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());

@@ -1,6 +1,8 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.constant.StringConstant;
+import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.factory.domain.dto.EarliestConclusionLhGroupHelper;
@@ -16,6 +18,8 @@ import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.handler.SkuMouldSelector;
 import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
+import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -36,6 +40,65 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CxContinueProductionHandler {
 
+    /**
+     * 续作Sku使用续作模具排产
+     * 可能需要进行降膜排产
+     *
+     * @param context            排产上下文
+     * @param productionStage    排产阶段
+     * @param groupPlanInfo      分组计划信息对象
+     * @param continueSkuInfoMap 续作Sku信息
+     */
+    public static void productionContinueSku(TbrProductionContext context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
+        Set<Integer> stopDays = context.getStopDays();
+        Integer continueSkuDeadLineDays = groupPlanInfo.getContinueSkuDeadLineDay(context);
+        ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();
+        //续作Sku轮询排产
+        String groupName = groupPlanInfo.getGroupName();
+        continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc));
+            if (!cxContinueSkuInfo.hasProduction()) {
+                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionQtyLog(context, groupName, materialDesc));
+                return;
+            }
+            Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty();
+            //挑选的模具 本次使用最多模具数，不一定与续作模具数相等，但不会超
+            Integer theoryMaxMouldNumber = cxContinueSkuInfo.getMouldNumber();
+            List<ProductionMouldInfoVo> selectMouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, productionStage, materialDesc, theoryMaxMouldNumber);
+            if (CollectionUtils.isEmpty(selectMouldList)) {
+                return;
+            }
+            cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
+            //1、降膜排产
+            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
+            List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
+            //分配结果
+            if (CollectionUtils.isEmpty(resultList)) {
+                //记录日志
+                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionResultLog(context, groupName, materialDesc));
+                return;
+            }
+            String mouldInfo = selectMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
+            log.info(TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo));
+            //2、将排产结果，逐日分配到模具上，按排产日由小到大排序
+            resultList.sort(Comparator.comparing(DailyScheduleVo::getScheduleDate));
+            resultList.forEach(dailySchedule -> {
+                //使用的硫化机台数-即模具数
+                Integer lhMachineCount = dailySchedule.getSkuMachines();
+                Integer sumProductionQty = dailySchedule.getSkuQuantity();
+                Integer productionDay = dailySchedule.getScheduleDate();
+                //按双模放置
+                for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= lhMachineCount; lhGroupNo++) {
+                    Integer productionQty = Math.min(sumProductionQty, maxDayQty);
+                    Integer startIndex = (lhGroupNo - BigDecimal.ONE.intValue()) * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+                    Integer endIndex = lhGroupNo * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+                    List<ProductionMouldInfoVo> doubleMouldList = selectMouldList.subList(startIndex, endIndex);
+                    CxLhMouldProductionCalculator.continueSkuLhProductionHandler(context, groupPlanInfo, cxContinueSkuInfo, productionDay, productionQty, doubleMouldList);
+                    sumProductionQty = sumProductionQty - productionQty;
+                }
+            });
+        });
+    }
     /**
      * 排产续作排产
      * 1、同规格同花纹

@@ -240,7 +240,7 @@ public class ProductionPlanGroupInfo {
             //粗算所需成型机台数
             groupInfo.calculateNeedCxCapacityMachineCount(context, context.getMaxProductionDays());
         });
-        //4、todo 去掉：对分组计划中小于最小要求天数的分组设置为不可排产，达到最小要求天数，没有满足最低上机天数的，将天数上调到最低上机天数
+        //4、对分组计划中没有满足最低上机天数的，将天数上调到最低上机天数-由模拟排产阶段决定是否要提前收尾
         ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
         Integer minProductionDays = paramConfiguration.getMinProductionDays();
         Integer minAllocationDays = paramConfiguration.getMinAllocationDays();
