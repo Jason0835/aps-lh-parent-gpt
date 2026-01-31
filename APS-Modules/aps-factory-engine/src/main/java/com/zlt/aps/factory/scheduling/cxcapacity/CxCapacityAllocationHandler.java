@@ -11,6 +11,7 @@ import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.enums.GroupCxMachineSelectedTypeEnum;
 import com.zlt.aps.factory.handler.GroupPlanCxMachineSelector;
 import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
@@ -438,11 +439,15 @@ public class CxCapacityAllocationHandler {
         if (CollectionUtils.isEmpty(groupPlanList)) {
             return null;
         }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        String cxMachineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         //1、取固定的
         Integer minFixedPriority = groupPlanList.stream().mapToInt(ProductionPlanGroupInfo::getFixedPriority).min().getAsInt();
         List<ProductionPlanGroupInfo> fixedGroupPlanList = groupPlanList.stream().filter(groupPlan -> minFixedPriority.equals(groupPlan.getFixedPriority())).collect(Collectors.toList());
         if (fixedGroupPlanList.size() == BigDecimal.ONE.intValue()) {
-            return fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
+            ProductionPlanGroupInfo selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.FIXED_PRIORITY));
+            return selected;
         }
         CxMachineAllocationPlanHelper lastHelper = cxMachineInfo.getLastAllocationInfo();
         //取前规格排产计划-所有
@@ -453,7 +458,9 @@ public class CxCapacityAllocationHandler {
             sameSpecificationsList = fixedGroupPlanList;
         }
         if (sameSpecificationsList.size() == BigDecimal.ONE.intValue()) {
-            return sameSpecificationsList.get(BigDecimal.ZERO.intValue());
+            ProductionPlanGroupInfo selected = sameSpecificationsList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_SPECIFICATIONS_PRIORITY));
+            return selected;
         }
         //3、与前结构含有同英寸的优先
         List<ProductionPlanGroupInfo> sameProSizeList = sameSpecificationsList.stream().filter(sameSpecificationsPlan -> sameSpecificationsPlan.hasSameProSize(realProductionPlanList)).collect(Collectors.toList());
@@ -461,7 +468,9 @@ public class CxCapacityAllocationHandler {
             sameProSizeList = sameSpecificationsList;
         }
         if (sameProSizeList.size() == BigDecimal.ONE.intValue()) {
-            return sameProSizeList.get(BigDecimal.ZERO.intValue());
+            ProductionPlanGroupInfo selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_PRO_SIZE_PRIORITY));
+            return selected;
         }
         //4、断面宽差值±10 参数
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
@@ -470,7 +479,9 @@ public class CxCapacityAllocationHandler {
             sectionWidthList = sameProSizeList;
         }
         if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
-            return sameProSizeList.get(BigDecimal.ZERO.intValue());
+            ProductionPlanGroupInfo selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY));
+            return selected;
         }
         //5、设置该成型机近1个月的排产分组和排产次数
         sectionWidthList.forEach(groupPlan -> {
@@ -479,7 +490,9 @@ public class CxCapacityAllocationHandler {
             productionHistoryHandler.setCxMachineProductionGroupPlanHistory(context, groupPlan, cxMachineInfo);
         });
         sectionWidthList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
-        return sectionWidthList.get(BigDecimal.ZERO.intValue());
+        ProductionPlanGroupInfo selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+        log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.HISTORY_QUALITY_PRIORITY));
+        return selected;
     }
 
     /**
@@ -509,11 +522,41 @@ public class CxCapacityAllocationHandler {
         List<CxMachineBaseInfoVo> fixedPriorityList = selectedCapacityList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
         if (fixedPriorityList.size() == BigDecimal.ONE.intValue()) {
             CxMachineBaseInfoVo fixedSelected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
-            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineTypeCode()));
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineTypeCode(), GroupCxMachineSelectedTypeEnum.FIXED_PRIORITY));
             return fixedSelected;
         }
         //设置是否同规格，同英寸,断面宽
         setSameInfo(context, fixedPriorityList, addNewGroupPlan);
+        //同规格优先
+        List<CxMachineBaseInfoVo> sameSpecificationsList = fixedPriorityList.stream().filter(cxMachineInfo -> YesOrNoEnum.YES.getCode().equals(cxMachineInfo.getSameSpecifications())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(sameSpecificationsList)) {
+            sameSpecificationsList = fixedPriorityList;
+        }
+        if (sameSpecificationsList.size() == BigDecimal.ONE.intValue()) {
+            CxMachineBaseInfoVo selected = sameSpecificationsList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode(), GroupCxMachineSelectedTypeEnum.SAME_SPECIFICATIONS_PRIORITY));
+            return selected;
+        }
+        //同英寸优先
+        List<CxMachineBaseInfoVo> sameProSizeList = sameSpecificationsList.stream().filter(cxMachineInfo -> YesOrNoEnum.YES.getCode().equals(cxMachineInfo.getSameProSize())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(sameProSizeList)) {
+            sameProSizeList = sameSpecificationsList;
+        }
+        if (sameProSizeList.size() == BigDecimal.ONE.intValue()) {
+            CxMachineBaseInfoVo selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode(), GroupCxMachineSelectedTypeEnum.SAME_PRO_SIZE_PRIORITY));
+            return selected;
+        }
+        //断面宽优先
+        List<CxMachineBaseInfoVo> sectionWidthList = sameSpecificationsList.stream().filter(cxMachineInfo -> YesOrNoEnum.YES.getCode().equals(cxMachineInfo.getSameProSize())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(sectionWidthList)) {
+            sectionWidthList = sameProSizeList;
+        }
+        if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
+            CxMachineBaseInfoVo selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode(), GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY));
+            return selected;
+        }
         //同规格优先 -> 同英寸优先 -> 断面宽优先 -> 历史最近优先 -> n个月生产最多优先 -> 非零度优先 -> 机台编号
         Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.reverseOrder())
                 .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.reverseOrder())
@@ -522,9 +565,9 @@ public class CxCapacityAllocationHandler {
                 .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.reverseOrder())
                 .thenComparing(CxMachineBaseInfoVo::getIsZeroRack)
                 .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
-        fixedPriorityList.sort(sortComparator);
-        CxMachineBaseInfoVo selected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
-        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode()));
+        sectionWidthList.sort(sortComparator);
+        CxMachineBaseInfoVo selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode(), GroupCxMachineSelectedTypeEnum.HISTORY_QUALITY_PRIORITY));
         return selected;
     }
 
