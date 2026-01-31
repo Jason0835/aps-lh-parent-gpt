@@ -188,6 +188,8 @@ public class MpWeekRollAdjustEngine {
             mpFinalVo.setFieldValueByFieldName(dayField,structureIn.getConfirmAdjustQty());
             mpFinalVo.setTrialProductionQty(structureIn.getConfirmAdjustQty());
             mpProdFinalList.add(mpFinalVo);
+            contextDTO.getFactoryMonthPlanProdFinalList().add(mpFinalVo);
+
             contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,排产上机日:%s,排产量:%s!",contextDTO.getStructureName(), structureIn.getMaterialCode(), newOnlineDay,structureIn.getConfirmAdjustQty())).append(ApsConstant.DIVISION);
         }
     }
@@ -746,7 +748,6 @@ public class MpWeekRollAdjustEngine {
         //1、排序：在机SKU上机日期早的优先增量排产
         mpProdFinalList.sort(Comparator.comparingInt(FactoryMonthPlanFinalAdjustVo::getBeginDay));
         Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap = convertToMapByMaterial(mpProdFinalList);
-
         Map<String, MpAdjustStructureIn> mpAdjustStructInMap = onIncrementAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
                  Collectors.collectingAndThen(Collectors.toList(),m-> {
                      return m.get(0);
@@ -1477,6 +1478,8 @@ public class MpWeekRollAdjustEngine {
         FactoryMonthPlanFinalAdjustVo mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
         //2.2、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
         mpProdFinalList.add(mpFinalVo);
+        contextDTO.getFactoryMonthPlanProdFinalList().add(mpFinalVo);
+
         String constructionStage = ConstructionStageEnum.getInstance(adjustStructInVo.getConstructionStage()).getDesc();
         //2.3、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
         newPlanQty = adjustStructInVo.getConfirmAdjustQty();
@@ -1499,6 +1502,7 @@ public class MpWeekRollAdjustEngine {
         int productionQty = getProductionQty(newOnLineDay, contextDTO.getStructureDeadLine(),mpFinalVo);
         if (productionQty <=0){
             mpProdFinalList.removeIf(item -> item.getMaterialCode().equals(mpFinalVo.getMaterialCode()));
+            contextDTO.getFactoryMonthPlanProdFinalList().removeIf(item -> item.getMaterialCode().equals(mpFinalVo.getMaterialCode()));
         }else{
             //重置各优先级总排产量
             resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
@@ -1659,6 +1663,8 @@ public class MpWeekRollAdjustEngine {
             mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructOutVo);
             //2.1、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
             mpProdFinalList.add(mpFinalVo);
+            contextDTO.getFactoryMonthPlanProdFinalList().add(mpFinalVo);
+
             iOrder += 1;
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
             //2.2、敲定在机SKU新的上机日期
@@ -1688,6 +1694,7 @@ public class MpWeekRollAdjustEngine {
             int productionQty = getProductionQty(newOnLineDay, contextDTO.getStructureDeadLine(),mpFinalVo);
             if (productionQty <=0){
                 mpProdFinalList.removeIf(item -> item.getMaterialCode().equals(adjustStructOutVo.getMaterialCode()));
+                contextDTO.getFactoryMonthPlanProdFinalList().removeIf(item -> item.getMaterialCode().equals(adjustStructOutVo.getMaterialCode()));
             }else{
                 //重置各优先级总排产量
                 resetTotalProductionQty(adjustStructOutVo,mpFinalVo,productionQty);
