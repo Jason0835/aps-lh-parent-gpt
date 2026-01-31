@@ -91,11 +91,11 @@ public class ProductionPlanGroupInfo {
      */
     private Integer fixedPriority;
     /**
-     * 近1个月的上机日期
+     * 近1个月的上机日期-机台挑计划时使用
      */
-    private Date lastBoardingDate;
+    private Integer lastBoardingDate;
     /**
-     * 近3个月的排产次数
+     * 近3个月的排产次数-机台挑计划时使用
      */
     private Integer productionCount;
 

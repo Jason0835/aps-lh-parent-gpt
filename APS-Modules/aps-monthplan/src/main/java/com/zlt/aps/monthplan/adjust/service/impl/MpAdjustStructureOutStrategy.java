@@ -238,7 +238,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //保存调整日志
         saveMpAdjustLog(contextDTO);
 
-        //contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
+        contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
     }
 
     @Override

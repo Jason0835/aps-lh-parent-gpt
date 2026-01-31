@@ -1,15 +1,20 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.basedataassemble.history.ProductionHistoryHandler;
 import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.*;
+import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.dto.ProductGroupCxCapacityInfo;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.handler.GroupPlanCxMachineSelector;
 import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -26,7 +31,10 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class CxCapacityAllocationHandler {
+
+    private final ProductionHistoryHandler productionHistoryHandler;
 
     /**
      * 对成型机台创建分配集合对象-按最小硫化配比分配
@@ -234,52 +242,48 @@ public class CxCapacityAllocationHandler {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
         }
+        Integer needDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
         //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
         List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> {
             Set<Integer> hasProductionDaySet = singleMachine.confirmProductionRange(context, workWeakProductionInfo);
             if (CollectionUtils.isEmpty(hasProductionDaySet)) {
                 return false;
             }
-            if (hasProductionDaySet.size() < minAllocationDays) {
+            Integer capacityDays = hasProductionDaySet.size();
+            if (capacityDays < minAllocationDays) {
                 return false;
             }
+            //设置历史信息
+            singleMachine.setLastBoardingDate(BigDecimal.ZERO.intValue());
+            singleMachine.setProductionCount(BigDecimal.ZERO.intValue());
+            productionHistoryHandler.setCxMachineProductionGroupPlanHistory(context, addNewGroupPlan, singleMachine);
+            //设置产能
             singleMachine.setSelectedProductionDaySet(hasProductionDaySet);
-            singleMachine.setSelectedProductionDys(hasProductionDaySet.size());
+            singleMachine.setSelectedProductionDys(capacityDays);
+            Integer diffValue = capacityDays - needDays;
+            singleMachine.setCapacityDiffValue(diffValue);
             return true;
         }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionDayList)) {
             return null;
         }
-        //可排产天数多的优先 todo 产能最合适
-        Integer maxProductionDays = hasProductionDayList.stream().mapToInt(CxMachineBaseInfoVo::getSelectedProductionDys).max().getAsInt();
-        List<CxMachineBaseInfoVo> maxCapacityList = hasProductionDayList.stream().filter(cxMachineInfo -> maxProductionDays.equals(cxMachineInfo.getSelectedProductionDys())).collect(Collectors.toList());
-        if (maxCapacityList.size() == BigDecimal.ONE.intValue()) {
-            CxMachineBaseInfoVo maxCapacitySelected = maxCapacityList.get(BigDecimal.ZERO.intValue());
-            log.info(TbrProductionGroupLogRecorder.addSelectedFinalByMaxCapacityMachineLog(context, structureName, isZeroRack, maxCapacitySelected.getCxMachineCode(), maxCapacitySelected.getCxMachineTypeCode()));
-            return maxCapacitySelected;
+        List<CxMachineBaseInfoVo> capacityCoverageList = hasProductionDayList.stream().filter(singleMachine -> singleMachine.getCapacityDiffValue() >= BigDecimal.ZERO.intValue()).collect(Collectors.toList());
+        List<CxMachineBaseInfoVo> selectedCapacityList;
+        if (!CollectionUtils.isEmpty(capacityCoverageList)) {
+            //产能能覆盖，取差值最小
+            Integer minProductionDays = capacityCoverageList.stream().mapToInt(CxMachineBaseInfoVo::getCapacityDiffValue).min().getAsInt();
+            selectedCapacityList = capacityCoverageList.stream().filter(cxMachineInfo -> minProductionDays.equals(cxMachineInfo.getCapacityDiffValue())).collect(Collectors.toList());
+        } else {
+            //产能不能覆盖，取差值最大
+            Integer maxProductionDays = hasProductionDayList.stream().mapToInt(CxMachineBaseInfoVo::getCapacityDiffValue).max().getAsInt();
+            selectedCapacityList = hasProductionDayList.stream().filter(cxMachineInfo -> maxProductionDays.equals(cxMachineInfo.getCapacityDiffValue())).collect(Collectors.toList());
         }
-        //设置机台固定信息
-        maxCapacityList.stream().forEach(cxMachineInfo -> cxMachineInfo.setFixedPriority(cxMachineInfo.getFixedPriorityValue(addNewGroupPlan)));
-        //固定优先
-        Integer minFixedPriority = maxCapacityList.stream().mapToInt(CxMachineBaseInfoVo::getFixedPriority).min().getAsInt();
-        List<CxMachineBaseInfoVo> fixedPriorityList = maxCapacityList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
-        if (fixedPriorityList.size() == BigDecimal.ONE.intValue()) {
-            CxMachineBaseInfoVo fixedSelected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
-            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineTypeCode()));
-            return fixedSelected;
+        if (selectedCapacityList.size() == BigDecimal.ONE.intValue()) {
+            CxMachineBaseInfoVo minProductionSelected = selectedCapacityList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addSelectedFinalByMaxCapacityMachineLog(context, structureName, isZeroRack, minProductionSelected.getCxMachineCode(), minProductionSelected.getCxMachineTypeCode()));
+            return minProductionSelected;
         }
-        //设置是否同规格，同英寸,断面宽
-        setSameInfo(context, fixedPriorityList, addNewGroupPlan);
-        //同规格优先 -> 同英寸优先 -> 断面宽优先 -> 剩余天数多 -> 机台编号
-        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getRemainingDays, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
-        fixedPriorityList.sort(sortComparator);
-        CxMachineBaseInfoVo selected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
-        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode()));
-        return selected;
+        return selectOneCxMachine(context, selectedCapacityList, addNewGroupPlan);
     }
 
     /**
@@ -468,8 +472,60 @@ public class CxCapacityAllocationHandler {
         if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
             return sameProSizeList.get(BigDecimal.ZERO.intValue());
         }
+        //5、设置该成型机近1个月的排产分组和排产次数
+        sectionWidthList.forEach(groupPlan -> {
+            groupPlan.setLastBoardingDate(BigDecimal.ZERO.intValue());
+            groupPlan.setProductionCount(BigDecimal.ZERO.intValue());
+            productionHistoryHandler.setCxMachineProductionGroupPlanHistory(context, groupPlan, cxMachineInfo);
+        });
         sectionWidthList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
         return sectionWidthList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 选择合适的机台
+     * 1、固定优先
+     * 2、与前分组同规格优先
+     * 3、与前分组同英寸优先
+     * 4、与前分组断面宽优先
+     * 5、近1个月最近生产优先
+     * 6、近n个月生产最多优先
+     * 7、非零度优先
+     * 8、机台编号大优先
+     *
+     * @param context              排产上下文
+     * @param selectedCapacityList 可选择的产能机台
+     * @param addNewGroupPlan      新增的计划
+     * @return
+     */
+    private CxMachineBaseInfoVo selectOneCxMachine(Context context, List<CxMachineBaseInfoVo> selectedCapacityList, ProductionPlanGroupInfo addNewGroupPlan) {
+        //获取分组及零度零度供料架
+        String structureName = addNewGroupPlan.getGroupName();
+        String isZeroRack = addNewGroupPlan.getIsZero();
+        //设置机台固定信息
+        selectedCapacityList.stream().forEach(cxMachineInfo -> cxMachineInfo.setFixedPriority(cxMachineInfo.getFixedPriorityValue(addNewGroupPlan)));
+        //固定优先
+        Integer minFixedPriority = selectedCapacityList.stream().mapToInt(CxMachineBaseInfoVo::getFixedPriority).min().getAsInt();
+        List<CxMachineBaseInfoVo> fixedPriorityList = selectedCapacityList.stream().filter(cxMachineInfo -> minFixedPriority.equals(cxMachineInfo.getFixedPriority())).collect(Collectors.toList());
+        if (fixedPriorityList.size() == BigDecimal.ONE.intValue()) {
+            CxMachineBaseInfoVo fixedSelected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, fixedSelected.getCxMachineCode(), fixedSelected.getCxMachineTypeCode()));
+            return fixedSelected;
+        }
+        //设置是否同规格，同英寸,断面宽
+        setSameInfo(context, fixedPriorityList, addNewGroupPlan);
+        //同规格优先 -> 同英寸优先 -> 断面宽优先 -> 历史最近优先 -> n个月生产最多优先 -> 非零度优先 -> 机台编号
+        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.reverseOrder())
+                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.reverseOrder())
+                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.reverseOrder())
+                .thenComparing(CxMachineBaseInfoVo::getLastBoardingDate, Comparator.reverseOrder())
+                .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.reverseOrder())
+                .thenComparing(CxMachineBaseInfoVo::getIsZeroRack)
+                .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
+        fixedPriorityList.sort(sortComparator);
+        CxMachineBaseInfoVo selected = fixedPriorityList.get(BigDecimal.ZERO.intValue());
+        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode()));
+        return selected;
     }
 
     /**
