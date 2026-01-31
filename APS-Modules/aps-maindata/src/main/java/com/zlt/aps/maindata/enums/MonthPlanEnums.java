@@ -108,10 +108,6 @@ public enum MonthPlanEnums {
      */
     SKU_SECOND_PRODUCTION("SYS0204003", "SKU二次上机的间隔时间"),
     /**
-     * SYS0204004 SKU排产分类为主销、常规，月均销量>=该值时，月底1-2天可直接补量
-     */
-    BOOST_AVERAGE_VALUE("SYS0204004", "SKU排产分类为主销、常规，月均销量>=该值时，月底1-2天可直接补量"),
-    /**
      * SYS0204005 SKU可月底补量的排产分类
      */
     BOOST_PRODUCTION_TYPE_VALUE("SYS0204005", "SKU可月底补量的排产分类"),

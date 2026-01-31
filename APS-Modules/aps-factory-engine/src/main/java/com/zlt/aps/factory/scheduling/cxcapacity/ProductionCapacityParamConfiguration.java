@@ -45,10 +45,6 @@ public class ProductionCapacityParamConfiguration {
      */
     private Set<String> boostProductionType;
     /**
-     * 主销产品或常规产品月均补量值
-     */
-    private Integer boostAverageValue;
-    /**
      * 主销产品或常规产品最大可补量天数
      */
     private Integer maxBoostDay;
