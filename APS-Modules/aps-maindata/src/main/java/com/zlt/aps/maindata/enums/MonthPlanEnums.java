@@ -108,13 +108,17 @@ public enum MonthPlanEnums {
      */
     SKU_SECOND_PRODUCTION("SYS0204003", "SKU二次上机的间隔时间"),
     /**
-     * SYS0204005 SKU可月底补量的排产分类
+     * SYS0204004 单位天，SKU符合SYS0204005时，SKU收尾日离结构收尾日可搭配补量的天数
      */
-    BOOST_PRODUCTION_TYPE_VALUE("SYS0204005", "SKU可月底补量的排产分类"),
+    MATCHING_BOOST_DAY("SYS0204004", "单位天，SKU符合SYS0204005时，SKU收尾日离结构收尾日可搭配补量的天数"),
     /**
-     * SYS0204006 SKU符合SYS0204004和SYS0204005时，收尾日离月底可补量的天数
+     * SYS0204005 SKU可月底补量或是临近结构收尾可搭配补量的排产分类
      */
-    MAX_BOOST_DAY("SYS0204006", "SKU符合SYS0204004和SYS0204005时，收尾日离月底可补量的天数"),
+    BOOST_PRODUCTION_TYPE_VALUE("SYS0204005", "SKU可月底补量或是临近结构收尾可搭配补量的排产分类"),
+    /**
+     * SYS0204006 单位天，SKU符合SYS0204005时，SKU收尾日离月底可补量的天数
+     */
+    MAX_BOOST_DAY("SYS0204006", "单位天，SKU符合SYS0204005时，SKU收尾日离月底可补量的天数"),
     /**
      * SYS0204009 结构需求量最小排产天数，<该值则不进行结构排产
      */
