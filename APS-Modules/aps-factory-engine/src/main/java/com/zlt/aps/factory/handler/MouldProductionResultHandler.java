@@ -204,7 +204,7 @@ public class MouldProductionResultHandler {
         Integer totalValue = DayProductionHandler.summaryDayQty(logDetail, FactoryConstant.PRODUCTION_CYCLE);
         logDetail.setTotalQty(totalValue.intValue());
         //总硫化时间
-        logDetail.setTotalVulcanizationMinutes(curingTime.multiply(BigDecimal.valueOf(totalValue)).divide(BigDecimal.valueOf(ProductionConstant.HOUR_SECOND), 1, BigDecimal.ROUND_FLOOR));
+        logDetail.setTotalVulcanizationMinutes(curingTime.multiply(BigDecimal.valueOf(totalValue)).divide(BigDecimal.valueOf(ProductionConstant.MINUTE_SECOND), 1, BigDecimal.ROUND_FLOOR));
     }
 
     /**
