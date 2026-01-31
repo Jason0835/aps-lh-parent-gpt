@@ -7,7 +7,6 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
-import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -17,6 +16,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +31,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SummaryDemandPlanService {
 
-  private final BaseDao baseDao;
+  // 批量插入处理器
+  private final BatchInsertProcessor<DpDemandPlanSum> batchInsertProcessor;
 
   public void summaryDemandPlan(List<DpDemandPlan> finalPlans,List<DpStockVersion> stockVersions) {
     Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey));
@@ -58,7 +59,8 @@ public class SummaryDemandPlanService {
       entity.setIsReachMinProductionQty(entity.getNetQty() >= entity.getMinProductionQty()? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
       datas.add(entity);
     });
-    baseDao.insertBatch(datas);
+    datas.sort(Comparator.comparing(DpDemandPlanSum::getMaterialCode));
+    this.batchInsertProcessor.batchInsert(datas);
   }
 
 

@@ -10,6 +10,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.common.utils.BatchInsertProcessor;
 import com.zlt.aps.monthplan.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -22,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,8 @@ import org.springframework.util.CollectionUtils;
 @Transactional(rollbackFor = Exception.class)
 public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion>  implements IDpStockVersionService {
     private final DpStockVersionEntityMapper dpStockVersionEntityMapper;
+    // 批量插入处理器
+    private final BatchInsertProcessor<DpStockVersion> batchInsertProcessor;
     @Override
     protected String getDocTypeCode() {
         return "2025122021";
@@ -91,7 +95,8 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
             DpStockVersion requireStock = this.buildRequireStock(createCondition,monthPlanVersion,finishedProductStock);
             list.add(requireStock);
         });
-        this.baseDao.insertBatch(list);
+        list.sort(Comparator.comparing(DpStockVersion::getMaterialCode));
+        this.batchInsertProcessor.batchInsert(list);
         return list;
     }
 

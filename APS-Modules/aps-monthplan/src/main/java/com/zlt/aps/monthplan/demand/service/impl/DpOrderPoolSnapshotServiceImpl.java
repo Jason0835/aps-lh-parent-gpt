@@ -13,6 +13,7 @@ import com.zlt.aps.monthplan.api.domain.entity.DpOrderPoolSnapshot;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.monthplan.common.utils.BatchInsertProcessor;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderPoolSnapshotEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -25,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.YearMonth;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +54,8 @@ import com.ruoyi.common.exception.ServiceException;
 public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPoolSnapshot>  implements IDpOrderPoolSnapshotService {
     private final static String DICT_TYPE_BRAND = "biz_brand_type";
     private final DpOrderPoolSnapshotEntityMapper dpOrderPoolSnapshotEntityMapper;
+    // 批量插入处理器
+    private final BatchInsertProcessor<DpOrderPoolSnapshot> batchInsertProcessor;
     @Override
     protected String getDocTypeCode() {
         return "2025122615";
@@ -89,7 +93,8 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
             supplyOrderPools.forEach(supplyOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(createCondition,supplyOrder)));
         }
         if(CollectionUtils.isNotEmpty(orderPoolSnapshots)){
-            this.baseDao.insertBatch(orderPoolSnapshots);
+            orderPoolSnapshots.sort(Comparator.comparing(DpOrderPoolSnapshot::getMaterialCode));
+            this.batchInsertProcessor.batchInsert(orderPoolSnapshots);
         }
     }
 
@@ -100,7 +105,8 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
             allStockUpOrders.forEach(supplyOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(predictionVersion,yearMonth,supplyOrder)));
         }
         if(CollectionUtils.isNotEmpty(orderPoolSnapshots)){
-            this.baseDao.insertBatch(orderPoolSnapshots);
+            orderPoolSnapshots.sort(Comparator.comparing(DpOrderPoolSnapshot::getMaterialCode));
+            this.batchInsertProcessor.batchInsert(orderPoolSnapshots);
         }
     }
 

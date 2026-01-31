@@ -44,6 +44,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +95,8 @@ public class PrecedentStockUpService {
 
   // 自定义线程池，避免使用默认的ForkJoinPool
   private final Executor ioExecutor;
+  // 批量插入处理器
+  private final BatchInsertProcessor<SupplyOrderPool> batchInsertProcessor;
 
   /**
    * 创建周期性备货
@@ -224,7 +227,8 @@ public class PrecedentStockUpService {
       CalculationData calculationData = prepareCalculationData(supplyOrderPool, skus);
       // 3.3 批量构建并插入订单池数据
       List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPools(supplyOrderPool, skus,context, calculationData);
-      batchInsertSupplyOrderPools(supplyOrderPools);
+      supplyOrderPools.sort(Comparator.comparing(SupplyOrderPool::getMaterialCode));
+      this.batchInsertProcessor.batchInsert(supplyOrderPools);
       return supplyOrderPools;
     } catch (Exception e) {
       log.error("重新创建供应链订单池失败", e);
@@ -588,36 +592,6 @@ public class PrecedentStockUpService {
         .collect(Collectors.toList());
   }
 
-
-  /**
-   * 批量插入供应链订单池数据
-   */
-  private void batchInsertSupplyOrderPools(List<SupplyOrderPool> supplyOrderPools) {
-    if (CollectionUtils.isEmpty(supplyOrderPools)) {
-      log.warn("没有需要插入的供应链订单池数据");
-      return;
-    }
-
-    log.info("开始批量插入供应链订单池数据, 数量: {}", supplyOrderPools.size());
-
-    // 分批插入，避免单次插入数据量过大
-    int batchSize = 1000;
-    int total = supplyOrderPools.size();
-
-    for (int i = 0; i < total; i += batchSize) {
-      int end = Math.min(i + batchSize, total);
-      List<SupplyOrderPool> batch = supplyOrderPools.subList(i, end);
-      try {
-        this.baseDao.insertBatch(batch);
-        log.debug("批量插入进度: {}/{}", end, total);
-      } catch (Exception e) {
-        log.error("批量插入失败, 批次范围: {}-{}, 错误: {}", i, end, e.getMessage(), e);
-        throw new BusinessException("批量插入供应链订单池数据失败", e);
-      }
-    }
-
-    log.info("批量插入完成, 总记录数: {}", total);
-  }
 
   private Set<String> findEligibleSkus(PrecedentStockUpContext context) {
     // 1. 获取不在周期排产结构配置表中的SKU

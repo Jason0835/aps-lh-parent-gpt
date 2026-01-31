@@ -1,7 +1,6 @@
 package com.zlt.aps.monthplan.demand.service;
 
 
-import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.bill.common.service.IDocService;
 
@@ -34,5 +33,9 @@ public interface IDpOrderOffsetDetailService  extends IDocService<DpOrderOffsetD
    * @return 版本集合
    */
   List<String> getOffsetVersion(DpOrderOffsetDetail dpOrderOffsetDetail);
-
+  /**
+   * 批量插入数据
+   * @param leftDemands
+   */
+  void batchInsert(List<DpOrderOffsetDetail> leftDemands);
 }
