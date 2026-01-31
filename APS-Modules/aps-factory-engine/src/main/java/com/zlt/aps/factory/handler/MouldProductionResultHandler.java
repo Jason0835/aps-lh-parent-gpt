@@ -202,9 +202,9 @@ public class MouldProductionResultHandler {
         logDetail.setInventorySalesRatio(BigDecimal.valueOf(planInfo.getInventorySalesRatio()));
         //统计总排产量
         Integer totalValue = DayProductionHandler.summaryDayQty(logDetail, FactoryConstant.PRODUCTION_CYCLE);
-        logDetail.setTotalQty(totalValue.intValue());
+        logDetail.setTotalQty(totalValue);
         //总硫化时间
-        logDetail.setTotalVulcanizationMinutes(curingTime.multiply(BigDecimal.valueOf(totalValue)).divide(BigDecimal.valueOf(ProductionConstant.HOUR_SECOND), 1, BigDecimal.ROUND_FLOOR));
+        logDetail.setTotalVulcanizationMinutes(curingTime.multiply(BigDecimal.valueOf(totalValue)).divide(BigDecimal.valueOf(ProductionConstant.MINUTE_SECOND), 1, RoundingMode.FLOOR));
     }
 
     /**
