@@ -781,6 +781,16 @@ public class MpWeekRollAdjustEngine {
 
     }
 
+    /**
+     * 执行在机SKU，单SKU增量调整
+     * @param contextDTO
+     * @param mpProdFinalList
+     * @param lockNextDay
+     * @param adjustStructInVo
+     * @param mpFinalVo
+     * @param newOnLineDay
+     * @return
+     */
     private boolean doOnlineOneAdjust(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
                                   MpAdjustStructureIn adjustStructInVo,FactoryMonthPlanFinalAdjustVo mpFinalVo,int newOnLineDay) {
         if (adjustStructInVo == null) {
@@ -797,12 +807,12 @@ public class MpWeekRollAdjustEngine {
         if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo, lockNextDay -1)){
             // 开始日 < 锁定日 且 锁定前日没有值,则退出
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,开始日小于锁定日且锁定日之前没有值,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
-            return false;
+            return true;
         }
-        if (newOnLineDay > mpFinalVo.getBeginDay()){
-            // 新的上机日比原开始日大，则退出
-            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,比原开始日大,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
-            return false;
+        if (mpFinalVo.getBeginDay() >= lockNextDay && newOnLineDay > mpFinalVo.getBeginDay()){
+            // 若在机SKU的开始日大于锁定日，且新的上机日比原开始日大，表示会发生延后，则退出,直接移除，因为后面的日期肯定更大
+            contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,在机SKU开始日在锁定日之后,新上机日:%s,比原开始日大,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
+            return true;
         }
         //2.2、检查SKU二次上机
         if (!checkSecOnline(mpFinalVo,newOnLineDay, contextDTO.getParamMap())){
