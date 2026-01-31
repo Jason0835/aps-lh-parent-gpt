@@ -2,8 +2,9 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Lists;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.utils.DictUtils;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -24,10 +25,12 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.YearMonth;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,10 +55,13 @@ import com.ruoyi.common.exception.ServiceException;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPoolSnapshot>  implements IDpOrderPoolSnapshotService {
-    private final static String DICT_TYPE_BRAND = "biz_brand_type";
+    private final static String BRAND_DICT_TYPE = "biz_brand_type";
     private final DpOrderPoolSnapshotEntityMapper dpOrderPoolSnapshotEntityMapper;
     // 批量插入处理器
     private final BatchInsertProcessor<DpOrderPoolSnapshot> batchInsertProcessor;
+    // 字典
+    private final ISysDictDataCacheService sysDictDataService;
+
     @Override
     protected String getDocTypeCode() {
         return "2025122615";
@@ -90,7 +96,10 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
             salesOrders.forEach(saleOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(createCondition,saleOrder)));
         }
         if(CollectionUtils.isNotEmpty(supplyOrderPools)){
-            supplyOrderPools.forEach(supplyOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(createCondition,supplyOrder)));
+            // 品牌字典
+            List<SysDictData> brandDictDatas = sysDictDataService.getType(BRAND_DICT_TYPE);
+            Map<String,String> valueToLabelMap = this.convertToMap(brandDictDatas);
+            supplyOrderPools.forEach(supplyOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(createCondition,supplyOrder,valueToLabelMap)));
         }
         if(CollectionUtils.isNotEmpty(orderPoolSnapshots)){
             orderPoolSnapshots.sort(Comparator.comparing(DpOrderPoolSnapshot::getMaterialCode));
@@ -98,16 +107,20 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         }
     }
 
-    @Override
-    public void saveOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth, List<SupplyOrderPool> allStockUpOrders) {
-        List<DpOrderPoolSnapshot> orderPoolSnapshots = Lists.newArrayList();
-        if(CollectionUtils.isNotEmpty(allStockUpOrders)){
-            allStockUpOrders.forEach(supplyOrder -> orderPoolSnapshots.add(buildOrderPoolSnapshot(predictionVersion,yearMonth,supplyOrder)));
+    private Map<String, String> convertToMap(List<SysDictData> brandDictDatas) {
+        if(CollectionUtils.isEmpty(brandDictDatas)){
+            return Collections.emptyMap();
         }
-        if(CollectionUtils.isNotEmpty(orderPoolSnapshots)){
-            orderPoolSnapshots.sort(Comparator.comparing(DpOrderPoolSnapshot::getMaterialCode));
-            this.batchInsertProcessor.batchInsert(orderPoolSnapshots);
-        }
+        return brandDictDatas.stream()
+            .filter(dict -> dict != null && dict.getDictValue() != null)
+            .collect(Collectors.toMap(
+                SysDictData::getDictValue,
+                dict -> dict.getDictLabel() != null ? dict.getDictLabel() : "",
+                (existing, replacement) -> {
+                    return existing;
+                },
+                LinkedHashMap::new
+            ));
     }
 
     @Override
@@ -171,33 +184,6 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         return supplyOrderPool;
     }
 
-    private DpOrderPoolSnapshot buildOrderPoolSnapshot(String predictionVersion, YearMonth yearMonth, SupplyOrderPool supplyOrder) {
-        DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
-        BeanUtils.copyProperties(supplyOrder, entity);
-        entity.setId(null);
-        entity.setBaseVale(null);
-        if(StringUtils.isNotBlank(supplyOrder.getBrand())) {
-            entity.setBrand(DictUtils.getLabel(DICT_TYPE_BRAND,supplyOrder.getBrand()));
-        }
-        entity.setYear(yearMonth.getYear());
-        entity.setMonth(yearMonth.getMonthValue());
-        entity.setMonthPlanVersion(predictionVersion);
-        entity.setOrderPriority(supplyOrder.getOrderType());
-        // entity.setAreaCode();
-        // entity.setCustomCode();
-        // entity.setCustomName();
-        // entity.setCustomNationCode();
-        entity.setDemandQty(supplyOrder.getQty());
-        // entity.setDestinationNationCode();
-        // entity.setIsDynamicBalance();
-        // entity.setIsUniformity();
-        // entity.setPoNumber();
-        // entity.setSubmitDate();
-        // entity.setScmId();
-        return entity;
-    }
-
-
     private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SalesOrderPool saleOrder) {
         DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
         BeanUtils.copyProperties(saleOrder, entity);
@@ -223,11 +209,11 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         return entity;
     }
 
-    private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SupplyOrderPool supplyOrder) {
+    private DpOrderPoolSnapshot buildOrderPoolSnapshot(DpDemandPlan createCondition, SupplyOrderPool supplyOrder,Map<String,String> valueToLabelMap) {
         DpOrderPoolSnapshot entity = new DpOrderPoolSnapshot();
         BeanUtils.copyProperties(supplyOrder, entity);
-        if(StringUtils.isNotBlank(supplyOrder.getBrand())) {
-            entity.setBrand(DictUtils.getLabel(DICT_TYPE_BRAND,supplyOrder.getBrand()));
+        if(StringUtils.isNotBlank(supplyOrder.getBrand()) && valueToLabelMap.containsKey(supplyOrder.getBrand())) {
+            entity.setBrand(valueToLabelMap.get(supplyOrder.getBrand()));
         }
         entity.setId(null);
         entity.setBaseVale(null);
