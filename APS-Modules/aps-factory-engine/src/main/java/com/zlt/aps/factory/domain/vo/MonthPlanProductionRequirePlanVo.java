@@ -511,6 +511,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return;
         }
         setIsProduction(YesOrNoEnum.NO.getCode());
+        setProductionFlag(YesOrNoEnum.NO.getCode());
         addNoProductionReason(addNoProductionReason);
     }
 
@@ -772,5 +773,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
 //        Integer sumLossQty = noHeightLossQty - heightLossQty;
 //        cxCapacityRequireQty = getNetQty() + sumLossQty;
         return cxCapacityRequireQty;
+    }
+
+    /**
+     *  分组：结构+主花纹
+     * @return 分组
+     */
+    public String getGroupKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, getStructureName(), getMainPattern());
     }
 }

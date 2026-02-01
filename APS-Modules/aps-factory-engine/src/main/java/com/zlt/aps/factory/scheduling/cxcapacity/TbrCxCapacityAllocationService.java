@@ -16,6 +16,7 @@ import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
@@ -152,7 +153,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         saveMouldUsedLog(productionContext);
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo.statisticsAndEstimateCxAllocationByGroup(productionContext, requirePlanList);
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = CalculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList);
         setGroupFixedCxMachineInfo(productionContext, estimateGroupCxAllocationMap);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         /**

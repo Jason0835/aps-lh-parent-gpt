@@ -18,6 +18,7 @@ import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
+import com.zlt.aps.factory.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
 import com.zlt.aps.factory.mapper.FactoryMouldingDayResultMapper;
@@ -102,8 +103,7 @@ public class MatchingProductionHandler {
         Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap = this.selectRequirePlan(productionContext); // 查询需求计划
         this.buildProductionContext(productionContext, planList, requirePlanMap); // 填充上下文各项必要数据
 
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = ProductionPlanGroupInfo
-                .statisticsAndEstimateCxAllocationByGroup(productionContext, new ArrayList<>(requirePlanMap.values())); // 分配成型产能
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = CalculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, new ArrayList<>(requirePlanMap.values())); // 分配成型产能
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         this.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap);
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = this.getContinueInfo(productionContext);
