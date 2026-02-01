@@ -4,6 +4,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.enums.GroupCxMachineSelectedTypeEnum;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -613,22 +614,45 @@ public class TbrProductionGroupLogRecorder {
 
     /**
      * 增加结构匹配到成型机-最终被选定日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮%s被选定====
      *
      * @param context         排程上下文
      * @param groupName       分组名
      * @param isZeroRack      分组是否要求零度
      * @param cxMachineCode   成型机台
      * @param machineTypeCode 机型
+     * @param selectedType    选定类型
      * @return
      */
-    public static String addGroupSelectedFixedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮固定优先被选定====";
+    public static String addGroupSelectedFixedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode, GroupCxMachineSelectedTypeEnum selectedType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮%s被选定====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, isZeroRack, cxMachineCode, machineTypeCode);
+                groupName, isZeroRack, cxMachineCode, machineTypeCode, selectedType.getSelectedDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加成型机台匹配到分组计划-最终被选定日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s,  成型机台：%s 机型：%s 匹配 结构：%s 零度：%s 本轮%s被选定====
+     *
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
+     * @param selectedType    选定类型
+     * @return
+     */
+    public static String addCxMachineSelectedGroupPlanLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode, GroupCxMachineSelectedTypeEnum selectedType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 成型机台：%s 机型：%s 匹配 结构：%s 零度：%s 本轮%s被选定====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, machineTypeCode, groupName, isZeroRack, selectedType.getSelectedDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CX_MACHINE_SELECTED_FINAL_GROUP, logContent);
         return logContent;
     }
 

@@ -304,7 +304,7 @@ public class DayCapacityLimitHelper implements Serializable {
             return;
         }
         changeCxMachineInfo.add(changeKey);
-        usedChangeCxMachineCount = usedChangeLhMachineCount + BigDecimal.ONE.intValue();
+        usedChangeCxMachineCount = usedChangeCxMachineCount + BigDecimal.ONE.intValue();
         log.info(DayLimitLogRecorder.addChangeGroupUsedLog(context, productionDay, changeKey, usedChangeCxMachineCount));
     }
 
@@ -323,11 +323,11 @@ public class DayCapacityLimitHelper implements Serializable {
             return;
         }
         changeCxMachineInfo.remove(changeKey);
-        usedChangeCxMachineCount = usedChangeLhMachineCount - BigDecimal.ONE.intValue();
+        usedChangeCxMachineCount = usedChangeCxMachineCount - BigDecimal.ONE.intValue();
         if (usedChangeCxMachineCount <= BigDecimal.ZERO.intValue()) {
             usedChangeCxMachineCount = BigDecimal.ZERO.intValue();
         }
-        log.info(DayLimitLogRecorder.addDeductionChangeGroupUsedLog(context, productionDay, changeKey, sumProductionCapacityQty));
+        log.info(DayLimitLogRecorder.addDeductionChangeGroupUsedLog(context, productionDay, changeKey, usedChangeCxMachineCount));
     }
 
     /**

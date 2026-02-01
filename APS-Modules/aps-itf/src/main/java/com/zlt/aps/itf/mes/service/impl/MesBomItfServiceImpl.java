@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -204,9 +205,19 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				
                 // 构建胎胚原料消耗量
                 List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList);
-                List<List<MdmMaterialConsumeDetail>> splitDetailList = ScmListUtils.getSplitList(detaiList, 1000);
-                for (List<MdmMaterialConsumeDetail> saveList : splitDetailList) { // 分批保存，防止长度超出限制
-                    baseDao.saveBatch(saveList);
+                if (CollectionUtils.isNotEmpty(detaiList)) {
+                    // 保存前先删除本次同步涉及的胎胚原材料明细
+                    List<String> embryoCodeList = detaiList.stream().map(MdmMaterialConsumeDetail::getEmbryoCode).distinct().collect(Collectors.toList());
+                    List<List<String>> splitDeleteList = ScmListUtils.getSplitList(embryoCodeList, 1000);
+                    for (List<String> deleteList : splitDeleteList) { // 分批处理，防止长度超出限制
+                        Map<String, Object> paramMap = new HashMap<>();
+                        paramMap.put("embryoCode", deleteList);
+                        baseDao.deleteByMap(MdmMaterialConsumeDetail.class, paramMap);
+                    }
+                    List<List<MdmMaterialConsumeDetail>> splitDetailList = ScmListUtils.getSplitList(detaiList, 1000);
+                    for (List<MdmMaterialConsumeDetail> saveList : splitDetailList) { // 分批处理，防止长度超出限制
+                        baseDao.saveBatch(saveList);
+                    }
                 }
 			} finally {
 				DynamicDataSourceContextHolder.clear();
