@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.capacity;
 
+import com.zlt.aps.monthplan.api.domain.vo.DayProductionInfoVo;
 import lombok.Data;
 
 import java.util.HashSet;
@@ -45,5 +46,20 @@ public class MpDailyCapacityLimitVo {
      *  当日使用的胎胚编码
      */
     private Set<String> embryoCodes = new HashSet<>();
+
+    /**
+     *  最大日产量
+     */
+    private Integer maxDayProductionQty = 0;
+
+    /**
+     * 日开停产标识
+     */
+    private String dayOpenCloseFlag;
+
+    /**
+     * 日产比例
+     */
+    private Integer dayProductionRate;
 
 }

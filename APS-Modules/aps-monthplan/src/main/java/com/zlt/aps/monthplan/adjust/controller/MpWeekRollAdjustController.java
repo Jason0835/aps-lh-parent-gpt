@@ -173,12 +173,7 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setProductionVersion(firstVersion.getProductionVersion());
 
         contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO));
-        /*if (PubUtil.isNotEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
-            FactoryMonthPlanFinalAdjustVo firstFinalVo = contextDTO.getFactoryMonthPlanProdFinalList().get(0);
-            contextDTO.setMonthPlanVersion(firstFinalVo.getMonthPlanVersion());
-            contextDTO.setProductType(firstFinalVo.getProductTypeCode());
-            contextDTO.setProductionVersion(firstFinalVo.getProductionVersion());
-        }*/
+
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
         //当日作为调整日
         //contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
@@ -189,6 +184,8 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
 
+        //初始工作日历
+        contextDTO.setWorkCalendarList(mpAdjustStructureInService.getWorkCalendarList(contextDTO));
         return contextDTO;
     }
 

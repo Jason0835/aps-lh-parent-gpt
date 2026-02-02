@@ -19,6 +19,9 @@ import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
+import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -421,6 +424,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             result.computeIfAbsent(vo.getStructureName(), k -> new ArrayList<>()).add(vo);
         }
         return result;
+    }
+
+    /**
+     * 设置 特殊结构总的生产实际排产量
+     * @param contextDTO
+     * @param mpFinalList
+     */
+    protected void setSpecStructureTotalQty(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpFinalList){
+        if (PubUtil.isEmpty(mpFinalList)){
+            return;
+        }
+        Integer specStructureTotalQty = mpFinalList.stream().mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
+        contextDTO.setSpecStructureTotalQty(specStructureTotalQty);
     }
 
     /**
@@ -2469,7 +2485,5 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .map(RawSpecialMaterialRecord::getMaterialCode)
                 .anyMatch(childMaterialCodes::contains);
     }
-
-
 
 }
