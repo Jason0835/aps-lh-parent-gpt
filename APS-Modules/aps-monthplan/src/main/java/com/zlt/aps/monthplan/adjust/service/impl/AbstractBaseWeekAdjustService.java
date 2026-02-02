@@ -1877,14 +1877,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 试制量试ID
                 adjustDetailVo.setTrialPlanId(trialPlan.getId());
             }
-            // 型腔数量、活块数量
-            adjustDetailVo.setMouldCavityQty(0);
-            adjustDetailVo.setTypeBlockQty(0);
-            adjustDetailVo.setHeightQty(0);
-            adjustDetailVo.setMidQty(0);
-            adjustDetailVo.setPostponeQty(0);
-            adjustDetailVo.setCycleReserveQty(0);
-            adjustDetailVo.setConventionReserveQty(0);
             return;
         }
         // 有月度生产计划时，赋值关联字段
@@ -1906,11 +1898,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
         // 制造示方书号
         adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
-        adjustDetailVo.setHeightQty(Convert.toInt(monthPlan.getHeightProductionQty(),0));
-        adjustDetailVo.setMidQty(Convert.toInt(monthPlan.getMidProductionQty(),0));
-        adjustDetailVo.setPostponeQty(Convert.toInt(monthPlan.getPostponeProductionQty(),0));
-        adjustDetailVo.setCycleReserveQty(Convert.toInt(monthPlan.getCycleProductionQty(),0));
-        adjustDetailVo.setConventionReserveQty(Convert.toInt(monthPlan.getConventionProductionQty(),0));
     }
 
     /**
@@ -2125,17 +2112,48 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
-            List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
-            if (PubUtil.isNotEmpty(dpDemandPlan)) {
+            List<DpDemandPlan> demandPlanList = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            if (PubUtil.isNotEmpty(demandPlanList)) {
+                DpDemandPlan dpDemandPlan = demandPlanList.get(0);
                 // 设置排产分类
-                adjust.setProductionType(dpDemandPlan.get(0).getProductionType());
+                adjust.setProductionType(dpDemandPlan.getProductionType());
+                // 设置高优先级
+                Integer sum = demandPlanList.stream()
+                        .filter(e -> e.getHeightQty() != null)
+                        .mapToInt(DpDemandPlan::getHeightQty)
+                        .sum();
+                adjust.setHeightQty(Convert.toInt(sum,0));
+                // 设置中优先级
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getMidQty() != null)
+                        .mapToInt(DpDemandPlan::getMidQty)
+                        .sum();
+                adjust.setMidQty(Convert.toInt(sum,0));
+                // 设置暂缓订单
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getPostponeQty() != null)
+                        .mapToInt(DpDemandPlan::getPostponeQty)
+                        .sum();
+                adjust.setPostponeQty(Convert.toInt(sum,0));
+                // 设置周期排产储备
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getCycleReserveQty() != null)
+                        .mapToInt(DpDemandPlan::getCycleReserveQty)
+                        .sum();
+                adjust.setCycleReserveQty(Convert.toInt(sum,0));
+                // 设置常规储备
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getConventionReserveQty() != null)
+                        .mapToInt(DpDemandPlan::getConventionReserveQty)
+                        .sum();
+                adjust.setConventionReserveQty(Convert.toInt(sum,0));
             }
             // 试制量试设置净需求为订单量
             if (ApsConstant.TRUE.equals(adjust.getIsTrial())) {
                 adjust.setCurrentNetQty(adjust.getOrdQty());
             } else {
                 // 汇总排产净需求
-                Integer netQtySum = dpDemandPlan.stream()
+                Integer netQtySum = demandPlanList.stream()
                         .filter(e -> e.getNetQty() != null)
                         .mapToInt(DpDemandPlan::getNetQty)
                         .sum();
