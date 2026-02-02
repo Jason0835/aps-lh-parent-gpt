@@ -10,6 +10,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.SpringContextSupplierUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
@@ -195,7 +196,10 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
         // 创建查询数据的异步任务
         // 查询SKU排产明细
-        CompletableFuture<List<FactoryMonthPlanFinalAdjustVo>> monthPlanFinalAdjustFuture = CompletableFuture.supplyAsync(() -> queryFactoryMonthPlanFinalAdjustList(param));
+        CompletableFuture<List<FactoryMonthPlanFinalAdjustVo>> monthPlanFinalAdjustFuture = CompletableFuture.supplyAsync(
+                // 解决父子上下文传递问题
+                SpringContextSupplierUtil.wrap(() -> queryFactoryMonthPlanFinalAdjustList(param))
+        );
         // 查询BOM物料消耗明细
         CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(() -> queryMaterialConsumeDetailList(param));
         // 查询特殊材料记录
