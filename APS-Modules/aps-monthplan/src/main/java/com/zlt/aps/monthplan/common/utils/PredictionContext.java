@@ -95,6 +95,12 @@ public class PredictionContext {
       this.netDemands = netDemands != null ? netDemands : Collections.emptyList();
       this.stockMap = stockMap != null ? stockMap : new HashMap<>();
     }
+
+    public void resetAll() {
+       this.allocations = Collections.emptyList();
+       this.netDemands = Collections.emptyList();
+       this.stockMap = Collections.emptyMap();
+    }
   }
 
 }

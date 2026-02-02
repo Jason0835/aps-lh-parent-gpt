@@ -495,7 +495,7 @@ public abstract class AbstractDailyCapacityLimit {
             //若今日的计划量<单日硫化量 且 今日计划量 >= 单模起排量*明日的硫化机台数，则今日的增模台数 = 明日的硫化机台数
             int tmpQty = afterMachines * changeMouldFirstQty;
             if (remainQty < dailyLhQty && remainQty>=tmpQty){
-                resultArr[0] = afterMachines + dayPlanQty / dailyLhQty;
+                resultArr[0] = afterMachines;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
             }

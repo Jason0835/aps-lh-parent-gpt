@@ -277,9 +277,10 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     @Override
-    public MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(String materialCode) {
+    public MpMonthlySaleQty getMpMonthlySaleQtyByMaterialCode(SupplyOrderPool supplyOrderPool) {
         LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(MpMonthlySaleQty::getMaterialCode, materialCode);
+        wrapper.eq(MpMonthlySaleQty::getFactoryCode, supplyOrderPool.getFactoryCode());
+        wrapper.eq(MpMonthlySaleQty::getMaterialCode, supplyOrderPool.getMaterialCode());
         wrapper.eq(MpMonthlySaleQty::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MpMonthlySaleQty> monthlySaleQties = entityMapper.selectList(wrapper);
         return CollectionUtils.isEmpty(monthlySaleQties) ? null : monthlySaleQties.get(0);

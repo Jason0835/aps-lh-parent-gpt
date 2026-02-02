@@ -1,8 +1,13 @@
 package com.zlt.aps.factory.basedataassemble.history;
 
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -20,6 +25,72 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class ProductionHistoryHandler {
+
+    /**
+     * 以成型机台维度，构建机台最近生产的分组计划信息
+     * 设置groupInfo的近1个月的生产日及近n个月的生产次数
+     *
+     * @param context       排产上下文
+     * @param groupInfo     即将要排产的分组
+     * @param cxMachineInfo 排产的机台
+     */
+    public void setCxMachineProductionGroupPlanHistory(Context context, ProductionPlanGroupInfo groupInfo, CxMachineBaseInfoVo cxMachineInfo) {
+        if (null == context || null == cxMachineInfo || null == groupInfo) {
+            return;
+        }
+        String groupName = groupInfo.getGroupName();
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        if (StringUtils.isBlank(groupName) || StringUtils.isBlank(cxMachineCode)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        CxMachineProductionHistoryInfo machineProductionHistoryInfo = baseDataContainer.getCxMachineProductionHistoryInfo().get(cxMachineInfo.getCxMachineCode());
+        if (null == machineProductionHistoryInfo) {
+            return;
+        }
+        CxMachineLatestProductionInfo latestGroupProductionInfo = machineProductionHistoryInfo.getProductionGroupPlanLatestHistory().get(groupName);
+        if (null != latestGroupProductionInfo) {
+            groupInfo.setLastBoardingDate(latestGroupProductionInfo.getProductionDay());
+        }
+        CxMachineProductionGroupInfo groupProductionInfo = machineProductionHistoryInfo.getProductionGroupPlanHistory().get(groupName);
+        if (null != groupProductionInfo) {
+            groupInfo.setProductionCount(groupProductionInfo.getProductionCount());
+        }
+    }
+
+    /**
+     * 以分组计划为维度，构建分组计划最近生产的机台信息
+     * 设置cxMachineInfo的近1个月的生产日及近n个月的生产次数
+     *
+     * @param context       排产上下文
+     * @param groupInfo     排产的分组
+     * @param cxMachineInfo 即将要排产的机台
+     */
+    public void setGroupPlanProductionCxMachineHistory(Context context, ProductionPlanGroupInfo groupInfo, CxMachineBaseInfoVo cxMachineInfo) {
+        if (null == context || null == cxMachineInfo || null == groupInfo) {
+            return;
+        }
+        String groupName = groupInfo.getGroupName();
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        if (StringUtils.isBlank(groupName) || StringUtils.isBlank(cxMachineCode)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        GroupPlanProductionHistoryInfo groupPlanProductionHistoryInfo = baseDataContainer.getGroupPlanHistoryInfoMap().get(cxMachineCode);
+        if (null == groupPlanProductionHistoryInfo) {
+            return;
+        }
+        CxMachineLatestProductionInfo latestGroupProductionInfo = groupPlanProductionHistoryInfo.getProductionCxMachineLatestHistory().get(cxMachineCode);
+        if (null != latestGroupProductionInfo) {
+            cxMachineInfo.setLastBoardingDate(latestGroupProductionInfo.getProductionDay());
+        }
+        CxMachineProductionGroupInfo groupProductionInfo = groupPlanProductionHistoryInfo.getProductionCxMachineHistory().get(cxMachineCode);
+        if (null != groupProductionInfo) {
+            cxMachineInfo.setProductionCount(groupProductionInfo.getProductionCount());
+        }
+    }
 
     /**
      * 创建以机台为维度的生产历史信息

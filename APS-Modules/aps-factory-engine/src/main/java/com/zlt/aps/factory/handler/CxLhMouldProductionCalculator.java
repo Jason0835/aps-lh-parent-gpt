@@ -519,7 +519,7 @@ public class CxLhMouldProductionCalculator {
         }
         MonthPlanProductionRequirePlanVo productionSkuInfo = boostInfo.getProductionSkuInfo();
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
-        if (!productionSkuInfo.hasBoostQty(paramConfiguration.getBoostAverageValue(), paramConfiguration.getBoostProductionType())) {
+        if (!productionSkuInfo.hasBoostQty(paramConfiguration.getBoostProductionType())) {
             return;
         }
         Set<String> cxMachineInfoSet = boostInfo.getCxMachineInfoSet();

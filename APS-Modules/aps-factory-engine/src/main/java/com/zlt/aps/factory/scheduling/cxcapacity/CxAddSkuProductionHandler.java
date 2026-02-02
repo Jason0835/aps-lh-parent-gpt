@@ -11,6 +11,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.factory.handler.SkuPrioritySelector;
 import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -248,22 +249,35 @@ public class CxAddSkuProductionHandler {
      */
     private static String getSelectedAddSku(TbrProductionContext productionContext, Integer startDay, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList) {
         if (CollectionUtils.isEmpty(productionPlanList)) {
-            return "";
+            return StringUtils.EMPTY;
         }
         List<MonthPlanProductionRequirePlanVo> hasProductionList = productionPlanList.stream().filter(singlePlan -> singlePlan.hasProductionThisRound()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionList)) {
-            return "";
+            return StringUtils.EMPTY;
         }
         //提取所有sku的物料描述
         Set<String> allMaterialDescSet = hasProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
         Set<String> enableMaterialDescSet = productionContext.getHasMouldCapacity(ProductionConstant.DOUBLE_MOULD_PRODUCTION, allMaterialDescSet, startDay, endDay);
         if (CollectionUtils.isEmpty(enableMaterialDescSet)) {
-            return "";
+            return StringUtils.EMPTY;
         }
         List<MonthPlanProductionRequirePlanVo> enablePlanList = hasProductionList.stream().filter(plan -> enableMaterialDescSet.contains(plan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(enablePlanList)) {
-            return "";
+            return StringUtils.EMPTY;
         }
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuPlanMap = enablePlanList.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialDesc())).collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+
+        // 3. 选择最高优先级SKU
+        Optional<String> highestPrioritySku = SkuPrioritySelector.selectHighestPrioritySku(skuPlanMap,productionContext,startDay,endDay);
+        if (highestPrioritySku.isPresent()) {
+            String highestPriorityMaterialDesc = highestPrioritySku.get();
+            log.info("最高优先级SKU:{} ",highestPriorityMaterialDesc);
+            return highestPriorityMaterialDesc;
+        } else {
+            log.info("没有找到符合条件的SKU");
+            return StringUtils.EMPTY;
+        }
+
         /**
          * 供应链标注"优先字样"最先排产
          * 先排产高优先级，在排产其它净需求
@@ -271,7 +285,7 @@ public class CxAddSkuProductionHandler {
          * 模具产能约束，则取排产量小的
          *
          */
-        List<MonthPlanProductionRequirePlanVo> hasPrioritizeList = enablePlanList.stream().filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsPrioritize())).collect(Collectors.toList());
+       /* List<MonthPlanProductionRequirePlanVo> hasPrioritizeList = enablePlanList.stream().filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsPrioritize())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasPrioritizeList)) {
             hasPrioritizeList = enablePlanList;
         }
@@ -313,7 +327,7 @@ public class CxAddSkuProductionHandler {
         Map<String, List<MonthPlanProductionRequirePlanVo>> limitShareMap = limitShareList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         limitShareMap.forEach((limitMaterial, planList) -> limitGroup.put(limitMaterial, planList.stream().mapToLong(MonthPlanProductionRequirePlanVo::getVirtualProductionQty).sum()));
         Optional<Map.Entry<String, Long>> minEntry = limitGroup.entrySet().stream().min(Map.Entry.comparingByValue());
-        return minEntry.get().getKey();
+        return minEntry.get().getKey();*/
     }
 
     /**

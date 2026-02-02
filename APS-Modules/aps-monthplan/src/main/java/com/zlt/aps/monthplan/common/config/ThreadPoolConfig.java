@@ -27,4 +27,21 @@ public class ThreadPoolConfig {
       executor.initialize();
       return executor;
     }
+
+  /**
+   * 创建执行器服务
+   */
+  @Bean("batchInsertExecutor")
+  public Executor batchInsertExecutor() {
+    // I/O密集型任务：线程数 = CPU核心数 * 2 + 1
+    int coreSize = Runtime.getRuntime().availableProcessors() * 2 + 1;
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(coreSize);
+    executor.setMaxPoolSize(coreSize * 2);
+    executor.setQueueCapacity(1000);
+    executor.setThreadNamePrefix("batch-insert-thread-");
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+    executor.initialize();
+    return executor;
+  }
 }

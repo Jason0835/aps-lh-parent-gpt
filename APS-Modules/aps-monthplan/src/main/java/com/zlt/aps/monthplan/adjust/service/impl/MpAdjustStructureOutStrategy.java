@@ -10,6 +10,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -217,8 +218,11 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Date startTime,endTime;
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
-        //结构内，按结构分别调整
-        contextDTO.setStructureName(contextDTO.getStructureName());
+        //contextDTO.setStructureName(contextDTO.getStructureName());
+        if (YesOrNoEnum.YES.getCode().equals(contextDTO.getMpAdjustStructureOutList().get(0).getHasSpecialMaterial())){
+            //若是特殊结构,预存特殊结构的总实际排产量
+            setSpecStructureTotalQty(contextDTO,mpProdFinalMap.get(contextDTO.getStructureName()));
+        }
         List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
         //更新结构转产表对应成型机台的调整开始日、结束日
         updateStructureAdjustDayByMachine(structureAllocationList,contextDTO);
@@ -238,7 +242,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //保存调整日志
         saveMpAdjustLog(contextDTO);
 
-        //contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
+        contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
     }
 
     @Override

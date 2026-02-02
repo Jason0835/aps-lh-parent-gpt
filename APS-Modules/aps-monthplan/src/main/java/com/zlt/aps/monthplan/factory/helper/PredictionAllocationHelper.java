@@ -54,17 +54,17 @@ public class PredictionAllocationHelper {
     // 计算该优先级的总订单数量
     int totalOrderQty;
     for (Map.Entry<String, List<DpOrderOffsetDetail>> entry : netDemandGroupMap.entrySet()) {
-      if(productionQtyMap.containsKey(entry.getKey()) && productionQtyMap.get(entry.getKey()) == 0) {
+      totalOrderQty = calculateTotalOrderQty(entry.getValue());
+      if(totalOrderQty <= 0) {
         continue;
       }
       productionQty = productionQtyMap.getOrDefault(entry.getKey(),0);
-      completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
-      totalProductionQty = productionQty - completionQty;
-      totalOrderQty = calculateTotalOrderQty(entry.getValue());
-      if(totalOrderQty == 0) {
+      if(productionQtyMap.containsKey(entry.getKey()) && productionQty == 0) {
         continue;
       }
-      if(totalProductionQty == 0) {
+      completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
+      totalProductionQty = productionQty - completionQty;
+      if(totalProductionQty <= 0) {
         result.addAll(entry.getValue());
         continue;
       }
@@ -134,6 +134,9 @@ public class PredictionAllocationHelper {
           );
           // 处理每个优先级
           for (PriorityProcessor processor : processors) {
+            if(context.getStockQty().compareTo(BigDecimal.ZERO) <= 0) {
+              break;
+            }
             processPriority(context, result, processor);
           }
           return result;
@@ -146,41 +149,50 @@ public class PredictionAllocationHelper {
       PredictionAllocationContext context,
       List<DpOrderOffsetDetail> result,
       PriorityProcessor processor) {
+    BigDecimal stockQty = context.getStockQty();
+    if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
+      return;
+    }
     // 查找该优先级的销售订单
     List<DpOrderOffsetDetail> saleOrdersByPriority = findSaleOrderByPriority(context.getSaleOrders(), processor.getPriority());
     if (CollectionUtils.isEmpty(saleOrdersByPriority)) {
       return;
     }
-    DpOrderOffsetDetail saleOrder = saleOrdersByPriority.get(0);
     // 计算该优先级的总订单数量
     int totalOrderQty = calculateTotalOrderQty(saleOrdersByPriority);
-    // 计算该优先级的生产数量
-    int productionQty = calculateProductionQty(context.getProductionResults(), processor.getProductionQtyExtractor());
-    if(context.getStockQty().intValue() >= totalOrderQty) {
-      context.setStockQty(context.getStockQty().subtract(BigDecimal.valueOf(totalOrderQty)));
-      totalOrderQty = BigDecimal.ZERO.intValue();
-    }else{
-      totalOrderQty = totalOrderQty  - context.getStockQty().intValue();
-      context.setStockQty(BigDecimal.ZERO);
-    }
-    log.info("materialCode: {},priority:{},totalOrderQty:{},productionQty:{},stockQty:{}",
-        saleOrder.getMaterialCode(),
-        processor.getPriority(),
-        totalOrderQty,productionQty,
-        context.getStockQty().intValue());
-    if(totalOrderQty <=0) {
+    if(totalOrderQty <= 0) {
       return;
     }
+    BigDecimal sumOrderQty = BigDecimal.valueOf(totalOrderQty);
+    DpOrderOffsetDetail saleOrder = saleOrdersByPriority.get(0);
+    // 计算该优先级的生产数量
+    int productionQty = calculateProductionQty(context.getProductionResults(), processor.getProductionQtyExtractor());
+    if(stockQty.compareTo(sumOrderQty) >= 0) {
+      stockQty = stockQty.subtract(sumOrderQty);
+      sumOrderQty = BigDecimal.ZERO;
+    }else{
+      sumOrderQty = sumOrderQty.subtract(stockQty);
+      stockQty = BigDecimal.ZERO;
+    }
+    if(sumOrderQty.compareTo(BigDecimal.ZERO) <= 0) {
+      return;
+    }
+    log.info("monthPlanVersion:{}, materialCode: {},priority:{},totalOrderQty:{},productionQty:{},stockQty:{}",
+        context.getCreateCondition().getMonthPlanVersion(),
+        saleOrder.getMaterialCode(),
+        processor.getPriority(),
+        sumOrderQty.intValue(),productionQty,
+        stockQty.intValue());
     DpDemandPlan createCondition =  context.getCreateCondition();
     saleOrder.setFactoryCode(createCondition.getFactoryCode());
     saleOrder.setYear(createCondition.getYear());
     saleOrder.setMonth(createCondition.getMonth());
     saleOrder.setMonthPlanVersion(createCondition.getMonthPlanVersion());
-    saleOrder.setOrderQty(totalOrderQty);
+    saleOrder.setOrderQty(sumOrderQty.intValue());
     saleOrder.setStockQty(BigDecimal.ZERO.intValue());
     saleOrder.setAllocationQty(BigDecimal.ZERO.intValue());
     saleOrder.setPlannedSurplus(BigDecimal.ZERO.intValue());
-    saleOrder.setProduceQtyDue(totalOrderQty);
+    saleOrder.setProduceQtyDue(sumOrderQty.intValue());
     saleOrder.setProductionQty(productionQty);
     saleOrder.setBaseVale(null);
     saleOrder.setId(null);

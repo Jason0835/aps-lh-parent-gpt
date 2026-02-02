@@ -115,7 +115,7 @@ public class OnLineGroupOnLineMachineHandler {
         }
         //续作Sku
         if (ContinueTypeEnum.SAME_SKU == type) {
-            CxContinueGroupAllocationHandler.productionContinueSku(productionContext, productionStage, groupPlan, continueSkuInfoMap);
+            CxContinueProductionHandler.productionContinueSku(productionContext, productionStage, groupPlan, continueSkuInfoMap);
             return;
         }
         Integer deadLineDay = groupPlan.getContinueSkuDeadLineDay(context);

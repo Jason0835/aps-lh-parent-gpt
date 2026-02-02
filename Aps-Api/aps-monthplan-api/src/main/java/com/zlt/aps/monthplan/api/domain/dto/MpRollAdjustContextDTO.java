@@ -72,6 +72,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "产品结构")
     private String structureName;
 
+    @ApiModelProperty(value = "特殊结构总计划量")
+    private Integer specStructureTotalQty;
+
     @ApiModelProperty(value = "排产机台")
     private String scheduledMachines;
 
@@ -149,5 +152,8 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "参数")
     private Map<String, Object> paramMap;
+
+    @ApiModelProperty(value = "工作日历")
+    private List<MdmWorkCalendar> workCalendarList;
 
 }
