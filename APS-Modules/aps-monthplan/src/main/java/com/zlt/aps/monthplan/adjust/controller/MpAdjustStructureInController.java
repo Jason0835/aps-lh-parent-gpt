@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.adjust.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.tlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
@@ -18,7 +19,12 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -58,8 +64,56 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpAdjustStructureIn queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        sortlList(tableDataInfo.getRows());
+        return tableDataInfo;
     }
+
+    protected void sortlList(List<?> rows) {
+        if (PubUtil.isEmpty(rows)) {
+            return;
+        }
+        List<MpAdjustStructureIn> mpAdjustStructureInList = (List<MpAdjustStructureIn>) rows;
+        Collections.sort(mpAdjustStructureInList, getSortComparator());
+    }
+
+    protected Comparator<MpAdjustStructureIn> getSortComparator() {
+        // 定义施工阶段自定义排序权重：正式(03) -> 试制(01) -> 量试(02) -> 无工艺(00)，空值排最后
+        Map<String, Integer> stageSortWeights = new HashMap<>();
+        // 正式：权重1
+        stageSortWeights.put(ConstructionStageEnum.FORMAL_PRODUCTION.getStage(), 1);
+        // 试制：权重2
+        stageSortWeights.put(ConstructionStageEnum.MEASUREMENT.getStage(), 2);
+        // 量试：权重3
+        stageSortWeights.put(ConstructionStageEnum.TRIAL_PRODUCTION.getStage(), 3);
+        // 无施工：权重4
+        stageSortWeights.put(ConstructionStageEnum.NO_CONSTRUCTION.getStage(), 4);
+        // 一级排序：结构名称升序，空值排最后
+        return Comparator.comparing(MpAdjustStructureIn::getStructureName, Comparator.nullsLast(String::compareTo))
+                // 二级排序：施工阶段按自定义权重升序（权重小排前）
+                .thenComparing(vo -> stageSortWeights.getOrDefault(vo.getConstructionStage(), 5))
+                // 三级排序：负数排前 -> 正数次之 -> 0（含null）最后，同组内绝对值从大到小
+                // 负数排前，非负数整体在后
+                .thenComparing(vo -> {
+                    // null统一视为0
+                    Integer qty = Optional.ofNullable(vo.getPendingQty()).orElse(0);
+                    // 负数返回0，非负数返回1，升序实现负数排前
+                    return qty < 0 ? 0 : 1;
+                })
+                // 非负数内部区分 正数排前，0最后
+                .thenComparing(vo -> {
+                    Integer qty = Optional.ofNullable(vo.getPendingQty()).orElse(0);
+                    // 正数返回0，0返回1，升序实现正数排前、0最后
+                    return qty > 0 ? 0 : 1;
+                })
+                // 同分组内（负数、正数、0）按绝对值降序（从大到小）
+                .thenComparing(vo -> {
+                    Integer qty = Optional.ofNullable(vo.getPendingQty()).orElse(0);
+                    return Math.abs(qty);
+                }, Comparator.reverseOrder());
+
+    }
+
 
     @Override
     protected String getOrderBy() {
