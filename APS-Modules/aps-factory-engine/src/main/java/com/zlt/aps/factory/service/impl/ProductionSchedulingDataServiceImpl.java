@@ -601,6 +601,10 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return;
         }
         dayResultList.forEach(singleData -> {
+            if(null == singleData.getAverageSaleQty()) {
+                singleData.setInventorySalesRatio(null);
+                return;
+            }
             if (null == singleData.getInventorySalesRatio()) {
                 return;
             }
