@@ -94,7 +94,6 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         if (StringUtils.isNotBlank(monthPlanVersion)) {
             queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         }
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         List<DpDemandPlan> demandPlanList = monthPlanRequireMapper.selectList(queryWrapper);
 
         // 构建物料描述到结构名的映射

@@ -213,7 +213,7 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
         // 发送消息
         messageServiceAdapter.sendMessage(
                  MsgTemplateEnums.RAW_WARNING_RECORD.getCode(),
-                 MsgTypeEnums.TASK.getCode(),
+                 MsgTypeEnums.NOTICE.getCode(),
                  MsgChannelEnums.SYSTEM.getCode(),
                  null,
                  context,
