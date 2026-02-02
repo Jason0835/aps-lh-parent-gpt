@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.setting.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -16,6 +17,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
@@ -128,7 +130,18 @@ public class MdmMonCycleSchStruConfController extends AbstractDocBizController<M
     protected List<MdmMonCycleSchStruConf> listExportData(MdmMonCycleSchStruConf obj) {
         QueryWrapper<MdmMonCycleSchStruConf> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MdmMonCycleSchStruConf> list = entityMapper.selectList(wrapper);
+        this.translationList(list);
+        return list;
+    }
+
+    private void translationList(List<MdmMonCycleSchStruConf> list) {
+        if(CollectionUtils.isEmpty(list)) {
+            return;
+        }
+        for (MdmMonCycleSchStruConf item : list) {
+            item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
+        }
     }
 
     @Override
