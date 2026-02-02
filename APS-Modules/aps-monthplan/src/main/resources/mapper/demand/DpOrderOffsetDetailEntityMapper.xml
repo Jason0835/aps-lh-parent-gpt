@@ -19,7 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="getOffsetVersion" resultType="java.lang.String">
         SELECT MONTH_PLAN_VERSION
-        FROM T_DP_ORDER_OFFSET_DETAIL
+        FROM t_dp_demand_plan_sum
         WHERE FACTORY_CODE = #{factoryCode}
           AND YEAR = #{year}
           AND MONTH = #{month}
