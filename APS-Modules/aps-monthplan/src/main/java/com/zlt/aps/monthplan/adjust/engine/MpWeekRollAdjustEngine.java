@@ -497,22 +497,31 @@ public class MpWeekRollAdjustEngine {
      * @return 可以移动的SKU列表
      */
     private List<FactoryMonthPlanFinalAdjustVo> findCanMoveSkuList(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int secStartDay) {
-        List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream()
+        List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream().filter(x->x.getBeginDay()!=null && x.getBeginDay()>=secStartDay)
+                .sorted(Comparator.comparing(FactoryMonthPlanFinalAdjustVo::getBeginDay)
+                .thenComparing((o1, o2) -> {
+                    // 自定义比较逻辑(总的已排实单量)
+                    int totalQty1 = o1.getHeightProductionQty() + o1.getMidProductionQty();
+                    int totalQty2 = o2.getHeightProductionQty() + o2.getMidProductionQty();
+                    return Integer.compare(totalQty2,totalQty1);
+                })).collect(Collectors.toList());
+       /* List<FactoryMonthPlanFinalAdjustVo> finalVoList = mpProdFinalList.stream()
                 .filter(x->x.getBeginDay()!=null && secStartDay == x.getBeginDay()).sorted((o1, o2) -> {
                     // 自定义比较逻辑(总的已排实单量)
                     int totalQty1 = o1.getHeightProductionQty() + o1.getMidProductionQty();
                     int totalQty2 = o2.getHeightProductionQty() + o2.getMidProductionQty();
                     return Integer.compare(totalQty2,totalQty1);
-            }).collect(Collectors.toList());
-        if (PubUtil.isNotEmpty(finalVoList)){
+            }).collect(Collectors.toList());*/
+    /*    if (PubUtil.isNotEmpty(finalVoList)){
             return finalVoList;
-        }
-        if (secStartDay >= FactoryConstant.MONTH_MAX_DAY){
+        }*/
+       /* if (secStartDay >= FactoryConstant.MONTH_MAX_DAY){
             //若第2天可开始日 已到月底最后1天，则退出
             return null;
         }
         // 加1天，递归查找
-        return findCanMoveSkuList(mpProdFinalList,secStartDay+1);
+        return findCanMoveSkuList(mpProdFinalList,secStartDay+1);*/
+        return finalVoList;
     }
 
     /**
