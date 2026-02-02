@@ -19,6 +19,9 @@ import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
+import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -421,6 +424,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             result.computeIfAbsent(vo.getStructureName(), k -> new ArrayList<>()).add(vo);
         }
         return result;
+    }
+
+    /**
+     * 设置 特殊结构总的生产实际排产量
+     * @param contextDTO
+     * @param mpFinalList
+     */
+    protected void setSpecStructureTotalQty(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpFinalList){
+        if (PubUtil.isEmpty(mpFinalList)){
+            return;
+        }
+        Integer specStructureTotalQty = mpFinalList.stream().mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
+        contextDTO.setSpecStructureTotalQty(specStructureTotalQty);
     }
 
     /**
@@ -1928,7 +1944,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 获取上周的周数
-        int week = getWeekNumber(new Date()) - 1;
+        int week = getWeekNumber(new Date());
+        if (week > 1) {
+            week = week - 1;
+        }
         Integer previousNetQty = Convert.toInt(monthPlan.getTotalQty(),0);
         Integer adjustQty = Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week),0);
         if (adjustQty != 0 && week > 0) {
@@ -2105,12 +2124,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
                 continue;
             }
+            String materialCode = adjust.getMaterialCode();
+            List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            if (PubUtil.isNotEmpty(dpDemandPlan)) {
+                // 设置排产分类
+                adjust.setProductionType(dpDemandPlan.get(0).getProductionType());
+            }
             // 试制量试设置净需求为订单量
             if (ApsConstant.TRUE.equals(adjust.getIsTrial())) {
                 adjust.setCurrentNetQty(adjust.getOrdQty());
             } else {
-                String materialCode = adjust.getMaterialCode();
-                List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
                 // 汇总排产净需求
                 Integer netQtySum = dpDemandPlan.stream()
                         .filter(e -> e.getNetQty() != null)
@@ -2469,7 +2492,5 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .map(RawSpecialMaterialRecord::getMaterialCode)
                 .anyMatch(childMaterialCodes::contains);
     }
-
-
 
 }

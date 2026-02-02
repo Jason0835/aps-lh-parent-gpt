@@ -103,6 +103,14 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
 
+    /**
+     * 排产分类 数据字典：biz_schedule_type
+     */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.productionType", dictType = "biz_schedule_type")
+    @ApiModelProperty(value = "排产分类", name = "productionType")
+    @TableField(value = "PRODUCTION_TYPE")
+    private String productionType;
+
     /** 是否含特殊材料            2、0-否，1-是 */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.hasSpecialMaterial")
     @ApiModelProperty(value = "是否含特殊材料            2、0-否，1-是", name = "hasSpecialMaterial")
