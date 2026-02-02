@@ -418,9 +418,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     private List<DpDemandPlan> generateDemandPlans(DpDemandPlan createCondition, List<DpOrderOffsetDetail>  leftDemands, List<SupplyOrderPool> supplyOrderPools) {
         List<DpDemandPlan> demandPlans = new ArrayList<>();
+        List<DpOrderOffsetDetail> orderOffsetDetails = null;
         // 处理净需求
         if (!CollectionUtils.isEmpty(leftDemands)) {
-            leftDemands.forEach(leftDemand -> demandPlans.add(buildDemandPlanFromAllocation(createCondition,leftDemand)));
+            List<String> scmPriorities = Lists.newArrayList(ApsConstant.SAL_PRIORITY_HIGHT,ApsConstant.SAL_PRIORITY_MID,ApsConstant.SAL_PRIORITY_POSTPONE);
+            orderOffsetDetails =   leftDemands.stream().filter(item -> scmPriorities.contains(item.getScmPriority()) && null != item.getProduceQtyDue() && item.getProduceQtyDue() > 0).collect(Collectors.toList());
+        }
+        if(!CollectionUtils.isEmpty(orderOffsetDetails)) {
+            orderOffsetDetails.forEach(leftDemand -> demandPlans.add(buildDemandPlanFromAllocation(createCondition,leftDemand)));
         }
         // 处理供应链订单
         if (!CollectionUtils.isEmpty(supplyOrderPools)) {
