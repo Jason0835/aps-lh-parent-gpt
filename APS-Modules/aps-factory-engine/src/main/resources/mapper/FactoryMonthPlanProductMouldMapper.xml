@@ -125,8 +125,8 @@
         '02' AS RELATION_TYPE
         FROM t_mdm_mould_delivery_plan mdp
         WHERE mdp.IS_DELETE = 0
-        AND mdp.BOARDING_DATE >= #{productionStartDate,jdbcType=DATE}
-        AND mdp.BOARDING_DATE <= #{productionEndDate,jdbcType=DATE}
+        AND mdp.BOARDING_DATE &gt;= #{productionStartDate,jdbcType=DATE}
+        AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
         AND EXISTS (
         SELECT 1
         FROM (
