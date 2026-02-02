@@ -21,7 +21,12 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -62,8 +67,46 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpAdjustResult queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        sortlList(tableDataInfo.getRows());
+        return tableDataInfo;
     }
+
+    protected void sortlList(List<?> rows) {
+        if (PubUtil.isEmpty(rows)) {
+            return;
+        }
+        List<MpAdjustResult> mpAdjustResultList = (List<MpAdjustResult>) rows;
+        Collections.sort(mpAdjustResultList, getSortComparator());
+    }
+
+    protected Comparator<MpAdjustResult> getSortComparator() {
+        // 一级排序：结构名称升序，空值排最后
+        return Comparator.comparing(MpAdjustResult::getStructureName, Comparator.nullsLast(String::compareTo))
+                // 二级排序：负数排前 -> 正数次之 -> 0（含null）最后，同组内绝对值从大到小
+                // 负数排前，非负数整体在后
+                .thenComparing(vo -> {
+                    // null统一视为0
+                    Integer qty = Optional.ofNullable(vo.getTotalPlanQty()).orElse(0);
+                    // 负数返回0，非负数返回1，升序实现负数排前
+                    return qty < 0 ? 0 : 1;
+                })
+                // 非负数内部区分 正数排前，0最后
+                .thenComparing(vo -> {
+                    Integer qty = Optional.ofNullable(vo.getTotalPlanQty()).orElse(0);
+                    // 正数返回0，0返回1，升序实现正数排前、0最后
+                    return qty > 0 ? 0 : 1;
+                })
+                // 同分组内（负数、正数、0）按绝对值降序（从大到小）
+                .thenComparing(vo -> {
+                    Integer qty = Optional.ofNullable(vo.getTotalPlanQty()).orElse(0);
+                    return Math.abs(qty);
+                }, Comparator.reverseOrder());
+
+    }
+
+
+
 
     @Override
     protected String getOrderBy() {
