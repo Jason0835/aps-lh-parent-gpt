@@ -35,8 +35,8 @@
         >
         <el-button
           @click="handleCopy"
-          v-hasPermi="['monthplan:mdmMouldAllocation:export']"
-          >{{ $t("复制") }}</el-button
+          v-hasPermi="['monthplan:mdmMouldAllocation:copy']"
+          >{{ $t("ui.params.copy") }}</el-button
         >
         <el-button
           v-hasPermi="['monthplan:mdmMouldAllocation:import']"

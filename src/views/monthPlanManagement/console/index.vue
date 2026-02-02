@@ -2,6 +2,7 @@
 <template>
   <basic-container>
     <page-table
+      ref="consoleRef"
       tableRef="ConsoleMainTable"
       :calcHeight="true"
       v-loading="loading"
@@ -18,6 +19,7 @@
       :showSummary="false"
       :selectArea="false"
       :span-method="spanMethod"
+      @select-all="handleSelectAll"
     >
       <template slot="header">
         <el-button
@@ -438,6 +440,10 @@ export default {
     },
   },
   methods: {
+    handleSelectAll(selection) {
+      this.$refs.consoleRef.getTableRef().clearSelection()
+
+    },
     handleChange(val) {
       // this.search.monthPlanVersion = val;
       // this.query.monthPlanVersion = val;
@@ -599,6 +605,7 @@ export default {
     },
 
     handleSelectionChange(rows) {
+      console.log(rows)
       this.selection = rows;
     },
     handleFinalized() {

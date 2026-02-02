@@ -537,7 +537,7 @@ export default {
       factoryCode: "116",
     };
     this.getList();
-    // this.getVersionList(true)
+    this.getVersionList()
   },
   activated() {
     // this.getList();
