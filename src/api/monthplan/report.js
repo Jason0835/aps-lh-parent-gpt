@@ -323,3 +323,14 @@ export function listOrderOffsetDetail(query) {
     data: query
   })
 }
+
+
+
+//订单冲减分配版本
+export function listOrderVersion(query) {
+  return request({
+    url: '/maindata/dpOrderOffsetDetail/findMonthPlanVersion',
+    method: 'post',
+    data: query
+  })
+}

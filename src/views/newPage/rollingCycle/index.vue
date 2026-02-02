@@ -24,9 +24,12 @@
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
           <el-tab-pane label="结构内" name="first">
-            <el-button @click="adjustOrder" :loading="getLoading"  v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']">{{
-              $t("获取调整订单")
-            }}</el-button>
+            <el-button
+              @click="adjustOrder"
+              :loading="getLoading"
+              v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
+              >{{ $t("获取调整订单") }}</el-button
+            >
             <el-button
               @click="handShowResult"
               :loading="autoLoading"
@@ -42,9 +45,11 @@
             <!-- <el-button @click="handleShowSpecial">{{
               $t("特殊材料生产情况")
             }}</el-button> -->
-            <el-button @click="handleAddSpecial" v-hasPermi="['monthplan:mpStructureAllocation:save']">{{
-              $t("新增结构")
-            }}</el-button>
+            <el-button
+              @click="handleAddSpecial"
+              v-hasPermi="['monthplan:mpStructureAllocation:save']"
+              >{{ $t("新增结构") }}</el-button
+            >
           </el-tab-pane>
           <el-tab-pane
             label="单结构调整"
@@ -118,8 +123,12 @@
               </el-form-item>
 
               <el-form-item>
-                <el-button type="primary" @click="getOutList"
-                 v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
+                <el-button
+                  type="primary"
+                  @click="getOutList"
+                  v-hasPermi="[
+                    'monthplan:mpWeekRollAdjust:getAdjustDetailList',
+                  ]"
                   >获取调整订单</el-button
                 >
               </el-form-item>
@@ -134,7 +143,12 @@
             </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="调整结果" name="three" v-if="this.hasPermission('monthplan:mpAdjustResult:list')"> </el-tab-pane>
+          <el-tab-pane
+            label="调整结果"
+            name="three"
+            v-if="this.hasPermission('monthplan:mpAdjustResult:list')"
+          >
+          </el-tab-pane>
         </el-tabs>
       </template>
       <template slot="footer" v-if="isShowFoot">
@@ -155,7 +169,6 @@
             v-if="activeName != 'singleResult'"
             :loading="loading"
             :disabled="data.length == 0"
-
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
@@ -165,7 +178,7 @@
             v-if="activeName == 'singleResult'"
             :loading="loading"
             :disabled="data.length == 0"
-             v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
@@ -462,6 +475,15 @@ export default {
             prop: "actualAdjustQty",
             label: this.$t("实际调整"),
             width: 120,
+            render: ({ row }) => {
+              return (
+                <div
+                  style={{ background: row.actualAdjustQty ? "yellow" : "" }}
+                >
+                  {row.actualAdjustQty}
+                </div>
+              );
+            },
           },
           // {
           //   prop: "adjustmentReason",
@@ -555,7 +577,7 @@ export default {
                     class="minus"
                     v-hasPermi={["monthplan:mpStructureAllocation:remove"]}
                     type="danger"
-                    disabled={row.dataSource!='01'}
+                    disabled={row.dataSource != "01"}
                     onClick={() => this.handleStructureDelete(row)}
                   >
                     {this.$t("ui.frame.btn.delete")}
@@ -823,6 +845,15 @@ export default {
             prop: "actualAdjustQty",
             label: this.$t("实际调整"),
             width: 120,
+            render: ({ row }) => {
+              return (
+                <div
+                  style={{ background: row.actualAdjustQty ? "yellow" : "" }}
+                >
+                  {row.actualAdjustQty}
+                </div>
+              );
+            },
           },
           // {
           //   prop: "adjustmentReason",

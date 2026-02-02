@@ -37,7 +37,7 @@ import Big from "big.js";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listOrderOffsetDetail } from "@/api/monthplan/report";
+import { listOrderOffsetDetail ,listOrderVersion} from "@/api/monthplan/report";
 import { areaList } from "@/api/monthplan/mdmAreaCapaAllocation";
 //components
 
@@ -71,6 +71,7 @@ export default {
       query: {},
       stat: {},
       areaDist:[],
+      versionList:[],
     };
   },
   computed: {
@@ -277,6 +278,9 @@ export default {
         {
           label: this.$t("ui.data.column.finishStock.requireVersion"),
           prop: "monthPlanVersion",
+          type: "select",
+          filterable: true,
+          dictData: this.versionList,
         },
         {
           prop: "productTypeCode",
@@ -486,6 +490,39 @@ export default {
         this.loading = false;
       }
     },
+    async getVersionList(isGet,isSet=true) {
+      if (isGet) {
+        this.loading = true;
+      }
+      try {
+        const data = await listOrderVersion(this.formatParams());
+        let list = [];
+        for (let i = 0; i < data.length; i++) {
+          let obj = {
+            label: data[i],
+            value: data[i],
+          };
+          list.push(obj);
+        }
+        this.versionList = list;
+        if (list.length > 0) {
+          this.$set(this.search, "monthPlanVersion", list[0].value);
+          this.$set(this.query, "monthPlanVersion", list[0].value);
+        } else {
+          this.$set(this.search, "monthPlanVersion", "");
+          this.$set(this.query, "monthPlanVersion", "");
+        }
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+      } finally {
+        if (isGet) {
+          this.$set(this.page, "current", 1);
+          this.getList();
+        }
+      }
+    },
+
   },
   created() {
     this.getAreaList();
@@ -499,7 +536,8 @@ export default {
       yearMonth: date.format("yyyy-MM"),
       factoryCode: "116",
     };
-    this.getList();
+    // this.getList();
+    this.getVersionList(true)
   },
   activated() {
     // this.getList();
