@@ -91,17 +91,10 @@ public class DpOrderOffsetDetailServiceImpl extends AbstractDocService<DpOrderOf
      */
     @Override
     public List<String> getOffsetVersion(DpOrderOffsetDetail queryCondition) {
-        LambdaQueryWrapper<DpOrderOffsetDetail> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DpOrderOffsetDetail::getFactoryCode, queryCondition.getFactoryCode());
-        wrapper.eq(DpOrderOffsetDetail::getYear, queryCondition.getYear());
-        wrapper.eq(DpOrderOffsetDetail::getMonth, queryCondition.getMonth());
-        wrapper.eq(DpOrderOffsetDetail::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.orderByDesc(DpOrderOffsetDetail::getCreateTime);
-        List<DpOrderOffsetDetail> list =  this.dpOrderOffsetDetailEntityMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(list)){
-            return Collections.emptyList();
-        }
-        return list.stream().map(DpOrderOffsetDetail::getMonthPlanVersion).distinct().collect(Collectors.toList());
+        return dpOrderOffsetDetailEntityMapper.getOffsetVersion(
+                queryCondition.getFactoryCode(),
+                queryCondition.getYear(),
+                queryCondition.getMonth());
     }
 
     @Override
