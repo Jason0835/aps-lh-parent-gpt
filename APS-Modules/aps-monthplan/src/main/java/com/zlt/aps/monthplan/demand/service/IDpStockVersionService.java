@@ -30,7 +30,7 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    * @param monthPlanVersion 需求版本号
    * @param finishedProductStockMap 成品库存记录
    */
-  List<DpStockVersion> insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
+  void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
 
   /**
    *  汇总库存

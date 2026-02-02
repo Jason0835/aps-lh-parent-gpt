@@ -85,9 +85,9 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
     }
 
     @Override
-    public List<DpStockVersion> insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap) {
+    public void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap) {
         if (CollectionUtils.isEmpty(finishedProductStockMap)) {
-            return Collections.emptyList();
+            return;
         }
         List<DpStockVersion> list = Lists.newArrayList();
         List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
@@ -97,7 +97,6 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
         });
         list.sort(Comparator.comparing(DpStockVersion::getMaterialCode));
         this.batchInsertProcessor.batchInsert(list);
-        return list;
     }
 
     @Override
