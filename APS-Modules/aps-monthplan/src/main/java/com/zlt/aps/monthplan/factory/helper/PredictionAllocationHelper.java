@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.factory.helper;
 
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
@@ -9,7 +10,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
@@ -79,6 +79,11 @@ public class PredictionAllocationHelper {
       );
       allocations = processOrderGroup(context);
       if(CollectionUtils.isEmpty(allocations)) {
+        continue;
+      }
+      List<String> scmPriorities = Lists.newArrayList(ApsConstant.SAL_PRIORITY_HIGHT,ApsConstant.SAL_PRIORITY_MID,ApsConstant.SAL_PRIORITY_POSTPONE);
+      int totalProduceQtyDue =   allocations.stream().filter(item -> scmPriorities.contains(item.getScmPriority()) && null != item.getProduceQtyDue()).mapToInt(DpOrderOffsetDetail::getProduceQtyDue).sum();
+      if(totalProduceQtyDue <= 0) {
         continue;
       }
       allocations.forEach(allocation -> {
