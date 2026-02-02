@@ -1,6 +1,8 @@
 package com.zlt.aps.monthplan.raw.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.RawWeekUsageEntityMapper;
@@ -34,6 +36,9 @@ public class RawWeekUsageGenerateServiceImpl {
     @Autowired
     private RawWeekUsageEntityMapper rawWeekUsageEntityMapper;
 
+    @Autowired
+    private ISysDictDataCacheService iSysDictDataCacheService;
+
 
     /**
      * 生成周维度原材料用量记录
@@ -54,9 +59,13 @@ public class RawWeekUsageGenerateServiceImpl {
             planWrapper.eq("MONTH", month);
             List<FactoryMonthPlanProdFinal> monthPlans = factoryMonthPlanProdFinalMapper.selectList(planWrapper);
 
+
+            List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+            String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(factoryCode)).findFirst().get().getDictLabel();
+
             if (monthPlans.isEmpty()) {
                 log.warn("未找到月生产计划，工厂：{}，年份：{}，月份：{}", factoryCode, year, month);
-                return AjaxResult.error(String.format("未找到月生产计划，工厂：%s，年份：%d，月份：%d", factoryCode, year, month));
+                return AjaxResult.error(String.format("未找到月生产计划，工厂：%s，年份：%d，月份：%d", factoryName, year, month));
             }
 
             // 2. 按周分组生产计划
@@ -80,7 +89,7 @@ public class RawWeekUsageGenerateServiceImpl {
             }
 
             log.info("周维度原材料用量记录生成完成，工厂：{}，年份：{}，月份：{}，总记录数：{}",
-                    factoryCode, year, month, totalRecords);
+                    factoryName, year, month, totalRecords);
 
             return AjaxResult.success(String.format("周维度原材料用量记录生成完成，共生成%d条记录", totalRecords));
 
