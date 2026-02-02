@@ -1573,7 +1573,7 @@ public class MpWeekRollAdjustEngine {
             dayField = FactoryConstant.DAY_FIELD+i;
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null){
                 //从锁定次日开始，若天的值为空，直接退
-                break;
+                continue;
             }
             matchDayField = FactoryConstant.MATCH_DAY_FIELD+i;
             if (mpFinalVo.getFieldValueByFieldName(matchDayField) != null){
@@ -1608,7 +1608,7 @@ public class MpWeekRollAdjustEngine {
             dayField = FactoryConstant.DAY_FIELD+i;
             if (mpFinalVo.getFieldValueByFieldName(dayField) == null){
                 //从锁定次日开始，若天的值为空，直接退
-                break;
+                continue;
             }
             matchDayField = FactoryConstant.MATCH_DAY_FIELD+i;
             if (mpFinalVo.getFieldValueByFieldName(matchDayField) != null){
