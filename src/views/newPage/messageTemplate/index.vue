@@ -220,15 +220,15 @@ export default {
     searchColumns() {
       return [
         {
-          prop: "模板编码",
+          prop: "templateCode",
           label: this.$t("模板编码"),
         },
         {
-          prop: "模板名称",
+          prop: "templateName",
           label: this.$t("模板名称"),
         },
         {
-          prop: "标题",
+          prop: "title",
           label: this.$t("标题"),
         },
       ];

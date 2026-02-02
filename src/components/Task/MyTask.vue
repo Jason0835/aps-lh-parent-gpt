@@ -159,7 +159,9 @@ import { debounce } from "@/utils";
 import { getNotice, delNotice, addNotice, updateNotice } from "@/api/system/notice";
 import {messageListTaskMessage,readMessageTask} from "@/api/system/message";
 import { mapGetters } from 'vuex'
+import AppLink from "@/layout/components/Sidebar/Link";
 export default {
+  components: { AppLink },
   name: "Task",
   dicts: ['msg_channel', 'msg_source', 'msg_status', 'msg_type'],
   props: {
@@ -244,6 +246,7 @@ export default {
   },
   methods: {
     handleClick(row){
+    console.log('ssss')
       readMessageTask(row.id).then(response => {
         this.getList()
 
