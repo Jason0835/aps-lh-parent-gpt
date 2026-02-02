@@ -64,10 +64,6 @@ public class PredictionAllocationHelper {
       }
       completionQty = completionQtyMap.getOrDefault(entry.getKey(), 0);
       totalProductionQty = productionQty - completionQty;
-      if(totalProductionQty <= 0) {
-        result.addAll(entry.getValue());
-        continue;
-      }
       if(totalOrderQty <= totalProductionQty) {
          continue;
       }
@@ -150,9 +146,6 @@ public class PredictionAllocationHelper {
       List<DpOrderOffsetDetail> result,
       PriorityProcessor processor) {
     BigDecimal stockQty = context.getStockQty();
-    if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-      return;
-    }
     // 查找该优先级的销售订单
     List<DpOrderOffsetDetail> saleOrdersByPriority = findSaleOrderByPriority(context.getSaleOrders(), processor.getPriority());
     if (CollectionUtils.isEmpty(saleOrdersByPriority)) {
