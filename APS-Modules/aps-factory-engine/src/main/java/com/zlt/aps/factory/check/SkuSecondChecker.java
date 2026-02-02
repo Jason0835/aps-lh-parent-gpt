@@ -33,6 +33,9 @@ public class SkuSecondChecker implements IProductionCheck {
         if (lastCloseDay == null){
             return true;
         }
+        if (newOnLineDay <=lastCloseDay){
+            return true;
+        }
         int diffDays = newOnLineDay - lastCloseDay;
         return diffDays > skuSecondOnlineDays;
     }
