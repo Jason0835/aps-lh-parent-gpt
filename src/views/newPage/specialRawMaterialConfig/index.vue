@@ -156,7 +156,7 @@ export default {
           label: this.$t("ui.data.column.masterdata.materialCode"),
         },
         {
-          prop: "materialDesc",
+          prop: "materialName",
           label: this.$t("common.name"),
           width:200
         },
@@ -239,7 +239,7 @@ export default {
           label: this.$t("ui.data.column.masterdata.materialCode"),
         },
         {
-          prop: "materialDesc",
+          prop: "materialName",
           label: this.$t("common.name"),
         }
       ];

@@ -15,6 +15,8 @@
       @refresh="getList"
       @search="handleSearch"
       @pageChange="handlePageChange"
+         @reset="refreshSearch"
+         :isReset="true"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
       row-key="id"
@@ -23,7 +25,7 @@
     >
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
-          <el-tab-pane label="结构内" name="first">
+          <el-tab-pane label="结构内" name="first" :disabled="loading">
             <el-button
               @click="adjustOrder"
               :loading="getLoading"
@@ -38,7 +40,7 @@
               >{{ $t("自动调整") }}</el-button
             >
           </el-tab-pane>
-          <el-tab-pane label="结构调整" name="second">
+          <el-tab-pane label="结构调整" name="second" :disabled="loading">
             <el-button @click="handleAdd" :disabled="selection.length != 1">{{
               $t("单选结构调整")
             }}</el-button>
@@ -146,6 +148,7 @@
           <el-tab-pane
             label="调整结果"
             name="three"
+             :disabled="loading"
             v-if="this.hasPermission('monthplan:mpAdjustResult:list')"
           >
           </el-tab-pane>
@@ -929,6 +932,9 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("物料编码"),
+          listeners: {
+            input: this.handleMaterialCodeChange,
+          },
         },
         {
           prop: "materialDesc",
@@ -1084,6 +1090,22 @@ export default {
     },
   },
   methods: {
+    refreshSearch(){
+      this.search={
+        factoryCode:this.search.factoryCode,
+        yearMonth:this.search.yearMonth,
+        productionVersion:this.search.productionVersion,
+        version:this.search.version,
+
+      }
+      this.query={
+        factoryCode:this.search.factoryCode,
+        yearMonth:this.search.yearMonth,
+        productionVersion:this.search.productionVersion,
+        version:this.search.version,
+      }
+      this.getList()
+    },
     //查询是否有权限
     hasPermission(permission) {
       const permissions = this.$store.state.user.permissions || [];
@@ -1174,6 +1196,18 @@ export default {
       };
 
       this.getVersionList();
+    },
+    handleMaterialCodeChange(val) {
+      console.log(val)
+      this.search = {
+        ...this.search,
+        materialCode: val,
+      };
+      this.query = {
+        ...this.search,
+        materialCode: val,
+      };
+
     },
     handleFactoryChange(val) {
       this.search = {
@@ -1452,6 +1486,7 @@ export default {
 
     //tab切换
     handleClick(tab, event) {
+
       // this.loading = true;
       this.showConfirmResult = false;
       this.show = false;
@@ -1742,7 +1777,7 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
         this.data = res.rows;
-        this.getOutResultList(res.rows[0].productionVersion);
+        this.getOutResultList(res.rows[0].productionVersion,res.rows[0].version);
         this.isShowFoot = true;
         this.showOutResult = true;
         this.formInline.adjustStartDay = this.formInline.beginDay;
@@ -1757,7 +1792,7 @@ export default {
     },
 
     //结构外初始化结构列表
-    async getOutResultList(productionVersion) {
+    async getOutResultList(productionVersion,version) {
       try {
         let params = {
           ...this.query,
@@ -1770,6 +1805,7 @@ export default {
           params.yearMonth = "";
         }
         params.productionVersion = productionVersion;
+        params.version = version;
         params.structureName = this.formInline.structureName;
         let res = await getStructureDetail(params);
         this.outResultData = res.rows;

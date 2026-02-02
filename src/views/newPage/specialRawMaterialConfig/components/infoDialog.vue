@@ -101,7 +101,7 @@ export default {
             trigger: "change",
           },
         ],
-        materialDesc: [
+        materialName: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -183,7 +183,7 @@ export default {
           maxlength:10
         },
         {
-          prop: "materialDesc",
+          prop: "materialName",
           label: this.$t("common.name"),
           maxlength:100
         },

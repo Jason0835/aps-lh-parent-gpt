@@ -84,6 +84,7 @@ export default {
           clearable
           placeholder={item.placeholder || this.$t("common.rule.input")}
           disabled={item.disabled}
+          on={item.listeners}
           onKeydown={() => {
             //
             console.log(1);
