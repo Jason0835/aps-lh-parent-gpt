@@ -2124,12 +2124,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
                 continue;
             }
+            String materialCode = adjust.getMaterialCode();
+            List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            if (PubUtil.isNotEmpty(dpDemandPlan)) {
+                // 设置排产分类
+                adjust.setProductionType(dpDemandPlan.get(0).getProductionType());
+            }
             // 试制量试设置净需求为订单量
             if (ApsConstant.TRUE.equals(adjust.getIsTrial())) {
                 adjust.setCurrentNetQty(adjust.getOrdQty());
             } else {
-                String materialCode = adjust.getMaterialCode();
-                List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
                 // 汇总排产净需求
                 Integer netQtySum = dpDemandPlan.stream()
                         .filter(e -> e.getNetQty() != null)
