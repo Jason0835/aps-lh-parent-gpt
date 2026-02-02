@@ -111,15 +111,16 @@ export default {
           width: 120,
         },
         {
-          prop: "mesMaterialCode",
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
-
-        },
-        {
           prop: "materialCode",
           label: this.$t("ui.data.defectiveStock.materialCode"),
           width:180
         },
+        {
+          prop: "mesMaterialCode",
+          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
+
+        },
+
 
         {
           prop: "materialDesc",

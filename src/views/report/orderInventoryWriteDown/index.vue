@@ -118,7 +118,7 @@ export default {
           width: 120,
         },
         {
-          prop: "areaCode",
+          prop: "areaCodeNameI18n",
           label: this.$t("common.area"),
           width: 120,
         },
@@ -536,8 +536,8 @@ export default {
       yearMonth: date.format("yyyy-MM"),
       factoryCode: "116",
     };
-    // this.getList();
-    this.getVersionList(true)
+    this.getList();
+    // this.getVersionList(true)
   },
   activated() {
     // this.getList();

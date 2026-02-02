@@ -34,6 +34,11 @@
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
+          @click="handleCopy"
+          v-hasPermi="['monthplan:mdmMouldAllocation:export']"
+          >{{ $t("复制") }}</el-button
+        >
+        <el-button
           v-hasPermi="['monthplan:mdmMouldAllocation:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
@@ -43,6 +48,7 @@
           v-hasPermi="['monthplan:mdmMouldAllocation:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -62,6 +68,7 @@
       :columns="importColumns"
     ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
+    <copyDialog ref="copyRef" @success="getList" />
   </basic-container>
 </template>
 <script>
@@ -77,7 +84,7 @@ import {
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import copyDialog from "./components/copyDialog.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -85,7 +92,8 @@ export default {
   components: {
     tltUpload,
     infoDialog,
-    TltUploadForm
+    TltUploadForm,
+    copyDialog
   },
   dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name", "biz_product_type"],
   provide() {
@@ -255,6 +263,11 @@ export default {
     },
   },
   methods: {
+    handleCopy(){
+      if (this.$refs.copyRef) {
+        this.$refs.copyRef.show();
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();

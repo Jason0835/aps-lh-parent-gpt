@@ -353,13 +353,13 @@ export default {
         {
           prop: "embryoCode",
           align: "center",
-          width: 120,
+          width: 180,
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
         },
         {
           prop: "embryoDesc",
           align: "center",
-          width: 120,
+          width: 320,
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
         {

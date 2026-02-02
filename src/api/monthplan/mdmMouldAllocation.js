@@ -22,4 +22,11 @@ export function removeMdmMouldAllocation(query) {
     data: query
   })
 }
+export function copyMdmMouldAllocation(query) {
+  return request({
+    url: '/monthplan/mdmMouldAllocation/copy',
+    method: 'post',
+    data: query
+  })
+}
 

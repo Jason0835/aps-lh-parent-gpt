@@ -163,6 +163,7 @@ export default {
         {
           prop: "rubberSpec",
           label: this.$t("ui.data.column.masterdata.rubberSpec"),
+          width:160
         },
         {
           prop: "quota",

@@ -163,6 +163,7 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
+          width:180
         },
         {
           prop: "materialCode",
