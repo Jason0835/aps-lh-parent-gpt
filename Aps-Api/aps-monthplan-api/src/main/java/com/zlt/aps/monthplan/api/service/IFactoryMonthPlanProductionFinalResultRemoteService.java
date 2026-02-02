@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -84,5 +85,12 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     @ApiOperation("查询版本列表")
     @PostMapping("/factoryMonthPlanFinalResult/getVersionList")
     TableDataInfo getVersionList(@RequestBody FactoryMonthPlanProductionFinalResult queryVO);
+
+    /**
+     * 查询列表
+     */
+    @ApiOperation("查询列表")
+    @PostMapping("/factoryMonthPlanFinalResult/listSkuScheduleItems")
+    TableDataInfo listSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResultParam queryVO);
 
 }
