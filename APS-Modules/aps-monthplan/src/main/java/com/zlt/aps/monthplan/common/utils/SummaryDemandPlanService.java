@@ -6,7 +6,7 @@ import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
-import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import lombok.RequiredArgsConstructor;
@@ -41,9 +41,9 @@ public class SummaryDemandPlanService {
 
   @Async("batchInsertExecutor")
   public void summaryDemandPlan(DpDemandPlan createCondition, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
-    List<DpStockVersion> stockVersions = this.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
+    this.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
     Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey));
-    Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(stockVersions);
+    Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(allocationResult.getStockMap());
     List<DpDemandPlanSum> datas = Lists.newArrayList();
     map.forEach((key, value) -> {
       Map<String,Integer> stockMap = stockQtyMap.getOrDefault(key, Collections.emptyMap());
@@ -51,7 +51,7 @@ public class SummaryDemandPlanService {
       BeanUtils.copyProperties(value.get(0), entity);
       entity.setId(null);
       entity.setBaseVale(null);
-      entity.setStockQty(stockMap.getOrDefault(StringConstant.ZERO, BigDecimal.ZERO.intValue()));
+      entity.setStockQty(value.get(0).getStockQty());
       entity.setCurrentYearStockQty(stockMap.getOrDefault(StringConstant.ONE,BigDecimal.ZERO.intValue()));
       entity.setSub1YearStockQty(stockMap.getOrDefault(StringConstant.TWO,BigDecimal.ZERO.intValue()));
       entity.setSub2YearStockQty(stockMap.getOrDefault(StringConstant.THREE,BigDecimal.ZERO.intValue()));
@@ -73,7 +73,7 @@ public class SummaryDemandPlanService {
   /**
    * 批量保存分配结果
    */
-  private List<DpStockVersion> saveAllocationResults(
+  private void saveAllocationResults(
       DpDemandPlan createCondition,
       String monthPlanVersion,
       PredictionContext.OrderAllocationResult allocationResult) {
@@ -83,28 +83,26 @@ public class SummaryDemandPlanService {
     }
     if(!CollectionUtils.isEmpty(allocationResult.getStockMap())) {
       // 批量插入库存版本
-      return  dpStockVersionService.insertBatchData(createCondition, monthPlanVersion, allocationResult.getStockMap());
+      dpStockVersionService.insertBatchData(createCondition, monthPlanVersion, allocationResult.getStockMap());
     }
-    return Collections.emptyList();
   }
 
 
 
-  private Map<String, Map<String, Integer>> calculateStockQty(List<DpStockVersion> list) {
-    if(CollectionUtils.isEmpty(list)){
+  private Map<String, Map<String, Integer>> calculateStockQty(Map<String, List<MdmProductStock>> finishProductStockMap) {
+    if(CollectionUtils.isEmpty(finishProductStockMap)){
       return Collections.emptyMap();
     }
     YearMonth now = YearMonth.now();
     YearMonth lastOneYear = now.minusYears(BigDecimal.ONE.intValue());
     YearMonth lastTwoYear = now.minusYears(BigDecimal.ONE.intValue() + BigDecimal.ONE.intValue());
     Map<String, Map<String, Integer>> result = new HashMap<>();
-    Map<String,List<DpStockVersion>> stockMap =   list.stream().collect(Collectors.groupingBy(DpStockVersion::getMonthPlanVersionKey));
-    stockMap.forEach((key,value)->{
+    finishProductStockMap.forEach((key,value)->{
       Map<String, Integer> map = Maps.newHashMap();
-      int totalStockQty = value.stream().filter(item -> null != item.getStockQty()).mapToInt(DpStockVersion::getStockQty).sum();
-      int currentStockQty = value.stream().filter(item -> filter(item,now)).mapToInt(DpStockVersion::getStockQty).sum();
-      int lastOneYearStockQty = value.stream().filter(item -> filter(item,lastOneYear)).mapToInt(DpStockVersion::getStockQty).sum();
-      int lastTwoYearStockQty = value.stream().filter(item -> filter(item,lastTwoYear)).mapToInt(DpStockVersion::getStockQty).sum();
+      int totalStockQty = value.stream().filter(item -> null != item.getStockQty()).mapToInt(MdmProductStock::getStockQty).sum();
+      int currentStockQty = value.stream().filter(item -> filter(item,now)).mapToInt(MdmProductStock::getStockQty).sum();
+      int lastOneYearStockQty = value.stream().filter(item -> filter(item,lastOneYear)).mapToInt(MdmProductStock::getStockQty).sum();
+      int lastTwoYearStockQty = value.stream().filter(item -> filter(item,lastTwoYear)).mapToInt(MdmProductStock::getStockQty).sum();
       map.put(StringConstant.ZERO,totalStockQty);
       map.put(StringConstant.ONE,currentStockQty);
       map.put(StringConstant.TWO,lastOneYearStockQty);
@@ -114,7 +112,7 @@ public class SummaryDemandPlanService {
     return result;
   }
 
-  private boolean filter(DpStockVersion item, YearMonth yearMonth) {
+  private boolean filter(MdmProductStock item, YearMonth yearMonth) {
     if(StringUtils.isBlank(item.getWeekYear()) || null == item.getStockQty()){
       return false;
     }

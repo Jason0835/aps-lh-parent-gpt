@@ -198,8 +198,8 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         QueryWrapper<MdmWorkCalendar> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
         queryWrapper.eq("PROC_CODE", ProductionProcessesTypeEnum.MONTH_PLAN.getProcCode());
-        queryWrapper.ge("YEAR", contextDTO.getMpYear());
-        queryWrapper.le("MONTH", contextDTO.getMpMonth());
+        queryWrapper.eq("YEAR", contextDTO.getMpYear());
+        queryWrapper.eq("MONTH", contextDTO.getMpMonth());
         return mdmWorkCalendarEntityMapper.selectList(queryWrapper);
     }
 }

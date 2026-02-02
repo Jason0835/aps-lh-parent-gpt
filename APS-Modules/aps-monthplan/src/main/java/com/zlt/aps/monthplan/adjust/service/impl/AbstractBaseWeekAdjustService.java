@@ -651,7 +651,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             lastMonthPlanVersion = monthPlanProdFinalList.get(0).getLastMonthPlanVersion();
         }
         // 调整结果按照物料编码分组
-        Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
+        Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
         // 月度生产计划排程结果
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = new ArrayList<>();
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
@@ -661,17 +661,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjustDetailVo.getMaterialCode();
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
             if (adjustResult == null) {
                 continue;
             }
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
-            monthPlan.setId(null);
+            BeanUtils.copyProperties(adjustDetailVo, monthPlan);
             monthPlan.setProductionNo(productionNo);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
+            monthPlan.setId(null);
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -791,23 +792,33 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     private void updateMonthPlanList(MpRollAdjustContextDTO contextDTO) {
         List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
         List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
-        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(factoryMonthPlanProdFinalList)) {
-            log.warn("更新月度生产计划：调整结果列表或月度计划列表为空，直接返回");
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(factoryMonthPlanProdFinalList) || PubUtil.isEmpty(adjustDetailList)) {
+            log.warn("更新月度生产计划：调整结果列表或月度计划列表或调整明细列表为空，直接返回");
             return;
         }
         // 调整结果按照物料编号分组
-        Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
+        Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
+        // 调整明细按照物料编号分组
+        Map<String, List<MpAdjustDetailVo>> adjustDetailMap = buildMaterialCodeAdjustDetailMap(adjustDetailList);
+
         // 遍历生产计划列表匹配调整结果（更新计划量、开始日期、结束日期、调整量)
         for (FactoryMonthPlanFinalAdjustVo monthPlanVo : factoryMonthPlanProdFinalList) {
             String materialCode = monthPlanVo.getMaterialCode();
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
             if (adjustResult == null) {
                 log.warn("更新月度生产计划：物料编号:{}未查询到对应调整结果，跳过", materialCode);
                 continue;
             }
+            MpAdjustDetailVo adjustDetail = getFirstAdjustDetail(adjustDetailMap, materialCode);
+            if (adjustDetail == null) {
+                log.warn("更新月度生产计划：物料编号:{}未查询到对应调整明细，跳过", materialCode);
+                continue;
+            }
+
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
                 String dayFieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + i;
@@ -836,9 +847,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
             monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
             monthPlanVo.setDifferenceQty(adjustResult.getDifferenceQty());
+
             // 获取周数
             int week = getWeekNumber(new Date());
-            monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustResult.getTotalPlanQty());
+            monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetail.getActualAdjustQty());
         }
         // 更新月度生产计划
         try {
@@ -959,6 +971,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
     }
 
+
+    /**
+     * 构建调整明细分组Map
+     *
+     * @param adjustDetailVoList
+     * @return
+     */
+    protected Map<String, List<MpAdjustDetailVo>> buildMaterialCodeAdjustDetailMap(List<MpAdjustDetailVo> adjustDetailVoList) {
+        if (PubUtil.isEmpty(adjustDetailVoList)) {
+            return Collections.emptyMap();
+        }
+        return adjustDetailVoList.stream()
+                .filter(detailVo -> StringUtils.isNotEmpty(detailVo.getMaterialCode()))
+                .collect(Collectors.groupingBy(MpAdjustDetailVo::getMaterialCode));
+    }
+
     /**
      * 构建调整结果分组Map
      *
@@ -986,6 +1014,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return null;
         }
         List<MpAdjustResult> resultList = materialCodeAdjustMap.get(materialCode);
+        if (PubUtil.isEmpty(resultList)) {
+            return null;
+        }
+        return resultList.get(0);
+    }
+
+    /**
+     * 获取第一个调整明细
+     *
+     * @param materialCodeAdjustMap
+     * @param materialCode
+     * @return
+     */
+    protected MpAdjustDetailVo getFirstAdjustDetail(Map<String, List<MpAdjustDetailVo>> materialCodeAdjustMap, String materialCode) {
+        if (materialCodeAdjustMap == null || StringUtils.isEmpty(materialCode)) {
+            return null;
+        }
+        List<MpAdjustDetailVo> resultList = materialCodeAdjustMap.get(materialCode);
         if (PubUtil.isEmpty(resultList)) {
             return null;
         }
@@ -1877,14 +1923,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 试制量试ID
                 adjustDetailVo.setTrialPlanId(trialPlan.getId());
             }
-            // 型腔数量、活块数量
-            adjustDetailVo.setMouldCavityQty(0);
-            adjustDetailVo.setTypeBlockQty(0);
-            adjustDetailVo.setHeightQty(0);
-            adjustDetailVo.setMidQty(0);
-            adjustDetailVo.setPostponeQty(0);
-            adjustDetailVo.setCycleReserveQty(0);
-            adjustDetailVo.setConventionReserveQty(0);
             return;
         }
         // 有月度生产计划时，赋值关联字段
@@ -1906,11 +1944,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
         // 制造示方书号
         adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
-        adjustDetailVo.setHeightQty(Convert.toInt(monthPlan.getHeightProductionQty(),0));
-        adjustDetailVo.setMidQty(Convert.toInt(monthPlan.getMidProductionQty(),0));
-        adjustDetailVo.setPostponeQty(Convert.toInt(monthPlan.getPostponeProductionQty(),0));
-        adjustDetailVo.setCycleReserveQty(Convert.toInt(monthPlan.getCycleProductionQty(),0));
-        adjustDetailVo.setConventionReserveQty(Convert.toInt(monthPlan.getConventionProductionQty(),0));
     }
 
     /**
@@ -2125,17 +2158,48 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
-            List<DpDemandPlan> dpDemandPlan = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
-            if (PubUtil.isNotEmpty(dpDemandPlan)) {
+            List<DpDemandPlan> demandPlanList = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            if (PubUtil.isNotEmpty(demandPlanList)) {
+                DpDemandPlan dpDemandPlan = demandPlanList.get(0);
                 // 设置排产分类
-                adjust.setProductionType(dpDemandPlan.get(0).getProductionType());
+                adjust.setProductionType(dpDemandPlan.getProductionType());
+                // 设置高优先级
+                Integer sum = demandPlanList.stream()
+                        .filter(e -> e.getHeightQty() != null)
+                        .mapToInt(DpDemandPlan::getHeightQty)
+                        .sum();
+                adjust.setHeightQty(Convert.toInt(sum,0));
+                // 设置中优先级
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getMidQty() != null)
+                        .mapToInt(DpDemandPlan::getMidQty)
+                        .sum();
+                adjust.setMidQty(Convert.toInt(sum,0));
+                // 设置暂缓订单
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getPostponeQty() != null)
+                        .mapToInt(DpDemandPlan::getPostponeQty)
+                        .sum();
+                adjust.setPostponeQty(Convert.toInt(sum,0));
+                // 设置周期排产储备
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getCycleReserveQty() != null)
+                        .mapToInt(DpDemandPlan::getCycleReserveQty)
+                        .sum();
+                adjust.setCycleReserveQty(Convert.toInt(sum,0));
+                // 设置常规储备
+                sum = demandPlanList.stream()
+                        .filter(e -> e.getConventionReserveQty() != null)
+                        .mapToInt(DpDemandPlan::getConventionReserveQty)
+                        .sum();
+                adjust.setConventionReserveQty(Convert.toInt(sum,0));
             }
             // 试制量试设置净需求为订单量
             if (ApsConstant.TRUE.equals(adjust.getIsTrial())) {
                 adjust.setCurrentNetQty(adjust.getOrdQty());
             } else {
                 // 汇总排产净需求
-                Integer netQtySum = dpDemandPlan.stream()
+                Integer netQtySum = demandPlanList.stream()
                         .filter(e -> e.getNetQty() != null)
                         .mapToInt(DpDemandPlan::getNetQty)
                         .sum();
