@@ -214,6 +214,7 @@ public class MdmMouldAllocationUIController extends BaseUIController<MdmMouldAll
     /**
      * 复制模具分配比例
      */
+    @RequiresPermissions("monthplan:mdmMouldAllocation:copy")
     @ApiOperation("复制模具分配比例")
     @PostMapping("/copy")
     @ResponseBody
