@@ -87,7 +87,8 @@ public class RawWarningServiceImpl extends ServiceImpl<RawWarningRecordEntityMap
                         I18nUtil.getMessage("raw.warning.no.week.usage.data"),
                         factoryCode, year, week
                 );
-                throw new BusinessException(message);
+                log.info(message);
+                return 0;
             }
 
             // 2. 批量获取用量偏差预警配置
