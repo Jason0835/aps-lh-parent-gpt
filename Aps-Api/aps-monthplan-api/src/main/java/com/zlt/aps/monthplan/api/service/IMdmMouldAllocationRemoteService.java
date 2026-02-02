@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.PeriodInfo;
 import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
@@ -76,5 +77,11 @@ public interface IMdmMouldAllocationRemoteService {
     @ApiOperation("导入模具分配比例(同结构/不同结构)")
     @PostMapping("/mdmMouldAllocation/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 复制模具分配比例
+     */
+    @PostMapping("/mdmMouldAllocation/copy")
+    AjaxResult copy(@RequestBody PeriodInfo periodinfo);
 
 }

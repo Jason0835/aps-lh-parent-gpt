@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.adjust.service;
 
 
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -63,4 +64,10 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
      * @param contextDTO 周程滚动调整上下文对象
      */
     void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 初始工作日历
+     * @param contextDTO
+     */
+    List<MdmWorkCalendar> getWorkCalendarList(MpRollAdjustContextDTO contextDTO);
 }

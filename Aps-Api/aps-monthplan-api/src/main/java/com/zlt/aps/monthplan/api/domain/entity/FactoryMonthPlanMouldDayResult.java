@@ -43,7 +43,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 年份
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.year")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
@@ -51,7 +51,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 月份
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.month")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -59,7 +59,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 年月:YYYYMM
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.yearMonth")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.yearMonth", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
     @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
@@ -256,7 +256,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 型腔数量(同主花纹的模具数量)
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mouldCavityQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mouldCavityQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "型腔数量(同主花纹的模具数量)", name = "mouldCavityQty")
     @TableField(value = "MOULD_CAVITY_QTY")
     private Integer mouldCavityQty;
@@ -264,7 +264,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 活块数量(同主花纹的物料模具数量)
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.typeBlockQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.typeBlockQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "活块数量(同主花纹的物料模具数量)", name = "typeBlockQty")
     @TableField(value = "TYPE_BLOCK_QTY")
     private Integer typeBlockQty;
@@ -286,7 +286,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 高优先级数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.heightQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.heightQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级数量", name = "heightQty")
     @TableField(value = "HEIGHT_QTY")
     private Integer heightQty;
@@ -294,7 +294,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 月均销量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.averageSaleQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.averageSaleQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月均销量", name = "averageSaleQty")
     @TableField(value = "AVERAGE_SALE_QTY")
     private Integer averageSaleQty;
@@ -302,7 +302,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 库销比
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.inventorySalesRatio")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.inventorySalesRatio", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "库销比", name = "inventorySalesRatio")
     @TableField(value = "INVENTORY_SALES_RATIO")
     private BigDecimal inventorySalesRatio;
@@ -310,7 +310,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 日硫化量(单模)
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.dayVulcanizationQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.dayVulcanizationQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "日硫化量(单模)", name = "dayVulcanizationQty")
     @TableField(value = "DAY_VULCANIZATION_QTY")
     private Integer dayVulcanizationQty;
@@ -354,7 +354,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 生产需求计划
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "生产需求计划", name = "prodReqPlan")
     @TableField(value = "PROD_REQ_PLAN")
     private Integer prodReqPlan;
@@ -362,7 +362,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 实际生产需求(含损耗)
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.factProdReqQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.factProdReqQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "实际生产需求(含损耗)", name = "factProdReqQty")
     @TableField(value = "FACT_PROD_REQ_QTY")
     private Integer factProdReqQty;
@@ -370,7 +370,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 生产实际排产量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.totalQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.totalQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "生产实际排产量", name = "totalQty")
     @TableField(value = "TOTAL_QTY")
     private Integer totalQty;
@@ -378,7 +378,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 高优先级排产数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.heightProductionQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.heightProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "高优先级排产数量", name = "heightProductionQty")
     @TableField(value = "HEIGHT_PRODUCTION_QTY")
     private Integer heightProductionQty;
@@ -386,7 +386,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 中优先级排产数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.midProductionQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.midProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级排产数量", name = "midProductionQty")
     @TableField(value = "MID_PRODUCTION_QTY")
     private Integer midProductionQty;
@@ -394,7 +394,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 周期排产储备排产数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.cycleProductionQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.cycleProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "周期排产储备排产数量", name = "cycleProductionQty")
     @TableField(value = "CYCLE_PRODUCTION_QTY")
     private Integer cycleProductionQty;
@@ -402,7 +402,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 常规储备排产数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.conventionProductionQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.conventionProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "常规储备排产数量", name = "conventionProductionQty")
     @TableField(value = "CONVENTION_PRODUCTION_QTY")
     private Integer conventionProductionQty;
@@ -410,7 +410,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 暂缓订单排产数量
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.postponeProductionQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.postponeProductionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "暂缓订单排产数量", name = "postponeProductionQty")
     @TableField(value = "POSTPONE_PRODUCTION_QTY")
     private Integer postponeProductionQty;
@@ -418,7 +418,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 差异量(未排产数量)
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.differenceQty")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.differenceQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "差异量(未排产数量)", name = "differenceQty")
     @TableField(value = "DIFFERENCE_QTY")
     private Integer differenceQty;
@@ -434,14 +434,14 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 开始日期
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.beginDay")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.beginDay", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "开始日期", name = "beginDay")
     @TableField(value = "BEGIN_DAY")
     private Integer beginDay;
     /**
      * 结束日期
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.endDay")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.endDay", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "结束日期", name = "endDay")
     @TableField(value = "END_DAY")
     private Integer endDay;
@@ -452,7 +452,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_1
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day1")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day1", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_1", name = "day1")
     @TableField(value = "DAY_1")
     private Integer day1;
@@ -460,7 +460,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_2
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day2")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day2", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_2", name = "day2")
     @TableField(value = "DAY_2")
     private Integer day2;
@@ -468,7 +468,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_3
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day3")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day3", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_3", name = "day3")
     @TableField(value = "DAY_3")
     private Integer day3;
@@ -476,7 +476,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_4
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day4")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day4", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_4", name = "day4")
     @TableField(value = "DAY_4")
     private Integer day4;
@@ -484,7 +484,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_5
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day5")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day5", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_5", name = "day5")
     @TableField(value = "DAY_5")
     private Integer day5;
@@ -492,7 +492,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_6
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day6")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day6", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_6", name = "day6")
     @TableField(value = "DAY_6")
     private Integer day6;
@@ -500,7 +500,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_7
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day7")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day7", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_7", name = "day7")
     @TableField(value = "DAY_7")
     private Integer day7;
@@ -508,7 +508,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_8
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day8")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day8", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_8", name = "day8")
     @TableField(value = "DAY_8")
     private Integer day8;
@@ -516,7 +516,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_9
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day9")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day9", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_9", name = "day9")
     @TableField(value = "DAY_9")
     private Integer day9;
@@ -524,7 +524,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_10
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day10")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day10", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_10", name = "day10")
     @TableField(value = "DAY_10")
     private Integer day10;
@@ -532,7 +532,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_11
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day11")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day11", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_11", name = "day11")
     @TableField(value = "DAY_11")
     private Integer day11;
@@ -540,7 +540,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_12
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day12")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day12", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_12", name = "day12")
     @TableField(value = "DAY_12")
     private Integer day12;
@@ -548,7 +548,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_13
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day13")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day13", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_13", name = "day13")
     @TableField(value = "DAY_13")
     private Integer day13;
@@ -556,7 +556,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_14
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day14")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day14", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_14", name = "day14")
     @TableField(value = "DAY_14")
     private Integer day14;
@@ -564,7 +564,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_15
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day15")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day15", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_15", name = "day15")
     @TableField(value = "DAY_15")
     private Integer day15;
@@ -572,7 +572,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_16
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day16")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day16", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_16", name = "day16")
     @TableField(value = "DAY_16")
     private Integer day16;
@@ -580,7 +580,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_17
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day17")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day17", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_17", name = "day17")
     @TableField(value = "DAY_17")
     private Integer day17;
@@ -588,7 +588,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_18
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day18")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day18", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_18", name = "day18")
     @TableField(value = "DAY_18")
     private Integer day18;
@@ -596,7 +596,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_19
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day19")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day19", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_19", name = "day19")
     @TableField(value = "DAY_19")
     private Integer day19;
@@ -604,7 +604,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_20
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day20")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day20", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_20", name = "day20")
     @TableField(value = "DAY_20")
     private Integer day20;
@@ -612,7 +612,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_21
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day21")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day21", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_21", name = "day21")
     @TableField(value = "DAY_21")
     private Integer day21;
@@ -620,7 +620,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_22
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day22")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day22", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_22", name = "day22")
     @TableField(value = "DAY_22")
     private Integer day22;
@@ -628,7 +628,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_23
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day23")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day23", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_23", name = "day23")
     @TableField(value = "DAY_23")
     private Integer day23;
@@ -636,7 +636,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_24
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day24")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day24", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_24", name = "day24")
     @TableField(value = "DAY_24")
     private Integer day24;
@@ -644,7 +644,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_25
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day25")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day25", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_25", name = "day25")
     @TableField(value = "DAY_25")
     private Integer day25;
@@ -652,7 +652,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_26
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day26")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day26", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_26", name = "day26")
     @TableField(value = "DAY_26")
     private Integer day26;
@@ -660,7 +660,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_27
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day27")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day27", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_27", name = "day27")
     @TableField(value = "DAY_27")
     private Integer day27;
@@ -668,7 +668,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_28
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day28")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day28", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_28", name = "day28")
     @TableField(value = "DAY_28")
     private Integer day28;
@@ -676,7 +676,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_29
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day29")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day29", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_29", name = "day29")
     @TableField(value = "DAY_29")
     private Integer day29;
@@ -684,7 +684,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_30
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day30")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day30", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_30", name = "day30")
     @TableField(value = "DAY_30")
     private Integer day30;
@@ -692,7 +692,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * DAY_31
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day31")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.day31", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "DAY_31", name = "day31")
     @TableField(value = "DAY_31")
     private Integer day31;
@@ -700,7 +700,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 硫化总工时
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.totalVulcanizationMinutes")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.totalVulcanizationMinutes", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "硫化总工时", name = "totalVulcanizationMinutes")
     @TableField(value = "TOTAL_VULCANIZATION_MINUTES")
     private BigDecimal totalVulcanizationMinutes;

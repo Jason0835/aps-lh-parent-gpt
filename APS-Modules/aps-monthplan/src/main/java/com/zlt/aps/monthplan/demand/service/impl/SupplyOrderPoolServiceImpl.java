@@ -163,7 +163,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         supplyOrderPool.setProductTypeCode(materialInfo.getProductTypeCode());
         supplyOrderPool.setProductCategory(materialInfo.getProductCategory());
         // (2)通过月均销量表，带出近3个月月均销量、近6个月月均销量、近12个月的发货频次、适销区域、备库上限/月均销量 * 30 = 30（天）
-        MpMonthlySaleQty monthlySaleQty =   monthlySaleQtyService.getMpMonthlySaleQtyByMaterialCode(supplyOrderPool.getMaterialCode());
+        MpMonthlySaleQty monthlySaleQty =   monthlySaleQtyService.getMpMonthlySaleQtyByMaterialCode(supplyOrderPool);
         if(null != monthlySaleQty) {
             supplyOrderPool.setThreeAverageQty(monthlySaleQty.getPassThreeMonthSaleQty());
             supplyOrderPool.setSixAverageQty(monthlySaleQty.getPassSixMonthSaleQty());

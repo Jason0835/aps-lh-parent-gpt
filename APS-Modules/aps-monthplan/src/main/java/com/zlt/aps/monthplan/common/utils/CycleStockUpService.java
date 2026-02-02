@@ -84,6 +84,9 @@ public class CycleStockUpService {
 
   private final BaseDao baseDao;
 
+  // 批量插入处理器
+  private final BatchInsertProcessor<SupplyOrderPool> batchInsertProcessor;
+
   // 自定义线程池，避免使用默认的ForkJoinPool
   private final Executor ioExecutor;
 
@@ -145,7 +148,8 @@ public class CycleStockUpService {
       CalculationData calculationData = prepareCalculationData(supplyOrderPool, skus);
       // 3.3 批量构建并插入订单池数据
       List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPools(supplyOrderPool, skus, calculationData);
-      batchInsertSupplyOrderPools(supplyOrderPools);
+      supplyOrderPools.sort(Comparator.comparing(SupplyOrderPool::getMaterialCode));
+      this.batchInsertProcessor.batchInsert(supplyOrderPools);
       return supplyOrderPools;
     } catch (Exception e) {
       log.error("重新创建供应链订单池失败", e);
@@ -520,36 +524,6 @@ public class CycleStockUpService {
 
 
   /**
-   * 批量插入供应链订单池数据
-   */
-  private void batchInsertSupplyOrderPools(List<SupplyOrderPool> supplyOrderPools) {
-    if (CollectionUtils.isEmpty(supplyOrderPools)) {
-      log.warn("没有需要插入的供应链订单池数据");
-      return;
-    }
-
-    log.info("开始批量插入供应链订单池数据, 数量: {}", supplyOrderPools.size());
-
-    // 分批插入，避免单次插入数据量过大
-    int batchSize = 1000;
-    int total = supplyOrderPools.size();
-
-    for (int i = 0; i < total; i += batchSize) {
-      int end = Math.min(i + batchSize, total);
-      List<SupplyOrderPool> batch = supplyOrderPools.subList(i, end);
-      try {
-        this.baseDao.insertBatch(batch);
-        log.debug("批量插入进度: {}/{}", end, total);
-      } catch (Exception e) {
-        log.error("批量插入失败, 批次范围: {}-{}, 错误: {}", i, end, e.getMessage(), e);
-        throw new BusinessException("批量插入供应链订单池数据失败", e);
-      }
-    }
-
-    log.info("批量插入完成, 总记录数: {}", total);
-  }
-
-  /**
    * 验证所有必要的前置条件
    */
   private Set<String> validatePrerequisites(SupplyOrderPool supplyOrderPool) {
@@ -619,17 +593,22 @@ public class CycleStockUpService {
   }
 
   public void validateEnableCreate(SupplyOrderPool supplyOrderPool) {
-    // 2. 验证前置条件
-    Set<String> validStructures = validatePrerequisites(supplyOrderPool);
-    if(CollectionUtils.isEmpty(validStructures)) {
-      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleProductionStructureConfig"));
+    MdmMaterialInfo  materialInfo = materialInfoService.getMaterialInfoByMaterialCode(supplyOrderPool.getFactoryCode(),supplyOrderPool.getMaterialCode());
+    if(null == materialInfo){
+       throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notFound.materialInfo"));
     }
-    // 3. 获取符合条件的SKU集合
-    Set<String> eligibleSkus = getEligibleSkus(supplyOrderPool.getFactoryCode(), validStructures);
-    if (CollectionUtils.isEmpty(eligibleSkus)) {
+    if(StringUtils.isBlank(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
     }
-    if(!eligibleSkus.contains(supplyOrderPool.getMaterialCode())) {
+    List<MdmMonCycleSchStruConf>  monCycleSchStruConfs =   mdmMonCycleSchStruConfService.findCurrentCycleSchStruConf(supplyOrderPool);
+    if(CollectionUtils.isEmpty(monCycleSchStruConfs)) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
+    }
+    Set<String> structureNames = monCycleSchStruConfs.stream().map(MdmMonCycleSchStruConf::getStructureName).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
+    if(CollectionUtils.isEmpty(structureNames)) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
+    }
+    if(!structureNames.contains(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
     }
   }

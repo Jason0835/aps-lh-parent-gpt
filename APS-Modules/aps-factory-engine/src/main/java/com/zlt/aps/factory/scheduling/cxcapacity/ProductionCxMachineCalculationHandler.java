@@ -1,26 +1,19 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
-import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.CxMachineLimitTypeEnum;
 import com.zlt.aps.factory.enums.ProductionStageEnum;
-import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
-import com.zlt.aps.factory.handler.SkuMouldSelector;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
-import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
-import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
-import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -30,15 +23,31 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 成型在机分组分配
- * TBR 在机结构成型机台产能分配
- * PCR 在机寸口成型机台产品分配
+ * 在产机台-产能分配测算
+ * TBR 在产机台根据在机结构的续作部分进行各在产机台的收尾点测算
+ * PCR 在产机台根据在机寸口的续作部分进行各在产机台的收尾点测算
+ * 先TBR业务
+ * 1、排产续作部分
+ * 1.1、先排产续作Sku部分
+ * 1.2、在排产续作Sku的同规格同花纹的高优先级部分
+ * 1.3、最后排产续作Sku的同生胎同模具的高优先级部分
+ * 模拟排产完毕后，有以下场景:
+ * 1、如果在机结构需求估算所需机台数 >= 结构在产机台数，则不需要测算，在产机台直接满台分配
+ * 2、如果结构在产机台数 = 1, 也不需要测算，直接按在机结构所需天数进行分配。
+ * 3、如果在机结构需求估算所需机台数 < 结构在产机台数，则测试需要进行测试。通过模拟续作Sku的收尾
+ * 来确定在产机台的收尾点
+ * 1、模拟排产续作SKu -> 续作Sku同规格同花纹 -> 续作Sku共生胎同模具
+ * 2、排产后，看最先满足收尾时排产日，即为各在产机台最低要求上机天数(胎胚种类数、硫化机台配比数)
+ * 2.1、如果日 = 1，则表示可以在月初就进行释放机台，此时按配比最大的释放，再次获取最先满足收尾是排产日
+ * 2.2、如果日 ！= 1，则表示至少都需要生产到到最早收尾的天数。
+ * 2.2.1、剩余需分配天数 = 需求天数 - (在产机台数 * 最低排产天数)
  *
  * @author ZLT
  * @date 20251227
  */
 @Slf4j
-public class CxContinueGroupAllocationHandler {
+@Component
+public class ProductionCxMachineCalculationHandler {
 
     /**
      * 对在机分组进行在机机台产能分配
@@ -51,7 +60,7 @@ public class CxContinueGroupAllocationHandler {
      * @param allContinueInfo  所有在产分组的续作Sku信息集合对象
      * @return
      */
-    public static List<CxMachineAllocationPlanHelper> allocationContinueAndProductionContinue(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
+    public List<CxMachineAllocationPlanHelper> allocationContinueAndProductionContinue(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
         if (CollectionUtils.isEmpty(allContinueInfo)) {
             log.info(TbrProductionGroupLogRecorder.addContinueSkuNoContinueGroupProductionLog(context));
             return Collections.emptyList();
@@ -66,7 +75,7 @@ public class CxContinueGroupAllocationHandler {
             }
             List<CxMachineAllocationPlanHelper> singleGroupAllocationResult = allocationProductionCxMachineAndProductionContinue(productionContext, groupPlan, cxContinueInfo);
             if (CollectionUtils.isEmpty(singleGroupAllocationResult)) {
-                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName, null));
+                log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, structureName, null, null));
                 return;
             }
             allAllocationResult.addAll(singleGroupAllocationResult);
@@ -90,17 +99,12 @@ public class CxContinueGroupAllocationHandler {
      * @param groupPlanInfo     分组计划信息对象
      * @param groupContinueInfo 分组计划对应的续作Sku信息
      */
-    private static List<CxMachineAllocationPlanHelper> allocationProductionCxMachineAndProductionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private List<CxMachineAllocationPlanHelper> allocationProductionCxMachineAndProductionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         if (CollectionUtils.isEmpty(productionCxMachineCodeSet)) {
             return Collections.emptyList();
         }
-        //粗算得到的机台
-        BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
-        Integer productionCount = productionCxMachineCodeSet.size();
-        //1、排产续作部分（续作Sku高优先级排产、同规格同花纹高优级排产、同生胎同模具高优级排产）
-        productionContinue(productionContext, groupPlanInfo, groupContinueInfo);
         /**
          * 2、在产机台的分配
          * 2.1、在产机台数 = 1时，直接分配多少就是多少
@@ -109,15 +113,10 @@ public class CxContinueGroupAllocationHandler {
          * 2.4、在产分组需求粗算所需机台数 < 在产机台数
          *
          */
-        //如果在产机台数只有一台的情形下，直接分配
-        if (BigDecimal.ONE.intValue() == productionCount) {
-            List<CxMachineAllocationPlanHelper> buildResult = buildNeedProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
-            if (groupPlanInfo.getLeftOverNeedAllocationDays() <= BigDecimal.ZERO.intValue()) {
-                groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            }
-            return buildResult;
-        }
-        //在产机台数有多台情形下
+        //粗算得到的机台
+        BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
+        Integer productionCount = productionCxMachineCodeSet.size();
+        //在产机台数<=在机结构所需机台数，则此时不用测算，机台直接分配
         if (needCount.compareTo(BigDecimal.valueOf(productionCount)) >= BigDecimal.ZERO.intValue()) {
             //在机分组还需要增加机台
             List<CxMachineAllocationPlanHelper> buildResult = buildAllProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
@@ -128,7 +127,17 @@ public class CxContinueGroupAllocationHandler {
             groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             return buildResult;
         }
-        //2、最后确定在产机台各自收尾时间点及分配
+        //如果在产机台数只有一台的情形下，直接分配
+        if (BigDecimal.ONE.intValue() == productionCount) {
+            List<CxMachineAllocationPlanHelper> buildResult = buildNeedProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo);
+            if (groupPlanInfo.getLeftOverNeedAllocationDays() <= BigDecimal.ZERO.intValue()) {
+                groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            }
+            return buildResult;
+        }
+        //1、排产续作部分（续作Sku高优先级排产、同规格同花纹高优级排产、同生胎同模具高优级排产）
+        productionContinue(productionContext, groupPlanInfo, groupContinueInfo);
+        //2、在产机台数有多台情形下，最后确定在产机台各自收尾时间点及分配
         return buildContinueCxMachineAllocationResult(context, groupPlanInfo, groupContinueInfo);
     }
 
@@ -142,7 +151,7 @@ public class CxContinueGroupAllocationHandler {
      * @param groupPlanInfo     分组计划信息对象
      * @param groupContinueInfo 分组计划-续作Sku信息对象
      */
-    private static void productionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private void productionContinue(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuInfoMap)) {
             //todo 记录日志
@@ -164,7 +173,7 @@ public class CxContinueGroupAllocationHandler {
             }
         });
         //1、先使用续作Sku的高优先级部分进行模拟排产
-        productionContinueSku(productionContext, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, continueSkuInfoMap);
+        CxContinueProductionHandler.productionContinueSku(productionContext, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, continueSkuInfoMap);
         //2、接着进行同规格同花纹的续作高优先级部分进行模拟排产
         Integer monthDays = context.getMonthDays();
         CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap);
@@ -179,7 +188,7 @@ public class CxContinueGroupAllocationHandler {
      * @param groupContinueInfo 分组计划对应的在产信息
      * @return
      */
-    private static List<CxMachineAllocationPlanHelper> buildNeedProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private List<CxMachineAllocationPlanHelper> buildNeedProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         if (CollectionUtils.isEmpty(productionCxMachineCodeSet) || productionCxMachineCodeSet.size() > BigDecimal.ONE.intValue()) {
             return Collections.emptyList();
@@ -193,13 +202,13 @@ public class CxContinueGroupAllocationHandler {
     }
 
     /**
-     * 构建所有在产机台分配给分组计划
+     * 构建所有在产机台产能全部分配给分组计划
      *
      * @param groupPlanInfo     分组计划信息
      * @param groupContinueInfo 分组计划对应的在产信息
      * @return
      */
-    private static List<CxMachineAllocationPlanHelper> buildAllProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private List<CxMachineAllocationPlanHelper> buildAllProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
         if (CollectionUtils.isEmpty(productionCxMachineCodeSet) || productionCxMachineCodeSet.size() == BigDecimal.ONE.intValue()) {
             return Collections.emptyList();
@@ -216,7 +225,7 @@ public class CxContinueGroupAllocationHandler {
     }
 
     /**
-     * 构建所有在产机台分配给分组计划
+     * 构建在产机台分配给分组计划产能allocationDays
      *
      * @param groupPlanInfo     分组计划信息
      * @param groupContinueInfo 分组计划对应的在产信息
@@ -224,13 +233,16 @@ public class CxContinueGroupAllocationHandler {
      * @param allocationDays    分配天数
      * @return
      */
-    private static CxMachineAllocationPlanHelper buildAllocationProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, String cxMachineCode, Integer allocationDays) {
+    private CxMachineAllocationPlanHelper buildAllocationProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo, String cxMachineCode, Integer allocationDays) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer monthDays = context.getMonthDays();
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
         Map<String, ProductGroupCxCapacityInfo> groupCxCapacityInfoMap = cxCapacityInfoList.stream().collect(Collectors.toMap(ProductGroupCxCapacityInfo::getCxMachineCode, Function.identity()));
         CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
+        //20260131 分配天数，成型机剩余天数与分配天数取最小
+        Integer remainingDays = cxMachineInfo.getRemainingDays();
+        allocationDays = Math.min(remainingDays, allocationDays);
         //更新分组剩余分配量
         groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
         ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
@@ -249,7 +261,7 @@ public class CxContinueGroupAllocationHandler {
      * @param groupContinueInfo 分组排产的续作信息对象
      * @return
      */
-    private static List<CxMachineAllocationPlanHelper> buildContinueCxMachineAllocationResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private List<CxMachineAllocationPlanHelper> buildContinueCxMachineAllocationResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //根据续作模拟排产信息，构建在产机台的分配，分配的机台数及最低分配的生产天数
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
@@ -310,66 +322,6 @@ public class CxContinueGroupAllocationHandler {
     }
 
     /**
-     * 续作Sku使用续作模具排产
-     * 可能需要进行降膜排产
-     *
-     * @param context            排产上下文
-     * @param productionStage    排产阶段
-     * @param groupPlanInfo      分组计划信息对象
-     * @param continueSkuInfoMap 续作Sku信息
-     */
-    static void productionContinueSku(TbrProductionContext context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
-        Set<Integer> stopDays = context.getStopDays();
-        Integer continueSkuDeadLineDays = groupPlanInfo.getContinueSkuDeadLineDay(context);
-        ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();
-        //续作Sku轮询排产
-        String groupName = groupPlanInfo.getGroupName();
-        continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            log.info(TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc));
-            if (!cxContinueSkuInfo.hasProduction()) {
-                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionQtyLog(context, groupName, materialDesc));
-                return;
-            }
-            Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty();
-            //挑选的模具 本次使用最多模具数，不一定与续作模具数相等，但不会超
-            Integer theoryMaxMouldNumber = cxContinueSkuInfo.getMouldNumber();
-            List<ProductionMouldInfoVo> selectMouldList = SkuMouldSelector.getContinueSkuMouldNumberInit(context, productionStage, materialDesc, theoryMaxMouldNumber);
-            if (CollectionUtils.isEmpty(selectMouldList)) {
-                return;
-            }
-            cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
-            //1、降膜排产
-            DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
-            List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
-            //分配结果
-            if (CollectionUtils.isEmpty(resultList)) {
-                //记录日志
-                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionResultLog(context, groupName, materialDesc));
-                return;
-            }
-            String mouldInfo = selectMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
-            log.info(TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo));
-            //2、将排产结果，逐日分配到模具上，按排产日由小到大排序
-            resultList.sort(Comparator.comparing(DailyScheduleVo::getScheduleDate));
-            resultList.forEach(dailySchedule -> {
-                //使用的硫化机台数-即模具数
-                Integer lhMachineCount = dailySchedule.getSkuMachines();
-                Integer sumProductionQty = dailySchedule.getSkuQuantity();
-                Integer productionDay = dailySchedule.getScheduleDate();
-                //按双模放置
-                for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= lhMachineCount; lhGroupNo++) {
-                    Integer productionQty = Math.min(sumProductionQty, maxDayQty);
-                    Integer startIndex = (lhGroupNo - BigDecimal.ONE.intValue()) * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                    Integer endIndex = lhGroupNo * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                    List<ProductionMouldInfoVo> doubleMouldList = selectMouldList.subList(startIndex, endIndex);
-                    CxLhMouldProductionCalculator.continueSkuLhProductionHandler(context, groupPlanInfo, cxContinueSkuInfo, productionDay, productionQty, doubleMouldList);
-                    sumProductionQty = sumProductionQty - productionQty;
-                }
-            });
-        });
-    }
-
-    /**
      * 获取在机结构，可释放机台数和续作收尾时间点
      *
      * @param context              排产上下文
@@ -380,7 +332,7 @@ public class CxContinueGroupAllocationHandler {
      * @param groupContinueInfo    在机结构续作信息
      * @return
      */
-    private static void getContinueMachineRelease(Context context, CxContinueMachineReleaseHelper release, Integer needWholeCount, Integer continueMachineCount, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private void getContinueMachineRelease(Context context, CxContinueMachineReleaseHelper release, Integer needWholeCount, Integer continueMachineCount, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         //相等，则表示在产机台不能释放
         if (needWholeCount.equals(continueMachineCount)) {
             //先不看扣减机台
@@ -441,7 +393,7 @@ public class CxContinueGroupAllocationHandler {
      * @param groupContinueInfo     续作Sku信息对象
      * @return
      */
-    private static Integer getMinDeductionMachineDay(Integer deductionMachineCount, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+    private Integer getMinDeductionMachineDay(Integer deductionMachineCount, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         List<GroupDayProductionSummaryHelper> summaryList = groupPlanInfo.getGroupProductionSummary();
         Integer maxEmbryoCount = groupContinueInfo.getDeductionCountLimitValue(deductionMachineCount, CxMachineLimitTypeEnum.MAX_EMBRYO_SIZE);
         Integer maxLhGroupCount = groupContinueInfo.getDeductionCountLimitValue(deductionMachineCount, CxMachineLimitTypeEnum.MAX_LH_COUNT);

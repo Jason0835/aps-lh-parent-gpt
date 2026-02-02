@@ -10,10 +10,10 @@ import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.handler.ContinuousProductionDayHandler;
-import com.zlt.aps.factory.scheduling.BaseDataContainer;
-import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -116,6 +116,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      */
     private Integer selectedProductionDys;
     /**
+     * 挑选时使用，可排产天数与需求天数的差值
+     */
+    private Integer capacityDiffValue;
+    /**
      * 挑选时使用，排产日集合
      */
     private Set<Integer> selectedProductionDaySet;
@@ -151,6 +155,14 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 日排产限制--只在第一轮按机台分配中使用-机台反选和计划挑选机台
      */
     private Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo;
+    /**
+     * 近1个月的上机日期-计划挑机台时使用
+     */
+    private Integer lastBoardingDate;
+    /**
+     * 近3个月的排产次数-计划挑机台时使用
+     */
+    private Integer productionCount;
 
     /**
      * 获取剩余产能，以剩余天数*此时的硫化配比

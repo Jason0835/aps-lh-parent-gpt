@@ -263,6 +263,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_SELECTED_FINAL_CX_MACHINE("20-16-99", "分组计划挑选机台-最终被选中"),
     /**
+     * 20-16-29 机台挑选计划-最终被选中
+     */
+    CX_MACHINE_SELECTED_FINAL_GROUP("20-16-29", "机台挑选分组计划-最终被选中"),
+    /**
      * 20-16 没有获取到下一组优先级高的分组计划
      */
     GROUP_NO_SELECTED_CX_MACHINE("20-16", "分组计划没有找到合适的机台"),

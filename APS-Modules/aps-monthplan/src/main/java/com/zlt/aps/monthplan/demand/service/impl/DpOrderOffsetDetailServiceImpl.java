@@ -3,12 +3,11 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.monthplan.common.utils.BatchInsertProcessor;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -17,6 +16,7 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,6 +45,9 @@ import org.springframework.util.CollectionUtils;
 @Transactional(rollbackFor = Exception.class)
 public class DpOrderOffsetDetailServiceImpl extends AbstractDocService<DpOrderOffsetDetail>  implements IDpOrderOffsetDetailService {
     private final DpOrderOffsetDetailEntityMapper dpOrderOffsetDetailEntityMapper;
+    // 批量插入处理器
+    private final BatchInsertProcessor<DpOrderOffsetDetail> batchInsertProcessor;
+
     @Override
     protected String getDocTypeCode() {
         return "2025123011";
@@ -92,5 +95,11 @@ public class DpOrderOffsetDetailServiceImpl extends AbstractDocService<DpOrderOf
                 queryCondition.getFactoryCode(),
                 queryCondition.getYear(),
                 queryCondition.getMonth());
+    }
+
+    @Override
+    public void batchInsert(List<DpOrderOffsetDetail> leftDemands) {
+        leftDemands.sort(Comparator.comparing(DpOrderOffsetDetail::getMaterialCode));
+        batchInsertProcessor.batchInsert(leftDemands);
     }
 }

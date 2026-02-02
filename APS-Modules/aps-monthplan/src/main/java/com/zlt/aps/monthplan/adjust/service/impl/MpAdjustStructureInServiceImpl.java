@@ -5,10 +5,13 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
+import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
+import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
@@ -31,6 +34,7 @@ import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.util.CollectionUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -61,6 +65,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Autowired
     private ProductionSchedulingDataService productionSchedulingDataService;
+
+    @Autowired
+    private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
 
 
     @Override
@@ -103,9 +110,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Override
     public List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO) {
         List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
-        if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+       /* if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
             mpFinalAdjustList = mpFinalAdjustList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
-        }
+        }*/
         return mpFinalAdjustList;
     }
 
@@ -125,6 +132,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
+        paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
         return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
@@ -181,5 +191,15 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         contextDTO.setEndDay(endDay);
         contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
+    }
+
+    @Override
+    public List<MdmWorkCalendar> getWorkCalendarList(MpRollAdjustContextDTO contextDTO) {
+        QueryWrapper<MdmWorkCalendar> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
+        queryWrapper.eq("PROC_CODE", ProductionProcessesTypeEnum.MONTH_PLAN.getProcCode());
+        queryWrapper.ge("YEAR", contextDTO.getMpYear());
+        queryWrapper.le("MONTH", contextDTO.getMpMonth());
+        return mdmWorkCalendarEntityMapper.selectList(queryWrapper);
     }
 }
