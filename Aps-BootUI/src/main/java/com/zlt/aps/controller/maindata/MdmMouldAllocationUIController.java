@@ -9,6 +9,7 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.PeriodInfo;
 import com.zlt.aps.monthplan.api.service.IMdmMouldAllocationRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -209,4 +210,16 @@ public class MdmMouldAllocationUIController extends BaseUIController<MdmMouldAll
         AjaxResult ajaxResult = iMdmMouldAllocationService.importData(context,updateSupport);
         return ajaxResult;
     }
+
+    /**
+     * 复制模具分配比例
+     */
+    @ApiOperation("复制模具分配比例")
+    @PostMapping("/copy")
+    @ResponseBody
+    public AjaxResult copy(PeriodInfo vo) {
+        return iMdmMouldAllocationService.copy(vo);
+    }
+
+
 }

@@ -1,14 +1,20 @@
 package com.zlt.aps.maindata.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.maindata.mapper.MdmMouldAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.PeriodInfo;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -18,7 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +50,9 @@ public class MdmMouldAllocationServiceImpl extends AbstractDocService<MdmMouldAl
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
+
+    @Autowired
+    private MdmMouldAllocationEntityMapper mdmMouldAllocationEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -77,6 +89,75 @@ public class MdmMouldAllocationServiceImpl extends AbstractDocService<MdmMouldAl
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "year", "month", "structureName", "specifications", "mainPattern"));
+    }
+
+
+    /**
+     * 复制模具分配比例
+     */
+    @Override
+    public AjaxResult copy(PeriodInfo vo) {
+        mergeByPeriod(vo);
+        return AjaxResult.success();
+    }
+
+
+    /**
+     * 复制指定年月、分厂数据，有则更新，无则插入
+     */
+    private void mergeByPeriod(PeriodInfo vo) {
+        LambdaQueryWrapper<MdmMouldAllocation> fromWrapper = Wrappers.lambdaQuery();
+        fromWrapper.eq(MdmMouldAllocation::getYear, vo.getFromyear());
+        fromWrapper.eq(MdmMouldAllocation::getMonth, vo.getFrommonth());
+        fromWrapper.eq(StringUtils.isNotBlank(vo.getFactoryCode()), MdmMouldAllocation::getFactoryCode, vo.getFactoryCode());
+        List<MdmMouldAllocation> fromList = mdmMouldAllocationEntityMapper.selectList(fromWrapper);
+
+        LambdaQueryWrapper<MdmMouldAllocation> copyWrapper = Wrappers.lambdaQuery();
+        copyWrapper.eq(MdmMouldAllocation::getYear, vo.getToyear());
+        copyWrapper.eq(MdmMouldAllocation::getMonth, vo.getTomonth());
+        copyWrapper.eq(StringUtils.isNotBlank(vo.getFactoryCode()), MdmMouldAllocation::getFactoryCode, vo.getFactoryCode());
+        List<MdmMouldAllocation> copyList = mdmMouldAllocationEntityMapper.selectList(copyWrapper);
+        // 按照主花纹、结构名称、规格进行分组
+        Map<String, Long> copyMap = convertToMap(copyList);
+
+        List<MdmMouldAllocation> updateList = new ArrayList<>();
+        List<MdmMouldAllocation> insertList = new ArrayList<>();
+        for (MdmMouldAllocation mdmMouldAllocation : fromList) {
+            mdmMouldAllocation.setYear(vo.getToyear());
+            mdmMouldAllocation.setMonth(vo.getTomonth());
+            mdmMouldAllocation.setId(null);
+            mdmMouldAllocation.setBaseVale(null);
+            String key = Objects.toString(mdmMouldAllocation.getMainPattern(), "")
+                    + Objects.toString(mdmMouldAllocation.getStructureName(), "")
+                    + Objects.toString(mdmMouldAllocation.getSpecifications(), "");
+            if (copyMap.containsKey(key)) {
+                Long copyId = copyMap.get(key);
+                mdmMouldAllocation.setId(copyId);
+                mdmMouldAllocation.setCreateBy(null);
+                mdmMouldAllocation.setCreateTime(null);
+                updateList.add(mdmMouldAllocation);
+            } else {
+                insertList.add(mdmMouldAllocation);
+            }
+        }
+
+        baseDao.insertBatch(insertList);
+        baseDao.updateBatch(updateList);
+
+    }
+
+    private Map<String, Long> convertToMap(List<MdmMouldAllocation> list) {
+        if (PubUtil.isEmpty(list)) {
+            return Collections.emptyMap();
+        }
+        return list.stream()
+                .collect(Collectors.toMap(
+                        item -> Objects.toString(item.getMainPattern(), "")
+                                + Objects.toString(item.getStructureName(), "")
+                                + Objects.toString(item.getSpecifications(), ""),
+                        MdmMouldAllocation::getId,
+                        (existingId, newId) -> existingId
+                ));
     }
 
 
