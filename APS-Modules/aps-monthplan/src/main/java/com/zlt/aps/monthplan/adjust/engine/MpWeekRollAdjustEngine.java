@@ -211,7 +211,7 @@ public class MpWeekRollAdjustEngine {
             return false;
         }
         //2. 检查自动补量天数
-        Integer boostDay = (Integer) paramMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
+        Integer boostDay = (Integer) paramMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         if (boostDay == null){
             return false;
         }
