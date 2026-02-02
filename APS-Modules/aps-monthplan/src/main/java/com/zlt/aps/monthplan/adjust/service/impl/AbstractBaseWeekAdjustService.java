@@ -1944,7 +1944,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 获取上周的周数
-        int week = getWeekNumber(new Date()) - 1;
+        int week = getWeekNumber(new Date());
+        if (week > 1) {
+            week = week - 1;
+        }
         Integer previousNetQty = Convert.toInt(monthPlan.getTotalQty(),0);
         Integer adjustQty = Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week),0);
         if (adjustQty != 0 && week > 0) {
