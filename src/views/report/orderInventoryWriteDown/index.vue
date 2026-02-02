@@ -265,6 +265,9 @@ export default {
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -273,6 +276,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
 
         {
@@ -323,6 +329,28 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.getVersionList();
+    },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
+    },
     async getAreaList() {
       try {
         let res = await areaList({
@@ -491,9 +519,7 @@ export default {
       }
     },
     async getVersionList(isGet,isSet=true) {
-      if (isGet) {
-        this.loading = true;
-      }
+      this.loading = true;
       try {
         const data = await listOrderVersion(this.formatParams());
         let list = [];
@@ -519,6 +545,8 @@ export default {
         if (isGet) {
           this.$set(this.page, "current", 1);
           this.getList();
+        }else{
+          this.loading=false
         }
       }
     },
@@ -536,8 +564,8 @@ export default {
       yearMonth: date.format("yyyy-MM"),
       factoryCode: "116",
     };
-    this.getList();
-    this.getVersionList()
+    // this.getList();
+    this.getVersionList(true)
   },
   activated() {
     // this.getList();
