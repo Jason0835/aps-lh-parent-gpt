@@ -77,7 +77,7 @@ public class DpStockVersion extends BaseEntity {
     /**
      * 品牌(物料信息.品牌)
      */
-    @Excel(name = "ui.data.column.dpStockVersion.brand")
+    @Excel(name = "ui.data.column.dpStockVersion.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌(物料信息.品牌)", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
