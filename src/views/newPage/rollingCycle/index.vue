@@ -475,15 +475,15 @@ export default {
             prop: "actualAdjustQty",
             label: this.$t("实际调整"),
             width: 120,
-            render: ({ row }) => {
-              return (
-                <div
-                  style={{ background: row.actualAdjustQty ? "yellow" : "" }}
-                >
-                  {row.actualAdjustQty}
-                </div>
-              );
-            },
+            // render: ({ row }) => {
+            //   return (
+            //     <div
+            //       style={{ background: row.actualAdjustQty ? "yellow" : "" }}
+            //     >
+            //       {row.actualAdjustQty}
+            //     </div>
+            //   );
+            // },
           },
           // {
           //   prop: "adjustmentReason",
