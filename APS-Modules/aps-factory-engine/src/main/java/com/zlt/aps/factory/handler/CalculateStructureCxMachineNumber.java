@@ -100,6 +100,7 @@ public class CalculateStructureCxMachineNumber {
               }
               //分配天数为零，或是小于最小要求天数，则设置不排产
               if (groupInfo.isBelowMinProductionDays(minProductionDays)) {
+                 setAllocationZero(groupInfo);
                  groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
               }else{
                 if(groupInfo.getTheoryDays() < minAllocationDays){
@@ -306,10 +307,6 @@ public class CalculateStructureCxMachineNumber {
     for (long maxMouldCapacity : totalMaxMouldCapacity) {
       result = result.add(new BigDecimal(maxMouldCapacity));
     }
-    String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 粗算总产能：%s ====",
-        productionContext.getFactoryCode(), productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion(), productionContext.getProductionVersion(),
-        groupInfo.getGroupName(), result.intValue());
-    log.info(logContent);
     return result.intValue();
   }
 
