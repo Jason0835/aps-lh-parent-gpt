@@ -399,7 +399,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             predictionContext.setPredictOffsetDetails(Collections.emptyList());
             return Collections.emptyList();
         }
-        leftDemands =   netDemands.stream().filter(item -> null != item.getProduceQtyDue() && item.getProduceQtyDue() > 0).collect(Collectors.toList());
+        leftDemands =   leftDemands.stream().filter(item -> null != item.getProduceQtyDue() && item.getProduceQtyDue() > 0).collect(Collectors.toList());
         if(CollectionUtils.isEmpty(leftDemands)){
             predictionContext.setPredictOffsetDetails(Collections.emptyList());
             return Collections.emptyList();
