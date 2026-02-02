@@ -177,6 +177,9 @@ public class MpWeekRollAdjustEngine {
         for (Map.Entry<Integer, MpDailyCapacityLimitVo> entry : dailyCapacityLimitVoMap.entrySet()) {
             dailyCapacityLimitVo = entry.getValue();
             workCalendar = workCalendarMap.get(entry.getKey());
+            if (workCalendar == null){
+                continue;
+            }
             dailyCapacityLimitVo.setDayOpenCloseFlag(workCalendar.getDayFlag());
             dailyCapacityLimitVo.setDayProductionRate(workCalendar.getRate());
             //日最大排产量 = 日最大产能*比率/100
