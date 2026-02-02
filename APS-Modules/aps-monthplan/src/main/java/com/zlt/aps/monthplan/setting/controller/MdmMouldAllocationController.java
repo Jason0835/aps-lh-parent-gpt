@@ -1,10 +1,10 @@
 package com.zlt.aps.monthplan.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmMouldAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.PeriodInfo;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -165,6 +165,14 @@ public class MdmMouldAllocationController extends AbstractDocBizController<MdmMo
     @Override
     protected String getTypeCode(){
         return "MDM0118";
+    }
+
+    /**
+     * 复制模具分配比例
+     */
+    @PostMapping("/copy")
+    public AjaxResult copy(@RequestBody PeriodInfo vo) {
+        return mdmMouldAllocationService.copy(vo);
     }
 
 
