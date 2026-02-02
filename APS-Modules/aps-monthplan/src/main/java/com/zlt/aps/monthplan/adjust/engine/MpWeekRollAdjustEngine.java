@@ -213,7 +213,7 @@ public class MpWeekRollAdjustEngine {
             return false;
         }
         // 起始日 = 月底最后1天 - 补量天数;
-        int startDay = getLastDayNumberOfMonth(LocalDate.now()) - boostDay;
+        int startDay = getLastDayNumberOfMonth(LocalDate.of(mpFinalVo.getYear(), mpFinalVo.getMonth(), 1)) - boostDay;
         return iDay > startDay;
     }
 
