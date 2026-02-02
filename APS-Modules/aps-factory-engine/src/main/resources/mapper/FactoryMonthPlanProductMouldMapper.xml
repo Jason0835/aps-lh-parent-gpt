@@ -152,7 +152,6 @@
         AND temp.MATERIAL_DESC = mdp.MATERIAL_DESC
         )
     </select>
-    </select>
 
 
     <select id="getEnableProductionMouldInfo" resultType="com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo">
