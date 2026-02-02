@@ -146,9 +146,6 @@ public class PredictionAllocationHelper {
       List<DpOrderOffsetDetail> result,
       PriorityProcessor processor) {
     BigDecimal stockQty = context.getStockQty();
-    if(stockQty.compareTo(BigDecimal.ZERO) <= 0) {
-      return;
-    }
     // 查找该优先级的销售订单
     List<DpOrderOffsetDetail> saleOrdersByPriority = findSaleOrderByPriority(context.getSaleOrders(), processor.getPriority());
     if (CollectionUtils.isEmpty(saleOrdersByPriority)) {
