@@ -514,12 +514,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             queryAdjustDetailList(contextDTO);
             // 3、查询月度生产计划
             queryMonthPlanList(contextDTO);
-            // 4、更新月度生产计划
-            updateMonthPlanList(contextDTO);
-            // 5、新增月度生产计划
-            insertMonthPlanList(contextDTO);
-            // 6、更新调整明细
+            // 4、更新调整明细
             updateAdjustDetailList(contextDTO);
+            // 5、更新月度生产计划
+            updateMonthPlanList(contextDTO);
+            // 6、新增月度生产计划
+            insertMonthPlanList(contextDTO);
             // 7、更新试制量制计划
             updateTrialPlanList(contextDTO);
             // 8、记录调整操作日志 TODO
@@ -839,17 +839,28 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     log.error("更新月度生产计划：物料:{}的结束日期转换失败，跳过", materialCode, e);
                 }
             }
+            // 生产实际排产量
             monthPlanVo.setTotalQty(adjustResult.getTotalQty());
+            // 高优先级排产数量
             monthPlanVo.setHeightProductionQty(adjustResult.getHeightProductionQty());
+            // 中优先级排产数量
             monthPlanVo.setMidProductionQty(adjustResult.getMidProductionQty());
+            // 周期排产储备排产数量
             monthPlanVo.setCycleProductionQty(adjustResult.getCycleProductionQty());
+            // 常规储备排产数量
             monthPlanVo.setConventionProductionQty(adjustResult.getConventionProductionQty());
+            // 暂缓订单排产数量
             monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
+            // 试制量试排产量
             monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
-            monthPlanVo.setDifferenceQty(adjustResult.getDifferenceQty());
-
+            // 实际生产需求含损耗
+            Integer factProdReqQty = 0;
+            // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
+            Integer differenceQty = factProdReqQty - Convert.toInt(monthPlanVo.getTotalQty(), 0);
+            monthPlanVo.setDifferenceQty(differenceQty);
             // 获取周数
             int week = getWeekNumber(new Date());
+            // 调整量
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetail.getActualAdjustQty());
         }
         // 更新月度生产计划
