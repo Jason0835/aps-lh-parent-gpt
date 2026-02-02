@@ -651,7 +651,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             lastMonthPlanVersion = monthPlanProdFinalList.get(0).getLastMonthPlanVersion();
         }
         // 调整结果按照物料编码分组
-        Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
+        Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
         // 月度生产计划排程结果
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = new ArrayList<>();
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
@@ -661,17 +661,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjustDetailVo.getMaterialCode();
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
             if (adjustResult == null) {
                 continue;
             }
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
-            monthPlan.setId(null);
+            BeanUtils.copyProperties(adjustDetailVo, monthPlan);
             monthPlan.setProductionNo(productionNo);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
+            monthPlan.setId(null);
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -846,6 +847,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
             monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
             monthPlanVo.setDifferenceQty(adjustResult.getDifferenceQty());
+
             // 获取周数
             int week = getWeekNumber(new Date());
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetail.getActualAdjustQty());
