@@ -674,6 +674,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
+//            monthPlan.setMesMaterialCode(adjustResult.getMesMaterialCode());
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
@@ -1932,6 +1933,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
+            adjustDetailVo.setMesMaterialCode(materialInfo.getMesMaterialCode());
             adjustDetailVo.setMaterialDesc(materialInfo.getMaterialDesc());
             adjustDetailVo.setProductTypeCode(materialInfo.getProductTypeCode());
             adjustDetailVo.setBrand(materialInfo.getBrand());
@@ -1950,7 +1952,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 施工阶段
                 adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
                 // 产品状态
-                adjustDetailVo.setProductStatus(trialPlan.getTrialStatus());
+                String productStatus = null;
+                if (ConstructionStageEnum.MEASUREMENT.getStage().equals(trialPlan.getTrialStatus())) {
+                    productStatus = ConstructionStageEnum.MEASUREMENT_FLAG;
+                }
+                if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(trialPlan.getTrialStatus())) {
+                    productStatus = ConstructionStageEnum.TRIAL_FLAG;
+                }
+                adjustDetailVo.setProductStatus(productStatus);
                 // 紧急程度
                 adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
                 // 制造示方书号
@@ -1962,6 +1971,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 有月度生产计划时，赋值关联字段
         adjustDetailVo.setIsSkuAdd(ApsConstant.FALSE);
+        adjustDetailVo.setMesMaterialCode(monthPlan.getMesMaterialCode());
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
         adjustDetailVo.setProductStatus(monthPlan.getProductStatus());
