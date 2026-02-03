@@ -9,7 +9,9 @@ import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
 import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
 import com.zlt.aps.factory.utils.DateUtils;
@@ -49,7 +51,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
     private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
 
     @Autowired
-    private MonthPlanRequireMapper monthPlanRequireMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
 
     /**
@@ -82,8 +84,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         Map<String, ProductionMouldInfoVo> mouldInfoMap =
                 createProductionMouldInfo(year, month, factoryCode, mouldRelationMap);
 
-        // 3. 获取净需求计划，补充SKU模具关系的结构
-        List<DpDemandPlan> demandPlanList = getDemandPlanList(year, month, factoryCode, monthPlanVersion);
+        // 3. 获取物料信息，补充SKU模具关系的结构
+        List<MdmMaterialInfo> demandPlanList = getDemandPlanList(factoryCode);
         Map<String, String> materialToStructureMap = buildMaterialToStructureMap(demandPlanList, mouldRelationMap);
 
         // 4. 计算指定日期的可用量
@@ -212,30 +214,25 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
     /**
      * 获取需求计划列表
      */
-    private List<DpDemandPlan> getDemandPlanList(Integer year, Integer month, String factoryCode, String monthPlanVersion) {
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
+    private List<MdmMaterialInfo> getDemandPlanList(String factoryCode) {
+        QueryWrapper<MdmMaterialInfo> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("FACTORY_CODE", factoryCode);
-        queryWrapper.eq("YEAR", year);
-        queryWrapper.eq("MONTH", month);
-        if (StringUtils.isNotBlank(monthPlanVersion)) {
-            queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
-        }
-        return monthPlanRequireMapper.selectList(queryWrapper);
+        return mdmMaterialInfoEntityMapper.selectList(queryWrapper);
     }
 
     /**
      * 构建物料到结构的映射
      */
-    private Map<String, String> buildMaterialToStructureMap(List<DpDemandPlan> demandPlanList,
+    private Map<String, String> buildMaterialToStructureMap(List<MdmMaterialInfo> mdmMaterialInfoList,
                                                             Map<String, List<MoldCavityInsertMaxValueCalculatorVo>> mouldRelationMap) {
         Map<String, String> materialToStructureMap = new HashMap<>();
 
-        for (DpDemandPlan demandPlan : demandPlanList) {
-            List<MoldCavityInsertMaxValueCalculatorVo> mouldRelationList = mouldRelationMap.get(demandPlan.getMaterialDesc());
+        for (MdmMaterialInfo mdmMaterialInfo : mdmMaterialInfoList) {
+            List<MoldCavityInsertMaxValueCalculatorVo> mouldRelationList = mouldRelationMap.get(mdmMaterialInfo.getMaterialDesc());
             if (!CollectionUtils.isEmpty(mouldRelationList)) {
                 // 格式：结构名 + 主花纹
-                materialToStructureMap.put(demandPlan.getMaterialDesc(),
-                        demandPlan.getStructureName() + demandPlan.getMainPattern());
+                materialToStructureMap.put(mdmMaterialInfo.getMaterialDesc(),
+                        mdmMaterialInfo.getStructureName() + mdmMaterialInfo.getMainPattern());
             }
         }
 
