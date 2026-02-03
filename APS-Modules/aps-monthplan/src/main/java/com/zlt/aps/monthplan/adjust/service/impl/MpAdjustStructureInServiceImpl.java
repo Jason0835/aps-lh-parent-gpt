@@ -206,7 +206,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     public void initCavityAndBlockQty(MpRollAdjustContextDTO contextDTO) {
         //1.按年月获取型腔及活块数据
-        DailyMouldAvailabilityResult cavity2BlockMap;
+        List<DailyMouldAvailabilityResult> cavity2BlockMap;
         try{
             cavity2BlockMap = moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode(),null,null);
             if (PubUtil.isEmpty(cavity2BlockMap)){
