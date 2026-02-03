@@ -21,7 +21,7 @@ import com.tlt.aps.utils.IncrementService;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
-import com.zlt.aps.factory.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -2092,7 +2092,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setYear(contextDTO.getMpYear());
         queryVo.setMonth(contextDTO.getMpMonth());
         queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
-        queryVo.setProductionVersion(contextDTO.getProductionVersion());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
     }
@@ -2101,11 +2100,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 计算型腔、活块可用量最大值
      * @param contextDTO
      */
-    protected DailyMouldAvailabilityResult calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
-        int day = DateUtil.dayOfMonth(new Date());
-        Date currentDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
+    protected List<DailyMouldAvailabilityResult> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(), currentDate, null);
+                contextDTO.getFactoryCode(), new Date(), null);
     }
 
     /**
@@ -2116,7 +2113,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 创建计时器
         StopWatch watch = new StopWatch();
         watch.start();
-        DailyMouldAvailabilityResult moldCavityInsertMap;
+        List<DailyMouldAvailabilityResult> moldCavityInsertMap;
         try {
             // 计算型腔、活块可用量最大值
             moldCavityInsertMap = calculateMoldCavityInsertMaxValue(contextDTO);
@@ -2136,9 +2133,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 调整明细列表
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 型腔可用量（按结构+主花纹分组）
-        Map<String, Integer> cavityResults = moldCavityInsertMap.getCavityResults();
+        Map<String, Integer> cavityResults = moldCavityInsertMap.get(0).getCavityResults();
         // 活块可用量（按物料描述分组）
-        Map<String, Integer> insertResults = moldCavityInsertMap.getInsertResults();
+        Map<String, Integer> insertResults = moldCavityInsertMap.get(0).getInsertResults();
         log.info("计算型腔、活块可用量最大值 ==> 型腔可用量:{} 活块可用量:{}", JSONObject.toJSONString(cavityResults), JSONObject.toJSONString(insertResults));
         // 遍历
         for (MpAdjustDetailVo adjust : adjustList) {

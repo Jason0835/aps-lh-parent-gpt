@@ -34,7 +34,7 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP1207 没有主花纹
      */
-    NO_MAIN_PATTERN("MP1207","没有主花纹", "alg.data.initCheck.noMainPattern"),
+    NO_MAIN_PATTERN("MP1207", "没有主花纹", "alg.data.initCheck.noMainPattern"),
     /**
      * MP1204 没有寸口
      */
@@ -104,6 +104,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME("MP2103", "因低于实单最低配比提前收尾,导致没有达到最低起产天数，不排", "alg.data.groupCapacity.noLowMinLhMachineCountWholeStructureName"),
     /**
+     * MP2104 因没有分配到成型产能，整个结构不排
+     */
+    NO_PRODUCTION_CX_MACHINE("MP2104", "因没有分配到成型产能，整个结构不排", "alg.data.groupCapacity.NoAllocationCxMachineCapacity"),
+    /**
      * MP2201 成型产能不足，整个英寸不排
      */
     EXCEED_CX_CAPACITY_WHOLE_PRO_SIZE("MP2201", "成型产能不足，整个英寸不排", "alg.data.groupCapacity.exceedCxCapacityWholeProSize"),
@@ -122,7 +126,7 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP2303 结构没有成型硫化配比配置
      */
-    GROUP_NO_CONFIGURATION_LH_RATION("MP2303","结构没有成型硫化配比配置","alg.data.groupCapacity.groupNoConfigurationLhRatio"),
+    GROUP_NO_CONFIGURATION_LH_RATION("MP2303", "结构没有成型硫化配比配置", "alg.data.groupCapacity.groupNoConfigurationLhRatio"),
     /**
      * MP3101 特殊轮胎产能控制
      */
@@ -194,7 +198,15 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP3708 缺少结构成型硫化配比数据
      */
-    STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY("MP3708", "缺少结构成型硫化配比数据", "alg.data.before.production.structureFormingVulcanizationRatioNotEmpty");
+    STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY("MP3708", "缺少结构成型硫化配比数据", "alg.data.before.production.structureFormingVulcanizationRatioNotEmpty"),
+    /**
+     * MP3798 成型或是模具产能不足
+     */
+    NO_ENOUGH_PRODUCTION_CAPACITY("MP3798","成型或是模具产能不足","alg.data.mouldProduction.NoEnoughProductionCapacity"),
+    /**
+     * MP3799 因%s不排
+     */
+    GENERAL_NO_PRODUCTION_REASON("MP3799", "因%s不排", "alg.data.mouldProduction.generalNoProductionReasons");
 
     private String errorCode;
 

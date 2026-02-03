@@ -185,6 +185,8 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
         Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext);
+        //设置不排原因
+        formalProductionHandler.setNoProductionReasonAfterResult(productionContext, estimateGroupCxAllocationMap, sumProductionMap);
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
     }

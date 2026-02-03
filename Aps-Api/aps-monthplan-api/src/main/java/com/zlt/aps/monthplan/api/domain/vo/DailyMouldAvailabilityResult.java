@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.domain.vo;
+package com.zlt.aps.monthplan.api.domain.vo;
 
 import lombok.Data;
 

@@ -177,15 +177,15 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
         //当日作为调整日
         contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
-        //TODO 测试使用
-        //contextDTO.setAdjustDay(26);
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(),contextDTO.getProductType()));
 
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
 
         //初始工作日历
-        contextDTO.setWorkCalendarList(mpAdjustStructureInService.getWorkCalendarList(contextDTO));
+        contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
+        //初始型腔与活块数量
+        contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO));
         return contextDTO;
     }
 

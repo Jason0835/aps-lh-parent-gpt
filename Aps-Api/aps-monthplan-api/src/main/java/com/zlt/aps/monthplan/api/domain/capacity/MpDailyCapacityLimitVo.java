@@ -53,6 +53,11 @@ public class MpDailyCapacityLimitVo {
     private Integer maxDayProductionQty = 0;
 
     /**
+     *  是否开产首日
+     */
+    private boolean openProductionFirstDay = false;
+
+    /**
      * 日开停产标识
      */
     private String dayOpenCloseFlag;
