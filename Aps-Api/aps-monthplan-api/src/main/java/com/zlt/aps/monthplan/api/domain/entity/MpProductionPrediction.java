@@ -66,7 +66,7 @@ public class MpProductionPrediction extends BaseEntity {
     private String locationType;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.productionPrediction.brand")
+    @Excel(name = "ui.data.column.productionPrediction.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;

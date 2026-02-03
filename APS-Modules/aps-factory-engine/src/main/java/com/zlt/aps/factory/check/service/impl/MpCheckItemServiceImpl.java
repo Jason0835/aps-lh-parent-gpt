@@ -8,12 +8,14 @@ import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.factory.basedataassemble.history.ProductionHistoryHandler;
 import com.zlt.aps.factory.check.service.IMpCheckItemRecordService;
 import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.scheduling.init.TbrProductionInitService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
@@ -50,8 +52,11 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
     @Autowired
     private IMpCheckItemRecordService iMpCheckItemRecordService;
 
-    public MpCheckItemServiceImpl(ProductionSchedulingDataService dataService) {
+    public MpCheckItemServiceImpl(ProductionSchedulingDataService dataService
+            , ProductionHistoryHandler productionHistoryHandler
+    ) {
         super(dataService);
+        super.setProductionHistoryHandler(productionHistoryHandler);
     }
 
     @Override
@@ -59,11 +64,13 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
         List<MpCheckItemVo> mpCheckItemVos = new ArrayList<>();
         List<MpCheckItemRecord> mpCheckItemRecords = new ArrayList<>();
         try {
+//            if (null == context.getInsertNewProductionVersion()) {
+//                context.setInsertNewProductionVersion(Boolean.FALSE);
+//            }
             TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
-            ProductionSchedulingDataService dataService = getDataService();
 
             // 2. 初始化数据检测 (Phase 1)
-            checkInitializationData(productionContext, dataService, mpCheckItemVos, mpCheckItemRecords);
+            checkInitializationData(productionContext, mpCheckItemVos, mpCheckItemRecords);
 
             // 3. 排产前数据检测 (Phase 2)
             checkBeforeSchedulingData(productionContext, mpCheckItemVos, mpCheckItemRecords);
@@ -76,7 +83,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
             // 记录系统级异常
             log.error("检测过程发生异常", e);
             MpCheckItemRecord errorRecord = new MpCheckItemRecord();
-            errorRecord.setCheckItem("SYSTEM_ERROR");
+            errorRecord.setCheckItem("99");
             errorRecord.setCheckContent("系统检测异常: " + e.getMessage());
             mpCheckItemRecords.add(errorRecord);
 
@@ -95,12 +102,11 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
      * 负责加载基础数据（物料、施工、模具）并校验计划有效性
      */
     private void checkInitializationData(TbrProductionContext productionContext,
-                                         ProductionSchedulingDataService dataService,
                                          List<MpCheckItemVo> mpCheckItemVos,
                                          List<MpCheckItemRecord> mpCheckItemRecords) {
 
         // 1. 获取计划列表
-        List<MonthPlanProductionRequirePlanVo> requirePlanList = dataService.getFactoryMonthPlanManufacturing(productionContext);
+        List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
 
         if (CollectionUtils.isEmpty(requirePlanList)) {
             addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "未查询到月度排产需求计划");
@@ -148,8 +154,8 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
         // 6. 添加结果
         addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, isInitDataPass, failReason);
 
-        // 如果初始化通过，将处理过的 requirePlanList 存入 Context，供排产前检测复用
-        if (isInitDataPass) {
+        // 将处理过的 requirePlanList 存入 Context，供排产前检测复用
+        if (true) {
             // 按物料描述分组 Map
             Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream()
                     .filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc()))
@@ -188,7 +194,8 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
                 log.warn("检测: 上下文中未找到计划数据，重新查询数据库");
                 requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
             }
-
+            //基础数据容器存储
+            productionContext.setBaseDataContainer(new BaseDataContainer());
             // 调用父类方法加载数据
             super.initProductionBaseData(productionContext, requirePlanList);
 
@@ -235,7 +242,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
 
         } catch (Exception e) {
             log.error("排产前数据检测失败", e);
-            addErrorRecord(mpCheckItemRecords, "SYSTEM_ERROR", "数据加载异常: " + e.getMessage());
+            addErrorRecord(mpCheckItemRecords, "99", "数据加载异常: " + e.getMessage());
             addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, false, "数据加载异常: " + e.getMessage());
         }
     }
@@ -256,7 +263,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
      */
     private void addCheckItemResult(List<MpCheckItemVo> list, CheckItemTypeEnums checkItemType, boolean isPass, String reason) {
         MpCheckItemVo vo = new MpCheckItemVo();
-        vo.setCheckItem(checkItemType.getName());
+        vo.setCheckItem(checkItemType.getCode());
         vo.setPass(isPass);
         list.add(vo);
     }
