@@ -6,6 +6,7 @@ import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
@@ -105,6 +106,57 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                 && (StringUtils.isEmpty(item.getScheduledMachines())
                 || StringUtils.contains(item.getScheduledMachines(), contextDTO.getScheduledMachines())));
     }
+
+    /**
+     * 更新结构转产
+     *
+     * @param contextDTO
+     */
+    @Override
+    protected void updateStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
+        // 工厂编码
+        String factoryCode = contextDTO.getFactoryCode();
+        // 年份
+        Integer year = contextDTO.getMpYear();
+        // 月份
+        Integer month = contextDTO.getMpMonth();
+        // 排产版本
+        String productionVersion = contextDTO.getProductionVersion();
+        // 结构名称
+        String structureName = contextDTO.getStructureName();
+        // 机台
+        String scheduledMachines = contextDTO.getScheduledMachines();
+        // 开始日期
+        Integer startDay = contextDTO.getStartDay();
+        // 结束日期
+        Integer endDay = contextDTO.getEndDay();
+        if (StringUtils.isEmpty(productionVersion) || StringUtils.isEmpty(factoryCode)
+                || StringUtils.isEmpty(structureName) || StringUtils.isEmpty(scheduledMachines)
+                || year == null || month == null || startDay == null || endDay == null) {
+            log.warn("更新结构转产：必须字段为空，直接返回");
+            return;
+        }
+        Integer allotDays = endDay - startDay + 1;
+        // 更新结构转产
+        try {
+            LambdaUpdateWrapper<MpStructureAllocation> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.eq(MpStructureAllocation::getStructureName, structureName)
+                    .eq(MpStructureAllocation::getCxMachineCode, scheduledMachines)
+                    .eq(MpStructureAllocation::getFactoryCode, factoryCode)
+                    .eq(MpStructureAllocation::getYear, year)
+                    .eq(MpStructureAllocation::getMonth, month)
+                    .eq(MpStructureAllocation::getProductionVersion, productionVersion)
+                    .set(MpStructureAllocation::getBeginDay, startDay)
+                    .set(MpStructureAllocation::getEndDay, endDay)
+                    .set(MpStructureAllocation::getAllotDays, allotDays);
+            mpStructureAllocationEntityMapper.update(null, wrapper);
+            log.info("更新结构转产成功");
+        } catch (Exception e) {
+            log.error("更新结构转产批量操作异常", e);
+            throw new RuntimeException("更新结构转产失败", e);
+        }
+    }
+
 
     /**
      * 查询调整明细
