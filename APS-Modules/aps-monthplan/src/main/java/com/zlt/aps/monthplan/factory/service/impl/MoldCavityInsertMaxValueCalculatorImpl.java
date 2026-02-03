@@ -5,12 +5,11 @@ import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.factory.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.factory.domain.vo.ProductionCycleInfo;
 import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.enums.MouldRelationTypeEnum;
-import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
@@ -123,8 +122,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         }
 
         // 计算可用量
-        Map<String, Set<String>> cavityTempMap = new HashMap<>(); // key: structureName, value: mouldCodes
-        Map<String, Set<String>> insertTempMap = new HashMap<>(); // key: materialDesc, value: mouldCodes
+        Map<String, Set<String>> cavityTempMap = new HashMap<>();
+        Map<String, Set<String>> insertTempMap = new HashMap<>();
 
         // 遍历所有模具
         for (Map.Entry<String, ProductionMouldInfoVo> entry : mouldInfoMap.entrySet()) {
@@ -237,32 +236,6 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         }
 
         return materialToStructureMap;
-    }
-
-    // 以下方法保持不变，因为它们是工具方法...
-    // 生产周期信息内部类
-    private static class ProductionCycleInfo {
-        private final Date startDate;
-        private final Date endDate;
-        private final Integer cycleStartDay;
-
-        public ProductionCycleInfo(Date startDate, Date endDate, Integer cycleStartDay) {
-            this.startDate = startDate;
-            this.endDate = endDate;
-            this.cycleStartDay = cycleStartDay;
-        }
-
-        public Date getStartDate() {
-            return startDate;
-        }
-
-        public Date getEndDate() {
-            return endDate;
-        }
-
-        public Integer getCycleStartDay() {
-            return cycleStartDay;
-        }
     }
 
     /**
