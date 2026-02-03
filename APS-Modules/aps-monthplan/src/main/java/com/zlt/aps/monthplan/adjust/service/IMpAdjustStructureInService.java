@@ -70,4 +70,10 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
      * @param contextDTO
      */
     List<MdmWorkCalendar> getWorkCalendarList(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 初始每日型腔/活块数量
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    void initCavityAndBlockQty(MpRollAdjustContextDTO contextDTO);
 }

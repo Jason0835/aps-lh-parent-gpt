@@ -6,7 +6,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
+import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
@@ -21,14 +23,18 @@ import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
+import com.zlt.aps.monthplan.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.sysdef.domain.SysDocType;
+import io.swagger.annotations.ApiModelProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +74,10 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Autowired
     private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+
+    @Autowired
+    private MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
+
 
 
     @Override
@@ -191,6 +201,35 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         contextDTO.setEndDay(endDay);
         contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
+    }
+
+    @Override
+    public void initCavityAndBlockQty(MpRollAdjustContextDTO contextDTO) {
+        //1.按年月获取型腔及活块数据
+        Map<String, Object> cavity2BlockMap;
+        try{
+            cavity2BlockMap = moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode(),null,null);
+            if (PubUtil.isEmpty(cavity2BlockMap)){
+                throw new BusinessException(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.noGetCavityAndBlock"));
+            }
+        }catch (Exception ex){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.getCavityAndBlockExcept"),
+                    ex.getMessage()));
+        }
+        Map<Integer, Map<String, Object>> dailyDetailMap = (Map<Integer, Map<String, Object>>)cavity2BlockMap.get("dailyDetails");
+        if (PubUtil.isEmpty(dailyDetailMap)){
+            throw new BusinessException(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.noGetCavityAndBlock"));
+        }
+        //2.按日初始上下文：型腔及活块数据
+        Map<Integer, Map<String, Set<String>>> dailyCavityMap = new HashMap<>();
+        Map<Integer, Map<String, Set<String>>> dailyBlockMap = new HashMap<>();
+        Map<String, Object> dayResult;
+
+        /*dailyCavityMap = dayResult.get("cavityDetail");
+        for (Map.Entry<Integer, Map<String, Object>> entry : dailyDetailMap.entrySet()) {
+            dayResult = entry.getValue();
+            dailyCavityMap.put(entry.getKey(),);
+        }*/
     }
 
     @Override
