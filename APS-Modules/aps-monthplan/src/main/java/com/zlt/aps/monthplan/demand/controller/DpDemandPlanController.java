@@ -1,13 +1,10 @@
 package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.core.web.page.PageDomain;
-import com.ruoyi.common.core.web.page.TableSupport;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.common.utils.CollectionKit;
 import com.zlt.aps.monthplan.common.utils.RequirementVersionService;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.demand.mapper.DpDemandPlanEntityMapper;
@@ -25,7 +22,6 @@ import com.ruoyi.common.log.enums.BusinessType;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,12 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
 
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService ;
@@ -70,35 +62,6 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     private final IDpDemandPlanService dpDemandPlanService;
     private final RequirementVersionService requirementVersionService;
     private final DpDemandPlanEntityMapper entityMapper;
-
-    /**
-     * 查询需求计划列表
-     */
-    @ApiOperation("查询列表")
-    @PostMapping("/list")
-    @Override
-    public TableDataInfo list(@RequestBody DpDemandPlan queryVO) {
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper<>();
-        builderCondition(queryWrapper,queryVO);
-        List<DpDemandPlan> dataList =  dpDemandPlanService.list(queryWrapper);
-        if(CollectionUtils.isEmpty(dataList)) {
-            return getDataTable(Collections.emptyList());
-        }
-        Comparator<DpDemandPlan> comparator = Comparator.comparing(DpDemandPlan::getCreateTime).reversed();
-        PageDomain pageDomain = TableSupport.buildPageRequest();
-        Integer pageNum = pageDomain.getPageNum();
-        Integer pageSize = pageDomain.getPageSize();
-        pageNum = pageNum == null ? 1 : pageNum;
-        pageSize = pageSize == null ? 10000000 : pageSize;
-        List<DpDemandPlan>  list = CollectionKit.sortPageAll(pageNum,pageSize,comparator,dataList);
-        TableDataInfo rspData = new TableDataInfo();
-        rspData.setCode(200);
-        rspData.setRows(list);
-        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
-        rspData.setTotal(dataList.size());
-        return rspData;
-    }
-
 
     @Override
     protected String getOrderBy() {
@@ -164,19 +127,6 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     public byte[] exportData(@RequestBody DpDemandPlan queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
-    }
-
-    @Override
-    protected List<DpDemandPlan> listExportData(DpDemandPlan obj) {
-        QueryWrapper<DpDemandPlan> wrapper = new QueryWrapper<>();
-        this.builderCondition(wrapper, obj);
-        List<DpDemandPlan> dataList =  dpDemandPlanService.list(wrapper);
-        if(CollectionUtils.isEmpty(dataList)) {
-            return Collections.emptyList();
-        }
-        Comparator<DpDemandPlan> comparator = Comparator.comparing(DpDemandPlan::getCreateTime).reversed();
-        dataList.sort(comparator);
-        return dataList;
     }
 
     @Override

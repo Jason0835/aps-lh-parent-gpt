@@ -177,6 +177,9 @@ public class MpWeekRollAdjustEngine {
         for (Map.Entry<Integer, MpDailyCapacityLimitVo> entry : dailyCapacityLimitVoMap.entrySet()) {
             dailyCapacityLimitVo = entry.getValue();
             workCalendar = workCalendarMap.get(entry.getKey());
+            if (workCalendar == null){
+                continue;
+            }
             dailyCapacityLimitVo.setDayOpenCloseFlag(workCalendar.getDayFlag());
             dailyCapacityLimitVo.setDayProductionRate(workCalendar.getRate());
             //日最大排产量 = 日最大产能*比率/100
@@ -208,12 +211,12 @@ public class MpWeekRollAdjustEngine {
             return false;
         }
         //2. 检查自动补量天数
-        Integer boostDay = (Integer) paramMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
+        Integer boostDay = (Integer) paramMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         if (boostDay == null){
             return false;
         }
         // 起始日 = 月底最后1天 - 补量天数;
-        int startDay = getLastDayNumberOfMonth(LocalDate.now()) - boostDay;
+        int startDay = getLastDayNumberOfMonth(LocalDate.of(mpFinalVo.getYear(), mpFinalVo.getMonth(), 1)) - boostDay;
         return iDay > startDay;
     }
 

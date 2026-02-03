@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -91,17 +90,12 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
 
     @Override
     public List<String> findMonthPlanVersion(DpDemandPlanSum queryCondition) {
-        LambdaQueryWrapper<DpDemandPlanSum> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DpDemandPlanSum::getFactoryCode, queryCondition.getFactoryCode());
-        wrapper.eq(DpDemandPlanSum::getYear, queryCondition.getYear());
-        wrapper.eq(DpDemandPlanSum::getMonth, queryCondition.getMonth());
-        wrapper.eq(DpDemandPlanSum::getIsDelete, YesOrNoEnum.NO.getValue());
-        wrapper.orderByDesc(DpDemandPlanSum::getCreateTime);
-        List<DpDemandPlanSum> list =  this.dpDemandPlanSumEntityMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(list)){
-            return Collections.emptyList();
-        }
-        return list.stream().map(DpDemandPlanSum::getMonthPlanVersion).distinct().collect(Collectors.toList());
+        return dpDemandPlanSumEntityMapper.selectDistinctMonthPlanVersion(
+            queryCondition.getFactoryCode(),
+            queryCondition.getYear(),
+            queryCondition.getMonth(),
+            YesOrNoEnum.NO.getValue()
+        );
     }
 
     private void updateDpDemandPlanSum(DpDemandPlanSum billVO) {

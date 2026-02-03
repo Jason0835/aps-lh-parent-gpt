@@ -31,10 +31,4 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    * @param finishedProductStockMap 成品库存记录
    */
   void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
-
-  /**
-   *  汇总库存
-   * @return
-   */
-  Map<String, Map<String, Integer>> calculateStockQty();
 }

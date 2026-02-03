@@ -167,7 +167,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         // 结构特殊材料排产
-        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
+//        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);

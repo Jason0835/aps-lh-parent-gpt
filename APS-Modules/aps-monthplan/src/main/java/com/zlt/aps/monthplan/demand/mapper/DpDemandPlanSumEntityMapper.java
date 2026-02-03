@@ -3,6 +3,10 @@ package com.zlt.aps.monthplan.demand.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,5 +23,21 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface DpDemandPlanSumEntityMapper extends CommBaseMapper<DpDemandPlanSum> {
-
+  /**
+   * 直接查询去重后的month_plan_version列表
+   */
+  @Select("SELECT DISTINCT MONTH_PLAN_VERSION " +
+      "FROM ( " +
+      "    SELECT MONTH_PLAN_VERSION, CREATE_TIME " +
+      "    FROM T_DP_DEMAND_PLAN_SUM " +
+      "    WHERE FACTORY_CODE = #{factoryCode} " +
+      "      AND `YEAR` = #{year} " +
+      "      AND `MONTH` = #{month} " +
+      "      AND IS_DELETE = #{isDelete} " +
+      "    ORDER BY CREATE_TIME DESC " +
+      ") t")
+  List<String> selectDistinctMonthPlanVersion(@Param("factoryCode") String factoryCode,
+                                              @Param("year") Integer year,
+                                              @Param("month") Integer month,
+                                              @Param("isDelete") Integer isDelete);
 }
