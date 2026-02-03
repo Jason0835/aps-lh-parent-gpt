@@ -73,32 +73,36 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
+    private final SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler;
+
+    private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
 
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
     private final InitNoProductionRecordService initNoProductionRecordService;
 
-    private final SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler;
-
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
+                                          InitNoProductionRecordService initNoProductionRecordService,
                                           FormalProductionHandler formalProductionHandler,
                                           ProductionHistoryHandler productionHistoryHandler,
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
+                                          SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler,
+                                          CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
-                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
-                                          InitNoProductionRecordService initNoProductionRecordService,
-                                          SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler) {
+                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService);
+        this.initNoProductionRecordService = initNoProductionRecordService;
         this.formalProductionHandler = formalProductionHandler;
         this.productionHistoryHandler = productionHistoryHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
+        this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
+        this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
-        this.initNoProductionRecordService = initNoProductionRecordService;
-        this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
         super.setProductionHistoryHandler(productionHistoryHandler);
     }
 
@@ -152,7 +156,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         saveMouldUsedLog(productionContext);
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = CalculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList);
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList);
         setGroupFixedCxMachineInfo(productionContext, estimateGroupCxAllocationMap);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         /**
