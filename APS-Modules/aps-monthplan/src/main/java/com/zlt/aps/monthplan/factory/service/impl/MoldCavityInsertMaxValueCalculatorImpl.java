@@ -65,7 +65,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      * @throws Exception 抛出异常各自处理
      */
     @Transactional(rollbackFor = Exception.class)
-    public DailyMouldAvailabilityResult moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
+    public List<DailyMouldAvailabilityResult> moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
                                                                         Date targetDate, String monthPlanVersion) throws Exception {
         // 参数校验
         validateParameters(year, month, factoryCode, targetDate);
@@ -76,7 +76,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         if (CollectionUtils.isEmpty(mouldRelationMap)) {
             log.warn("未找到任何模具配置信息，工厂：{}，年月：{}-{}，日期：{}", factoryCode, year, month, targetDate);
-            return DailyMouldAvailabilityResult.emptyResult();
+            return Collections.singletonList(DailyMouldAvailabilityResult.emptyResult());
         }
 
         // 2. 每个模具计算结合工作日历计算可用日期
@@ -87,14 +87,107 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         List<MdmMaterialInfo> demandPlanList = getDemandPlanList(factoryCode);
         Map<String, String> materialToStructureMap = buildMaterialToStructureMap(demandPlanList, mouldRelationMap);
 
-        // 4. 计算指定日期的可用量
-        return calculateForSpecificDate(year, month, factoryCode, targetDate, mouldInfoMap, materialToStructureMap);
+        // 4. 根据是否传入日期返回不同结果
+        if (targetDate != null) {
+            // 计算指定日期的可用量
+            return calculateForSpecificDate(year, month, factoryCode, targetDate, mouldInfoMap, materialToStructureMap);
+        } else {
+            // 计算整个月份的可用量
+            return calculateForMonth(year, month, factoryCode, mouldInfoMap, materialToStructureMap);
+        }
+    }
+
+    /**
+     * 计算整个月份的型腔活块可用量
+     */
+    private List<DailyMouldAvailabilityResult> calculateForMonth(Integer year, Integer month, String factoryCode,
+                                                                 Map<String, ProductionMouldInfoVo> mouldInfoMap,
+                                                                 Map<String, String> materialToStructureMap) {
+        // 获取排产周期信息
+        ProductionCycleInfo cycleInfo = getProductionCycleInfo(year, month, factoryCode);
+        Date productionStartDate = cycleInfo.getStartDate();
+        Date productionEndDate = cycleInfo.getEndDate();
+
+        // 获取整个月份的天数
+        Integer monthDays = getMonthDays(productionStartDate, productionEndDate);
+        // 获取停产日
+        Set<Integer> stopDays = getStopDay(factoryCode, productionStartDate, productionEndDate);
+
+        List<DailyMouldAvailabilityResult> results = new ArrayList<>();
+
+        // 遍历整个排产周期的每一天
+        for (int day = 1; day <= monthDays; day++) {
+            // 创建当天的结果对象
+            DailyMouldAvailabilityResult dayResult = new DailyMouldAvailabilityResult();
+            dayResult.setDayOfCycle(day);
+
+            if (stopDays.contains(day)) {
+                results.add(dayResult);
+                continue;
+            }
+
+            // 计算当天的可用量
+            Map<String, Set<String>> cavityTempMap = new HashMap<>();
+            Map<String, Set<String>> insertTempMap = new HashMap<>();
+
+            // 遍历所有模具
+            for (Map.Entry<String, ProductionMouldInfoVo> entry : mouldInfoMap.entrySet()) {
+                String mouldCode = entry.getKey();
+                ProductionMouldInfoVo mouldInfo = entry.getValue();
+
+                // 检查模具在当前日期是否可用
+                if (mouldInfo.getProductionDaySet() != null &&
+                        mouldInfo.getProductionDaySet().contains(day)) {
+
+                    // 遍历模具关联的物料描述
+                    for (String materialDesc : mouldInfo.getAssociationMaterialSet()) {
+                        String structureName = materialToStructureMap.get(materialDesc);
+
+                        // 计算活块可用量（按物料描述）
+                        insertTempMap.computeIfAbsent(materialDesc, k -> new HashSet<>()).add(mouldCode);
+
+                        // 计算型腔可用量（按结构+主花纹）
+                        if (StringUtils.isNotBlank(structureName)) {
+                            cavityTempMap.computeIfAbsent(structureName, k -> new HashSet<>()).add(mouldCode);
+                        }
+                    }
+                }
+            }
+
+            // 转换为当天结果
+            Map<String, Integer> cavityDayResults = new HashMap<>();
+            for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
+                cavityDayResults.put(entry.getKey(), entry.getValue().size());
+            }
+
+            Map<String, Integer> insertDayResults = new HashMap<>();
+            for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
+                insertDayResults.put(entry.getKey(), entry.getValue().size());
+            }
+
+            dayResult.setCavityResults(cavityDayResults);
+            dayResult.setInsertResults(insertDayResults);
+
+            results.add(dayResult);
+        }
+
+        return results;
+    }
+
+    /**
+     * 根据开始日期和第几天计算具体日期
+     */
+    private Date calculateDateFromDay(Date startDate, int day) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(startDate);
+        calendar.add(Calendar.DATE, day - 1);
+        return calendar.getTime();
     }
 
     /**
      * 计算指定日期的型腔活块可用量
      */
-    private DailyMouldAvailabilityResult calculateForSpecificDate(Integer year, Integer month, String factoryCode,
+    private List<DailyMouldAvailabilityResult> calculateForSpecificDate(Integer year, Integer month, String factoryCode,
                                                                   Date targetDate, Map<String, ProductionMouldInfoVo> mouldInfoMap,
                                                                   Map<String, String> materialToStructureMap) {
         // 获取排产周期信息
@@ -104,7 +197,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         if (!isDateInCycle(targetDate, cycleInfo)) {
             log.warn("目标日期{}不在排产周期内，工厂：{}，排产周期：{} 至 {}",
                     targetDate, factoryCode, cycleInfo.getStartDate(), cycleInfo.getEndDate());
-            return DailyMouldAvailabilityResult.outOfCycleResult();
+            return new ArrayList<>();
         }
 
         // 计算目标日期是排产周期的第几天（从1开始）
@@ -114,11 +207,13 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         Set<Integer> stopDays = getStopDay(factoryCode, cycleInfo.getStartDate(), cycleInfo.getEndDate());
 
         // 准备结果对象
+        List<DailyMouldAvailabilityResult> mouldRelationList = new ArrayList<>();
         DailyMouldAvailabilityResult result = new DailyMouldAvailabilityResult();
+        mouldRelationList.add(result);
         result.setDayOfCycle(dayOfCycle);
         // 如果是停产日，直接返回空结果
         if (stopDays.contains(dayOfCycle)) {
-            return result;
+            return new ArrayList<>();
         }
 
         // 计算可用量
@@ -163,7 +258,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         result.setCavityResults(cavityResults);
         result.setInsertResults(insertResults);
 
-        return result;
+        return mouldRelationList;
     }
 
     /**
@@ -204,9 +299,6 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         }
         if (StringUtils.isBlank(factoryCode)) {
             throw new IllegalArgumentException("工厂代码不能为空");
-        }
-        if (targetDate == null) {
-            throw new IllegalArgumentException("目标日期不能为空");
         }
     }
 
