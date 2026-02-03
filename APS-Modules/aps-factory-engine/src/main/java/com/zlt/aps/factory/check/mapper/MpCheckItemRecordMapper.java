@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.check.mapper;
+package com.zlt.aps.factory.check.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;

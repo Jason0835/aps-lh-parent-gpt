@@ -158,7 +158,39 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP3603 因胎胚种类数限制
      */
-    DAY_EMBRYO_CODE_LIMIT("MP3603", "因胎胚种类数限制", "alg.data.mouldProduction.dayEmbryoCodeLimit");
+    DAY_EMBRYO_CODE_LIMIT("MP3603", "因胎胚种类数限制", "alg.data.mouldProduction.dayEmbryoCodeLimit"),
+    /**
+     * MP3701 缺少特殊原材料数据
+     */
+    SPECIAL_RAW_MATERIAL_NOTEMPTY("MP3701", "缺少特殊原材料数据", "alg.data.before.production.rawSpecialMaterialNoEmpty"),
+    /**
+     * MP3702 缺少生产日历数据
+     */
+    PRODUCTION_CALENDAR_NOTEMPTY("MP3702", "缺少生产日历数据", "alg.data.before.production.productionCalendarNotEmpty"),
+    /**
+     * MP3703 缺少成型机基础数据
+     */
+    MOLD_MACHINE_BASEDATA_NOTEMPTY("MP3703", "缺少成型机基础数据", "alg.data.before.production.moldMachineBaseDataNotEmpty"),
+    /**
+     * MP3704 缺少工装台账数据
+     */
+    WORKWEAR_INVENTORY_NOTEMPTY("MP3704", "缺少工装台账数据", "alg.data.before.production.workwearInventoryNotEmpty"),
+    /**
+     * MP3705 缺少模具分配比例配置
+     */
+    MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY("MP3705", "缺少模具分配比例配置", "alg.data.before.production.moldAllocationRatioConfigNotEmpty"),
+    /**
+     * MP3706 缺少模壳数据
+     */
+    MOLD_SHELL_NOTEMPTY("MP3706", "缺少模壳数据", "alg.data.before.production.moldShellNotEmpty"),
+    /**
+     * MP3707 缺少胶囊卡盘数据
+     */
+    CAPSULE_CHUCK_NOTEMPTY("MP3707", "缺少胶囊卡盘数据", "alg.data.before.production.capsuleChuckNotEmpty"),
+    /**
+     * MP3708 缺少结构成型硫化配比数据
+     */
+    STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY("MP3708", "缺少结构成型硫化配比数据", "alg.data.before.production.structureFormingVulcanizationRatioNotEmpty");
 
     private String errorCode;
 

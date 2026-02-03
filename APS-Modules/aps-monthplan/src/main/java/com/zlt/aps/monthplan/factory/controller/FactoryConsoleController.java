@@ -8,6 +8,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.redissonLock.annotation.DistributedLock;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.zlt.aps.factory.check.service.IMpCheckItemService;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -45,6 +46,8 @@ public class FactoryConsoleController extends BaseController {
     private final IFactoryConsoleService factoryConsoleService;
 
     private final IFactoryProductionVersionService factoryProductionVersionService;
+
+    private final IMpCheckItemService mpCheckItemService;
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService iFactoryMonthPlanProductionFinalResultService;
@@ -366,5 +369,11 @@ public class FactoryConsoleController extends BaseController {
             return AjaxResult.success(new FactoryMonthPlanTypeVo());
         }
         return AjaxResult.success(factoryConsoleService.getProductionMonthType(query));
+    }
+
+    @ApiOperation("检测需求月计划排产")
+    @PostMapping("/checkProductionDemandPlan")
+    public AjaxResult checkProductionDemandPlan(@RequestBody FactoryProductionParamVo factoryProductionParam){
+        return factoryConsoleService.checkProductionDemandPlan(factoryProductionParam);
     }
 }

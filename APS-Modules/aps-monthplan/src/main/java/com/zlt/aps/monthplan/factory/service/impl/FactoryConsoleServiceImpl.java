@@ -5,6 +5,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.factory.check.service.IMpCheckItemService;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
@@ -43,6 +44,8 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
     private final FactoryConsoleMapper factoryConsoleMapper;
 
     private final IMonthPlanProductionSchedulingService monthPlanProductionSchedulingService;
+
+    private final IMpCheckItemService mpCheckItemService;
 
     @Override
     public List<FactoryProductionPlanVersionDto> getProductionVersionList(FactoryProductionPlanVo queryCondition) {
@@ -326,5 +329,15 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         FactoryMonthPlanFinalVersionInfoVo info = new FactoryMonthPlanFinalVersionInfoVo();
         BeanUtils.copyProperties(result, info);
         return info;
+    }
+
+    @Override
+    public AjaxResult checkProductionDemandPlan(FactoryProductionParamVo factoryProductionParam) {
+        Context context = buildContext(factoryProductionParam);
+        List<MpCheckItemVo> mpCheckItemVos = mpCheckItemService.check(context);
+        if (CollectionUtils.isEmpty(mpCheckItemVos)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.check.result.empty"));
+        }
+        return AjaxResult.success(mpCheckItemVos);
     }
 }

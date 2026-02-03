@@ -79,7 +79,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         context.setPlanType(planType);
         productionContext.setPlanType(planType);
         //获取初始化业务参数设定
-        ProductionInitParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+        ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
         //SKU-损耗处理
         handlerLoss(productionContext, requirePlanList, paramConfiguration.getOpenLevelRatio());
         //物料基础信息
@@ -169,126 +169,6 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         getDataService().addFactoryProductionVersion(factoryProductionVersion);
     }
 
-    /**
-     * 根据工厂编码 + 年月 + 需求计划版本，获取对应的月需要排产的需求计划
-     *
-     * @param productionContext
-     * @return
-     */
-    private List<MonthPlanProductionRequirePlanVo> getMonthPlanRequirePlan(TbrProductionContext productionContext) {
-        //得到制造需求计划
-        List<DpDemandPlan> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
-        if (CollectionUtils.isEmpty(monthPlanRequireList)) {
-            String planListIsNull = I18nUtil.getMessage("alg.data.alter.message.planListIsNull");
-            throw new BusinessException(String.format(planListIsNull, productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion()));
-        }
-        List<MonthPlanProductionRequirePlanVo> productionPlanList = new ArrayList<>();
-        monthPlanRequireList.forEach(require -> {
-            MonthPlanProductionRequirePlanVo productionPlan = MonthPlanProductionRequirePlanVo.buildInitProductionPlan(productionContext, productionContext.getProductionVersion(), require);
-            productionPlanList.add(productionPlan);
-        });
-        return productionPlanList;
-    }
-
-    /**
-     * 获取初始化业务的参数设定
-     *
-     * @param productionContext
-     * @return
-     */
-    private ProductionInitParamConfiguration createParamConfiguration(TbrProductionContext productionContext) {
-        ProductionInitParamConfiguration configuration = new ProductionInitParamConfiguration();
-        List<String> paramCodeList = new ArrayList<>(16);
-        paramCodeList.add(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode());
-        paramCodeList.add(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode());
-        paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
-        Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
-        if (CollectionUtils.isEmpty(paramConfigurationMap)) {
-            log.info(TbrProductionInitLogRecorder.addInitParamEmptyLog(productionContext));
-            return configuration;
-        }
-        configuration.setOpenPreemptionMouldCapacity((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode()));
-        configuration.setOpenLevelRatio((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode()));
-        //日硫化量获取
-        String dayVulcanizationParam = (String) paramConfigurationMap.get(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
-        if (StringUtils.isBlank(dayVulcanizationParam)) {
-            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.STANDARD_CAPACITY);
-        } else {
-            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.getInstance(dayVulcanizationParam));
-        }
-        return configuration;
-    }
-
-    /**
-     * 获取物料基础信息
-     * key = materialDesc: value = MdmMaterialInfo
-     * 对物料描述去重(数据问题，应该源头控制)
-     *
-     * @param productionContext
-     * @return
-     */
-    private Map<String, ProductBaseInfoVo> getMaterialInfo(TbrProductionContext productionContext) {
-        List<ProductBaseInfoVo> productBaseInfoList = getDataService().getProductionMaterialInfo(productionContext);
-        if (CollectionUtils.isEmpty(productBaseInfoList)) {
-            log.info(TbrProductionInitLogRecorder.addMaterialInfoEmptyLog(productionContext));
-            return Collections.emptyMap();
-        }
-        return productBaseInfoList.stream().collect(Collectors.toMap(ProductBaseInfoVo::getMaterialDesc, Function.identity(), (before, after) -> before));
-    }
-
-    /**
-     * 获取需要排产的SKU的施工配置信息
-     * key = materialCode: value = List<MonthPlanProductConstructionInfoVo>
-     *
-     * @param productionContext
-     * @return
-     */
-    private Map<String, List<MonthPlanProductConstructionInfoVo>> getProductionConstructionInfo(TbrProductionContext productionContext) {
-        List<MonthPlanProductConstructionInfoVo> constructionInfoList = getDataService().getProductionConstructionInfo(productionContext);
-        if (CollectionUtils.isEmpty(constructionInfoList)) {
-            log.info(TbrProductionInitLogRecorder.addConstructionInfoEmptyLog(productionContext));
-            return Collections.emptyMap();
-        }
-        return constructionInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductConstructionInfoVo::getMaterialCode));
-    }
-
-    /**
-     * 获取需要排产的SKU的模具配置信息
-     * key = materialDesc: value = List<MonthPlanProductMouldInfoVo>
-     *
-     * @param productionContext
-     * @return
-     */
-    private Map<String, List<MonthPlanProductMouldInfoVo>> getProductionMouldInfo(TbrProductionContext productionContext) {
-        //已有模具的配置关系
-        List<MonthPlanProductMouldInfoVo> productMouldInfoList = getDataService().getProductionMouldInfo(productionContext);
-        //新模具到货计划关系
-        List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getProductionMouldDeliveryInfo(productionContext);
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList);
-        if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
-            return Collections.emptyMap();
-        }
-        return allMouldRelationInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
-    }
-
-    /**
-     * 获取SKU的日硫化产能信息
-     * key = materialDesc: value = MonthPlanProductLhCapacityVo
-     *
-     * @param productionContext 排产上下文
-     * @param mode              日硫化量模式
-     * @return
-     */
-    private Map<String, MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(TbrProductionContext productionContext, DayVulcanizationModeEnum mode) {
-        List<MonthPlanProductLhCapacityVo> lhCapacityList = getDataService().getProductLhCapacityInfo(productionContext);
-        if (CollectionUtils.isEmpty(lhCapacityList)) {
-            log.info(TbrProductionInitLogRecorder.addDayLhCapacityInfoEmptyLog(productionContext));
-            return Collections.emptyMap();
-        }
-        //计算日硫化产能
-        lhCapacityList.forEach(lhCapacity -> lhCapacity.calculateDayVulcanizationQty(mode));
-        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity(), (before, after) -> after));
-    }
 
     /**
      * 损耗处理，看是否开启采用损耗率
