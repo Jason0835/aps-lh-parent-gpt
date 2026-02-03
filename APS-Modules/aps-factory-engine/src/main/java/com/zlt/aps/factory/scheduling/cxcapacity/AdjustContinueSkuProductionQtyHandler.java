@@ -252,7 +252,7 @@ public class AdjustContinueSkuProductionQtyHandler {
     if(null == dayVulcanizationQty) {
       return 0;
     }
-    return dayVulcanizationQty*changeTypeBlockQty;
+    return dayVulcanizationQty - changeTypeBlockQty;
   }
 
   /**

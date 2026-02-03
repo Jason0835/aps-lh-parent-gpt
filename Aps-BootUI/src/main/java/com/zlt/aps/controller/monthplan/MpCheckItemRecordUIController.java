@@ -59,7 +59,7 @@ public class MpCheckItemRecordUIController extends BaseUIController<MpCheckItemR
      * 根据条件查询S2-1202 检测项记录列表
      */
     @ApiOperation("根据条件查询S2-1202 检测项记录列表")
-    @RequiresPermissions("monthplan:checkItemRecord:list")
+//    @RequiresPermissions("monthplan:checkItemRecord:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MpCheckItemRecord entity) {
