@@ -348,8 +348,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private List<MdmCycleSchStruConf> queryMdmCycleSchStruConf(MpStructureAllocation mpStructureAllocation) {
         MdmCycleSchStruConf queryVO = new MdmCycleSchStruConf();
         queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
-        queryVO.setYear(mpStructureAllocation.getYear());
-        queryVO.setMonth(mpStructureAllocation.getMonth());
 
         LambdaQueryWrapper<MdmCycleSchStruConf> queryWrapper = new LambdaQueryWrapper<>();
         buildMdmCycleSchStruConfCondition(queryWrapper, queryVO);
@@ -364,8 +362,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      */
     private void buildMdmCycleSchStruConfCondition(LambdaQueryWrapper<MdmCycleSchStruConf> queryWrapper, MdmCycleSchStruConf queryVO) {
         queryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, queryVO.getFactoryCode());
-        queryWrapper.eq(MdmCycleSchStruConf::getYear, queryVO.getYear());
-        queryWrapper.eq(MdmCycleSchStruConf::getMonth, queryVO.getMonth());
         queryWrapper.eq(MdmCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
