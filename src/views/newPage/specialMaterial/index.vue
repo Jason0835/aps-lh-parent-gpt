@@ -153,7 +153,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.masterdata.materialCode"),
+          label: this.$t("材料编码"),
         },
         {
           prop: "materialDesc",
@@ -162,7 +162,7 @@ export default {
         },
         {
           prop: "rubberSpec",
-          label: this.$t("ui.data.column.masterdata.rubberSpec"),
+          label: this.$t("适用范围"),
           width:160
         },
         {
@@ -230,7 +230,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.column.masterdata.materialCode"),
+          label: this.$t("材料编码"),
         },
         {
           prop: "materialDesc",

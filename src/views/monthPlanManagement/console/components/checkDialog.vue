@@ -19,7 +19,7 @@
           <div class="stat-label">已通过</div>
           <div class="stat-value success">{{ passedCount }}</div>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" style="cursor: pointer;" @click="showReason">
           <div class="stat-label">未通过</div>
           <div class="stat-value failed">{{ failedCount }}</div>
         </div>
@@ -45,6 +45,7 @@
           :key="item.id"
           class="check-item"
           :class="getItemClass(item.status)"
+          @click="goReason(item.status)"
         >
           <div class="item-index">{{ index + 1 }}</div>
 
@@ -97,17 +98,24 @@
         this.$t("common.button.confirm")
       }}</el-button>
     </template> -->
+    <reasonDialog ref="reasonRef" />
   </el-dialog>
+
 </template>
 
 <script>
 import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
+import reasonDialog from "./reasonDialog.vue";
 
-import { factoryWholeCourseProduction,checkProductionDemandPlan } from "@/api/factory/console";
+
+import {
+  factoryWholeCourseProduction,
+  checkProductionDemandPlan,
+} from "@/api/factory/console";
 export default {
-  components: { infoForm },
+  components: { infoForm,reasonDialog },
   inject: ["parentDict"],
   data() {
     return {
@@ -116,9 +124,9 @@ export default {
       dialogVisible: false,
       checking: false,
       confirming: false,
-      actionData:{},
+      actionData: {},
 
-      checkItems: []
+      checkItems: [],
     };
   },
   computed: {
@@ -141,7 +149,7 @@ export default {
     // 已检查的数量
     checkedCount() {
       return this.checkItems.filter(
-        (item) => item.status === "passed" || item.status === "failed"
+        (item) => item.status == true || item.status == false
       ).length;
     },
 
@@ -152,7 +160,7 @@ export default {
 
     // 是否全部通过
     allPassed() {
-      return this.checkItems.every((item) => item.status === "passed");
+      return this.checkItems.every((item) => item.status == true);
     },
 
     // 进度百分比
@@ -191,7 +199,7 @@ export default {
     getItemClass(status) {
       return {
         "check-item-passed": status == true,
-        "check-item-failed": status ==false,
+        "check-item-failed": status == false,
         "check-item-checking": status === "checking",
       };
     },
@@ -200,19 +208,24 @@ export default {
     getStatusClass(status) {
       return {
         "status-passed": status == true,
-        "status-failed": status  ==false,
+        "status-failed": status == false,
         "status-checking": status === "checking",
       };
     },
 
     // 获取状态文本
     getStatusText(status) {
-      const statusMap = {
-        true: "已通过",
-        false: "未通过",
-        checking: "检查中",
-      };
-      return statusMap[status] || status;
+      console.log(status);
+      let text = "检查中";
+      if(status=='checking'){
+        return text
+      }
+      if (status == true) {
+        text = "已通过";
+      } else {
+        text = "未通过";
+      }
+      return text;
     },
     // api
     async save(params) {
@@ -229,27 +242,40 @@ export default {
         this.loading = false;
       }
     },
-    async startCheck(data){
-      try{
-        let res=await checkProductionDemandPlan(data)
-        console.log(res)
-      }catch(err){
-        console.log(err)
+    async startCheck(data) {
+      this.loading=true
+      try {
+        let res = await checkProductionDemandPlan(data);
+
+        let list = JSON.parse(JSON.stringify(this.checkItems));
+        for (let i = 0; i < res.length; i++) {
+          for (let j = 0; j < list.length; j++) {
+            if (res[i].checkItem == list[j].value) {
+              list[j].status = res[i].pass;
+            }
+          }
+        }
+
+        this.checkItems = list;
+        this.loading=false
+      } catch (err) {
+        console.log(err);
+        this.loading=false
       }
     },
     //utils
     show(data) {
       this.visible = true;
-      this.actionData=data
-      console.log(this.parentDict.type.check_item_type.length)
-      let list=this.parentDict.type.check_item_type
+      this.actionData = data;
+      console.log(this.parentDict.type.check_item_type.length);
+      let list = this.parentDict.type.check_item_type;
       for (let i = 0; i < list.length; i++) {
-        list[i].status='checking'
-
+        list[i].status = "checking";
       }
-      this.checkItems=list
-      this.startCheck(data)
-
+      this.checkItems = list;
+      this.$nextTick(() => {
+        this.startCheck(data);
+      });
     },
     hide() {
       this.form = {};
@@ -260,22 +286,34 @@ export default {
       return this.isEmpty(val) ? undefined : val;
     },
 
-    handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        if (params.yearMonth) {
-          let arr = params.yearMonth.split("-");
-          params.year = arr[0];
-          params.month = arr[1];
-        }
-
-        Object.keys(params).forEach((key) => {
-          if (this.isEmpty(params[key])) {
-            params[key] = "";
-          }
+    async handleConfirm() {
+      factoryWholeCourseProduction(this.ac)
+        .then((res) => {
+          this.$modal.msgSuccess(res.msg);
+          this.$emit("success");
+          this.hide();
+        })
+        .catch(() => {
+          this.loading = false;
         });
+    },
+    showReason(){
+      if(this.loading){
+       return this.$modal.msgWarning('正在检测中...');
+      }
+      if (this.$refs.reasonRef) {
+        this.$refs.reasonRef.show(this.actionData);
+      }
 
-        this.save(params);
-      });
+    },
+    goReason(status){
+      if(this.loading){
+       return this.$modal.msgWarning('正在检测中...');
+      }
+      if(status)return
+      if (this.$refs.reasonRef) {
+        this.$refs.reasonRef.show(this.actionData);
+      }
     },
   },
 };

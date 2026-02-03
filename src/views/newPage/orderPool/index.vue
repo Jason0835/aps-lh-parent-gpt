@@ -47,7 +47,7 @@
           >{{ $t("ui.frame.btn.import") }}
         </el-button> -->
         <el-button
-          :disabled="selection.length == 0"
+          :disabled="selection.length != 1"
             v-hasPermi="['monthplan:SalesOrderPool:edit']"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.data.column.monthplan.modifyLevel") }}

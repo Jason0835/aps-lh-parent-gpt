@@ -251,16 +251,16 @@ export default {
           label: this.$t("ui.data.monthlyProductionPlan.heightQty"),
           width: 120,
         },
-        {
-          prop: "averageSaleQty",
-          label: this.$t("ui.data.defectiveStock.averageSaleQty"),
-          width: 120,
-        },
-        {
-          prop: "inventorySalesRatio",
-          label: this.$t("ui.data.monthlyProductionPlan.inventorySalesRatio"),
-          width: 120,
-        },
+        // {
+        //   prop: "averageSaleQty",
+        //   label: this.$t("ui.data.defectiveStock.averageSaleQty"),
+        //   width: 120,
+        // },
+        // {
+        //   prop: "inventorySalesRatio",
+        //   label: this.$t("ui.data.monthlyProductionPlan.inventorySalesRatio"),
+        //   width: 120,
+        // },
         {
           prop: "dayVulcanizationQty",
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),

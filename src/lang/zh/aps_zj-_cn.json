@@ -341,7 +341,9 @@
   "ui.data.messageTemplate.templateCode":"模板编码",
   "ui.data.messageTemplate.templateName":"模板名称",
   "ui.data.messageTemplate.title":"标题",
-  "ui.message.taskCenter":"任务中心"
+  "ui.message.taskCenter":"任务中心",
+  "ui.data.specialMaterial.rubberSpec":"适用范围",
+  "ui.data.specialMaterial.materialCode":"材料编码"
 
 
 

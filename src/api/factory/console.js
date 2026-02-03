@@ -132,8 +132,21 @@ export function checkProductionDemandPlan(query) {
     url: '/factory/console/checkProductionDemandPlan',
     method: 'post',
     data: query,
-    // headers: {
-    //   'Content-Type': 'application/json;charset=UTF-8'
-    // },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}
+
+//检测生成配置项失败原因
+
+export function checkReason(query) {
+  return request({
+    url: '/monthplan/checkItemRecord/list',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
   })
 }
