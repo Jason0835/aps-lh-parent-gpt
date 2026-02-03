@@ -223,7 +223,9 @@ export default {
       immediate: true,
     },
   },
-  created() {},
+  created() {
+    console.log('sssss')
+  },
   activated() {
     console.log("activeated");
 

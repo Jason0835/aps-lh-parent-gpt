@@ -340,7 +340,8 @@
   "ui.data.console.rankStructure":"排结构",
   "ui.data.messageTemplate.templateCode":"模板编码",
   "ui.data.messageTemplate.templateName":"模板名称",
-  "ui.data.messageTemplate.title":"标题"
+  "ui.data.messageTemplate.title":"标题",
+  "ui.message.taskCenter":"任务中心"
 
 
 

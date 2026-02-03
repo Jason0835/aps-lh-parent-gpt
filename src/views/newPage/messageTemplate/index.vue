@@ -350,6 +350,7 @@ export default {
     },
   },
   created() {
+    console.log('pandangengx')
     let defaultParams = {
       factoryCode: "116",
     };
