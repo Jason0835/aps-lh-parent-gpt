@@ -673,6 +673,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
             monthPlan.setId(null);
+            // 获取周数
+            int week = getWeekNumber(new Date());
+            // 调整量
+            monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetailVo.getActualAdjustQty());
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -874,6 +878,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     }
 
+    /**
+     * 根据时间获取周次
+     * 范围：第1周1-7，第2周8-14，第3周15-21，第4周22-31
+     * @param date
+     * @return
+     */
     protected int getWeekNumber(Date date) {
         int dayOfMonth = DateUtil.dayOfMonth(date);
         int baseWeek = (dayOfMonth - 1) / 7 + 1;
