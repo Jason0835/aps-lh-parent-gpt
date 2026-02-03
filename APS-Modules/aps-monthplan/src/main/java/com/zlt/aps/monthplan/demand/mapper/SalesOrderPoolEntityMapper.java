@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.demand.mapper;
 
 import java.util.List;
 
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import org.apache.ibatis.annotations.Mapper;
 
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
@@ -29,4 +30,10 @@ public interface SalesOrderPoolEntityMapper extends CommBaseMapper<SalesOrderPoo
 	 * @return
 	 */
 	int batchInsert(List<SalesOrderPool> salesOrderPoolList);
+	/**
+	 * 获取调整的销售订单
+	 * @param createCondition 调整参数
+	 * @return 销售订单
+	 */
+  List<SalesOrderPool> findAdjustSalesOrderPool(DpDemandPlan createCondition);
 }

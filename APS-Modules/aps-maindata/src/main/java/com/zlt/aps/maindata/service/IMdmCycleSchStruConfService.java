@@ -2,6 +2,7 @@ package com.zlt.aps.maindata.service;
 
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -42,5 +43,10 @@ public interface IMdmCycleSchStruConfService extends IDocService<MdmCycleSchStru
      * 异步导入
      */
     void importDataAsync(List<MdmCycleSchStruConf> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
-
+    /**
+     *  获取调整周期结构
+     * @param createCondition 调整参数
+     * @return 周期结构
+     */
+    List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition);
 }

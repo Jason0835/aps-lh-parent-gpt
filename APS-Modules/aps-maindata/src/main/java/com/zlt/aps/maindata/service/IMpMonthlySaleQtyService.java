@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
@@ -50,4 +51,10 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      * @return
      */
     Map<String, Integer> findCurrentMonthlySaleQty(String factoryCode);
+    /**
+     * 获取调整月均销量
+     * @param createCondition 调整参数
+     * @return 月均销量
+     */
+    Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition);
 }

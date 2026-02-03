@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.mapper;
 
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
@@ -66,4 +67,10 @@ public interface MdmMaterialInfoEntityMapper extends CommBaseMapper<MdmMaterialI
      * @return 结果
      */
     int updateMainPatternToMaterial(MdmSkuMouldRel queryVO);
+    /**
+     *  获取调整物料信息
+     * @param createCondition 调整参数
+     * @return  物料信息
+     */
+    List<MdmMaterialInfo> findAdjustMaterialInfo(DpDemandPlan createCondition);
 }

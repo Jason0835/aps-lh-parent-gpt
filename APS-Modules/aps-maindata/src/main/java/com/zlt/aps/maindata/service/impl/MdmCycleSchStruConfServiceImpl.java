@@ -19,6 +19,7 @@ import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
@@ -117,6 +118,11 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }
+    }
+
+    @Override
+    public List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition) {
+        return mdmCycleSchStruConfEntityMapper.findAdjustCycleSchStruConf(createCondition);
     }
 
     /**
