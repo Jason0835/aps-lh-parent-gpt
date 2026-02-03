@@ -1036,20 +1036,20 @@ export default {
           label: this.$t("产品结构"),
           width: 180,
         },
-        {
-          prop: "version",
-          label: this.$t("版本号"),
-          width: 180,
-        },
+        // {
+        //   prop: "version",
+        //   label: this.$t("版本号"),
+        //   width: 180,
+        // },
 
-        {
-          prop: "hasSpecialMaterial",
-          label: this.$t("是否含特殊材料"),
-          width: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
+        // {
+        //   prop: "hasSpecialMaterial",
+        //   label: this.$t("是否含特殊材料"),
+        //   width: 120,
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
         {
           prop: "totalPlanQty",
           label: this.$t("计划量"),
