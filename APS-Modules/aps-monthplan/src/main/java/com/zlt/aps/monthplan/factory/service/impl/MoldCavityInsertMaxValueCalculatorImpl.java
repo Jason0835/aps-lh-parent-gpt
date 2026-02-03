@@ -201,7 +201,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         }
 
         // 计算目标日期是排产周期的第几天（从1开始）
-        int dayOfCycle = DateUtils.getIntervalDays(cycleInfo.getStartDate(), targetDate) + 1;
+        int dayOfCycle = DateUtils.getIntervalDays(cycleInfo.getStartDate(), targetDate);
 
         // 获取停产日
         Set<Integer> stopDays = getStopDay(factoryCode, cycleInfo.getStartDate(), cycleInfo.getEndDate());
@@ -445,7 +445,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         Set<Integer> stopDaySet = new HashSet<>();
         stopDays.forEach(stopProductionInfo -> {
             Date stopProduction = stopProductionInfo.getProductionDate();
-            Integer stopDay = DateUtils.getIntervalDays(productionStartDate, stopProduction) + 1; // 从1开始
+            Integer stopDay = DateUtils.getIntervalDays(productionStartDate, stopProduction);
             stopDaySet.add(stopDay);
         });
         return stopDaySet;
