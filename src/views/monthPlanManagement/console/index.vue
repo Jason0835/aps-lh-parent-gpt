@@ -612,17 +612,17 @@ export default {
       }
     },
     handleGenerate(row) {
-      let obj = {
-        factoryCode: row.factoryCode,
-        year: row.year,
-        month: row.month,
-        monthPlanVersion: row.monthPlanVersion,
-        productTypeCode:row.productTypeCode
-      };
-      if (this.$refs.checkRef) {
-        this.$refs.checkRef.show(obj);
-      }
-      return;
+      // let obj = {
+      //   factoryCode: row.factoryCode,
+      //   year: row.year,
+      //   month: row.month,
+      //   monthPlanVersion: row.monthPlanVersion,
+      //   productTypeCode:row.productTypeCode
+      // };
+      // if (this.$refs.checkRef) {
+      //   this.$refs.checkRef.show(obj);
+      // }
+      // return;
       this.$confirm("确定生成？").then(() => {
         this.loading = true;
         factoryWholeCourseProduction({
