@@ -125,3 +125,15 @@ export function deleteMonthPlanRequire(query) {
 }
 
 
+//检测生成配置项
+
+export function checkProductionDemandPlan(query) {
+  return request({
+    url: '/factory/console/checkProductionDemandPlan',
+    method: 'post',
+    data: query,
+    // headers: {
+    //   'Content-Type': 'application/json;charset=UTF-8'
+    // },
+  })
+}

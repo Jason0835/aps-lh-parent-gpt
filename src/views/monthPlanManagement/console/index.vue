@@ -143,7 +143,7 @@ export default {
     infoDialog,
     finalizedDialog,
     noVersionList,
-    checkDialog
+    checkDialog,
   },
   dicts: [
     "biz_factory_name",
@@ -152,6 +152,7 @@ export default {
     "biz_channel_type",
     "biz_brand_type",
     "biz_product_type",
+    "check_item_type"
   ],
   provide() {
     return {
@@ -194,7 +195,7 @@ export default {
                   <text-button
                     onClick={() => this.handleRouterMonthPlanVersion(row)}
                   >
-                  {this.$t("plan.planProduction.detail")}
+                    {this.$t("plan.planProduction.detail")}
                   </text-button>
                   <text-button
                     onClick={() => {
@@ -331,14 +332,14 @@ export default {
                 <text-button
                   onClick={() => this.handleRouterProductionVersions(row)}
                 >
-                  { this.$t("排产明细")}
+                  {this.$t("排产明细")}
                 </text-button>
                 <text-button
                   onClick={() =>
                     this.handleRouterMonthPlanNoProductionPlan(row)
                   }
                 >
-                  { this.$t("未排产明细")}
+                  {this.$t("未排产明细")}
                 </text-button>
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
@@ -356,9 +357,7 @@ export default {
           //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           // },
           render: ({ row }) => {
-            return (
-             <span>{row.isFinal==1?'是':''}</span>
-            );
+            return <span>{row.isFinal == 1 ? "是" : ""}</span>;
           },
         },
         // {
@@ -434,15 +433,14 @@ export default {
           prop: "productionVersion",
           type: "select",
           dictData: this.productionVersionList,
-          filterable: true
+          filterable: true,
         },
       ];
     },
   },
   methods: {
     handleSelectAll(selection) {
-      this.$refs.consoleRef.getTableRef().clearSelection()
-
+      this.$refs.consoleRef.getTableRef().clearSelection();
     },
     handleChange(val) {
       // this.search.monthPlanVersion = val;
@@ -605,7 +603,7 @@ export default {
     },
 
     handleSelectionChange(rows) {
-      console.log(rows)
+      console.log(rows);
       this.selection = rows;
     },
     handleFinalized() {
@@ -614,11 +612,17 @@ export default {
       }
     },
     handleGenerate(row) {
-
-      {/* if (this.$refs.checkRef) {
-        this.$refs.checkRef.show();
-      }
-    return */}
+      // let obj = {
+      //   factoryCode: row.factoryCode,
+      //   year: row.year,
+      //   month: row.month,
+      //   monthPlanVersion: row.monthPlanVersion,
+      //   productTypeCode:row.productTypeCode
+      // };
+      // if (this.$refs.checkRef) {
+      //   this.$refs.checkRef.show(obj);
+      // }
+      // return;
       this.$confirm("确定生成？").then(() => {
         this.loading = true;
         factoryWholeCourseProduction({

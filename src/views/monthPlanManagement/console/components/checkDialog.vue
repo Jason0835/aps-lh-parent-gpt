@@ -65,8 +65,7 @@
           </div>
 
           <div class="item-content">
-            <div class="item-title">{{ item.title }}</div>
-            <div class="item-desc">{{ item.desc }}</div>
+            <div class="item-title">{{ item.label }}</div>
           </div>
 
           <div class="item-status">
@@ -79,7 +78,9 @@
 
       <!-- 操作按钮 -->
       <div class="action-buttons">
-        <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
+        <el-button @click="hide">{{
+          this.$t("common.button.cancel")
+        }}</el-button>
         <el-button
           @click="handleConfirm"
           :disabled="!allPassed || checking"
@@ -104,7 +105,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { createSaleRequirePlan } from "@/api/factory/console";
+import { factoryWholeCourseProduction,checkProductionDemandPlan } from "@/api/factory/console";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -115,122 +116,110 @@ export default {
       dialogVisible: false,
       checking: false,
       confirming: false,
+      actionData:{},
 
-      checkItems: [
-        { id: '1', title: '特殊原材料数据', desc: '检查特殊原材料数据', status: 'pending' },
-        { id: '2', title: '生产日历数据', desc: '读取停产日期数据', status: 'pending' },
-        { id: '3', title: '成型机基础数据', desc: '检查成型机基础信息', status: 'pending' },
-        { id: '4', title: '成型机维修数据', desc: '检查维修记录数据', status: 'pending' },
-        { id: '5', title: '工装台账数据', desc: '检查工装设备台账', status: 'pending' },
-        { id: '6', title: '模具关系配置数据', desc: '检查模具关系配置', status: 'pending' },
-        { id: '7', title: '模具到货计划', desc: '检查模具到货计划', status: 'pending' },
-        { id: '8', title: '可用模具关系数据', desc: '检查可用模具关系', status: 'pending' },
-        { id: '9', title: '模具分配比例配置数据', desc: '检查跨结构模具配置', status: 'pending' },
-        { id: '10', title: '模壳数据', desc: '检查模壳型号数量限制', status: 'pending' },
-        { id: '11', title: '胶囊卡盘数据', desc: '检查规格和英寸数据限制', status: 'pending' },
-        { id: '12', title: '结构成型硫化配比数据', desc: '检查估算成型机和硫化机数据', status: 'pending' }
-      ]
+      checkItems: []
     };
   },
   computed: {
-      // 通过的数量
-      passedCount() {
-      return this.checkItems.filter(item => item.status === 'passed').length
+    // 通过的数量
+    passedCount() {
+      return this.checkItems.filter((item) => item.status == true).length;
     },
 
     // 失败的数量
     failedCount() {
-      return this.checkItems.filter(item => item.status === 'failed').length
+      return this.checkItems.filter((item) => item.status == false).length;
     },
 
     // 检查中的数量
     checkingCount() {
-      return this.checkItems.filter(item => item.status === 'checking').length
+      return this.checkItems.filter((item) => item.status === "checking")
+        .length;
     },
 
     // 已检查的数量
     checkedCount() {
-      return this.checkItems.filter(item =>
-        item.status === 'passed' || item.status === 'failed'
-      ).length
+      return this.checkItems.filter(
+        (item) => item.status === "passed" || item.status === "failed"
+      ).length;
     },
 
     // 是否有失败的检查项
     hasFailed() {
-      return this.failedCount > 0
+      return this.failedCount > 0;
     },
 
     // 是否全部通过
     allPassed() {
-      return this.checkItems.every(item => item.status === 'passed')
+      return this.checkItems.every((item) => item.status === "passed");
     },
 
     // 进度百分比
     progressPercentage() {
-      const total = this.checkItems.length
-      const checked = this.checkedCount
-      return Math.round((checked / total) * 100)
+      const total = this.checkItems.length;
+      const checked = this.checkedCount;
+      return Math.round((checked / total) * 100);
     },
 
     // 进度条状态
     progressStatus() {
-      if (this.hasFailed) return 'exception'
-      if (this.checking) return ''
-      return 'success'
+      if (this.hasFailed) return "exception";
+      if (this.checking) return "";
+      return "success";
     },
 
     // 进度文本
     progressText() {
-      if (this.checking) return '正在检查中...'
-      if (this.allPassed) return `全部检查通过 (${this.passedCount}/${this.checkItems.length})`
-      return `已检查 ${this.checkedCount}/${this.checkItems.length}`
+      if (this.checking) return "正在检查中...";
+      if (this.allPassed)
+        return `全部检查通过 (${this.passedCount}/${this.checkItems.length})`;
+      return `已检查 ${this.checkedCount}/${this.checkItems.length}`;
     },
 
     // 确认按钮文本
     confirmText() {
-      if (this.confirming) return '确认中...'
-      if (this.checking) return '检查中...'
-      if (this.allPassed) return `确认 (${this.passedCount}/${this.checkItems.length})`
-      return `确认 (${this.passedCount}/${this.checkItems.length})`
-    }
+      if (this.confirming) return "确认中...";
+      if (this.checking) return "检查中...";
+      if (this.allPassed)
+        return `确认 (${this.passedCount}/${this.checkItems.length})`;
+      return `确认 (${this.passedCount}/${this.checkItems.length})`;
+    },
   },
   methods: {
-       // 获取检查项CSS类
-       getItemClass(status) {
+    // 获取检查项CSS类
+    getItemClass(status) {
       return {
-        'check-item-passed': status === 'passed',
-        'check-item-failed': status === 'failed',
-        'check-item-checking': status === 'checking',
-        'check-item-pending': status === 'pending'
-      }
+        "check-item-passed": status == true,
+        "check-item-failed": status ==false,
+        "check-item-checking": status === "checking",
+      };
     },
 
     // 获取状态CSS类
     getStatusClass(status) {
       return {
-        'status-passed': status === 'passed',
-        'status-failed': status === 'failed',
-        'status-checking': status === 'checking',
-        'status-pending': status === 'pending'
-      }
+        "status-passed": status == true,
+        "status-failed": status  ==false,
+        "status-checking": status === "checking",
+      };
     },
 
     // 获取状态文本
     getStatusText(status) {
       const statusMap = {
-        'passed': '已通过',
-        'failed': '未通过',
-        'checking': '检查中',
-        'pending': '待检查'
-      }
-      return statusMap[status] || status
+        true: "已通过",
+        false: "未通过",
+        checking: "检查中",
+      };
+      return statusMap[status] || status;
     },
     // api
     async save(params) {
       try {
         this.loading = true;
 
-        const res = await createSaleRequirePlan(params);
+        const res = await factoryWholeCourseProduction(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -240,10 +229,27 @@ export default {
         this.loading = false;
       }
     },
-
+    async startCheck(data){
+      try{
+        let res=await checkProductionDemandPlan(data)
+        console.log(res)
+      }catch(err){
+        console.log(err)
+      }
+    },
     //utils
     show(data) {
       this.visible = true;
+      this.actionData=data
+      console.log(this.parentDict.type.check_item_type.length)
+      let list=this.parentDict.type.check_item_type
+      for (let i = 0; i < list.length; i++) {
+        list[i].status='checking'
+
+      }
+      this.checkItems=list
+      this.startCheck(data)
+
     },
     hide() {
       this.form = {};
@@ -309,15 +315,15 @@ export default {
 }
 
 .stat-value.success {
-  color: #67C23A;
+  color: #67c23a;
 }
 
 .stat-value.failed {
-  color: #F56C6C;
+  color: #f56c6c;
 }
 
 .stat-value.checking {
-  color: #409EFF;
+  color: #409eff;
 }
 
 /* 进度条 */
@@ -352,7 +358,7 @@ export default {
 }
 
 .check-item:hover {
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .check-item-passed {
@@ -394,15 +400,15 @@ export default {
 }
 
 .success-icon {
-  color: #67C23A;
+  color: #67c23a;
 }
 
 .failed-icon {
-  color: #F56C6C;
+  color: #f56c6c;
 }
 
 .checking-icon {
-  color: #409EFF;
+  color: #409eff;
   animation: rotating 2s linear infinite;
 }
 
@@ -439,17 +445,17 @@ export default {
 }
 
 .status-passed {
-  background-color: #67C23A;
+  background-color: #67c23a;
   color: white;
 }
 
 .status-failed {
-  background-color: #F56C6C;
+  background-color: #f56c6c;
   color: white;
 }
 
 .status-checking {
-  background-color: #409EFF;
+  background-color: #409eff;
   color: white;
 }
 

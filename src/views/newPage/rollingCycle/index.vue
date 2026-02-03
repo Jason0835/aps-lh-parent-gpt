@@ -1368,6 +1368,7 @@ export default {
               ? this.data[0]?.version
               : this.outResultData[0]?.version,
           productionVersion: this.data[0]?.productionVersion,
+
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
@@ -1375,6 +1376,12 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
+        params.beginDay=this.formInline.beginDay
+        params.endDay=this.formInline.endDay
+        params.adjustEndDay=this.formInline.adjustEndDay
+        params.adjustStartDay=this.formInline.adjustStartDay
+        params.structureName=this.formInline.structureName
+        params.cxMachineCode=this.formInline.cxMachineCode
         // if (this.adjustType == "02") {
         //   params.adjustEndDay = this.formInline.adjustEndDay;
         //   params.isMove = this.formInline.isMove;
