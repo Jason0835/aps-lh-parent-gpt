@@ -121,6 +121,9 @@ export default {
   },
   methods: {
     show(data) {
+
+      let arr=data.userName.split(',')
+      console.log(arr)
       this.visible = true;
       this.actionData=data
       this.getList()

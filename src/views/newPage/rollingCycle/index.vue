@@ -1065,14 +1065,14 @@ export default {
           label: this.$t("结束日期"),
           width: 120,
         },
-        {
-          prop: "isLockSchedule",
-          width: 120,
-          label: this.$t("锁定上机日期"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
-        },
+        // {
+        //   prop: "isLockSchedule",
+        //   width: 120,
+        //   label: this.$t("锁定上机日期"),
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+        //   },
+        // },
       ];
       const days = 31;
       for (let i = 0; i < days; i++) {
