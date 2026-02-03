@@ -14,6 +14,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
  * @author Yelq
  */
 @Slf4j
+@Component
 public class CalculateStructureCxMachineNumber {
 
     /**
@@ -46,14 +48,19 @@ public class CalculateStructureCxMachineNumber {
      * @param requirePlanList   需求计划
      * @return 结构分组
      */
-    public static Map<String, ProductionPlanGroupInfo> calculateStructureCxMachineNumber(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    public Map<String, ProductionPlanGroupInfo> calculateStructureCxMachineNumber(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
         return buildGroupPlanInfoMap(productionContext, requirePlanList);
     }
 
-    private static Map<String, ProductionPlanGroupInfo> buildGroupPlanInfoMap(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    /**
+     * @param productionContext
+     * @param requirePlanList
+     * @return
+     */
+    private Map<String, ProductionPlanGroupInfo> buildGroupPlanInfoMap(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
@@ -76,7 +83,7 @@ public class CalculateStructureCxMachineNumber {
                     .anyMatch(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsZeroRack()));
             groupInfo.setIsZero(zeroRack ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
             Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = getCxMachineLhRationMap(structureName, productionContext);
-            if(CollectionUtils.isEmpty(cxMachineLhRationMap)){
+            if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
                 log.info(TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(productionContext, structureName));
                 groupInfo.setNoProductionNoCxMachineLhRatio();
             }
@@ -118,7 +125,12 @@ public class CalculateStructureCxMachineNumber {
         return groupInfoMap;
     }
 
-    private static Map<String, MonthPlanStructureLhRatioVo> getCxMachineLhRationMap(String structureName, TbrProductionContext productionContext) {
+    /**
+     * @param structureName
+     * @param productionContext
+     * @return
+     */
+    private Map<String, MonthPlanStructureLhRatioVo> getCxMachineLhRationMap(String structureName, TbrProductionContext productionContext) {
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = productionContext.getBaseDataContainer().getStructureLhRatioList();
         if (CollectionUtils.isEmpty(structureLhRatioList)) {
             return Collections.emptyMap();
@@ -127,14 +139,21 @@ public class CalculateStructureCxMachineNumber {
         return CollectionUtils.isEmpty(allCxLhRatioMap) ? Collections.emptyMap() : allCxLhRatioMap;
     }
 
-    private static void setAllocationZero(ProductionPlanGroupInfo groupInfo) {
+    /**
+     * @param groupInfo
+     */
+    private void setAllocationZero(ProductionPlanGroupInfo groupInfo) {
         groupInfo.setNeedCxCapacityMachineCount(BigDecimal.ZERO);
         groupInfo.setTheoryDays(0);
         groupInfo.setLeftOverNeedAllocationDays(0);
         groupInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
     }
 
-    private static Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioMap(TbrProductionContext productionContext) {
+    /**
+     * @param productionContext
+     * @return
+     */
+    private Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioMap(TbrProductionContext productionContext) {
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = productionContext.getBaseDataContainer().getStructureLhRatioList();
         if (CollectionUtils.isEmpty(structureLhRatioList)) {
             return Collections.emptyMap();
@@ -170,7 +189,7 @@ public class CalculateStructureCxMachineNumber {
      * @param productionContext 排产上下文
      * @return 成型机台数
      */
-    private static BigDecimal calculateCxMachineNumber(ProductionPlanGroupInfo groupInfo, TbrProductionContext productionContext) {
+    private BigDecimal calculateCxMachineNumber(ProductionPlanGroupInfo groupInfo, TbrProductionContext productionContext) {
         if (null == groupInfo.getSumPlanQty()
                 || null == groupInfo.getMinLhDayCapacityQty()
                 || null == groupInfo.getMinLhMachineCount()
@@ -210,14 +229,13 @@ public class CalculateStructureCxMachineNumber {
         return machineCount.setScale(1, RoundingMode.UP);
     }
 
-
     /**
      * 得到结构主花纹下最大可用模具数-按物料描述分组取最大
      *
      * @param productionContext 排产上下文
      * @return 最大可用模具数-按物料描述分组取最大
      */
-    private static Map<String, Long> calculateMaxEnableMouldNumber(TbrProductionContext productionContext) {
+    private Map<String, Long> calculateMaxEnableMouldNumber(TbrProductionContext productionContext) {
         Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
         if (CollectionUtils.isEmpty(skuMouldRelationMap)) {
             return Collections.emptyMap();
@@ -266,7 +284,7 @@ public class CalculateStructureCxMachineNumber {
      * @param productionContext 排产上下文
      * @return 模具最大产能
      */
-    private static int calculateMaxMouldCapacity(ProductionPlanGroupInfo groupInfo, List<MonthPlanProductionRequirePlanVo> groupDatas, Map<String, Long> maxEnableMouldNumberMap, TbrProductionContext productionContext) {
+    private int calculateMaxMouldCapacity(ProductionPlanGroupInfo groupInfo, List<MonthPlanProductionRequirePlanVo> groupDatas, Map<String, Long> maxEnableMouldNumberMap, TbrProductionContext productionContext) {
         // 模具最大产能=日硫化量<取最小>*模具数/2 * 月度最大天数，若是共用模，合并计算；
         if (CollectionUtils.isEmpty(maxEnableMouldNumberMap)) {
             return 0;
@@ -318,7 +336,7 @@ public class CalculateStructureCxMachineNumber {
      * @param groupDatas 结构计划列表
      * @return 结构最小日硫化量
      */
-    private static int calculateMinLhDayCapacityQty(List<MonthPlanProductionRequirePlanVo> groupDatas) {
+    private int calculateMinLhDayCapacityQty(List<MonthPlanProductionRequirePlanVo> groupDatas) {
         //最小日硫化量
         return groupDatas.stream().filter(item -> null != item.getDayVulcanizationQty()).mapToInt(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().orElse(0);
     }

@@ -76,6 +76,8 @@ public class MatchingProductionHandler {
     @Autowired
     private BaseDao baseDao;
 
+    @Autowired
+    private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
     /**
      * 搭配排产（已排产结果入口）
      *
@@ -103,7 +105,7 @@ public class MatchingProductionHandler {
         Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap = this.selectRequirePlan(productionContext); // 查询需求计划
         this.buildProductionContext(productionContext, planList, requirePlanMap); // 填充上下文各项必要数据
 
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = CalculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, new ArrayList<>(requirePlanMap.values())); // 分配成型产能
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, new ArrayList<>(requirePlanMap.values())); // 分配成型产能
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         this.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap);
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = this.getContinueInfo(productionContext);
