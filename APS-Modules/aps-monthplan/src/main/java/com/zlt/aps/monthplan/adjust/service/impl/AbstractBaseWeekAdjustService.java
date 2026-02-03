@@ -20,6 +20,7 @@ import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -2056,7 +2057,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 计算型腔、活块可用量最大值
      * @param contextDTO
      */
-    protected Map<String, Object> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
+    protected DailyMouldAvailabilityResult calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         int day = DateUtil.dayOfMonth(new Date());
         Date currentDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
@@ -2071,7 +2072,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 创建计时器
         StopWatch watch = new StopWatch();
         watch.start();
-        Map<String, Object> moldCavityInsertMap;
+        DailyMouldAvailabilityResult moldCavityInsertMap;
         try {
             // 计算型腔、活块可用量最大值
             moldCavityInsertMap = calculateMoldCavityInsertMaxValue(contextDTO);
@@ -2091,9 +2092,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 调整明细列表
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 型腔可用量（按结构+主花纹分组）
-        Map<String, Integer> cavityResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "cavityResults", new HashMap<>());
+        Map<String, Integer> cavityResults = moldCavityInsertMap.getCavityResults();
         // 活块可用量（按物料描述分组）
-        Map<String, Integer> insertResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "insertResults", new HashMap<>());
+        Map<String, Integer> insertResults = moldCavityInsertMap.getInsertResults();
         log.info("计算型腔、活块可用量最大值 ==> 型腔可用量:{} 活块可用量:{}", JSONObject.toJSONString(cavityResults), JSONObject.toJSONString(insertResults));
         // 遍历
         for (MpAdjustDetailVo adjust : adjustList) {
