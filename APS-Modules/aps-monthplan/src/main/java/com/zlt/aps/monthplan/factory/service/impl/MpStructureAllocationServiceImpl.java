@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
+import cn.hutool.core.convert.Convert;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
@@ -11,11 +12,23 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.SpringContextSupplierUtil;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.FactoryParamMapper;
+import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -23,8 +36,10 @@ import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StopWatch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +49,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 /**
@@ -59,6 +76,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MpStructureAllocationEntityMapper entityMapper;
     private final FactoryMonthPlanProductionFinalResultServiceImpl monthPlanProductionFinalResultService;
     private final MdmStructureLhRatioEntityMapper mdmStructureLhRatioEntityMapper;
+    private final MdmMonCycleSchStruConfEntityMapper mdmMonCycleSchStruConfEntityMapper;
+    private final MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
+    private final FactoryParamMapper factoryParamMapper;
 
     @Override
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
@@ -117,55 +137,261 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     @Override
     public int save(MpStructureAllocation mpStructureAllocation) {
-        // 工厂
-        String factoryCode = mpStructureAllocation.getFactoryCode();
-        // 年
-        Integer year = mpStructureAllocation.getYear();
-        // 月
-        Integer month = mpStructureAllocation.getMonth();
-        // 产品结构
-        String structureName = mpStructureAllocation.getStructureName();
-
-        // 获取定稿的月度计划
-        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
-        param.setFactoryCode(factoryCode);
-        param.setYear(year);
-        param.setMonth(month);
-        List<FactoryMonthPlanProductionFinalResult>  monthPlanProductionFinalResultList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
-        if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
-            FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
-            mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
-            mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
-        }
-        mpStructureAllocation.setBaseVale(null);
+        // 唯一性校验
         this.checkUnique(mpStructureAllocation);
-        // 获取结构转产
-        MpStructureAllocation queryParam = new MpStructureAllocation();
-        queryParam.setFactoryCode(factoryCode);
-        queryParam.setYear(year);
-        queryParam.setMonth(month);
-        queryParam.setProductionVersion(mpStructureAllocation.getProductionVersion());
-        List<MpStructureAllocation> structureAllocationList = getDataList(queryParam);
+
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+
+        // 创建查询数据的异步任务
+        // 查询月度生产计划
+        CompletableFuture<List<FactoryMonthPlanProductionFinalResult>> monthPlanFinalResultFuture = CompletableFuture.supplyAsync(
+                // 解决父子上下文传递问题
+                SpringContextSupplierUtil.wrap(() -> queryMonthPlanFinalResult(mpStructureAllocation))
+        );
+        // 查询排产结构
+        CompletableFuture<List<MpStructureAllocation>> structureAllocationFuture = CompletableFuture.supplyAsync(
+                () -> queryMpStructureAllocation(mpStructureAllocation)
+        );
+        // 查询成型硫化结构配比
+        CompletableFuture<List<MdmStructureLhRatio>> structureLhRatioFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmStructureLhRatio(mpStructureAllocation)
+        );
+        // 查询月周期排产结构配置
+        CompletableFuture<List<MdmMonCycleSchStruConf>> monCycleSchStruConfFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmMonCycleSchStruConf(mpStructureAllocation)
+        );
+        // 查询周期排产结构配置
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmCycleSchStruConf(mpStructureAllocation)
+        );
+        // 查询工厂排产设定
+        CompletableFuture<List<FactoryParam>> factoryParamFuture = CompletableFuture.supplyAsync(
+                () -> queryFactoryParam(mpStructureAllocation)
+        );
+
+        try {
+            // 等待所有异步任务执行完成
+            CompletableFuture.allOf(
+                    monthPlanFinalResultFuture,
+                    structureAllocationFuture,
+                    structureLhRatioFuture,
+                    monCycleSchStruConfFuture,
+                    cycleSchStruConfFuture,
+                    factoryParamFuture
+            ).join();
+
+            log.info("并行查询数据执行完成");
+
+        } catch (CompletionException e) {
+            // 异常处理
+            Throwable throwable = e.getCause();
+            log.error("查询数据失败! 失败原因:{}", throwable.getMessage(), throwable);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
+        } finally {
+            watch.stop();
+        }
+
+        log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
+
+        List<FactoryMonthPlanProductionFinalResult> monthPlanProductionFinalResultList = monthPlanFinalResultFuture.join();
+        List<MpStructureAllocation> structureAllocationList = structureAllocationFuture.join();
+        List<MdmStructureLhRatio> structureLhRatioList = structureLhRatioFuture.join();
+        List<MdmMonCycleSchStruConf> monCycleSchStruConfList = monCycleSchStruConfFuture.join();
+        List<MdmCycleSchStruConf> cycleSchStruConfList = cycleSchStruConfFuture.join();
+        List<FactoryParam> factoryParamList = factoryParamFuture.join();
+
         // 判断时间是否有交叉，若有则抛出异常
         List<String> dateCrossedErrorMsgList = getDateCrossedErrorMsgList(mpStructureAllocation, structureAllocationList);
         if (PubUtil.isNotEmpty(dateCrossedErrorMsgList)) {
             throw new BusinessException(String.join("</br>", dateCrossedErrorMsgList));
         }
-        // 获取成型结构硫化配比
-        LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, factoryCode)
-                .eq(MdmStructureLhRatio::getStructureName, structureName);
-        List<MdmStructureLhRatio> structureLhRatioList = mdmStructureLhRatioEntityMapper.selectList(queryWrapper);
+
+        // 设置需求计划版本、排产版本号
+        if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
+            FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
+            mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
+            mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
+        }
+
+        // 设置最大胎胚种类数、最大硫化机台数
         if (PubUtil.isNotEmpty(structureLhRatioList)) {
             MdmStructureLhRatio mdmStructureLhRatio = structureLhRatioList.get(0);
             mpStructureAllocation.setMaxEmbryoCodeCount(mdmStructureLhRatio.getMaxEmbryoQty());
             mpStructureAllocation.setMaxLhMachineCount(mdmStructureLhRatio.getLhMachineMaxQty());
         }
+
+        // 产品结构
+        String structureName = mpStructureAllocation.getStructureName();
+        // 开始日期
+        Integer beginDay = mpStructureAllocation.getBeginDay();
+        // 结束日期
+        Integer endDay = mpStructureAllocation.getEndDay();
+
+        // 设置实单最低硫化机台数
+        Integer minLhMachineCount = 0;
+        MdmMonCycleSchStruConf monCycleSchStruConf = monCycleSchStruConfList.stream()
+                .filter(v -> StringUtils.equals(structureName, v.getStructureName()))
+                .findFirst()
+                .orElse(new MdmMonCycleSchStruConf());
+        minLhMachineCount = monCycleSchStruConf.getMinVulcanizingMachine();
+
+        if (minLhMachineCount == null) {
+            MdmCycleSchStruConf cycleSchStruConf = cycleSchStruConfList.stream()
+                    .filter(v -> StringUtils.equals(structureName, v.getStructureName()))
+                    .findFirst()
+                    .orElse(new MdmCycleSchStruConf());
+            minLhMachineCount = cycleSchStruConf.getMinVulcanizingMachine();
+        }
+
+        if (minLhMachineCount == null) {
+            FactoryParam factoryParam = factoryParamList.stream()
+                    .filter(v -> StringUtils.equals(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode(), v.getParamCode()))
+                    .findFirst()
+                    .orElse(new FactoryParam());
+            minLhMachineCount = Convert.toInt(factoryParam.getParamValue(), 0);
+        }
+        // 实单最低硫化机台数
+        mpStructureAllocation.setMinLhMachineCount(minLhMachineCount);
+        mpStructureAllocation.setBaseVale(null);
         // 计划类型
         mpStructureAllocation.setPlanType("01");
+        // 分配天数 TODO 后续再扣除停工的天数
+        mpStructureAllocation.setAllotDays(endDay - beginDay + 1);
+        // 排产净需求
+        mpStructureAllocation.setNetQty(0);
+        // 排产净需求(含损耗)
+        mpStructureAllocation.setLossQty(0);
         // 数据来源
         mpStructureAllocation.setDataSource(DataSourceEnum.HAND.getCode());
         return baseDao.save(mpStructureAllocation);
+    }
+
+
+
+    /**
+     * 查询月度生产计划
+     *
+     * @param mpStructureAllocation
+     */
+    private List<FactoryMonthPlanProductionFinalResult> queryMonthPlanFinalResult(MpStructureAllocation mpStructureAllocation) {
+        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
+        param.setFactoryCode(mpStructureAllocation.getFactoryCode());
+        param.setYear(mpStructureAllocation.getYear());
+        param.setMonth(mpStructureAllocation.getMonth());
+        return monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
+    }
+
+
+    /**
+     * 查询排产结构
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MpStructureAllocation> queryMpStructureAllocation(MpStructureAllocation mpStructureAllocation) {
+        MpStructureAllocation queryParam = new MpStructureAllocation();
+        queryParam.setFactoryCode(mpStructureAllocation.getFactoryCode());
+        queryParam.setYear(mpStructureAllocation.getYear());
+        queryParam.setMonth(mpStructureAllocation.getMonth());
+        queryParam.setProductionVersion(mpStructureAllocation.getProductionVersion());
+        return getDataList(queryParam);
+    }
+
+    /**
+     * 查询成型硫化结构配比
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation) {
+        LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, mpStructureAllocation.getFactoryCode())
+                .eq(MdmStructureLhRatio::getStructureName, mpStructureAllocation.getStructureName());
+        return mdmStructureLhRatioEntityMapper.selectList(queryWrapper);
+    }
+
+
+    /**
+     * 查询月周期排产结构配置
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmMonCycleSchStruConf> queryMdmMonCycleSchStruConf(MpStructureAllocation mpStructureAllocation) {
+        MdmMonCycleSchStruConf queryVO = new MdmMonCycleSchStruConf();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+        queryVO.setYear(mpStructureAllocation.getYear());
+        queryVO.setMonth(mpStructureAllocation.getMonth());
+
+        LambdaQueryWrapper<MdmMonCycleSchStruConf> queryWrapper = new LambdaQueryWrapper<>();
+        buildMdmMonCycleSchStruConfCondition(queryWrapper, queryVO);
+        return mdmMonCycleSchStruConfEntityMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建月周期排产结构配置条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildMdmMonCycleSchStruConfCondition(LambdaQueryWrapper<MdmMonCycleSchStruConf> queryWrapper, MdmMonCycleSchStruConf queryVO) {
+        queryWrapper.eq(MdmMonCycleSchStruConf::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmMonCycleSchStruConf::getYear, queryVO.getYear());
+        queryWrapper.eq(MdmMonCycleSchStruConf::getMonth, queryVO.getMonth());
+        queryWrapper.eq(MdmMonCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 查询周期排产结构配置
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmCycleSchStruConf> queryMdmCycleSchStruConf(MpStructureAllocation mpStructureAllocation) {
+        MdmCycleSchStruConf queryVO = new MdmCycleSchStruConf();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+        queryVO.setYear(mpStructureAllocation.getYear());
+        queryVO.setMonth(mpStructureAllocation.getMonth());
+
+        LambdaQueryWrapper<MdmCycleSchStruConf> queryWrapper = new LambdaQueryWrapper<>();
+        buildMdmCycleSchStruConfCondition(queryWrapper, queryVO);
+        return mdmCycleSchStruConfEntityMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建周期排产结构配置条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildMdmCycleSchStruConfCondition(LambdaQueryWrapper<MdmCycleSchStruConf> queryWrapper, MdmCycleSchStruConf queryVO) {
+        queryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmCycleSchStruConf::getYear, queryVO.getYear());
+        queryWrapper.eq(MdmCycleSchStruConf::getMonth, queryVO.getMonth());
+        queryWrapper.eq(MdmCycleSchStruConf::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 查询工厂排产设定
+     *
+     * @param mpStructureAllocation
+     */
+    private List<FactoryParam> queryFactoryParam(MpStructureAllocation mpStructureAllocation) {
+        FactoryParam queryVO = new FactoryParam();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+
+        LambdaQueryWrapper<FactoryParam> queryWrapper = new LambdaQueryWrapper<>();
+        buildFactoryParamCondition(queryWrapper, queryVO);
+        return factoryParamMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建工厂排产设定条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildFactoryParamCondition(LambdaQueryWrapper<FactoryParam> queryWrapper, FactoryParam queryVO) {
+        queryWrapper.eq(FactoryParam::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(FactoryParam::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
 
