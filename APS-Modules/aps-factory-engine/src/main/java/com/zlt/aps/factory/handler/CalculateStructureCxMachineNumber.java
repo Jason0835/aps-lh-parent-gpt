@@ -94,26 +94,26 @@ public class CalculateStructureCxMachineNumber {
                 setAllocationZero(groupInfo);
                 log.info(TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(productionContext, structureName));
               }else{
-                log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
+                  log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
                     productionContext, structureName, groupInfo.getSumPlanQty(),groupInfo.getMinLhMachineCount(),
                     groupInfo.getMinLhDayCapacityQty(),groupInfo.getTheoryDays(),groupInfo.getNeedCxCapacityMachineCount()));
+                  //分配天数为零，或是小于最小要求天数，则设置不排产
+                  if (null != minProductionDays && groupInfo.getTheoryDays() < minProductionDays) {
+                    groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
+                  }else{
+                    if(null != minAllocationDays && groupInfo.getTheoryDays() < minAllocationDays){
+                      groupInfo.setTheoryDays(minAllocationDays);
+                      groupInfo.setLeftOverNeedAllocationDays(minAllocationDays);
+                      //重新计算估算的机台数
+                      BigDecimal newNeedCxCapacityMachineCount = BigDecimal.valueOf(minAllocationDays).divide(BigDecimal.valueOf(productionContext.getMonthDays()), 1, RoundingMode.UP);
+                      groupInfo.setNeedCxCapacityMachineCount(newNeedCxCapacityMachineCount);
+                      log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
+                          productionContext, structureName, groupInfo.getSumPlanQty(),groupInfo.getMinLhMachineCount(),
+                          groupInfo.getMinLhDayCapacityQty(),groupInfo.getTheoryDays(),groupInfo.getNeedCxCapacityMachineCount()));
+                    }
+                  }
               }
-              //分配天数为零，或是小于最小要求天数，则设置不排产
-              if (groupInfo.isBelowMinProductionDays(minProductionDays)) {
-                 setAllocationZero(groupInfo);
-                 groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
-              }else{
-                if(groupInfo.getTheoryDays() < minAllocationDays){
-                  groupInfo.setTheoryDays(minAllocationDays);
-                  groupInfo.setLeftOverNeedAllocationDays(minAllocationDays);
-                  //重新计算估算的机台数
-                  BigDecimal newNeedCxCapacityMachineCount = BigDecimal.valueOf(minAllocationDays).divide(BigDecimal.valueOf(productionContext.getMonthDays()), 1, RoundingMode.UP);
-                  groupInfo.setNeedCxCapacityMachineCount(newNeedCxCapacityMachineCount);
-                  log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
-                      productionContext, structureName, groupInfo.getSumPlanQty(),groupInfo.getMinLhMachineCount(),
-                      groupInfo.getMinLhDayCapacityQty(),groupInfo.getTheoryDays(),groupInfo.getNeedCxCapacityMachineCount()));
-                }
-              }
+
               groupInfoMap.put(structureName, groupInfo);
         });
         return groupInfoMap;
