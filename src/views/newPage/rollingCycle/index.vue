@@ -1223,6 +1223,7 @@ export default {
     },
     //获取版本列表
     async getVersionList(isGet = false) {
+      this.loading=true
       let res;
       try {
         if (this.activeName == "first") {
@@ -1279,6 +1280,8 @@ export default {
       } finally {
         if (isGet) {
           this.getList();
+        }else{
+          this.loading=false
         }
       }
     },
@@ -1493,15 +1496,16 @@ export default {
       this.isShowResult = false;
       this.isShowFoot = false;
       this.showOutResult = false;
+      console.log('this.activeName',this.activeName)
       if (this.activeName == "three") {
-        // this.getResultList();
+        this.isTabChange = true;
         this.page = {
           current: 1,
           pageSize: 20,
           total: 0,
         };
         this.getVersionList(true);
-        this.isTabChange = true;
+
         return;
       }
       if (this.activeName == "second") {
