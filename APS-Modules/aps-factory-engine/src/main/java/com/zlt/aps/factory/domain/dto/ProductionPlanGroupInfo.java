@@ -181,6 +181,7 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 更新设置整个分组计划不排产
+     * 没有达到起排量
      */
     public void setNoProductionNoReachMinProductionDays(Integer minProductionDays) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -191,6 +192,17 @@ public class ProductionPlanGroupInfo {
         needCxCapacityMachineCount = BigDecimal.ZERO;
         String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
+    }
+
+    /**
+     * 更新设置整个分组不排产-没有成型硫化配比配置
+     */
+    public void setNoProductionNoCxMachineLhRatio() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        String noConfigurationLhRatioReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GROUP_NO_CONFIGURATION_LH_RATION);
+        groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noConfigurationLhRatioReason));
     }
 
     /**
@@ -275,9 +287,6 @@ public class ProductionPlanGroupInfo {
      */
     public boolean isBelowMinProductionDays(Integer minProductionDays) {
         if (null == minProductionDays || null == theoryDays) {
-            return true;
-        }
-        if (theoryDays <= BigDecimal.ZERO.intValue()) {
             return true;
         }
         return theoryDays < minProductionDays;

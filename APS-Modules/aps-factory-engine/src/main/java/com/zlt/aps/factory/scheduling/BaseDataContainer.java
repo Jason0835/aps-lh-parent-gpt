@@ -89,7 +89,10 @@ public class BaseDataContainer implements Serializable {
      * 分组(结构)成型硫化配比
      */
     private List<MonthPlanStructureLhRatioVo> structureLhRatioList;
-
+    /**
+     * 按结构分组，成型硫化配比
+     */
+    private Map<String, List<MonthPlanStructureLhRatioVo>> groupNameStructureLhRationMap;
     /**
      * 所有模具信息--用于记录模具日志
      * key=型腔模号 : value=模具信息
@@ -132,6 +135,62 @@ public class BaseDataContainer implements Serializable {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 设置成型硫化配比
+     *
+     * @param structureLhRatioList
+     */
+    public void setStructureLhRatioList(List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
+        if (null == structureLhRatioList) {
+            this.structureLhRatioList = Collections.emptyList();
+            this.groupNameStructureLhRationMap = Collections.emptyMap();
+            return;
+        }
+        this.structureLhRatioList = structureLhRatioList;
+        Map<String, List<MonthPlanStructureLhRatioVo>> groupMap = structureLhRatioList.stream().collect(Collectors.groupingBy(MonthPlanStructureLhRatioVo::getStructureName));
+        this.groupNameStructureLhRationMap = groupMap;
+    }
+
+    /**
+     * 按结构获取其所有硫化配比信息
+     *
+     * @param groupName
+     */
+    public List<MonthPlanStructureLhRatioVo> getAllLhRationListByGroup(String groupName) {
+        if (StringUtils.isBlank(groupName)) {
+            return Collections.emptyList();
+        }
+        if (CollectionUtils.isEmpty(groupNameStructureLhRationMap)) {
+            return Collections.emptyList();
+        }
+        List<MonthPlanStructureLhRatioVo> ratioList = groupNameStructureLhRationMap.get(groupName);
+        if (CollectionUtils.isEmpty(ratioList)) {
+            return Collections.emptyList();
+        }
+        return ratioList;
+    }
+
+    /**
+     * 按结构获取其最小硫化配比
+     *
+     * @param groupName
+     */
+    public MonthPlanStructureLhRatioVo getMinLhRatioByGroup(String groupName) {
+        if (StringUtils.isBlank(groupName)) {
+            return null;
+        }
+        if (CollectionUtils.isEmpty(groupNameStructureLhRationMap)) {
+            return null;
+        }
+        List<MonthPlanStructureLhRatioVo> ratioList = groupNameStructureLhRationMap.get(groupName);
+        if (CollectionUtils.isEmpty(ratioList)) {
+            return null;
+        }
+        //按硫化配比由小到大排序
+        ratioList.sort(Comparator.comparing(MonthPlanStructureLhRatioVo::getLhMachineMaxQty));
+        return ratioList.get(BigDecimal.ZERO.intValue());
     }
 
     /**

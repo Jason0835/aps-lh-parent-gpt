@@ -1,23 +1,19 @@
-package com.zlt.aps.monthplan.check.service.impl;
+package com.zlt.aps.factory.check.service.impl;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.factory.check.mapper.MpCheckItemRecordMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
-import com.zlt.aps.monthplan.check.mapper.MpCheckItemRecordMapper;
-import com.zlt.aps.monthplan.check.service.IMpCheckItemRecordService;
-import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.aps.factory.check.service.IMpCheckItemRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.apache.commons.collections4.CollectionUtils;
 import com.ruoyi.common.constant.UserConstants;
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
-import com.zlt.common.utils.ImportExcelValidatedUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -145,4 +141,10 @@ public class MpCheckItemRecordServiceImpl extends ServiceImpl<MpCheckItemRecordM
         return UserConstants.UNIQUE;
     }
 
+    @Override
+    public void clearInvalidData() {
+        LambdaQueryWrapper<MpCheckItemRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpCheckItemRecord::getIsDelete, ApsConstant.DEL_FLAG_DEL);
+        mpCheckItemRecordMapper.delete(wrapper);
+    }
 }

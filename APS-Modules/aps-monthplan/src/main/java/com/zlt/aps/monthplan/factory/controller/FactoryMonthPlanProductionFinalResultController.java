@@ -229,8 +229,9 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
         // 遍历设置是否特殊材料
         for (FactoryMonthPlanFinalAdjustVo monthPlanFinalAdjustVo : monthPlanFinalAdjustVoList) {
-            boolean hasSpecialMaterial = hasSpecialMaterial(monthPlanFinalAdjustVo.getEmbryoCode(), materialConsumeDetailList, specialMaterialRecordList);
-            monthPlanFinalAdjustVo.setHasSpecialMaterial(hasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+//            boolean hasSpecialMaterial = hasSpecialMaterial(monthPlanFinalAdjustVo.getMaterialCode(), materialConsumeDetailList, specialMaterialRecordList);
+//            monthPlanFinalAdjustVo.setHasSpecialMaterial(hasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+            monthPlanFinalAdjustVo.setHasSpecialMaterial(null);
         }
         return getDataTable(monthPlanFinalAdjustVoList);
     }

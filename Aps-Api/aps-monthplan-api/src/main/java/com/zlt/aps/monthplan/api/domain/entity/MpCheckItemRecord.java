@@ -32,7 +32,37 @@ public class MpCheckItemRecord extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-     /** 检测项 */
+    /** 年份 */
+    @Excel(name = "ui.data.column.checkItemRecord.year")
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /** 月份 */
+    @Excel(name = "ui.data.column.checkItemRecord.month")
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
+
+    /** 工厂编码 */
+    @Excel(name = "ui.data.column.checkItemRecord.factoryCode")
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /** 品名 */
+    @Excel(name = "ui.data.column.checkItemRecord.productTypeCode")
+    @ApiModelProperty(value = "品名", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
+
+    /** 需求计划版本 */
+    @Excel(name = "ui.data.column.checkItemRecord.monthPlanVersion")
+    @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
+    @TableField(value = "MONTH_PLAN_VERSION")
+    private String monthPlanVersion;
+
+    /** 检测项 */
     @Excel(name = "ui.data.column.checkItemRecord.checkItem")
     @ApiModelProperty(value = "检测项", name = "checkItem")
     @TableField(value = "CHECK_ITEM")

@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.check.service;
+package com.zlt.aps.factory.check.service;
 
 import java.util.List;
 
@@ -6,24 +6,25 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpCheckItemRecordService.java
  * 描    述：IMpCheckItemRecordServiceS2-1202 检测项记录后端接口
- *@author hsc
- *@date 2026-01-29
- *@version 1.0
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：hsc
- *     修改内容：...
+ * @author hsc
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：hsc
+ * 修改内容：...
+ * @date 2026-01-29
  */
-public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
-{
+public interface IMpCheckItemRecordService extends IService<MpCheckItemRecord> {
     /**
      * 查询S2-1202 检测项记录
-     * 
+     *
      * @param id S2-1202 检测项记录主键
      * @return S2-1202 检测项记录
      */
@@ -31,7 +32,7 @@ public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
 
     /**
      * 查询S2-1202 检测项记录列表
-     * 
+     *
      * @param mpCheckItemRecord S2-1202 检测项记录
      * @return S2-1202 检测项记录集合
      */
@@ -40,7 +41,7 @@ public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
 
     /**
      * 新增S2-1202 检测项记录
-     * 
+     *
      * @param mpCheckItemRecord S2-1202 检测项记录
      * @return 结果
      */
@@ -49,7 +50,7 @@ public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
 
     /**
      * 修改S2-1202 检测项记录
-     * 
+     *
      * @param mpCheckItemRecord S2-1202 检测项记录
      * @return 结果
      */
@@ -58,11 +59,11 @@ public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
 
     /**
      * 批量删除S2-1202 检测项记录
-     * 
+     *
      * @param ids 需要删除的S2-1202 检测项记录主键集合
      * @return 结果
      */
-   
+
     @Transactional
     public int deleteMpCheckItemRecordByIds(Long[] ids);
 
@@ -78,7 +79,7 @@ public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
 
     /**
      * 删除S2-1202 检测项记录信息
-     * 
+     *
      * @param id S2-1202 检测项记录主键
      * @return 结果
      */
@@ -90,4 +91,8 @@ public interface IMpCheckItemRecordService  extends IService<MpCheckItemRecord>
      */
     public String checkMpCheckItemRecordUnique(MpCheckItemRecord mpCheckItemRecord);
 
+    /**
+     * 清理无效数据
+     */
+    public void clearInvalidData();
 }
