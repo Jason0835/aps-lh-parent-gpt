@@ -2,7 +2,6 @@ package com.zlt.aps.factory.domain.vo;
 
 import lombok.Data;
 
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -11,6 +10,7 @@ import java.util.Map;
  */
 @Data
 public class DailyMouldAvailabilityResult {
+
     /**
      * 天数
      */
@@ -27,6 +27,9 @@ public class DailyMouldAvailabilityResult {
     private Map<String, Integer> insertResults;
 
 
+    /**
+     * 构造方法
+     */
     public DailyMouldAvailabilityResult() {
         this.cavityResults = new HashMap<>();
         this.insertResults = new HashMap<>();
