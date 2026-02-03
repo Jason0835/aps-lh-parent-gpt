@@ -2,10 +2,7 @@ package com.zlt.aps.factory.scheduling;
 
 import com.google.common.collect.Lists;
 import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
-import com.zlt.aps.factory.daylimit.DayCapacityLimitVo;
-import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
@@ -77,6 +74,11 @@ public class TbrProductionContext extends Context {
      * 排产计数器
      */
     private SkuProductionCounter productionCounter;
+    /**
+     * 模具排产限制信息记录
+     * key=物料描述 ： value=限制原因集合
+     */
+    private Map<String, List<MouldProductionLimitTypeEnum>> skuProductionLimitInfo;
 
     /**
      * 加入收尾，方向匹配结构集合
@@ -276,6 +278,13 @@ public class TbrProductionContext extends Context {
             return null;
         }
         return allMouldShellMap.get(mouldSetCode);
+    }
+
+    /**
+     * 清空排产限制情况信息
+     */
+    public void clearSkuProductionLimitInfo() {
+        skuProductionLimitInfo = new HashMap<>(32);
     }
 
     /**
