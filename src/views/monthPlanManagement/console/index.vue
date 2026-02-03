@@ -205,7 +205,7 @@ export default {
                   </text-button>
                   <text-button
                     onClick={() => {
-                      downloadLink("/monthplan/demandPlan/export", {
+                      downloadLink("/monthplan/demandPlanSum/export", {
                         year: row.year,
                         month: row.month,
                         monthPlanVersion: row.monthPlanVersion,
