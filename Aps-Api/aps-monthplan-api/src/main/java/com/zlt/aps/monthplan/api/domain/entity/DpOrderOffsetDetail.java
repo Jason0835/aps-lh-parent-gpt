@@ -188,10 +188,17 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private Integer productionQty;
 
     /** 供应链优先级 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.scmPriority")
+    @Excel(name = "ui.data.column.orderOffsetDetail.scmPriority", dictType = "biz_order_type")
     @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;
+    /**
+     * 优先级(订单类型)
+     */
+    @Excel(name = "ui.data.column.orderOffsetDetail.orderPriority", dictType = "biz_order_type")
+    @ApiModelProperty(value = "优先级(订单类型)", name = "orderPriority")
+    @TableField(value = "ORDER_PRIORITY")
+    private String orderPriority;
 
     /** 年周号 */
     @Excel(name = "ui.data.column.orderOffsetDetail.weekYear")
@@ -228,11 +235,6 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "SCMID", name = "scmId")
     @TableField(value = "SCM_ID")
     private Long scmId;
-
-    /** 订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单 */
-    @ApiModelProperty(value = "订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单", name = "orderPriority")
-    @TableField(exist = false)
-    private String orderPriority;
 
     /** 提报日期 */
     @ApiModelProperty(value = "提报日期", name = "billDate")

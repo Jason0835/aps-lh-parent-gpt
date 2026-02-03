@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.factory.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -250,6 +251,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         Comparator.nullsLast(Integer::compareTo)));
         // 从集合中找出日期最接近目标开始日期和结束日期的数据
         MpStructureAllocation structureAllocation = getClosestStructureAllocation(structureAllocationList, param.getId(), beginDay, endDay);
+        if (structureAllocation != null) {
+            int day = DateUtil.lengthOfMonth(param.getMonth(), DateUtil.isLeapYear(param.getYear()));
+            structureAllocation.setAdjustStartDay(Math.min(adjustEndDay + 1, day));
+        }
         return structureAllocation;
     }
 

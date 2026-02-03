@@ -66,6 +66,12 @@ public class MdmCycleSchStruConf extends BaseEntity {
     @TableField(value = "MIN_VULCANIZING_MACHINE")
     private Integer minVulcanizingMachine;
 
+    @Excel(name = "ui.data.column.mdmCycleSchStruConf.updateDate")
+    @ApiModelProperty(value = "更新日期", name = "updateDate")
+    @TableField(exist = false)
+    private String updateDate;
+
+
     /**
      * 年份
      */

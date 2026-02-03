@@ -26,16 +26,14 @@ public interface DpDemandPlanSumEntityMapper extends CommBaseMapper<DpDemandPlan
   /**
    * 直接查询去重后的month_plan_version列表
    */
-  @Select("SELECT DISTINCT MONTH_PLAN_VERSION " +
-      "FROM ( " +
-      "    SELECT MONTH_PLAN_VERSION, CREATE_TIME " +
-      "    FROM T_DP_DEMAND_PLAN_SUM " +
-      "    WHERE FACTORY_CODE = #{factoryCode} " +
-      "      AND `YEAR` = #{year} " +
-      "      AND `MONTH` = #{month} " +
-      "      AND IS_DELETE = #{isDelete} " +
-      "    ORDER BY CREATE_TIME DESC " +
-      ") t")
+  @Select("SELECT MONTH_PLAN_VERSION " +
+      " FROM T_DP_DEMAND_PLAN_SUM " +
+      " WHERE FACTORY_CODE = #{factoryCode} " +
+      " AND `YEAR` = #{year} " +
+      " AND `MONTH` = #{month} " +
+      " AND IS_DELETE = #{isDelete} " +
+      " GROUP BY MONTH_PLAN_VERSION " +
+      " ORDER BY MAX(CREATE_TIME) DESC ")
   List<String> selectDistinctMonthPlanVersion(@Param("factoryCode") String factoryCode,
                                               @Param("year") Integer year,
                                               @Param("month") Integer month,

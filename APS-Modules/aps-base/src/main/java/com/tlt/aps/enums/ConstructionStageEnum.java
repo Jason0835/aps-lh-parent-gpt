@@ -28,15 +28,15 @@ public enum ConstructionStageEnum {
     /**
      * T 量试标记
      */
-    private static final String TRIAL_FLAG = "T";
+    public static final String TRIAL_FLAG = "T";
     /**
      * X 试制标记
      */
-    private static final String MEASUREMENT_FLAG = "X";
+    public static final String MEASUREMENT_FLAG = "X";
     /**
      * S 正式标记
      */
-    private static final String FORMAL_FLAG = "S";
+    public static final String FORMAL_FLAG = "S";
 
     private String stage;
 

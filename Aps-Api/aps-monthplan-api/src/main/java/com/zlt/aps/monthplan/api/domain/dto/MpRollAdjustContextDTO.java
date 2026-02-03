@@ -156,4 +156,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "工作日历")
     private List<MdmWorkCalendar> workCalendarList;
 
+    @ApiModelProperty(value = "日型腔数Map")
+    private Map<Integer, Map<String,Integer>> dailyCavityMap;
+
+    @ApiModelProperty(value = "日活块数Map")
+    private Map<Integer, Map<String,Integer>> dailyBlockMap;
 }

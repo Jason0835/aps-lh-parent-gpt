@@ -96,4 +96,11 @@ public interface IFactoryConsoleService {
     FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query);
 
     FactoryMonthPlanFinalVersionInfoVo getFinalVersionInfo(String factoryCode, Integer year, Integer month);
+
+    /**
+     * 检测
+     * @param factoryProductionParam
+     * @return
+     */
+    AjaxResult checkProductionDemandPlan(FactoryProductionParamVo factoryProductionParam);
 }

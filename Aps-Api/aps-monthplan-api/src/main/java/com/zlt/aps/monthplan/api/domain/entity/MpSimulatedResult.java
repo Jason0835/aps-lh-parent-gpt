@@ -80,7 +80,7 @@ public class MpSimulatedResult extends BaseEntity {
     private String mainPattern;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.simulatedResult.brand")
+    @Excel(name = "ui.data.column.simulatedResult.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;
