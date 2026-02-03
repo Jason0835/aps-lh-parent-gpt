@@ -2105,10 +2105,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     protected DailyMouldAvailabilityResult calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
-        int day = DateUtil.dayOfMonth(new Date());
-        Date currentDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(), currentDate, null);
+                contextDTO.getFactoryCode(), new Date(), null);
     }
 
     /**
