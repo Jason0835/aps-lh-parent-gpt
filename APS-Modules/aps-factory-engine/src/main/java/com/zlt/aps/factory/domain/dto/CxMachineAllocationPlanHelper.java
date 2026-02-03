@@ -3,6 +3,7 @@ package com.zlt.aps.factory.domain.dto;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -100,6 +101,56 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     public String getDuplicateKey() {
         String keyFormat = "%s|*|%s|*|%s";
         return String.format(keyFormat, cxMachineCode, startDay, endDay);
+    }
+
+    /**
+     * 是否匹配当前段排产结构
+     * 1、如果没有排产天数 = false
+     * 2、有排产天数，则判断是否同机台
+     * 2.1、如果是同机台，则判断是否同结构
+     * 2.1.1、如果是同结构
+     * 2.1.1.1、则判断是否同段，同段排除 = false
+     * 2.1.1.2、如果不同段，则 = true
+     * 2.1.2、如果是不同结构，则 = false
+     * 2.2、如果是不同机台，则判断是否同结构
+     * 2.2.1 如果是同结构 = true
+     * 2.2.2 如果不是同结构 = false
+     *
+     * @param currentProductionInfo
+     * @return
+     */
+    public boolean hasMatchProduction(CxMachineAllocationPlanHelper currentProductionInfo) {
+        if (null == currentProductionInfo) {
+            return false;
+        }
+        String currentGroupName = currentProductionInfo.getAllocationGroup();
+        if (StringUtils.isBlank(currentGroupName)) {
+            return false;
+        }
+        if (null == allocationDay || allocationDay <= BigDecimal.ZERO.intValue()) {
+            return false;
+        }
+        //同机台
+        if (cxMachineCode.equals(currentProductionInfo.getCxMachineCode())) {
+            if (!currentGroupName.equals(getAllocationGroup())) {
+                return false;
+            }
+            String productionDuplicateKey = currentProductionInfo.getProductionDuplicateKey();
+            return !productionDuplicateKey.equals(getProductionDuplicateKey());
+        }
+        //不同机台，只判断结构
+        return currentGroupName.equals(getAllocationGroup());
+    }
+
+    /**
+     * 同机台分配的天产能范围只能有一个结构
+     * 结构|%|开始日|*|结束日
+     *
+     * @return
+     */
+    public String getProductionDuplicateKey() {
+        String keyFormat = "%s|*|%s|*|%s";
+        return String.format(keyFormat, productionPlanInfo.getGroupName(), startDay, endDay);
     }
 
     /**
