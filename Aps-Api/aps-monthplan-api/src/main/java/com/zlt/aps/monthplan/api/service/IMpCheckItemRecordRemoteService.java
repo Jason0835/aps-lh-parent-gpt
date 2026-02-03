@@ -84,4 +84,7 @@ public interface IMpCheckItemRecordRemoteService {
     @PostMapping("/checkItemRecord/importData")
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    @ApiOperation("清理无效数据")
+    @PostMapping("/checkItemRecord/clearInvalidData")
+    public void clearInvalidData();
 }

@@ -11,6 +11,7 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -158,4 +159,8 @@ public interface IFactoryConsoleRemoteService {
     @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
     @PostMapping("/factoryConsole/getProductionMonthType")
     AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdFinal condition);
+
+    @ApiOperation("检测需求月计划排产")
+    @PostMapping("/factoryConsole/checkProductionDemandPlan")
+    public AjaxResult checkProductionDemandPlan(@RequestBody FactoryProductionParamVo factoryProductionParam);
 }
