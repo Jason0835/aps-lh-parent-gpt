@@ -15,8 +15,8 @@
       @refresh="getList"
       @search="handleSearch"
       @pageChange="handlePageChange"
-         @reset="refreshSearch"
-         :isReset="true"
+      @reset="refreshSearch"
+      :isReset="true"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
       row-key="id"
@@ -148,7 +148,7 @@
           <el-tab-pane
             label="调整结果"
             name="three"
-             :disabled="loading"
+            :disabled="loading"
             v-if="this.hasPermission('monthplan:mpAdjustResult:list')"
           >
           </el-tab-pane>
@@ -204,6 +204,24 @@
           :width="item.width"
           :fixed="item.fixed ? true : false"
         >
+          <template v-slot="scope" v-if="item.prop == 'isLockSchedule'">
+            <div>
+              <el-select v-if="showConfirmResult"
+                v-model="scope.row.isLockSchedule"
+                @change="handleLockScheduleChange(scope.row, $event)"
+                placeholder="请选择"
+                size="mini"
+              >
+                <el-option
+                  v-for="option in dict.type.biz_yes_no"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <span v-else>{{ selectDictLabel(dict.type.biz_yes_no, scope.row.isLockSchedule) }}</span>
+            </div>
+          </template>
         </el-table-column>
       </el-table>
       <div
@@ -1065,14 +1083,15 @@ export default {
           label: this.$t("结束日期"),
           width: 120,
         },
-        // {
-        //   prop: "isLockSchedule",
-        //   width: 120,
-        //   label: this.$t("锁定上机日期"),
-        //   formatter: (row, column, value) => {
-        //     return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-        //   },
-        // },
+        {
+          prop: "isLockSchedule",
+          width: 120,
+          label: this.$t("锁定上机日期"),
+
+          // formatter: (row, column, value) => {
+          //   return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          // },
+        },
       ];
       const days = 31;
       for (let i = 0; i < days; i++) {
@@ -1090,21 +1109,20 @@ export default {
     },
   },
   methods: {
-    refreshSearch(){
-      this.search={
-        factoryCode:this.search.factoryCode,
-        yearMonth:this.search.yearMonth,
-        productionVersion:this.search.productionVersion,
-        version:this.search.version,
-
-      }
-      this.query={
-        factoryCode:this.search.factoryCode,
-        yearMonth:this.search.yearMonth,
-        productionVersion:this.search.productionVersion,
-        version:this.search.version,
-      }
-      this.getList()
+    refreshSearch() {
+      this.search = {
+        factoryCode: this.search.factoryCode,
+        yearMonth: this.search.yearMonth,
+        productionVersion: this.search.productionVersion,
+        version: this.search.version,
+      };
+      this.query = {
+        factoryCode: this.search.factoryCode,
+        yearMonth: this.search.yearMonth,
+        productionVersion: this.search.productionVersion,
+        version: this.search.version,
+      };
+      this.getList();
     },
     //查询是否有权限
     hasPermission(permission) {
@@ -1116,7 +1134,10 @@ export default {
     },
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
-      saveAdjustResult(row)
+      saveAdjustResult({
+        id:row.id,
+        isLockSchedule:row.isLockSchedule
+      })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
           // this.getList();
@@ -1198,7 +1219,7 @@ export default {
       this.getVersionList();
     },
     handleMaterialCodeChange(val) {
-      console.log(val)
+      console.log(val);
       this.search = {
         ...this.search,
         materialCode: val,
@@ -1207,7 +1228,6 @@ export default {
         ...this.search,
         materialCode: val,
       };
-
     },
     handleFactoryChange(val) {
       this.search = {
@@ -1223,7 +1243,7 @@ export default {
     },
     //获取版本列表
     async getVersionList(isGet = false) {
-      this.loading=true
+      this.loading = true;
       let res;
       try {
         if (this.activeName == "first") {
@@ -1280,8 +1300,8 @@ export default {
       } finally {
         if (isGet) {
           this.getList();
-        }else{
-          this.loading=false
+        } else {
+          this.loading = false;
         }
       }
     },
@@ -1368,7 +1388,6 @@ export default {
               ? this.data[0]?.version
               : this.outResultData[0]?.version,
           productionVersion: this.data[0]?.productionVersion,
-
         };
         if (params.yearMonth) {
           let arr = params.yearMonth.split("-");
@@ -1376,12 +1395,12 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.beginDay=this.formInline.beginDay
-        params.endDay=this.formInline.endDay
-        params.adjustEndDay=this.formInline.adjustEndDay
-        params.adjustStartDay=this.formInline.adjustStartDay
-        params.structureName=this.formInline.structureName
-        params.cxMachineCode=this.formInline.cxMachineCode
+        params.beginDay = this.formInline.beginDay;
+        params.endDay = this.formInline.endDay;
+        params.adjustEndDay = this.formInline.adjustEndDay;
+        params.adjustStartDay = this.formInline.adjustStartDay;
+        params.structureName = this.formInline.structureName;
+        params.scheduledMachines = this.formInline.cxMachineCode;
         // if (this.adjustType == "02") {
         //   params.adjustEndDay = this.formInline.adjustEndDay;
         //   params.isMove = this.formInline.isMove;
@@ -1496,14 +1515,13 @@ export default {
 
     //tab切换
     handleClick(tab, event) {
-
       // this.loading = true;
       this.showConfirmResult = false;
       this.show = false;
       this.isShowResult = false;
       this.isShowFoot = false;
       this.showOutResult = false;
-      console.log('this.activeName',this.activeName)
+      console.log("this.activeName", this.activeName);
       if (this.activeName == "three") {
         this.isTabChange = true;
         this.page = {
@@ -1788,7 +1806,10 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
         this.data = res.rows;
-        this.getOutResultList(res.rows[0].productionVersion,res.rows[0].version);
+        this.getOutResultList(
+          res.rows[0].productionVersion,
+          res.rows[0].version
+        );
         this.isShowFoot = true;
         this.showOutResult = true;
         this.formInline.adjustStartDay = this.formInline.beginDay;
@@ -1803,7 +1824,7 @@ export default {
     },
 
     //结构外初始化结构列表
-    async getOutResultList(productionVersion,version) {
+    async getOutResultList(productionVersion, version) {
       try {
         let params = {
           ...this.query,
