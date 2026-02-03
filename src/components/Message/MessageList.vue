@@ -256,7 +256,11 @@ export default {
         this.messageList = response.rows;
         this.total = response.total;
         this.loading = false;
-      });
+      }).finally(() => {
+        this.loading = false;
+        // 无论成功或失败都会执行
+        // this.loading = false; // 如果已经在 then 和 catch 中设置了，这里可以不重复设置
+    });
     },
     // 取消按钮
     cancel() {
