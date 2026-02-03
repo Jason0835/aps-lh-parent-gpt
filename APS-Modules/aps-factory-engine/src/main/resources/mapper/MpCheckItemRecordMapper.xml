@@ -22,7 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 
     <sql id="selectMpCheckItemRecordVo">
-        SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_TYPE_CODE, MONTH_PLAN_VERSION, CHECK_ITEM, CHECK_CONTENT, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK, FROM T_MP_CHECK_ITEM_RECORD
+        SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_TYPE_CODE, MONTH_PLAN_VERSION, CHECK_ITEM, CHECK_CONTENT, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK FROM T_MP_CHECK_ITEM_RECORD
     </sql>
 
     <select id="selectMpCheckItemRecordList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord" resultMap="MpCheckItemRecordResult">

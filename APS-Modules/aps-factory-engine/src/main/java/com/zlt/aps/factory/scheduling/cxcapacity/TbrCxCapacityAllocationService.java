@@ -1,18 +1,10 @@
 package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.Constant;
-import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
-import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.factory.basedataassemble.history.CxMachineProductionHistoryInfo;
-import com.zlt.aps.factory.basedataassemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.factory.basedataassemble.history.ProductionHistoryHandler;
-import com.zlt.aps.factory.constant.ProductionConstant;
-import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
@@ -27,10 +19,8 @@ import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.InitNoProductionRecordService;
-import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -41,9 +31,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 工厂TBR业务轮胎成型产能分配
@@ -494,12 +482,6 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
-
-
-
-
-
-
 
 
     /**

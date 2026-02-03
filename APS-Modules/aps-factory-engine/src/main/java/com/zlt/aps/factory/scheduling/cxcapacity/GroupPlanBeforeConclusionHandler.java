@@ -206,7 +206,7 @@ public class GroupPlanBeforeConclusionHandler {
         Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
         //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
         if (realAllocationDayBeforeConclusion < minAllocationDays) {
-            if (!isSingleMachine) {
+            if (!hasOtherProductionCxMachine(productionContext, groupPlanInfo, cxMachineInfo, allocationInfo)) {
                 //分组计划不排产-单台
                 groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, minAllocationDays);
             }
@@ -295,6 +295,45 @@ public class GroupPlanBeforeConclusionHandler {
             deductionDaySet.add(productionDay);
         }
         beforeConclusionInfo.updateInfo(beforeConclusionDay, deductionDay, deductionDaySet);
+    }
+
+    /**
+     * 获取结构是否在其它成型机上有排产
+     * true 表示有排产 false 表示没有排产
+     *
+     * @param productionContext 排产上下文
+     * @param groupPlanInfo     排产计划
+     * @param cxMachineInfo     成型机台
+     * @param allocationInfo    当前排产段信息
+     * @return
+     */
+    private static boolean hasOtherProductionCxMachine(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo) {
+        if (null == groupPlanInfo) {
+            return false;
+        }
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfo)) {
+            return false;
+        }
+        List<CxMachineBaseInfoVo> otherProductionInfo = new ArrayList<>();
+        allCxMachineInfo.forEach((cxMachineInfoCode, cxMachineProductionInfo) -> {
+            if (cxMachineInfoCode.equals(cxMachineInfo.getCxMachineCode())) {
+                return;
+            }
+            List<CxMachineAllocationPlanHelper> allocationList = cxMachineProductionInfo.getAllocationList();
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            List<CxMachineAllocationPlanHelper> productionList = allocationList.stream().filter(allocationPlan -> allocationPlan.hasMatchProduction(allocationInfo)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(productionList)) {
+                return;
+            }
+            otherProductionInfo.add(cxMachineProductionInfo);
+        });
+        if (CollectionUtils.isEmpty(otherProductionInfo)) {
+            return false;
+        }
+        return true;
     }
 
     /**

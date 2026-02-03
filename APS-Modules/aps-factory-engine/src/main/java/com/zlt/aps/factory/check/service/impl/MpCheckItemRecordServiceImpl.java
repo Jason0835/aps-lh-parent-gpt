@@ -2,9 +2,12 @@ package com.zlt.aps.factory.check.service.impl;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ruoyi.common.core.utils.SecurityUtils;
+import com.tlt.aps.utils.JsonUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.check.mapper.MpCheckItemRecordMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
@@ -57,7 +60,11 @@ public class MpCheckItemRecordServiceImpl extends ServiceImpl<MpCheckItemRecordM
     @Override
     public List<MpCheckItemRecord> selectMpCheckItemRecordList(MpCheckItemRecord mpCheckItemRecord)
     {
-        return mpCheckItemRecordMapper.selectMpCheckItemRecordList(mpCheckItemRecord);
+        List<MpCheckItemRecord> mpCheckItemRecordList = mpCheckItemRecordMapper.selectMpCheckItemRecordList(mpCheckItemRecord);
+        //获取当前语言包
+        Locale language = SecurityUtils.getUserLang();
+        JsonUtils.parseJsonRemarkList(mpCheckItemRecordList, language.toString(), "checkContent");
+        return mpCheckItemRecordList;
     }
 
     /**
