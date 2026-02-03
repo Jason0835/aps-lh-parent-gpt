@@ -176,9 +176,9 @@ public class MpWeekRollAdjustController extends BaseController {
 
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
         //当日作为调整日
-        //contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
+        contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
         //TODO 测试使用
-        contextDTO.setAdjustDay(26);
+        //contextDTO.setAdjustDay(26);
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(),contextDTO.getProductType()));
 
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
