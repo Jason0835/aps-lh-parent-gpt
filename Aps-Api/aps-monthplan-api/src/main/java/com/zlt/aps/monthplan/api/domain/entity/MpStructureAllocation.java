@@ -167,6 +167,13 @@ public class MpStructureAllocation extends BaseEntity {
     private String remark;
 
     /**
+     * 调整开始日期
+     */
+    @ApiModelProperty(value = "调整开始日期", name = "adjustStartDay")
+    @TableField(exist = false)
+    private Integer adjustStartDay;
+
+    /**
      * 调整结束日期
      */
     @ApiModelProperty(value = "调整结束日期", name = "adjustEndDay")
