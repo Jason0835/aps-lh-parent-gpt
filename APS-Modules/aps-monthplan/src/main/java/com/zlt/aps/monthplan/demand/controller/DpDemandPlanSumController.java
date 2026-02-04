@@ -70,7 +70,7 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
 
     @Override
     protected String getOrderBy() {
-        return "update_time DESC,ID DESC,MAIN_PATTERN ASC,STRUCTURE_NAME ASC";
+        return "update_time DESC,ID DESC,STRUCTURE_NAME ASC,MAIN_PATTERN ASC,NET_QTY DESC";
     }
 
     /**
@@ -175,7 +175,16 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliveryDateDue")), "DELIVERY_DATE_DUE", queryVO.getFieldValueByFieldName("deliveryDateDue"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isImport")), "IS_IMPORT", queryVO.getFieldValueByFieldName("isImport"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureType")), "STRUCTURE_TYPE", queryVO.getFieldValueByFieldName("structureType"));
-
+        if(!YesOrNoEnum.YES.getValue().equals(queryVO.getFieldValueByFieldName("viewFlag"))) {
+            // 库存、净需求（含暂缓订单）、月度余量，都为0，默认隐藏
+            queryWrapper.nested(wq -> wq
+                .ne("STOCK_QTY", 0)
+                .or()
+                .ne("POSTPONE_NET_QTY", 0)
+                .or()
+                .ne("PLANNED_SURPLUS", 0)
+            );
+        }
     }
 
 

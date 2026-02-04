@@ -2092,6 +2092,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setYear(contextDTO.getMpYear());
         queryVo.setMonth(contextDTO.getMpMonth());
         queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
+        queryVo.setProductionVersion(contextDTO.getProductionVersion());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
     }
