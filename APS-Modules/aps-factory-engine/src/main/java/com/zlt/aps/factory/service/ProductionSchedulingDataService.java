@@ -57,14 +57,6 @@ public interface ProductionSchedulingDataService {
     List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList);
 
     /**
-     * 获取周期结构的最低硫化配比信息
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context);
-
-    /**
      * 获取工厂的成型基础配置信息
      * 包含成型维修停机信息(合并全局停产日)
      * 固定机构先后顺序，固定SKU
@@ -91,14 +83,6 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<MdmCapsuleChuck> getCapsuleChuck(Context context);
-
-    /**
-     * 获取投产施工基础信息
-     *
-     * @return
-     */
-    @Deprecated
-    Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo();
 
     /**
      * 获取需求计划对应的物料基础信息
@@ -149,24 +133,6 @@ public interface ProductionSchedulingDataService {
      */
     @Deprecated
     Map<String, ProductALevelVo> getProductDamageConfiguration(String factoryCode, String productTypeCode);
-
-    /**
-     * 获取分厂的最小批量设置
-     *
-     * @param productionContext
-     * @return
-     */
-    @Deprecated
-    Map<String, Long> getMinimumLotSizeConfiguration(ProductionContext productionContext);
-
-    /**
-     * 根据分厂编号，获取分厂的排产分组信息
-     *
-     * @param factoryCode 分厂编码
-     * @return
-     */
-    @Deprecated
-    List<ProductionGroupVo> getFactoryProductionGroupConfiguration(String factoryCode);
 
     /**
      * 根据需求计划，获取对应的需求模具配置信息
@@ -231,32 +197,12 @@ public interface ProductionSchedulingDataService {
     List<MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(Context context);
 
     /**
-     * 获取分厂在指定年份、月份的不排产物料信息，并按物料分组
-     *
-     * @param factoryCode
-     * @param year
-     * @param month
-     * @return
-     */
-    @Deprecated
-    Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month);
-
-    /**
      * 获取利率优先值配置
      *
      * @return
      */
     @Deprecated
     List<MdmInterestRate> getInterestRateConfiguration();
-
-    /**
-     * 根据上下文，获取分厂排程排产顺序配置
-     *
-     * @param context
-     * @return
-     */
-    @Deprecated
-    List<PlanOrderSortConfiguration> getProductionConfiguration(ProductionContext context);
 
     /**
      * 获取分厂成型机、硫化机 机台数

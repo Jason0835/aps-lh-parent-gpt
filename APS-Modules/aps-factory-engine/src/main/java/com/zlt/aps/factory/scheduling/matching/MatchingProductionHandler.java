@@ -31,6 +31,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
+import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
@@ -76,6 +77,8 @@ public class MatchingProductionHandler {
     private FactoryParamMapper factoryParamMapper;
     @Autowired
     private BaseDao baseDao;
+    @Autowired
+    private DpRequireDataService dpRequireDataService;
     @Autowired
     private MonthProductionDataService monthProductionDataService;
     @Autowired
@@ -772,8 +775,7 @@ public class MatchingProductionHandler {
             singleRatio.setCxMachineTypeCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
         });
         // 周期结构硫化配比
-        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService()
-                .getCycleLhRatioInfo(context);
+        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = dpRequireDataService.getCycleLhRatioInfo(context);
         Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
         if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
             cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {

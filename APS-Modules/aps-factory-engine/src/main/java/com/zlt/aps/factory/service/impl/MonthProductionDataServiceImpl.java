@@ -24,10 +24,9 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 排产调用数据获取服务类
@@ -184,6 +183,15 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
             return;
         }
         factoryMouldUsedStatusLogService.saveBatch(usedLogList);
+    }
+
+    @Override
+    public Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month) {
+        List<FactoryNoProduction> noProductionList = factoryProductionSchedulingMapper.getFactoryNoProductionConfiguration(factoryCode, year, month);
+        if (CollectionUtils.isEmpty(noProductionList)) {
+            return Collections.emptyMap();
+        }
+        return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getMaterialCode, Function.identity()));
     }
 
     @Override

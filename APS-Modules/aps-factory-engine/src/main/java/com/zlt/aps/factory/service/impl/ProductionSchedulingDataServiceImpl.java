@@ -14,11 +14,9 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.mapper.*;
-import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
 import com.zlt.aps.maindata.service.IProductALevelService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -44,8 +42,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ProductionSchedulingDataServiceImpl implements ProductionSchedulingDataService {
-
-    private final ProductMinConfigurationMapper productMinConfigurationMapper;
 
     private final MdmInterestRateEntityMapper interestRateMapper;
 
@@ -74,8 +70,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     private final IFactoryParamService factoryParamService;
 
     private final IProductALevelService productALevelService;
-
-    private final IPlanOrderSortConfigurationService sortConfigurationService;
 
     @Override
     public Integer getProductionCycleConfiguration(Context context) {
@@ -129,17 +123,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context) {
-        if (isEmptyFactoryAndYearMonth(context)) {
-            return Collections.emptyList();
-        }
-        String factoryCode = context.getFactoryCode();
-        Integer year = context.getYear();
-        Integer month = context.getMonth();
-        return factoryMonthPlanProductLhCapacityMapper.getCycleStructureMinLhRatioInfo(factoryCode, year, month);
-    }
-
-    @Override
     public Map<String, CxMachineBaseInfoVo> getCxMachineBaseInfo(Context context) {
         String factoryCode = context.getFactoryCode();
         Date productionStartDate = context.getProductionStartDate();
@@ -179,15 +162,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         return capsuleChuckEntityMapper.selectList(queryWrapper);
-    }
-
-    @Override
-    public Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo() {
-        List<BaseConstructionVersionInfoVo> baseConstructionInfoList = factoryProductionSchedulingMapper.getBaseConstructionInfo();
-        if (CollectionUtils.isEmpty(baseConstructionInfoList)) {
-            return Collections.emptyMap();
-        }
-        return baseConstructionInfoList.stream().collect(Collectors.toMap(BaseConstructionVersionInfoVo::getEmbryoCode, Function.identity()));
     }
 
     @Override
@@ -261,49 +235,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public Map<String, Long> getMinimumLotSizeConfiguration(ProductionContext productionContext) {
-        String factoryCode = productionContext.getFactoryCode();
-        Integer year = productionContext.getYear();
-        Integer month = productionContext.getMonth();
-        String monthPlanVersion = productionContext.getMonthPlanVersion();
-        QueryWrapper<ProductMinConfiguration> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("PRODUCT_CODE", "*");
-        queryWrapper.eq("FACTORY_CODE", factoryCode);
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        ProductMinConfiguration general = productMinConfigurationMapper.selectOne(queryWrapper);
-        Long defaultMin = BigDecimal.ZERO.longValue();
-        if (null != general) {
-            defaultMin = Long.valueOf(general.getMinQty());
-        }
-        List<ProductMinConfiguration> requireMinConfigurationList = factoryProductionSchedulingMapper.getRequireMinConfiguration(factoryCode, year, month, monthPlanVersion);
-        if (CollectionUtils.isEmpty(requireMinConfigurationList)) {
-            return Collections.emptyMap();
-        }
-        Map<String, Long> minimumLotSizeMap = new HashMap<>();
-        for (ProductMinConfiguration requireMinConfiguration : requireMinConfigurationList) {
-            Integer minQty = requireMinConfiguration.getMinQty();
-            String productCode = requireMinConfiguration.getProductCode();
-            if (StringUtils.isBlank(productCode)) {
-                continue;
-            }
-            if (null == minQty) {
-                minimumLotSizeMap.put(productCode, defaultMin);
-            } else {
-                minimumLotSizeMap.put(productCode, Long.valueOf(minQty));
-            }
-        }
-        return minimumLotSizeMap;
-    }
-
-    @Override
-    public List<ProductionGroupVo> getFactoryProductionGroupConfiguration(String factoryCode) {
-        if (StringUtils.isBlank(factoryCode)) {
-            return Collections.emptyList();
-        }
-        return factoryProductionSchedulingMapper.getFactoryProductionGroupConfiguration(factoryCode);
-    }
-
-    @Override
     public List<MonthPlanProductMouldInfoVo> getProductionMouldInfo(Context context) {
         return factoryMonthPlanProductMouldMapper.getProductionMouldInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
     }
@@ -345,26 +276,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month) {
-        List<FactoryNoProduction> noProductionList = factoryProductionSchedulingMapper.getFactoryNoProductionConfiguration(factoryCode, year, month);
-        if (CollectionUtils.isEmpty(noProductionList)) {
-            return Collections.emptyMap();
-        }
-        return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getMaterialCode, Function.identity()));
-    }
-
-    @Override
     public List<MdmInterestRate> getInterestRateConfiguration() {
         return interestRateMapper.selectList(new QueryWrapper<>());
-    }
-
-    @Override
-    public List<PlanOrderSortConfiguration> getProductionConfiguration(ProductionContext context) {
-        List<PlanOrderSortConfiguration> sortConfigurationList = sortConfigurationService.getProductionConfiguration(context.getFactoryCode());
-        if (CollectionUtils.isEmpty(sortConfigurationList)) {
-            return Collections.emptyList();
-        }
-        return sortConfigurationList;
     }
 
     @Override

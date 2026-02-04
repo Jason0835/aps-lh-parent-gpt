@@ -7,6 +7,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 排产调用数据获取服务类
@@ -102,6 +103,17 @@ public interface MonthProductionDataService {
      * @param usedLogList
      */
     void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList);
+
+    /**
+     * 获取分厂在指定年份、月份的不排产物料信息，并按物料分组
+     *
+     * @param factoryCode
+     * @param year
+     * @param month
+     * @return
+     */
+    @Deprecated
+    Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month);
 
     /**
      * 获取续作SKU信息，包含续作机台及使用的模具数

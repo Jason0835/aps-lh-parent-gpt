@@ -471,7 +471,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
             singleRatio.setCxMachineTypeCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
         });
         //周期结构硫化配比
-        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
+        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDpRequireDataService().getCycleLhRatioInfo(context);
         Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
         if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
             cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {
