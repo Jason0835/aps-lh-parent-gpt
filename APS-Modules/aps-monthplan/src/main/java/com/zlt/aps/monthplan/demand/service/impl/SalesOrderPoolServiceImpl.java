@@ -322,7 +322,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setMonth(month);
 			newVO.setArea(String.valueOf(vo.getEmployeeDept()));
 			newVO.setBillDate(vo.getBillDate());
-			newVO.setBrand(vo.getBrandName());
+			newVO.setBrand(vo.getEngBrand());
 			newVO.setDeliverGoodsType(shipType);
 			newVO.setIsEudr(vo.getEudrFlag());
 			newVO.setMaterialDesc(materialDesc);
@@ -341,9 +341,10 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 //					newVO.setUniformity(uniformity);
 			String scmPriority = ApsConstant.SAL_PRIORITY_MID;
 			if (isFirstCatch) { // 年月首次抓取
-				// 订单类型 !=空，且PO号含有储备字样，则供应链优先级 = 中优先级;，否则供应链优先级 = 订单类型
+				// 订单类型 !=空，且PO号含有储备字样（20260204同时订单类型不为储备），则供应链优先级 = 中优先级;，否则供应链优先级 = 订单类型
 				if (StringUtils.isNotEmpty(salPriority) && StringUtils.isNotEmpty(salesOrderStockFlag)
-						&& StringUtils.isNotEmpty(salCodePo) && !salCodePo.contains(salesOrderStockFlag)) {
+						&& StringUtils.isNotEmpty(salCodePo) && !salCodePo.contains(salesOrderStockFlag)
+						&& !ApsConstant.SAL_PRIORITY_STOCK.equals(salPriority)) {
 					scmPriority = salPriority;
 				}
 			}

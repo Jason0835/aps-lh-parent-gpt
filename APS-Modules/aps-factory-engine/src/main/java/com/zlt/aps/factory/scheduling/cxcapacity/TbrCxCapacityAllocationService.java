@@ -13,10 +13,7 @@ import com.zlt.aps.factory.handler.ContinueSkuCalculator;
 import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
 import com.zlt.aps.factory.logrecorder.*;
-import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
-import com.zlt.aps.factory.scheduling.BaseDataContainer;
-import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.*;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
@@ -54,8 +51,8 @@ import java.util.stream.Collectors;
  * @date 20251209
  */
 @Slf4j
-@Service(value = "tbrCxCapacityAllocationService")
-public class TbrCxCapacityAllocationService extends AbstractProductionBusinessService {
+@Service(value = "tbrWholeProductionService")
+public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final FormalProductionHandler formalProductionHandler;
 
@@ -85,17 +82,15 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService);
+        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.initNoProductionRecordService = initNoProductionRecordService;
         this.formalProductionHandler = formalProductionHandler;
-        this.productionHistoryHandler = productionHistoryHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
-        super.setProductionHistoryHandler(productionHistoryHandler);
     }
 
     /**

@@ -6,6 +6,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
@@ -18,8 +19,8 @@ import io.swagger.annotations.ApiOperation;
  * @author ZLT
  * @date 20250213
  */
-//@FeignClient(contextId = "IScmItfService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.itf:/itf}")
-@FeignClient(contextId = "IScmItfService", value = "aps-itf")
+@FeignClient(contextId = "IScmItfService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.itf:/itf}")
+//@FeignClient(contextId = "IScmItfService", value = "aps-itf")
 public interface IScmItfService {
     /**
      * 同步已计划未发货数据

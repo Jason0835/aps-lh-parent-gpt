@@ -70,6 +70,7 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
         queryWrapper.eq("MONTH", context.getMonth());
         queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getCode());
+        //不需要插入版本记录，则需要带入排产版本号查询
         if (!Boolean.TRUE.equals(context.getInsertNewProductionVersion())) {
             queryWrapper.eq("PRODUCTION_VERSION", context.getProductionVersion());
             return factoryEngineProductionVersionMapper.selectOne(queryWrapper);

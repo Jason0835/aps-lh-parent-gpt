@@ -121,10 +121,39 @@ public class CxCapacityAllocationHandler {
             //todo 记录日志
             return;
         }
-        //最先收尾的先-剩余天数多的
-        endingCxMachineList.sort(Comparator.comparing(CxMachineBaseInfoVo::getRemainingDays, Comparator.reverseOrder()).thenComparing(CxMachineBaseInfoVo::getCxMachineCode));
+        // 对机台排序
+        endingCxMachineList.sort((machine1, machine2) -> {
+            // 最先给有特殊结构在机的机台挑选
+            Boolean isSpecial1 = this.hasSpecialStructure(machine1);
+            Boolean isSpecial2 = this.hasSpecialStructure(machine2);
+            int result = isSpecial2.compareTo(isSpecial1); // Boolean的true比false大，倒序，优先处理true的
+            if (result != 0) {
+                return result;
+            }
+            // 其次最先收尾的先-剩余天数多的，倒序，越大的约优先
+            Integer remainingDays1 = machine1.getRemainingDays();
+            Integer remainingDays2 = machine2.getRemainingDays();
+            result = remainingDays2.compareTo(remainingDays1);
+            if (result != 0) {
+                return result;
+            }
+            // 最后按机台编号顺序
+            String code1 = machine1.getCxMachineCode();
+            String code2 = machine2.getCxMachineCode();
+            return code1.compareTo(code2);
+        });
         //一台一台反向挑选合适的结构分组计划
         endingCxMachineList.forEach(reverseCxMachineInfo -> selectedGroupPlanByCxMachine(productionContext, estimateGroupCxAllocationMap, reverseCxMachineInfo));
+    }
+
+    /**
+     * 判断机台是否包含特殊结构
+     * @param machine
+     * @return
+     */
+    private Boolean hasSpecialStructure(CxMachineBaseInfoVo machine) {
+        return machine.getAllocationList().stream()
+                .anyMatch(allocation -> allocation.getProductionPlanInfo().isSpecialMaterial());
     }
 
     /**
@@ -169,6 +198,7 @@ public class CxCapacityAllocationHandler {
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
         //20260109 标记分配完成
+        ((TbrProductionContext) context).updateSpecialMaterialInfoMap(allocationGroupPlan, needAllocationDays); // 更新特殊材料库存
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
@@ -202,6 +232,14 @@ public class CxCapacityAllocationHandler {
         List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlanList.stream().filter(groupPlan -> groupPlan.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(needProductionGroupList)) {
             return null;
+        }
+        // 如果有在机的特殊结构，则优先取出特殊结构
+        if (((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo().values()
+                .stream().anyMatch(machine -> this.hasSpecialStructure(machine))) {
+            List<ProductionPlanGroupInfo> specialMaterialList = allGroupPlanList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
+            if (!CollectionUtils.isEmpty(specialMaterialList)) {
+                needProductionGroupList = specialMaterialList;
+            }
         }
         //高优先级需求SKU个数多的优先
         Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
@@ -270,8 +308,8 @@ public class CxCapacityAllocationHandler {
         }
         List<CxMachineBaseInfoVo> capacityCoverageList = hasProductionDayList.stream().filter(singleMachine -> singleMachine.getCapacityDiffValue() >= BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         List<CxMachineBaseInfoVo> selectedCapacityList;
-        if (!CollectionUtils.isEmpty(capacityCoverageList)) {
-            //产能能覆盖，取差值最小
+        if (!CollectionUtils.isEmpty(capacityCoverageList) && !addNewGroupPlan.isSpecialMaterial()) {
+            //产能能覆盖且非特殊结构，取差值最小
             Integer minProductionDays = capacityCoverageList.stream().mapToInt(CxMachineBaseInfoVo::getCapacityDiffValue).min().getAsInt();
             selectedCapacityList = capacityCoverageList.stream().filter(cxMachineInfo -> minProductionDays.equals(cxMachineInfo.getCapacityDiffValue())).collect(Collectors.toList());
         } else {
@@ -441,9 +479,25 @@ public class CxCapacityAllocationHandler {
         }
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         String cxMachineTypeCode = cxMachineInfo.getCxMachineTypeCode();
+        // 1、如果在机结构有特殊材料，需要优先选择包含特殊材料的结构
+        List<ProductionPlanGroupInfo> specialMaterialList = groupPlanList;
+        boolean isSpecial = this.hasSpecialStructure(cxMachineInfo);
+        if (!isSpecial) { // 如果在机结构没有特殊材料，但是其他机台的在机结构有特殊材料，则同样需要优先选择包含特殊材料的结构
+            TbrProductionContext productionContext = (TbrProductionContext) context;
+            isSpecial = productionContext.getBaseDataContainer().getCxMachineBaseInfo().values().stream()
+                    .anyMatch(machine -> this.hasSpecialStructure(machine));
+        }
+        if (isSpecial) { // 特殊材料校验为true，则需要优先排特殊结构
+            List<ProductionPlanGroupInfo> tempSpecialMaterialList = groupPlanList.stream()
+                    .filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
+            if (!CollectionUtils.isEmpty(tempSpecialMaterialList)) {
+                specialMaterialList = tempSpecialMaterialList;
+            }
+        }
+        
         //1、取固定的
-        Integer minFixedPriority = groupPlanList.stream().mapToInt(ProductionPlanGroupInfo::getFixedPriority).min().getAsInt();
-        List<ProductionPlanGroupInfo> fixedGroupPlanList = groupPlanList.stream().filter(groupPlan -> minFixedPriority.equals(groupPlan.getFixedPriority())).collect(Collectors.toList());
+        Integer minFixedPriority = specialMaterialList.stream().mapToInt(ProductionPlanGroupInfo::getFixedPriority).min().getAsInt();
+        List<ProductionPlanGroupInfo> fixedGroupPlanList = specialMaterialList.stream().filter(groupPlan -> minFixedPriority.equals(groupPlan.getFixedPriority())).collect(Collectors.toList());
         if (fixedGroupPlanList.size() == BigDecimal.ONE.intValue()) {
             ProductionPlanGroupInfo selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
             log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.FIXED_PRIORITY));

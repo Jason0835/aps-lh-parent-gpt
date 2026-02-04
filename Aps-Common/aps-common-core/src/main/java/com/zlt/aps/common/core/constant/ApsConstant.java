@@ -415,6 +415,11 @@ public class ApsConstant {
     public static final String SAL_PRIORITY_POSTPONE = "5";
 
     /**
+     * 销售优先级：7-储备；
+     */
+    public static final String SAL_PRIORITY_STOCK = "7";
+
+    /**
      * 发货模式：02-整单发货
      */
     public static final String DELIVERY_MODE_ALL = "02";

@@ -51,6 +51,13 @@ public interface IFactoryConsoleService {
     AjaxResult reinitializeMouldingProduction(FactoryProductionParamVo factoryProductionParam);
 
     /**
+     * 分组计划产能重新分配排产
+     *
+     * @param factoryProductionParam
+     * @return
+     */
+    AjaxResult groupPlanCapacityResetAllocationProduction(FactoryProductionParamVo factoryProductionParam);
+    /**
      * 重新进行模具排产
      *
      * @param factoryProductionParam

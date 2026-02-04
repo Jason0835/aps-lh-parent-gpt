@@ -119,6 +119,18 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
     }
 
     @Override
+    public AjaxResult groupPlanCapacityResetAllocationProduction(FactoryProductionParamVo factoryProductionParam) {
+        AjaxResult checkResult = checkParam(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkResult.get(AjaxResult.CODE_TAG)) {
+            return checkResult;
+        }
+        Context context = buildContext(factoryProductionParam);
+        monthPlanProductionSchedulingService.groupCapacityScheduling(context);
+        return AjaxResult.success();
+    }
+
+    @Override
     public AjaxResult reMouldingProduction(FactoryProductionParamVo factoryProductionParam) {
         AjaxResult checkResult = checkParam(factoryProductionParam);
         //校验没通过
@@ -230,7 +242,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         queryWrapper.eq("MONTH", month);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
-        //正式需要排产版本号 queryWrapper.eq(StringUtils.isNotBlank(productionVersion), "PRODUCTION_VERSION", productionVersion);
+        //正式需要排产版本号
         queryWrapper.eq("PRODUCTION_VERSION", productionVersion);
         MpFactoryProductionVersion version = factoryProductionVersionMapper.selectOne(queryWrapper);
         if (null == version) {

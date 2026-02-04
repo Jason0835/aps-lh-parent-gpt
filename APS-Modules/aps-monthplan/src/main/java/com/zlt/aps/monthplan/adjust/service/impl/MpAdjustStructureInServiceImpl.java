@@ -140,7 +140,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
-        return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
+        return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
     @Override

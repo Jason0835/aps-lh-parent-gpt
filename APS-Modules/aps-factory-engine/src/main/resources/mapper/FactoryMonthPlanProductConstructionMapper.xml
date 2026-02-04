@@ -25,6 +25,7 @@
            AND mpc.MATERIAL_CODE = prp.MATERIAL_CODE
            AND IFNULL(mpc.IS_DELETE, 0) = 0
          WHERE IFNULL(prp.IS_DELETE, 0) = 0
+           AND mpc.ID IS NOT NULL
            AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND prp.YEAR = #{year,jdbcType=DECIMAL}
            AND prp.MONTH = #{month,jdbcType=DECIMAL}

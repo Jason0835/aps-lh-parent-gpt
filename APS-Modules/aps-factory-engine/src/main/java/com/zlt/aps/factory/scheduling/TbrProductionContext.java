@@ -1,6 +1,8 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.google.common.collect.Lists;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.*;
 import com.zlt.aps.factory.domain.Context;
@@ -17,7 +19,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 /**
@@ -549,5 +553,72 @@ public class TbrProductionContext extends Context {
             mouldInfos.add(mouldInfo);
         });
         return mouldInfos.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION ? Collections.emptyList() : mouldInfos;
+    }
+    
+    /**
+     * 更新特殊材料库存<br/>
+     * 根据结构分组的分配天数变化量，调整涉及特殊材料的已排库存信息
+     * 
+     * @param groupInfo                  结构分组信息
+     * @param allocationDays 分配天数
+     */
+    public void updateSpecialMaterialInfoMap(ProductionPlanGroupInfo groupInfo, Integer allocationDays) {
+        if (!groupInfo.isSpecialMaterial()) { // 非特殊结构，直接结束
+            return;
+        }
+        // 计算分配后剩余可分配天数的变化
+        if (null == allocationDays || allocationDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        Integer leftOverNeedAllocationDays = groupInfo.getLeftOverNeedAllocationDays();
+        if (null == leftOverNeedAllocationDays) {
+            return;
+        }
+        if (leftOverNeedAllocationDays <= allocationDays) {
+            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        } else {
+            leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
+        }
+        if (leftOverNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
+            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+        }
+        Integer diffDays = leftOverNeedAllocationDays - groupInfo.getLeftOverNeedAllocationDays(); // 计算变化量
+        if (diffDays == 0) { // 无变化直接结束
+            return;
+        }
+        BigDecimal realProductionQty = BigDecimalUtils.multiply(diffDays, groupInfo.getMinLhDayCapacityQty(),
+                groupInfo.getMinLhMachineCount());// 天数换算成排产量 = 天数 * 日硫化量 * 配比
+        Map<String, BigDecimal> embryoSpecialMaterialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
+        for (Entry<String, BigDecimal> entry : embryoSpecialMaterialInfoMap.entrySet()) {
+            // 预估本结构的用量
+            String materialCode = entry.getKey(); // 特殊材料物料
+            BigDecimal unitConsumeQty = entry.getValue(); // 单胎消耗量
+            Long materialConsumeQty = BigDecimalUtils.multiply(unitConsumeQty, realProductionQty, true).longValue(); // 总消耗量
+            Map<Long, SpecialMaterialInfoVo> specialMaterialinfo = specialMaterialInfoMap.get(materialCode); // 取出各标准用量的特殊材料库存
+            List<SpecialMaterialInfoVo> stockList = specialMaterialinfo.values().stream()
+                    .filter(s -> s.getSumProductionQty() < s.getStock()) // 取出库存还有剩余的库存信息
+                    .sorted((s1, s2) -> {
+                        // 第一顺位：从已排量最大的开始分配
+                        Long sumProductionQty1 = s1.getSumProductionQty();
+                        Long sumProductionQty2 = s2.getSumProductionQty();
+                        int result = sumProductionQty2.compareTo(sumProductionQty1);
+                        if (result != 0) {
+                            return result;
+                        }
+                        // 第二顺位：从剩余库存大于本结构用量且最接近的开始分配：abs(库存-已分配-需求量)
+                        Boolean isEnoughStock1 = s1.getStock() - sumProductionQty1 > materialConsumeQty;
+                        Boolean isEnoughStock2 = s2.getStock() - sumProductionQty2 > materialConsumeQty;
+                        if (!isEnoughStock1 || !isEnoughStock2) { // 任意一个可用库存小于结构用量，都结束，且优先使用大于结构用量的
+                            return isEnoughStock2.compareTo(isEnoughStock1);
+                        }
+                        Long remainQty1 = s1.getStock() - sumProductionQty1 - materialConsumeQty;
+                        Long remainQty2 = s2.getStock() - sumProductionQty2 - materialConsumeQty;
+                        result = remainQty1.compareTo(remainQty2);
+                        return result;
+                    }).collect(Collectors.toList());
+            for (SpecialMaterialInfoVo stockInfo : stockList) {
+                stockInfo.setSumProductionQty(stockInfo.getSumProductionQty() + materialConsumeQty);
+            }
+        }
     }
 }
