@@ -215,15 +215,6 @@ public interface ProductionSchedulingDataService {
     List<MdmProductStock> getMdmProductStock(Context context);
 
     /**
-     * 根据查询条件，获取工厂的排产计划信息
-     * 从初始化中获取
-     *
-     * @param context
-     * @return
-     */
-    List<MonthPlanProductionRequirePlanVo> getFactoryMonthPlanManufacturing(Context context);
-
-    /**
      * 获取分厂品名物料的折损率配置
      *
      * @param factoryCode
@@ -341,27 +332,6 @@ public interface ProductionSchedulingDataService {
     List<MdmInterestRate> getInterestRateConfiguration();
 
     /**
-     * 根据上下文，删除某个版本的初始化数据
-     *
-     * @param context
-     */
-    void deletedInitData(Context context);
-
-    /**
-     * 根据上下文，删除某个版本的模具排产数据
-     *
-     * @param context
-     */
-    void deletedMouldProductionData(Context context);
-
-    /**
-     * 保存排产初始化信息
-     *
-     * @param monthPlanInitList
-     */
-    void saveMonthPlanInit(List<MonthPlanProductionRequirePlanVo> monthPlanInitList);
-
-    /**
      * 根据上下文，获取分厂排程排产顺序配置
      *
      * @param context
@@ -390,20 +360,6 @@ public interface ProductionSchedulingDataService {
      * @param dayResultList
      */
     void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList);
-
-    /**
-     * 保存模具排程排产流程日志
-     *
-     * @param productionLog 日志信息
-     */
-    void saveMouldProductionLog(MouldProductionLog productionLog);
-
-    /**
-     * 保存模具状态日志
-     *
-     * @param usedLogList
-     */
-    void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList);
 
     /**
      * 保存分组计划的成型转产结果

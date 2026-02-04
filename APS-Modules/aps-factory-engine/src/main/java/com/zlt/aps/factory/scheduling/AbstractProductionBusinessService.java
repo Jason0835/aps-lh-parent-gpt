@@ -21,6 +21,7 @@ import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -56,11 +57,17 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
      * 需求计划服务数据提供接口
      */
     private final DpRequireDataService dpRequireDataService;
+    /**
+     * 月度排产计划服务数据提供接口
+     */
+    private final MonthProductionDataService monthProductionDataService;
 
     public AbstractProductionBusinessService(ProductionSchedulingDataService dataService,
-                                             DpRequireDataService dpRequireDataService) {
+                                             DpRequireDataService dpRequireDataService,
+                                             MonthProductionDataService monthProductionDataService) {
         this.dataService = dataService;
         this.dpRequireDataService = dpRequireDataService;
+        this.monthProductionDataService = monthProductionDataService;
     }
 
     // 定义 Handler 成员变量
@@ -107,7 +114,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         log.setPlanType(context.getPlanType());
         log.setWorkNo(context.getOperationWorkNo());
         log.setLogContent(logContent);
-        dataService.saveMouldProductionLog(log);
+        monthProductionDataService.saveMouldProductionLog(log);
     }
 
     /**
@@ -177,6 +184,10 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
 
     public DpRequireDataService getDpRequireDataService() {
         return dpRequireDataService;
+    }
+
+    public MonthProductionDataService getMonthProductionDataService() {
+        return monthProductionDataService;
     }
 
     /**

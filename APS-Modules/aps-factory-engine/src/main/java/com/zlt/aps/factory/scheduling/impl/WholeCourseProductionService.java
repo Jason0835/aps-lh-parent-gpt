@@ -5,6 +5,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
 import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
@@ -30,9 +31,10 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
 
     public WholeCourseProductionService(ProductionSchedulingDataService dataService,
                                         DpRequireDataService dpRequireDataService,
+                                        MonthProductionDataService monthProductionDataService,
                                         @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService,
                                         @Qualifier("tbrCxCapacityAllocationService") IProductionBusinessService tbrCxCapacityAllocationService) {
-        super(dataService, dpRequireDataService);
+        super(dataService, dpRequireDataService, monthProductionDataService);
         this.tbrProductionInitService = tbrProductionInitService;
         this.tbrCxCapacityAllocationService = tbrCxCapacityAllocationService;
     }

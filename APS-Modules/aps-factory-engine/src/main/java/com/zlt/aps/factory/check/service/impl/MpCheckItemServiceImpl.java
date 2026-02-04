@@ -20,6 +20,7 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
@@ -51,8 +52,9 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
 
     public MpCheckItemServiceImpl(ProductionSchedulingDataService dataService,
                                   DpRequireDataService dpRequireDataService,
+                                  MonthProductionDataService monthProductionDataService,
                                   ProductionHistoryHandler productionHistoryHandler) {
-        super(dataService, dpRequireDataService);
+        super(dataService, dpRequireDataService, monthProductionDataService);
         super.setProductionHistoryHandler(productionHistoryHandler);
     }
 
@@ -177,7 +179,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
             } else {
                 // 容错：如果 Context 中没有（可能逻辑分支没走到），则重新查询
                 log.warn("检测: 上下文中未找到计划数据，重新查询数据库");
-                requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
+                requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
             }
             //基础数据容器存储
             productionContext.setBaseDataContainer(new BaseDataContainer());
