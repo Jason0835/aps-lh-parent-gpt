@@ -2,6 +2,7 @@ package com.zlt.aps.factory.handler;
 
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
+import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
@@ -11,6 +12,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
@@ -357,6 +359,10 @@ public class MouldProductionResultHandler {
         for (MonthPlanProductionRequirePlanVo requirement : requireList) {
             String noProductionReason = requirement.getNoProductionReason();
             if (StringUtils.isBlank(noProductionReason)) {
+                continue;
+            }
+            String noProductionQtyReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_QTY);
+            if(noProductionQtyReason.equals(noProductionReason)) {
                 continue;
             }
             if (StringUtils.isBlank(reason)) {
