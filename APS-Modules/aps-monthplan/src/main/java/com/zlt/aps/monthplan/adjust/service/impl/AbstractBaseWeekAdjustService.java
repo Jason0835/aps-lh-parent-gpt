@@ -527,7 +527,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             updateTrialPlanList(contextDTO);
             // 8、更新结构转产
             updateStructureAllocationList(contextDTO);
-            // 9、记录调整操作日志 TODO
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
