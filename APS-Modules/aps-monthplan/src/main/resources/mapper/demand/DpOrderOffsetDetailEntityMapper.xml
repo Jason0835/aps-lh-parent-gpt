@@ -32,12 +32,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                   AND YEAR = #{year}
                   AND MONTH = #{month}
                   AND PLAN_TYPE = '01'
-                  AND IS_DELETE = 0 UNION ALL
+                  AND IS_DELETE = 0
+                UNION ALL
                 SELECT
                     BATCH_NUMBER AS MONTH_PLAN_VERSION,
                     CREATE_TIME
                 FROM
                     t_mp_prediction_detail
+                WHERE
+                    FACTORY_CODE = #{factoryCode}
+                  AND YEAR = #{year}
+                  AND MONTH = #{month}
+                  AND IS_DELETE = 0
+                UNION ALL
+                SELECT
+                    MONTH_PLAN_VERSION,
+                    CREATE_TIME
+                FROM
+                    T_MP_SIMULATED_RESULT
                 WHERE
                     FACTORY_CODE = #{factoryCode}
                   AND YEAR = #{year}
