@@ -4,7 +4,6 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.AbstractBaseProductionService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
-import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
@@ -36,10 +35,13 @@ public class GeneralInitService extends AbstractBaseProductionService {
         //根据类别进行
         ProductTypeEnum productType = context.getProductType();
         if (ProductTypeEnum.WHOLE_STEEL == productType) {
-            context.setProductionProcessStage(ProductionProcessStage.STAGE_INIT);
-            tbrProductionInitService.run(context, userObj);
-            //保存日志
-            saveProductionProcessLog(context, ProductionProcessStage.STAGE_INIT);
+            try {
+                context.setProductionProcessStage(ProductionProcessStage.STAGE_INIT);
+                tbrProductionInitService.run(context, userObj);
+            }finally {
+                //保存日志
+                saveProductionProcessLog(context, ProductionProcessStage.STAGE_INIT);
+            }
             return;
         }
     }

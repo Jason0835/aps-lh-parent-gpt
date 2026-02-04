@@ -4,7 +4,6 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.AbstractBaseProductionService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
-import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
@@ -32,7 +31,7 @@ public class WholeCourseProductionService extends AbstractBaseProductionService 
     public WholeCourseProductionService(ProductionMdmDataService dataService,
                                         MonthProductionDataService monthProductionDataService,
                                         @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService,
-                                        @Qualifier("tbrCxCapacityAllocationService") IProductionBusinessService tbrCxCapacityAllocationService) {
+                                        @Qualifier("tbrWholeProductionService") IProductionBusinessService tbrCxCapacityAllocationService) {
         super(dataService, monthProductionDataService);
         this.tbrProductionInitService = tbrProductionInitService;
         this.tbrCxCapacityAllocationService = tbrCxCapacityAllocationService;
@@ -60,7 +59,6 @@ public class WholeCourseProductionService extends AbstractBaseProductionService 
             } finally {
                 //保存日志
                 saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
-
             }
         }
     }

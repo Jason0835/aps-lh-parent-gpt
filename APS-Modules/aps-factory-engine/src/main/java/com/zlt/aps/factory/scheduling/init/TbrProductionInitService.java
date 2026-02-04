@@ -134,6 +134,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         //保存初始化结果
         saveInitInfo(productionContext, requirePlanList);
         log.info(TbrProductionInitLogRecorder.addSaveInitDataLog(productionContext));
+        context.setPlanType(productionContext.getPlanType());
     }
 
 

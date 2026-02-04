@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
  * @date 20251209
  */
 @Slf4j
-@Service(value = "tbrCxCapacityAllocationService")
+@Service(value = "tbrWholeProductionService")
 public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final FormalProductionHandler formalProductionHandler;

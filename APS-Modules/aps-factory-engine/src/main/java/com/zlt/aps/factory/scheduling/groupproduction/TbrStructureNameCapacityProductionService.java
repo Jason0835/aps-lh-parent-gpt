@@ -383,6 +383,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         if (null == productionVersion) {
             return;
         }
+        context.setPlanType(productionVersion.getPlanType());
         Date productionStartDate = productionVersion.getProductionStartDate();
         context.setProductionStartDate(productionStartDate);
         context.setStartDay(com.zlt.aps.factory.utils.DateUtils.getDaysByMonth(productionStartDate));
