@@ -145,8 +145,8 @@ export function checkReason(query) {
     url: '/monthplan/checkItemRecord/list',
     method: 'post',
     data: query,
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    },
+    // headers: {
+    //   'Content-Type': 'application/json;charset=UTF-8'
+    // },
   })
 }

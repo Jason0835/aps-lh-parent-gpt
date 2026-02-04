@@ -84,11 +84,11 @@
         }}</el-button>
         <el-button
           @click="handleConfirm"
-          :disabled="!allPassed || checking"
-          :loading="confirming"
+          :disabled="loading"
+          :loading="loading"
           type="primary"
         >
-          {{ confirmText }}
+          {{ this.$t("common.button.generate") }}
         </el-button>
       </div>
     </div>
@@ -287,10 +287,12 @@ export default {
     },
 
     async handleConfirm() {
-      factoryWholeCourseProduction(this.ac)
+      this.loading = true;
+      factoryWholeCourseProduction(this.actionData)
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
           this.$emit("success");
+          this.loading = true;
           this.hide();
         })
         .catch(() => {

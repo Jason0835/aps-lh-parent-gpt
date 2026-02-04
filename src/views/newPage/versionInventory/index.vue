@@ -270,7 +270,7 @@ export default {
       };
       this.getVersionList();
     },
-    async getVersionList(isGet) {
+    async getVersionList(isGet,isSet=true) {
       if (isGet) {
         this.loading = true;
       }
@@ -285,6 +285,7 @@ export default {
           list.push(obj);
         }
         this.versionList = list;
+        if(!isSet)return
         if (list.length > 0) {
           this.$set(this.search, "requireVersion", list[0].value);
           this.$set(this.query, "requireVersion", list[0].value);
@@ -343,7 +344,8 @@ export default {
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
-      this.getList();
+      // this.getList();
+      this.getVersionList(true,false);
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);
