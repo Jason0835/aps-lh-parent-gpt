@@ -141,7 +141,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             log.warn("更新结构转产：必须字段为空，直接返回");
             return;
         }
-        Integer allotDays = endDay - startDay + 1;
+        Integer allotDays = adjustEndDay - adjustStartDay + 1;
         // 更新结构转产
         try {
             LambdaUpdateWrapper<MpStructureAllocation> wrapper = new LambdaUpdateWrapper<>();
@@ -151,10 +151,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                     .eq(MpStructureAllocation::getYear, year)
                     .eq(MpStructureAllocation::getMonth, month)
                     .eq(MpStructureAllocation::getProductionVersion, productionVersion)
-                    .set(MpStructureAllocation::getBeginDay, startDay)
-                    .set(MpStructureAllocation::getEndDay, endDay)
-//                    .set(MpStructureAllocation::getAdjustStartDay, adjustStartDay)
-//                    .set(MpStructureAllocation::getAdjustEndDay, adjustEndDay)
+                    .set(MpStructureAllocation::getBeginDay, adjustStartDay)
+                    .set(MpStructureAllocation::getEndDay, adjustEndDay)
                     .set(MpStructureAllocation::getAllotDays, allotDays);
             mpStructureAllocationEntityMapper.update(null, wrapper);
             log.info("更新结构转产成功");
