@@ -244,9 +244,16 @@ public class MouldProductionResultHandler {
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
         int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
         int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
+        if(lossQty != 0) {
+            if(sumCycleReserveQty % 2 != 0) {
+                sumCycleReserveQty = sumCycleReserveQty + lossQty;
+            }else{
+                sumMidQty = sumMidQty +  lossQty;
+            }
+        }
         dayResult.setHeightLossQty(totalHeightLossQty);
-        dayResult.setCycleReserveLossQty(sumCycleReserveQty + lossQty);
-        dayResult.setMidLossQty(sumMidQty + lossQty);
+        dayResult.setCycleReserveLossQty(sumCycleReserveQty);
+        dayResult.setMidLossQty(sumMidQty);
         dayResult.setConventionReserveQty(sumConventionQty);
         dayResult.setPostponeQty(sumPostponeQty);
         //排产量置为零

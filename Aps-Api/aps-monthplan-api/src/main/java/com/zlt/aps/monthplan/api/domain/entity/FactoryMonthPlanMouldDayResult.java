@@ -31,6 +31,8 @@ import java.math.BigDecimal;
 public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
+    // 正常需求计划
+    private static final String NORMAL_PLAN_TYPE = "01";
 
     /**
      * 工厂编号
@@ -741,6 +743,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private Integer nonEudrQty;
 
 
+
     /**
      * 根据优先级顺序分配生产数量
      * 顺序：heightLossQty -> cycleReserveLossQty -> midLossQty -> conventionReserveQty -> postponeQty
@@ -777,21 +780,22 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
             remainingQty -= this.midProductionQty;
         }
 
-        // 4. 分配常规储备
-        if (remainingQty > 0 && this.conventionReserveQty != null && this.conventionReserveQty > 0) {
-            this.conventionProductionQty = Math.min(remainingQty, this.conventionReserveQty);
-            remainingQty -= this.conventionProductionQty;
+        // 4. 分配暂缓优先级
+        if (!NORMAL_PLAN_TYPE.equals(this.planType)  &&   remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {
+            this.postponeQty = Math.min(remainingQty, this.postponeQty);
+            remainingQty -= this.postponeQty;
         }
 
-        // 5. 分配暂缓订单（如果有剩余）
+        //  5. 分配常规储备（如果有剩余）
         if (remainingQty > 0) {
-            // 如果设置了postponeQty，则不超过该值
-            if (this.postponeQty != null && this.postponeQty > 0) {
-                this.postponeProductionQty = Math.min(remainingQty, this.postponeQty);
+            // 如果设置了conventionReserveQty，则不超过该值
+            if (this.conventionReserveQty != null && this.conventionReserveQty > 0) {
+                this.conventionReserveQty = Math.min(remainingQty, this.conventionReserveQty);
             } else {
-                this.postponeProductionQty = remainingQty;
+                this.conventionReserveQty = remainingQty;
             }
         }
+
     }
     /**
      * 分组|*|主花纹
