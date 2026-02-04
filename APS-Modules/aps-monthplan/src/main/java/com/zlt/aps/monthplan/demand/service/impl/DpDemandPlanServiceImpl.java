@@ -376,7 +376,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<Integer> minProductionQtyFuture =
             CompletableFuture.supplyAsync(this::getMinProductionQty);
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
-            CompletableFuture.supplyAsync(() -> materialInfoService.findAdjustMaterialInfo(createCondition));
+            CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(createCondition));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
             CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findAdjustCycleSchStruConf(createCondition));
         // 等待所有任务完成
@@ -403,7 +403,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks);
+            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks,materialInfoMap);
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
@@ -596,7 +596,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
-        Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks());
+        Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());
         Map<String, Integer> originalMonthSurplusMap;
         Map<String, Integer> monthSurplusMap;
         if(!CollectionUtils.isEmpty(initialData)) {
@@ -791,7 +791,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks);
+            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks,materialInfoMap);
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
