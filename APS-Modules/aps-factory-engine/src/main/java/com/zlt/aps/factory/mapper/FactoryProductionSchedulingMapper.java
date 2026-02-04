@@ -1,13 +1,9 @@
 package com.zlt.aps.factory.mapper;
 
-import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.ProductMinConfiguration;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -18,21 +14,6 @@ import java.util.List;
  */
 @Mapper
 public interface FactoryProductionSchedulingMapper {
-    /**
-     * 根据排产版本号，更新排产月份模式及排产开始、结束日信息
-     *
-     * @param updateVersion
-     * @return
-     */
-    int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion);
-
-    /**
-     * 获取所有施工信息，
-     * 主要为胚胎代码及胎体布层级
-     *
-     * @return
-     */
-    List<BaseConstructionVersionInfoVo> getBaseConstructionInfo();
 
     /**
      * 根据分厂、年份、月份，制造需求计划版本，获取分厂不排产的物料
@@ -45,34 +26,6 @@ public interface FactoryProductionSchedulingMapper {
     List<FactoryNoProduction> getFactoryNoProductionConfiguration(@Param("factoryCode") String factoryCode,
                                                                   @Param("year") Integer year,
                                                                   @Param("month") Integer month);
-
-    /**
-     * 根据分厂、年份、月份，制造需求计划版本，获取分厂维修返厂的模具
-     *
-     * @param factoryCode      分厂编码
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<MouldMaintenanceConfigurationVo> getFactoryMouldMaintenanceConfiguration(@Param("factoryCode") String factoryCode,
-                                                                                  @Param("year") Integer year,
-                                                                                  @Param("month") Integer month,
-                                                                                  @Param("monthPlanVersion") String monthPlanVersion);
-
-    /**
-     * 根据分厂、年份、月份，制造需求计划版本，获取分厂维修返厂的模具
-     *
-     * @param factoryCode      分厂编码
-     * @param startDate        开始日期
-     * @param endDate          结束日期
-     * @param monthPlanVersion 制造需求计划版本
-     * @return
-     */
-    List<MouldMaintenanceConfigurationVo> getFactoryMouldMaintenanceConfigurationByDateRange(@Param("factoryCode") String factoryCode,
-                                                                                             @Param("startDate") Date startDate,
-                                                                                             @Param("endDate") Date endDate,
-                                                                                             @Param("monthPlanVersion") String monthPlanVersion);
 
     /**
      * 根据制造需求版本及排产版本，删除对应的排产初始化数据
@@ -115,14 +68,6 @@ public interface FactoryProductionSchedulingMapper {
     Integer getVulcanizationMachineCount(@Param("factoryCode") String factoryCode);
 
     /**
-     * 根据分厂，获取分厂的排产分组信息集合
-     *
-     * @param factoryCode 分厂编码
-     * @return
-     */
-    List<ProductionGroupVo> getFactoryProductionGroupConfiguration(@Param("factoryCode") String factoryCode);
-
-    /**
      * 根据分厂，获取分厂的成型机台数量
      *
      * @param factoryCode 分厂编码
@@ -130,17 +75,4 @@ public interface FactoryProductionSchedulingMapper {
      */
     Integer getFormingMachineCount(@Param("factoryCode") String factoryCode);
 
-    /**
-     * 根据需求，获取其最小批量配置
-     *
-     * @param factoryCode      分厂编码
-     * @param year             年份
-     * @param month            月份
-     * @param monthPlanVersion 销售需求计划版本
-     * @return
-     */
-    List<ProductMinConfiguration> getRequireMinConfiguration(@Param("factoryCode") String factoryCode,
-                                                             @Param("year") Integer year,
-                                                             @Param("month") Integer month,
-                                                             @Param("monthPlanVersion") String monthPlanVersion);
 }

@@ -527,7 +527,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             updateTrialPlanList(contextDTO);
             // 8、更新结构转产
             updateStructureAllocationList(contextDTO);
-            // 9、记录调整操作日志 TODO
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
@@ -2156,6 +2155,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setMonth(contextDTO.getMpMonth());
         queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
         queryVo.setProductionVersion(contextDTO.getProductionVersion());
+        log.info("生成调整需求计划 ==> factoryCode:{} year:{} month:{} monthPlanVersion:{} productionVersion:{}",
+                queryVo.getFactoryCode(), queryVo.getYear(), queryVo.getMonth(), queryVo.getMonthPlanVersion(), queryVo.getProductionVersion());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
     }

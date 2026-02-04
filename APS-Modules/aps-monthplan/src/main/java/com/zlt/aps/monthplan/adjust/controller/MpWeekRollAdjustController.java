@@ -78,11 +78,11 @@ public class MpWeekRollAdjustController extends BaseController {
         // 构建上下文对象
         MpRollAdjustContextDTO contextDTO = buildAdjustContext(weekRollAdjustDTO);
         log.info("获取调整明细 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
-                contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         // 执行周程滚动调整策略（生成调整明细）
         weekAdjustStrategy.generateAdjust(contextDTO);
         log.info("获取调整明细 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
-                contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         // 返回结果处理
         return getDataTable(contextDTO.getAdjustDetailList());
     }
@@ -110,11 +110,11 @@ public class MpWeekRollAdjustController extends BaseController {
             // 构建上下文对象
             MpRollAdjustContextDTO contextDTO = buildAutoAdjustContext(weekRollAdjustDTO,weekAdjustStrategy);
             log.info("自动调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
-                    contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+                    String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
             // 执行周程滚动调整策略（自动调整）
             weekAdjustStrategy.autoAdjust(contextDTO);
             log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
-                    contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+                    String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
             return AjaxResult.success(contextDTO.getAdjustResultList());
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
@@ -135,11 +135,11 @@ public class MpWeekRollAdjustController extends BaseController {
         // 构建上下文对象
         MpRollAdjustContextDTO contextDTO = buildAdjustContext(weekRollAdjustDTO);
         log.info("确认调整 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
-                contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         // 执行周程滚动调整策略（确认调整）
         weekAdjustStrategy.confirmAdjust(contextDTO);
         log.info("确认调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
-                contextDTO.getMpYear() + "" + contextDTO.getMpMonth());
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         return AjaxResult.success();
     }
 
