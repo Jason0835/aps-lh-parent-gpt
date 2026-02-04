@@ -447,8 +447,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void saveMpAdjustResult(MpRollAdjustContextDTO contextDTO){
-        List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
-        if (PubUtil.isEmpty(factoryMonthPlanProdFinalList)){
+        //List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
+        List<FactoryMonthPlanFinalAdjustVo> saveMpProdFinalList = contextDTO.getSaveMpProdFinalList();
+        if (PubUtil.isEmpty(saveMpProdFinalList)){
             return;
         }
         //1、根据调整版本 先删除(物理)
@@ -457,7 +458,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //2、保存调整记录
         MpAdjustResult mpAdjustResult;
         List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
-        for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:factoryMonthPlanProdFinalList){
+        for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:saveMpProdFinalList){
             mpAdjustResult = new MpAdjustResult();
             BeanUtils.copyProperties(finalAdjustVo,mpAdjustResult);
             mpAdjustResult.setId(null);
