@@ -290,7 +290,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         LocalDate previousMonth = context.getPreviousMonth();
         Integer year = previousMonth.getYear();
         Integer month = previousMonth.getMonthValue();
-        MpFactoryProductionVersion previousVersion = getDataService().getFinalVersion(factoryCode, year, month);
+        MpFactoryProductionVersion previousVersion = getMonthProductionDataService().getFinalVersion(factoryCode, year, month);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderPreviousMonthLog(context, previousMonth, previousVersion));
         if (null == previousVersion) {
             return Collections.emptyMap();
@@ -497,7 +497,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param context
      */
     private void setProductionCycleInfo(Context context) {
-        MpFactoryProductionVersion productionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion productionVersion = getMonthProductionDataService().getFactoryMonthPlanVersion(context);
         if (null == productionVersion) {
             return;
         }

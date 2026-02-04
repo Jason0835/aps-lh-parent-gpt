@@ -611,7 +611,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         productionContext.getBaseDataContainer().setStructureLhRatioList(structureLhRatioList);
         //16、机台近3个月的生产历史信息
-        List<MpStructureAllocation> historyAllocationList = getDataService().getHistoryStructureAllocationInfo(productionContext);
+        List<MpStructureAllocation> historyAllocationList = monthProductionDataService.getHistoryStructureAllocationInfo(productionContext);
         Map<String, CxMachineProductionHistoryInfo> cxMachineProductionHistoryInfo = productionHistoryHandler.buildCxMachineProductionHistory(productionContext, historyAllocationList);
         productionContext.getBaseDataContainer().setCxMachineProductionHistoryInfo(cxMachineProductionHistoryInfo);
         Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap = productionHistoryHandler.buildGroupPlanProductionHistory(productionContext, historyAllocationList);

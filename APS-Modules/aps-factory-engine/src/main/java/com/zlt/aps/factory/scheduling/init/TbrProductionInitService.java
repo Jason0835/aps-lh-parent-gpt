@@ -141,15 +141,15 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     private void saveProductionVersionRecord(Context context) {
         //工厂排产版本更新或是插入记录
-        MpFactoryProductionVersion factoryProductionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion factoryProductionVersion = getMonthProductionDataService().getFactoryMonthPlanVersion(context);
         if (null != factoryProductionVersion) {
             setProductionVersionCycleInfo(factoryProductionVersion, context);
             context.setPlanType(factoryProductionVersion.getPlanType());
-            getDataService().updateFactoryProductionVersion(factoryProductionVersion);
+            getMonthProductionDataService().updateFactoryProductionVersion(factoryProductionVersion);
             return;
         }
         //不存在，则表示新插入记录，此时需要获取计划类型等
-        MpFactoryProductionVersion firstVersion = getDataService().getFirstFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion firstVersion = getMonthProductionDataService().getFirstFactoryMonthPlanVersion(context);
         if (null == firstVersion) {
             String errorFormat = I18nUtil.getMessage("alg.data.before.production.planListIsNull");
             String errorInfo = String.format(errorFormat, context.getYear(), context.getMonth(), context.getMonthPlanVersion());

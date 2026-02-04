@@ -40,42 +40,6 @@ public interface ProductionSchedulingDataService {
     Map<String, Object> getFactoryParamByCondition(Context context, List<String> paramCodeList);
 
     /**
-     * 获取工厂排程版本
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context);
-
-    /**
-     * 获取工厂需求计划版本第一个版本信息
-     * (可能没有排，也可能有排)
-     *
-     * @param context
-     * @return
-     */
-    MpFactoryProductionVersion getFirstFactoryMonthPlanVersion(Context context);
-
-    /**
-     * 根据工厂编码、年份、月份获取对应的定稿版本信息
-     *
-     * @param factoryCode 工厂编码
-     * @param year        年份
-     * @param month       月份
-     * @return
-     */
-    MpFactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month);
-
-    /**
-     * 更新分厂排程版本
-     * 补充 初始化版本及排产版本
-     *
-     * @param updateVersion
-     * @return
-     */
-    int updateFactoryProductionVersion(MpFactoryProductionVersion updateVersion);
-
-    /**
      * 根据排产版本号，更新排产月份模式及排产开始、结束日
      *
      * @param updateVersion
@@ -303,14 +267,6 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(Context context);
-
-    /**
-     * 获取历史分组排产数据信息
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    List<MpStructureAllocation> getHistoryStructureAllocationInfo(Context context);
 
     /**
      * 获取分厂在指定年份、月份的不排产物料信息，并按物料分组

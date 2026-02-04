@@ -3,7 +3,9 @@ package com.zlt.aps.factory.service;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.monthplan.api.domain.entity.MouldProductionLog;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpMouldUsedStatusLog;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 
 import java.util.List;
 
@@ -16,6 +18,41 @@ import java.util.List;
  */
 public interface MonthProductionDataService {
 
+    /**
+     * 获取工厂排程版本
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context);
+
+    /**
+     * 获取工厂需求计划版本第一个版本信息
+     * (可能没有排，也可能有排)
+     *
+     * @param context
+     * @return
+     */
+    MpFactoryProductionVersion getFirstFactoryMonthPlanVersion(Context context);
+
+    /**
+     * 根据工厂编码、年份、月份获取对应的定稿版本信息
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return
+     */
+    MpFactoryProductionVersion getFinalVersion(String factoryCode, Integer year, Integer month);
+
+    /**
+     * 更新分厂排程版本
+     * 补充 初始化版本及排产版本
+     *
+     * @param updateVersion
+     * @return
+     */
+    int updateFactoryProductionVersion(MpFactoryProductionVersion updateVersion);
     /**
      * 根据上下文，删除某个版本的初始化数据
      *
@@ -58,4 +95,12 @@ public interface MonthProductionDataService {
      * @param usedLogList
      */
     void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList);
+
+    /**
+     * 获取历史分组排产数据信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MpStructureAllocation> getHistoryStructureAllocationInfo(Context context);
 }
