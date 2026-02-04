@@ -232,11 +232,11 @@ export default {
           },
           minWidth:100
         },
-        {
-          prop: "updateTime",
-          width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
-        },
+        // {
+        //   prop: "updateTime",
+        //   width: 180,
+        //   label: this.$t("ui.data.column.scheduleAdjust.updata"),
+        // },
       ];
       return columns;
     },

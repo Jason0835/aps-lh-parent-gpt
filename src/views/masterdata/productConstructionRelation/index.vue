@@ -306,14 +306,14 @@ export default {
           type:'select',
           dictData: this.dict.type.biz_factory_name,
         },
-        {
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          prop: "materialCode",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          prop: "specifications",
-        },
+        // {
+        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+        //   prop: "materialCode",
+        // },
+        // {
+        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        //   prop: "specifications",
+        // },
         {
           label: this.$t("ui.data.column.skuConstruction.embryoCode"),
           prop: "constructionCode",
