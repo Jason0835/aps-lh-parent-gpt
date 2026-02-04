@@ -9,6 +9,7 @@ import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,14 +55,21 @@ public class NoProductionReasonUtils {
         String errorCode = noProductionReason.getErrorCode();
         JSONObject noProductionReasonInfo = JsonUtils.getLanguageJsonObject(noProductionReasonI18nKey);
         if (CollectionUtils.isEmpty(limitTypeList)) {
-            String i18Key = MonthPlanNoProductionReasonEnum.NO_ENOUGH_PRODUCTION_CAPACITY.getI18nKey();
-            JSONObject i18nInfo = JsonUtils.getLanguageJsonObject(i18Key);
+            String i18nKey = MonthPlanNoProductionReasonEnum.NO_ENOUGH_PRODUCTION_CAPACITY.getI18nKey();
+            JSONObject i18nInfo = JsonUtils.getLanguageJsonObject(i18nKey);
             fullText(noProductionReasonInfo, errorCode, i18nInfo, languageList);
             return noProductionReasonInfo.toString();
         }
-        JSONObject fullI18nInfo = buildAllFullText(limitTypeList, languageList);
-        fullText(noProductionReasonInfo, errorCode, fullI18nInfo, languageList);
+        //20260224 取得最后一个限制
+        int limitSize = limitTypeList.size();
+        MouldProductionLimitTypeEnum lastLimit = limitTypeList.get(limitSize - BigDecimal.ONE.intValue());
+        String i18nKey = lastLimit.getI18nKey();
+        JSONObject i18nInfo = JsonUtils.getLanguageJsonObject(i18nKey);
+        fullText(noProductionReasonInfo, errorCode, i18nInfo, languageList);
         return noProductionReasonInfo.toString();
+//        JSONObject fullI18nInfo = buildAllFullText(limitTypeList, languageList);
+//        fullText(noProductionReasonInfo, errorCode, fullI18nInfo, languageList);
+//        return noProductionReasonInfo.toString();
     }
 
     /**

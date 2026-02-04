@@ -42,5 +42,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           AND t3.IS_DELETE = 0
     </update>
 
-
+    <insert id="insertMainMaterialDesc4SkuConstructionRef">
+        INSERT INTO T_MDM_SKU_STRUCTURE_REF(
+            FACTORY_CODE,
+            MAIN_MATERIAL_DESC,
+            CREATE_BY,
+            CREATE_TIME
+        )
+        SELECT
+            t1.FACTORY_CODE,
+            t1.MAIN_MATERIAL_DESC,
+            #{createBy},
+            #{createTime}
+        FROM T_MDM_SKU_CONSTRUCTION_REF t1
+        WHERE t1.IS_DELETE = 0
+          AND t1.MAIN_MATERIAL_DESC IS NOT NULL
+          AND NOT EXISTS(
+            SELECT 1
+            FROM T_MDM_SKU_STRUCTURE_REF t2
+            WHERE t2.IS_DELETE = 0
+              AND t2.MAIN_MATERIAL_DESC = t1.MAIN_MATERIAL_DESC
+        )
+        GROUP BY
+            t1.MAIN_MATERIAL_DESC,
+            t1.FACTORY_CODE
+    </insert>
 </mapper>

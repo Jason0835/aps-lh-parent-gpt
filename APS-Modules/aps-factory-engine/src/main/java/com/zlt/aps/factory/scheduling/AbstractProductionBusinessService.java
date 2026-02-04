@@ -20,6 +20,7 @@ import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
+import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -51,9 +52,15 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
      * 数据提供接口
      */
     private final ProductionSchedulingDataService dataService;
+    /**
+     * 需求计划服务数据提供接口
+     */
+    private final DpRequireDataService dpRequireDataService;
 
-    public AbstractProductionBusinessService(ProductionSchedulingDataService dataService) {
+    public AbstractProductionBusinessService(ProductionSchedulingDataService dataService,
+                                             DpRequireDataService dpRequireDataService) {
         this.dataService = dataService;
+        this.dpRequireDataService = dpRequireDataService;
     }
 
     // 定义 Handler 成员变量
@@ -168,6 +175,10 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         return dataService;
     }
 
+    public DpRequireDataService getDpRequireDataService() {
+        return dpRequireDataService;
+    }
+
     /**
      * 根据工厂编码 + 年月 + 需求计划版本，获取对应的月需要排产的需求计划
      *
@@ -176,7 +187,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
      */
     protected List<MonthPlanProductionRequirePlanVo> getMonthPlanRequirePlan(TbrProductionContext productionContext) {
         //得到制造需求计划
-        List<DpDemandPlan> monthPlanRequireList = getDataService().getFactoryMonthPlan(productionContext);
+        List<DpDemandPlan> monthPlanRequireList = dpRequireDataService.getFactoryMonthPlan(productionContext);
         if (CollectionUtils.isEmpty(monthPlanRequireList)) {
             String planListIsNull = I18nUtil.getMessage("alg.data.alter.message.planListIsNull");
             throw new BusinessException(String.format(planListIsNull, productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion()));

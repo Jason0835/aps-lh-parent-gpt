@@ -670,6 +670,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String prefixKey = IncrementConstant.MONTH_FINAL + com.ruoyi.common.core.utils.DateUtils.dateTimeNow("yyMMdd");
         // 批次号
         String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
+        // 初始化SKU与施工（示方书）关系
+        initSkuConstructionRef(contextDTO);
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
         for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
             String isSkuAdd = adjustDetailVo.getIsSkuAdd();
@@ -684,18 +686,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
-//            monthPlan.setMesMaterialCode(adjustResult.getMesMaterialCode());
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
             monthPlan.setId(null);
+            monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
             monthPlan.setProductionNo(productionNo);
+            // 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
+            setSkuConstructionRefField(contextDTO, monthPlan);
+            // 净需求
+            monthPlan.setProdReqPlan(adjustDetailVo.getCurrentNetQty());
             // 实际生产需求含损耗 = 净需求量汇总
             Integer factProdReqQty = Convert.toInt(adjustDetailVo.getCurrentNetQty(), 0);
             monthPlan.setFactProdReqQty(factProdReqQty);
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
+            // 试制量试关联字段设置
+            if (adjustDetailVo.getTrialPlanId() != null) {
+                // 试制量试计划需求数量
+                monthPlan.setTrialQty(adjustDetailVo.getCurrentNetQty());
+                // 差异量(未排产数量) = 生产实际排产量 - 试制量试计划需求数量
+                differenceQty = Convert.toInt(monthPlan.getTotalQty(), 0) - Convert.toInt(monthPlan.getTrialQty(), 0);
+            }
+            // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
             // 获取周数
             int week = getWeekNumber(new Date());
@@ -712,6 +726,55 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new RuntimeException("新增月度生产计划失败", e);
         }
 
+    }
+
+    /**
+     * 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
+     * @param contextDTO
+     * @param monthPlan
+     */
+    private void setSkuConstructionRefField(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanProductionFinalResult monthPlan) {
+        // SKU与施工（示方书）关系列表
+        List<MdmSkuConstructionRef> skuConstructionRefList = contextDTO.getMdmSkuConstructionRefList();
+        if (PubUtil.isEmpty(skuConstructionRefList)) {
+            return;
+        }
+        // 物料编码
+        String materialCode = monthPlan.getMaterialCode();
+        // 产品状态
+        String productStatus = monthPlan.getProductStatus();
+        // 根据物料编码和产品状态匹配SKU与施工关系数据
+        MdmSkuConstructionRef mdmSkuConstructionRef = getSkuConstructionRefByCondition(skuConstructionRefList, materialCode, productStatus);
+        if (mdmSkuConstructionRef != null) {
+            // 是否零度材料
+            monthPlan.setIsZeroRack(mdmSkuConstructionRef.getIsZeroRack());
+            // 制造示方书号
+            monthPlan.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+            // 文字示方书号
+            monthPlan.setTextNo(mdmSkuConstructionRef.getTextNo());
+            // 硫化示方书号
+            monthPlan.setLhNo(mdmSkuConstructionRef.getLhNo());
+        }
+    }
+
+    /**
+     * 根据物料编码和产品状态匹配SKU与施工关系数据
+     * @param skuConstructionRefList SKU与施工（示方书）关系列表
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return
+     */
+    public MdmSkuConstructionRef getSkuConstructionRefByCondition(List<MdmSkuConstructionRef> skuConstructionRefList, String materialCode,
+                                                                  String productStatus) {
+        if (PubUtil.isEmpty(skuConstructionRefList)) {
+            return null;
+        }
+        MdmSkuConstructionRef matchRef = skuConstructionRefList.stream()
+                .filter(ref -> StringUtils.equals(materialCode, ref.getMaterialCode())
+                        && StringUtils.equals(productStatus, ref.getTrialStatus()))
+                .findFirst()
+                .orElse(null);
+        return matchRef;
     }
 
 

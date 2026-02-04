@@ -2,6 +2,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.tlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.deduct.DeductMouldScheduler;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
@@ -99,6 +100,7 @@ public class CxContinueProductionHandler {
             });
         });
     }
+
     /**
      * 排产续作排产
      * 1、同规格同花纹
@@ -156,6 +158,7 @@ public class CxContinueProductionHandler {
         List<ProductionMouldInfoVo> selectedMouldList = SkuMouldSelector.getSelectedMouldList(context, selectedMaterialDesc, earliestConclusionLhGroup, startDay, realEndDay);
         if (CollectionUtils.isEmpty(selectedMouldList)) {
             //todo 记录日志
+            productionContext.addSkuProductionLimitInfo(selectedMaterialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
             return;
         }
         log.info(TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, groupName, materialDesc, continueType, selectedMaterialDesc));

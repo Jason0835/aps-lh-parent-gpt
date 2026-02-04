@@ -3,6 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
@@ -75,6 +76,7 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addContinueLhGroupSkuNoFindMouldLog(context, groupName, onLineMachineInfo, materialDesc));
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
             retrieveNextSku(context, groupPlanInfo, needProductionInfo, excludeDays);
             return;
         }
