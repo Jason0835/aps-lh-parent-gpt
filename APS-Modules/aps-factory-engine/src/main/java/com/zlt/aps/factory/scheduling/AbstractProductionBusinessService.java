@@ -22,7 +22,7 @@ import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCapacityParamConfigur
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -50,9 +50,9 @@ import java.util.stream.Stream;
 @Slf4j
 public abstract class AbstractProductionBusinessService implements IProductionBusinessService {
     /**
-     * 数据提供接口
+     * 主数据数据提供接口
      */
-    private final ProductionSchedulingDataService dataService;
+    private final ProductionMdmDataService dataService;
     /**
      * 需求计划服务数据提供接口
      */
@@ -62,7 +62,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
      */
     private final MonthProductionDataService monthProductionDataService;
 
-    public AbstractProductionBusinessService(ProductionSchedulingDataService dataService,
+    public AbstractProductionBusinessService(ProductionMdmDataService dataService,
                                              DpRequireDataService dpRequireDataService,
                                              MonthProductionDataService monthProductionDataService) {
         this.dataService = dataService;
@@ -178,7 +178,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         context.setProductionEndDate(com.zlt.aps.factory.utils.DateUtils.getDate(year, month, cycleStartDay - 1));
     }
 
-    public ProductionSchedulingDataService getDataService() {
+    public ProductionMdmDataService getDataService() {
         return dataService;
     }
 
@@ -471,7 +471,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
             singleRatio.setCxMachineTypeCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
         });
         //周期结构硫化配比
-        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDataService().getCycleLhRatioInfo(context);
+        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = getDpRequireDataService().getCycleLhRatioInfo(context);
         Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
         if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
             cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {
@@ -611,7 +611,7 @@ public abstract class AbstractProductionBusinessService implements IProductionBu
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
         productionContext.getBaseDataContainer().setStructureLhRatioList(structureLhRatioList);
         //16、机台近3个月的生产历史信息
-        List<MpStructureAllocation> historyAllocationList = getDataService().getHistoryStructureAllocationInfo(productionContext);
+        List<MpStructureAllocation> historyAllocationList = monthProductionDataService.getHistoryStructureAllocationInfo(productionContext);
         Map<String, CxMachineProductionHistoryInfo> cxMachineProductionHistoryInfo = productionHistoryHandler.buildCxMachineProductionHistory(productionContext, historyAllocationList);
         productionContext.getBaseDataContainer().setCxMachineProductionHistoryInfo(cxMachineProductionHistoryInfo);
         Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap = productionHistoryHandler.buildGroupPlanProductionHistory(productionContext, historyAllocationList);

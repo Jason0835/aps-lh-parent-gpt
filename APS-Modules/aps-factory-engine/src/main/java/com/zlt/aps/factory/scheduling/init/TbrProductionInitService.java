@@ -12,7 +12,7 @@ import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 @Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractProductionBusinessService {
 
-    public TbrProductionInitService(ProductionSchedulingDataService dataService,
+    public TbrProductionInitService(ProductionMdmDataService dataService,
                                     DpRequireDataService dpRequireDataService,
                                     MonthProductionDataService monthProductionDataService) {
         super(dataService, dpRequireDataService, monthProductionDataService);
@@ -141,15 +141,15 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     private void saveProductionVersionRecord(Context context) {
         //工厂排产版本更新或是插入记录
-        MpFactoryProductionVersion factoryProductionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion factoryProductionVersion = getMonthProductionDataService().getFactoryMonthPlanVersion(context);
         if (null != factoryProductionVersion) {
             setProductionVersionCycleInfo(factoryProductionVersion, context);
             context.setPlanType(factoryProductionVersion.getPlanType());
-            getDataService().updateFactoryProductionVersion(factoryProductionVersion);
+            getMonthProductionDataService().updateFactoryProductionVersion(factoryProductionVersion);
             return;
         }
         //不存在，则表示新插入记录，此时需要获取计划类型等
-        MpFactoryProductionVersion firstVersion = getDataService().getFirstFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion firstVersion = getMonthProductionDataService().getFirstFactoryMonthPlanVersion(context);
         if (null == firstVersion) {
             String errorFormat = I18nUtil.getMessage("alg.data.before.production.planListIsNull");
             String errorInfo = String.format(errorFormat, context.getYear(), context.getMonth(), context.getMonthPlanVersion());
@@ -167,7 +167,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         factoryProductionVersion.setIsSelectedDemand(firstVersion.getIsSelectedDemand());
         //设置月份排产模式自然月或非自然月及开始、结束排产日期
         setProductionVersionCycleInfo(factoryProductionVersion, context);
-        getDataService().addFactoryProductionVersion(factoryProductionVersion);
+        getMonthProductionDataService().addFactoryProductionVersion(factoryProductionVersion);
     }
 
 

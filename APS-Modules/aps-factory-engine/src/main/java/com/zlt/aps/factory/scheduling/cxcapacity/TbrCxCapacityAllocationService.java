@@ -19,7 +19,7 @@ import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.InitNoProductionRecordService;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
@@ -73,7 +73,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final InitNoProductionRecordService initNoProductionRecordService;
 
-    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
+    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
                                           MonthProductionDataService monthProductionDataService,
                                           InitNoProductionRecordService initNoProductionRecordService,
@@ -290,7 +290,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         LocalDate previousMonth = context.getPreviousMonth();
         Integer year = previousMonth.getYear();
         Integer month = previousMonth.getMonthValue();
-        MpFactoryProductionVersion previousVersion = getDataService().getFinalVersion(factoryCode, year, month);
+        MpFactoryProductionVersion previousVersion = getMonthProductionDataService().getFinalVersion(factoryCode, year, month);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderPreviousMonthLog(context, previousMonth, previousVersion));
         if (null == previousVersion) {
             return Collections.emptyMap();
@@ -311,7 +311,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             return Collections.emptyMap();
         }
         //获取上个排产周期最后排产日的排产信息
-        List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
+        List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
@@ -362,7 +362,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(allAllocationList)) {
             return Collections.emptyList();
         }
-        getDataService().saveGroupConversionResult(allAllocationList);
+        getMonthProductionDataService().saveGroupConversionResult(allAllocationList);
         return allAllocationList;
     }
 
@@ -400,12 +400,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(detailLogList)) {
             return Collections.emptyMap();
         }
-        getDataService().saveMouldProductionDetailLog(detailLogList);
+        getMonthProductionDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
         Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
-        getDataService().saveMouldProductionResult(dayResultList);
+        getMonthProductionDataService().saveMouldProductionResult(dayResultList);
         return sumProductionMap;
     }
 
@@ -418,7 +418,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
-        getDataService().saveNoProductionPlan(noProductionPlanList);
+        getMonthProductionDataService().saveNoProductionPlan(noProductionPlanList);
     }
 
     private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {
@@ -497,7 +497,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @param context
      */
     private void setProductionCycleInfo(Context context) {
-        MpFactoryProductionVersion productionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion productionVersion = getMonthProductionDataService().getFactoryMonthPlanVersion(context);
         if (null == productionVersion) {
             return;
         }
@@ -520,7 +520,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @return
      */
     private Map<String, Set<String>> getContinueGroupInfo(Context context, String factoryCode, Integer year, Integer month, Integer lastDay) {
-        List<ContinueGroupInfo> continueGroupInfoList = getDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
+        List<ContinueGroupInfo> continueGroupInfoList = getMonthProductionDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             return Collections.emptyMap();

@@ -195,7 +195,7 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmSkuStructureRefService.importData(context,false);
+        AjaxResult ajaxResult = iMdmSkuStructureRefService.importData(context, updateSupport);
         return ajaxResult;
     }
 
