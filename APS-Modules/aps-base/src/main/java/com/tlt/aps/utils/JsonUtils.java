@@ -212,7 +212,8 @@ public class JsonUtils {
     }
 
     /**
-     * 解析json字段信息列表，并将多个错误内容用<br>换行显示
+     * 解析json字段信息列表，并将多个错误内容用\n换行显示
+     * 注意：前端需要配合处理换行符显示（例如 css: white-space: pre-wrap;）
      *
      * @param list   数据集合
      * @param locale 语言
@@ -231,16 +232,17 @@ public class JsonUtils {
                 if (StringUtils.isBlank(fieldJson)) {
                     continue;
                 }
+
                 String jsonToParse = fieldJson;
+                // 修正非标准JSON格式（如果不以[开头，自动包裹成数组）
                 if (!fieldJson.trim().startsWith("[")) {
                     jsonToParse = "[" + fieldJson + "]";
                 }
+
                 try {
-                    // 使用处理过的 jsonToParse 进行解析
                     JsonNode rootNode = objectMapper.readTree(jsonToParse);
                     List<String> errorMessages = new ArrayList<>();
 
-                    // 此时 rootNode 必定是数组，可以直接遍历
                     if (rootNode.isArray()) {
                         for (JsonNode node : rootNode) {
                             if (node.has(locale)) {
@@ -248,25 +250,24 @@ public class JsonUtils {
                             }
                         }
                     } else if (rootNode.isObject()) {
-                        // 兜底逻辑：万一加了括号还是对象（虽然不太可能）
                         if (rootNode.has(locale)) {
                             errorMessages.add(rootNode.get(locale).asText());
                         }
                     }
 
-                    // 3. 用<br>连接各条错误信息
+                    // 将提取出的多条信息用 \n 连接
                     if (!errorMessages.isEmpty()) {
-                        String contentWithLineBreak = String.join("<br>", errorMessages);
+                        String contentWithLineBreak = String.join("\n", errorMessages);
                         item.setFieldValueByFieldName(field, contentWithLineBreak);
                     }
 
                 } catch (Exception e) {
-                    // 解析失败时保持原值或记录日志
                     log.error("解析JSON失败: {}", fieldJson, e);
                 }
             }
         }
     }
+
 
 
 
