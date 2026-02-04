@@ -9,6 +9,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.MdmMouldAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
@@ -97,8 +98,20 @@ public class MdmMouldAllocationServiceImpl extends AbstractDocService<MdmMouldAl
      */
     @Override
     public AjaxResult copy(PeriodInfo vo) {
+        check(vo);
         mergeByPeriod(vo);
         return AjaxResult.success();
+    }
+
+    private void check(PeriodInfo vo) {
+        Integer fromyear = vo.getFromyear();
+        Integer frommonth = vo.getFrommonth();
+        Integer toyear = vo.getToyear();
+        Integer tomonth = vo.getTomonth();
+        if (fromyear.equals(toyear) && frommonth.equals(tomonth)) {
+            String message = StringUtils.format(I18nUtil.getMessage("ui.data.alert.mdmMouldAllocation.sameYearMonth"));
+            throw new BusinessException(message);
+        }
     }
 
 

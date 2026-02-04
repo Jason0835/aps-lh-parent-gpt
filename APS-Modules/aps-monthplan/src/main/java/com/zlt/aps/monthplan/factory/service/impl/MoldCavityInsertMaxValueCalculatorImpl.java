@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.factory.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.factory.domain.vo.ProductionCycleInfo;
 import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
@@ -66,7 +66,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      */
     @Transactional(rollbackFor = Exception.class)
     public List<DailyMouldAvailabilityResult> moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
-                                                                        Date targetDate, String monthPlanVersion) throws Exception {
+                                                                        Date targetDate, String monthPlanVersion){
         // 参数校验
         validateParameters(year, month, factoryCode, targetDate);
 

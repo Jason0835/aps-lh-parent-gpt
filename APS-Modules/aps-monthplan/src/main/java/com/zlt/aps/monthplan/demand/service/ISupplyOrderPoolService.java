@@ -47,4 +47,10 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
    * @return
    */
   AjaxResult checkOverdue(SupplyOrderPool supplyOrderPool);
+  /**
+   * 获取调整供应链订单
+   * @param createCondition 调整参数
+   * @return 供应链订单
+   */
+  List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition);
 }

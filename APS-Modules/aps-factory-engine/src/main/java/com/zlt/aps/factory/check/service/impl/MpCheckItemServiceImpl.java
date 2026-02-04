@@ -5,33 +5,31 @@ import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tlt.aps.enums.CheckItemTypeEnums;
 import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
-import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.basedataassemble.history.ProductionHistoryHandler;
 import com.zlt.aps.factory.check.service.IMpCheckItemRecordService;
+import com.zlt.aps.factory.check.service.IMpCheckItemService;
 import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
-import com.zlt.aps.factory.scheduling.init.TbrProductionInitService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpCheckItemVo;
-import com.zlt.aps.factory.check.service.IMpCheckItemService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.scheduling.TbrProductionContext;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,10 +50,11 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
     @Autowired
     private IMpCheckItemRecordService iMpCheckItemRecordService;
 
-    public MpCheckItemServiceImpl(ProductionSchedulingDataService dataService
-            , ProductionHistoryHandler productionHistoryHandler
-    ) {
-        super(dataService);
+    public MpCheckItemServiceImpl(ProductionMdmDataService dataService,
+                                  DpRequireDataService dpRequireDataService,
+                                  MonthProductionDataService monthProductionDataService,
+                                  ProductionHistoryHandler productionHistoryHandler) {
+        super(dataService, dpRequireDataService, monthProductionDataService);
         super.setProductionHistoryHandler(productionHistoryHandler);
     }
 
@@ -101,9 +100,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
      * 初始化数据检测
      * 负责加载基础数据（物料、施工、模具）并校验计划有效性
      */
-    private void checkInitializationData(TbrProductionContext productionContext,
-                                         List<MpCheckItemVo> mpCheckItemVos,
-                                         List<MpCheckItemRecord> mpCheckItemRecords) {
+    private void checkInitializationData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
 
         // 1. 获取计划列表
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
@@ -132,10 +129,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
         });
 
         // 4. 过滤有效数据
-        List<MonthPlanProductionRequirePlanVo> validCheckList = requirePlanList.stream()
-                .filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsProduction()))
-                .filter(plan -> plan.getPlanNeedProductionQty() > BigDecimal.ZERO.intValue())
-                .collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> validCheckList = requirePlanList.stream().filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsProduction())).filter(plan -> plan.getPlanNeedProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
 
         // 5. 执行检测逻辑
         boolean isInitDataPass = true;
@@ -157,15 +151,12 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
         // 将处理过的 requirePlanList 存入 Context，供排产前检测复用
         if (true) {
             // 按物料描述分组 Map
-            Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream()
-                    .filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc()))
-                    .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+            Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream().filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc())).collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
 
             productionContext.setAllSkuProductionPlan(allSkuMap);
 
             // 按ID分组 Map
-            Map<Long, MonthPlanProductionRequirePlanVo> allPlanMap = requirePlanList.stream()
-                    .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
+            Map<Long, MonthPlanProductionRequirePlanVo> allPlanMap = requirePlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
             productionContext.setAllProductionPlan(allPlanMap);
         }
     }
@@ -176,23 +167,19 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
      * 1. 调用父类 initProductionBaseData 加载所有排产所需数据（包含环境数据）
      * 2. 检查关键 Map 是否为空
      */
-    private void checkBeforeSchedulingData(TbrProductionContext productionContext,
-                                           List<MpCheckItemVo> mpCheckItemVos,
-                                           List<MpCheckItemRecord> mpCheckItemRecords) {
+    private void checkBeforeSchedulingData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
         try {
             List<MonthPlanProductionRequirePlanVo> requirePlanList;
 
             // 【整合点】优先尝试从 Context 获取已经初始化过的列表
             if (!productionContext.getAllSkuProductionPlan().isEmpty()) {
                 // 将 Map 还原为 List
-                requirePlanList = productionContext.getAllSkuProductionPlan().values().stream()
-                        .flatMap(List::stream)
-                        .collect(Collectors.toList());
+                requirePlanList = productionContext.getAllSkuProductionPlan().values().stream().flatMap(List::stream).collect(Collectors.toList());
                 log.info("检测: 复用上下文中的初始化计划数据，条数: {}", requirePlanList.size());
             } else {
                 // 容错：如果 Context 中没有（可能逻辑分支没走到），则重新查询
                 log.warn("检测: 上下文中未找到计划数据，重新查询数据库");
-                requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
+                requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
             }
             //基础数据容器存储
             productionContext.setBaseDataContainer(new BaseDataContainer());
@@ -250,8 +237,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
     /**
      * 辅助方法：添加检测结果
      */
-    private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason,
-                                List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
+    private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
         if (!isPass) {
             addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason);
         }

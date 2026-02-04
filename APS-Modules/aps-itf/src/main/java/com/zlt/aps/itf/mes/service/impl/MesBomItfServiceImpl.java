@@ -14,6 +14,7 @@ import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.mapper.MdmBomInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmConstructionInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
@@ -25,15 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -53,6 +46,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	private MdmConstructionInfoEntityMapper mdmConstructionInfoEntityMapper;
 	@Autowired
 	private MdmBomInfoEntityMapper mdmBomInfoEntityMapper;
+	@Autowired
+	private MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
 	@Autowired
 	private BaseDao baseDao;
 
@@ -93,6 +88,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				MdmSkuConstructionRef queryVO = new MdmSkuConstructionRef();
 				queryVO.setBaseVale(null);
 				mdmSkuConstructionRefEntityMapper.updateMainMaterialDescToMaterialInfo(queryVO);
+				// 新增不存在的胎胚描述到 胎胚描述与结构关系表
+				mdmSkuStructureRefEntityMapper.insertMainMaterialDesc4SkuConstructionRef(queryVO);
 			} finally {
 				DynamicDataSourceContextHolder.clear();
 				/** 切换APS数据源 end **/
@@ -197,12 +194,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 						}
 					});
 				}
-				
+
 				List<List<MdmBomInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
 				for (List<MdmBomInfo> saveList : splitList) { // 分批保存，防止长度超出限制
 					baseDao.saveBatch(saveList);
 				}
-				
+
                 // 构建胎胚原料消耗量
                 List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList);
                 if (CollectionUtils.isNotEmpty(detaiList)) {
@@ -229,7 +226,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 
     /**
      * 构建胎胚原料消耗量
-     * 
+     *
      * @param mesDateList    接口同步的bom数据
      * @param apsDataList aps库现有的bom数据
      * @return

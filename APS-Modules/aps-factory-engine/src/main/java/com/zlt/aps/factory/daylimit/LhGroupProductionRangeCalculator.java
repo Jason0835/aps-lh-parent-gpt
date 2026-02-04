@@ -57,9 +57,11 @@ public class LhGroupProductionRangeCalculator {
      */
     public static MouldProductionDayLimitHelper confirmProductionRange(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer lhGroupStartDay, Integer lhGroupEndDay, List<ProductionMouldInfoVo> selectedMould, List<GroupPlanCxLhCapacityLimitHelper> dayLimitList, Set<Integer> stopDaySet) {
         String productionEmbryoCode = addSkuInfo.getEmbryoCode();
+        String materialDesc = addSkuInfo.getMaterialDesc();
         //在满足硫化配比限制下，取得排产计划可排的满足胎胚种类数限制的排产范围
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> !dayLimit.isReachLimitByEmbryoCode(productionEmbryoCode)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.EMBRYO_CODE_COUNT_LIMIT);
             //说明达到胎胚种类数限制
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.EMBRYO_CODE_COUNT_LIMIT);
         }
@@ -72,47 +74,57 @@ public class LhGroupProductionRangeCalculator {
             }
         }
         if (CollectionUtils.isEmpty(effectiveDaySet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.MOULD_LOCAL_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_LOCAL_LIMIT);
         }
         //2、取得与模具排产范围的交集
         Set<Integer> effectiveMouldSet = getEffectiveDay(effectiveDaySet, selectedMould);
         if (CollectionUtils.isEmpty(effectiveMouldSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.EMBRYO_COUNT_AND_MOULD_LOCAL_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.EMBRYO_COUNT_AND_MOULD_LOCAL_LIMIT);
         }
         //3、20260116 取得与模壳排产范围的交集
         Set<Integer> mouldShellSet = productionContext.getMouldShellRange(selectedMould.get(BigDecimal.ZERO.intValue()));
         if (CollectionUtils.isEmpty(mouldShellSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.MOULD_SHELL_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_SHELL_LIMIT);
         }
         Set<Integer> intersectionSet = effectiveMouldSet.stream().filter(mouldShellSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.MOULD_SHELL_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_SHELL_DOUBLE_LIMIT);
         }
         //4、20260617 取得与模具分配比例排产范围的交集
         Set<Integer> mouldAllocationSet = productionContext.getMouldAllocationRange(addSkuInfo);
         if (CollectionUtils.isEmpty(mouldAllocationSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.MOULD_ALLOCATION_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_ALLOCATION_LIMIT);
         }
         intersectionSet = intersectionSet.stream().filter(mouldAllocationSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.MOULD_ALLOCATION_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.MOULD_ALLOCATION_DOUBLE_LIMIT);
         }
         //5、20260119 取得与胶囊卡盘总数排产范围的交集
         Set<Integer> capsuleChuckSet = productionContext.getCapsuleChuckRange(addSkuInfo);
         if (CollectionUtils.isEmpty(capsuleChuckSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CAPSULE_CHUCK_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CAPSULE_CHUCK_LIMIT);
         }
         intersectionSet = intersectionSet.stream().filter(capsuleChuckSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CAPSULE_CHUCK_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CAPSULE_CHUCK_DOUBLE_LIMIT);
         }
         //6、20260126 取得与每日排产上限的排产范围的交集
         Set<Integer> dayCapacityLimitSet = productionContext.getDayCapacityLimitRange();
         if (CollectionUtils.isEmpty(dayCapacityLimitSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.DAY_CAPACITY_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.DAY_CAPACITY_LIMIT);
         }
         intersectionSet = intersectionSet.stream().filter(dayCapacityLimitSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.DAY_CAPACITY_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.DAY_CAPACITY_DOUBLE_LIMIT);
         }
         //取得最早的一段连续时间

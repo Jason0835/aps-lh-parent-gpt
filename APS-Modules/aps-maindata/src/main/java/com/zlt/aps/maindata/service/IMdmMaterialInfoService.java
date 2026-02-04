@@ -209,4 +209,10 @@ public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
      * @return
      */
     List<MdmMaterialInfo> findMaterialInfoByStructureNames(String factoryCode, Set<String> structureNames);
+    /**
+     *  获取调整物料信息
+     * @param createCondition 调整参数
+     * @return 物料信息
+     */
+    Map<String, MdmMaterialInfo> findAdjustMaterialInfo(DpDemandPlan createCondition);
 }

@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -141,20 +142,32 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @return
      */
     public Integer getPlanNeedProductionQty() {
-        Integer sum = BigDecimal.ZERO.intValue();
-        if (null != getNetQty()) {
-            sum = sum + getNetQty();
-        }
-        if (null != getConventionReserveQty()) {
-            sum = sum + getConventionReserveQty();
-        }
-        if (ProductionPlanType.NORMAL.getPlanType().equals(planType)) {
+        Integer sum = Optional.ofNullable(getNetQty()).orElse(BigDecimal.ZERO.intValue());
+        sum = sum + Optional.ofNullable(getConventionReserveQty()).orElse(BigDecimal.ZERO.intValue());
+        if (isNormalTypePlan()) {
             return sum;
         }
-        if (null != getPostponeQty()) {
-            sum = sum + getFactProdReqQty();
-        }
+        sum = sum + Optional.of(getPostponeQty()).orElse(BigDecimal.ZERO.intValue());
         return sum;
+    }
+
+    /**
+     * 是否为正常类型的计划
+     *
+     * @return
+     */
+    public boolean isNormalTypePlan() {
+        return ProductionPlanType.NORMAL.getPlanType().equals(planType);
+    }
+
+    /**
+     * 是否需要排产暂缓的类型计划
+     * 实单模拟及产量预测类型需要进行暂缓订单排产
+     *
+     * @return
+     */
+    public boolean isNeedPostponeTypePlan() {
+        return ProductionPlanType.PREDICTION.getPlanType().equals(planType) || ProductionPlanType.SIMULATE.getPlanType().equals(planType);
     }
 
     /**
@@ -238,6 +251,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             plan.setIsProduction(YesOrNoEnum.YES.getCode());
         } else {
             plan.setIsProduction(require.getIsProduction());
+        }
+        if (plan.isNeedPostponeTypePlan()) {
+            //20260204 实单模拟及产能预测需要排产暂缓订单
+            Integer sum = Optional.ofNullable(plan.getNetQty()).orElse(BigDecimal.ZERO.intValue());
+            sum = sum + Optional.ofNullable(plan.getPostponeQty()).orElse(BigDecimal.ZERO.intValue());
+            plan.setNetQty(sum);
         }
         return plan;
     }
@@ -516,6 +535,15 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 单独增加不排产原因
+     *
+     * @param addNoProductionReason
+     */
+    public void singleAddNoProductionReason(String addNoProductionReason) {
+        addNoProductionReason(addNoProductionReason);
+    }
+
+    /**
      * 获取模具分配比例控制key
      * 结构+主花纹
      *
@@ -776,7 +804,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
-     *  分组：结构+主花纹
+     * 分组：结构+主花纹
+     *
      * @return 分组
      */
     public String getGroupKey() {

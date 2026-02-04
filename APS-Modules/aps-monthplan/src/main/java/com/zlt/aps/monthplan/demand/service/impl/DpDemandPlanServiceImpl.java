@@ -214,7 +214,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
 
     private void postProcess(DpDemandPlan createCondition, PredictionContext data, List<DpDemandPlan> finalPlans,PredictionContext.OrderAllocationResult allocationResult) {
         // 8. 保存订单池快照
-        saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
+        if(!ProductionPlanType.ADJUST.getPlanType().equals(createCondition.getPlanType())){
+            saveOrderPoolSnapshot(createCondition, data.getSalesOrders(), data.getSupplyOrderPools());
+        }
         if(CollectionUtils.isEmpty(finalPlans)){
             return;
         }
@@ -332,14 +334,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     public List<DpDemandPlan> createAdjustRequire(DpDemandPlan createCondition) {
         // 1. 前置校验
         validateFinalizedForAdjust(createCondition);
+        // 3. 并行获取数据
+        PredictionContext data = fetchRequiredDataInParallelByAdjust(createCondition);
         // 2. 生成版本号不能重复
         String monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST);
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(monthPlanVersion);
         createCondition.setIncludePostpone(true);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());
-        // 3. 并行获取数据
-        PredictionContext data = fetchRequiredDataInParallel(createCondition);
         data.setPostponeOrders(null);
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 4. 处理销售订单分配
@@ -355,6 +357,77 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8: 后续处理
         postProcess(createCondition, data, finalPlans,allocationResult);
         return finalPlans;
+    }
+
+    private PredictionContext fetchRequiredDataInParallelByAdjust(DpDemandPlan createCondition) {
+        CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
+            CompletableFuture.supplyAsync(() ->  this.salesOrderPoolService.findAdjustSalesOrderPool(createCondition));
+        CompletableFuture<List<MdmProductStock>> stocksFuture =
+            CompletableFuture.supplyAsync(() ->  this.fetchFinishedProductStocks(createCondition.getFactoryCode()));
+        CompletableFuture<Map<String, String>> productionTypeFuture =
+            CompletableFuture.supplyAsync(() -> this.fetchProductionTypeMap(createCondition.getFactoryCode()));
+
+        CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
+            CompletableFuture.supplyAsync(() -> this.supplyOrderPoolService.findAdjustSupplyOrderPool(createCondition));
+
+        CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
+            CompletableFuture.supplyAsync(() -> this.mpMonthlySaleQtyService.findAdjustMonthlySaleQty(createCondition));
+
+        CompletableFuture<Integer> minProductionQtyFuture =
+            CompletableFuture.supplyAsync(this::getMinProductionQty);
+        CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
+            CompletableFuture.supplyAsync(() -> materialInfoService.findAdjustMaterialInfo(createCondition));
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
+            CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findAdjustCycleSchStruConf(createCondition));
+        // 等待所有任务完成
+        CompletableFuture.allOf(
+            salesOrdersFuture, stocksFuture, productionTypeFuture,
+            supplyOrdersFuture, monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture,
+            cycleSchStruConfFuture
+        ).join();
+        try {
+            List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
+            List<MdmProductStock> finishedProductStocks = stocksFuture.get();
+            Map<String, String> productionTypeMap = productionTypeFuture.get();
+            List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
+            Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
+            int minProductionQty = minProductionQtyFuture.get();
+            Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
+            List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
+            if(!CollectionUtils.isEmpty(finishedProductStocks)){
+                finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
+            }
+            // 处理成品库存映射
+            Map<String, List<MdmProductStock>> finishedProductStockMap =
+                CollectionUtils.isEmpty(finishedProductStocks) ?
+                    new HashMap<>(16) :
+                    finishedProductStocks.stream()
+                        .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
+            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks);
+            // 按优先级分离销售订单
+            Map<Boolean, List<SalesOrderPool>> partitionedOrders =
+                partitionSalesOrdersByPriority(salesOrders);
+            Map<String,Integer> orderQtyMap = SaleRequirePlanHelper.calculateOrderQty(salesOrders);
+            return new PredictionContext(
+                salesOrders,
+                orderQtyMap,
+                finishedProductStocks,
+                finishedProductStockMap,
+                productionTypeMap,
+                supplyOrderPools,
+                partitionedOrders.get(false),
+                partitionedOrders.get(true),
+                monthSurplusMap,
+                monthlySaleQty,
+                minProductionQty,
+                materialInfoMap,
+                cycleSchStruConf
+            );
+
+        } catch (Exception e) {
+            log.error("并行获取数据失败", e);
+            throw new BusinessException("获取数据失败");
+        }
     }
 
     @Override

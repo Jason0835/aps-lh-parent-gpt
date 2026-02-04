@@ -8,14 +8,12 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.factory.domain.vo.DailyMouldAvailabilityResult;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
@@ -26,22 +24,18 @@ import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.aps.monthplan.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.sysdef.domain.SysDocType;
-import io.swagger.annotations.ApiModelProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
-import org.springframework.util.CollectionUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -71,7 +65,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     private MpAdjustStructureInEntityMapper structureInEntityMapper;
 
     @Autowired
-    private ProductionSchedulingDataService productionSchedulingDataService;
+    private ProductionMdmDataService productionSchedulingDataService;
 
     @Autowired
     private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
@@ -204,28 +198,33 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         contextDTO.setStructureDeadLine(endDay);
     }
 
-    public void initCavityAndBlockQty(MpRollAdjustContextDTO contextDTO) {
+    @Override
+    public Map<Integer, DailyMouldAvailabilityResult> getCavityAndBlockQtyMap(MpRollAdjustContextDTO contextDTO) {
         //1.按年月获取型腔及活块数据
-        List<DailyMouldAvailabilityResult> cavity2BlockMap;
-        try{
-            cavity2BlockMap = moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode(),null,null);
-            if (PubUtil.isEmpty(cavity2BlockMap)){
-                throw new BusinessException(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.noGetCavityAndBlock"));
-            }
-        }catch (Exception ex){
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.getCavityAndBlockExcept"),
-                    ex.getMessage()));
+        List<DailyMouldAvailabilityResult> cavity2BlockList = moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode(),null,null);
+        if (PubUtil.isEmpty(cavity2BlockList)){
+            throw new BusinessException(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.noGetCavityAndBlock"));
         }
-        // todo 补充业务逻辑
+        //2.按日进行序列化
+        Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap = cavity2BlockList.stream().collect(Collectors.groupingBy(item->item.getDayOfCycle(),
+                Collectors.collectingAndThen(Collectors.toList(),m-> {
+                    return m.get(0);
+                })));
+        return cavity2BlockMap;
     }
 
     @Override
-    public List<MdmWorkCalendar> getWorkCalendarList(MpRollAdjustContextDTO contextDTO) {
+    public Map<Integer, MdmWorkCalendar> getWorkCalendarMap(MpRollAdjustContextDTO contextDTO) {
         QueryWrapper<MdmWorkCalendar> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
         queryWrapper.eq("PROC_CODE", ProductionProcessesTypeEnum.MONTH_PLAN.getProcCode());
         queryWrapper.eq("YEAR", contextDTO.getMpYear());
         queryWrapper.eq("MONTH", contextDTO.getMpMonth());
-        return mdmWorkCalendarEntityMapper.selectList(queryWrapper);
+        List<MdmWorkCalendar> workCalendarList = mdmWorkCalendarEntityMapper.selectList(queryWrapper);
+        Map<Integer, MdmWorkCalendar> workCalendarMap = workCalendarList.stream().collect(Collectors.groupingBy(item->item.getDay(),
+                Collectors.collectingAndThen(Collectors.toList(),m-> {
+                    return m.get(0);
+                })));
+        return workCalendarMap;
     }
 }

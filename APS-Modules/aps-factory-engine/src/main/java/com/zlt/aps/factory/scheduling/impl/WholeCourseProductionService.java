@@ -4,7 +4,9 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,10 +29,12 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
 
     private final IProductionBusinessService tbrCxCapacityAllocationService;
 
-    public WholeCourseProductionService(ProductionSchedulingDataService dataService,
+    public WholeCourseProductionService(ProductionMdmDataService dataService,
+                                        DpRequireDataService dpRequireDataService,
+                                        MonthProductionDataService monthProductionDataService,
                                         @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService,
                                         @Qualifier("tbrCxCapacityAllocationService") IProductionBusinessService tbrCxCapacityAllocationService) {
-        super(dataService);
+        super(dataService, dpRequireDataService, monthProductionDataService);
         this.tbrProductionInitService = tbrProductionInitService;
         this.tbrCxCapacityAllocationService = tbrCxCapacityAllocationService;
     }
@@ -53,7 +57,7 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
                 context.setInsertNewProductionVersion(Boolean.FALSE);
                 //排结构、排模具
                 tbrCxCapacityAllocationService.run(context, userObj);
-            }finally {
+            } finally {
                 //保存日志
                 saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
 

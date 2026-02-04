@@ -7,14 +7,12 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
-import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -22,8 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
-import java.util.function.Function;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -41,8 +40,10 @@ import java.util.stream.Collectors;
 @Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractProductionBusinessService {
 
-    public TbrProductionInitService(ProductionSchedulingDataService dataService) {
-        super(dataService);
+    public TbrProductionInitService(ProductionMdmDataService dataService,
+                                    DpRequireDataService dpRequireDataService,
+                                    MonthProductionDataService monthProductionDataService) {
+        super(dataService, dpRequireDataService, monthProductionDataService);
     }
 
     /**
@@ -140,15 +141,15 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
      */
     private void saveProductionVersionRecord(Context context) {
         //工厂排产版本更新或是插入记录
-        MpFactoryProductionVersion factoryProductionVersion = getDataService().getFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion factoryProductionVersion = getMonthProductionDataService().getFactoryMonthPlanVersion(context);
         if (null != factoryProductionVersion) {
             setProductionVersionCycleInfo(factoryProductionVersion, context);
             context.setPlanType(factoryProductionVersion.getPlanType());
-            getDataService().updateFactoryProductionVersion(factoryProductionVersion);
+            getMonthProductionDataService().updateFactoryProductionVersion(factoryProductionVersion);
             return;
         }
         //不存在，则表示新插入记录，此时需要获取计划类型等
-        MpFactoryProductionVersion firstVersion = getDataService().getFirstFactoryMonthPlanVersion(context);
+        MpFactoryProductionVersion firstVersion = getMonthProductionDataService().getFirstFactoryMonthPlanVersion(context);
         if (null == firstVersion) {
             String errorFormat = I18nUtil.getMessage("alg.data.before.production.planListIsNull");
             String errorInfo = String.format(errorFormat, context.getYear(), context.getMonth(), context.getMonthPlanVersion());
@@ -166,7 +167,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         factoryProductionVersion.setIsSelectedDemand(firstVersion.getIsSelectedDemand());
         //设置月份排产模式自然月或非自然月及开始、结束排产日期
         setProductionVersionCycleInfo(factoryProductionVersion, context);
-        getDataService().addFactoryProductionVersion(factoryProductionVersion);
+        getMonthProductionDataService().addFactoryProductionVersion(factoryProductionVersion);
     }
 
 
@@ -493,7 +494,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //先删除旧的初始化数据
         deleteOldData(productionContext);
         //再保存新的初始化数据
-        getDataService().saveMonthPlanInit(requirePlanList);
+        getMonthProductionDataService().saveMonthPlanInit(requirePlanList);
     }
 
     /**
@@ -509,8 +510,8 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             throw new BusinessException(I18nUtil.getMessage("alg.data.alter.message.productionVersionNoEmpty"));
         }
         //删除版本已有数据
-        getDataService().deletedInitData(productionContext);
-        getDataService().deletedMouldProductionData(productionContext);
+        getMonthProductionDataService().deletedInitData(productionContext);
+        getMonthProductionDataService().deletedMouldProductionData(productionContext);
     }
 
     /**
