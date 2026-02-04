@@ -153,8 +153,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                     .eq(MpStructureAllocation::getProductionVersion, productionVersion)
                     .set(MpStructureAllocation::getBeginDay, startDay)
                     .set(MpStructureAllocation::getEndDay, endDay)
-                    .set(MpStructureAllocation::getAdjustStartDay, adjustStartDay)
-                    .set(MpStructureAllocation::getAdjustEndDay, adjustEndDay)
+//                    .set(MpStructureAllocation::getAdjustStartDay, adjustStartDay)
+//                    .set(MpStructureAllocation::getAdjustEndDay, adjustEndDay)
                     .set(MpStructureAllocation::getAllotDays, allotDays);
             mpStructureAllocationEntityMapper.update(null, wrapper);
             log.info("更新结构转产成功");
