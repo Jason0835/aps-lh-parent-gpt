@@ -220,18 +220,22 @@ export default {
         {
           prop: "mesMaterialCategory",
           width: 120,
-          label: this.$t("MES物料大类"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.mes_material_category, value);
-          },
+          label: this.$t("MES物料大类编码"),
         },
         {
           prop: "mesMaterialSubcategory",
           width: 120,
-          label: this.$t("MES物料细类"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.mes_material_subcategory, value);
-          },
+          label: this.$t("MES物料细类编码"),
+        },
+        {
+          prop: "mesMaterialCateName",
+          width: 120,
+          label: this.$t("MES物料大类名称"),
+        },
+        {
+          prop: "mesMaterialSubcatName",
+          width: 120,
+          label: this.$t("MES物料细类名称"),
         },
         {
           prop: "productCategory",

@@ -266,6 +266,10 @@ export default {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
+        {
+          prop: "materialDesc",
+          label: this.$t("common.name"),
+        },
         // {
         //   prop: "物料代码",
         //   label: this.$t("物料代码"),

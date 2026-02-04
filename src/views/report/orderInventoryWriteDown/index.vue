@@ -123,7 +123,7 @@ export default {
           width: 120,
         },
         {
-          prop: "customName",
+          prop: "customCode",
           label: this.$t("ui.data.column.monthplan.salCode"),
           width: 120,
         },
@@ -177,11 +177,11 @@ export default {
           width: 120,
           label: this.$t("库存分配量"),
         },
-        // {
-        //   prop: "生产分配量",
-        //   width: 120,
-        //   label: this.$t("生产分配量"),
-        // },
+        {
+          prop: "productionQty",
+          width: 120,
+          label: this.$t("生产分配量"),
+        },
         {
           prop: "plannedSurplus",
           width: 120,

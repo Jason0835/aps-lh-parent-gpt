@@ -31,9 +31,7 @@
 <script>
 import { mapState } from "vuex";
 
-import {
-  saveMdmProductConstruction
-} from "@/api/maindata/rawMaterialRequirePlan​";
+import { saveMdmProductConstruction } from "@/api/maindata/rawMaterialRequirePlan​";
 
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -51,21 +49,19 @@ export default {
       const strValue = String(value).trim();
 
       // 检查是否只包含数字
-      if (!/^\d+$/.test(strValue)) {
-        return callback(
-          new Error(this.$t("common.rule.noPoint"))
-        );
+      if (!/^\d+(\.\d{0,2})?$/.test(strValue)) {
+        return callback(new Error(this.$t("只能输入大于等于0,并且最多两位小数")));
       }
 
       // 转换为数字
       const numValue = Number(strValue);
-      if (numValue > 99999999) {
-        return callback(new Error(this.$t("common.rule.inoutMax")));
-      }
+      // if (numValue > 99999999) {
+      //   return callback(new Error(this.$t("common.rule.inoutMax")));
+      // }
 
-      if (!Number.isInteger(numValue)) {
-        return callback(new Error(this.$t("common.rule.peleaseInteger")));
-      }
+      // if (!Number.isInteger(numValue)) {
+      //   return callback(new Error(this.$t("common.rule.peleaseInteger")));
+      // }
 
       callback();
     };
@@ -209,7 +205,6 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           clearable: false,
-
         },
         {
           prop: "yearMonth",
@@ -228,60 +223,60 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
-          maxlength:300
+          maxlength: 300,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          maxlength:10
+          maxlength: 10,
         },
         {
           prop: "curMonthQty",
           label: this.$t("ui.data.column.rawMaterial.curMonthQty"),
-          type:'number',
-          max:99999999.99,
-          min:0
+          type: "number",
+          max: 99999999.99,
+          min: 0,
         },
         {
           prop: "t1MonthQty",
           label: this.$t("ui.data.column.rawMaterial.t1MonthQty"),
-          type:'number',
-          max:99999999.99,
-          min:0
+          type: "number",
+          max: 99999999.99,
+          min: 0,
         },
 
         {
           prop: "t2MonthQty",
           label: this.$t("ui.data.column.rawMaterial.t2MonthQty"),
-          type:'number',
-          max:99999999.99,
-          min:0
+          type: "number",
+          max: 99999999.99,
+          min: 0,
         },
         {
           prop: "curMonthRudrQty",
           label: this.$t("ui.data.column.rawMaterial.curMonthRudrQty"),
-          type:'number',
-          max:99999999.99,
-          min:0
+          type: "number",
+          max: 99999999.99,
+          min: 0,
         },
         {
           prop: "t1MonthEudrQty",
           label: this.$t("ui.data.column.rawMaterial.t1MonthEudrQty"),
-          type:'number',
-          max:99999999.99,
-          min:0
+          type: "number",
+          max: 99999999.99,
+          min: 0,
         },
         {
           prop: "t2MonthEudrQty",
           label: this.$t("ui.data.column.rawMaterial.t2MonthEudrQty"),
-          type:'number',
-          max:99999999.99,
-          min:0
+          type: "number",
+          max: 99999999.99,
+          min: 0,
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
-          maxlength:100
+          maxlength: 100,
         },
       ];
     },
@@ -313,7 +308,8 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
-          yearMonth: data.year + "-" + (data.month < 10 ? "0" + data.month : data.month),
+          yearMonth:
+            data.year + "-" + (data.month < 10 ? "0" + data.month : data.month),
         };
       } else {
         this.form = {

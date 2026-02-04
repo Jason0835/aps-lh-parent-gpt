@@ -1799,12 +1799,15 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
+
         params.scheduledMachines = this.formInline.cxMachineCode;
         params.structureName = this.formInline.structureName;
 
         params.adjustType = this.adjustType;
+         this.outResultData=[]
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
+
         this.data = res.rows;
         this.getOutResultList(
           res.rows[0].productionVersion,

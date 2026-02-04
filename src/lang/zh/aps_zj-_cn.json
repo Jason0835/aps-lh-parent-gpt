@@ -314,8 +314,10 @@
 
 
 
-  "ui.data.material.mesMaterialCategory":"MES物料大类",
-  "ui.data.material.mesMaterialSubcategory":"MES物料细类",
+  "ui.data.material.mesMaterialCategory":"MES物料大类编码",
+  "ui.data.material.mesMaterialSubcategory":"MES物料细类编码",
+  "ui.data.material.mesMaterialCateName":"MES物料大类名称",
+  "ui.data.material.mesMaterialSubcatName":"MES物料细类名称",
   "ui.data.rawMaterialRequirement.isSpringFestivalMonth":"是否春节月份",
   "ui.data.vulcanizationTable.onboardDate":"上机日期",
   "ui.data.factoryParam.paramCode":"参数编码",
@@ -325,6 +327,7 @@
   "ui.data.orderInventoryWriteDown.stockQty":"库存总数",
   "ui.data.orderInventoryWriteDown.allocationQty":"库存分配量",
   "ui.data.orderInventoryWriteDown.plannedSurplus":"月底计划余量分配量",
+  "ui.data.orderInventoryWriteDown.productionQty":"生产分配量",
   "ui.data.regionalCapacityAllocation.sumTotal":"区域产能分配总和",
   "ui.data.productionMonthPlanInit.productionVersion":"排产版本号",
   "ui.data.productionMonthPlanInit.maxEmbryoCodeCount":"最大胎胚种类数",
@@ -343,7 +346,8 @@
   "ui.data.messageTemplate.title":"标题",
   "ui.message.taskCenter":"任务中心",
   "ui.data.specialMaterial.rubberSpec":"适用范围",
-  "ui.data.specialMaterial.materialCode":"材料编码"
+  "ui.data.specialMaterial.materialCode":"材料编码",
+  "common.rule.maxTwo": "只能输入大于等于0,并且最多两位小数"
 
 
 
