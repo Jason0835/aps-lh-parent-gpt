@@ -33,6 +33,9 @@ public class NoProductionPlanUtils {
       String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
       noProductionPlan.setIsProduction(isProduction);
       noProductionPlan.setUnProductionQty(unProductionQty);
+      if(unProductionQty <= 0) {
+        return;
+      }
       //有排产计划，则取排产数量
       if (sumProductionMap.containsKey(monthPlanId) && unProductionQty > BigDecimal.ZERO.intValue()) {
         noProductionPlanList.add(noProductionPlan);
