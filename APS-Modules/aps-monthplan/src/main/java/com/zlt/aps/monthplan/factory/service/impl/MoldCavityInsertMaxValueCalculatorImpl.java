@@ -121,11 +121,6 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
             DailyMouldAvailabilityResult dayResult = new DailyMouldAvailabilityResult();
             dayResult.setDayOfCycle(day);
 
-            if (stopDays.contains(day)) {
-                results.add(dayResult);
-                continue;
-            }
-
             // 计算当天的可用量
             Map<String, Set<String>> cavityTempMap = new HashMap<>();
             Map<String, Set<String>> insertTempMap = new HashMap<>();
@@ -158,11 +153,17 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
             Map<String, Integer> cavityDayResults = new HashMap<>();
             for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
                 cavityDayResults.put(entry.getKey(), entry.getValue().size());
+                if (stopDays.contains(day)) {
+                    cavityDayResults.put(entry.getKey(), 0);
+                }
             }
 
             Map<String, Integer> insertDayResults = new HashMap<>();
             for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
                 insertDayResults.put(entry.getKey(), entry.getValue().size());
+                if (stopDays.contains(day)) {
+                    insertDayResults.put(entry.getKey(), 0);
+                }
             }
 
             dayResult.setCavityResults(cavityDayResults);
@@ -211,10 +212,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         DailyMouldAvailabilityResult result = new DailyMouldAvailabilityResult();
         mouldRelationList.add(result);
         result.setDayOfCycle(dayOfCycle);
-        // 如果是停产日，直接返回空结果
-        if (stopDays.contains(dayOfCycle)) {
-            return new ArrayList<>();
-        }
+
 
         // 计算可用量
         Map<String, Set<String>> cavityTempMap = new HashMap<>();
@@ -248,11 +246,19 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         Map<String, Integer> cavityResults = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
             cavityResults.put(entry.getKey(), entry.getValue().size());
+            // 如果是停产日，直接返回空结果
+            if (stopDays.contains(dayOfCycle)) {
+                cavityResults.put(entry.getKey(), 0);
+            }
         }
 
         Map<String, Integer> insertResults = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
             insertResults.put(entry.getKey(), entry.getValue().size());
+            // 如果是停产日，直接返回空结果
+            if (stopDays.contains(dayOfCycle)) {
+                insertResults.put(entry.getKey(), 0);
+            }
         }
 
         result.setCavityResults(cavityResults);
