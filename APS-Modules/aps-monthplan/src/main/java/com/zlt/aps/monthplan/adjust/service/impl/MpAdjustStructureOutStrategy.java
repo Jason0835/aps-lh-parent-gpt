@@ -130,9 +130,14 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         Integer startDay = contextDTO.getStartDay();
         // 结束日期
         Integer endDay = contextDTO.getEndDay();
+        // 调整开始日期
+        Integer adjustStartDay = contextDTO.getAdjustStartDay();
+        // 调整结束日期
+        Integer adjustEndDay = contextDTO.getAdjustEndDay();
         if (StringUtils.isEmpty(productionVersion) || StringUtils.isEmpty(factoryCode)
                 || StringUtils.isEmpty(structureName) || StringUtils.isEmpty(scheduledMachines)
-                || year == null || month == null || startDay == null || endDay == null) {
+                || year == null || month == null || startDay == null || endDay == null
+                || adjustStartDay == null || adjustEndDay == null) {
             log.warn("更新结构转产：必须字段为空，直接返回");
             return;
         }
@@ -148,6 +153,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                     .eq(MpStructureAllocation::getProductionVersion, productionVersion)
                     .set(MpStructureAllocation::getBeginDay, startDay)
                     .set(MpStructureAllocation::getEndDay, endDay)
+                    .set(MpStructureAllocation::getAdjustStartDay, adjustStartDay)
+                    .set(MpStructureAllocation::getAdjustEndDay, adjustEndDay)
                     .set(MpStructureAllocation::getAllotDays, allotDays);
             mpStructureAllocationEntityMapper.update(null, wrapper);
             log.info("更新结构转产成功");
