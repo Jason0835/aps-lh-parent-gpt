@@ -33,7 +33,7 @@ import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -66,7 +66,7 @@ import java.util.stream.Stream;
 @Component
 public class MatchingProductionHandler {
     @Autowired
-    private ProductionSchedulingDataService productionSchedulingDataService;
+    private ProductionMdmDataService productionSchedulingDataService;
     @Autowired
     private FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
     @Autowired
@@ -1966,7 +1966,7 @@ public class MatchingProductionHandler {
      *
      * @return
      */
-    public ProductionSchedulingDataService getDataService() {
+    public ProductionMdmDataService getDataService() {
         return productionSchedulingDataService;
     }
 }

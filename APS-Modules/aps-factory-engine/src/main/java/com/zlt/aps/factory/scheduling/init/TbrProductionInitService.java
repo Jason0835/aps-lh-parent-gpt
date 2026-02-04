@@ -12,7 +12,7 @@ import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 @Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractProductionBusinessService {
 
-    public TbrProductionInitService(ProductionSchedulingDataService dataService,
+    public TbrProductionInitService(ProductionMdmDataService dataService,
                                     DpRequireDataService dpRequireDataService,
                                     MonthProductionDataService monthProductionDataService) {
         super(dataService, dpRequireDataService, monthProductionDataService);

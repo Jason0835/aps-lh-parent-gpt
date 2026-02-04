@@ -14,7 +14,7 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.mapper.*;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IProductALevelService;
@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProductionSchedulingDataServiceImpl implements ProductionSchedulingDataService {
+public class ProductionMdmDataServiceImpl extends AbstractDataService implements ProductionMdmDataService {
 
     private final MdmInterestRateEntityMapper interestRateMapper;
 
@@ -390,61 +390,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             productionDaySet.add(productionDay);
         }
         cxMachineInfo.setTheoryProductionDaySet(productionDaySet);
-    }
-
-    /**
-     * 是否空的工厂、年份、月份、需求版本、排产版本条件
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryAndProductionVersion(Context context) {
-        boolean isEmptyFactoryAndRequireVersion = isEmptyFactoryAndRequireVersion(context);
-        if (isEmptyFactoryAndRequireVersion) {
-            return true;
-        }
-        return StringUtils.isBlank(context.getProductionVersion());
-    }
-
-    /**
-     * 是否空的工厂、年份、月份、需求版本
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryAndRequireVersion(Context context) {
-        boolean isEmptyFactoryAndYearMonth = isEmptyFactoryAndYearMonth(context);
-        if (isEmptyFactoryAndYearMonth) {
-            return true;
-        }
-        return StringUtils.isBlank(context.getMonthPlanVersion());
-    }
-
-    /**
-     * 是否空的工厂及年份、月份查询条件
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryAndYearMonth(Context context) {
-        boolean isEmptyFactoryCode = isEmptyFactoryCode(context);
-        if (isEmptyFactoryCode) {
-            return true;
-        }
-        return null == context.getYear() || null == context.getMonth();
-    }
-
-    /**
-     * 是否空的工厂查询条件
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryCode(Context context) {
-        if (null == context) {
-            return true;
-        }
-        return StringUtils.isBlank(context.getFactoryCode());
     }
 
 }

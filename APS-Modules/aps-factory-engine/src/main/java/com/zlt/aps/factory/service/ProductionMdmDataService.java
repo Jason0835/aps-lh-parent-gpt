@@ -3,11 +3,8 @@ package com.zlt.aps.factory.service;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
-import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
 
@@ -20,7 +17,7 @@ import java.util.Map;
  * @author ZLT
  * @date 20251208
  */
-public interface ProductionSchedulingDataService {
+public interface ProductionMdmDataService {
     /**
      * 获取排产周期配置信息
      * 自然月与非自然月周期

@@ -19,7 +19,7 @@ import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.InitNoProductionRecordService;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
@@ -73,7 +73,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final InitNoProductionRecordService initNoProductionRecordService;
 
-    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
+    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
                                           MonthProductionDataService monthProductionDataService,
                                           InitNoProductionRecordService initNoProductionRecordService,
