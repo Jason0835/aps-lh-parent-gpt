@@ -127,11 +127,8 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 if (YesOrNoEnum.NO.getCode().equals(singlePlan.getIsProduction())) {
                     return;
                 }
-                Integer realProductionQty = sumProductionMap.get(singlePlan.getMonthPlanId());
-                if (null == realProductionQty) {
-                    realProductionQty = BigDecimal.ZERO.intValue();
-                }
-                Integer diffValue = realProductionQty - singlePlan.getOriginProductionQty();
+                Integer realProductionQty = sumProductionMap.getOrDefault(singlePlan.getMonthPlanId(), BigDecimal.ZERO.intValue());
+                Integer diffValue = singlePlan.getFactProdReqQty() - realProductionQty;
                 if (diffValue <= BigDecimal.ZERO.intValue()) {
                     return;
                 }

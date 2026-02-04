@@ -542,6 +542,7 @@ public class ProductionPlanGroupInfo {
         if (null == changeMouldDay || null == preSelected.getEndDay()) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
+            productionContext.addSkuProductionLimitInfo(addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
             return;
         }
         //换模次数处理

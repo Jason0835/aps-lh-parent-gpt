@@ -31,6 +31,7 @@ import com.zlt.aps.factory.scheduling.cxcapacity.SkuNeedProductionInfo;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
+import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
@@ -75,7 +76,8 @@ public class MatchingProductionHandler {
     private FactoryParamMapper factoryParamMapper;
     @Autowired
     private BaseDao baseDao;
-
+    @Autowired
+    private MonthProductionDataService monthProductionDataService;
     @Autowired
     private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
     /**
@@ -194,9 +196,8 @@ public class MatchingProductionHandler {
      * 计算生产日期
      *
      * @param productionContext      上下文
-     * @param structureName          结构名称
      * @param groupInfo              排程分组对象
-     * @param structureLhRatioMap    成型硫化配比
+     * @param ratioVo    成型硫化配比
      * @param mouldDayProductionList 模具日计划列表
      * @param allSinglePlanMap       需求计划列表
      * @param continueInfo           续作规格
@@ -317,8 +318,6 @@ public class MatchingProductionHandler {
      * @param newSkuQtyMap       已搭配排产规格数量
      * @param groupInfo          排产计划分组
      * @param continueInfo       首日续作规格
-     * @param startDay           排产开始日期
-     * @param endDay             排产截至日期
      */
     private void matchingSchedule(TbrProductionContext productionContext, MonthPlanStructureLhRatioVo ratioVo,
                                   String materialDesc, SkuNeedProductionInfo needProductionInfo,
@@ -522,7 +521,6 @@ public class MatchingProductionHandler {
      * @param productionPlanList
      * @param productionQty
      * @param maxProductionQty
-     * @param lhMouldQty
      * @param beginDate
      * @param endDate
      * @param continueMouldList
@@ -802,7 +800,7 @@ public class MatchingProductionHandler {
     /**
      * 加载需求计划列表(合并后)
      *
-     * @param productionVersion 月计划生产版本
+     * @param productionContext 月计划生产版本
      * @return
      */
     private Map<String, MonthPlanProductionRequirePlanVo> selectRequirePlan(TbrProductionContext productionContext) {
@@ -867,7 +865,6 @@ public class MatchingProductionHandler {
      * 将定稿计划和需求计划构建成算法要求的上下文结构
      *
      * @param planList       定稿计划
-     * @param demandPlanList 需求计划
      * @return
      */
     private TbrProductionContext initProductionContext(List<FactoryMonthPlanMouldDayResult> planList) {
@@ -894,7 +891,7 @@ public class MatchingProductionHandler {
      * 将定稿计划和需求计划构建成算法要求的上下文结构
      *
      * @param planList       定稿计划
-     * @param demandPlanList 需求计划
+     * @param requirePlanMap 需求计划
      * @return
      */
     private TbrProductionContext buildProductionContext(TbrProductionContext productionContext,
@@ -1602,7 +1599,7 @@ public class MatchingProductionHandler {
     /**
      * 在正式排产前进行重置数据处理
      *
-     * @param context          排产上下文
+     * @param productionContext          排产上下文
      * @param allGroupPlanInfo 所有分组计划对象
      */
     private void resetBeforeFormalProduction(TbrProductionContext productionContext,
@@ -1841,7 +1838,7 @@ public class MatchingProductionHandler {
         LocalDate previousMonth = context.getPreviousMonth();
         Integer year = previousMonth.getYear();
         Integer month = previousMonth.getMonthValue();
-        MpFactoryProductionVersion previousVersion = getDataService().getFinalVersion(factoryCode, year, month);
+        MpFactoryProductionVersion previousVersion = monthProductionDataService.getFinalVersion(factoryCode, year, month);
         if (null == previousVersion) {
             return Collections.emptyMap();
         }

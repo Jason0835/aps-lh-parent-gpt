@@ -7,12 +7,9 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
-import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
@@ -33,15 +30,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SummaryDemandPlanService {
-  private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
+
   // 批量插入处理器
   private final BatchInsertProcessor<DpDemandPlanSum> batchInsertProcessor;
-  // 版本库存
-  private final IDpStockVersionService dpStockVersionService;
 
-  @Async("batchInsertExecutor")
+  private final SaveAllocationResultService saveAllocationResultService;
+
   public void summaryDemandPlan(DpDemandPlan createCondition, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
-    this.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
     Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey));
     Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(allocationResult.getStockMap());
     List<DpDemandPlanSum> datas = Lists.newArrayList();
@@ -68,26 +63,8 @@ public class SummaryDemandPlanService {
     });
     datas.sort(Comparator.comparing(DpDemandPlanSum::getMaterialCode));
     this.batchInsertProcessor.batchInsert(datas);
+    this.saveAllocationResultService.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
   }
-
-  /**
-   * 批量保存分配结果
-   */
-  private void saveAllocationResults(
-      DpDemandPlan createCondition,
-      String monthPlanVersion,
-      PredictionContext.OrderAllocationResult allocationResult) {
-    // 批量插入分配结果
-    if (!CollectionUtils.isEmpty(allocationResult.getAllocations())) {
-      this.dpOrderOffsetDetailService.batchInsert(allocationResult.getAllocations());
-    }
-    if(!CollectionUtils.isEmpty(allocationResult.getStockMap())) {
-      // 批量插入库存版本
-      dpStockVersionService.insertBatchData(createCondition, monthPlanVersion, allocationResult.getStockMap());
-    }
-  }
-
-
 
   private Map<String, Map<String, Integer>> calculateStockQty(Map<String, List<MdmProductStock>> finishProductStockMap) {
     if(CollectionUtils.isEmpty(finishProductStockMap)){

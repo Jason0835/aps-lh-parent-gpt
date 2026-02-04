@@ -281,13 +281,6 @@ public class TbrProductionContext extends Context {
     }
 
     /**
-     * 清空排产限制情况信息
-     */
-    public void clearSkuProductionLimitInfo() {
-        skuProductionLimitInfo = new HashMap<>(32);
-    }
-
-    /**
      * 清空所有模壳的使用量
      */
     public void clearAllMouldShellUsed() {
@@ -296,6 +289,37 @@ public class TbrProductionContext extends Context {
             return;
         }
         allMouldShellMap.forEach((mouldSetCode, mouldShellInfo) -> mouldShellInfo.clearDayUsed());
+    }
+
+    /**
+     * 增加Sku排产受限信息
+     *
+     * @param materialDesc 物料描述
+     * @param limitType    限制类型
+     */
+    public void addSkuProductionLimitInfo(String materialDesc, MouldProductionLimitTypeEnum limitType) {
+        if (StringUtils.isBlank(materialDesc) || null == limitType) {
+            return;
+        }
+        if (MouldProductionLimitTypeEnum.NO_LIMIT == limitType) {
+            return;
+        }
+        if (null == skuProductionLimitInfo) {
+            skuProductionLimitInfo = new HashMap<>(64);
+        }
+        List<MouldProductionLimitTypeEnum> skuLimitInfo = skuProductionLimitInfo.get(materialDesc);
+        if (null == skuLimitInfo) {
+            skuLimitInfo = new ArrayList<>(16);
+            skuProductionLimitInfo.put(materialDesc, skuLimitInfo);
+        }
+        skuLimitInfo.add(limitType);
+    }
+
+    /**
+     * 清空排产限制情况信息
+     */
+    public void clearSkuProductionLimitInfo() {
+        skuProductionLimitInfo = new HashMap<>(64);
     }
 
     /**

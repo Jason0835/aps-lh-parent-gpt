@@ -63,7 +63,8 @@ public class MpCheckItemRecordServiceImpl extends ServiceImpl<MpCheckItemRecordM
         List<MpCheckItemRecord> mpCheckItemRecordList = mpCheckItemRecordMapper.selectMpCheckItemRecordList(mpCheckItemRecord);
         //获取当前语言包
         Locale language = SecurityUtils.getUserLang();
-        JsonUtils.parseJsonRemarkList(mpCheckItemRecordList, language.toString(), "checkContent");
+        JsonUtils.parseJsonRemarkListWithLineBreak(mpCheckItemRecordList, language.toString(), "checkContent");
+
         return mpCheckItemRecordList;
     }
 

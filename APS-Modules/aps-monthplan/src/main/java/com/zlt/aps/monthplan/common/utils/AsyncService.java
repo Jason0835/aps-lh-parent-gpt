@@ -43,7 +43,10 @@ public class AsyncService {
   private final ProductionSchedulingService productionSchedulingService;
   // 定稿的月度排产计划
   private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
+
   private final BaseDao baseDao;
+
+
 
   @Async("taskExecutor")
   public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange){
