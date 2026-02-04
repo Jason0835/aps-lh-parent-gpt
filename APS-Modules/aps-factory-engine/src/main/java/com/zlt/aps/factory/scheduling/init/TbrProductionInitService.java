@@ -167,7 +167,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         factoryProductionVersion.setIsSelectedDemand(firstVersion.getIsSelectedDemand());
         //设置月份排产模式自然月或非自然月及开始、结束排产日期
         setProductionVersionCycleInfo(factoryProductionVersion, context);
-        getDataService().addFactoryProductionVersion(factoryProductionVersion);
+        getMonthProductionDataService().addFactoryProductionVersion(factoryProductionVersion);
     }
 
 

@@ -15,9 +15,6 @@ import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultDetailService;
-import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultService;
-import com.zlt.aps.factory.service.IFactoryProductionNoProductionPlanService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -26,7 +23,6 @@ import com.zlt.aps.maindata.service.IProductALevelService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
-import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -75,20 +71,11 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
 
-    private final BaseDao baseDao;
-
     private final IFactoryParamService factoryParamService;
 
     private final IProductALevelService productALevelService;
 
     private final IPlanOrderSortConfigurationService sortConfigurationService;
-
-    private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
-
-    private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
-
-    private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
-
 
     @Override
     public Integer getProductionCycleConfiguration(Context context) {
@@ -106,15 +93,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //数据类型转换
         paramConfigurationMap.forEach((key, paramConfiguration) -> paramValueMap.put(key, getParamValue(paramConfiguration)));
         return paramValueMap;
-    }
-
-    @Override
-    public int addFactoryProductionVersion(MpFactoryProductionVersion addVersion) {
-        if (null == addVersion) {
-            return 0;
-        }
-        addVersion.setId(null);
-        return baseDao.insert(addVersion);
     }
 
     @Override
@@ -387,62 +365,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyList();
         }
         return sortConfigurationList;
-    }
-
-    @Override
-    public void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList) {
-        if (CollectionUtils.isEmpty(noProductionPlanList)) {
-            return;
-        }
-        noProductionPlanList.forEach(noProductionPlan -> {
-            String noProductionReason = noProductionPlan.getReason();
-            if (StringUtils.isNotBlank(noProductionReason)) {
-                noProductionPlan.setReason(String.format("[%s]", noProductionReason));
-            }
-        });
-        factoryProductionNoProductionPlanService.saveBatch(noProductionPlanList);
-    }
-
-    @Override
-    public void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList) {
-        if (CollectionUtils.isEmpty(detailLogList)) {
-            return;
-        }
-        detailLogList.forEach(singleData -> {
-            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
-                singleData.setInventorySalesRatio(BigDecimal.ZERO);
-            }
-        });
-        factoryProductionDayProductionResultDetailService.saveBatch(detailLogList);
-    }
-
-    @Override
-    public void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList) {
-        if (CollectionUtils.isEmpty(dayResultList)) {
-            return;
-        }
-        dayResultList.forEach(singleData -> {
-            if (null == singleData.getAverageSaleQty()) {
-                singleData.setInventorySalesRatio(null);
-                return;
-            }
-            if (null == singleData.getInventorySalesRatio()) {
-                return;
-            }
-            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
-                singleData.setInventorySalesRatio(BigDecimal.ZERO);
-            }
-        });
-        factoryProductionDayProductionResultService.saveBatch(dayResultList);
-    }
-
-    @Override
-    public void saveGroupConversionResult(List<MpStructureAllocation> allocationResult) {
-        if (CollectionUtils.isEmpty(allocationResult)) {
-            return;
-        }
-        //数据不会太多
-        baseDao.insertBatch(allocationResult);
     }
 
     @Override

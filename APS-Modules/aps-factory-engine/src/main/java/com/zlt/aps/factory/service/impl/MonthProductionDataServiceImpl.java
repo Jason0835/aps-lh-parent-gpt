@@ -11,9 +11,7 @@ import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.mapper.*;
-import com.zlt.aps.factory.service.IFactoryMouldUsedStatusLogService;
-import com.zlt.aps.factory.service.IFactoryProductionMonthPlanInitService;
-import com.zlt.aps.factory.service.MonthProductionDataService;
+import com.zlt.aps.factory.service.*;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
@@ -51,13 +49,19 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
 
     private final FactoryProductionSchedulingMapper factoryProductionSchedulingMapper;
 
-    private final FactoryMonthPlanContinueProductInfoMapper factoryMonthPlanContinueProductInfoMapper;
-
     private final FactoryEngineProductionVersionMapper factoryEngineProductionVersionMapper;
+
+    private final FactoryMonthPlanContinueProductInfoMapper factoryMonthPlanContinueProductInfoMapper;
 
     private final IFactoryMouldUsedStatusLogService factoryMouldUsedStatusLogService;
 
     private final IFactoryProductionMonthPlanInitService factoryProductionMonthPlanInitService;
+
+    private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
+
+    private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
+
+    private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
 
     @Override
     public MpFactoryProductionVersion getFactoryMonthPlanVersion(Context context) {
@@ -89,6 +93,15 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
         }
         dataList.sort(Comparator.comparing(MpFactoryProductionVersion::getId));
         return dataList.get(BigDecimal.ZERO.intValue());
+    }
+
+    @Override
+    public int addFactoryProductionVersion(MpFactoryProductionVersion addVersion) {
+        if (null == addVersion) {
+            return BigDecimal.ZERO.intValue();
+        }
+        addVersion.setId(null);
+        return baseDao.insert(addVersion);
     }
 
     @Override
@@ -210,6 +223,62 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
             return Collections.emptyList();
         }
         return allocationList;
+    }
+
+    @Override
+    public void saveGroupConversionResult(List<MpStructureAllocation> allocationResult) {
+        if (CollectionUtils.isEmpty(allocationResult)) {
+            return;
+        }
+        //数据不会太多
+        baseDao.insertBatch(allocationResult);
+    }
+
+    @Override
+    public void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList) {
+        if (CollectionUtils.isEmpty(detailLogList)) {
+            return;
+        }
+        detailLogList.forEach(singleData -> {
+            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
+                singleData.setInventorySalesRatio(BigDecimal.ZERO);
+            }
+        });
+        factoryProductionDayProductionResultDetailService.saveBatch(detailLogList);
+    }
+
+    @Override
+    public void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList) {
+        if (CollectionUtils.isEmpty(dayResultList)) {
+            return;
+        }
+        dayResultList.forEach(singleData -> {
+            if (null == singleData.getAverageSaleQty()) {
+                singleData.setInventorySalesRatio(null);
+                return;
+            }
+            if (null == singleData.getInventorySalesRatio()) {
+                return;
+            }
+            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
+                singleData.setInventorySalesRatio(BigDecimal.ZERO);
+            }
+        });
+        factoryProductionDayProductionResultService.saveBatch(dayResultList);
+    }
+
+    @Override
+    public void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList) {
+        if (CollectionUtils.isEmpty(noProductionPlanList)) {
+            return;
+        }
+        noProductionPlanList.forEach(noProductionPlan -> {
+            String noProductionReason = noProductionPlan.getReason();
+            if (StringUtils.isNotBlank(noProductionReason)) {
+                noProductionPlan.setReason(String.format("[%s]", noProductionReason));
+            }
+        });
+        factoryProductionNoProductionPlanService.saveBatch(noProductionPlanList);
     }
 
     /**

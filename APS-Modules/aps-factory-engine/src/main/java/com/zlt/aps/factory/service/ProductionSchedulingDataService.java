@@ -40,14 +40,6 @@ public interface ProductionSchedulingDataService {
     Map<String, Object> getFactoryParamByCondition(Context context, List<String> paramCodeList);
 
     /**
-     * 增加一条分厂排程版本记录
-     *
-     * @param updateVersion
-     * @return
-     */
-    int addFactoryProductionVersion(MpFactoryProductionVersion updateVersion);
-
-    /**
      * 根据工厂、排产信息获取工厂对应的月计划开停产工作日历
      *
      * @param context
@@ -265,36 +257,6 @@ public interface ProductionSchedulingDataService {
      */
     @Deprecated
     List<PlanOrderSortConfiguration> getProductionConfiguration(ProductionContext context);
-
-    /**
-     * 保存未排计划信息
-     *
-     * @param noProductionPlanList
-     */
-    void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList);
-
-    /**
-     * 保存模具排产明细日志
-     *
-     * @param detailLogList
-     */
-    void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList);
-
-    /**
-     * 保存模具排产结果信息
-     *
-     * @param dayResultList
-     */
-    void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList);
-
-    /**
-     * 保存分组计划的成型转产结果
-     * TBR-为结构
-     * PCR-英寸
-     *
-     * @param allocationResult
-     */
-    void saveGroupConversionResult(List<MpStructureAllocation> allocationResult);
 
     /**
      * 获取分厂成型机、硫化机 机台数
