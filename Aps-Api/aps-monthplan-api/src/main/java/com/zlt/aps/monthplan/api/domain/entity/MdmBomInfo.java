@@ -150,14 +150,14 @@ public class MdmBomInfo extends BaseEntity {
 
     /** MES系统创建时间 */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mdmBomInfo.mesCreateDate", width = 30, dateFormat = "yyyy-MM-dd")
+//    @Excel(name = "ui.data.column.mdmBomInfo.mesCreateDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "MES系统创建时间", name = "mesCreateDate")
     @TableField(value = "MES_CREATE_DATE")
     private Date mesCreateDate;
 
     /** MES更新时间 */
     @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "ui.data.column.mdmBomInfo.mesUpdateDate", width = 30, dateFormat = "yyyy-MM-dd")
+//    @Excel(name = "ui.data.column.mdmBomInfo.mesUpdateDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "MES更新时间", name = "mesUpdateDate")
     @TableField(value = "MES_UPDATE_DATE")
     private Date mesUpdateDate;
@@ -167,7 +167,7 @@ public class MdmBomInfo extends BaseEntity {
      */
     @TableField(exist = false)
     private MdmBomInfo parent;
-    
+
     /**
      * 叶子节点标记（仅用于构建树，默认空值）
      */
