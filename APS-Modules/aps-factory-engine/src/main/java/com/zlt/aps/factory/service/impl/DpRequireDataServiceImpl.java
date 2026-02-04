@@ -3,6 +3,8 @@ package com.zlt.aps.factory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.factory.mapper.FactoryMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.factory.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
@@ -28,6 +30,8 @@ public class DpRequireDataServiceImpl extends AbstractDataService implements DpR
 
     private final MonthPlanRequireMapper monthPlanRequireMapper;
 
+    private final FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
+
     @Override
     public List<DpDemandPlan> getFactoryMonthPlan(Context context) {
         if (isEmptyFactoryAndRequireVersion(context)) {
@@ -42,6 +46,17 @@ public class DpRequireDataServiceImpl extends AbstractDataService implements DpR
         }
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         return monthPlanRequireMapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context) {
+        if (isEmptyFactoryAndYearMonth(context)) {
+            return Collections.emptyList();
+        }
+        String factoryCode = context.getFactoryCode();
+        Integer year = context.getYear();
+        Integer month = context.getMonth();
+        return factoryMonthPlanProductLhCapacityMapper.getCycleStructureMinLhRatioInfo(factoryCode, year, month);
     }
 
 }

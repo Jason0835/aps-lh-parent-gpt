@@ -6,7 +6,7 @@ import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -29,7 +29,7 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
 
     private final IProductionBusinessService tbrCxCapacityAllocationService;
 
-    public WholeCourseProductionService(ProductionSchedulingDataService dataService,
+    public WholeCourseProductionService(ProductionMdmDataService dataService,
                                         DpRequireDataService dpRequireDataService,
                                         MonthProductionDataService monthProductionDataService,
                                         @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService,

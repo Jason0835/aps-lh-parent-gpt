@@ -14,19 +14,13 @@ import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.factory.mapper.*;
-import com.zlt.aps.factory.scheduling.ProductionContext;
-import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultDetailService;
-import com.zlt.aps.factory.service.IFactoryProductionDayProductionResultService;
-import com.zlt.aps.factory.service.IFactoryProductionNoProductionPlanService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.maindata.service.IPlanOrderSortConfigurationService;
 import com.zlt.aps.maindata.service.IProductALevelService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
-import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -47,9 +41,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProductionSchedulingDataServiceImpl implements ProductionSchedulingDataService {
-
-    private final ProductMinConfigurationMapper productMinConfigurationMapper;
+public class ProductionMdmDataServiceImpl extends AbstractDataService implements ProductionMdmDataService {
 
     private final MdmInterestRateEntityMapper interestRateMapper;
 
@@ -75,20 +67,9 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
 
-    private final BaseDao baseDao;
-
     private final IFactoryParamService factoryParamService;
 
     private final IProductALevelService productALevelService;
-
-    private final IPlanOrderSortConfigurationService sortConfigurationService;
-
-    private final IFactoryProductionNoProductionPlanService factoryProductionNoProductionPlanService;
-
-    private final IFactoryProductionDayProductionResultService factoryProductionDayProductionResultService;
-
-    private final IFactoryProductionDayProductionResultDetailService factoryProductionDayProductionResultDetailService;
-
 
     @Override
     public Integer getProductionCycleConfiguration(Context context) {
@@ -106,15 +87,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //数据类型转换
         paramConfigurationMap.forEach((key, paramConfiguration) -> paramValueMap.put(key, getParamValue(paramConfiguration)));
         return paramValueMap;
-    }
-
-    @Override
-    public int addFactoryProductionVersion(MpFactoryProductionVersion addVersion) {
-        if (null == addVersion) {
-            return 0;
-        }
-        addVersion.setId(null);
-        return baseDao.insert(addVersion);
     }
 
     @Override
@@ -148,17 +120,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyList();
         }
         return configurationList;
-    }
-
-    @Override
-    public List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context) {
-        if (isEmptyFactoryAndYearMonth(context)) {
-            return Collections.emptyList();
-        }
-        String factoryCode = context.getFactoryCode();
-        Integer year = context.getYear();
-        Integer month = context.getMonth();
-        return factoryMonthPlanProductLhCapacityMapper.getCycleStructureMinLhRatioInfo(factoryCode, year, month);
     }
 
     @Override
@@ -201,15 +162,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         return capsuleChuckEntityMapper.selectList(queryWrapper);
-    }
-
-    @Override
-    public Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo() {
-        List<BaseConstructionVersionInfoVo> baseConstructionInfoList = factoryProductionSchedulingMapper.getBaseConstructionInfo();
-        if (CollectionUtils.isEmpty(baseConstructionInfoList)) {
-            return Collections.emptyMap();
-        }
-        return baseConstructionInfoList.stream().collect(Collectors.toMap(BaseConstructionVersionInfoVo::getEmbryoCode, Function.identity()));
     }
 
     @Override
@@ -283,49 +235,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public Map<String, Long> getMinimumLotSizeConfiguration(ProductionContext productionContext) {
-        String factoryCode = productionContext.getFactoryCode();
-        Integer year = productionContext.getYear();
-        Integer month = productionContext.getMonth();
-        String monthPlanVersion = productionContext.getMonthPlanVersion();
-        QueryWrapper<ProductMinConfiguration> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("PRODUCT_CODE", "*");
-        queryWrapper.eq("FACTORY_CODE", factoryCode);
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        ProductMinConfiguration general = productMinConfigurationMapper.selectOne(queryWrapper);
-        Long defaultMin = BigDecimal.ZERO.longValue();
-        if (null != general) {
-            defaultMin = Long.valueOf(general.getMinQty());
-        }
-        List<ProductMinConfiguration> requireMinConfigurationList = factoryProductionSchedulingMapper.getRequireMinConfiguration(factoryCode, year, month, monthPlanVersion);
-        if (CollectionUtils.isEmpty(requireMinConfigurationList)) {
-            return Collections.emptyMap();
-        }
-        Map<String, Long> minimumLotSizeMap = new HashMap<>();
-        for (ProductMinConfiguration requireMinConfiguration : requireMinConfigurationList) {
-            Integer minQty = requireMinConfiguration.getMinQty();
-            String productCode = requireMinConfiguration.getProductCode();
-            if (StringUtils.isBlank(productCode)) {
-                continue;
-            }
-            if (null == minQty) {
-                minimumLotSizeMap.put(productCode, defaultMin);
-            } else {
-                minimumLotSizeMap.put(productCode, Long.valueOf(minQty));
-            }
-        }
-        return minimumLotSizeMap;
-    }
-
-    @Override
-    public List<ProductionGroupVo> getFactoryProductionGroupConfiguration(String factoryCode) {
-        if (StringUtils.isBlank(factoryCode)) {
-            return Collections.emptyList();
-        }
-        return factoryProductionSchedulingMapper.getFactoryProductionGroupConfiguration(factoryCode);
-    }
-
-    @Override
     public List<MonthPlanProductMouldInfoVo> getProductionMouldInfo(Context context) {
         return factoryMonthPlanProductMouldMapper.getProductionMouldInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion());
     }
@@ -367,82 +276,8 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
     }
 
     @Override
-    public Map<String, FactoryNoProduction> getFactoryNoProductionConfiguration(String factoryCode, Integer year, Integer month) {
-        List<FactoryNoProduction> noProductionList = factoryProductionSchedulingMapper.getFactoryNoProductionConfiguration(factoryCode, year, month);
-        if (CollectionUtils.isEmpty(noProductionList)) {
-            return Collections.emptyMap();
-        }
-        return noProductionList.stream().collect(Collectors.toMap(FactoryNoProduction::getMaterialCode, Function.identity()));
-    }
-
-    @Override
     public List<MdmInterestRate> getInterestRateConfiguration() {
         return interestRateMapper.selectList(new QueryWrapper<>());
-    }
-
-    @Override
-    public List<PlanOrderSortConfiguration> getProductionConfiguration(ProductionContext context) {
-        List<PlanOrderSortConfiguration> sortConfigurationList = sortConfigurationService.getProductionConfiguration(context.getFactoryCode());
-        if (CollectionUtils.isEmpty(sortConfigurationList)) {
-            return Collections.emptyList();
-        }
-        return sortConfigurationList;
-    }
-
-    @Override
-    public void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList) {
-        if (CollectionUtils.isEmpty(noProductionPlanList)) {
-            return;
-        }
-        noProductionPlanList.forEach(noProductionPlan -> {
-            String noProductionReason = noProductionPlan.getReason();
-            if (StringUtils.isNotBlank(noProductionReason)) {
-                noProductionPlan.setReason(String.format("[%s]", noProductionReason));
-            }
-        });
-        factoryProductionNoProductionPlanService.saveBatch(noProductionPlanList);
-    }
-
-    @Override
-    public void saveMouldProductionDetailLog(List<FactoryMonthPlanMouldDayDetail> detailLogList) {
-        if (CollectionUtils.isEmpty(detailLogList)) {
-            return;
-        }
-        detailLogList.forEach(singleData -> {
-            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
-                singleData.setInventorySalesRatio(BigDecimal.ZERO);
-            }
-        });
-        factoryProductionDayProductionResultDetailService.saveBatch(detailLogList);
-    }
-
-    @Override
-    public void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList) {
-        if (CollectionUtils.isEmpty(dayResultList)) {
-            return;
-        }
-        dayResultList.forEach(singleData -> {
-            if (null == singleData.getAverageSaleQty()) {
-                singleData.setInventorySalesRatio(null);
-                return;
-            }
-            if (null == singleData.getInventorySalesRatio()) {
-                return;
-            }
-            if (singleData.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
-                singleData.setInventorySalesRatio(BigDecimal.ZERO);
-            }
-        });
-        factoryProductionDayProductionResultService.saveBatch(dayResultList);
-    }
-
-    @Override
-    public void saveGroupConversionResult(List<MpStructureAllocation> allocationResult) {
-        if (CollectionUtils.isEmpty(allocationResult)) {
-            return;
-        }
-        //数据不会太多
-        baseDao.insertBatch(allocationResult);
     }
 
     @Override
@@ -555,61 +390,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             productionDaySet.add(productionDay);
         }
         cxMachineInfo.setTheoryProductionDaySet(productionDaySet);
-    }
-
-    /**
-     * 是否空的工厂、年份、月份、需求版本、排产版本条件
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryAndProductionVersion(Context context) {
-        boolean isEmptyFactoryAndRequireVersion = isEmptyFactoryAndRequireVersion(context);
-        if (isEmptyFactoryAndRequireVersion) {
-            return true;
-        }
-        return StringUtils.isBlank(context.getProductionVersion());
-    }
-
-    /**
-     * 是否空的工厂、年份、月份、需求版本
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryAndRequireVersion(Context context) {
-        boolean isEmptyFactoryAndYearMonth = isEmptyFactoryAndYearMonth(context);
-        if (isEmptyFactoryAndYearMonth) {
-            return true;
-        }
-        return StringUtils.isBlank(context.getMonthPlanVersion());
-    }
-
-    /**
-     * 是否空的工厂及年份、月份查询条件
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryAndYearMonth(Context context) {
-        boolean isEmptyFactoryCode = isEmptyFactoryCode(context);
-        if (isEmptyFactoryCode) {
-            return true;
-        }
-        return null == context.getYear() || null == context.getMonth();
-    }
-
-    /**
-     * 是否空的工厂查询条件
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    private boolean isEmptyFactoryCode(Context context) {
-        if (null == context) {
-            return true;
-        }
-        return StringUtils.isBlank(context.getFactoryCode());
     }
 
 }

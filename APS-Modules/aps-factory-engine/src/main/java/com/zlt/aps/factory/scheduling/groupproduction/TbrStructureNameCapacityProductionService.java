@@ -4,7 +4,7 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 @Service(value = "tbrCapacityAllocationService")
 public class TbrStructureNameCapacityProductionService extends AbstractProductionBusinessService {
 
-    public TbrStructureNameCapacityProductionService(ProductionSchedulingDataService dataService,
+    public TbrStructureNameCapacityProductionService(ProductionMdmDataService dataService,
                                                      DpRequireDataService dpRequireDataService,
                                                      MonthProductionDataService monthProductionDataService) {
         super(dataService, dpRequireDataService, monthProductionDataService);

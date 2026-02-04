@@ -21,7 +21,7 @@ import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.monthplan.api.domain.vo.MpCheckItemVo;
@@ -50,7 +50,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
     @Autowired
     private IMpCheckItemRecordService iMpCheckItemRecordService;
 
-    public MpCheckItemServiceImpl(ProductionSchedulingDataService dataService,
+    public MpCheckItemServiceImpl(ProductionMdmDataService dataService,
                                   DpRequireDataService dpRequireDataService,
                                   MonthProductionDataService monthProductionDataService,
                                   ProductionHistoryHandler productionHistoryHandler) {

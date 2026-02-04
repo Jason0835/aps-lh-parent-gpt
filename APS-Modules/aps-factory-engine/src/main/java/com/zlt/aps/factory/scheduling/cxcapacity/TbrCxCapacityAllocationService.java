@@ -19,7 +19,7 @@ import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.InitNoProductionRecordService;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
@@ -73,7 +73,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     private final InitNoProductionRecordService initNoProductionRecordService;
 
-    public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
+    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
                                           MonthProductionDataService monthProductionDataService,
                                           InitNoProductionRecordService initNoProductionRecordService,
@@ -362,7 +362,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(allAllocationList)) {
             return Collections.emptyList();
         }
-        getDataService().saveGroupConversionResult(allAllocationList);
+        getMonthProductionDataService().saveGroupConversionResult(allAllocationList);
         return allAllocationList;
     }
 
@@ -400,12 +400,12 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(detailLogList)) {
             return Collections.emptyMap();
         }
-        getDataService().saveMouldProductionDetailLog(detailLogList);
+        getMonthProductionDataService().saveMouldProductionDetailLog(detailLogList);
         //构建未排信息
         Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
-        getDataService().saveMouldProductionResult(dayResultList);
+        getMonthProductionDataService().saveMouldProductionResult(dayResultList);
         return sumProductionMap;
     }
 
@@ -418,7 +418,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;
         }
-        getDataService().saveNoProductionPlan(noProductionPlanList);
+        getMonthProductionDataService().saveNoProductionPlan(noProductionPlanList);
     }
 
     private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {

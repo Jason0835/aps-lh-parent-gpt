@@ -1,6 +1,7 @@
 package com.zlt.aps.factory.service;
 
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 
 import java.util.List;
@@ -21,5 +22,13 @@ public interface DpRequireDataService {
      * @return
      */
     List<DpDemandPlan> getFactoryMonthPlan(Context context);
+
+    /**
+     * 获取周期结构的最低硫化配比信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context);
 
 }
