@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.api.domain.dto;
 
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import io.swagger.annotations.ApiModelProperty;
@@ -154,11 +155,8 @@ public class MpRollAdjustContextDTO implements Serializable {
     private Map<String, Object> paramMap;
 
     @ApiModelProperty(value = "工作日历")
-    private List<MdmWorkCalendar> workCalendarList;
+    private Map<Integer, MdmWorkCalendar> workCalendarMap;
 
-    @ApiModelProperty(value = "日型腔数Map")
-    private Map<Integer, Map<String,Integer>> dailyCavityMap;
-
-    @ApiModelProperty(value = "日活块数Map")
-    private Map<Integer, Map<String,Integer>> dailyBlockMap;
+    @ApiModelProperty(value = "型腔与活块Map")
+    private Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap;
 }

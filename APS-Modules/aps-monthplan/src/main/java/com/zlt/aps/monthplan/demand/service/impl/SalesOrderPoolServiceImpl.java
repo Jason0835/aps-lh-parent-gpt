@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -143,6 +144,11 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			result.addAll(salesOrderPoolEntityMapper.selectList(wrapper));
 		}
 		return result;
+	}
+
+	@Override
+	public List<SalesOrderPool> findAdjustSalesOrderPool(DpDemandPlan createCondition) {
+		return salesOrderPoolEntityMapper.findAdjustSalesOrderPool(createCondition);
 	}
 
 	/**

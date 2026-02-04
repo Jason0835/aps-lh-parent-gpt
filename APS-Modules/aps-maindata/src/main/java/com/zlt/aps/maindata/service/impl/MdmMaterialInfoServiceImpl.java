@@ -747,5 +747,20 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
         }
         return result;
     }
+
+    @Override
+    public Map<String, MdmMaterialInfo> findAdjustMaterialInfo(DpDemandPlan createCondition) {
+        List<MdmMaterialInfo> materialInfos = this.mdmMaterialInfoEntityMapper.findAdjustMaterialInfo(createCondition);
+        if(CollectionUtils.isEmpty(materialInfos)){
+            return Collections.emptyMap();
+        }
+        return materialInfos.stream()
+            .filter(Objects::nonNull)
+            .filter(material -> StringUtils.isNotBlank(material.getMaterialCode()))
+            .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode,
+                material -> material,
+                (existing, replacement) -> existing
+            ));
+    }
 }
 

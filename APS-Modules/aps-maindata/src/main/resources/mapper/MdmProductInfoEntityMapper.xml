@@ -95,6 +95,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         tmpi.MATERIAL_CATEGORY,
         tmpi.PRODUCT_CATEGORY,
         tmpi.STRUCTURE_NAME,
+        tmpi.MES_MATERIAL_CATEGORY,
+        tmpi.MES_MATERIAL_SUBCATEGORY,
+        tmpi.MES_MATERIAL_CATE_NAME,
+        tmpi.MES_MATERIAL_SUBCAT_NAME,
                mmmr.MOULD_NO,
                mmmr.SPEC_CODE,
                mmmr.MOULD_NUMBER,
@@ -243,6 +247,49 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{materialCode}
         </foreach>
     </select>
+
+
+  <select id="findAdjustMaterialInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+          SELECT
+            mi.FACTORY_CODE,
+            mi.MES_MATERIAL_CATEGORY,
+            mi.MES_MATERIAL_SUBCATEGORY,
+            mi.MES_MATERIAL_CATE_NAME,
+            mi.MES_MATERIAL_SUBCAT_NAME,
+            mi.MATERIAL_CATEGORY,
+            mi.PRODUCT_CATEGORY,
+            mi.STRUCTURE_NAME,
+            mi.MATERIAL_CODE,
+            mi.MES_MATERIAL_CODE,
+            mi.MATERIAL_DESC,
+            mi.SPECIFICATIONS,
+            mi.MAIN_PATTERN,
+            mi.PATTERN,
+            mi.BRAND,
+            mi.SPEED,
+            mi.HIERARCHY,
+            mi.PRO_SIZE,
+            mi.ABILITY,
+            mi.CANT_PRODUCE,
+            mi.EMBRYO_CODE,
+            mi.EMBRYO_DESC,
+            mi.SECTION_WIDTH,
+            mi.PRODUCT_TYPE_CODE,
+            mi.PRODUCT_TYPE_NAME,
+            mi.MOULD_CATEGORY,
+            mi.TIRE_TYPE,
+            mi.COMMON_TYPE
+          FROM t_mdm_material_info mi
+                 INNER JOIN T_MP_STRUCTURE_ALLOCATION msa
+                            ON msa.STRUCTURE_NAME = mi.STRUCTURE_NAME
+                              AND msa.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                              AND msa.`YEAR` = #{year,jdbcType=DECIMAL}
+                              AND msa.`MONTH` = #{month,jdbcType=DECIMAL}
+                              AND msa.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                              AND msa.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                              AND msa.IS_DELETE = 0
+          WHERE mi.IS_DELETE = 0
+  </select>
 
     <update id="updateMainPatternToMaterial">
         UPDATE T_MDM_MATERIAL_INFO t1

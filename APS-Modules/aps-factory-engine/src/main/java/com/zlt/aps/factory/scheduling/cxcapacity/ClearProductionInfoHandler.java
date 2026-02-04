@@ -47,6 +47,8 @@ public class ClearProductionInfoHandler {
                 singleMouldInfo.setDayProductionInfo(new HashMap<>());
             });
         }
+        //清空Sku排产限制情况
+        productionContext.clearSkuProductionLimitInfo();
         //清除模壳使用量
         productionContext.clearAllMouldShellUsed();
         //清除模具分配使用量

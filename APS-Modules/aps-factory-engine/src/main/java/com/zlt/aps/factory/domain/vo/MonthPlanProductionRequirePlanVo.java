@@ -516,6 +516,15 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 单独增加不排产原因
+     *
+     * @param addNoProductionReason
+     */
+    public void singleAddNoProductionReason(String addNoProductionReason) {
+        addNoProductionReason(addNoProductionReason);
+    }
+
+    /**
      * 获取模具分配比例控制key
      * 结构+主花纹
      *
@@ -776,7 +785,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
-     *  分组：结构+主花纹
+     * 分组：结构+主花纹
+     *
      * @return 分组
      */
     public String getGroupKey() {
