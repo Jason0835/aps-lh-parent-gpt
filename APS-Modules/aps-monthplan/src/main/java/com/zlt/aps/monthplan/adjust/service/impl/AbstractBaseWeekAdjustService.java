@@ -341,8 +341,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         checkFieldMap.put("mainMaterialDesc", "主物料胎胚号");
         checkFieldMap.put("mainPattern", "主花纹");
         checkFieldMap.put("curingTime", "硫化时间");
-        checkFieldMap.put("mouldCavityQty", "型腔数量");
-        checkFieldMap.put("typeBlockQty", "活块数量");
+//        checkFieldMap.put("mouldCavityQty", "型腔数量");
+//        checkFieldMap.put("typeBlockQty", "活块数量");
         checkFieldMap.put("dayVulcanizationQty", "日硫化量单模");
         return Collections.unmodifiableMap(checkFieldMap);
     }
@@ -687,7 +687,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
-            monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
+            monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
             monthPlan.setId(null);
             monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
@@ -1278,7 +1278,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         if (contextDTO.getMpYear() != null && contextDTO.getMpMonth() != null) {
             // 年月
-            contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + String.format("%02d",contextDTO.getMpMonth())));
+            contextDTO.setYearMonth(Integer.valueOf(String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth())));
             // 获取定稿的月度计划
             FactoryMonthPlanFinalAdjustVo monthPlan = getIsFinalMonthPlan(contextDTO);
             if (monthPlan != null) {
