@@ -281,7 +281,7 @@ public abstract class AbstractDailyCapacityLimit {
                 //Map<主花纹,余量大于日计划量/2 的减模机台数>
                 closeNoAddMachinesDecMould += countPatternCloseNoAddMachines(patternNoAddDecMouldMap,dailyLhQty, mpFinalVo,paramMap,dayField);
                 //Map<主花纹,前SKU收尾量与日硫化量差异<40条 的减模机台数>
-                closeNoChangeMachinesDecMould += countPatternCloseNoChangeMachines(patternNoChangeDecMouldMap,dailyLhQty, mpFinalVo,paramMap,dayField);
+                closeNoChangeMachinesDecMould += countPatternCloseNoChangeMachines(patternNoChangeDecMouldMap,dailyLhQty, mpFinalVo,paramMap,dayField,dailyCapacityLimitVo);
                 //Map<主花纹,余量与日硫化量差异数<=8 的减模机台数>
                 //countPatternCloseDiffDailyQtyMachines(patternDiffDailyQtyDecMouldMap,dailyLhQty,mpFinalVo,paramMap,dayField);
             }else{
@@ -444,12 +444,16 @@ public abstract class AbstractDailyCapacityLimit {
      * @param patternMachinesMap
      * @param mpFinalVo
      */
-    private int countPatternCloseNoChangeMachines(Map<String, Integer> patternMachinesMap, Integer dailyLhQty,BaseEntity mpFinalVo, Map<String,Object> paramMap,String dayField) {
+    private int countPatternCloseNoChangeMachines(Map<String, Integer> patternMachinesMap, Integer dailyLhQty,BaseEntity mpFinalVo, Map<String,Object> paramMap,String dayField,MpDailyCapacityLimitVo dailyCapacityLimitVo) {
         // 日硫化量 = 单模硫化量 * 2；
         //Integer dailyLhQty = getDayVulcanizationQty(mpFinalVo);
         int remainQty = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) % dailyLhQty;
         int iCount = 0;
         int changeTypeBlockDiffQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode());
+        if (dailyCapacityLimitVo.isOpenProductionFirstDay()){
+            //若开产首日，将日硫化量等比例减，奇数+1
+            changeTypeBlockDiffQty = getProportionalDeductQty(dailyCapacityLimitVo,changeTypeBlockDiffQty);
+        }
         //前SKU的收尾量与日硫化量差异<=40条(32+8)（有收尾但当日不能换活字块）
         if (dailyLhQty - remainQty <= changeTypeBlockDiffQty){
             iCount += 1;
