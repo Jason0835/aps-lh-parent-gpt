@@ -333,6 +333,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setProductType(productType);
 			newVO.setSalCode(vo.getSalCode());
 			newVO.setSalCodePo(salCodePo);
+            newVO.setLocationType(vo.getLocationType());
 			newVO.setSalNCode(vo.getSalNCode());
 			newVO.setWeekYear(vo.getWeekYearRequirement());
 			newVO.setScmDetailId(vo.getId());

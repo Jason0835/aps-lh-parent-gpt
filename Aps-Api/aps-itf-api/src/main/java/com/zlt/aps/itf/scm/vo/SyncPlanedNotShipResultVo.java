@@ -89,6 +89,12 @@ public class SyncPlanedNotShipResultVo {
 	private String salCodePo;
 
 	/**
+	 * 内外销
+	 */
+    @ApiModelProperty(value = "内外销", name = "locationType")
+    private String locationType;
+
+	/**
 	 * 原物料编码
 	 */
 	@ApiModelProperty(value = "原物料编码")
