@@ -181,6 +181,7 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 更新设置整个分组计划不排产
+     * 没有达到起排量
      */
     public void setNoProductionNoReachMinProductionDays(Integer minProductionDays) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -191,6 +192,17 @@ public class ProductionPlanGroupInfo {
         needCxCapacityMachineCount = BigDecimal.ZERO;
         String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
+    }
+
+    /**
+     * 更新设置整个分组不排产-没有成型硫化配比配置
+     */
+    public void setNoProductionNoCxMachineLhRatio() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        String noConfigurationLhRatioReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GROUP_NO_CONFIGURATION_LH_RATION);
+        groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noConfigurationLhRatioReason));
     }
 
     /**
@@ -275,9 +287,6 @@ public class ProductionPlanGroupInfo {
      */
     public boolean isBelowMinProductionDays(Integer minProductionDays) {
         if (null == minProductionDays || null == theoryDays) {
-            return true;
-        }
-        if (theoryDays <= BigDecimal.ZERO.intValue()) {
             return true;
         }
         return theoryDays < minProductionDays;
@@ -449,8 +458,11 @@ public class ProductionPlanGroupInfo {
         }
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> {
+            //前一日排产情况
             GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
-            return !dayLimit.isReachLimitByMouldNumber(previousDayLimit);
+            //后一日排产情况
+            GroupPlanCxLhCapacityLimitHelper nexDayLimit = getNextDayInfo(dayLimit);
+            return !dayLimit.isReachLimitByMouldNumber(previousDayLimit, nexDayLimit);
         }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
@@ -1364,20 +1376,45 @@ public class ProductionPlanGroupInfo {
         List<Integer> productionDayList = new ArrayList<>(dayProductionLimitInfo.keySet());
         Collections.sort(productionDayList);
         //获取各排产日所在位置
-        Map<Integer, Integer> productionDayPositionMap = new HashMap<>();
-        int positionIndex = BigDecimal.ZERO.intValue();
-        for (Integer singleProductionDay : productionDayList) {
-            productionDayPositionMap.put(singleProductionDay, positionIndex);
-            positionIndex = positionIndex + BigDecimal.ONE.intValue();
-        }
+        Map<Integer, Integer> productionDayPositionMap = getProductionDayPositionInfo();
         //得到排产日所在位置
         int productionPosition = productionDayPositionMap.get(productionDay);
         if (productionPosition == BigDecimal.ZERO.intValue()) {
             return null;
         }
-        //得到前一个排产日
+        //得到前一个排产日-根据位置
         Integer previousDay = productionDayList.get(productionPosition - BigDecimal.ONE.intValue());
         return dayProductionLimitInfo.get(previousDay);
+    }
+
+    /**
+     * 得到当前排产信息后一日的排产信息
+     *
+     * @param currentLimit 当前排产信息
+     * @return
+     */
+    private GroupPlanCxLhCapacityLimitHelper getNextDayInfo(GroupPlanCxLhCapacityLimitHelper currentLimit) {
+        if (null == currentLimit) {
+            return null;
+        }
+        Integer productionDay = currentLimit.getDay();
+        if (null == productionDay || !dayProductionLimitInfo.containsKey(productionDay)) {
+            return null;
+        }
+        //获取所有排产日，并按排产日排序
+        List<Integer> productionDayList = new ArrayList<>(dayProductionLimitInfo.keySet());
+        Collections.sort(productionDayList);
+        //获取各排产日所在位置
+        Map<Integer, Integer> productionDayPositionMap = getProductionDayPositionInfo();
+        //得到排产日所在位置
+        int productionPosition = productionDayPositionMap.get(productionDay);
+        int maxIndex = productionDayList.size() - BigDecimal.ONE.intValue();
+        if (productionPosition == maxIndex) {
+            return null;
+        }
+        //得到后一个排产日-根据位置
+        Integer nextDay = productionDayList.get(productionPosition + BigDecimal.ONE.intValue());
+        return dayProductionLimitInfo.get(nextDay);
     }
 
     /**
@@ -1436,6 +1473,29 @@ public class ProductionPlanGroupInfo {
             return previousDay;
         }
         return getPreviousDay(previousDay);
+    }
+
+    /**
+     * 获取各排产日所处位置
+     * 返还排产日及排产位置index
+     *
+     * @return
+     */
+    private Map<Integer, Integer> getProductionDayPositionInfo() {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return Collections.emptyMap();
+        }
+        //获取所有排产日，并按排产日排序
+        List<Integer> productionDayList = new ArrayList<>(dayProductionLimitInfo.keySet());
+        Collections.sort(productionDayList);
+        //获取各排产日所在位置
+        Map<Integer, Integer> productionDayPositionMap = new HashMap<>();
+        int positionIndex = BigDecimal.ZERO.intValue();
+        for (Integer singleProductionDay : productionDayList) {
+            productionDayPositionMap.put(singleProductionDay, positionIndex);
+            positionIndex = positionIndex + BigDecimal.ONE.intValue();
+        }
+        return productionDayPositionMap;
     }
 
     /**

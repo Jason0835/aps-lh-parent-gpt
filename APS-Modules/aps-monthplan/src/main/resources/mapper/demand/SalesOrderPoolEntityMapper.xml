@@ -3,6 +3,48 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper">
+
+  <select id="findAdjustSalesOrderPool" resultType="com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool">
+          SELECT
+            sop.FACTORY_CODE,
+            sop.PRODUCT_TYPE,
+            sop.ORDER_PRIORITY,
+            sop.AREA,
+            sop.SAL_CODE,
+            sop.SAL_N_CODE,
+            sop.NAT_CODE,
+            sop.BRAND,
+            sop.SAL_CODE_PO,
+            sop.BILL_DATE,
+            sop.ORI_MATERIAL_CODE,
+            sop.MATERIAL_DESC,
+            sop.ORD_QTY,
+            sop.WEEK_YEAR,
+            sop.IS_UNIFORMITY,
+            sop.IS_DYNAMIC_BALANCE,
+            sop.IS_EUDR,
+            sop.DELIVER_GOODS_TYPE,
+            sop.SCM_PRIORITY,
+            sop.SCM_DETAIL_ID,
+            sop.ORDER_STATUS
+          FROM (
+                 SELECT DISTINCT STRUCTURE_NAME
+                 FROM T_MP_STRUCTURE_ALLOCATION
+                 WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                   AND `YEAR` = #{year,jdbcType=DECIMAL}
+                   AND `MONTH` = #{month,jdbcType=DECIMAL}
+                   AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                   AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                   AND IS_DELETE = 0
+               ) filtered_structures
+                 INNER JOIN t_mdm_material_info  mi
+                            ON mi.STRUCTURE_NAME = filtered_structures.STRUCTURE_NAME
+                              AND mi.IS_DELETE = 0
+                 INNER JOIN T_DP_SALES_ORDER_POOL  sop
+                            ON sop.ORI_MATERIAL_CODE = mi.MATERIAL_CODE
+                              AND sop.IS_DELETE = 0
+  </select>
+
 	<insert id="batchInsert">
 		INSERT INTO T_DP_SALES_ORDER_POOL (
 			FACTORY_CODE,

@@ -5,6 +5,7 @@ import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.bill.common.service.IDocService;
 
@@ -66,8 +67,14 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
     void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO);
 
     /**
-     * 初始工作日历
+     * 获取工作日历
      * @param contextDTO
      */
-    List<MdmWorkCalendar> getWorkCalendarList(MpRollAdjustContextDTO contextDTO);
+    Map<Integer, MdmWorkCalendar> getWorkCalendarMap(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 获取每日型腔/活块数量
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    Map<Integer, DailyMouldAvailabilityResult> getCavityAndBlockQtyMap(MpRollAdjustContextDTO contextDTO);
 }

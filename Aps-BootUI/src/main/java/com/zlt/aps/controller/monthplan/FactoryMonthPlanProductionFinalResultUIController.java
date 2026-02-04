@@ -77,34 +77,9 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
     @PostMapping("/listSkuScheduleItems")
     @ApiOperation("获取SKU排产明细")
     public TableDataInfo listSkuScheduleItems(FactoryMonthPlanProductionFinalResultParam param) {
-        if (null == param || null == param.getMonth() || null == param.getYear() || StringUtils.isBlank(param.getFactoryCode())) {
-            throw new BusinessException(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
-        }
-        FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
-        BeanUtils.copyProperties(param, condition);
-        return iFactoryMonthPlanProductionFinalResultService.list(condition);
+        return iFactoryMonthPlanProductionFinalResultService.listSkuScheduleItems(param);
     }
 
-
-
-
-
-    private void sortSkuScheduleItem(List<FactoryMonthPlanProductionFinalResult> list) {
-        if (PubUtil.isEmpty(list)) {
-            return;
-        }
-        Collections.sort(list, getSkuScheduleItemSortComparator());
-    }
-
-    private Comparator<FactoryMonthPlanProductionFinalResult> getSkuScheduleItemSortComparator() {
-        return Comparator
-                .comparing(FactoryMonthPlanProductionFinalResult::getCxMachineCode,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(FactoryMonthPlanProductionFinalResult::getStructureName,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-    }
 
     /**
      * 校验工厂月生产计划-最终排产计划定稿唯一性

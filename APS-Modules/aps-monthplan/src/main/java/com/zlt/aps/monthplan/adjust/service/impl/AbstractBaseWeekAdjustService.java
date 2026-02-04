@@ -13,15 +13,15 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
+import com.tlt.aps.constant.IncrementConstant;
 import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.IncrementService;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
-import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -170,6 +170,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected BaseDao baseDao;
+
+    @Autowired
+    protected IncrementService incrementService;
 
 
     @Override
@@ -514,20 +517,32 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             queryAdjustDetailList(contextDTO);
             // 3、查询月度生产计划
             queryMonthPlanList(contextDTO);
-            // 4、更新月度生产计划
-            updateMonthPlanList(contextDTO);
-            // 5、新增月度生产计划
-            insertMonthPlanList(contextDTO);
-            // 6、更新调整明细
+            // 4、更新调整明细
             updateAdjustDetailList(contextDTO);
+            // 5、更新月度生产计划
+            updateMonthPlanList(contextDTO);
+            // 6、新增月度生产计划
+            insertMonthPlanList(contextDTO);
             // 7、更新试制量制计划
             updateTrialPlanList(contextDTO);
-            // 8、记录调整操作日志 TODO
+            // 8、更新结构转产
+            updateStructureAllocationList(contextDTO);
+            // 9、记录调整操作日志 TODO
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
             throw new BusinessException("周程调整确认失败：" + e.getMessage());
         }
+    }
+
+
+    /**
+     * 更新结构转产
+     *
+     * @param contextDTO
+     */
+    protected void updateStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
+
     }
 
 
@@ -642,18 +657,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
             return;
         }
-        // 工单号
-        String productionNo = "";
         // 最新需求计划版本
         String lastMonthPlanVersion = "";
         if (PubUtil.isNotEmpty(monthPlanProdFinalList)) {
-            productionNo = monthPlanProdFinalList.get(0).getProductionNo();
             lastMonthPlanVersion = monthPlanProdFinalList.get(0).getLastMonthPlanVersion();
         }
         // 调整结果按照物料编码分组
         Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
         // 月度生产计划排程结果
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = new ArrayList<>();
+        // 批次号前缀
+        String prefixKey = IncrementConstant.MONTH_FINAL + com.ruoyi.common.core.utils.DateUtils.dateTimeNow("yyMMdd");
+        // 批次号
+        String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
         for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
             String isSkuAdd = adjustDetailVo.getIsSkuAdd();
@@ -668,11 +684,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
-            monthPlan.setProductionNo(productionNo);
+//            monthPlan.setMesMaterialCode(adjustResult.getMesMaterialCode());
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
             monthPlan.setId(null);
+            String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
+            monthPlan.setProductionNo(productionNo);
+            // 实际生产需求含损耗 = 净需求量汇总
+            Integer factProdReqQty = Convert.toInt(adjustDetailVo.getCurrentNetQty(), 0);
+            monthPlan.setFactProdReqQty(factProdReqQty);
+            // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
+            Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
+            monthPlan.setDifferenceQty(differenceQty);
+            // 获取周数
+            int week = getWeekNumber(new Date());
+            // 调整量
+            monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetailVo.getActualAdjustQty());
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -839,17 +867,29 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     log.error("更新月度生产计划：物料:{}的结束日期转换失败，跳过", materialCode, e);
                 }
             }
+            // 生产实际排产量
             monthPlanVo.setTotalQty(adjustResult.getTotalQty());
+            // 高优先级排产数量
             monthPlanVo.setHeightProductionQty(adjustResult.getHeightProductionQty());
+            // 中优先级排产数量
             monthPlanVo.setMidProductionQty(adjustResult.getMidProductionQty());
+            // 周期排产储备排产数量
             monthPlanVo.setCycleProductionQty(adjustResult.getCycleProductionQty());
+            // 常规储备排产数量
             monthPlanVo.setConventionProductionQty(adjustResult.getConventionProductionQty());
+            // 暂缓订单排产数量
             monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
+            // 试制量试排产量
             monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
-            monthPlanVo.setDifferenceQty(adjustResult.getDifferenceQty());
-
+            // 实际生产需求含损耗 = 净需求量汇总
+            Integer factProdReqQty = Convert.toInt(adjustDetail.getCurrentNetQty(), 0);
+            monthPlanVo.setFactProdReqQty(factProdReqQty);
+            // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
+            Integer differenceQty = Convert.toInt(factProdReqQty, 0) - Convert.toInt(monthPlanVo.getTotalQty(), 0);
+            monthPlanVo.setDifferenceQty(differenceQty);
             // 获取周数
             int week = getWeekNumber(new Date());
+            // 调整量
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetail.getActualAdjustQty());
         }
         // 更新月度生产计划
@@ -863,6 +903,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     }
 
+    /**
+     * 根据时间获取周次
+     * 范围：第1周1-7，第2周8-14，第3周15-21，第4周22-31
+     * @param date
+     * @return
+     */
     protected int getWeekNumber(Date date) {
         int dayOfMonth = DateUtil.dayOfMonth(date);
         int baseWeek = (dayOfMonth - 1) / 7 + 1;
@@ -1897,6 +1943,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
+            adjustDetailVo.setMesMaterialCode(materialInfo.getMesMaterialCode());
             adjustDetailVo.setMaterialDesc(materialInfo.getMaterialDesc());
             adjustDetailVo.setProductTypeCode(materialInfo.getProductTypeCode());
             adjustDetailVo.setBrand(materialInfo.getBrand());
@@ -1915,7 +1962,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 施工阶段
                 adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
                 // 产品状态
-                adjustDetailVo.setProductStatus(trialPlan.getTrialStatus());
+                String productStatus = null;
+                if (ConstructionStageEnum.MEASUREMENT.getStage().equals(trialPlan.getTrialStatus())) {
+                    productStatus = ConstructionStageEnum.MEASUREMENT_FLAG;
+                }
+                if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(trialPlan.getTrialStatus())) {
+                    productStatus = ConstructionStageEnum.TRIAL_FLAG;
+                }
+                adjustDetailVo.setProductStatus(productStatus);
                 // 紧急程度
                 adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
                 // 制造示方书号
@@ -1927,6 +1981,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 有月度生产计划时，赋值关联字段
         adjustDetailVo.setIsSkuAdd(ApsConstant.FALSE);
+        adjustDetailVo.setMesMaterialCode(monthPlan.getMesMaterialCode());
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
         adjustDetailVo.setProductStatus(monthPlan.getProductStatus());
@@ -2037,6 +2092,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setYear(contextDTO.getMpYear());
         queryVo.setMonth(contextDTO.getMpMonth());
         queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
+        queryVo.setProductionVersion(contextDTO.getProductionVersion());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
     }
@@ -2045,11 +2101,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 计算型腔、活块可用量最大值
      * @param contextDTO
      */
-    protected Map<String, Object> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
-        int day = DateUtil.dayOfMonth(new Date());
-        Date currentDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
+    protected List<DailyMouldAvailabilityResult> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(), currentDate, null);
+                contextDTO.getFactoryCode(), new Date(), null);
     }
 
     /**
@@ -2060,7 +2114,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 创建计时器
         StopWatch watch = new StopWatch();
         watch.start();
-        Map<String, Object> moldCavityInsertMap;
+        List<DailyMouldAvailabilityResult> moldCavityInsertMap;
         try {
             // 计算型腔、活块可用量最大值
             moldCavityInsertMap = calculateMoldCavityInsertMaxValue(contextDTO);
@@ -2080,9 +2134,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 调整明细列表
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 型腔可用量（按结构+主花纹分组）
-        Map<String, Integer> cavityResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "cavityResults", new HashMap<>());
+        Map<String, Integer> cavityResults = moldCavityInsertMap.get(0).getCavityResults();
         // 活块可用量（按物料描述分组）
-        Map<String, Integer> insertResults = (Map<String, Integer>) MapUtils.getObject(moldCavityInsertMap, "insertResults", new HashMap<>());
+        Map<String, Integer> insertResults = moldCavityInsertMap.get(0).getInsertResults();
         log.info("计算型腔、活块可用量最大值 ==> 型腔可用量:{} 活块可用量:{}", JSONObject.toJSONString(cavityResults), JSONObject.toJSONString(insertResults));
         // 遍历
         for (MpAdjustDetailVo adjust : adjustList) {

@@ -3,5 +3,48 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.monthplan.demand.mapper.SupplyOrderPoolEntityMapper">
-
+  <select id="findAdjustSupplyOrderPool" resultType="com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool">
+          SELECT
+            sop.FACTORY_CODE,
+            sop.`YEAR`,
+            sop.`MONTH`,
+            sop.PRODUCT_TYPE_CODE,
+            sop.LOCATION_TYPE,
+            sop.PRODUCT_CATEGORY,
+            sop.ORDER_TYPE,
+            sop.SALE_AREA,
+            sop.BRAND,
+            sop.MATERIAL_CODE,
+            sop.MATERIAL_DESC,
+            sop.QTY,
+            sop.THREE_AVERAGE_QTY,
+            sop.SIX_AVERAGE_QTY,
+            sop.DELIVERY_FREQUENCY,
+            sop.STRUCTURE_FREQUENCY,
+            sop.THREE_OVERDUE_STOCK_QTY,
+            sop.SIX_OVERDUE_STOCK_QTY,
+            sop.NIGHT_OVERDUE_STOCK_QTY,
+            sop.TWELVE_OVERDUE_STOCK_QTY,
+            sop.STOCK_LIMIT
+          FROM (
+                 SELECT DISTINCT STRUCTURE_NAME
+                 FROM T_MP_STRUCTURE_ALLOCATION
+                 WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                   AND `YEAR` = #{year,jdbcType=DECIMAL}
+                   AND `MONTH` = #{month,jdbcType=DECIMAL}
+                   AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                   AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                   AND IS_DELETE = 0
+               ) filtered_structures
+                 INNER JOIN t_mdm_material_info  mi
+                            ON mi.STRUCTURE_NAME = filtered_structures.STRUCTURE_NAME
+                              AND mi.IS_DELETE = 0
+                 INNER JOIN T_DP_SUPPLY_ORDER_POOL  sop
+                            ON sop.MATERIAL_CODE = mi.MATERIAL_CODE
+                              AND sop.FACTORY_CODE=#{factoryCode,jdbcType=VARCHAR}
+                              AND sop.`YEAR`= #{year,jdbcType=DECIMAL}
+                              AND sop.`MONTH`= #{month,jdbcType=DECIMAL}
+                              AND sop.SOURCE_TYPE = '01'
+                              AND sop.IS_DELETE = 0
+  </select>
 </mapper>

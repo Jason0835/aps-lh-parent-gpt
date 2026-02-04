@@ -339,6 +339,10 @@ public class DpDemandPlanSum extends BaseEntity {
     @TableField(value = "STRUCTURE_TYPE")
     private String structureType;
 
+    @ApiModelProperty(value = "全选框", name = "viewFlag")
+    @TableField(exist = false)
+    private Integer viewFlag;
+
 
 
 

@@ -17,12 +17,10 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
 
@@ -288,6 +286,15 @@ public class FactoryConsoleUIController extends BaseController {
         BeanUtils.copyProperties(param, prodFinal);
         return factoryConsoleService.getProductionMonthType(prodFinal);
     }
+
+
+    @ApiOperation("检测需求月计划排产")
+    @PostMapping("/checkProductionDemandPlan")
+    @ResponseBody
+    public AjaxResult check(@RequestBody FactoryProductionParamVo factoryProductionParam) {
+        return factoryConsoleService.checkProductionDemandPlan(factoryProductionParam);
+    }
+
 
     /**
      * 校验分厂、年、月份不可为空

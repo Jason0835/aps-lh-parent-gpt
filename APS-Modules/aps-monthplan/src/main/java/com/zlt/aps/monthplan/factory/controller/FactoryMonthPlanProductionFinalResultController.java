@@ -1,11 +1,23 @@
 package com.zlt.aps.monthplan.factory.controller;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.enums.YesOrNoEnum;
+import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.SpringContextSupplierUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
+import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
+import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -14,12 +26,21 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
+
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -46,6 +67,12 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
     @Autowired
     private FactoryMonthPlanProductionFinalResultEntityMapper entityMapper;
+
+    @Autowired
+    protected RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
+
+    @Autowired
+    protected MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
@@ -152,4 +179,154 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         this.clearPage();
         return this.getDataTable(list);
     }
+
+    /**
+     * 获取SKU排产明细
+     */
+    @ApiOperation("获取SKU排产明细")
+    @PostMapping("/listSkuScheduleItems")
+    public TableDataInfo listSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResultParam param) {
+        if (null == param || null == param.getMonth() || null == param.getYear() || StringUtils.isBlank(param.getFactoryCode())) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
+        }
+
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+
+        // 创建查询数据的异步任务
+        // 查询SKU排产明细
+        CompletableFuture<List<FactoryMonthPlanFinalAdjustVo>> monthPlanFinalAdjustFuture = CompletableFuture.supplyAsync(
+                // 解决父子上下文传递问题
+                SpringContextSupplierUtil.wrap(() -> queryFactoryMonthPlanFinalAdjustList(param))
+        );
+        // 查询BOM物料消耗明细
+        CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(() -> queryMaterialConsumeDetailList(param));
+        // 查询特殊材料记录
+        CompletableFuture<List<RawSpecialMaterialRecord>> specialMaterialFuture = CompletableFuture.supplyAsync(() -> querySpecialMaterialRecordList(param));
+        try {
+            // 等待所有异步任务执行完成
+            CompletableFuture.allOf(
+                    monthPlanFinalAdjustFuture,
+                    materialConsumeDetailFuture,
+                    specialMaterialFuture
+            ).join();
+
+            log.info("并行查询数据执行完成");
+
+        } catch (CompletionException e) {
+            // 异常处理
+            Throwable throwable = e.getCause();
+            log.error("查询数据失败! 失败原因:{}", throwable.getMessage(), throwable);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
+        } finally {
+            watch.stop();
+        }
+
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanFinalAdjustVoList = monthPlanFinalAdjustFuture.join();
+        List<MdmMaterialConsumeDetail> materialConsumeDetailList = materialConsumeDetailFuture.join();
+        List<RawSpecialMaterialRecord> specialMaterialRecordList = specialMaterialFuture.join();
+
+        // 遍历设置是否特殊材料
+        for (FactoryMonthPlanFinalAdjustVo monthPlanFinalAdjustVo : monthPlanFinalAdjustVoList) {
+//            boolean hasSpecialMaterial = hasSpecialMaterial(monthPlanFinalAdjustVo.getMaterialCode(), materialConsumeDetailList, specialMaterialRecordList);
+//            monthPlanFinalAdjustVo.setHasSpecialMaterial(hasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+            monthPlanFinalAdjustVo.setHasSpecialMaterial(null);
+        }
+        return getDataTable(monthPlanFinalAdjustVoList);
+    }
+
+    /**
+     * 判断是否特殊材料
+     * @param targetEmbryoCode 目标胚胎编码
+     * @param mdmMaterialConsumeDetailList BOM物料消耗明细列表
+     * @param specialMaterialList 特殊材料清单列表
+     * @return
+     */
+    protected boolean hasSpecialMaterial(String targetEmbryoCode, List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList,
+                                         List<RawSpecialMaterialRecord> specialMaterialList) {
+
+        if (StringUtils.isEmpty(targetEmbryoCode) || PubUtil.isEmpty(mdmMaterialConsumeDetailList)
+                || PubUtil.isEmpty(specialMaterialList)) {
+            return Boolean.FALSE;
+        }
+
+        // 从BOM物料消耗明细列表中通过胎胚代码筛选出匹配的所有数据
+        Set<String> childMaterialCodes = mdmMaterialConsumeDetailList.stream()
+                .filter(detail -> StringUtils.equals(targetEmbryoCode, detail.getEmbryoCode()))
+                .map(MdmMaterialConsumeDetail::getChildMaterialCode)
+                .collect(Collectors.toSet());
+
+        // 如果没有匹配到直接返回false
+        if (PubUtil.isEmpty(childMaterialCodes)) {
+            return Boolean.FALSE;
+        }
+
+        // 检查特殊材料清单列表中是否存在匹配的数据
+        return specialMaterialList.stream()
+                .map(RawSpecialMaterialRecord::getMaterialCode)
+                .anyMatch(childMaterialCodes::contains);
+    }
+
+
+    private List<FactoryMonthPlanFinalAdjustVo> queryFactoryMonthPlanFinalAdjustList(FactoryMonthPlanProductionFinalResultParam param) {
+        FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
+        BeanUtils.copyProperties(param, condition);
+        List<FactoryMonthPlanProductionFinalResult> list = factoryMonthPlanProductionFinalResultService.getDataList(condition);
+        return BeanUtil.copyToList(list, FactoryMonthPlanFinalAdjustVo.class);
+    }
+
+
+    /**
+     * 查询特殊材料记录
+     *
+     * @param param
+     */
+    private List<RawSpecialMaterialRecord> querySpecialMaterialRecordList(FactoryMonthPlanProductionFinalResultParam param) {
+        RawSpecialMaterialRecord queryVO = new RawSpecialMaterialRecord();
+        queryVO.setFactoryCode(param.getFactoryCode());
+
+        LambdaQueryWrapper<RawSpecialMaterialRecord> queryWrapper = new LambdaQueryWrapper<>();
+        buildSpecialMaterialCondition(queryWrapper, queryVO);
+        return rawSpecialMaterialRecordMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建特殊材料条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildSpecialMaterialCondition(LambdaQueryWrapper<RawSpecialMaterialRecord> queryWrapper, RawSpecialMaterialRecord queryVO) {
+        queryWrapper.eq(RawSpecialMaterialRecord::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(RawSpecialMaterialRecord::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 查询BOM物料消耗明细
+     *
+     * @param param
+     */
+    private List<MdmMaterialConsumeDetail> queryMaterialConsumeDetailList(FactoryMonthPlanProductionFinalResultParam param) {
+        MdmMaterialConsumeDetail queryVO = new MdmMaterialConsumeDetail();
+        queryVO.setFactoryCode(param.getFactoryCode());
+
+        LambdaQueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new LambdaQueryWrapper<>();
+        buildMaterialConsumeDetailCondition(queryWrapper, queryVO);
+        return mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建BOM物料消耗明细条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildMaterialConsumeDetailCondition(LambdaQueryWrapper<MdmMaterialConsumeDetail> queryWrapper, MdmMaterialConsumeDetail queryVO) {
+        queryWrapper.eq(MdmMaterialConsumeDetail::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmMaterialConsumeDetail::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+
+
 }

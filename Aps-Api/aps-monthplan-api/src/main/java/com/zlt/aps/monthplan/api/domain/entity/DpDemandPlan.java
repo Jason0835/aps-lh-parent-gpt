@@ -441,6 +441,10 @@ public class DpDemandPlan extends BaseEntity {
     @TableField(exist = false)
     private Integer sub2YearStockQty;
 
+    @ApiModelProperty(value = "排产版本号", name = "productionVersion")
+    @TableField(exist = false)
+    private String productionVersion;
+
 
 
 

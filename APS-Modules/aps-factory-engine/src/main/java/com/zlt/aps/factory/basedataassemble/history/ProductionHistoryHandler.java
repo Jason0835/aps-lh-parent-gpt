@@ -271,7 +271,16 @@ public class ProductionHistoryHandler {
         if (CollectionUtils.isEmpty(allGroupProductionInfo)) {
             return new CxMachineLatestProductionInfo(cxMachineCode, groupName, BigDecimal.ZERO.intValue());
         }
-        List<MpStructureAllocation> effectiveList = allGroupProductionInfo.stream().filter(single -> single.getAllotDays() > BigDecimal.ZERO.intValue() && single.getEndDay() > BigDecimal.ZERO.intValue() && single.getEndDay() > single.getBeginDay()).collect(Collectors.toList());
+        List<MpStructureAllocation> effectiveList = allGroupProductionInfo.stream()
+                .filter(single ->
+                        // 1. 判空：防止 getAllotDays() 为 null
+                        single.getAllotDays() != null && single.getAllotDays() > BigDecimal.ZERO.intValue()
+                                // 2. 判空：防止 getEndDay() 为 null，并判断大于0
+                                && single.getEndDay() != null && single.getEndDay() > BigDecimal.ZERO.intValue()
+                                // 3. 判空：防止 getBeginDay() 为 null，并判断结束大于开始
+                                && single.getBeginDay() != null && single.getEndDay() > single.getBeginDay()
+                )
+                .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(effectiveList)) {
             return new CxMachineLatestProductionInfo(cxMachineCode, groupName, BigDecimal.ZERO.intValue());
         }

@@ -44,6 +44,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
+    private final ClearProductionInfoHandler clearProductionInfoHandler;
+
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
 
     /**
@@ -84,7 +86,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //对测算成型产能分配的续作部分进行重排-先清空已排信息
-        new ClearProductionInfoHandler().clearProductionData(productionContext);
+        clearProductionInfoHandler.clearProductionData(productionContext);
         //在机结构对在产机台构建硫化组限制
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         allContinueMap.forEach((structureName, cxContinueInfo) -> {

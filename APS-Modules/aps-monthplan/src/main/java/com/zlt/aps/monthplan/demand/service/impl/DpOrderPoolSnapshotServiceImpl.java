@@ -180,7 +180,8 @@ public class DpOrderPoolSnapshotServiceImpl extends AbstractDocService<DpOrderPo
         supplyOrderPool.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         supplyOrderPool.setOrderQty(orderPoolSnapshot.getDemandQty());
         supplyOrderPool.setProduceQtyDue(orderPoolSnapshot.getDemandQty());
-        supplyOrderPool.setScmPriority(orderPoolSnapshot.getOrderPriority());
+        supplyOrderPool.setOrderPriority(orderPoolSnapshot.getOrderPriority());
+        supplyOrderPool.setScmPriority(orderPoolSnapshot.getScmPriority());
         return supplyOrderPool;
     }
 

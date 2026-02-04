@@ -34,7 +34,7 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP1207 没有主花纹
      */
-    NO_MAIN_PATTERN("MP1207","没有主花纹", "alg.data.initCheck.noMainPattern"),
+    NO_MAIN_PATTERN("MP1207", "没有主花纹", "alg.data.initCheck.noMainPattern"),
     /**
      * MP1204 没有寸口
      */
@@ -104,6 +104,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME("MP2103", "因低于实单最低配比提前收尾,导致没有达到最低起产天数，不排", "alg.data.groupCapacity.noLowMinLhMachineCountWholeStructureName"),
     /**
+     * MP2104 因没有分配到成型产能，整个结构不排
+     */
+    NO_PRODUCTION_CX_MACHINE("MP2104", "因没有分配到成型产能，整个结构不排", "alg.data.groupCapacity.NoAllocationCxMachineCapacity"),
+    /**
      * MP2201 成型产能不足，整个英寸不排
      */
     EXCEED_CX_CAPACITY_WHOLE_PRO_SIZE("MP2201", "成型产能不足，整个英寸不排", "alg.data.groupCapacity.exceedCxCapacityWholeProSize"),
@@ -119,6 +123,10 @@ public enum MonthPlanNoProductionReasonEnum {
      * MP2302 没有成型硫化配比配置
      */
     NO_CONFIGURATION_LH_RATIO("MP2302", "没有成型硫化配比配置", "alg.data.groupCapacity.noConfigurationLhRatio"),
+    /**
+     * MP2303 结构没有成型硫化配比配置
+     */
+    GROUP_NO_CONFIGURATION_LH_RATION("MP2303", "结构没有成型硫化配比配置", "alg.data.groupCapacity.groupNoConfigurationLhRatio"),
     /**
      * MP3101 特殊轮胎产能控制
      */
@@ -158,7 +166,47 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP3603 因胎胚种类数限制
      */
-    DAY_EMBRYO_CODE_LIMIT("MP3603", "因胎胚种类数限制", "alg.data.mouldProduction.dayEmbryoCodeLimit");
+    DAY_EMBRYO_CODE_LIMIT("MP3603", "因胎胚种类数限制", "alg.data.mouldProduction.dayEmbryoCodeLimit"),
+    /**
+     * MP3701 缺少特殊原材料数据
+     */
+    SPECIAL_RAW_MATERIAL_NOTEMPTY("MP3701", "缺少特殊原材料数据", "alg.data.before.production.rawSpecialMaterialNoEmpty"),
+    /**
+     * MP3702 缺少生产日历数据
+     */
+    PRODUCTION_CALENDAR_NOTEMPTY("MP3702", "缺少生产日历数据", "alg.data.before.production.productionCalendarNotEmpty"),
+    /**
+     * MP3703 缺少成型机基础数据
+     */
+    MOLD_MACHINE_BASEDATA_NOTEMPTY("MP3703", "缺少成型机基础数据", "alg.data.before.production.moldMachineBaseDataNotEmpty"),
+    /**
+     * MP3704 缺少工装台账数据
+     */
+    WORKWEAR_INVENTORY_NOTEMPTY("MP3704", "缺少工装台账数据", "alg.data.before.production.workwearInventoryNotEmpty"),
+    /**
+     * MP3705 缺少模具分配比例配置
+     */
+    MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY("MP3705", "缺少模具分配比例配置", "alg.data.before.production.moldAllocationRatioConfigNotEmpty"),
+    /**
+     * MP3706 缺少模壳数据
+     */
+    MOLD_SHELL_NOTEMPTY("MP3706", "缺少模壳数据", "alg.data.before.production.moldShellNotEmpty"),
+    /**
+     * MP3707 缺少胶囊卡盘数据
+     */
+    CAPSULE_CHUCK_NOTEMPTY("MP3707", "缺少胶囊卡盘数据", "alg.data.before.production.capsuleChuckNotEmpty"),
+    /**
+     * MP3708 缺少结构成型硫化配比数据
+     */
+    STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY("MP3708", "缺少结构成型硫化配比数据", "alg.data.before.production.structureFormingVulcanizationRatioNotEmpty"),
+    /**
+     * MP3798 成型或是模具产能不足
+     */
+    NO_ENOUGH_PRODUCTION_CAPACITY("MP3798","成型或是模具产能不足","alg.data.mouldProduction.NoEnoughProductionCapacity"),
+    /**
+     * MP3799 因%s不排
+     */
+    GENERAL_NO_PRODUCTION_REASON("MP3799", "因%s不排", "alg.data.mouldProduction.generalNoProductionReasons");
 
     private String errorCode;
 

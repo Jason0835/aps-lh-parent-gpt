@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.setting.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -174,7 +175,18 @@ public class MdmCycleSchStruConfController extends AbstractDocBizController<MdmC
     protected List<MdmCycleSchStruConf> listExportData(MdmCycleSchStruConf obj) {
         QueryWrapper<MdmCycleSchStruConf> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MdmCycleSchStruConf> list = entityMapper.selectList(wrapper);
+        this.translationList(list);
+        return list;
+    }
+
+    private void translationList(List<MdmCycleSchStruConf> list) {
+        if(CollectionUtils.isEmpty(list)) {
+            return;
+        }
+        for (MdmCycleSchStruConf item : list) {
+            item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
+        }
     }
 
     @Override
