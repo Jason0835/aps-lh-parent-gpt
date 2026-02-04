@@ -17,10 +17,12 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.Date;
 
@@ -111,6 +113,24 @@ public class FactoryConsoleUIController extends BaseController {
             return checkParamResult;
         }
         return factoryConsoleService.resetConfigurationInitProduction(factoryProductionParam);
+    }
+
+    /**
+     * 按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产
+     *
+     * @param factoryProductionParam 重新排产结构
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/resetGroupAllocationCapacityProduction")
+    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产")
+    public AjaxResult resetGroupAllocationCapacityProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
+        AjaxResult checkParamResult = checkEmptyProductionVersion(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
+        }
+        return factoryConsoleService.resetGroupAllocationCapacityProduction(factoryProductionParam);
     }
 
     /**
@@ -221,6 +241,45 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
+     * 查询对应年月+分厂的需求计划版本
+     */
+    @ResponseBody
+    @PostMapping("/versionList")
+    @ApiOperation("查询对应年月+分厂的需求计划版本")
+    public AjaxResult versionList(MpFactoryProductionVersion saleMonthPlanRequire) {
+        return factoryConsoleService.versionList(saleMonthPlanRequire);
+    }
+
+    /**
+     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     */
+    @ResponseBody
+    @PostMapping("/getProductionVersionList")
+    @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
+    public AjaxResult getProductionVersionList(MpFactoryProductionVersion query) {
+        return factoryConsoleService.getProductionVersionList(query);
+    }
+
+    @ResponseBody
+    @PostMapping("/getProductionMonthType")
+    @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
+    public AjaxResult getProductionMonthType(FactoryMonthPlanProdResultDto param) {
+        if (checkParamEmpty(param)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
+        }
+        FactoryMonthPlanProdFinal prodFinal = new FactoryMonthPlanProdFinal();
+        BeanUtils.copyProperties(param, prodFinal);
+        return factoryConsoleService.getProductionMonthType(prodFinal);
+    }
+
+    @ApiOperation("检测需求月计划排产")
+    @PostMapping("/checkProductionDemandPlan")
+    @ResponseBody
+    public AjaxResult check(@RequestBody FactoryProductionParamVo factoryProductionParam) {
+        return factoryConsoleService.checkProductionDemandPlan(factoryProductionParam);
+    }
+
+    /**
      * 参数校验
      * 工厂、年份、月份、需求计划版本
      *
@@ -254,47 +313,6 @@ public class FactoryConsoleUIController extends BaseController {
         }
         return AjaxResult.success();
     }
-
-    /**
-     * 查询对应年月+分厂的需求计划版本
-     */
-    @ResponseBody
-    @PostMapping("/versionList")
-    @ApiOperation("查询对应年月+分厂的需求计划版本")
-    public AjaxResult versionList(MpFactoryProductionVersion saleMonthPlanRequire) {
-        return factoryConsoleService.versionList(saleMonthPlanRequire);
-    }
-
-    /**
-     * 查询对应年月+分厂+需求计划版本的分厂月计划版本
-     */
-    @ResponseBody
-    @PostMapping("/getProductionVersionList")
-    @ApiOperation("查询对应年月+分厂+需求计划版本的分厂月计划版本")
-    public AjaxResult getProductionVersionList(MpFactoryProductionVersion query) {
-        return factoryConsoleService.getProductionVersionList(query);
-    }
-
-    @ResponseBody
-    @PostMapping("/getProductionMonthType")
-    @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
-    public AjaxResult getProductionMonthType(FactoryMonthPlanProdResultDto param) {
-        if (checkParamEmpty(param)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
-        }
-        FactoryMonthPlanProdFinal prodFinal = new FactoryMonthPlanProdFinal();
-        BeanUtils.copyProperties(param, prodFinal);
-        return factoryConsoleService.getProductionMonthType(prodFinal);
-    }
-
-
-    @ApiOperation("检测需求月计划排产")
-    @PostMapping("/checkProductionDemandPlan")
-    @ResponseBody
-    public AjaxResult check(@RequestBody FactoryProductionParamVo factoryProductionParam) {
-        return factoryConsoleService.checkProductionDemandPlan(factoryProductionParam);
-    }
-
 
     /**
      * 校验分厂、年、月份不可为空

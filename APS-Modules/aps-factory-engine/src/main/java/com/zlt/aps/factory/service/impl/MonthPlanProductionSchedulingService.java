@@ -22,17 +22,26 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     private final IProductionBusinessService wholeCourseProductionService;
 
+    private final IProductionBusinessService groupCapacityProductionService;
+
     public MonthPlanProductionSchedulingService(@Qualifier("generalInitService") IProductionBusinessService generalInitService,
-                                                @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService
-    ) {
+                                                @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService,
+                                                @Qualifier("groupCapacityProductionService") IProductionBusinessService groupCapacityProductionService) {
         this.generalInitService = generalInitService;
         this.wholeCourseProductionService = wholeCourseProductionService;
+        this.groupCapacityProductionService = groupCapacityProductionService;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void init(Context context) {
         generalInitService.run(context, new Object());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void groupCapacityScheduling(Context context) {
+        groupCapacityProductionService.run(context, new Object());
     }
 
     @Override

@@ -11,7 +11,6 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -75,6 +74,16 @@ public interface IFactoryConsoleRemoteService {
     @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
     @PostMapping("/factoryConsole/resetConfigurationInitProduction")
     AjaxResult resetConfigurationInitProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
+
+    /**
+     * 按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产
+     *
+     * @param factoryProductionParam
+     * @return
+     */
+    @PostMapping("/factoryConsole/resetGroupAllocationCapacityProduction")
+    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产")
+    AjaxResult resetGroupAllocationCapacityProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 创建导入模板的版本信息，主要获取版本周期

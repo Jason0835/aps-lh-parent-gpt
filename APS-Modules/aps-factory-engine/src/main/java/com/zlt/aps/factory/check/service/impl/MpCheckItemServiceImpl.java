@@ -15,7 +15,7 @@ import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.AbstractDataLoaderService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.scheduling.init.ProductionInitParamConfiguration;
@@ -26,7 +26,6 @@ import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.monthplan.api.domain.vo.MpCheckItemVo;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -44,18 +43,17 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
-public class MpCheckItemServiceImpl extends AbstractProductionBusinessService implements IMpCheckItemService {
+public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements IMpCheckItemService {
 
-
-    @Autowired
-    private IMpCheckItemRecordService iMpCheckItemRecordService;
+    private final IMpCheckItemRecordService iMpCheckItemRecordService;
 
     public MpCheckItemServiceImpl(ProductionMdmDataService dataService,
                                   DpRequireDataService dpRequireDataService,
                                   MonthProductionDataService monthProductionDataService,
-                                  ProductionHistoryHandler productionHistoryHandler) {
-        super(dataService, dpRequireDataService, monthProductionDataService);
-        super.setProductionHistoryHandler(productionHistoryHandler);
+                                  ProductionHistoryHandler productionHistoryHandler,
+                                  IMpCheckItemRecordService iMpCheckItemRecordService) {
+        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+        this.iMpCheckItemRecordService = iMpCheckItemRecordService;
     }
 
     @Override
@@ -63,9 +61,7 @@ public class MpCheckItemServiceImpl extends AbstractProductionBusinessService im
         List<MpCheckItemVo> mpCheckItemVos = new ArrayList<>();
         List<MpCheckItemRecord> mpCheckItemRecords = new ArrayList<>();
         try {
-//            if (null == context.getInsertNewProductionVersion()) {
-//                context.setInsertNewProductionVersion(Boolean.FALSE);
-//            }
+
             TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
 
             // 2. 初始化数据检测 (Phase 1)

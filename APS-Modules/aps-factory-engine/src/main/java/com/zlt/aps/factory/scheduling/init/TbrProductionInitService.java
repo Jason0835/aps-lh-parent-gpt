@@ -8,12 +8,13 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
-import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.AbstractInitDataLoadService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service(value = "tbrProductionInitService")
-public class TbrProductionInitService extends AbstractProductionBusinessService {
+public class TbrProductionInitService extends AbstractInitDataLoadService {
 
     public TbrProductionInitService(ProductionMdmDataService dataService,
                                     DpRequireDataService dpRequireDataService,
@@ -64,6 +65,9 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
     public void run(Context context, Object userObj) {
         if (null == context.getInsertNewProductionVersion()) {
             context.setInsertNewProductionVersion(Boolean.FALSE);
+        }
+        if (null == context.getProductionProcessStage()) {
+            context.setProductionProcessStage(ProductionProcessStage.STAGE_INIT);
         }
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
@@ -498,9 +502,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
     }
 
     /**
-     * 设置生产版本号，如果已经有生产版本号，则不进行设置
-     * 否则根据当前时间戳及版本号前缀设置
-     * 已有生产版本号，则根据生产版本号删除旧有数据
+     * 根据生产版本号删除旧有数据
      *
      * @param productionContext
      */
