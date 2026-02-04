@@ -334,14 +334,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     public List<DpDemandPlan> createAdjustRequire(DpDemandPlan createCondition) {
         // 1. 前置校验
         validateFinalizedForAdjust(createCondition);
+        // 3. 并行获取数据
+        PredictionContext data = fetchRequiredDataInParallelByAdjust(createCondition);
         // 2. 生成版本号不能重复
         String monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST);
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(monthPlanVersion);
         createCondition.setIncludePostpone(true);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());
-        // 3. 并行获取数据
-        PredictionContext data = fetchRequiredDataInParallelByAdjust(createCondition);
         data.setPostponeOrders(null);
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
         // 4. 处理销售订单分配
