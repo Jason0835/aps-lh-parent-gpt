@@ -17,119 +17,274 @@ import java.util.*;
 public class MachineCombinationCalculator {
 
     /**
-     * 核心算法：计算最终机台数
-     * 算法逻辑：
-     * 1. 先处理可以组合的减模与增模配对
-     * 2. 再处理剩余的减模与换活字块配对
-     * 3. 最后计算剩余的单独机台
-     *
-     * 算法步骤伪代码：
-     * 1. 计算可增模组合的减模数 = X - Z
-     * 2. 减模与增模组合数 = min(可增模组合减模数, Y)
-     * 3. 剩余减模(可组合部分) = 可增模组合减模数 - 组合数
-     * 4. 剩余增模 = Y - 组合数
-     * 5. 可用于换活字块的减模总数 = Z + 剩余减模(可组合部分)
-     * 6. 减模与换活字块组合数 = min(可用于换活字块的减模总数, M)
-     * 7. 最终剩余减模 = 可用于换活字块的减模总数 - 组合数
-     * 8. 最终剩余换活字块 = M - 组合数
-     * 9. 总机台数 = 增模组合数 + 换活字块组合数 + 剩余减模 + 剩余增模 + 剩余换活字块
+     * X - 减模总数
      */
-    public static MachineResultVo calculateMachines(MachineInputVo input) {
-        StringBuilder steps = new StringBuilder();
-        steps.append("开始机台组合计算...\n");
-        steps.append(String.format("输入参数: 减模X=%d, 不让增模Z=%d, 增模Y=%d, 换活字块M=%d\n",
-                input.getTotalReduceMolds(), input.getCannotAddMolds(),
-                input.getTotalAddMolds(), input.getTotalCharacterBlocks()));
+    private int totalMolds;
 
-        // 步骤1: 计算可以用于增模组合的减模数量
-        int availableForAddCombine = input.getTotalReduceMolds() - input.getCannotAddMolds();
-        steps.append(String.format("步骤1: 可以用于增模组合的减模数 = %d - %d = %d\n",
-                input.getTotalReduceMolds(), input.getCannotAddMolds(), availableForAddCombine));
+    /**
+     * Z - 不能与增模组合的减模数
+     */
+    private int noIncreaseMolds;
 
-        // 步骤2: 减模与增模组合
-        int addCombineCount = Math.min(availableForAddCombine, input.getTotalAddMolds());
-        int remainingReduceAfterAdd = availableForAddCombine - addCombineCount;
-        int remainingAdd = input.getTotalAddMolds() - addCombineCount;
+    /**
+     * W - 不能与换活字块组合的减模数
+     */
+    private int noChangeMolds;
 
-        steps.append(String.format("步骤2: 减模与增模组合数 = min(%d, %d) = %d\n",
-                availableForAddCombine, input.getTotalAddMolds(), addCombineCount));
-        steps.append(String.format("      组合后剩余减模(可组合部分) = %d\n", remainingReduceAfterAdd));
-        steps.append(String.format("      组合后剩余增模 = %d\n", remainingAdd));
+    /**
+     * Y - 增模数
+     */
+    private int increaseMolds;
 
-        // 步骤3: 所有减模（包括不让增模的）与换活字块组合
-        // 可用的减模总数 = 不让增模的减模 + 增模组合后剩余的减模
-        int totalReduceAvailable = input.getCannotAddMolds() + remainingReduceAfterAdd;
-        steps.append(String.format("步骤3: 可用于换活字块组合的减模总数 = %d + %d = %d\n",
-                input.getCannotAddMolds(), remainingReduceAfterAdd, totalReduceAvailable));
+    /**
+     * M - 换活字块数
+     */
+    private int changeBlocks;
 
-        int characterCombineCount = Math.min(totalReduceAvailable, input.getTotalCharacterBlocks());
-        int remainingReduceAfterCharacter = totalReduceAvailable - characterCombineCount;
-        int remainingCharacter = input.getTotalCharacterBlocks() - characterCombineCount;
 
-        steps.append(String.format("      减模与换活字块组合数 = min(%d, %d) = %d\n",
-                totalReduceAvailable, input.getTotalCharacterBlocks(), characterCombineCount));
-        steps.append(String.format("      组合后剩余减模 = %d\n", remainingReduceAfterCharacter));
-        steps.append(String.format("      组合后剩余换活字块 = %d\n", remainingCharacter));
 
-        // 步骤4: 计算单独机台
-        int remainingReduceMachines = remainingReduceAfterCharacter;
-        int remainingAddMachines = remainingAdd;
-        int remainingCharacterMachines = remainingCharacter;
+    // 减模分类统计
+    /**
+     * I类 - 两者都不能匹配
+     */
+    private int isolatedCount;
 
-        steps.append("步骤4: 计算剩余单独机台\n");
-        steps.append(String.format("      剩余减模机台数 = %d\n", remainingReduceMachines));
-        steps.append(String.format("      剩余增模机台数 = %d\n", remainingAddMachines));
-        steps.append(String.format("      剩余换活字块机台数 = %d\n", remainingCharacterMachines));
+    /**
+     * 只能匹配增模 (W_only)
+     */
+    private int onlyIncreaseCount;
 
-        // 步骤5: 计算总机台数
-        int totalMachines = addCombineCount + characterCombineCount +
-                remainingReduceMachines + remainingAddMachines +
-                remainingCharacterMachines;
+    /**
+     * 只能匹配换活字块 (Z_only)
+     */
+    private int onlyChangeCount;
 
-        steps.append(String.format("步骤5: 总机台数 = %d + %d + %d + %d + %d = %d\n",
-                addCombineCount, characterCombineCount, remainingReduceMachines,
-                remainingAddMachines, remainingCharacterMachines, totalMachines));
+    /**
+     * 可以匹配两者
+     */
+    private int normalCount;
 
-        return new MachineResultVo(
-                totalMachines, addCombineCount, characterCombineCount,
-                remainingReduceMachines, remainingAddMachines, remainingCharacterMachines,
-                steps.toString()
-        );
+    /**
+     * 构造函数
+     * @param totalMolds 减模总数X
+     * @param noIncreaseMolds 不能与增模组合的减模数Z
+     * @param noChangeMolds 不能与换活字块组合的减模数W
+     * @param increaseMolds 增模数Y
+     * @param changeBlocks 换活字块数M
+     */
+    public MachineCombinationCalculator(int totalMolds, int noIncreaseMolds, int noChangeMolds,
+                         int increaseMolds, int changeBlocks) {
+        validateInput(totalMolds, noIncreaseMolds, noChangeMolds, increaseMolds, changeBlocks);
+
+        this.totalMolds = totalMolds;
+        this.noIncreaseMolds = noIncreaseMolds;
+        this.noChangeMolds = noChangeMolds;
+        this.increaseMolds = increaseMolds;
+        this.changeBlocks = changeBlocks;
+
+        classifyMolds();
     }
 
     /**
-     * 批量计算多个方案
+     * 验证输入参数
      */
-    public static List<MachineResultVo> calculateMultipleScenarios(List<MachineInputVo> inputs) {
-        List<MachineResultVo> results = new ArrayList<>();
-        for (int i = 0; i < inputs.size(); i++) {
-            try {
-                MachineResultVo result = calculateMachines(inputs.get(i));
-                results.add(result);
-            } catch (Exception e) {
-                System.err.println("方案" + (i+1) + "计算失败: " + e.getMessage());
+    private void validateInput(int totalMolds, int noIncreaseMolds, int noChangeMolds,
+                               int increaseMolds, int changeBlocks) {
+        if (totalMolds < 0 || noIncreaseMolds < 0 || noChangeMolds < 0 ||
+                increaseMolds < 0 || changeBlocks < 0) {
+            throw new IllegalArgumentException("所有参数必须为非负整数");
+        }
+
+        if (noIncreaseMolds > totalMolds) {
+            throw new IllegalArgumentException("不能与增模组合的减模数不能超过减模总数");
+        }
+
+        if (noChangeMolds > totalMolds) {
+            throw new IllegalArgumentException("不能与换活字块组合的减模数不能超过减模总数");
+        }
+
+        // Z和W的交集不能超过两者各自的最小值
+        int intersection = Math.max(0, noIncreaseMolds + noChangeMolds - totalMolds);
+        if (intersection > Math.min(noIncreaseMolds, noChangeMolds)) {
+            throw new IllegalArgumentException("参数不合法：Z和W的交集计算错误");
+        }
+    }
+
+    /**
+     * 对减模进行分类
+     */
+    private void classifyMolds() {
+        // 计算交集I（两者都不能匹配的减模）
+        isolatedCount = Math.max(0, noIncreaseMolds + noChangeMolds - totalMolds);
+
+        // 计算只能匹配增模的数量 (W_only)
+        onlyIncreaseCount = noChangeMolds - isolatedCount;
+
+        // 计算只能匹配换活字块的数量 (Z_only)
+        onlyChangeCount = noIncreaseMolds - isolatedCount;
+
+        // 计算可以匹配两者的正常减模
+        normalCount = totalMolds - (onlyIncreaseCount + onlyChangeCount + isolatedCount);
+
+        // 验证分类结果
+        if (onlyIncreaseCount < 0 || onlyChangeCount < 0 || normalCount < 0) {
+            throw new IllegalStateException("分类计算错误，请检查输入参数");
+        }
+    }
+
+    /**
+     * 获取减模分类信息
+     */
+    public Map<DeductMoldType, Integer> getMoldClassification() {
+        Map<DeductMoldType, Integer> classification = new EnumMap<>(DeductMoldType.class);
+        classification.put(DeductMoldType.NORMAL, normalCount);
+        classification.put(DeductMoldType.ONLY_INCREASE, onlyIncreaseCount);
+        classification.put(DeductMoldType.ONLY_CHANGE, onlyChangeCount);
+        classification.put(DeductMoldType.ISOLATED, isolatedCount);
+        return classification;
+    }
+
+    /**
+     * 计算最小机台数
+     * @return 计算结果
+     */
+    public MachineResultVo calculate() {
+        // 第一步：处理只能匹配换活字块的减模 (Z_only)
+        int s1 = Math.min(onlyChangeCount, changeBlocks);
+        int remainingChanges = changeBlocks - s1;
+        int remainingOnlyChange = onlyChangeCount - s1;
+
+        // 第二步：处理只能匹配增模的减模 (W_only)
+        int s2 = Math.min(onlyIncreaseCount, increaseMolds);
+        int remainingIncreases = increaseMolds - s2;
+        int remainingOnlyIncrease = onlyIncreaseCount - s2;
+
+        // 第三步：处理正常减模
+        // 正常减模可以匹配剩余的增模和换活字块
+        int availableResources = remainingIncreases + remainingChanges;
+        int s3_s4 = Math.min(normalCount, availableResources);
+
+        // 分配正常减模到两种资源，尽量先匹配一种类型
+        int s3 = Math.min(normalCount, remainingIncreases);  // 匹配增模
+        int s4 = Math.min(normalCount - s3, remainingChanges); // 匹配换活字块
+
+        // 如果还有剩余匹配能力，调整分配
+        if (s3 + s4 < s3_s4) {
+            // 可以增加s3或s4
+            int additional = s3_s4 - (s3 + s4);
+            if (remainingIncreases - s3 >= additional) {
+                s3 += additional;
+            } else {
+                int fromIncrease = remainingIncreases - s3;
+                s3 += fromIncrease;
+                s4 += (additional - fromIncrease);
             }
         }
-        return results;
+
+        // 总匹配对数
+        int totalMatches = s1 + s2 + s3 + s4;
+
+        // 计算单独机台数
+        // 未匹配的减模
+        int unmatchedMolds = totalMolds - totalMatches;
+
+        // 未匹配的增模
+        int unmatchedIncreases = increaseMolds - (s2 + s3);
+
+        // 未匹配的换活字块
+        int unmatchedChanges = changeBlocks - (s1 + s4);
+
+        // 总机台数 = 匹配对数 + 未匹配的减模 + 未匹配的增模 + 未匹配的换活字块
+        int totalMachines = totalMatches + unmatchedMolds + unmatchedIncreases + unmatchedChanges;
+
+        return new MachineResultVo(totalMachines, totalMatches, unmatchedMolds,
+                unmatchedIncreases, unmatchedChanges);
     }
 
     /**
-     * 测试主方法
+     * 测试用例执行方法
+     */
+    private static void testCase(String title, int x, int z, int w, int y, int m) {
+        System.out.println("\n" + title);
+        System.out.printf("输入参数:\n");
+        System.out.printf("  减模总数(X): %d\n", x);
+        System.out.printf("  不能与增模组合的减模数(Z): %d\n", z);
+        System.out.printf("  不能与换活字块组合的减模数(W): %d\n", w);
+        System.out.printf("  增模数(Y): %d\n", y);
+        System.out.printf("  换活字块数(M): %d\n", m);
+
+        try {
+            MachineCombinationCalculator calculator = new MachineCombinationCalculator(x, z, w, y, m);
+
+            // 显示减模分类
+            Map<DeductMoldType, Integer> classification = calculator.getMoldClassification();
+            System.out.println("\n减模分类:");
+            System.out.printf("  正常减模(可匹配两者): %d\n", classification.get(DeductMoldType.NORMAL));
+            System.out.printf("  只能匹配增模: %d\n", classification.get(DeductMoldType.ONLY_INCREASE));
+            System.out.printf("  只能匹配换活字块: %d\n", classification.get(DeductMoldType.ONLY_CHANGE));
+            System.out.printf("  不能匹配任何资源: %d\n", classification.get(DeductMoldType.ISOLATED));
+
+            // 计算结果
+            MachineResultVo result = calculator.calculate();
+            System.out.println("\n计算结果:");
+            System.out.println(result);
+
+        } catch (IllegalArgumentException e) {
+            System.out.println("错误: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 使用示例和测试
      */
     public static void main(String[] args) {
-        System.out.println("=== 轮胎APS机台组合算法测试 ===\n");
-        // 批量计算示例
-        System.out.println("批量计算示例:");
-        List<MachineInputVo> scenarios = Arrays.asList(
-                new MachineInputVo(3, 2, 5, 2),
-                new MachineInputVo(15, 3, 10, 8),
-                new MachineInputVo(20, 5, 12, 10),
-                new MachineInputVo(30, 10, 20, 15)
-        );
+        System.out.println("=== 轮胎APS组合组件测试 ===\n");
 
-        List<MachineResultVo> batchResults = calculateMultipleScenarios(scenarios);
-        for (int i = 0; i < batchResults.size(); i++) {
-            System.out.printf("方案%d: %d个机台\n", i+1, batchResults.get(i).getTotalMachines());
+        // 测试用例1：基本示例
+        testCase("测试用例1：基本示例",
+                10, 3, 2, 8, 6);
+
+        // 测试用例2：Z和W有重叠
+        testCase("测试用例2：Z和W有重叠",
+                15, 5, 7, 10, 8);
+
+        // 测试用例3：资源充足
+        testCase("测试用例3：资源充足",
+                10, 2, 3, 15, 12);
+
+        // 测试用例4：减模过多
+        testCase("测试用例4：减模过多",
+                20, 5, 6, 8, 7);
+
+        // 测试用例5：完全匹配
+        testCase("测试用例5：完全匹配",
+                10, 2, 2, 8, 8);
+
+        // 用户自定义测试
+        System.out.println("\n=== 自定义测试 ===");
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            System.out.print("请输入减模总数(X): ");
+            int x = scanner.nextInt();
+
+            System.out.print("请输入不能与增模组合的减模数(Z): ");
+            int z = scanner.nextInt();
+
+            System.out.print("请输入不能与换活字块组合的减模数(W): ");
+            int w = scanner.nextInt();
+
+            System.out.print("请输入增模数(Y): ");
+            int y = scanner.nextInt();
+
+            System.out.print("请输入换活字块数(M): ");
+            int m = scanner.nextInt();
+
+            testCase("自定义测试", x, z, w, y, m);
+        } catch (Exception e) {
+            System.out.println("输入错误: " + e.getMessage());
+        } finally {
+            scanner.close();
         }
     }
 }
