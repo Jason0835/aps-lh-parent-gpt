@@ -1,43 +1,68 @@
 package com.zlt.aps.factory.capacity;
 
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 机台组合结果
+ */
 public class MachineResultVo {
 
-    private int totalMachines;                     // 总机台数
-    private int addCombineMachines;               // 增模组合机台数
-    private int characterCombineMachines;         // 换活字块组合机台数
-    private int remainingReduceMachines;          // 剩余减模机台数
-    private int remainingAddMachines;             // 剩余增模机台数
-    private int remainingCharacterMachines;       // 剩余换活字块机台数
-    private String calculationSteps;              // 计算步骤
+    /**
+     * 总机台数
+     */
+    private int totalMachines;
+    /**
+     * 成功配对数
+     */
+    private int matchedPairs;
+    /**
+     * 单独机台的减模数
+     */
+    private int isolatedMolds;
+    /**
+     * 单独机台的增模数
+     */
+    private int isolatedIncreases;
+    /**
+     * 单独机台的换活字块数
+     */
+    private int isolatedChanges;
+    /**
+     * 详细统计
+     */
+    private Map<String, Integer> details;
 
-    public MachineResultVo(int totalMachines, int addCombineMachines, int characterCombineMachines,
-                      int remainingReduceMachines, int remainingAddMachines,
-                      int remainingCharacterMachines, String calculationSteps) {
+    public MachineResultVo(int totalMachines, int matchedPairs, int isolatedMolds,
+                  int isolatedIncreases, int isolatedChanges) {
         this.totalMachines = totalMachines;
-        this.addCombineMachines = addCombineMachines;
-        this.characterCombineMachines = characterCombineMachines;
-        this.remainingReduceMachines = remainingReduceMachines;
-        this.remainingAddMachines = remainingAddMachines;
-        this.remainingCharacterMachines = remainingCharacterMachines;
-        this.calculationSteps = calculationSteps;
-    }
-
-    @Override
-    public String toString() {
-        return String.format(
-                "总机台数: %d\n" +
-                        "增模组合机台: %d\n" +
-                        "换活字块组合机台: %d\n" +
-                        "剩余减模机台: %d\n" +
-                        "剩余增模机台: %d\n" +
-                        "剩余换活字块机台: %d\n" +
-                        "计算步骤:\n%s",
-                totalMachines, addCombineMachines, characterCombineMachines,
-                remainingReduceMachines, remainingAddMachines, remainingCharacterMachines,
-                calculationSteps
-        );
+        this.matchedPairs = matchedPairs;
+        this.isolatedMolds = isolatedMolds;
+        this.isolatedIncreases = isolatedIncreases;
+        this.isolatedChanges = isolatedChanges;
+        this.details = new HashMap<>();
+        details.put("配对机台数", matchedPairs);
+        details.put("单独减模机台数", isolatedMolds);
+        details.put("单独增模机台数", isolatedIncreases);
+        details.put("单独换活字块机台数", isolatedChanges);
     }
 
     // Getters
     public int getTotalMachines() { return totalMachines; }
+    public int getMatchedPairs() { return matchedPairs; }
+    public int getIsolatedMolds() { return isolatedMolds; }
+    public int getIsolatedIncreases() { return isolatedIncreases; }
+    public int getIsolatedChanges() { return isolatedChanges; }
+    public Map<String, Integer> getDetails() { return details; }
+
+    @Override
+    public String toString() {
+        return String.format("总机台数: %d\n" +
+                        "成功配对数: %d\n" +
+                        "单独减模机台: %d\n" +
+                        "单独增模机台: %d\n" +
+                        "单独换活字块机台: %d",
+                totalMachines, matchedPairs, isolatedMolds,
+                isolatedIncreases, isolatedChanges);
+    }
 }
