@@ -1,6 +1,7 @@
 package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -45,4 +46,10 @@ public interface MdmSkuStructureRefEntityMapper extends CommBaseMapper<MdmSkuStr
      * @return 结果
      */
     int updateStructureToMaterial(MdmSkuStructureRef queryVO);
+
+    /**
+     * 根据SKU与示方关系新增不存在的胎胚描述
+     * @return 结果
+     */
+    int insertMainMaterialDesc4SkuConstructionRef(MdmSkuConstructionRef queryVO);
 }
