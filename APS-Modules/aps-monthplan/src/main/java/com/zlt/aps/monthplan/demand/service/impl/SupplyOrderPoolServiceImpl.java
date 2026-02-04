@@ -268,6 +268,11 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         return checkOverDue?AjaxResult.error(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.overdue")):AjaxResult.success();
     }
 
+    @Override
+    public List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition) {
+        return this.supplyOrderPoolEntityMapper.findAdjustSupplyOrderPool(createCondition);
+    }
+
     /**
      * 获取配置信息
      *

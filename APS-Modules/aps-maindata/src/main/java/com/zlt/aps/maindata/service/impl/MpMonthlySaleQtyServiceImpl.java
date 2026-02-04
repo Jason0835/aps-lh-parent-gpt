@@ -298,6 +298,18 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
             .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
     }
 
+    @Override
+    public Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition) {
+        List<MpMonthlySaleQty> list = entityMapper.findAdjustMonthlySaleQty(createCondition);
+        if(CollectionUtils.isEmpty(list)){
+            return Collections.emptyMap();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .filter(monthlySaleQty -> StringUtils.isNotBlank(monthlySaleQty.getMaterialCode()) && monthlySaleQty.getAverageSaleQty() != null)
+            .collect(Collectors.groupingBy(MpMonthlySaleQty::getMaterialCode, Collectors.summingInt(MpMonthlySaleQty::getAverageSaleQty)));
+    }
+
     private List<MpMonthlySaleQty> findCurrentMonthlySaleQtyByFactoryCode(String factoryCode) {
         LambdaQueryWrapper<MpMonthlySaleQty> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(MpMonthlySaleQty::getFactoryCode, factoryCode);

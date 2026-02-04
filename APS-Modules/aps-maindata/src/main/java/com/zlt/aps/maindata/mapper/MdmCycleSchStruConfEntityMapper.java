@@ -1,8 +1,11 @@
 package com.zlt.aps.maindata.mapper;
 
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -20,5 +23,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MdmCycleSchStruConfEntityMapper extends CommBaseMapper<MdmCycleSchStruConf> {
-
+  /**
+   *  获取调整周期结构
+   * @param createCondition 调整参数
+   * @return 周期结构
+   */
+  List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition);
 }
