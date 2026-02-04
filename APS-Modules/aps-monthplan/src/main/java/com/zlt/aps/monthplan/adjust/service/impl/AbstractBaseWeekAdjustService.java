@@ -689,6 +689,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
             monthPlan.setId(null);
+            monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
             monthPlan.setProductionNo(productionNo);
             // 实际生产需求含损耗 = 净需求量汇总
@@ -696,6 +697,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setFactProdReqQty(factProdReqQty);
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
+            // 试制量试关联字段设置
+            if (adjustDetailVo.getTrialPlanId() != null) {
+                monthPlan.setTrialQty(adjustDetailVo.getCurrentNetQty());
+                // 差异量(未排产数量) = 生产实际排产量 - 试制量试计划需求数量
+                differenceQty = Convert.toInt(monthPlan.getTotalQty(), 0) - Convert.toInt(monthPlan.getTrialQty(), 0);
+            }
+            // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
             // 获取周数
             int week = getWeekNumber(new Date());
