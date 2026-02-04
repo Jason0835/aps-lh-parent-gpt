@@ -1395,7 +1395,7 @@ export default {
           params.mpMonth = arr[1];
           params.yearMonth = "";
         }
-        params.beginDay = this.formInline.beginDay;
+        params.startDay = this.formInline.beginDay;
         params.endDay = this.formInline.endDay;
         params.adjustEndDay = this.formInline.adjustEndDay;
         params.adjustStartDay = this.formInline.adjustStartDay;
