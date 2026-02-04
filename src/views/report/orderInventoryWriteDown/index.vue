@@ -128,12 +128,12 @@ export default {
           width: 120,
         },
         {
-          prop: "customNationCode",
+          prop: "customNationCodeNameI18n",
           label: this.$t("ui.data.column.monthplan.salNCode"),
           width: 120,
         },
         {
-          prop: "destinationNationCode",
+          prop: "destinationNationCodeNameI18n",
           label: this.$t("ui.data.column.monthplan.natCode"),
           width: 120,
         },
