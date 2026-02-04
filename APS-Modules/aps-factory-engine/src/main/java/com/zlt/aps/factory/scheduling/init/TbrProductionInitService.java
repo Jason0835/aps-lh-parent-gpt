@@ -7,14 +7,11 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
-import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -22,8 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
-import java.util.function.Function;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -41,8 +39,9 @@ import java.util.stream.Collectors;
 @Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractProductionBusinessService {
 
-    public TbrProductionInitService(ProductionSchedulingDataService dataService) {
-        super(dataService);
+    public TbrProductionInitService(ProductionSchedulingDataService dataService,
+                                    DpRequireDataService dpRequireDataService) {
+        super(dataService, dpRequireDataService);
     }
 
     /**

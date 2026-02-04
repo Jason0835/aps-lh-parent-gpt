@@ -4,6 +4,7 @@ import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
+import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +24,9 @@ public class GeneralInitService extends AbstractProductionBusinessService {
     private final IProductionBusinessService tbrProductionInitService;
 
     public GeneralInitService(ProductionSchedulingDataService dataService,
+                              DpRequireDataService dpRequireDataService,
                               @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService) {
-        super(dataService);
+        super(dataService, dpRequireDataService);
         this.tbrProductionInitService = tbrProductionInitService;
     }
 

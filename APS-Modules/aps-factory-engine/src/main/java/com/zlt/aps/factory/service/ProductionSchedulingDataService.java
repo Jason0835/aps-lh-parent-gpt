@@ -175,14 +175,6 @@ public interface ProductionSchedulingDataService {
     Map<String, BaseConstructionVersionInfoVo> getBaseConstructionInfo();
 
     /**
-     * 根据查询条件，获取分厂的排产制造需求计划数据
-     *
-     * @param context 排产上下文
-     * @return
-     */
-    List<DpDemandPlan> getFactoryMonthPlan(Context context);
-
-    /**
      * 获取需求计划对应的物料基础信息
      *
      * @param context 排产上下文

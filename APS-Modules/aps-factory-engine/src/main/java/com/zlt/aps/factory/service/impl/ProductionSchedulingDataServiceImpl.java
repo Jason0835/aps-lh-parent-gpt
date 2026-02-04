@@ -54,8 +54,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final ProductMinConfigurationMapper productMinConfigurationMapper;
 
-    private final MonthPlanRequireMapper monthPlanRequireMapper;
-
     private final MdmInterestRateEntityMapper interestRateMapper;
 
     private final MdmWorkWearInfoEntityMapper workWearInfoEntityMapper;
@@ -305,22 +303,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return Collections.emptyMap();
         }
         return baseConstructionInfoList.stream().collect(Collectors.toMap(BaseConstructionVersionInfoVo::getEmbryoCode, Function.identity()));
-    }
-
-    @Override
-    public List<DpDemandPlan> getFactoryMonthPlan(Context context) {
-        if (isEmptyFactoryAndRequireVersion(context)) {
-            return Collections.emptyList();
-        }
-        QueryWrapper<DpDemandPlan> queryWrapper = new QueryWrapper();
-        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
-        queryWrapper.eq("YEAR", context.getYear());
-        queryWrapper.eq("MONTH", context.getMonth());
-        if (StringUtils.isNotBlank(context.getMonthPlanVersion())) {
-            queryWrapper.eq("MONTH_PLAN_VERSION", context.getMonthPlanVersion());
-        }
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        return monthPlanRequireMapper.selectList(queryWrapper);
     }
 
     @Override
@@ -601,7 +583,7 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
             return;
         }
         dayResultList.forEach(singleData -> {
-            if(null == singleData.getAverageSaleQty()) {
+            if (null == singleData.getAverageSaleQty()) {
                 singleData.setInventorySalesRatio(null);
                 return;
             }
