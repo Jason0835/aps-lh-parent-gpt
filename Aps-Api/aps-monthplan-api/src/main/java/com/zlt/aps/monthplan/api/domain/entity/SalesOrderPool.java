@@ -62,6 +62,12 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "客户", name = "salCode")
     @TableField(value = "SAL_CODE")
     private String salCode;
+    
+    /** 内外销 */
+    @Excel(name = "ui.data.column.SalesOrderPool.locationType", dictType = "biz_stor_type")
+    @ApiModelProperty(value = "内外销", name = "locationType")
+    @TableField(value = "LOCATION_TYPE")
+    private String locationType;
 
     /** 客户国别 */
     @Excel(name = "ui.data.column.SalesOrderPool.salNCode")

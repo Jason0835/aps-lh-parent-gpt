@@ -96,4 +96,17 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     @ApiModelProperty(value = "数据版本", name = "dataVersion")
     @TableField(exist = false)
     private String dataVersion;
+
+
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
+    @ImportExcelValidated(maxLength = 300)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate")
+    @ApiModelProperty(value = "更新日期", name = "updateDate")
+    @TableField(exist = false)
+    private String updateDate;
+
 }

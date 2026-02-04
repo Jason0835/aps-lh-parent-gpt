@@ -220,13 +220,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 检查sku与施工示方书关系是否有数据
         errorMsgList.addAll(checkExistSkuConstructionRef(contextDTO));
         // 格式化错误信息（换行）
-        String errorMsg = Optional.ofNullable(errorMsgList)
-                .orElse(Collections.emptyList())
-                .stream()
-                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
-        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
-            return new BusinessException(errorMsg);
-        });
+//        String errorMsg = Optional.ofNullable(errorMsgList)
+//                .orElse(Collections.emptyList())
+//                .stream()
+//                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+//        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+//            return new BusinessException(errorMsg);
+//        });
     }
 
     /**
@@ -335,15 +335,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected Map<String, String> getCheckEmptyFieldMap() {
         Map<String, String> checkFieldMap = new HashMap<>();
-        checkFieldMap.put("structureName", "结构名称");
-        checkFieldMap.put("constructionStage", "施工阶段");
-        checkFieldMap.put("productTypeCode", "产品品类");
-        checkFieldMap.put("mainMaterialDesc", "主物料胎胚号");
-        checkFieldMap.put("mainPattern", "主花纹");
-        checkFieldMap.put("curingTime", "硫化时间");
-        checkFieldMap.put("mouldCavityQty", "型腔数量");
-        checkFieldMap.put("typeBlockQty", "活块数量");
-        checkFieldMap.put("dayVulcanizationQty", "日硫化量单模");
+//        checkFieldMap.put("structureName", "结构名称");
+//        checkFieldMap.put("constructionStage", "施工阶段");
+//        checkFieldMap.put("productTypeCode", "产品品类");
+//        checkFieldMap.put("mainMaterialDesc", "主物料胎胚号");
+//        checkFieldMap.put("mainPattern", "主花纹");
+//        checkFieldMap.put("curingTime", "硫化时间");
+////        checkFieldMap.put("mouldCavityQty", "型腔数量");
+////        checkFieldMap.put("typeBlockQty", "活块数量");
+//        checkFieldMap.put("dayVulcanizationQty", "日硫化量单模");
         return Collections.unmodifiableMap(checkFieldMap);
     }
 
@@ -687,7 +687,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
-            monthPlan.setYearMonth(Integer.valueOf(adjustResult.getYear() + "" + String.format("%02d",adjustResult.getMonth())));
+            monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
             monthPlan.setId(null);
             monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
@@ -1157,11 +1157,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     public abstract void doAutoAdjust(MpRollAdjustContextDTO contextDTO);
 
-    /**
-     * 调整确认(业务逻辑处理)
-     */
-    public abstract void doConfirmAdjust(MpRollAdjustContextDTO contextDTO);
-
 
     /**
      * 生成分布式唯一版本号
@@ -1278,7 +1273,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         if (contextDTO.getMpYear() != null && contextDTO.getMpMonth() != null) {
             // 年月
-            contextDTO.setYearMonth(Integer.valueOf(contextDTO.getMpYear() + "" + String.format("%02d",contextDTO.getMpMonth())));
+            contextDTO.setYearMonth(Integer.valueOf(String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth())));
             // 获取定稿的月度计划
             FactoryMonthPlanFinalAdjustVo monthPlan = getIsFinalMonthPlan(contextDTO);
             if (monthPlan != null) {
