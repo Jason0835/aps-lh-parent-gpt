@@ -236,6 +236,7 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime")), "HYDRAULIC_PRESSURE_CURING_TIME", queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("moldCavity")), "MOLD_CAVITY", queryVO.getFieldValueByFieldName("moldCavity"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionStage")), "PRODUCTION_STAGE", queryVO.getFieldValueByFieldName("productionStage"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("pattern")), "PATTERN", queryVO.getFieldValueByFieldName("pattern"));
     }
 
 
