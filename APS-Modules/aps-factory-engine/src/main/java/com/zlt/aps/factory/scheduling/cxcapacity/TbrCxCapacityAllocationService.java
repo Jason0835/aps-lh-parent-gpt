@@ -311,7 +311,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
             return Collections.emptyMap();
         }
         //获取上个排产周期最后排产日的排产信息
-        List<ContinueProductInfo> continueProductionInfoList = getDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
+        List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
         Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
@@ -520,7 +520,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
      * @return
      */
     private Map<String, Set<String>> getContinueGroupInfo(Context context, String factoryCode, Integer year, Integer month, Integer lastDay) {
-        List<ContinueGroupInfo> continueGroupInfoList = getDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
+        List<ContinueGroupInfo> continueGroupInfoList = getMonthProductionDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             return Collections.emptyMap();

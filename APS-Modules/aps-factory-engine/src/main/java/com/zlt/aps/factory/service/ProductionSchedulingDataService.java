@@ -40,14 +40,6 @@ public interface ProductionSchedulingDataService {
     Map<String, Object> getFactoryParamByCondition(Context context, List<String> paramCodeList);
 
     /**
-     * 根据排产版本号，更新排产月份模式及排产开始、结束日
-     *
-     * @param updateVersion
-     * @return
-     */
-    int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion);
-
-    /**
      * 增加一条分厂排程版本记录
      *
      * @param updateVersion
@@ -79,28 +71,6 @@ public interface ProductionSchedulingDataService {
      * @return
      */
     List<CycleStructureMinLhMachineQtyVo> getCycleLhRatioInfo(Context context);
-
-    /**
-     * 获取续作SKU信息，包含续作机台及使用的模具数
-     *
-     * @param factoryCode 工厂编码
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
-     * @return
-     */
-    List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
-
-    /**
-     * 获取在机结构信息，从结构排产表中获取
-     *
-     * @param factoryCode 工厂编码
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
-     * @return
-     */
-    List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
 
     /**
      * 获取工厂的成型基础配置信息

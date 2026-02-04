@@ -9,8 +9,6 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
-import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.dto.CxDevicePlanShutInfoHelper;
 import com.zlt.aps.factory.domain.dto.MachineCountDto;
 import com.zlt.aps.factory.domain.vo.*;
@@ -73,8 +71,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
 
     private final FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
 
-    private final FactoryMonthPlanContinueProductInfoMapper factoryMonthPlanContinueProductInfoMapper;
-
     private final FactoryMonthPlanSpecialMaterialInfoMapper factoryMonthPlanSpecialMaterialInfoMapper;
 
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
@@ -110,14 +106,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         //数据类型转换
         paramConfigurationMap.forEach((key, paramConfiguration) -> paramValueMap.put(key, getParamValue(paramConfiguration)));
         return paramValueMap;
-    }
-
-    @Override
-    public int updateProductionVersionInfo(MpFactoryProductionVersion updateVersion) {
-        if (null == updateVersion || StringUtils.isBlank(updateVersion.getProductionVersion())) {
-            return 0;
-        }
-        return factoryProductionSchedulingMapper.updateProductionVersionInfo(updateVersion);
     }
 
     @Override
@@ -171,23 +159,6 @@ public class ProductionSchedulingDataServiceImpl implements ProductionScheduling
         Integer year = context.getYear();
         Integer month = context.getMonth();
         return factoryMonthPlanProductLhCapacityMapper.getCycleStructureMinLhRatioInfo(factoryCode, year, month);
-    }
-
-    @Override
-    public List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
-        //取得上个月最后一天的排产信息
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
-            return Collections.emptyList();
-        }
-        return factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, lastDay);
-    }
-
-    @Override
-    public List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
-            return Collections.emptyList();
-        }
-        return factoryMonthPlanContinueProductInfoMapper.getContinueGroupInfo(factoryCode, year, month, lastDay);
     }
 
     @Override

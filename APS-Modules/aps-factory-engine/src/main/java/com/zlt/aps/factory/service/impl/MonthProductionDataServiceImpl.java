@@ -6,12 +6,11 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
+import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
-import com.zlt.aps.factory.mapper.FactoryEngineProductionVersionMapper;
-import com.zlt.aps.factory.mapper.FactoryProductionInitMapper;
-import com.zlt.aps.factory.mapper.FactoryProductionSchedulingMapper;
-import com.zlt.aps.factory.mapper.MpStructureAllocationMapper;
+import com.zlt.aps.factory.mapper.*;
 import com.zlt.aps.factory.service.IFactoryMouldUsedStatusLogService;
 import com.zlt.aps.factory.service.IFactoryProductionMonthPlanInitService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
@@ -51,6 +50,8 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     private final FactoryProductionInitMapper factoryProductionInitMapper;
 
     private final FactoryProductionSchedulingMapper factoryProductionSchedulingMapper;
+
+    private final FactoryMonthPlanContinueProductInfoMapper factoryMonthPlanContinueProductInfoMapper;
 
     private final FactoryEngineProductionVersionMapper factoryEngineProductionVersionMapper;
 
@@ -170,6 +171,23 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
             return;
         }
         factoryMouldUsedStatusLogService.saveBatch(usedLogList);
+    }
+
+    @Override
+    public List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
+        //取得上个月最后一天的排产信息
+        if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
+            return Collections.emptyList();
+        }
+        return factoryMonthPlanContinueProductInfoMapper.getContinueProductInfo(factoryCode, year, month, lastDay);
+    }
+
+    @Override
+    public List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
+        if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
+            return Collections.emptyList();
+        }
+        return factoryMonthPlanContinueProductInfoMapper.getContinueGroupInfo(factoryCode, year, month, lastDay);
     }
 
     @Override

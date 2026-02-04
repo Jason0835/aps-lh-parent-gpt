@@ -1,6 +1,8 @@
 package com.zlt.aps.factory.service;
 
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
+import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.monthplan.api.domain.entity.MouldProductionLog;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
@@ -96,6 +98,27 @@ public interface MonthProductionDataService {
      */
     void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList);
 
+    /**
+     * 获取续作SKU信息，包含续作机台及使用的模具数
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @param lastDay     最后一天
+     * @return
+     */
+    List<ContinueProductInfo> getContinueProductionInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
+
+    /**
+     * 获取在机结构信息，从结构排产表中获取
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @param lastDay     最后一天
+     * @return
+     */
+    List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
     /**
      * 获取历史分组排产数据信息
      *
