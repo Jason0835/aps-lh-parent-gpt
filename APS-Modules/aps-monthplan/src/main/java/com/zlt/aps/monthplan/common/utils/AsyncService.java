@@ -11,8 +11,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
-import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
-import com.zlt.aps.monthplan.demand.service.IDpStockVersionService;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -45,25 +43,10 @@ public class AsyncService {
   private final ProductionSchedulingService productionSchedulingService;
   // 定稿的月度排产计划
   private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
-  private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
-  // 版本库存
-  private final IDpStockVersionService dpStockVersionService;
+
   private final BaseDao baseDao;
 
-  @Async("batchInsertExecutor")
-  public void saveAllocationResults(
-      DpDemandPlan createCondition,
-      String monthPlanVersion,
-      PredictionContext.OrderAllocationResult allocationResult) {
-    // 批量插入分配结果
-    if (!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getAllocations())) {
-      this.dpOrderOffsetDetailService.batchInsert(allocationResult.getAllocations());
-    }
-    if(!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getStockMap())) {
-      // 批量插入库存版本
-      dpStockVersionService.insertBatchData(createCondition, monthPlanVersion, allocationResult.getStockMap());
-    }
-  }
+
 
   @Async("taskExecutor")
   public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange){

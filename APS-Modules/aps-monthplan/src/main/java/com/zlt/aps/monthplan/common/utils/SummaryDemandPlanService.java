@@ -34,7 +34,7 @@ public class SummaryDemandPlanService {
   // 批量插入处理器
   private final BatchInsertProcessor<DpDemandPlanSum> batchInsertProcessor;
 
-  private final AsyncService asyncService;
+  private final SaveAllocationResultService saveAllocationResultService;
 
   public void summaryDemandPlan(DpDemandPlan createCondition, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
     Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey));
@@ -63,7 +63,7 @@ public class SummaryDemandPlanService {
     });
     datas.sort(Comparator.comparing(DpDemandPlanSum::getMaterialCode));
     this.batchInsertProcessor.batchInsert(datas);
-    this.asyncService.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
+    this.saveAllocationResultService.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
   }
 
   private Map<String, Map<String, Integer>> calculateStockQty(Map<String, List<MdmProductStock>> finishProductStockMap) {
