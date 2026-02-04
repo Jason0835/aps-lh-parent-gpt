@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
@@ -12,6 +14,7 @@ import net.sf.cglib.core.Local;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -207,6 +210,65 @@ public class JsonUtils {
             }
         }
     }
+
+    /**
+     * 解析json字段信息列表，并将多个错误内容用<br>换行显示
+     *
+     * @param list   数据集合
+     * @param locale 语言
+     * @param fields 字段
+     */
+    public static void parseJsonRemarkListWithLineBreak(List<? extends BaseEntity> list, String locale, String... fields) {
+        if (CollectionUtils.isEmpty(list) || StringUtils.isEmpty(locale) || fields == null || fields.length == 0) {
+            return;
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        for (BaseEntity item : list) {
+            for (String field : fields) {
+                String fieldJson = (String) item.getFieldValueByFieldName(field);
+                if (StringUtils.isBlank(fieldJson)) {
+                    continue;
+                }
+                String jsonToParse = fieldJson;
+                if (!fieldJson.trim().startsWith("[")) {
+                    jsonToParse = "[" + fieldJson + "]";
+                }
+                try {
+                    // 使用处理过的 jsonToParse 进行解析
+                    JsonNode rootNode = objectMapper.readTree(jsonToParse);
+                    List<String> errorMessages = new ArrayList<>();
+
+                    // 此时 rootNode 必定是数组，可以直接遍历
+                    if (rootNode.isArray()) {
+                        for (JsonNode node : rootNode) {
+                            if (node.has(locale)) {
+                                errorMessages.add(node.get(locale).asText());
+                            }
+                        }
+                    } else if (rootNode.isObject()) {
+                        // 兜底逻辑：万一加了括号还是对象（虽然不太可能）
+                        if (rootNode.has(locale)) {
+                            errorMessages.add(rootNode.get(locale).asText());
+                        }
+                    }
+
+                    // 3. 用<br>连接各条错误信息
+                    if (!errorMessages.isEmpty()) {
+                        String contentWithLineBreak = String.join("<br>", errorMessages);
+                        item.setFieldValueByFieldName(field, contentWithLineBreak);
+                    }
+
+                } catch (Exception e) {
+                    // 解析失败时保持原值或记录日志
+                    log.error("解析JSON失败: {}", fieldJson, e);
+                }
+            }
+        }
+    }
+
+
 
     /**
      * 解析json备注信息，可能存在多种拼接情况
