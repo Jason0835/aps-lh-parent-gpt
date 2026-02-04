@@ -37,16 +37,17 @@ public class SummaryDemandPlanService {
   private final SaveAllocationResultService saveAllocationResultService;
 
   public void summaryDemandPlan(DpDemandPlan createCondition, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
-    Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersionKey));
+    Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupFactoryAndMaterialKey));
     Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(allocationResult.getStockMap());
     List<DpDemandPlanSum> datas = Lists.newArrayList();
     map.forEach((key, value) -> {
+      DpDemandPlan demandPlan = value.get(0);
       Map<String,Integer> stockMap = stockQtyMap.getOrDefault(key, Collections.emptyMap());
       DpDemandPlanSum entity = new DpDemandPlanSum();
-      BeanUtils.copyProperties(value.get(0), entity);
+      BeanUtils.copyProperties(demandPlan, entity);
       entity.setId(null);
       entity.setBaseVale(null);
-      entity.setStockQty(value.get(0).getStockQty());
+      entity.setStockQty(stockMap.getOrDefault(StringConstant.ZERO,BigDecimal.ZERO.intValue()));
       entity.setCurrentYearStockQty(stockMap.getOrDefault(StringConstant.ONE,BigDecimal.ZERO.intValue()));
       entity.setSub1YearStockQty(stockMap.getOrDefault(StringConstant.TWO,BigDecimal.ZERO.intValue()));
       entity.setSub2YearStockQty(stockMap.getOrDefault(StringConstant.THREE,BigDecimal.ZERO.intValue()));
