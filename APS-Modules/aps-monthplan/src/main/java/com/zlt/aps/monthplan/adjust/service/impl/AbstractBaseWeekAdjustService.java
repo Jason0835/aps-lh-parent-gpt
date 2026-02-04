@@ -335,15 +335,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected Map<String, String> getCheckEmptyFieldMap() {
         Map<String, String> checkFieldMap = new HashMap<>();
-        checkFieldMap.put("structureName", "结构名称");
-        checkFieldMap.put("constructionStage", "施工阶段");
-        checkFieldMap.put("productTypeCode", "产品品类");
-        checkFieldMap.put("mainMaterialDesc", "主物料胎胚号");
-        checkFieldMap.put("mainPattern", "主花纹");
-        checkFieldMap.put("curingTime", "硫化时间");
-//        checkFieldMap.put("mouldCavityQty", "型腔数量");
-//        checkFieldMap.put("typeBlockQty", "活块数量");
-        checkFieldMap.put("dayVulcanizationQty", "日硫化量单模");
+//        checkFieldMap.put("structureName", "结构名称");
+//        checkFieldMap.put("constructionStage", "施工阶段");
+//        checkFieldMap.put("productTypeCode", "产品品类");
+//        checkFieldMap.put("mainMaterialDesc", "主物料胎胚号");
+//        checkFieldMap.put("mainPattern", "主花纹");
+//        checkFieldMap.put("curingTime", "硫化时间");
+////        checkFieldMap.put("mouldCavityQty", "型腔数量");
+////        checkFieldMap.put("typeBlockQty", "活块数量");
+//        checkFieldMap.put("dayVulcanizationQty", "日硫化量单模");
         return Collections.unmodifiableMap(checkFieldMap);
     }
 
@@ -1156,11 +1156,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 自动调整(业务逻辑处理)
      */
     public abstract void doAutoAdjust(MpRollAdjustContextDTO contextDTO);
-
-    /**
-     * 调整确认(业务逻辑处理)
-     */
-    public abstract void doConfirmAdjust(MpRollAdjustContextDTO contextDTO);
 
 
     /**
