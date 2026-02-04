@@ -185,10 +185,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         CollUtil.filter(adjustDetailList, item -> structureNameSet.contains(item.getStructureName()));
     }
 
-    @Override
-    public void doConfirmAdjust(MpRollAdjustContextDTO contextDTO) {
-
-    }
 
     @Override
     public void specialInit(MpRollAdjustContextDTO contextDTO) {
