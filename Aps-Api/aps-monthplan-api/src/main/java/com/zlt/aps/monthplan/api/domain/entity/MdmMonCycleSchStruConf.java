@@ -84,6 +84,10 @@ public class MdmMonCycleSchStruConf extends BaseEntity {
     @TableField(value = "MIN_VULCANIZING_MACHINE")
     private Integer minVulcanizingMachine;
 
+    @ApiModelProperty("订单来源：01：正常 02：产量预测：03：实单模拟")
+    @TableField("SOURCE_TYPE")
+    private String sourceType;
+
     @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate")
     @ApiModelProperty(value = "更新日期", name = "updateDate")
     @TableField(exist = false)

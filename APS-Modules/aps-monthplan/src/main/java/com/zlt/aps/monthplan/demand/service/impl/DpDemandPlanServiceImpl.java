@@ -468,7 +468,10 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             return Collections.emptyList();
         }
         predictionContext.setPredictOffsetDetails(leftDemands);
-        List<SupplyOrderPool> supplyOrderPools = this.createSupplyOrder(createCondition,currentMonth);
+        List<SupplyOrderPool> supplyOrderPools = Lists.newArrayList();
+        if(ProductionPlanType.PREDICTION.getPlanType().equals(createCondition.getPlanType())) {
+            supplyOrderPools = this.createSupplyOrder(createCondition,currentMonth);
+        }
         // 6. 处理需求计划生成
         List<DpDemandPlan> rawPlans = generateDemandPlans(createCondition,leftDemands,supplyOrderPools);
         // 7: 计划合并和持久化

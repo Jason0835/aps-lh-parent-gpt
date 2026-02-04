@@ -155,12 +155,25 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
         // 查询月度排产计划表关联查询出 对应参数月份-配置月份的数据
         List<MdmMonCycleSchStruConf> resultList = monCycleSchStruConfEntityMapper.selectMonthCycleSchStruConf(mdmCycleSchStruConf);
         if (CollectionUtils.isNotEmpty(resultList)) {
-            LambdaUpdateWrapper<MdmMonCycleSchStruConf> updateWrapper = new LambdaUpdateWrapper<>();
-            updateWrapper.eq(MdmMonCycleSchStruConf::getYear, year)
+            if(StringUtils.isNotBlank(mdmCycleSchStruConf.getSourceType())) {
+                for (MdmMonCycleSchStruConf mdmMonCycleSchStruConf : resultList) {
+                    mdmMonCycleSchStruConf.setSourceType(mdmCycleSchStruConf.getSourceType());
+                }
+                LambdaUpdateWrapper<MdmMonCycleSchStruConf> updateWrapper = new LambdaUpdateWrapper<>();
+                updateWrapper.eq(MdmMonCycleSchStruConf::getYear, year)
+                    .eq(MdmMonCycleSchStruConf::getMonth, month)
+                    .eq(MdmMonCycleSchStruConf::getSourceType, mdmCycleSchStruConf.getSourceType())
+                    .set(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_DEL);
+                monCycleSchStruConfEntityMapper.update(null, updateWrapper);
+                baseDao.saveBatch(resultList);
+            }else{
+                LambdaUpdateWrapper<MdmMonCycleSchStruConf> updateWrapper = new LambdaUpdateWrapper<>();
+                updateWrapper.eq(MdmMonCycleSchStruConf::getYear, year)
                     .eq(MdmMonCycleSchStruConf::getMonth, month)
                     .set(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_DEL);
-            monCycleSchStruConfEntityMapper.update(null, updateWrapper);
-            baseDao.saveBatch(resultList);
+                monCycleSchStruConfEntityMapper.update(null, updateWrapper);
+                baseDao.saveBatch(resultList);
+            }
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.mdmCycleSchStruConf.generateDataNull"));
         }
