@@ -13,13 +13,15 @@
         <el-table-column prop="checkItem" label="项目名称" show-overflow-tooltip width="240">
           <template v-slot="scope">
             <div>
-
               <span >{{ selectDictLabel(parentDict.type.check_item_type, scope.row.checkItem) }}</span>
             </div>
           </template>
         </el-table-column>
         </el-table-column>
         <el-table-column prop="checkContent" label="原因" show-overflow-tooltip >
+          <template v-slot="scope">
+            <div  class="error-message" v-html="scope.row.checkContent"></div>
+          </template>
         </el-table-column>
       </el-table>
     </div>

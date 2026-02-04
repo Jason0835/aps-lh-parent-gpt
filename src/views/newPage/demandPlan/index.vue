@@ -554,6 +554,12 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
+        {
+          prop: "viewFlag",
+          label: this.$t("显示所有净需求"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
       ];
     },
   },
