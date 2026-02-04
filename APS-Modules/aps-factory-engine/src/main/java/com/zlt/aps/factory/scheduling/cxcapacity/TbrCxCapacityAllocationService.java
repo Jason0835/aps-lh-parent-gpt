@@ -18,6 +18,7 @@ import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.factory.utils.InitNoProductionRecordService;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
@@ -74,6 +75,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
 
     public TbrCxCapacityAllocationService(ProductionSchedulingDataService dataService,
                                           DpRequireDataService dpRequireDataService,
+                                          MonthProductionDataService monthProductionDataService,
                                           InitNoProductionRecordService initNoProductionRecordService,
                                           FormalProductionHandler formalProductionHandler,
                                           ProductionHistoryHandler productionHistoryHandler,
@@ -83,7 +85,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
-        super(dataService, dpRequireDataService);
+        super(dataService, dpRequireDataService, monthProductionDataService);
         this.initNoProductionRecordService = initNoProductionRecordService;
         this.formalProductionHandler = formalProductionHandler;
         this.productionHistoryHandler = productionHistoryHandler;
@@ -129,7 +131,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         //开始进行成型产能分配-结构排产
         log.info(TbrBeforeProductionGroupLogRecorder.addStartGroupLog(productionContext));
         //1、获取排产计划信息
-        List<MonthPlanProductionRequirePlanVo> requirePlanList = getDataService().getFactoryMonthPlanManufacturing(productionContext);
+        List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addGetProductionVersionDataLog(productionContext));
         if (CollectionUtils.isEmpty(requirePlanList)) {
             throw new BusinessException(I18nUtil.getMessage("alg.data.production.noRequirePlan"));
@@ -246,7 +248,7 @@ public class TbrCxCapacityAllocationService extends AbstractProductionBusinessSe
         if (CollectionUtils.isEmpty(usedLogList)) {
             return;
         }
-        getDataService().saveMouldUsedLog(usedLogList);
+        getMonthProductionDataService().saveMouldUsedLog(usedLogList);
     }
 
     /**

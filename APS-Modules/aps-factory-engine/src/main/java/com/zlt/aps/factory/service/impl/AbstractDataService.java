@@ -15,6 +15,19 @@ import org.apache.commons.lang3.StringUtils;
 public abstract class AbstractDataService {
 
     /**
+     * 是否空的工厂、年份、月份、需求版本、排产版本条件
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    protected boolean isEmptyFactoryAndProductionVersion(Context context) {
+        boolean isEmptyFactoryAndRequireVersion = isEmptyFactoryAndRequireVersion(context);
+        if (isEmptyFactoryAndRequireVersion) {
+            return true;
+        }
+        return StringUtils.isBlank(context.getProductionVersion());
+    }
+    /**
      * 是否空的工厂、年份、月份、需求版本
      *
      * @param context 排产上下文

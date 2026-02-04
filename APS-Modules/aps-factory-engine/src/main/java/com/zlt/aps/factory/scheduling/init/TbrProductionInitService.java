@@ -11,6 +11,7 @@ import com.zlt.aps.factory.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionSchedulingDataService;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
@@ -40,8 +41,9 @@ import java.util.stream.Collectors;
 public class TbrProductionInitService extends AbstractProductionBusinessService {
 
     public TbrProductionInitService(ProductionSchedulingDataService dataService,
-                                    DpRequireDataService dpRequireDataService) {
-        super(dataService, dpRequireDataService);
+                                    DpRequireDataService dpRequireDataService,
+                                    MonthProductionDataService monthProductionDataService) {
+        super(dataService, dpRequireDataService, monthProductionDataService);
     }
 
     /**
@@ -492,7 +494,7 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
         //先删除旧的初始化数据
         deleteOldData(productionContext);
         //再保存新的初始化数据
-        getDataService().saveMonthPlanInit(requirePlanList);
+        getMonthProductionDataService().saveMonthPlanInit(requirePlanList);
     }
 
     /**
@@ -508,8 +510,8 @@ public class TbrProductionInitService extends AbstractProductionBusinessService 
             throw new BusinessException(I18nUtil.getMessage("alg.data.alter.message.productionVersionNoEmpty"));
         }
         //删除版本已有数据
-        getDataService().deletedInitData(productionContext);
-        getDataService().deletedMouldProductionData(productionContext);
+        getMonthProductionDataService().deletedInitData(productionContext);
+        getMonthProductionDataService().deletedMouldProductionData(productionContext);
     }
 
     /**
