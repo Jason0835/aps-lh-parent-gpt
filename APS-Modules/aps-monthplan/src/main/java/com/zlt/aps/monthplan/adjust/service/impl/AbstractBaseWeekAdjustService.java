@@ -220,13 +220,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 检查sku与施工示方书关系是否有数据
         errorMsgList.addAll(checkExistSkuConstructionRef(contextDTO));
         // 格式化错误信息（换行）
-        String errorMsg = Optional.ofNullable(errorMsgList)
-                .orElse(Collections.emptyList())
-                .stream()
-                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
-        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
-            return new BusinessException(errorMsg);
-        });
+//        String errorMsg = Optional.ofNullable(errorMsgList)
+//                .orElse(Collections.emptyList())
+//                .stream()
+//                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+//        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+//            return new BusinessException(errorMsg);
+//        });
     }
 
     /**
