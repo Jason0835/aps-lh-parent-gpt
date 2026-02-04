@@ -142,19 +142,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @return
      */
     public Integer getPlanNeedProductionQty() {
-        Integer sum = BigDecimal.ZERO.intValue();
-        if (null != getNetQty()) {
-            sum = sum + getNetQty();
-        }
-        if (null != getConventionReserveQty()) {
-            sum = sum + getConventionReserveQty();
-        }
+        Integer sum = Optional.ofNullable(getNetQty()).orElse(BigDecimal.ZERO.intValue());
+        sum = sum + Optional.ofNullable(getConventionReserveQty()).orElse(BigDecimal.ZERO.intValue());
         if (isNormalTypePlan()) {
             return sum;
         }
-        if (null != getPostponeQty()) {
-            sum = sum + getFactProdReqQty();
-        }
+        sum = sum + Optional.of(getPostponeQty()).orElse(BigDecimal.ZERO.intValue());
         return sum;
     }
 
