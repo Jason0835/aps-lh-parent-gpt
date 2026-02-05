@@ -69,7 +69,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             return new BusinessException(msg);
         });
         // 6、按照结构、物料编码维度进行分组，并汇总订单量
-        resultList = sumByStructureAndMaterial(resultList);
+        resultList = sumByStructureAndMaterial(resultList, Boolean.FALSE);
         contextDTO.setAdjustDetailList(resultList);
         // 7、设置是否特殊材料
         setHasSpecialMaterial(contextDTO);
