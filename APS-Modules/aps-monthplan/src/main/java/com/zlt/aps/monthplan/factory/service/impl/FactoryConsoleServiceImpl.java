@@ -131,7 +131,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
     }
 
     @Override
-    public AjaxResult reMouldingProduction(FactoryProductionParamVo factoryProductionParam) {
+    public AjaxResult rescheduleMouldingProduction(FactoryProductionParamVo factoryProductionParam) {
         AjaxResult checkResult = checkParam(factoryProductionParam);
         //校验没通过
         if (AjaxResult.Type.ERROR.value() == (Integer) checkResult.get(AjaxResult.CODE_TAG)) {
