@@ -98,16 +98,41 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String customName;
 
     /** 客户国别 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.customNationCode")
+
     @ApiModelProperty(value = "客户国别", name = "customNationCode")
     @TableField(value = "CUSTOM_NATION_CODE")
     private String customNationCode;
 
+    /**
+     * 客户国别名称国际化字符串
+     */
+    @TableField(exist = false)
+    private String customNationCodeName;
+
+    /**
+     * 客户国别名称国际化
+     */
+    @Excel(name = "ui.data.column.orderOffsetDetail.customNationCode")
+    @TableField(exist = false)
+    private String customNationCodeNameI18n;
+
     /** 目的国 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.destinationNationCode")
     @ApiModelProperty(value = "目的国", name = "destinationNationCode")
     @TableField(value = "DESTINATION_NATION_CODE")
     private String destinationNationCode;
+
+    /**
+     * 客户国别名称国际化字符串
+     */
+    @TableField(exist = false)
+    private String destinationNationCodeName;
+
+    /**
+     * 客户国别名称国际化
+     */
+    @Excel(name = "ui.data.column.orderOffsetDetail.destinationNationCode")
+    @TableField(exist = false)
+    private String destinationNationCodeNameI18n;
 
     /** PO号 */
     @Excel(name = "ui.data.column.orderOffsetDetail.poNumber")

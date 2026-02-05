@@ -85,4 +85,9 @@ public class MdmCycleSchStruConf extends BaseEntity {
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(exist = false)
     private Integer month;
+
+    @ApiModelProperty("订单来源：01：正常 02：产量预测：03：实单模拟")
+    @TableField(exist = false)
+    private String sourceType;
+
 }

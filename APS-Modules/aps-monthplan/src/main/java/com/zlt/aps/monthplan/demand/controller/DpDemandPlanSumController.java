@@ -70,7 +70,7 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
 
     @Override
     protected String getOrderBy() {
-        return "update_time DESC,ID DESC,STRUCTURE_NAME ASC,MAIN_PATTERN ASC,NET_QTY DESC";
+        return "update_time DESC,ID DESC,STRUCTURE_NAME ASC,MAIN_PATTERN ASC,ORDER_QTY DESC";
     }
 
     /**
@@ -180,7 +180,7 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
             queryWrapper.nested(wq -> wq
                 .ne("STOCK_QTY", 0)
                 .or()
-                .ne("POSTPONE_NET_QTY", 0)
+                .ne("ORDER_QTY", 0)
                 .or()
                 .ne("PLANNED_SURPLUS", 0)
             );

@@ -12,12 +12,14 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.maindata.service.IMpOverdueSkuService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
+import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
@@ -65,6 +67,8 @@ public class CycleStockUpService {
   // 注入的依赖服务
   private final SupplyOrderPoolEntityMapper supplyOrderPoolEntityMapper;
 
+  private final IMdmCycleSchStruConfService mdmCycleSchStruConfService;
+
   private final IMdmMonCycleSchStruConfService mdmMonCycleSchStruConfService;
   // 物料信息
   private final IMdmMaterialInfoService materialInfoService;
@@ -100,12 +104,18 @@ public class CycleStockUpService {
     log.info("开始创建周期性备货, 工厂编码: {}", supplyOrderPool.getFactoryCode());
     try {
       if(validateFlag) {
-        // 1. 准备基础数据
-        YearMonth nextMonth = YearMonth.now().plusMonths(1);
-        supplyOrderPool.setFactoryCode(resolveFactoryCode(supplyOrderPool));
-        supplyOrderPool.setYear(nextMonth.getYear());
-        supplyOrderPool.setMonth(nextMonth.getMonthValue());
-        supplyOrderPool.setSourceType(ProductionPlanType.NORMAL.getPlanType());
+          // 1. 准备基础数据
+          YearMonth nextMonth = YearMonth.now().plusMonths(1);
+          supplyOrderPool.setFactoryCode(resolveFactoryCode(supplyOrderPool));
+          supplyOrderPool.setYear(nextMonth.getYear());
+          supplyOrderPool.setMonth(nextMonth.getMonthValue());
+          supplyOrderPool.setSourceType(ProductionPlanType.NORMAL.getPlanType());
+      }else{
+        MdmCycleSchStruConf mdmCycleSchStruConf = new MdmCycleSchStruConf();
+        mdmCycleSchStruConf.setFactoryCode(supplyOrderPool.getFactoryCode());
+        mdmCycleSchStruConf.setYear(supplyOrderPool.getYear());
+        mdmCycleSchStruConf.setMonth(supplyOrderPool.getMonth());
+        mdmCycleSchStruConfService.genMonthCycleSchStruConf(mdmCycleSchStruConf);
       }
       // 2. 验证前置条件
       Set<String> validStructures = validatePrerequisites(supplyOrderPool);

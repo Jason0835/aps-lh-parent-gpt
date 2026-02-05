@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -118,7 +119,14 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         productionContinue(ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        allContinueMap.forEach((structureName, cxContinueInfo) -> {
+        allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {
+            // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
+            Boolean isSpecial1 = allGroupPlanMap.get(entry1.getKey()).isSpecialMaterial();
+            Boolean isSpecial2 = allGroupPlanMap.get(entry2.getKey()).isSpecialMaterial();
+            return isSpecial2.compareTo(isSpecial1); // Boolean的true比false大，因此需要倒序，优先处理true的
+        })
+        .forEach(entry -> {
+            String structureName = entry.getKey();
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
             if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
@@ -215,6 +223,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新剩余天数
         Integer leftOver1 = remainingDays - realAllocationDays;
+        productionContext.updateSpecialMaterialInfoMap(addNewGroupPlan, realAllocationDays); // 更新特殊材料库存
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);

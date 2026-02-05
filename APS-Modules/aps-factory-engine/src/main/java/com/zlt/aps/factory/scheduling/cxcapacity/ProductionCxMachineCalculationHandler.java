@@ -244,6 +244,7 @@ public class ProductionCxMachineCalculationHandler {
         Integer remainingDays = cxMachineInfo.getRemainingDays();
         allocationDays = Math.min(remainingDays, allocationDays);
         //更新分组剩余分配量
+        productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDays); // 更新特殊材料库存
         groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
         ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
         CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, capacityInfo, groupPlanInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);
@@ -294,6 +295,7 @@ public class ProductionCxMachineCalculationHandler {
                 CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
                 Integer remainingDays = cxMachineInfo.getRemainingDays();
                 Integer allocationDay = Math.min(sumDays, remainingDays);
+                productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay); // 更新特殊材料库存
                 groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
                 CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
                 cxMachineInfo.addAllocationPlanInfo(context, helper);
@@ -310,6 +312,7 @@ public class ProductionCxMachineCalculationHandler {
             Integer remainingDays = cxMachineInfo.getRemainingDays() - minAllocationDays;
             Integer leftOverAllocationDay = Math.min(leftOverSplitDays, remainingDays);
             Integer allocationDay = leftOverAllocationDay + minAllocationDays;
+            productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay); // 更新特殊材料库存
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
             CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
             cxMachineInfo.addAllocationPlanInfo(context, helper);

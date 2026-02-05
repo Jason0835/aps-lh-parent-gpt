@@ -96,4 +96,11 @@ public class RawWarningConfig extends BaseEntity {
     @ApiModelProperty(value = "通知方式", name = "notifyTypes")
     @TableField(value = "NOTIFY_TYPES")
     private String notifyTypes;
+
+
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
+    @ImportExcelValidated(maxLength = 300)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }

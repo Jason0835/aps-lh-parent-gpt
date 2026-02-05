@@ -130,13 +130,18 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         Integer startDay = contextDTO.getStartDay();
         // 结束日期
         Integer endDay = contextDTO.getEndDay();
+        // 调整开始日期
+        Integer adjustStartDay = contextDTO.getAdjustStartDay();
+        // 调整结束日期
+        Integer adjustEndDay = contextDTO.getAdjustEndDay();
         if (StringUtils.isEmpty(productionVersion) || StringUtils.isEmpty(factoryCode)
                 || StringUtils.isEmpty(structureName) || StringUtils.isEmpty(scheduledMachines)
-                || year == null || month == null || startDay == null || endDay == null) {
+                || year == null || month == null || startDay == null || endDay == null
+                || adjustStartDay == null || adjustEndDay == null) {
             log.warn("更新结构转产：必须字段为空，直接返回");
             return;
         }
-        Integer allotDays = endDay - startDay + 1;
+        Integer allotDays = adjustEndDay - adjustStartDay + 1;
         // 更新结构转产
         try {
             LambdaUpdateWrapper<MpStructureAllocation> wrapper = new LambdaUpdateWrapper<>();
@@ -146,8 +151,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                     .eq(MpStructureAllocation::getYear, year)
                     .eq(MpStructureAllocation::getMonth, month)
                     .eq(MpStructureAllocation::getProductionVersion, productionVersion)
-                    .set(MpStructureAllocation::getBeginDay, startDay)
-                    .set(MpStructureAllocation::getEndDay, endDay)
+                    .set(MpStructureAllocation::getBeginDay, adjustStartDay)
+                    .set(MpStructureAllocation::getEndDay, adjustEndDay)
                     .set(MpStructureAllocation::getAllotDays, allotDays);
             mpStructureAllocationEntityMapper.update(null, wrapper);
             log.info("更新结构转产成功");
@@ -291,10 +296,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         weekRollAdjustEngine.structureOutAdjustForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+
+        contextDTO.setSaveMpProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
         //保存调整日志
         saveMpAdjustLog(contextDTO);
-
-        contextDTO.setFactoryMonthPlanProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
     }
 
     @Override
@@ -341,11 +346,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         }
     }
 
-    @Override
-    public void doConfirmAdjust(MpRollAdjustContextDTO contextDTO) {
-
-    }
-
+    
     @Override
     public void specialInit(MpRollAdjustContextDTO contextDTO) {
     }

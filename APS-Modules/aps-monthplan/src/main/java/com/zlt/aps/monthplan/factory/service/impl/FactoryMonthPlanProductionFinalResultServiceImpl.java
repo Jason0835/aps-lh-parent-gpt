@@ -138,7 +138,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     @Override
-    public Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks) {
+    public Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks,Map<String, MdmMaterialInfo> materialInfoMap) {
         if (CollectionUtils.isEmpty(finishedProductStocks)) {
             return Collections.emptyMap();
         }
@@ -167,7 +167,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Map<String, Integer> monthSurplusMap = Maps.newHashMap();
         List<MdmMonthSurplus> result = Lists.newArrayList();
         Map<String, List<FactoryMonthPlanProductionFinalResult>> groupByMaterialCode = this.getGroupMonthProdFinalPlanByMaterialCode(factoryMonthPlanProdFinals);
-        Map<String,String> brandMap = this.getBrandMap(finishedProductStocks);
         groupByMaterialCode.forEach((key, value) -> {
             int planSurplusQty = this.calculateMonthSurplus(value, stockDay);
             if (planSurplusQty <= BigDecimal.ZERO.longValue()) {
@@ -182,7 +181,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             entity.setMonth(value.get(0).getMonth());
             entity.setRequireVersion(requireVersion);
             entity.setProductTypeCode(value.get(0).getProductTypeCode());
-            entity.setBrand(brandMap.getOrDefault(value.get(0).getMaterialCode(), null));
+            if(materialInfoMap.containsKey(value.get(0).getMaterialCode())) {
+                entity.setBrand(materialInfoMap.get(value.get(0).getMaterialCode()).getBrand());
+            }
             entity.setMaterialCode(value.get(0).getMaterialCode());
             entity.setMaterialDesc(value.get(0).getMaterialDesc());
             entity.setStructureName(value.get(0).getStructureName());
@@ -193,19 +194,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             this.baseDao.insertBatch(result);
         }
         return monthSurplusMap;
-    }
-
-    private Map<String, String> getBrandMap(List<MdmProductStock> finishedProductStocks) {
-        if(CollectionUtils.isEmpty(finishedProductStocks)) {
-            return Collections.emptyMap();
-        }
-        return finishedProductStocks.stream()
-            .filter(stock -> StringUtils.isNotBlank(stock.getMaterialCode()))
-            .collect(Collectors.toMap(
-                MdmProductStock::getMaterialCode,
-                MdmProductStock::getBrand,
-                (existing, replacement) -> existing
-            ));
     }
 
 

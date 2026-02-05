@@ -80,6 +80,7 @@ public class SkuMouldSelector {
         String groupName = productionPlan.getStructureName();
         Integer max = effectiveList.size();
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
             return Collections.emptyList();
         }
         //20260116 得到模壳标准：理论只有一个模壳标准

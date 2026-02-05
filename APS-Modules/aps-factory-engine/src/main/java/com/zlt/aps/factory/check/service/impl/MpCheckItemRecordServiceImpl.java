@@ -63,17 +63,8 @@ public class MpCheckItemRecordServiceImpl extends ServiceImpl<MpCheckItemRecordM
         List<MpCheckItemRecord> mpCheckItemRecordList = mpCheckItemRecordMapper.selectMpCheckItemRecordList(mpCheckItemRecord);
         //获取当前语言包
         Locale language = SecurityUtils.getUserLang();
-        JsonUtils.parseJsonRemarkList(mpCheckItemRecordList, language.toString(), "checkContent");
-        // 【新增逻辑】遍历列表，将 checkContent 字段中的逗号替换为换行符
-        if (mpCheckItemRecordList != null && !mpCheckItemRecordList.isEmpty()) {
-            for (MpCheckItemRecord record : mpCheckItemRecordList) {
-                if (record != null && record.getCheckContent() != null) {
-                    // 将逗号(中文或英文)替换为换行符
-                    // 如果需要保留空格缩进，可以在替换字符串中加上空格，例如 "   \n" 或直接 "\n"
-                    record.setCheckContent(record.getCheckContent().replace(",", "\n"));
-                }
-            }
-        }
+        JsonUtils.parseJsonRemarkListWithLineBreak(mpCheckItemRecordList, language.toString(), "checkContent");
+
         return mpCheckItemRecordList;
     }
 

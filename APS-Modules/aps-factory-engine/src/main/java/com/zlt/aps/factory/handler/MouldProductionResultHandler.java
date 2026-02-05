@@ -2,6 +2,7 @@ package com.zlt.aps.factory.handler;
 
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
+import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
@@ -11,6 +12,7 @@ import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
@@ -83,15 +85,19 @@ public class MouldProductionResultHandler {
         if (CollectionUtils.isEmpty(detailLogList)) {
             return Collections.emptyList();
         }
-        SkuProductionCounter productionCounter = productionContext.getProductionCounter();
-        List<MonthPlanProductionRequirePlanVo> allRequireList = productionContext.getAllProductionPlan().values().stream().collect(Collectors.toList());
-        Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupRequireMap = allRequireList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        Map<String, List<FactoryMonthPlanMouldDayDetail>> skuGroupDetailMap = detailLogList.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialDesc())).collect(Collectors.groupingBy(FactoryMonthPlanMouldDayDetail::getMaterialDesc));
+        if(CollectionUtils.isEmpty(skuGroupDetailMap)) {
+            return Collections.emptyList();
+        }
         List<FactoryMonthPlanMouldDayResult> resultList = new ArrayList<>();
-        Map<String, List<FactoryMonthPlanMouldDayDetail>> skuGroupDetailMap = detailLogList.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayDetail::getMaterialDesc));
+        SkuProductionCounter productionCounter = productionContext.getProductionCounter();
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap = baseDataContainer.getGroupMainPatternMouldRelationMap();
+        Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = baseDataContainer.getSkuMouldRelationMap();
+        Map<String, ProductionPlanGroupInfo> allGroupPlanInfo = productionContext.getGroupProductionInfo();
+        List<MonthPlanProductionRequirePlanVo> allRequireList = new ArrayList<>(productionContext.getAllProductionPlan().values());
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupRequireMap = allRequireList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         skuGroupDetailMap.forEach((materialDesc, detailLogInfo) -> {
-            if (CollectionUtils.isEmpty(detailLogInfo)) {
-                return;
-            }
             List<MonthPlanProductionRequirePlanVo> requireList = skuGroupRequireMap.get(materialDesc);
             if (CollectionUtils.isEmpty(requireList)) {
                 return;
@@ -107,34 +113,27 @@ public class MouldProductionResultHandler {
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));
             dayResult.allocateProductionByPriority();
             dayResult.setDifferenceQty(dayResult.getFactProdReqQty() - dayResult.getTotalQty());
-            resultList.add(dayResult);
-        });
-        if (CollectionUtils.isEmpty(resultList)) {
-            return Collections.emptyList();
-        }
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
-        Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldRelationMap = baseDataContainer.getGroupMainPatternMouldRelationMap();
-        Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = baseDataContainer.getSkuMouldRelationMap();
-        Map<String, ProductionPlanGroupInfo> allGroupPlanInfo = productionContext.getGroupProductionInfo();
-        //模具信息
-        resultList.forEach(singleResult -> {
-            List<ProductionMouldInfoVo> maxMouldList = groupMainPatternMouldRelationMap.get(singleResult.getGroupAndMainPattern());
+            if(dayResult.getDifferenceQty() <= 0) {
+                dayResult.setReason(StringUtils.EMPTY);
+            }
+            List<ProductionMouldInfoVo> maxMouldList = groupMainPatternMouldRelationMap.get(dayResult.getGroupAndMainPattern());
             if (CollectionUtils.isEmpty(maxMouldList)) {
-                singleResult.setMouldCavityQty(BigDecimal.ZERO.intValue());
+                dayResult.setMouldCavityQty(BigDecimal.ZERO.intValue());
             } else {
-                singleResult.setMouldCavityQty(maxMouldList.size());
+                dayResult.setMouldCavityQty(maxMouldList.size());
             }
-            List<MonthPlanProductMouldInfoVo> skuMaxUsedList = skuMouldRelationMap.get(singleResult.getMaterialDesc());
+            List<MonthPlanProductMouldInfoVo> skuMaxUsedList = skuMouldRelationMap.get(dayResult.getMaterialDesc());
             if (CollectionUtils.isEmpty(skuMaxUsedList)) {
-                singleResult.setTypeBlockQty(BigDecimal.ZERO.intValue());
+                dayResult.setTypeBlockQty(BigDecimal.ZERO.intValue());
             } else {
-                singleResult.setTypeBlockQty(skuMaxUsedList.size());
+                dayResult.setTypeBlockQty(skuMaxUsedList.size());
             }
-            setMouldUsedInfo(singleResult);
-            Set<String> cxMachineCodeSet = allGroupPlanInfo.get(singleResult.getStructureName()).getAllocationCxMachineCodeSet();
+            setMouldUsedInfo(dayResult);
+            Set<String> cxMachineCodeSet = allGroupPlanInfo.get(dayResult.getStructureName()).getAllocationCxMachineCodeSet();
             if (!CollectionUtils.isEmpty(cxMachineCodeSet)) {
-                singleResult.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeSet));
+                dayResult.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeSet));
             }
+            resultList.add(dayResult);
         });
         return resultList;
     }
@@ -244,9 +243,16 @@ public class MouldProductionResultHandler {
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
         int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
         int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
+        if(lossQty != 0) {
+            if(sumCycleReserveQty % 2 != 0) {
+                sumCycleReserveQty = sumCycleReserveQty + lossQty;
+            }else{
+                sumMidQty = sumMidQty +  lossQty;
+            }
+        }
         dayResult.setHeightLossQty(totalHeightLossQty);
-        dayResult.setCycleReserveLossQty(sumCycleReserveQty + lossQty);
-        dayResult.setMidLossQty(sumMidQty + lossQty);
+        dayResult.setCycleReserveLossQty(sumCycleReserveQty);
+        dayResult.setMidLossQty(sumMidQty);
         dayResult.setConventionReserveQty(sumConventionQty);
         dayResult.setPostponeQty(sumPostponeQty);
         //排产量置为零
@@ -353,6 +359,10 @@ public class MouldProductionResultHandler {
         for (MonthPlanProductionRequirePlanVo requirement : requireList) {
             String noProductionReason = requirement.getNoProductionReason();
             if (StringUtils.isBlank(noProductionReason)) {
+                continue;
+            }
+            String noProductionQtyReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_QTY);
+            if(noProductionQtyReason.equals(noProductionReason)) {
                 continue;
             }
             if (StringUtils.isBlank(reason)) {

@@ -47,7 +47,7 @@ public class SalesOrderPool extends BaseEntity{
 
     /** 订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单 */
     @Excel(name = "ui.data.column.SalesOrderPool.orderPriority", dictType = "biz_order_type")
-    @ApiModelProperty(value = "订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单", name = "orderPriority")
+    @ApiModelProperty(value = "订单优先级，数据字典：biz_order_type，1 高优先级 3 中优先级 5 暂缓订单7储备", name = "orderPriority")
     @TableField(value = "ORDER_PRIORITY")
     private String orderPriority;
 
@@ -62,6 +62,12 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "客户", name = "salCode")
     @TableField(value = "SAL_CODE")
     private String salCode;
+    
+    /** 内外销 */
+    @Excel(name = "ui.data.column.SalesOrderPool.locationType", dictType = "biz_stor_type")
+    @ApiModelProperty(value = "内外销", name = "locationType")
+    @TableField(value = "LOCATION_TYPE")
+    private String locationType;
 
     /** 客户国别 */
     @Excel(name = "ui.data.column.SalesOrderPool.salNCode")
@@ -143,7 +149,7 @@ public class SalesOrderPool extends BaseEntity{
     private String deliverGoodsType;
 
     /** 供应链优先级 */
-    @Excel(name = "ui.data.column.SalesOrderPool.scmPriority", dictType = "biz_order_type")
+    @Excel(name = "ui.data.column.SalesOrderPool.scmPriority", dictType = "biz_scm_type")
     @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;

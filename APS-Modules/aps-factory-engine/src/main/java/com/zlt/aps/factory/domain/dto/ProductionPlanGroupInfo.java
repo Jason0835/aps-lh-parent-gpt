@@ -127,6 +127,16 @@ public class ProductionPlanGroupInfo {
      * 是否分配完毕 1 分配完成
      */
     private Integer isAllocationFinish;
+    
+    /**
+     * 特殊材料清单，同结构的特殊材料用量相同
+     */
+    private Map<String, BigDecimal> embryoSpecialMaterialInfoMap;
+    
+    /**
+     * 是否最后一个特殊材料结构
+     */
+    private Boolean isLatestSpecialMaterial;
 
     /**
      * 构建初始化分组信息对象
@@ -136,13 +146,27 @@ public class ProductionPlanGroupInfo {
      * @param groupPlanData 分组所有计划
      * @return
      */
-    public static ProductionPlanGroupInfo createInitByGroupList(String groupName, ProductTypeEnum productType, List<MonthPlanProductionRequirePlanVo> groupPlanData) {
+    public static ProductionPlanGroupInfo createInitByGroupList(Context context, String groupName, ProductTypeEnum productType, List<MonthPlanProductionRequirePlanVo> groupPlanData) {
         ProductionPlanGroupInfo groupInfo = new ProductionPlanGroupInfo();
         groupInfo.setGroupName(groupName);
         groupInfo.setProductType(productType);
         groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
         groupInfo.setGroupPlanData(groupPlanData);
         groupInfo.setFixedCxMachineSet(new HashSet<>());
+        groupInfo.setIsLatestSpecialMaterial(false);
+        // 处理特殊材料清单
+        if (!CollectionUtils.isEmpty(groupPlanData)) {
+            TbrProductionContext productionContext = (TbrProductionContext) context;
+            // 判断如果是特殊结构，需要判断是否最后一个结构
+            Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer()
+                    .getEmbryoSpecialMaterialInfoMap(); // 胎胚与特殊材料对应关系清单
+            Map<String, BigDecimal> materilMap = embryoSpecialMaterialInfoMap
+                    .get(CollectionUtils.firstElement(groupPlanData).getEmbryoCode()); // 本结构涉及的特殊材料清单
+            if (materilMap == null) {
+                materilMap = new HashMap<>();
+            }
+            groupInfo.setEmbryoSpecialMaterialInfoMap(materilMap);
+        }
         return groupInfo;
     }
 
@@ -542,6 +566,7 @@ public class ProductionPlanGroupInfo {
         if (null == changeMouldDay || null == preSelected.getEndDay()) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
+            productionContext.addSkuProductionLimitInfo(addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
             return;
         }
         //换模次数处理
@@ -833,6 +858,14 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return materialSet.size();
+    }
+    
+    /**
+     * 是否含有特殊材料
+     * @return
+     */
+    public boolean isSpecialMaterial() {
+        return CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap);
     }
 
     /**
@@ -1236,7 +1269,7 @@ public class ProductionPlanGroupInfo {
         Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
         groupPlanMap.forEach((structureName, planList) -> {
-            ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(structureName, context.getProductType(), planList);
+            ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(context, structureName, context.getProductType(), planList);
             //是否零度结构
             List<MonthPlanProductionRequirePlanVo> isZeroRackList = planList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsZeroRack())).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(isZeroRackList)) {

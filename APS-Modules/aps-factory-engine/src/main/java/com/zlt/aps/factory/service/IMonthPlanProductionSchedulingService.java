@@ -18,6 +18,12 @@ public interface IMonthPlanProductionSchedulingService {
     void init(Context context);
 
     /**
+     * 分组计划排产
+     *
+     * @param context
+     */
+    void groupCapacityScheduling(Context context);
+    /**
      * 模具排产
      *
      * @param context
@@ -25,7 +31,7 @@ public interface IMonthPlanProductionSchedulingService {
     void mouldingScheduling(Context context);
 
     /**
-     * 一件进行计划排产，包含初始化、排成型、排硫化
+     * 进行一键计划排产，包含初始化、排成型、排硫化
      *
      * @param context
      */

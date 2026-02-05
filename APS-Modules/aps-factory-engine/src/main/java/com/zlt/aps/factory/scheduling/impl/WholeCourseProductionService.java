@@ -2,9 +2,10 @@ package com.zlt.aps.factory.scheduling.impl;
 
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.AbstractBaseProductionService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -21,16 +22,17 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service(value = "wholeCourseProductionService")
-public class WholeCourseProductionService extends AbstractProductionBusinessService {
+public class WholeCourseProductionService extends AbstractBaseProductionService {
 
     private final IProductionBusinessService tbrProductionInitService;
 
     private final IProductionBusinessService tbrCxCapacityAllocationService;
 
-    public WholeCourseProductionService(ProductionSchedulingDataService dataService,
+    public WholeCourseProductionService(ProductionMdmDataService dataService,
+                                        MonthProductionDataService monthProductionDataService,
                                         @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService,
-                                        @Qualifier("tbrCxCapacityAllocationService") IProductionBusinessService tbrCxCapacityAllocationService) {
-        super(dataService);
+                                        @Qualifier("tbrWholeProductionService") IProductionBusinessService tbrCxCapacityAllocationService) {
+        super(dataService, monthProductionDataService);
         this.tbrProductionInitService = tbrProductionInitService;
         this.tbrCxCapacityAllocationService = tbrCxCapacityAllocationService;
     }
@@ -47,16 +49,16 @@ public class WholeCourseProductionService extends AbstractProductionBusinessServ
         ProductTypeEnum productType = context.getProductType();
         if (ProductTypeEnum.WHOLE_STEEL == productType) {
             try {
+                context.setProductionProcessStage(ProductionProcessStage.ONE_CLICK_SCHEDULING);
                 context.setInsertNewProductionVersion(Boolean.TRUE);
                 //初始化
                 tbrProductionInitService.run(context, userObj);
                 context.setInsertNewProductionVersion(Boolean.FALSE);
                 //排结构、排模具
                 tbrCxCapacityAllocationService.run(context, userObj);
-            }finally {
+            } finally {
                 //保存日志
                 saveProductionProcessLog(context, ProductionProcessStage.ONE_CLICK_SCHEDULING);
-
             }
         }
     }

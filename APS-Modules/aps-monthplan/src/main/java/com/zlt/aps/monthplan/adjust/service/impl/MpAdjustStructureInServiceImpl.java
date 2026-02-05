@@ -9,7 +9,7 @@ import com.tlt.aps.enums.ProductionProcessesTypeEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
@@ -65,7 +65,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     private MpAdjustStructureInEntityMapper structureInEntityMapper;
 
     @Autowired
-    private ProductionSchedulingDataService productionSchedulingDataService;
+    private ProductionMdmDataService productionSchedulingDataService;
 
     @Autowired
     private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
@@ -140,7 +140,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
-        return  productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
+        return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
     @Override

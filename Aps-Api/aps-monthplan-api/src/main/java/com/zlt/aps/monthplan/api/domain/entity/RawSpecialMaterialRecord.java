@@ -41,10 +41,10 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    /** 胶料 */
+    /** 适用范围 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.rubberSpec")
     @ImportExcelValidated(required = true, maxLength = 100)
-    @ApiModelProperty(value = "胶料", name = "rubberSpec")
+    @ApiModelProperty(value = "适用范围", name = "rubberSpec")
     @TableField(value = "RUBBER_SPEC")
     private String rubberSpec;
 

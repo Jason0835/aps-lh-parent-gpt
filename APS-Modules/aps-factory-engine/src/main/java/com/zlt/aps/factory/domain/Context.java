@@ -3,6 +3,7 @@ package com.zlt.aps.factory.domain;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
+import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -59,7 +60,10 @@ public class Context {
      * 是否插入新的排产版本标记
      */
     private Boolean insertNewProductionVersion;
-
+    /**
+     * 排产方式：一键排产、初始化、排结构、排模具
+     */
+    private ProductionProcessStage productionProcessStage;
     /**
      * 版本前缀
      */

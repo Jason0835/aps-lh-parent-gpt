@@ -107,6 +107,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Date startTime,endTime;
         List<MpStructureAllocation> structureAllocationList;
+        List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //4.1 初始结构上下文
@@ -131,9 +132,13 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+            newMpFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
+
             //4.3 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
+
+        contextDTO.setSaveMpProdFinalList(newMpFinalList);
     }
 
     /**
@@ -185,10 +190,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         CollUtil.filter(adjustDetailList, item -> structureNameSet.contains(item.getStructureName()));
     }
 
-    @Override
-    public void doConfirmAdjust(MpRollAdjustContextDTO contextDTO) {
-
-    }
 
     @Override
     public void specialInit(MpRollAdjustContextDTO contextDTO) {

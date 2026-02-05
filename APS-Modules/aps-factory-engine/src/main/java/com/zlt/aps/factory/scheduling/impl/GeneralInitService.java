@@ -2,9 +2,10 @@ package com.zlt.aps.factory.scheduling.impl;
 
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.scheduling.AbstractProductionBusinessService;
+import com.zlt.aps.factory.scheduling.AbstractBaseProductionService;
 import com.zlt.aps.factory.scheduling.IProductionBusinessService;
-import com.zlt.aps.factory.service.ProductionSchedulingDataService;
+import com.zlt.aps.factory.service.MonthProductionDataService;
+import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -18,13 +19,14 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service(value = "generalInitService")
-public class GeneralInitService extends AbstractProductionBusinessService {
+public class GeneralInitService extends AbstractBaseProductionService {
 
     private final IProductionBusinessService tbrProductionInitService;
 
-    public GeneralInitService(ProductionSchedulingDataService dataService,
+    public GeneralInitService(ProductionMdmDataService dataService,
+                              MonthProductionDataService monthProductionDataService,
                               @Qualifier("tbrProductionInitService") IProductionBusinessService tbrProductionInitService) {
-        super(dataService);
+        super(dataService, monthProductionDataService);
         this.tbrProductionInitService = tbrProductionInitService;
     }
 
@@ -33,9 +35,13 @@ public class GeneralInitService extends AbstractProductionBusinessService {
         //根据类别进行
         ProductTypeEnum productType = context.getProductType();
         if (ProductTypeEnum.WHOLE_STEEL == productType) {
-            tbrProductionInitService.run(context, userObj);
-            //保存日志
-            saveProductionProcessLog(context, ProductionProcessStage.STAGE_INIT);
+            try {
+                context.setProductionProcessStage(ProductionProcessStage.STAGE_INIT);
+                tbrProductionInitService.run(context, userObj);
+            }finally {
+                //保存日志
+                saveProductionProcessLog(context, ProductionProcessStage.STAGE_INIT);
+            }
             return;
         }
     }

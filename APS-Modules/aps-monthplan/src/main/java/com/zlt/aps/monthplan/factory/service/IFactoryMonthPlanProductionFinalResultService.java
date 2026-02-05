@@ -4,6 +4,7 @@ package com.zlt.aps.monthplan.factory.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.bill.common.service.IDocService;
@@ -57,9 +58,10 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      *
      * @param requireVersion        需求版本号
      * @param finishedProductStocks 成品库存
+     * @param materialInfoMap 物料信息
      * @return 月度计划量汇总
      */
-    Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks);
+    Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks,Map<String, MdmMaterialInfo> materialInfoMap);
 
     /**
      * 库存抓取日~（同月）月底的月度计划量汇总不保存

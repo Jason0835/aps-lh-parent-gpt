@@ -110,6 +110,24 @@ public class BigDecimalUtils {
     }
 
     /**
+     * 参数所有元素相乘
+     *
+     * @param numbers
+     * @return
+     */
+    public static BigDecimal multiply(Object... numbers) {
+        BigDecimal result = null;
+        for (Object number : numbers) {
+            if (result == null) {
+                result = valueOf(number);
+            } else {
+                multiply(result, number, true);
+            }
+        }
+        return result;
+    }
+
+    /**
      * number1乘number2
      *
      * @param number1
