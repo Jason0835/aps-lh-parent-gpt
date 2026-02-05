@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.mapper;
 
+import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.monthplan.api.domain.vo.MonthPlanProductionFinalResultVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
@@ -72,4 +73,11 @@ public interface MdmProductModelRelationEntityMapper extends CommBaseMapper<MdmS
      * @return 结果
      */
     List<MdmSkuMouldRel> selectByUniqueKeyList(@Param("list") List<MdmSkuMouldRel> mouldCodeList);
+
+    /**
+     * 根据模具台账更新SKU与模具关系的主花纹
+     * @param modelInfo 创建人、创建时间
+     * @return 结果
+     */
+    int updateMainPatternByModelInfo(MdmModelInfo modelInfo);
 }

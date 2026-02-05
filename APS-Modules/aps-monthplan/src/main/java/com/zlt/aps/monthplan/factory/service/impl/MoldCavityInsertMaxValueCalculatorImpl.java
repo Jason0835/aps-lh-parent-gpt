@@ -344,6 +344,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         if (CollectionUtils.isEmpty(mouldAssociationMap)) {
             return Collections.emptyMap();
         }
+
         Map<String, ProductionMouldInfoVo> mouldInfoMap = new HashMap<>();
         mouldAssociationMap.forEach((materialDesc, associationList) -> {
             if (CollectionUtils.isEmpty(associationList)) {
@@ -355,6 +356,14 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                     return;
                 }
                 MouldRelationTypeEnum relationType = MouldRelationTypeEnum.getInstance(associationInfo.getRelationType());
+
+                //associationInfo.getBoardingDate 小于本月第一天，则改成则改成SKU_RELATION_CONFIGURATION类型
+                if (relationType == MouldRelationTypeEnum.MOULD_DELIVERY_PLAN) {
+                    if (associationInfo.getBoardingDate().before(getNaturalMonthStartDate(year, month))) {
+                        relationType = MouldRelationTypeEnum.SKU_RELATION_CONFIGURATION;
+                    }
+                }
+
                 ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
                 if (null == productionMouldInfo) {
                     productionMouldInfo = createEmptyProductionMouldInfo(mouldCode, relationType);

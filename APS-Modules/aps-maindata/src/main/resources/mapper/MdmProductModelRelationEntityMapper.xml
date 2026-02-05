@@ -104,4 +104,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </if>
     </select>
 
+    <update id="updateMainPatternByModelInfo">
+        UPDATE T_MDM_SKU_MOULD_REL t1
+        JOIN T_MDM_MOULD_INFO t2 ON t1.MOULD_CODE = t2.MOULD_CODE AND t1.FACTORY_CODE = t2.FACTORY_CODE
+        SET t1.MAIN_PATTERN = t2.MAIN_PATTERN,
+            t1.UPDATE_BY = #{updateBy},
+            t1.UPDATE_TIME = #{updateTime}
+        WHERE t1.IS_DELETE = 0 AND t1.MAIN_PATTERN IS NULL
+    </update>
 </mapper>

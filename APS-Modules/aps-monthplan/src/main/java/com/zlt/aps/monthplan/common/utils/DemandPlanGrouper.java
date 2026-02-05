@@ -31,13 +31,50 @@ public class DemandPlanGrouper {
     if (CollectionUtils.isEmpty(demandPlans)) {
       return Collections.emptyMap();
     }
-
+    List<DpDemandPlan> filterDemandPlans = processDemandPlansOptimized(demandPlans);
+    if (CollectionUtils.isEmpty(filterDemandPlans)) {
+      return Collections.emptyMap();
+    }
     // 1. 按原始groupKey分组
     Map<String, List<DpDemandPlan>> originalGroups = demandPlans.stream()
         .collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
 
     // 2. 分类处理
     return processGroups(createCondition,originalGroups);
+  }
+
+
+  private static List<DpDemandPlan> processDemandPlansOptimized(List<DpDemandPlan> demandPlans) {
+    if (demandPlans == null || demandPlans.isEmpty()) {
+      return new ArrayList<>();
+    }
+    // 使用自定义的GroupInfo来跟踪分组信息
+    Map<String, GroupInfo> groupInfoMap = new HashMap<>();
+    for (DpDemandPlan plan : demandPlans) {
+      String key = plan.getGroupFactoryAndMaterialKey();
+      GroupInfo info = groupInfoMap.computeIfAbsent(key, k -> new GroupInfo());
+      // 累加净需求
+      info.totalNetQty += (plan.getNetQty() != null ? plan.getNetQty() : 0);
+      // 收集原始对象
+      info.plans.add(plan);
+    }
+    // 构建结果列表
+    List<DpDemandPlan> result = new ArrayList<>();
+    for (GroupInfo info : groupInfoMap.values()) {
+      if (info.totalNetQty != 0) {
+        result.addAll(info.plans);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 分组信息内部类
+   */
+  private static class GroupInfo {
+    int totalNetQty = 0;
+    List<DpDemandPlan> plans = new ArrayList<>();
   }
 
   /**
