@@ -20,7 +20,6 @@ import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -28,13 +27,11 @@ import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 结构外调整策略
@@ -68,7 +65,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             return new BusinessException(msg);
         });
         // 5、按照结构、物料编码维度进行分组，并汇总订单量
-        resultList = sumByStructureAndMaterial(resultList);
+        resultList = sumByStructureAndMaterial(resultList, Boolean.FALSE);
         contextDTO.setAdjustDetailList(resultList);
         // 6、设置是否特殊材料
         setHasSpecialMaterial(contextDTO);
@@ -270,7 +267,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
 
-        //4.按结构序列化分组
+        //2.按结构序列化分组
         //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Date startTime,endTime;
@@ -281,24 +278,32 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             setSpecStructureTotalQty(contextDTO,mpProdFinalMap.get(contextDTO.getStructureName()));
         }
         List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
-        //更新结构转产表对应成型机台的调整开始日、结束日
+        //3.更新结构转产表对应成型机台的调整开始日、结束日
         updateStructureAdjustDayByMachine(structureAllocationList,contextDTO);
+        //4.补充更新周程滚动上下文
         contextDTO.setOneStructureAllocationList(structureAllocationList);
-        //初始锁定日
+        //4.1初始锁定日
         contextDTO.setLockEndDay(getLockEndDay(contextDTO));
-        //初始结构收尾日
+        //4.2初始结构收尾日
         initStructureStartAndEndDay(contextDTO);
-        //初始化日志
+        //4.3初始化日志
         contextDTO.setLogDetail(new StringBuilder());
-        //规格挑选可用机台
+
+        //5.处理单个结构间调整
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        weekRollAdjustEngine.structureOutAdjustForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
+        weekRollAdjustEngine.doStructureOutForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+        //6 执行结构间搭配排产,暂不考虑特殊结构
+        //TODO
+        //=========================================================
+
+        //=========================================================
+
         contextDTO.setSaveMpProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
-        //保存调整日志
+        //7.保存调整日志
         saveMpAdjustLog(contextDTO);
     }
 
@@ -346,7 +351,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         }
     }
 
-    
+
     @Override
     public void specialInit(MpRollAdjustContextDTO contextDTO) {
     }

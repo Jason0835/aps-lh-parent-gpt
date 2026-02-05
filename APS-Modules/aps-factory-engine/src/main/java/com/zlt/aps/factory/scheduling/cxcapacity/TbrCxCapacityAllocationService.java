@@ -17,7 +17,7 @@ import com.zlt.aps.factory.scheduling.*;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
-import com.zlt.aps.factory.utils.InitNoProductionRecordService;
+import com.zlt.aps.factory.handler.InitNoProductionRecordHandler;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -68,25 +68,25 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
-    private final InitNoProductionRecordService initNoProductionRecordService;
+    private final InitNoProductionRecordHandler initNoProductionRecordHandler;
 
     public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
                                           MonthProductionDataService monthProductionDataService,
-                                          InitNoProductionRecordService initNoProductionRecordService,
                                           FormalProductionHandler formalProductionHandler,
                                           ProductionHistoryHandler productionHistoryHandler,
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
+                                          InitNoProductionRecordHandler initNoProductionRecordHandler,
                                           SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler,
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
-        this.initNoProductionRecordService = initNoProductionRecordService;
         this.formalProductionHandler = formalProductionHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
+        this.initNoProductionRecordHandler = initNoProductionRecordHandler;
         this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
@@ -135,7 +135,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         requirePlanList.forEach(singlePlan -> {
             log.info(TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan));
             singlePlan.initProductionDataInfo();
-            this.initNoProductionRecordService.initNoProductionRecord(productionContext, singlePlan);
+            this.initNoProductionRecordHandler.initNoProductionRecord(productionContext, singlePlan);
         });
         //2、初始排产需要的基础数据，成型、模具关系、成型硫化配比、计划初始库销比
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));

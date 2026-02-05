@@ -26,6 +26,9 @@
                    AND `MONTH` = #{month,jdbcType=DECIMAL}
                    AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
                    AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                  <if test="structureName != null and structureName != ''">
+                    AND STRUCTURE_NAME = #{structureName}
+                  </if>
                    AND IS_DELETE = 0
                ) filtered_structures
                  INNER JOIN t_mdm_material_info  mi
