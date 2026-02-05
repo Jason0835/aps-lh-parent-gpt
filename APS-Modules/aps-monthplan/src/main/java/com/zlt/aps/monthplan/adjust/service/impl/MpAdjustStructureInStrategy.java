@@ -97,7 +97,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
 
-        //4.按结构序列化分组
+        //2.按结构序列化分组
         //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
@@ -106,7 +106,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
-            //4.1 初始结构上下文
+            //2.1 初始结构上下文
             //1）结构内，按结构分别调整
             contextDTO.setStructureName(entry.getKey());
             if (YesOrNoEnum.YES.getCode().equals(entry.getValue().get(0).getHasSpecialMaterial())){
@@ -121,16 +121,21 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             initStructureStartAndEndDay(contextDTO);
             //4）初始化日志
             contextDTO.setLogDetail(new StringBuilder());
-            //4.2 执行结构内调整
+            //2.2 执行结构内调整
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
             weekRollAdjustEngine.doStructureInForOne(contextDTO,entry.getValue(), mpProdFinalMap.get(entry.getKey()));
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+            //2.3 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
+            //TODO
+            //=========================================================
+
+            //=========================================================
             newMpFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
 
-            //4.3 保存调整日志
+            //2.4 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
 
