@@ -274,7 +274,6 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = rows.map((row) => row.id).join(",");
-        console.log(ids);
         removeProductionMouldConfiguration({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
@@ -362,7 +361,6 @@ export default {
           if (!data[i].monthGroupList) {
             data[i].monthGroupList = [];
           }
-          console.log(data[i].areaGroupList.length);
           for (let j = 0; j < data[i].areaGroupList.length; j++) {
             data[i][data[i].areaGroupList[j].areaCodeShow] =
               data[i].areaGroupList[j].saleQty;
@@ -375,7 +373,6 @@ export default {
           }
         }
         this.data = data;
-        console.log(data);
         this.page.total = listdata.total;
       } catch (error) {
         console.error(error);

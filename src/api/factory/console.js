@@ -63,7 +63,8 @@ export function finalized(query) {
  */
 export function factoryMouldingProduction(query) {
   return request({
-    url: '/factory/console/factoryMouldingProduction',
+    // url: '/factory/console/factoryMouldingProduction',
+    url: '/factory/console/rescheduleMouldingProduction',
     method: 'post',
     data: query,
     headers: {

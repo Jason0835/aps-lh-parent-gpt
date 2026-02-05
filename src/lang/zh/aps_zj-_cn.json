@@ -340,14 +340,23 @@
   "ui.data.console.productNoDetail":"未排产明细",
   "ui.data.console.nextGenerate":"生成下一步",
   "ui.data.console.moldArrangement":"排模具",
+  "ui.data.console.confirmMoldArrangement":"确定排模具？",
   "ui.data.console.rankStructure":"排结构",
+  "ui.data.console.confirmRankStructure":"确定初始化？",
   "ui.data.messageTemplate.templateCode":"模板编码",
   "ui.data.messageTemplate.templateName":"模板名称",
   "ui.data.messageTemplate.title":"标题",
   "ui.message.taskCenter":"任务中心",
   "ui.data.specialMaterial.rubberSpec":"适用范围",
   "ui.data.specialMaterial.materialCode":"材料编码",
-  "common.rule.maxTwo": "只能输入大于等于0,并且最多两位小数"
+  "common.rule.maxTwo": "只能输入大于等于0,并且最多两位小数",
+  "ui.data.checkDialog.allCheck":"总检查项",
+  "ui.data.checkDialog.check":"检查中",
+  "ui.data.checkDialog.success":"已通过",
+  "ui.data.checkDialog.faile":"未通过",
+  "ui.data.checkDialog.reason":"原因",
+  "ui.data.checkDialog.checking":"正在检测中..",
+  "ui.data.checkDialog.itemName":"项目名称"
 
 
 

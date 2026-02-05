@@ -262,7 +262,7 @@ export default {
         //   width: 120,
         // },
         {
-          prop: "dayVulcanizationQty",
+          prop: "dayLhQty",
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
           width: 120,
         },
