@@ -118,8 +118,13 @@ export default {
   },
   methods: {
     show(data) {
-      let arr = data.userName.split(",");
-      this.actionList = arr;
+      if(data.userName){
+        let arr = data.userName.split(",");
+        this.actionList = arr;
+      }else{
+        this.actionList=[]
+      }
+
       this.visible = true;
       this.actionData = data;
       this.getList(true);
