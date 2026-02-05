@@ -55,8 +55,8 @@ export default {
       const strValue = String(value).trim();
 
       // 检查是否只包含数字
-      if (!/^\d+$/.test(strValue)) {
-        return callback(new Error(this.$t("common.rule.noPoint")));
+      if (!/^[1-9]\d*$/.test(strValue)) {
+        return callback(new Error(this.$t("请输入大于0的正整数")));
       }
 
       // 转换为数字
@@ -190,7 +190,7 @@ export default {
                 <el-input
                   type="number"
                   v-model={form.qty}
-                  min={0}
+                  min={1}
                   max={99999999}
                   onBlur={this.handleQtyBlur}
                 />
