@@ -65,10 +65,21 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
 
             // 2. 初始化数据检测 (Phase 1)
-            checkInitializationData(productionContext, mpCheckItemVos, mpCheckItemRecords);
+            try {
+                checkInitializationData(productionContext, mpCheckItemVos, mpCheckItemRecords);
+            } catch (Exception e) {
+                log.error("初始化数据检测(Phase 1)发生异常", e);
+                addSystemError(mpCheckItemVos, mpCheckItemRecords, "初始化数据检测异常");
+            }
 
             // 3. 排产前数据检测 (Phase 2)
-            checkBeforeSchedulingData(productionContext, mpCheckItemVos, mpCheckItemRecords);
+            try {
+                checkBeforeSchedulingData(productionContext, mpCheckItemVos, mpCheckItemRecords);
+            } catch (Exception e) {
+                log.error("排产前数据检测(Phase 2)发生异常", e);
+                // 【核心调用】这里会处理：保留1、2，失败3~8，并新增99记录
+                markPhase2AsFailed(mpCheckItemVos, mpCheckItemRecords, e);
+            }
 
             // 4. 保存并返回
             saveRecords(mpCheckItemRecords, context);
@@ -90,6 +101,106 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             saveRecords(mpCheckItemRecords, context);
             return mpCheckItemVos;
         }
+    }
+
+    private void addSystemError(List<MpCheckItemVo> vos, List<MpCheckItemRecord> records, String msg) {
+        MpCheckItemRecord errorRecord = new MpCheckItemRecord();
+        errorRecord.setCheckItem(CheckItemTypeEnums.INIT_DATA.getCode());
+        errorRecord.setCheckContent(msg);
+        records.add(errorRecord);
+
+        MpCheckItemVo errorVo = new MpCheckItemVo();
+        errorVo.setCheckItem(CheckItemTypeEnums.INIT_DATA.getCode());
+        errorVo.setPass(false);
+        vos.add(errorVo);
+    }
+
+    private void markPhase2AsFailed(List<MpCheckItemVo> vos, List<MpCheckItemRecord> records, Exception e) {
+        // 1. 分析异常，获取具体的报错检查项 Code
+        String errorItemCode = getFailedCheckItemCode(e);
+        String errorMsg = "数据检测异常中断";
+
+        // 2. 插入 99 类型的系统异常记录
+        // 如果定位到了具体项，将 checkItem 设置为该项的 Code；否则设置为 "99"
+        String recordItemCode = StringUtils.isNotBlank(errorItemCode) ? errorItemCode : "99";
+        String recordContent = StringUtils.isNotBlank(errorItemCode)
+                ? ("检测项[" + errorItemCode + "]执行异常: " + e.getMessage())
+                : ("系统检测异常: " + e.getMessage());
+
+        MpCheckItemRecord errorRecord = new MpCheckItemRecord();
+        errorRecord.setCheckItem(recordItemCode);
+        errorRecord.setCheckContent(recordContent);
+        records.add(errorRecord);
+
+        MpCheckItemVo errorVo = new MpCheckItemVo();
+        errorVo.setCheckItem(StringUtils.isNotBlank(errorItemCode) ? errorItemCode : "99");
+        errorVo.setPass(false);
+        vos.add(errorVo);
+
+        // 3. 遍历 8 个检测项，统一设置为 false
+        // 注意：这里依然依赖 addCheckResult 的幂等性来保留 1、2 项
+        addCheckResult(false, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.MOLD_SHELL_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, errorMsg, vos, records);
+    }
+
+    /**
+     * 根据异常堆栈的行号，判断是哪个检查项报错了
+     * 【注意】你需要根据代码实际的行号修改下面的数字范围
+     */
+    private String getFailedCheckItemCode(Exception e) {
+        StackTraceElement[] stackTrace = e.getStackTrace();
+        for (StackTraceElement element : stackTrace) {
+            // 只关心本类中的 checkBeforeSchedulingData 方法
+            if ("checkBeforeSchedulingData".equals(element.getMethodName())
+                    && element.getClassName().equals(this.getClass().getName())) {
+
+                int lineNumber = element.getLineNumber();
+
+                // --- 以下行号范围仅为示例，请打开 IDE 查看代码实际行号并修改 ---
+
+                // 检查 1: 特殊原材料数据 (假设代码在 150-155 行)
+                if (lineNumber >= 295 && lineNumber <= 300) {
+                    return CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA.getCode();
+                }
+                // 检查 2: 生产日历数据 (假设代码在 158-163 行)
+                else if (lineNumber >= 301 && lineNumber <= 305) {
+                    return CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA.getCode();
+                }
+                // 检查 3: 成型机基础数据 (假设代码在 166-171 行)
+                else if (lineNumber >= 306 && lineNumber <= 310) {
+                    return CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE.getCode();
+                }
+                // 检查 4: 工装台账数据
+                else if (lineNumber >= 311 && lineNumber <= 315) {
+                    return CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA.getCode();
+                }
+                // 检查 5: 模具分配比例配置
+                else if (lineNumber >= 316 && lineNumber <= 320) {
+                    return CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA.getCode();
+                }
+                // 检查 6: 模壳数据
+                else if (lineNumber >= 321 && lineNumber <= 325) {
+                    return CheckItemTypeEnums.MOLD_SHELL_DATA.getCode();
+                }
+                // 检查 7: 胶囊卡盘数据
+                else if (lineNumber >= 326 && lineNumber <= 330) {
+                    return CheckItemTypeEnums.CAPSULE_CHUCK_DATA.getCode();
+                }
+                // 检查 8: 结构成型硫化配比数据
+                else if (lineNumber >= 331 && lineNumber <= 335) {
+                    return CheckItemTypeEnums.SULFURIZATION_RATIO_DATA.getCode();
+                }
+
+                break; // 找到对应方法后即可跳出循环
+            }
+        }
+        return null; // 未定位到具体行号
     }
 
     /**
@@ -164,76 +275,73 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
      * 2. 检查关键 Map 是否为空
      */
     private void checkBeforeSchedulingData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
-        try {
-            List<MonthPlanProductionRequirePlanVo> requirePlanList;
-
-            // 【整合点】优先尝试从 Context 获取已经初始化过的列表
-            if (!productionContext.getAllSkuProductionPlan().isEmpty()) {
-                // 将 Map 还原为 List
-                requirePlanList = productionContext.getAllSkuProductionPlan().values().stream().flatMap(List::stream).collect(Collectors.toList());
-                log.info("检测: 复用上下文中的初始化计划数据，条数: {}", requirePlanList.size());
-            } else {
-                // 容错：如果 Context 中没有（可能逻辑分支没走到），则重新查询
-                log.warn("检测: 上下文中未找到计划数据，重新查询数据库");
-                requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
-            }
-            //基础数据容器存储
-            productionContext.setBaseDataContainer(new BaseDataContainer());
-            // 调用父类方法加载数据
-            super.initProductionBaseData(productionContext, requirePlanList);
-
-            // 2. 开始从 BaseDataContainer 中检查关键数据
-            // 检查 1: 特殊原材料数据
-            Map<String, Map<String, BigDecimal>> specialMaterialMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
-            boolean hasSpecialMaterial = !specialMaterialMap.isEmpty();
-            addCheckResult(hasSpecialMaterial, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.SPECIAL_RAW_MATERIAL_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 2: 生产日历数据
-            Map<Integer, Integer> capacityRatioMap = productionContext.getCapacityRatioMap();
-            boolean hasCalendar = !capacityRatioMap.isEmpty();
-            addCheckResult(hasCalendar, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_CALENDAR_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 3: 成型机基础数据
-            Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-            boolean hasMoldingMachine = !cxMachineBaseInfo.isEmpty();
-            addCheckResult(hasMoldingMachine, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_MACHINE_BASEDATA_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 4: 工装台账数据
-            Map<String, ProductionMouldInfoVo> mouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
-            boolean hasEquipmentLedger = !mouldInfoMap.isEmpty();
-            addCheckResult(hasEquipmentLedger, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_INVENTORY_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 5: 模具分配比例配置
-            Map<String, MouldAllocationInfoVo> mouldAllocationMap = productionContext.getBaseDataContainer().getGroupMainPatternAllocationLimitMap();
-            boolean hasMouldRatio = !mouldAllocationMap.isEmpty();
-            addCheckResult(hasMouldRatio, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 6: 模壳数据
-            Map<String, MouldShellBaseInfoVo> mouldShellMap = productionContext.getBaseDataContainer().getMouldShellMap();
-            boolean hasMoldShell = !mouldShellMap.isEmpty();
-            addCheckResult(hasMoldShell, CheckItemTypeEnums.MOLD_SHELL_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_SHELL_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 7: 胶囊卡盘数据
-            Map<String, CapsuleChuckInfoVo> capsuleChuckInfoMap = productionContext.getBaseDataContainer().getCapsuleChuckInfoMap();
-            boolean hasCapsuleChuck = !capsuleChuckInfoMap.isEmpty();
-            addCheckResult(hasCapsuleChuck, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.CAPSULE_CHUCK_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-            // 检查 8: 结构成型硫化配比数据
-            List<MonthPlanStructureLhRatioVo> structureLhRatioList = productionContext.getBaseDataContainer().getStructureLhRatioList();
-            boolean hasSulfurizationRatio = CollectionUtils.isNotEmpty(structureLhRatioList);
-            addCheckResult(hasSulfurizationRatio, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
-
-        } catch (Exception e) {
-            log.error("排产前数据检测失败", e);
-            addErrorRecord(mpCheckItemRecords, "99", "数据加载异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, false, "数据加载异常: " + e.getMessage());
+        List<MonthPlanProductionRequirePlanVo> requirePlanList;
+        if (!productionContext.getAllSkuProductionPlan().isEmpty()) {
+            requirePlanList = productionContext.getAllSkuProductionPlan().values().stream().flatMap(List::stream).collect(Collectors.toList());
+            log.info("检测: 复用上下文中的初始化计划数据，条数: {}", requirePlanList.size());
+        } else {
+            log.warn("检测: 上下文中未找到计划数据，重新查询数据库");
+            requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
         }
+        //基础数据容器存储
+        productionContext.setBaseDataContainer(new BaseDataContainer());
+        // 调用父类方法加载数据
+        super.initProductionBaseData(productionContext, requirePlanList);
+
+        // 2. 开始从 BaseDataContainer 中检查关键数据
+        // 检查 1: 特殊原材料数据
+        Map<String, Map<String, BigDecimal>> specialMaterialMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
+        boolean hasSpecialMaterial = !specialMaterialMap.isEmpty();
+        addCheckResult(hasSpecialMaterial, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.SPECIAL_RAW_MATERIAL_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 2: 生产日历数据
+        Map<Integer, Integer> capacityRatioMap = productionContext.getCapacityRatioMap();
+        boolean hasCalendar = !capacityRatioMap.isEmpty();
+        addCheckResult(hasCalendar, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_CALENDAR_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 3: 成型机基础数据
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        boolean hasMoldingMachine = !cxMachineBaseInfo.isEmpty();
+        addCheckResult(hasMoldingMachine, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_MACHINE_BASEDATA_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 4: 工装台账数据
+        Map<String, ProductionMouldInfoVo> mouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
+        boolean hasEquipmentLedger = !mouldInfoMap.isEmpty();
+        addCheckResult(hasEquipmentLedger, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_INVENTORY_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 5: 模具分配比例配置
+        Map<String, MouldAllocationInfoVo> mouldAllocationMap = productionContext.getBaseDataContainer().getGroupMainPatternAllocationLimitMap();
+        boolean hasMouldRatio = !mouldAllocationMap.isEmpty();
+        addCheckResult(hasMouldRatio, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 6: 模壳数据
+        Map<String, MouldShellBaseInfoVo> mouldShellMap = productionContext.getBaseDataContainer().getMouldShellMap();
+        boolean hasMoldShell = !mouldShellMap.isEmpty();
+        addCheckResult(hasMoldShell, CheckItemTypeEnums.MOLD_SHELL_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_SHELL_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 7: 胶囊卡盘数据
+        Map<String, CapsuleChuckInfoVo> capsuleChuckInfoMap = productionContext.getBaseDataContainer().getCapsuleChuckInfoMap();
+        boolean hasCapsuleChuck = !capsuleChuckInfoMap.isEmpty();
+        addCheckResult(hasCapsuleChuck, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.CAPSULE_CHUCK_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 检查 8: 结构成型硫化配比数据
+        List<MonthPlanStructureLhRatioVo> structureLhRatioList = productionContext.getBaseDataContainer().getStructureLhRatioList();
+        boolean hasSulfurizationRatio = CollectionUtils.isNotEmpty(structureLhRatioList);
+        addCheckResult(hasSulfurizationRatio, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
     }
 
     /**
      * 辅助方法：添加检测结果
      */
     private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
+        // 先判断该类型的检测是否已经存在结果
+        boolean isAlreadyChecked = mpCheckItemVos.stream()
+                .anyMatch(vo -> checkItemType.getCode().equals(vo.getCheckItem()));
+
+        // 如果已经检测过，直接返回，保留原来的结果（保留第1、2项的成功状态）
+        if (isAlreadyChecked) {
+            return;
+        }
         if (!isPass) {
             addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason);
         }
