@@ -203,10 +203,10 @@ public class MdmMaterialInfo extends BaseEntity {
     private String ability;
 
     /**
-     * 是否不可生产，0否1是
+     * 不可生产，0否1是
      */
     @Excel(name = "ui.data.column.mdmMaterialInfo.cantProduce", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "是否不可生产", name = "cantProduce")
+    @ApiModelProperty(value = "不可生产", name = "cantProduce")
     @TableField(value = "CANT_PRODUCE")
     private Integer cantProduce;
 
