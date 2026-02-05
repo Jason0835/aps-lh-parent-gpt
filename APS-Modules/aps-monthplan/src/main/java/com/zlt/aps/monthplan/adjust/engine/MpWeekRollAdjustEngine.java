@@ -1,12 +1,14 @@
 package com.zlt.aps.monthplan.adjust.engine;
 
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.UrgencyTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.check.DayTotalCapacityChecker;
@@ -460,7 +462,7 @@ public class MpWeekRollAdjustEngine {
         //1、从锁定次日向后遍历排产计划，检测每日硫化机台数不超限制数且每日胎胚种类数不超限制数的日期，记为有空间的日期；
         //2、在有空间的日期向后依次找SKU，越靠近的SKU优先移动；
         //3、将SKU整体模拟往前移动到空间日期，并向后再次检测每日硫化机台数、胎胚种类数的符合性，若符合，则可以移动，否则不能移动，继续找下一个SKU；
-        int secStartDay,cavityQty;
+        int secStartDay;
         List<FactoryMonthPlanFinalAdjustVo> canMoveFinalList;
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
@@ -484,13 +486,13 @@ public class MpWeekRollAdjustEngine {
             //3、移动SKU列表，直到第I天没有剩余空间
             for (FactoryMonthPlanFinalAdjustVo finalVo:canMoveFinalList){
 
-                adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),finalVo.getMainPattern());
+                /*adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),finalVo.getMainPattern());
                 //检查：主花纹向下模具数量(/2转成机台数) 符合性
                 cavityQty = getNewCavityQty(contextDTO,finalVo,i);
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),finalVo.getMaterialCode(),i,cavityQty)).append(ApsConstant.DIVISION);
                 if (!checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
                     continue;
-                }
+                }*/
                 //3.3、清空定稿表日计划量
                 clearMpFinalDayValue(contextDTO,secStartDay, finalVo);
 
@@ -1370,6 +1372,9 @@ public class MpWeekRollAdjustEngine {
                                     Integer newOnLineDay, Integer newPlanQty, FactoryMonthPlanFinalAdjustVo mpFinalVo) {
         String dayField;
         int dayValue;
+        FactoryMonthPlanFinalAdjustVo bakMpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+        BeanUtils.copyProperties(mpFinalVo,bakMpFinalVo);
+
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         int structureDeadLine = contextDTO.getStructureDeadLine();
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
@@ -1441,8 +1446,13 @@ public class MpWeekRollAdjustEngine {
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,cavityQty)).append(ApsConstant.DIVISION);
                 if (!checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
                     // 将值还原，并退出 外循环
-                    dayValue -= dayVulcanizationQty;
-                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                    if (i == newOnLineDay){
+                        //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
+                        mpFinalVo = bakMpFinalVo;
+                    }else{
+                        dayValue -= dayVulcanizationQty;
+                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                    }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,主花纹:%s,其主花纹模具数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,mpFinalVo.getMainPattern())).append(ApsConstant.DIVISION);
                     return newPlanQty < 0 ? 0:newPlanQty;
                 }
