@@ -4,10 +4,13 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
+import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
+import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpProductionPredictionService;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
@@ -15,7 +18,6 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +32,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -52,14 +57,13 @@ import com.zlt.bill.common.service.IDocService ;
 */
 @Slf4j
 @Api(tags = "S2-1002.未来产量预测")
+@AllArgsConstructor
 @RestController
 @RequestMapping("/productionPrediction")
 public class MpProductionPredictionController extends AbstractDocBizController<MpProductionPrediction> {
-    @Autowired
-    private IMpProductionPredictionService mpProductionPredictionService;
-
-    @Autowired
-    private MpProductionPredictionEntityMapper entityMapper;
+    private final IMpProductionPredictionService mpProductionPredictionService;
+    private final MpProductionPredictionEntityMapper entityMapper;
+    private final IMpPredictionDetailService mpPredictionDetailService;
 
     /**
      * 查询S2-1002.未来产量预测列表
@@ -68,7 +72,27 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpProductionPrediction queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableResult = super.list(queryVO);
+        if(CollectionUtils.isEmpty(tableResult.getRows())) {
+            return tableResult;
+        }
+        this.translationList((List<MpProductionPrediction>)tableResult.getRows(),true);
+        return tableResult;
+    }
+
+    private List<MpProductionPrediction> translationList(List<MpProductionPrediction> resultList, boolean fetchVersion) {
+        if(!fetchVersion) {
+            for (MpProductionPrediction item : resultList) {
+                item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime()));
+            }
+            return resultList;
+        }
+        Set<String> batchNumbers = resultList.stream().map(MpProductionPrediction::getPredictionVersion).collect(Collectors.toSet());
+        Map<String, Map<String, MpPredictionDetail>> versionMap = this.mpPredictionDetailService.fetchVersion(batchNumbers);
+        for (MpProductionPrediction item : resultList) {
+            item.setVersionMap(versionMap.get(item.getPredictionVersion()));
+        }
+        return resultList;
     }
 
     @Override
@@ -145,8 +169,7 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptyList();
         }
-        list.forEach(item -> item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime())));
-        return list;
+        return translationList(entityMapper.selectList(wrapper),false);
     }
 
     @Override

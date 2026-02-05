@@ -21,21 +21,24 @@ public class NoProductionPlanUtils {
   public static List<MonthPlanNoProductionPlan> buildNoProductionPlanList(Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap, Map<Long, MonthPlanNoProductionPlan> noProductionRecordMap, Map<Long, Integer> sumProductionMap) {
     List<MonthPlanNoProductionPlan> noProductionPlanList = Lists.newArrayList();
     productionPlanMap.forEach((key, productionPlan) -> {
-        Long monthPlanId = productionPlan.getMonthPlanId();
+      Long monthPlanId = productionPlan.getMonthPlanId();
+      int needProductionQty = productionPlan.getFactProdReqQty();
+      int plannedQty = sumProductionMap.getOrDefault(monthPlanId, 0);
+      int unProductionQty = needProductionQty - plannedQty;
+      if(needProductionQty == 0 && YesOrNoEnum.YES.getCode().equals(productionPlan.getIsProduction())){
+          return;
+      }
+      if(unProductionQty <= 0) {
+        return;
+      }
       String unProductionReason = productionPlan.getNoProductionReason();
       MonthPlanNoProductionPlan noProductionPlan = new MonthPlanNoProductionPlan();
       BeanUtils.copyProperties(productionPlan, noProductionPlan);
       noProductionPlan.setId(null);
       noProductionPlan.setReason(unProductionReason);
-      int needProductionQty = productionPlan.getCxCapacityRequireQty();
-      int plannedQty = sumProductionMap.getOrDefault(monthPlanId, 0);
-      int unProductionQty = needProductionQty - plannedQty;
       String isProduction = plannedQty > 0?YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
       noProductionPlan.setIsProduction(isProduction);
       noProductionPlan.setUnProductionQty(unProductionQty);
-      if(unProductionQty <= 0) {
-        return;
-      }
       //有排产计划，则取排产数量
       if (sumProductionMap.containsKey(monthPlanId) && unProductionQty > BigDecimal.ZERO.intValue()) {
         noProductionPlanList.add(noProductionPlan);
@@ -56,29 +59,8 @@ public class NoProductionPlanUtils {
     return noProductionPlanList;
   }
 
-  /**
-   * 提取不排产计划条件
-   * isProduction = 0 或是 可排产量为0
-   *
-   * @param monthPlanInit
-   * @return
-   */
-  private static boolean hasNoProduction(MonthPlanProductionRequirePlanVo monthPlanInit) {
-    if (null == monthPlanInit) {
-      return false;
-    }
-    if (YesOrNoEnum.NO.getCode().equals(monthPlanInit.getIsProduction())) {
-      return true;
-    }
-    Integer productionQty = monthPlanInit.getProductionQty();
-    if (null == productionQty) {
-      productionQty = BigDecimal.ZERO.intValue();
-    }
-    return productionQty <= BigDecimal.ZERO.intValue();
-  }
-
   public static MonthPlanNoProductionPlan createNoProductionRecordData(MonthPlanProductionRequirePlanVo monthPlanInit) {
-    if(!hasNoProduction(monthPlanInit)) {
+    if(YesOrNoEnum.YES.getCode().equals(monthPlanInit.getIsProduction())) {
        return null;
     }
     MonthPlanNoProductionPlan noProductionRecord = new MonthPlanNoProductionPlan();
