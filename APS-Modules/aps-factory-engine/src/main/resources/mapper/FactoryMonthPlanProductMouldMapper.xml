@@ -199,7 +199,6 @@
                 mdp.MATERIAL_CODE,
                 mdp.MATERIAL_DESC,
                 mdp.MOULD_CODE,
-                mdp.BOARDING_DATE,
                 mdp.MAIN_PATTERN,
                 mdp.MOULD_CODE AS BASE_MOULD_CODE,
                 '' AS MOULD_TYPE,
