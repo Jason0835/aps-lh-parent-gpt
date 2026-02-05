@@ -141,6 +141,9 @@ public class PredictionAllocationHelper {
           );
           // 处理每个优先级
           for (PriorityProcessor processor : processors) {
+            if(context.getStockQty().compareTo(BigDecimal.ZERO) <= 0) {
+               break;
+            }
             processPriority(context, processor);
           }
           return context.getSaleOrders();
@@ -192,6 +195,7 @@ public class PredictionAllocationHelper {
         stockQty = BigDecimal.ZERO;
       }
     }
+    context.setStockQty(stockQty);
     if(sumOrderQty.compareTo(BigDecimal.ZERO) <= 0) {
       context.setSaleOrders(otherSaleOrders);
       return;
