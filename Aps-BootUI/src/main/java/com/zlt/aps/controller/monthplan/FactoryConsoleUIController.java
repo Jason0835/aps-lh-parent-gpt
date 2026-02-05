@@ -134,6 +134,24 @@ public class FactoryConsoleUIController extends BaseController {
     }
 
     /**
+     * 按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划重新模具排产
+     *
+     * @param factoryProductionParam
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/rescheduleMouldingProduction")
+    @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划重新模具排产")
+    public AjaxResult rescheduleMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
+        AjaxResult checkParamResult = checkEmptyProductionVersion(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
+        }
+        return factoryConsoleService.rescheduleMouldingProduction(factoryProductionParam);
+    }
+
+    /**
      * 按工厂 + 排产日期获取分厂的定稿版本信息
      *
      * @param queryCondition 查询条件
@@ -154,31 +172,6 @@ public class FactoryConsoleUIController extends BaseController {
         }
         return factoryConsoleService.getFinalVersion(queryCondition);
     }
-
-    /**
-     * 按分厂 + 年月 + 排产版本的方式进行分厂模具排产
-     *
-     * @param factoryProductionParam
-     * @return
-     */
-    @ResponseBody
-    @PostMapping("/factoryMouldingProduction")
-    @ApiOperation("按分厂 + 年月 + 排产版本的方式进行分厂模具排产")
-    public AjaxResult factoryMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam) {
-        if (null == factoryProductionParam) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
-        }
-        String factoryCode = factoryProductionParam.getFactoryCode();
-        Integer year = factoryProductionParam.getYear();
-        Integer month = factoryProductionParam.getMonth();
-        String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
-        String productionVersion = factoryProductionParam.getProductionVersion();
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion) || StringUtils.isBlank(productionVersion)) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.PRODUCTION_VERSION_NO_EMPTY));
-        }
-        return factoryConsoleService.factoryMouldingProduction(factoryProductionParam);
-    }
-
 
     /**
      * 按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本

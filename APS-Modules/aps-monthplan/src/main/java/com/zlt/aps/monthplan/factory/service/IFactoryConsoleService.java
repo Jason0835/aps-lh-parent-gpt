@@ -63,7 +63,7 @@ public interface IFactoryConsoleService {
      * @param factoryProductionParam
      * @return
      */
-    AjaxResult reMouldingProduction(FactoryProductionParamVo factoryProductionParam);
+    AjaxResult rescheduleMouldingProduction(FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 按工厂 + 年月 + 需求版本的方式，删除对应的需求版本的排产版本记录及排产版本数据
