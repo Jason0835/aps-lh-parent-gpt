@@ -1,4 +1,4 @@
-package com.zlt.aps.factory.scheduling.cxcapacity;
+package com.zlt.aps.factory.scheduling.mouldproduction;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.ProductTypeEnum;
@@ -10,10 +10,19 @@ import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.factory.handler.ContinueSkuCalculator;
-import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
 import com.zlt.aps.factory.handler.MouldProductionResultHandler;
-import com.zlt.aps.factory.logrecorder.*;
-import com.zlt.aps.factory.scheduling.*;
+import com.zlt.aps.factory.logrecorder.KeyInformationLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrMouldFormalProductionLogRecorder;
+import com.zlt.aps.factory.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.factory.scheduling.AbstractDataLoaderService;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
+import com.zlt.aps.factory.scheduling.ProductionContext;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.cxcapacity.AdjustContinueSkuProductionQtyHandler;
+import com.zlt.aps.factory.scheduling.cxcapacity.ClearProductionInfoHandler;
+import com.zlt.aps.factory.scheduling.cxcapacity.FormalProductionHandler;
+import com.zlt.aps.factory.scheduling.cxcapacity.ProductionCxMachineCalculationHandler;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
@@ -21,6 +30,7 @@ import com.zlt.aps.factory.handler.InitNoProductionRecordHandler;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -33,34 +43,20 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 工厂TBR业务轮胎成型产能分配
- * 主要完成按结构进行成型产能分配
- * 1、按结构汇总净需求量，粗算结构所需成型机台数
- * 2、从上个月的月度排产计划，获取在产结构-即续作结构
- * 3、如果续作结构需求量减少，导致需要提前释放续作结构的成型机台数，则优先释放配比机台数多的
- * 4、续作结构排产完毕后，对续作结构中收尾的成型机台，进行反向查找下个结构(需成型机台剩余产能能满足结构净需求)
- * 5、对剩余还有需求量的结构，按结构优先级，挑选优先级最高的结构，匹配能分配的成型机台
- * 5.1、固定机台优先，是否零度结构 = 零度供料架
- * 5.2、成型机当前排产结构是否与挑选结构含有同规格(结构向下SKU只要有一个同规格则认为同规格)
- * 5.3、成型机当前排产结构是否与挑选结构含有同英寸(结构向下SKU只要有一个同英寸则认为同英寸)
- * 5.4、成型机当前排产结构是否与挑选结构的断面宽±10优先
- * 5.5、近1个月历史结构在期日期近的优先(最后一个排产日)
- * 5.6、近3个月历史结构在机次数多的优先(一个月算一次)
+ * 工厂TBR业务轮胎结构排产业务
+ * 主要根据结构产能分配进行模具排产
  *
- * @author ZLT
- * @date 20251209
+ * @author
  */
 @Slf4j
-@Service(value = "tbrWholeProductionService")
-public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
+@Service(value = "tbrMouldProductionService")
+public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     private final FormalProductionHandler formalProductionHandler;
 
-    private final SimulateProductionHandler simulateProductionHandler;
-
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
-    private final SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler;
+    private final InitNoProductionRecordHandler initNoProductionRecordHandler;
 
     private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
 
@@ -68,61 +64,36 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
-    private final InitNoProductionRecordHandler initNoProductionRecordHandler;
-
-    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
-                                          DpRequireDataService dpRequireDataService,
-                                          MonthProductionDataService monthProductionDataService,
-                                          FormalProductionHandler formalProductionHandler,
-                                          ProductionHistoryHandler productionHistoryHandler,
-                                          SimulateProductionHandler simulateProductionHandler,
-                                          ClearProductionInfoHandler clearProductionInfoHandler,
-                                          InitNoProductionRecordHandler initNoProductionRecordHandler,
-                                          SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler,
-                                          CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
-                                          ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
-                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
+    public TbrMouldProductionService(ProductionMdmDataService dataService,
+                                     DpRequireDataService dpRequireDataService,
+                                     ProductionHistoryHandler productionHistoryHandler,
+                                     FormalProductionHandler formalProductionHandler,
+                                     MonthProductionDataService monthProductionDataService,
+                                     ClearProductionInfoHandler clearProductionInfoHandler,
+                                     InitNoProductionRecordHandler initNoProductionRecordHandler,
+                                     CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
+                                     ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
+                                     AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.formalProductionHandler = formalProductionHandler;
-        this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
-        this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
     }
 
-    /**
-     * 结构排产
-     * 1、构建排产Tbr排产上下文(设置排产版本信息、构建排产周期信息)
-     * 2、根据工厂、年份、月份、需求版本号获取排产需求(前面初始化部分已经处理-故而从初始化表中获取t_mp_proc_month_plan_init)
-     * 3、构建排产前的基础配置数据获取
-     * 3.1、工厂排产参数配置读取：t_mp_factory_param
-     * 3.2、胎胚需要使用的特殊材料信息 t_mdm_material_consume_detail
-     * 4、按结构分组，并根据结构+主花纹的最大模具数，控制结构的合理最大排产量，以此数据来估算使用的机台数
-     * 5、对在机结构进行在产机台分配(需要根据模拟排产续作Sku部分来分配)
-     * 5.1、续作Sku分为3步：续作Sku使用续作模具数排产高优先级部分、接着排续作Sku同规格同花纹部分的高优先级量，最后排同生胎、共模具部分的高优先级量
-     * 6、在机结构在产机台分配完后，继续对在机结构的新增Sku模拟模具排产，同时确定是否需要提前收尾，最终确认收尾时间点
-     * 7、对在产机台有收尾的机台，反向匹配分组计划(机台剩余产能能够覆盖需求量，并满足匹配条件)
-     * 8、对新增结构和在机结构剩余量进行产能分配，比较结构的优先级，确认最高优先级结构，挑选机台
-     * 8.1、确认机台与分组计划关系后，进行模拟模具排产，确定其准确的收尾时间
-     * 9、每排完一次匹配，则进行机台反向选择分组计划
-     * 9.1、每确定一组机台与分组计划关系后，进行模拟模具排产，确定其准确的收尾时间
-     * 10、模拟完成后，得到最终结构排产结果(结构与机台的上机时间~收尾时间、机台结构间的衔接)
-     * 11、根据最终结果排产结果，按结构维度重新开始正式模具排产
-     * 11.1、优先在机机构排产
-     * 11.1.1、在机结构续作Sku先排->续作Sku的同规格同花纹->续作Sku的同生胎同模具
-     * 11.1.2、在机结构新增Sku排产
-     * 11.2、新增结构排产
-     *
-     * @param context 排产上下文
-     * @param userObj 用户数据
-     */
     @Override
     public void run(Context context, Object userObj) {
+        if (null == context.getInsertNewProductionVersion()) {
+            context.setInsertNewProductionVersion(Boolean.FALSE);
+        }
+        if (null == context.getProductionProcessStage()) {
+            context.setProductionProcessStage(ProductionProcessStage.STAGE_MOULDING);
+        }
         //0、创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        deleteOldData(productionContext);
         //开始进行成型产能分配-结构排产
         log.info(TbrBeforeProductionGroupLogRecorder.addStartGroupLog(productionContext));
         //1、获取排产计划信息
@@ -135,7 +106,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         requirePlanList.forEach(singlePlan -> {
             log.info(TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan));
             singlePlan.initProductionDataInfo();
-            this.initNoProductionRecordHandler.initNoProductionRecord(productionContext, singlePlan);
+            initNoProductionRecordHandler.initNoProductionRecord(productionContext, singlePlan);
         });
         //2、初始排产需要的基础数据，成型、模具关系、成型硫化配比、计划初始库销比
         log.info(TbrBeforeProductionGroupLogRecorder.addStartBeforeProductionDataLog(productionContext));
@@ -156,8 +127,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        // 结构特殊材料排产
-//        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
@@ -167,12 +136,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //             		   处理方案：首先，需要算一下模具的产能，如果能把高优先级+续作的中优先级全部能包过来，那么就续作优先；
         //                   如果不能包过来，就需要把中优先级中途下机，下机的时间点是，剩余的模具产能，正好能把高优先级产完。
         adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap, productionContext);
-        //8、进行模拟模具排产
-        log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
-        simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
-        //9、保存结构成型排程结果
-        List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
-        //10、第二轮排产
+        //获取结构排产信息
+        List<MpStructureAllocation> allAllocationList = getMonthProductionDataService().getStructureAllocationInfoByProductionVersion(productionContext);
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
         //清除模拟排产信息
         clearProductionInfoHandler.clearProductionData(productionContext);
@@ -204,6 +169,22 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         }
         //主要为-半钢业务
         return buildDefaultProductionContext(context);
+    }
+
+    /**
+     * 设置生产版本号，如果已经有生产版本号，则不进行设置
+     * 否则根据当前时间戳及版本号前缀设置
+     * 已有生产版本号，则根据生产版本号删除旧有数据
+     *
+     * @param productionContext
+     */
+    private void deleteOldData(TbrProductionContext productionContext) {
+        String productionVersion = productionContext.getProductionVersion();
+        if (StringUtils.isBlank(productionVersion)) {
+            throw new BusinessException(I18nUtil.getMessage("alg.data.alter.message.productionVersionNoEmpty"));
+        }
+        //删除版本已有数据-初始化、分组产能排产不删除
+        getMonthProductionDataService().deletedMouldProductionData(productionContext);
     }
 
     /**
@@ -347,21 +328,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
     }
 
     /**
-     * 9：根据成型信息，得到结构排产结果
-     * 即结构转产信息
-     *
-     * @param productionContext
-     */
-    private List<MpStructureAllocation> saveStructureInfo(TbrProductionContext productionContext) {
-        List<MpStructureAllocation> allAllocationList = GroupProductionConversionHandler.getFinalResult(productionContext);
-        if (CollectionUtils.isEmpty(allAllocationList)) {
-            return Collections.emptyList();
-        }
-        getMonthProductionDataService().saveGroupConversionResult(allAllocationList);
-        return allAllocationList;
-    }
-
-    /**
      * 10：在正式排产前重新构建分组限制信息
      *
      * @param context           排产上下文
@@ -416,23 +382,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         getMonthProductionDataService().saveNoProductionPlan(noProductionPlanList);
     }
 
-    private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {
-        Map<Long, Integer> sumMonthPlanMap = new HashMap<>();
-        detailList.forEach(productionDetail -> {
-            Long monthPlanId = productionDetail.getMonthPlanId();
-            Integer productionQty = productionDetail.getTotalQty();
-            if (null == productionQty) {
-                productionQty = BigDecimal.ZERO.intValue();
-            }
-            Integer plannedProductionQty = sumMonthPlanMap.get(monthPlanId);
-            if (null == plannedProductionQty) {
-                plannedProductionQty = BigDecimal.ZERO.intValue();
-            }
-            sumMonthPlanMap.put(monthPlanId, plannedProductionQty + productionQty);
-        });
-        return sumMonthPlanMap;
-    }
-
     /**
      * 0.1：构建全钢排产上下文
      * 设置排产版本号：为空时生产排产版本号
@@ -484,6 +433,22 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         return productionContext;
     }
 
+    private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {
+        Map<Long, Integer> sumMonthPlanMap = new HashMap<>();
+        detailList.forEach(productionDetail -> {
+            Long monthPlanId = productionDetail.getMonthPlanId();
+            Integer productionQty = productionDetail.getTotalQty();
+            if (null == productionQty) {
+                productionQty = BigDecimal.ZERO.intValue();
+            }
+            Integer plannedProductionQty = sumMonthPlanMap.get(monthPlanId);
+            if (null == plannedProductionQty) {
+                plannedProductionQty = BigDecimal.ZERO.intValue();
+            }
+            sumMonthPlanMap.put(monthPlanId, plannedProductionQty + productionQty);
+        });
+        return sumMonthPlanMap;
+    }
 
     /**
      * 0.1~2.1：设置排产周期信息等信息
@@ -496,6 +461,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         if (null == productionVersion) {
             return;
         }
+        context.setPlanType(productionVersion.getPlanType());
         Date productionStartDate = productionVersion.getProductionStartDate();
         context.setProductionStartDate(productionStartDate);
         context.setStartDay(com.zlt.aps.factory.utils.DateUtils.getDaysByMonth(productionStartDate));
@@ -555,5 +521,4 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }
-
 }

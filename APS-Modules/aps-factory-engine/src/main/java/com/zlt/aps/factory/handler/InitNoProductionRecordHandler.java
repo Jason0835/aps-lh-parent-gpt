@@ -1,8 +1,9 @@
-package com.zlt.aps.factory.utils;
+package com.zlt.aps.factory.handler;
 
 import com.google.common.collect.Maps;
 import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -14,7 +15,7 @@ import java.util.Map;
  * @author Yelq
  */
 @Service
-public class InitNoProductionRecordService {
+public class InitNoProductionRecordHandler {
 
   public void initNoProductionRecord(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo requirePlan) {
     Map<Long, MonthPlanNoProductionPlan> noProductionRecordMap = productionContext.getNoProductionRecordMap();
