@@ -558,12 +558,28 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
             Map<String, Object> listMap = new HashMap<>();
             listMap.put("monthShow", mapKey);
             listMap.put("month", value.getMonth());
+            listMap.put("year", value.getYear());
             monthMapList.add(listMap);
         }
+
+        monthMapList = monthMapList.stream().sorted(Comparator.comparing(MpMonthlySaleQtyController::getYearMonthSortKey)).collect(Collectors.toList());
 
         map.put("areaTableTitle", areaMapList);
         map.put("monthTableTitle", monthMapList);
         return map;
+    }
+
+    /**
+     * 获取年月格式
+     * @param item 要获取的数据
+     * @return 结果
+     */
+    private static int getYearMonthSortKey(Map<String, Object> item) {
+        // 提取年份和月份（简化类型转换）
+        int year = Integer.parseInt(item.get("year").toString());
+        int month = Integer.parseInt(item.get("month").toString());
+        // 拼接为yyyymm格式的整数（如2026*100 + 2 = 202602）
+        return year * 100 + month;
     }
 
     /**
