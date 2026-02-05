@@ -1383,7 +1383,8 @@ public class MpWeekRollAdjustEngine {
         MpDailyCapacityLimitVo dailyCapacityLimitVo = contextDTO.getDailyCapacityLimitVoMap().get(newOnLineDay);
         int startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),newOnLineDay,mpFinalVo,dailyCapacityLimitVo);
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
-        int dayVulcanizationQty,blockQty,cavityQty;
+        int blockQty,cavityQty;
+        Integer dayVulcanizationQty;
         boolean bFirstAddMould = true;
         while (newPlanQty > 0){
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
@@ -1413,8 +1414,13 @@ public class MpWeekRollAdjustEngine {
                     }
                 }else{
                     if (bFirstAddMould){
-                        dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,newOnLineDay, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
+                        dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,i, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
                     }
+                }
+                if(dayVulcanizationQty == null){
+                    //若获取到首日量是空值,表示主花纹向下，当日不让增模或换活字块
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到的首日计划量为空,表示当前排产日主花纹下不允许换活块！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    continue;
                 }
 
                 //检查是否自动补量
