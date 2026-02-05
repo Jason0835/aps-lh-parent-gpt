@@ -695,6 +695,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
+            monthPlan.setDayVulcanizationQty(Convert.toInt(adjustDetailVo.getDayVulcanizationQty(), 0) * 2);
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
@@ -717,6 +718,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 monthPlan.setTrialQty(adjustDetailVo.getCurrentNetQty());
                 // 差异量(未排产数量) = 生产实际排产量 - 试制量试计划需求数量
                 differenceQty = Convert.toInt(monthPlan.getTotalQty(), 0) - Convert.toInt(monthPlan.getTrialQty(), 0);
+                monthPlan.setFactProdReqQty(null);
             }
             // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
