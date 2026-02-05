@@ -203,6 +203,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
             return Collections.emptyList();
         }
         DpDemandPlan demandPlan = tMonthDemands.get(0);
+        Map<String,List<DpDemandPlan>>  tMonthDemandsGroupByMaterialCode =  tMonthDemands.stream().collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
         Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
         List<MpProductionPrediction> result = Lists.newArrayList();
         YearMonth yearMonth = monthRangeResult.getTMonth();
@@ -211,6 +212,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                     return;
                 }
                 List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode = map.get(materialCode);
+                List<DpDemandPlan> netDemands = tMonthDemandsGroupByMaterialCode.get(materialCode);
                 MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
                 MpProductionPrediction productionPrediction = new MpProductionPrediction();
                 BeanUtils.copyProperties(materialInfo,productionPrediction);
@@ -225,8 +227,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
                 productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
                 productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
                 productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));
-                productionPrediction.setNetQty(calculateNetQty(tMonthDemands));
-                productionPrediction.setHeightQty(calculateHeightQty(tMonthDemands));
+                productionPrediction.setNetQty(calculateNetQty(netDemands));
+                productionPrediction.setHeightQty(calculateHeightQty(netDemands));
                 productionPrediction.setProductionQty(calculateProductionQty(listGroupByMaterialCode));
                 productionPrediction.setMonth1(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTMonth()));
                 productionPrediction.setMonth2(calculateProductionQty(listGroupByMaterialCode,monthRangeResult.getTPlus1Month()));
