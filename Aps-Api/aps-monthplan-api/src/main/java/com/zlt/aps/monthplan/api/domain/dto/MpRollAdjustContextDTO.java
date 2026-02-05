@@ -97,6 +97,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "需要保存的月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> saveMpProdFinalList;
 
+    @ApiModelProperty(value = "需要发送消息的月计划调整最终结果表")
+    private List<FactoryMonthPlanFinalAdjustVo> sendMsgMpProdFinalList;
+
     @ApiModelProperty(value = "月计划结构转产表")
     private List<MpStructureAllocation> structureAllocationList;
 
