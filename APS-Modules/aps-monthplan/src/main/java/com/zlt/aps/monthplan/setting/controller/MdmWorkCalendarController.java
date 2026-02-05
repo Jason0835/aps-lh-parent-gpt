@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmHolidayEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
@@ -115,6 +116,10 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
             billVO.setYear(instance.get(Calendar.YEAR));
             billVO.setMonth(instance.get(Calendar.MONTH) + 1);
             billVO.setDay(instance.get(Calendar.DAY_OF_MONTH));
+        }
+        // 停产比例改成0
+        if (YesOrNoEnum.NO.getCode().equals(billVO.getDayFlag())) {
+            billVO.setRate(0);
         }
         return super.save(billVO);
     }
