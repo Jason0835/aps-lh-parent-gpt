@@ -466,7 +466,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldDeliveryLog(productionContext, mouldDeliveryList));
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList);
+        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList,productionContext);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
