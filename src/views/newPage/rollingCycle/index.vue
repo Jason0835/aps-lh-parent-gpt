@@ -64,34 +64,34 @@
               :model="formInline"
               class="demo-form-inline"
             >
-              <el-form-item label="机台">
+              <el-form-item :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')">
                 <el-input
                   v-model="formInline.cxMachineCode"
                   disabled
-                  placeholder="机台"
+                  :placeholder="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
                 ></el-input>
               </el-form-item>
-              <el-form-item label="产品结构">
+              <el-form-item :label="this.$t('ui.data.column.finishStock.structureName')">
                 <el-input
                   v-model="formInline.structureName"
                   disabled
-                  placeholder="产品结构"
+                 :placeholder="this.$t('ui.data.column.finishStock.structureName')"
                 ></el-input>
               </el-form-item>
-              <el-form-item label="开始日期">
+              <el-form-item :label="this.$t('common.startDate')">
                 <el-input
                   disabled
                   v-model="formInline.beginDay"
                   style="width: 50px"
-                  placeholder="开始日期"
+                  :placeholder="this.$t('common.startDate')"
                 ></el-input>
               </el-form-item>
-              <el-form-item label="结束日期">
+              <el-form-item :label="this.$t('common.endDate')">
                 <el-input
                   disabled
                   style="width: 50px"
                   v-model="formInline.endDay"
-                  placeholder="结束日期"
+                  :placeholder="this.$t('common.endDate')"
                 ></el-input>
               </el-form-item>
               <el-form-item label="调整开始日期">
@@ -210,7 +210,7 @@
                 v-if="showConfirmResult"
                 v-model="scope.row.isLockSchedule"
                 @change="handleLockScheduleChange(scope.row, $event)"
-                placeholder="请选择"
+
                 size="mini"
               >
                 <el-option
