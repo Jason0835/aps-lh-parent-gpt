@@ -339,9 +339,10 @@ public abstract class AbstractDailyCapacityLimit {
         if (returnFirstQty){
             int patternDecMouldCount = patternDecMouldMap.get(mainPattern) == null ? 0:patternDecMouldMap.get(mainPattern);
             int patternAddMouldCount = patternAddMouldMap.get(mainPattern) == null ? 0:patternAddMouldMap.get(mainPattern);
+            int patternNoChangeDecMouldCount = patternNoChangeDecMouldMap.get(mainPattern) == null ? 0:patternNoChangeDecMouldMap.get(mainPattern);
             //int patternDiffDailyQtyDecMouldCount = patternDiffDailyQtyDecMouldMap.get(mainPattern) == null ? 0:patternDiffDailyQtyDecMouldMap.get(mainPattern);
             //int patternTwentyBlockAddMouldCount = patternTwentyBlockAddMouldMap.get(mainPattern) == null ? 0:patternTwentyBlockAddMouldMap.get(mainPattern);
-            return getFirstDayQty(patternDecMouldCount,patternAddMouldCount,paramMap);
+            return getFirstDayQty(patternDecMouldCount - patternNoChangeDecMouldCount,patternAddMouldCount,paramMap);
         }
 
         return null;
