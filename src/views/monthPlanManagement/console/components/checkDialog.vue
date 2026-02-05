@@ -19,7 +19,7 @@
           <div class="stat-label">已通过</div>
           <div class="stat-value success">{{ passedCount }}</div>
         </div>
-        <div class="stat-item" style="cursor: pointer;" @click="showReason">
+        <div class="stat-item" style="cursor: pointer" @click="showReason">
           <div class="stat-label">未通过</div>
           <div class="stat-value failed">{{ failedCount }}</div>
         </div>
@@ -45,34 +45,41 @@
           :key="item.id"
           class="check-item"
           :class="getItemClass(item.status)"
-          @click="goReason(item.status)"
+          @click="toggleItem(item)"
+          v-loading="item.loading"
         >
-          <div class="item-index">{{ index + 1 }}</div>
+          <div class="check-content">
+            <div class="item-index">{{ index + 1 }}</div>
 
-          <div class="item-icon">
-            <i
-              v-if="item.status === 'passed'"
-              class="el-icon-success success-icon"
-            ></i>
-            <i
-              v-else-if="item.status === 'failed'"
-              class="el-icon-error failed-icon"
-            ></i>
-            <i
-              v-else-if="item.status === 'checking'"
-              class="el-icon-loading checking-icon"
-            ></i>
-            <i v-else class="el-icon-minus pending-icon"></i>
+            <div class="item-icon">
+              <i
+                v-if="item.status === 'passed'"
+                class="el-icon-success success-icon"
+              ></i>
+              <i
+                v-else-if="item.status === 'failed'"
+                class="el-icon-error failed-icon"
+              ></i>
+              <i
+                v-else-if="item.status === 'checking'"
+                class="el-icon-loading checking-icon"
+              ></i>
+              <i v-else class="el-icon-minus pending-icon"></i>
+            </div>
+
+            <div class="item-content">
+              <div class="item-title">{{ item.label }}</div>
+            </div>
+
+            <div class="item-status">
+              <span :class="getStatusClass(item.status)">
+                {{ getStatusText(item.status) }}
+              </span>
+            </div>
           </div>
-
-          <div class="item-content">
-            <div class="item-title">{{ item.label }}</div>
-          </div>
-
-          <div class="item-status">
-            <span :class="getStatusClass(item.status)">
-              {{ getStatusText(item.status) }}
-            </span>
+          <div v-if="item.expanded">
+            <div class="reason-title">原因：</div>
+            <div class="reason-content" v-html="item.reason"></div>
           </div>
         </div>
       </div>
@@ -100,7 +107,6 @@
     </template> -->
     <reasonDialog ref="reasonRef" />
   </el-dialog>
-
 </template>
 
 <script>
@@ -109,13 +115,13 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 import reasonDialog from "./reasonDialog.vue";
 
-
 import {
   factoryWholeCourseProduction,
   checkProductionDemandPlan,
+  checkReason,
 } from "@/api/factory/console";
 export default {
-  components: { infoForm,reasonDialog },
+  components: { infoForm, reasonDialog },
   inject: ["parentDict"],
   data() {
     return {
@@ -195,6 +201,33 @@ export default {
     },
   },
   methods: {
+    // 切换展开收起状态
+    toggleItem(item) {
+      // 只有失败状态的项目可以展开
+      if (!item.status) {
+        if (!item.expanded) {
+          let obj={
+            ...this.actionData,
+            checkItem:item.value
+          }
+          this.$set(item, "loading", true);
+          checkReason(obj).then((response) => {
+           let reason=''
+           for (let i = 0; i < response.rows.length; i++) {
+            reason+=response.rows[i].checkContent
+           }
+           this.$set(item, "reason", reason);
+          }).finally(()=>{
+            this.$set(item, "loading", false);
+          })
+        }
+        this.$set(item, "expanded", !item.expanded);
+      }
+      // 其他状态可以执行原有逻辑（如果有的话）
+      else {
+        // this.goReason(item.status) // 如果还需要的话
+      }
+    },
     // 获取检查项CSS类
     getItemClass(status) {
       return {
@@ -215,10 +248,9 @@ export default {
 
     // 获取状态文本
     getStatusText(status) {
-      console.log(status);
       let text = "检查中";
-      if(status=='checking'){
-        return text
+      if (status == "checking") {
+        return text;
       }
       if (status == true) {
         text = "已通过";
@@ -243,7 +275,7 @@ export default {
       }
     },
     async startCheck(data) {
-      this.loading=true
+      this.loading = true;
       try {
         let res = await checkProductionDemandPlan(data);
 
@@ -257,20 +289,22 @@ export default {
         }
 
         this.checkItems = list;
-        this.loading=false
+        this.loading = false;
       } catch (err) {
         console.log(err);
-        this.loading=false
+        this.loading = false;
       }
     },
     //utils
     show(data) {
       this.visible = true;
       this.actionData = data;
-      console.log(this.parentDict.type.check_item_type.length);
       let list = this.parentDict.type.check_item_type;
       for (let i = 0; i < list.length; i++) {
         list[i].status = "checking";
+        list[i].expanded = false;
+        list[i].loading = false;
+        list[i].response=''
       }
       this.checkItems = list;
       this.$nextTick(() => {
@@ -299,20 +333,19 @@ export default {
           this.loading = false;
         });
     },
-    showReason(){
-      if(this.loading){
-       return this.$modal.msgWarning('正在检测中...');
+    showReason() {
+      if (this.loading) {
+        return this.$modal.msgWarning("正在检测中...");
       }
       if (this.$refs.reasonRef) {
         this.$refs.reasonRef.show(this.actionData);
       }
-
     },
-    goReason(status){
-      if(this.loading){
-       return this.$modal.msgWarning('正在检测中...');
+    goReason(status) {
+      if (this.loading) {
+        return this.$modal.msgWarning("正在检测中...");
       }
-      if(status)return
+      if (status) return;
       if (this.$refs.reasonRef) {
         this.$refs.reasonRef.show(this.actionData);
       }
@@ -389,12 +422,18 @@ export default {
 
 .check-item {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   padding: 12px;
   margin-bottom: 8px;
   border-radius: 4px;
   border: 1px solid #ebeef5;
   transition: all 0.3s;
+  cursor: pointer;
+}
+.check-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 
 .check-item:hover {
@@ -539,5 +578,14 @@ export default {
 
 .check-list::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+.reason-title{
+  font-size: 16px;
+  color:#262626;
+  margin-bottom: 8px;
+}
+.reason-content{
+  font-size: 14px;
+  color:#8c8c8c;
 }
 </style>

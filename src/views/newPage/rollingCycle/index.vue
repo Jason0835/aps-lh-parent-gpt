@@ -206,7 +206,8 @@
         >
           <template v-slot="scope" v-if="item.prop == 'isLockSchedule'">
             <div>
-              <el-select v-if="showConfirmResult"
+              <el-select
+                v-if="showConfirmResult"
                 v-model="scope.row.isLockSchedule"
                 @change="handleLockScheduleChange(scope.row, $event)"
                 placeholder="请选择"
@@ -219,7 +220,9 @@
                   :value="option.value"
                 />
               </el-select>
-              <span v-else>{{ selectDictLabel(dict.type.biz_yes_no, scope.row.isLockSchedule) }}</span>
+              <span v-else>{{
+                selectDictLabel(dict.type.biz_yes_no, scope.row.isLockSchedule)
+              }}</span>
             </div>
           </template>
         </el-table-column>
@@ -1135,8 +1138,8 @@ export default {
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
       saveAdjustResult({
-        id:row.id,
-        isLockSchedule:row.isLockSchedule
+        id: row.id,
+        isLockSchedule: row.isLockSchedule,
       })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
@@ -1804,7 +1807,7 @@ export default {
         params.structureName = this.formInline.structureName;
 
         params.adjustType = this.adjustType;
-         this.outResultData=[]
+        this.outResultData = [];
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
 
@@ -1815,11 +1818,11 @@ export default {
         );
         this.isShowFoot = true;
         this.showOutResult = true;
-        if(!this.formInline.adjustStartDay){
-          this.formInline.adjustStartDay= this.formInline.beginDay;
+        if (!this.formInline.adjustStartDay) {
+          this.formInline.adjustStartDay = this.formInline.beginDay;
         }
-        if(!this.formInline.adjustEndDay){
-          this.formInline.adjustEndDay= this.formInline.endDay;
+        if (!this.formInline.adjustEndDay) {
+          this.formInline.adjustEndDay = this.formInline.endDay;
         }
 
         this.getOutVersionList();
@@ -1963,9 +1966,11 @@ export default {
             return;
           }
           data = await listResult(this.formatParams());
+          console.log(this.insertDataAfterEachName(data.rows));
         } else {
           return;
         }
+
         this.data = data.rows;
         if (this.activeName == "second" || this.activeName == "three") {
           this.page.total = data.total;
@@ -2013,6 +2018,41 @@ export default {
       } finally {
         this.nextLoading = false;
       }
+    },
+
+    //调整结果插入数据
+    insertDataAfterEachName(arr) {
+      if (!arr.length) return [];
+
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        const current = arr[i];
+        const next = arr[i + 1];
+
+        // 添加当前数据
+        result.push(current);
+
+        // 如果下一个元素不存在或structureName不同，说明这是当前分组的最后一项
+        if (!next || next.structureName !== current.structureName) {
+          // 在当前分组后插入两条数据
+          result.push(
+            {
+              id: `${current.structureName}_after_1_${i}`,
+              type: "footer",
+              message: `${current.structureName} 结构分组结束`,
+              isInserted: true,
+            },
+            {
+              id: `${current.structureName}_after_2_${i}`,
+              type: "divider",
+              value: "========",
+              isInserted: true,
+            }
+          );
+        }
+      }
+
+      return result;
     },
   },
   mounted() {

@@ -117,6 +117,11 @@ export default {
         ],
         qty: [
           {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+          {
             validator: (rule, value, callback) => {
               validatePositiveInteger({ required: false }, value, callback);
             },
@@ -187,9 +192,9 @@ export default {
                   v-model={form.qty}
                   min={0}
                   max={99999999}
-                 onBlur={this.handleQtyBlur}
+                  onBlur={this.handleQtyBlur}
                 />
-                {this.showTip && <span class='tipText'>{this.tipMsg}</span>}
+                {this.showTip && <span class="tipText">{this.tipMsg}</span>}
               </div>
             );
           },
@@ -286,12 +291,11 @@ export default {
           month: arr[1],
         });
 
-
         this.tipMsg = res.data.msg;
-         if(this.form.orderType==2){
+        if (this.form.orderType == 2) {
           this.showTip = true;
-        }else{
-          this.showTip = false
+        } else {
+          this.showTip = false;
         }
         // this.$modal.msgWarning(res.data.msg);
       } catch (err) {
@@ -299,11 +303,10 @@ export default {
       }
     },
     async blurMaterialCode() {
-      let obj={
-        materialCode:this.form.materialCode,
+      let obj = {
+        materialCode: this.form.materialCode,
         factoryCode: this.form.factoryCode,
-
-      }
+      };
       // if(this.form.yearMonth){
       //   let arr = this.form.yearMonth.split("-");
       //   obj.year=arr[0]
@@ -366,7 +369,7 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      this.showTip=false
+      this.showTip = false;
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -405,8 +408,8 @@ export default {
 };
 </script>
 <style scoped>
-  .tipText {
-    color: #1890ff;                /* 蓝色 - 信息色 */
-    font-size: 12px;
-  }
+.tipText {
+  color: #1890ff; /* 蓝色 - 信息色 */
+  font-size: 12px;
+}
 </style>

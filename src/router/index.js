@@ -662,7 +662,7 @@ constantRoutes.push(
         path: "insertOrderDetail/:id",
         component: () => import("@/views/newPage/insertOrderDetail"),
         name: "insertOrderDetail",
-        meta: { title: "实单模拟明细" },
+        meta: { title: "明细" },
       }],
   },
   {

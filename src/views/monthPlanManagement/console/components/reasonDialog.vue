@@ -64,7 +64,6 @@ export default {
       this.loading = true;
       try {
         let res = await checkReason(data);
-        console.log(res);
         this.tableData = res.rows;
       } catch (err) {
         console.log(err);
