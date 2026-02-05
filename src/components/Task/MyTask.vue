@@ -58,7 +58,7 @@
     <t-table ref="MyTaskTableRef" :height="availableHeight" v-loading="loading" :data="messageList" @selection-change="handleSelectionChange" border>
       <t-table-column type="selection" width="55" align="center" />
       <t-table-column :label="$t('bd.serialNo')" align="center" type="index" width="100" />
-      <t-table-column :label="$t('common.messageTask.msgType')" align="center" prop="msgType" width="100">
+      <t-table-column :label="$t('任务类型')" align="center" prop="msgType" width="100">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.msg_type" :value="scope.row.msgType"/>
         </template>
