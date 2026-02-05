@@ -79,12 +79,26 @@ public class MpStructureAllocation extends BaseEntity {
     private String planType;
 
     /**
+     * 数据来源 01-手工新增 02-自动生成 03-导入 04-接口同步
+     */
+    @ApiModelProperty(value = "数据来源", name = "dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
+
+    /**
      * 产品结构
      */
     @Excel(name = "ui.data.column.mpStructureAllocation.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
+
+    /**
+     * 是否含有特殊材料
+     */
+    @ApiModelProperty(value = "是否含有特殊材料", name = "isHasSpecialMaterial")
+    @TableField(value = "IS_HAS_SPECIAL_MATERIAL")
+    private String isHasSpecialMaterial;
 
     /**
      * 成型机编码
@@ -179,13 +193,6 @@ public class MpStructureAllocation extends BaseEntity {
     @ApiModelProperty(value = "调整结束日期", name = "adjustEndDay")
     @TableField(exist = false)
     private Integer adjustEndDay;
-
-    /**
-     * 数据来源 01-手工新增 02-自动生成 03-导入 04-接口同步
-     */
-    @ApiModelProperty(value = "数据来源", name = "dataSource")
-    @TableField(value = "DATA_SOURCE")
-    private String dataSource;
 
     /**
      * 判断productionDay是否在beginDay与endDay范围内

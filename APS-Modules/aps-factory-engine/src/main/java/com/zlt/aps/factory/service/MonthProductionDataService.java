@@ -61,12 +61,21 @@ public interface MonthProductionDataService {
      * @return
      */
     int updateFactoryProductionVersion(MpFactoryProductionVersion updateVersion);
+
     /**
      * 根据上下文，删除某个版本的初始化数据
      *
      * @param context
      */
     void deletedInitData(Context context);
+
+    /**
+     * 根据上下文，删除某个版本的分组排产数据
+     * Tbr 为结构排产表
+     *
+     * @param context
+     */
+    void deletedGroupProductionData(Context context);
 
     /**
      * 根据上下文，删除某个版本的模具排产数据
@@ -88,6 +97,7 @@ public interface MonthProductionDataService {
      * @param productionLog 日志信息
      */
     void saveMouldProductionLog(MouldProductionLog productionLog);
+
     /**
      * 根据查询条件，获取工厂的排产计划信息
      * 从初始化中获取
@@ -136,6 +146,7 @@ public interface MonthProductionDataService {
      * @return
      */
     List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
+
     /**
      * 获取历史分组排产数据信息
      *
@@ -144,6 +155,13 @@ public interface MonthProductionDataService {
      */
     List<MpStructureAllocation> getHistoryStructureAllocationInfo(Context context);
 
+    /**
+     * 获取当前排产版本的分配信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MpStructureAllocation> getStructureAllocationInfoByProductionVersion(Context context);
     /**
      * 保存分组计划的成型转产结果
      * TBR-为结构

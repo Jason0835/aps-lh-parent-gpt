@@ -1,5 +1,6 @@
 package com.zlt.aps.factory.handler;
 
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
@@ -80,6 +81,9 @@ public class GroupProductionConversionHandler {
         allocationInfo.setMaxEmbryoCodeCount(allocationDetail.getMaxEmbryoCodeCount());
         allocationInfo.setMaxLhMachineCount(allocationDetail.getMaxRatio());
         allocationInfo.setMinLhMachineCount(allocationDetail.getMinRatio());
+        //20260205 特殊材料结构标记
+        String isHasSpecialMaterial = productionPlanInfo.isSpecialMaterial() ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode();
+        allocationInfo.setIsHasSpecialMaterial(isHasSpecialMaterial);
         List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlanInfo.getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return allocationInfo;

@@ -53,7 +53,7 @@ public interface FactoryProductionSchedulingMapper {
      * @param productionVersion 排产版本号
      * @return
      */
-    int deleteProductionMouldVersion(@Param("factoryCode") String factoryCode,
+    int deleteProductionGroupVersion(@Param("factoryCode") String factoryCode,
                                      @Param("year") Integer year,
                                      @Param("month") Integer month,
                                      @Param("monthPlanVersion") String monthPlanVersion,

@@ -134,12 +134,21 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     }
 
     @Override
+    public void deletedGroupProductionData(Context context) {
+        String productionVersion = context.getProductionVersion();
+        if (StringUtils.isBlank(productionVersion)) {
+            return;
+        }
+        factoryProductionSchedulingMapper.deleteProductionGroupVersion(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+    }
+
+    @Override
     public void deletedMouldProductionData(Context context) {
         String productionVersion = context.getProductionVersion();
         if (StringUtils.isBlank(productionVersion)) {
             return;
         }
-        factoryProductionSchedulingMapper.deleteProductionMouldVersion(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        factoryProductionSchedulingMapper.deleteProductionVersionAfterGroup(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
     }
 
     @Override
@@ -228,6 +237,23 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
         queryWrapper.eq("PLAN_TYPE", ProductionPlanType.NORMAL.getPlanType());
         List<MpStructureAllocation> allocationList = mpStructureAllocationMapper.selectList(queryWrapper);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxMachineHistoryInfoLog(context, allocationList, finalVersionList));
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return Collections.emptyList();
+        }
+        return allocationList;
+    }
+
+    @Override
+    public List<MpStructureAllocation> getStructureAllocationInfoByProductionVersion(Context context) {
+        if (isEmptyFactoryAndProductionVersion(context)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        queryWrapper.in("PRODUCTION_VERSION", context.getProductionVersion());
+        queryWrapper.eq("PLAN_TYPE", ProductionPlanType.NORMAL.getPlanType());
+        List<MpStructureAllocation> allocationList = mpStructureAllocationMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(allocationList)) {
             return Collections.emptyList();
         }
