@@ -20,7 +20,6 @@ import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -28,13 +27,11 @@ import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 结构外调整策略
@@ -293,7 +290,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //规格挑选可用机台
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        weekRollAdjustEngine.structureOutAdjustForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
+        weekRollAdjustEngine.doStructureOutForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 

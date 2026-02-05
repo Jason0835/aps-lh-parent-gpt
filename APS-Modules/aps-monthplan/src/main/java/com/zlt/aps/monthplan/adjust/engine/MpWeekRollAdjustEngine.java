@@ -8,13 +8,11 @@ import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.UrgencyTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
-import com.tlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.check.DayTotalCapacityChecker;
 import com.zlt.aps.factory.check.SkuSecondChecker;
 import com.zlt.aps.factory.deduct.DeductMouldScheduler;
-import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
@@ -61,7 +59,7 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    public void structureInAdjustForOne(MpRollAdjustContextDTO contextDTO,List<MpAdjustStructureIn> mpAdjustStructureInList,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    public void doStructureInForOne(MpRollAdjustContextDTO contextDTO, List<MpAdjustStructureIn> mpAdjustStructureInList, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         //1.解析出关单/减量、在产SKU、新增SKU以及暂缓
         List<MpAdjustStructureIn> deductAdjustList = new ArrayList<>();
         List<MpAdjustStructureIn> onIncrementAdjustList = new ArrayList<>();
@@ -74,7 +72,7 @@ public class MpWeekRollAdjustEngine {
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
-            //4.1 检查日硫化量
+            //1.0 检查日硫化量
             checkDayLhQty(sbError,adjustStructureIn);
 
             if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustStructureIn.getConstructionStage())){
@@ -105,7 +103,7 @@ public class MpWeekRollAdjustEngine {
         //2.减量调整
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureInAdjustWithDeduct(contextDTO,deductAdjustList,mpProdFinalList);
+        doStructureInWithDeduct(contextDTO,deductAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
@@ -125,38 +123,33 @@ public class MpWeekRollAdjustEngine {
         //5.在机SKU增量
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureInAdjustWithOnIncrement(contextDTO,onIncrementAdjustList,mpProdFinalList);
+        doStructureInWithOnlineInc(contextDTO,onIncrementAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //6.新增SKU
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureInAdjustWithIncrement(contextDTO,incrementAdjustList,mpProdFinalList);
+        doStructureInWithNewSku(contextDTO,incrementAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //7.其他SKU往前移动前，先重置下开始/结束日
-        //resetBegin2EndDay2TotalQty(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
-
-        //8.优化：其他SKU往前移动
+        //7.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        otherSkuForwardMove(contextDTO,lockNextDay,mpProdFinalList);
+        moveForwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //9.试制
+        //8.试制
         //1）试制不受胎胚种类数\机台数的限制；
         //2）试制是紧急的，可以在锁定期内插单；普通的，在锁定期外1天插单；
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureInAdjustWithTrial(contextDTO,trialAdjustList,mpProdFinalList);
+        doStructureInWithTrial(contextDTO,trialAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //10.重置开始/结束日及计划量
-        //resetBegin2EndDay2TotalQty(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
     }
 
     /**
@@ -244,9 +237,9 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureInAdjustWithTrial(MpRollAdjustContextDTO contextDTO,
-                                                List<MpAdjustStructureIn> trialAdjustList,
-                                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureInWithTrial(MpRollAdjustContextDTO contextDTO,
+                                        List<MpAdjustStructureIn> trialAdjustList,
+                                        List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if (PubUtil.isEmpty(trialAdjustList)) {
             return;
         }
@@ -344,7 +337,7 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    public void structureOutAdjustForOne(MpRollAdjustContextDTO contextDTO, List<MpAdjustStructureOut> mpAdjustStructureOutList, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    public void doStructureOutForOne(MpRollAdjustContextDTO contextDTO, List<MpAdjustStructureOut> mpAdjustStructureOutList, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         //1.解析出关单/减量、在产SKU、新增SKU以及暂缓
         List<MpAdjustStructureOut> deductAdjustList = new ArrayList<>();
         List<MpAdjustStructureOut> onIncrementAdjustList = new ArrayList<>();
@@ -358,6 +351,9 @@ public class MpWeekRollAdjustEngine {
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureOut adjustStructureOut:mpAdjustStructureOutList){
+            //1.0 检查日硫化量
+            checkDayLhQty(sbError,adjustStructureOut);
+
             if (adjustStructureOut.getConfirmAdjustQty() < 0){
                 //1.1 减量
                 deductAdjustList.add(adjustStructureOut);
@@ -372,8 +368,7 @@ public class MpWeekRollAdjustEngine {
                     incrementAdjustList.add(adjustStructureOut);
                 }
             }
-            //4.1 检查日硫化量
-            checkDayLhQty(sbError,adjustStructureOut);
+
         }
         if (!StringUtil.isEmptyWithTrim(sbError.toString())){
             throw new BusinessException(sbError.toString());
@@ -381,7 +376,7 @@ public class MpWeekRollAdjustEngine {
         //2.减量调整
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureOutAdjustWithDeduct(contextDTO,deductAdjustList,mpProdFinalList);
+        doStructureOutWithDeduct(contextDTO,deductAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
@@ -402,29 +397,23 @@ public class MpWeekRollAdjustEngine {
         //5.在机SKU增量
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureOutAdjustWithOnIncrement(contextDTO,onIncrementAdjustList,mpProdFinalList);
+        doStructureOutWithOnlineInc(contextDTO,onIncrementAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //6.新增SKU
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        structureOutAdjustWithIncrement(contextDTO,incrementAdjustList,mpProdFinalList);
+        doStructureOutWithNewSku(contextDTO,incrementAdjustList,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //7.重置开始/结束日
-        //resetBegin2EndDay2TotalQty(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
-
-        //8.优化：其他SKU往前移动
+        //7.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        otherSkuForwardMove(contextDTO,lockNextDay,mpProdFinalList);
+        moveForwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
-
-        //10.重置开始/结束日
-        //resetBegin2EndDay2TotalQty(FactoryConstant.MONTH_START_DAY,contextDTO.getEndDay(),mpProdFinalList);
     }
 
     /**
@@ -457,8 +446,8 @@ public class MpWeekRollAdjustEngine {
      * @param lockNextDay 锁定次日
      * @param mpProdFinalList 定稿列表
      */
-    private void otherSkuForwardMove(MpRollAdjustContextDTO contextDTO,int lockNextDay,
-                                     List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
+    private void moveForwardWithOtherSku(MpRollAdjustContextDTO contextDTO, int lockNextDay,
+                                         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         //1、从锁定次日向后遍历排产计划，检测每日硫化机台数不超限制数且每日胎胚种类数不超限制数的日期，记为有空间的日期；
         //2、在有空间的日期向后依次找SKU，越靠近的SKU优先移动；
         //3、将SKU整体模拟往前移动到空间日期，并向后再次检测每日硫化机台数、胎胚种类数的符合性，若符合，则可以移动，否则不能移动，继续找下一个SKU；
@@ -553,8 +542,8 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureInAdjustWithDeduct(MpRollAdjustContextDTO contextDTO,
-                                             List<MpAdjustStructureIn> deductAdjustList,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureInWithDeduct(MpRollAdjustContextDTO contextDTO,
+                                         List<MpAdjustStructureIn> deductAdjustList, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if(PubUtil.isEmpty(deductAdjustList)){
             return;
         }
@@ -582,7 +571,7 @@ public class MpWeekRollAdjustEngine {
             int allowDeductQty = calcAllowDeductQty(mpFinalVo);
             needDeductQty = allowDeductQty >= reAdjustQty ? reAdjustQty:allowDeductQty;
             contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,getRealBillQty(mpFinalVo),mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
-            needDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
+            doNeedDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4.重置开始日\结束日\汇总值
@@ -597,8 +586,8 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureOutAdjustWithDeduct(MpRollAdjustContextDTO contextDTO,
-                                             List<MpAdjustStructureOut> deductAdjustList,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureOutWithDeduct(MpRollAdjustContextDTO contextDTO,
+                                          List<MpAdjustStructureOut> deductAdjustList, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if(PubUtil.isEmpty(deductAdjustList)){
             return;
         }
@@ -625,7 +614,7 @@ public class MpWeekRollAdjustEngine {
             int allowDeductQty = calcAllowDeductQty(mpFinalVo);
             needDeductQty = allowDeductQty >= reAdjustQty ? reAdjustQty:allowDeductQty;
             contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,getRealBillQty(mpFinalVo),mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
-            needDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
+            doNeedDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4、重置开始日\结束日\汇总值
@@ -659,7 +648,7 @@ public class MpWeekRollAdjustEngine {
      * @param needDeductQty 需要扣减的量
      * @param prodFinal 定额记录
      */
-    private void needDeductProductionQty(MpRollAdjustContextDTO contextDTO,int needDeductQty, FactoryMonthPlanFinalAdjustVo prodFinal) {
+    private void doNeedDeductProductionQty(MpRollAdjustContextDTO contextDTO, int needDeductQty, FactoryMonthPlanFinalAdjustVo prodFinal) {
         int tmpNeedDeductQty = needDeductQty;
         int oriRealOrdQty = prodFinal.getHeightProductionQty() + prodFinal.getMidProductionQty() + prodFinal.getPostponeProductionQty();
         //根据 需要扣减量，从高优先级->中优先级->暂缓
@@ -848,9 +837,9 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureInAdjustWithOnIncrement(MpRollAdjustContextDTO contextDTO,
-                                                  List<MpAdjustStructureIn> onIncrementAdjustList,
-                                                  List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureInWithOnlineInc(MpRollAdjustContextDTO contextDTO,
+                                            List<MpAdjustStructureIn> onIncrementAdjustList,
+                                            List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if(PubUtil.isEmpty(onIncrementAdjustList)){
             return;
         }
@@ -892,7 +881,7 @@ public class MpWeekRollAdjustEngine {
                     continue;
                 }
                 //3、先排实单->自带的搭配
-                doOnlineSkuOneStructureIn(contextDTO, mpProdFinalList, lockNextDay,adjustStructInVo ,
+                doStructureInWithOnlineOneSku(contextDTO, mpProdFinalList, lockNextDay,adjustStructInVo ,
                         mpFinalVo,newOnLineDay);
                 reLocateProdFinalIter.remove();
             }
@@ -910,8 +899,8 @@ public class MpWeekRollAdjustEngine {
      * @param newOnLineDay 新的上机日
      * @return
      */
-    private void doOnlineSkuOneStructureIn(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
-                                           MpAdjustStructureIn adjustStructInVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int newOnLineDay) {
+    private void doStructureInWithOnlineOneSku(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
+                                               MpAdjustStructureIn adjustStructInVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int newOnLineDay) {
         if (adjustStructInVo == null) {
             // 非在机SKU，继续
             return;
@@ -1044,9 +1033,9 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureOutAdjustWithOnIncrement(MpRollAdjustContextDTO contextDTO,
-                                                  List<MpAdjustStructureOut> onIncrementAdjustList,
-                                                  List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureOutWithOnlineInc(MpRollAdjustContextDTO contextDTO,
+                                             List<MpAdjustStructureOut> onIncrementAdjustList,
+                                             List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if(PubUtil.isEmpty(onIncrementAdjustList)){
             return;
         }
@@ -1088,7 +1077,7 @@ public class MpWeekRollAdjustEngine {
                     continue;
                 }
                 //3、先排实单->自带的搭配
-                doOnlineSkuOneStructureOut(contextDTO, mpProdFinalList, lockNextDay,adjustStructOutVo ,
+                doStructureOutWithOnlineSkuForOne(contextDTO, mpProdFinalList, lockNextDay,adjustStructOutVo ,
                         mpFinalVo,newOnLineDay);
                 reLocateProdFinalIter.remove();
             }
@@ -1105,8 +1094,8 @@ public class MpWeekRollAdjustEngine {
      * @param newOnLineDay 新的上机日
      * @return
      */
-    private void doOnlineSkuOneStructureOut(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
-                                           MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int newOnLineDay) {
+    private void doStructureOutWithOnlineSkuForOne(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
+                                                   MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int newOnLineDay) {
         if (adjustStructOutVo == null) {
             // 非在机SKU，继续
             return;
@@ -1747,9 +1736,9 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureInAdjustWithIncrement(MpRollAdjustContextDTO contextDTO,
-                                                List<MpAdjustStructureIn> incrementAdjustList,
-                                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureInWithNewSku(MpRollAdjustContextDTO contextDTO,
+                                         List<MpAdjustStructureIn> incrementAdjustList,
+                                         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if(PubUtil.isEmpty(incrementAdjustList)){
             return;
         }
@@ -1777,7 +1766,7 @@ public class MpWeekRollAdjustEngine {
                     //2.2.1 正式规格列表 占位
                     incAdjustFormalIter = incAdjustFormalList.iterator();
                     while (incAdjustFormalIter.hasNext()){
-                        if (incOneAdjust(contextDTO,mpProdFinalList,incAdjustFormalIter.next(),lockNextDay,newOnLineDay)){
+                        if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustFormalIter.next(),lockNextDay,newOnLineDay)){
                             incAdjustFormalIter.remove();
                         }
                     }
@@ -1785,7 +1774,7 @@ public class MpWeekRollAdjustEngine {
                     //2.2.1 排产量试列表
                     incAdjustBatchTrailIter = incAdjustBatchTrailList.iterator();
                     while (incAdjustBatchTrailIter.hasNext()){
-                        if (incOneAdjust(contextDTO,mpProdFinalList,incAdjustBatchTrailIter.next(),lockNextDay,newOnLineDay)){
+                        if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustBatchTrailIter.next(),lockNextDay,newOnLineDay)){
                             incAdjustBatchTrailIter.remove();
                         }
                     }
@@ -1795,7 +1784,7 @@ public class MpWeekRollAdjustEngine {
                 if (PubUtil.isNotEmpty(incAdjustFormalList)){
                     Iterator<MpAdjustStructureIn> incAdjustIter = incAdjustFormalList.iterator();
                     while (incAdjustIter.hasNext()){
-                        if (incOneAdjust(contextDTO,mpProdFinalList,incAdjustIter.next(),lockNextDay,newOnLineDay)){
+                        if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustIter.next(),lockNextDay,newOnLineDay)){
                             incAdjustIter.remove();
                         }
                     }
@@ -1812,7 +1801,7 @@ public class MpWeekRollAdjustEngine {
      * @param lockNextDay 锁定次日
      * @param newOnLineDay 新的上机日
      */
-    private boolean incOneAdjust(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustStructureIn adjustStructInVo, int lockNextDay,int newOnLineDay) {
+    private boolean doStructureInWithNewSkuForOne(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, MpAdjustStructureIn adjustStructInVo, int lockNextDay, int newOnLineDay) {
         FactoryMonthPlanFinalAdjustVo mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructInVo);
         //2.2、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
         mpProdFinalList.add(mpFinalVo);
@@ -2019,9 +2008,9 @@ public class MpWeekRollAdjustEngine {
      * @param mpProdFinalList 月计划定稿表列表
      * @throws BusinessException
      */
-    private void structureOutAdjustWithIncrement(MpRollAdjustContextDTO contextDTO,
-                                                List<MpAdjustStructureOut> incrementAdjustList,
-                                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
+    private void doStructureOutWithNewSku(MpRollAdjustContextDTO contextDTO,
+                                          List<MpAdjustStructureOut> incrementAdjustList,
+                                          List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) throws BusinessException {
         if(PubUtil.isEmpty(incrementAdjustList)){
             return;
         }
