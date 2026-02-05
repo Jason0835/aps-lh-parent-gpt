@@ -103,6 +103,8 @@ export default {
     "biz_order_type",
     "biz_factory_name",
     "biz_deliver_goods_type",
+    "biz_scm_type",
+    "biz_stor_type"
   ],
   provide() {
     return {
@@ -162,7 +164,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-select placeholder="请选择" v-model={row.scmPriority} onChange={(val) => this.handlePriorityChange(row, val)}>
-                {this.dict.type.biz_order_type.map((item) => (
+                {this.dict.type.biz_scm_type.map((item) => (
                   <el-option
                     key={item.value}
                     label={item.label}
@@ -192,6 +194,16 @@ export default {
           // },
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_order_type, value);
+          },
+        },
+        {
+          prop: "locationType",
+          label: this.$t("ui.data.column.mdmStockUpPlan.locationType"),
+          formatter: (row) => {
+            return this.selectDictLabel(
+              this.dict.type.biz_stor_type,
+              row.locationType
+            );
           },
         },
         {

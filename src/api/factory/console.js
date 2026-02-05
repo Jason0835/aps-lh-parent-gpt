@@ -94,7 +94,8 @@ export function factoryWholeCourseProduction(query) {
  */
 export function initFactoryProduction(query) {
   return request({
-    url: '/factory/console/initFactoryProduction',
+    // url: '/factory/console/initFactoryProduction',
+    url: '/factory/console/resetGroupAllocationCapacityProduction',
     method: 'post',
     data: query,
     headers: {
