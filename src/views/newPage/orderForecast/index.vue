@@ -163,17 +163,63 @@ export default {
           prop: "month1",
           label: this.$t("ui.data.orderForecast.month1"),
           width: 120,
+          render: ({ row }) => {
+            return (
+              <div>
+                <div>
+                  <text-button
+                    onClick={() => {
+                      this.showDetail(row.versionMap[`T`],'T');
+                    }}
+                  >
+                    {row[`month1`]}
+                  </text-button>
+                </div>
+              </div>
+            );
+          },
         },
 
         {
           prop: "month2",
           label: this.$t("ui.data.orderForecast.month2"),
           width: 120,
+          render: ({ row }) => {
+            return (
+              <div>
+                <div>
+                  <text-button
+                    onClick={() => {
+                      this.showDetail(row.versionMap[`T1`]);
+                    }}
+                  >
+                    {row[`month2`]}
+                  </text-button>
+                </div>
+              </div>
+            );
+          },
         },
         {
           prop: "month3",
           label: this.$t("ui.data.orderForecast.month3"),
           width: 120,
+          render: ({ row }) => {
+            return (
+              <div>
+                <div>
+                  <text-button
+                    onClick={() => {
+                      this.showDetail(row.versionMap[`T2`]);
+                    }}
+                  >
+                    {row[`month3`]}
+                  </text-button>
+                </div>
+              </div>
+            );
+          },
+
         },
         {
           prop: "remark",
@@ -239,6 +285,22 @@ export default {
     },
   },
   methods: {
+    showDetail(row,isT) {
+      if(!row)return
+      let query={
+        monthPlanVersion:row.monthPlanVersion,
+        sourceType:row.planType,
+        productionVersion:row.productionVersion,
+        year:row.year,
+        month:row.month<10? "0" + row.month : row.month,
+        requireVersion:isT?row.batchNumber:row.monthPlanVersion,
+      }
+      this.$router.push({
+        path: `./insertOrderDetail/` + row.id,
+        query,
+      });
+
+    },
     handleYearMonthChange(val) {
       this.search = {
         ...this.search,

@@ -1815,8 +1815,12 @@ export default {
         );
         this.isShowFoot = true;
         this.showOutResult = true;
-        this.formInline.adjustStartDay = this.formInline.beginDay;
-        this.formInline.adjustEndDay = this.formInline.endDay;
+        if(!this.formInline.adjustStartDay){
+          this.formInline.adjustStartDay= this.formInline.beginDay;
+        }
+        if(!this.formInline.adjustEndDay){
+          this.formInline.adjustEndDay= this.formInline.endDay;
+        }
 
         this.getOutVersionList();
       } catch (err) {

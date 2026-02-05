@@ -389,7 +389,6 @@ export default {
   },
   methods: {
     showDetail(row,isT) {
-      console.log(row)
       if(!row)return
       let query={
         monthPlanVersion:row.monthPlanVersion,
