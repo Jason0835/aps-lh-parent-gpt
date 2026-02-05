@@ -35,7 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSumQtyGroupByMonth"
             resultType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord">
-        SELECT `MONTH`, MATERIAL_CODE, CONCAT('month', `MONTH`) as AREA_CODE_SHOW,
+        SELECT `YEAR`, `MONTH`, MATERIAL_CODE, CONCAT('month', `MONTH`) as AREA_CODE_SHOW,
         SUM(SALE_QTY) as SALE_QTY
         from T_MDM_HISTORY_SALE_RECORD
         where IS_DELETE = 0
@@ -47,6 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 #{item}
             </foreach>
         </if>
-        group by `MONTH`, MATERIAL_CODE
+        group by `YEAR`, `MONTH`, MATERIAL_CODE
+        ORDER BY `YEAR`, `MONTH`
     </select>
 </mapper>

@@ -546,7 +546,8 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
         List<Map<String, Object>> monthMapList = new ArrayList<>();
         List<MpHistorySaleRecord> sumQtyGroupByMonthList = mpHistorySaleRecordEntityMapper.selectSumQtyGroupByMonth(factoryCode, last12YearMonth, maxYearMonth, codeList);
         Map<Integer, MpHistorySaleRecord> monthGroupMap = sumQtyGroupByMonthList.stream()
-                .sorted(Comparator.comparing(MpHistorySaleRecord::getMonth))
+                .sorted(Comparator.comparing(MpHistorySaleRecord::getYear)
+                        .thenComparing(MpHistorySaleRecord::getMonth))
                 .collect(Collectors.toMap(MpHistorySaleRecord::getMonth, Function.identity(), (v1, v2) -> v1));
         Set<Map.Entry<Integer, MpHistorySaleRecord>> monthEntrySet = monthGroupMap.entrySet();
 
