@@ -164,6 +164,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
             throw new BusinessException(I18nUtil.getMessage("alg.data.alter.message.productionVersionNoEmpty"));
         }
         //删除版本已有数据-初始化不删除
+        getMonthProductionDataService().deletedGroupProductionData(productionContext);
         getMonthProductionDataService().deletedMouldProductionData(productionContext);
     }
 
