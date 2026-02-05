@@ -2034,18 +2034,18 @@ public class MpWeekRollAdjustEngine {
         int iOrder = 0;
         for (MpAdjustStructureOut adjustStructOutVo:incrementAdjustList){
             mpFinalVo = createMpFinalAdjustVo(contextDTO, adjustStructOutVo);
-            //2.1、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
+            iOrder += 1;
+            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
+            //2.1、敲定在机SKU新的上机日期
+            newOnLineDay = getNewOnLineDayForStructOut(contextDTO, lockNextDay);
+            if (newOnLineDay == null){
+                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,有可能上机日与结构收尾日重叠,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+                continue;
+            }
+            //2.2、将新增的SKU纳入定稿列表(因在模拟排产时需要实时判断模数，后面没有排上，再移除)
             mpProdFinalList.add(mpFinalVo);
             contextDTO.getFactoryMonthPlanProdFinalList().add(mpFinalVo);
 
-            iOrder += 1;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,开始日:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
-            //2.2、敲定在机SKU新的上机日期
-            newOnLineDay = getNewOnLineDayForStructOut(contextDTO, lockNextDay);
-            if (newOnLineDay == null){
-                contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,没有获取到新的上机日期,退出！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-                continue;
-            }
             //2.3、计算新需要排产的计划量 = 实单量，其中，实单量：待调整量
             newPlanQty = adjustStructOutVo.getConfirmAdjustQty();
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,排序:%s,物料编码:%s,新的上机日期:%s,新的排产量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty)).append(ApsConstant.DIVISION);
