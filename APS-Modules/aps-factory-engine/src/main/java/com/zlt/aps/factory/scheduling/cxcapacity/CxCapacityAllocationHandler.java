@@ -236,7 +236,7 @@ public class CxCapacityAllocationHandler {
         // 如果有在机的特殊结构，则优先取出特殊结构
         if (((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo().values()
                 .stream().anyMatch(machine -> this.hasSpecialStructure(machine))) {
-            List<ProductionPlanGroupInfo> specialMaterialList = allGroupPlanList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
+            List<ProductionPlanGroupInfo> specialMaterialList = needProductionGroupList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(specialMaterialList)) {
                 needProductionGroupList = specialMaterialList;
             }

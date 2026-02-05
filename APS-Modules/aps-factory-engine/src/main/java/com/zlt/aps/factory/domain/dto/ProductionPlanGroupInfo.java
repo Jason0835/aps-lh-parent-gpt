@@ -865,7 +865,7 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public boolean isSpecialMaterial() {
-        return CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap);
+        return !CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap);
     }
 
     /**

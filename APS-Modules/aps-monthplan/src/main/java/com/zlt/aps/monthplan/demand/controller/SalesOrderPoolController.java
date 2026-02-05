@@ -26,6 +26,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.redissonLock.annotation.DistributedLock;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
@@ -202,6 +203,12 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @RequiresPermissions( "monthplan:SalesOrderPool:getSCMData")
     @ApiOperation("抓取SCM数据")
     @PostMapping("/getSCMData")
+    @DistributedLock(key = "'redissonLock:salesOrderPool:getSCMData:' + #salesOrderPool.factoryCode + #salesOrderPool.year + #salesOrderPool.month",
+        failMsg = "ui.data.alert.SalesOrderPool.getSCMData.lock",
+        args = {"#salesOrderPool.factoryCode", "#salesOrderPool.year", "#salesOrderPool.month"},
+        waitTime = 1,
+        leaseTime = 300
+    )
     public AjaxResult getSCMData(@RequestBody SalesOrderPool salesOrderPool){
         return salesOrderPoolService.getSCMData(salesOrderPool);
     }
