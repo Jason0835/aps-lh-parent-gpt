@@ -8,6 +8,8 @@ import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.util.Map;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpProductionPrediction.java
@@ -188,6 +190,10 @@ public class MpProductionPrediction extends BaseEntity {
     @ApiModelProperty(value = "计划类型", name = "planType")
     @TableField(value = "PLAN_TYPE")
     private String planType;
+
+    @ApiModelProperty(value = "版本列表", name = "versionMap")
+    @TableField(exist = false)
+    private Map<String, MpPredictionDetail> versionMap;
 
     /**
      * 获取指定月份的生产量
