@@ -6,7 +6,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item :label="$t('common.messageTask.msgTitle')" prop="msgTitle">
+      <el-form-item :label="$t('common.job.column.jobName')" prop="msgTitle">
         <el-input
           v-model="queryParams.msgTitle"
           :placeholder="$t('common.rule.input')"
@@ -14,8 +14,8 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
-      <el-form-item :label="$t('common.messageTask.msgSource')" prop="msgSource">
-        <el-select v-model="queryParams.msgSource" :placeholder="$t('common.messageTask.msgSource')" clearable>
+      <el-form-item :label="$t('任务来源')" prop="msgSource">
+        <el-select v-model="queryParams.msgSource" :placeholder="$t('任务来源')" clearable>
           <el-option
             v-for="dict in dict.type.msg_source"
             :key="dict.value"
@@ -24,8 +24,8 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item :label="$t('common.messageTask.msgStatus')" prop="msgStatus">
-        <el-select v-model="queryParams.msgStatus" :placeholder="$t('common.messageTask.msgStatus')" clearable>
+      <el-form-item :label="$t('common.job.column.jobStatus')" prop="msgStatus">
+        <el-select v-model="queryParams.msgStatus" :placeholder="$t('common.job.column.jobStatus')" clearable>
           <el-option
             v-for="dict in dict.type.msg_status"
             :key="dict.value"
@@ -64,7 +64,7 @@
         </template>
       </t-table-column>
       <t-table-column
-        :label="$t('common.messageTask.msgTitle')"
+        :label="$t('common.job.column.jobName')"
         align="center"
         prop="msgTitle"
         :show-overflow-tooltip="true"
@@ -75,12 +75,12 @@
           <span v-else @click="handleClick(scope.row)">{{ scope.row.msgContent }}</span>
         </template>
       </t-table-column>
-      <t-table-column :label="$t('common.messageTask.msgSource')" align="center" prop="msgStatus" width="100">
+      <t-table-column :label="$t('任务来源')" align="center" prop="msgStatus" width="100">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.msg_source" :value="scope.row.msgSource"/>
         </template>
       </t-table-column>
-      <t-table-column :label="$t('common.messageTask.msgStatus')" align="center" prop="msgStatus" width="100">
+      <t-table-column :label="$t('common.job.column.jobStatus')" align="center" prop="msgStatus" width="100">
         <template slot-scope="scope">
           <dict-tag :options="dict.type.msg_status" :value="scope.row.msgStatus"/>
         </template>

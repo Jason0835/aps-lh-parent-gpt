@@ -1869,14 +1869,17 @@ export default {
         });
       });
     },
-    handleOutDelete(row) {
+    handleOutDelete(row,index) {
+
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
         const ids = row.id;
+
         removeOutHistory({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
-          this.resizeOutHistoryList();
+          this.data = this.data.filter(item => item.id != row.id);
+          // this.resizeOutHistoryList();
         });
       });
     },
