@@ -514,6 +514,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         }
         //删除版本已有数据
         getMonthProductionDataService().deletedInitData(productionContext);
+        getMonthProductionDataService().deletedGroupProductionData(productionContext);
         getMonthProductionDataService().deletedMouldProductionData(productionContext);
     }
 

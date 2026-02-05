@@ -23,41 +23,12 @@
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 
-    <delete id="deleteProductionMouldVersion">
-        DELETE FROM t_mp_proc_no_production_plan
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_moulding_day_result
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_mould_day_detail_log
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_mould_lh_log
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
-           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+    <delete id="deleteProductionGroupVersion">
         DELETE FROM t_mp_structure_allocation
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE FROM t_mp_mould_use_status_log
-         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND YEAR = #{year,jdbcType=DECIMAL}
-           AND MONTH = #{month,jdbcType=DECIMAL}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 

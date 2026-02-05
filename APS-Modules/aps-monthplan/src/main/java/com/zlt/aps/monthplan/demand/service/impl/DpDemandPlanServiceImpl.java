@@ -954,7 +954,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if (CollectionUtils.isEmpty(demandPlans)) {
             return Collections.emptyList();
         }
-
         Map<String, List<DpDemandPlan>> groupMap = DemandPlanGrouper.groupDemandPlans(createCondition,demandPlans);
         if(CollectionUtils.isEmpty(groupMap)) {
             return Collections.emptyList();

@@ -158,9 +158,15 @@ public class CycleStockUpService {
       CalculationData calculationData = prepareCalculationData(supplyOrderPool, skus);
       // 3.3 批量构建并插入订单池数据
       List<SupplyOrderPool> supplyOrderPools = buildSupplyOrderPools(supplyOrderPool, skus, calculationData);
-      supplyOrderPools.sort(Comparator.comparing(SupplyOrderPool::getMaterialCode));
-      this.batchInsertProcessor.batchInsert(supplyOrderPools);
-      return supplyOrderPools;
+      List<SupplyOrderPool> filterSupplyOrderPools = null;
+      if(!CollectionUtils.isEmpty(supplyOrderPools)) {
+        filterSupplyOrderPools  = supplyOrderPools.stream().filter(item -> null !=item.getQty() && item.getQty() > 0).collect(Collectors.toList());
+      }
+      if(!CollectionUtils.isEmpty(filterSupplyOrderPools)) {
+        filterSupplyOrderPools.sort(Comparator.comparing(SupplyOrderPool::getMaterialCode));
+        this.batchInsertProcessor.batchInsert(supplyOrderPools);
+      }
+      return filterSupplyOrderPools;
     } catch (Exception e) {
       log.error("重新创建供应链订单池失败", e);
       throw new BusinessException("重新创建供应链订单池失败: " + e.getMessage(), e);
