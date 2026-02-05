@@ -2160,8 +2160,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setMonth(contextDTO.getMpMonth());
         queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
         queryVo.setProductionVersion(contextDTO.getProductionVersion());
-        log.info("生成调整需求计划 ==> factoryCode:{} year:{} month:{} monthPlanVersion:{} productionVersion:{}",
-                queryVo.getFactoryCode(), queryVo.getYear(), queryVo.getMonth(), queryVo.getMonthPlanVersion(), queryVo.getProductionVersion());
+        queryVo.setStructureName(contextDTO.getStructureName());
+        log.info("生成调整需求计划 ==> factoryCode:{} year:{} month:{} monthPlanVersion:{} productionVersion:{} structureName:{}",
+                queryVo.getFactoryCode(), queryVo.getYear(), queryVo.getMonth(), queryVo.getMonthPlanVersion(), queryVo.getProductionVersion(),
+                queryVo.getStructureName());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
     }
@@ -2212,12 +2214,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         for (MpAdjustDetailVo adjust : adjustList) {
             // 设置型腔数量
             String mouldCavityKey = adjust.getStructureName() + adjust.getMainPattern();
-            if (Convert.toInt(adjust.getMouldCavityQty(),0) == 0) {
+            if (cavityResults != null && cavityResults.containsKey(mouldCavityKey)) {
                 adjust.setMouldCavityQty(MapUtils.getInteger(cavityResults, mouldCavityKey, 0));
             }
             // 设置活块数量
             String typeBlockKey = adjust.getMaterialDesc();
-            if (Convert.toInt(adjust.getTypeBlockQty(),0) == 0) {
+            if (insertResults != null && insertResults.containsKey(typeBlockKey)) {
                 adjust.setTypeBlockQty(MapUtils.getInteger(insertResults, typeBlockKey, 0));
             }
         }

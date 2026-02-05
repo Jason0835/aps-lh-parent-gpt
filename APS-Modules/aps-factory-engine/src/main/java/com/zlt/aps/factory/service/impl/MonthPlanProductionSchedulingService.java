@@ -20,14 +20,18 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
 
     private final IProductionBusinessService generalInitService;
 
+    private final IProductionBusinessService mouldProductionService;
+
     private final IProductionBusinessService wholeCourseProductionService;
 
     private final IProductionBusinessService groupCapacityProductionService;
 
     public MonthPlanProductionSchedulingService(@Qualifier("generalInitService") IProductionBusinessService generalInitService,
+                                                @Qualifier("mouldProductionService") IProductionBusinessService mouldProductionService,
                                                 @Qualifier("wholeCourseProductionService") IProductionBusinessService wholeCourseProductionService,
                                                 @Qualifier("groupCapacityProductionService") IProductionBusinessService groupCapacityProductionService) {
         this.generalInitService = generalInitService;
+        this.mouldProductionService = mouldProductionService;
         this.wholeCourseProductionService = wholeCourseProductionService;
         this.groupCapacityProductionService = groupCapacityProductionService;
     }
@@ -47,7 +51,7 @@ public class MonthPlanProductionSchedulingService implements IMonthPlanProductio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void mouldingScheduling(Context context) {
-
+        mouldProductionService.run(context, new Object());
     }
 
     @Override

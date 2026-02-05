@@ -112,8 +112,8 @@ public interface IFactoryConsoleRemoteService {
      * @return
      */
     @ApiOperation("按工厂 + 年月 + 排产版本的方式分厂排产模具")
-    @PostMapping("/factoryConsole/factoryMouldingProduction")
-    AjaxResult factoryMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
+    @PostMapping("/factoryConsole/rescheduleMouldingProduction")
+    AjaxResult rescheduleMouldingProduction(@RequestBody FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 按工厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本
