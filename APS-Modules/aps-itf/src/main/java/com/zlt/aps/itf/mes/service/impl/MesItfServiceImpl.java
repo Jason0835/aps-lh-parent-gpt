@@ -142,6 +142,10 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 baseDao.saveBatch(saveList);
             }
+            // 更新SKU与模具关系的主花纹
+            MdmModelInfo modelInfo = new MdmModelInfo();
+            modelInfo.setBaseVale(null);
+            productModelRelationEntityMapper.updateMainPatternByModelInfo(modelInfo);
         } finally {
             DynamicDataSourceContextHolder.clear();
             // 切换APS数据源 end
