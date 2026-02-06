@@ -677,7 +677,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 遍历日期，设置每个dayN字段
         for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
             String fieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day;
-            if (Convert.toInt(result.getFieldValueByFieldName(fieldName)) == 0) {
+            if (Convert.toInt(result.getFieldValueByFieldName(fieldName), 0) == 0) {
                 result.setFieldValueByFieldName(fieldName, null);
             }
         }
