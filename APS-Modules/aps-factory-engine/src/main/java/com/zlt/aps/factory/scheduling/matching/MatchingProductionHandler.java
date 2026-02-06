@@ -807,7 +807,6 @@ public class MatchingProductionHandler {
                 plan.setHeightProductionQty(oldPlan.getHeightProductionQty());
                 plan.setMidProductionQty(oldPlan.getMidProductionQty());
                 plan.setCycleProductionQty(oldPlan.getCycleProductionQty());
-                plan.setConventionProductionQty(oldPlan.getConventionProductionQty());
                 plan.setPostponeProductionQty(oldPlan.getPostponeProductionQty());
                 plan.setDifferenceQty(oldPlan.getDifferenceQty());
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
