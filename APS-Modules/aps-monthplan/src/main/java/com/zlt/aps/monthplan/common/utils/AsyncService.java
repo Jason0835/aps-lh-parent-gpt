@@ -95,7 +95,7 @@ public class AsyncService {
       // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
       currentMonthDemands =  dpDemandPlanService.createPredictionRequire(currentMonth,param,currentFinalVersion,predictionContext);
       // 排产汇总
-      if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
+      if(!CollectionUtils.isEmpty(currentMonthDemands)) {
         try{
           Context context = buildContext(currentMonthDemands);
           productionSchedulingService.executeSchedulingInNewTransaction(param,context);

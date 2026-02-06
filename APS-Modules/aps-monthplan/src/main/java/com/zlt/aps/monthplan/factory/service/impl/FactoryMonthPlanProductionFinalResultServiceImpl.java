@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -27,6 +28,7 @@ import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
 import com.zlt.aps.monthplan.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.demand.mapper.MpPredictionDetailEntityMapper;
 import com.zlt.aps.monthplan.factory.event.MonthPlanFinalizedEvent;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
@@ -82,6 +84,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private EventPublisher eventPublisher;
     @Autowired
     private FactoryProductionVersionServiceImpl factoryProductionVersionService;
+    @Autowired
+    private  MpPredictionDetailEntityMapper mpPredictionDetailEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -575,5 +579,99 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             structureFrequencyMap.put(materialCode, yearMonths.size());
         });
         return structureFrequencyMap;
+    }
+
+    @Override
+    public List<FactoryMonthPlanMouldDayResult> listExportData(Set<String> monthPlanVersions) {
+        if(CollectionUtils.isEmpty(monthPlanVersions)) {
+            return Collections.emptyList();
+        }
+        List<MpPredictionDetail> predictionDetailList = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> versionList = new ArrayList<>(monthPlanVersions);
+        for (int i = 0; i < versionList.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, versionList.size());
+            List<String> batchVersions = versionList.subList(i, end);
+            LambdaQueryWrapper<MpPredictionDetail> wrapper =
+                Wrappers.lambdaQuery(MpPredictionDetail.class)
+                    .in(MpPredictionDetail::getBatchNumber, batchVersions)
+                    .eq(MpPredictionDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
+            predictionDetailList.addAll(this.mpPredictionDetailEntityMapper.selectList(wrapper));
+        }
+        if(CollectionUtils.isEmpty(predictionDetailList)) {
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanMouldDayResult> list = Lists.newArrayList();
+        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList = this.findFinalMouldDayResult(predictionDetailList);
+        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(predictionDetailList);
+        if(!CollectionUtils.isEmpty(finalMouldDayResultList)) {
+            list.addAll(finalMouldDayResultList);
+        }
+        if(!CollectionUtils.isEmpty(notFinalMouldDayResultList)) {
+            list.addAll(notFinalMouldDayResultList);
+        }
+        return list;
+    }
+
+    private List<FactoryMonthPlanMouldDayResult> findNotFinalMouldDayResult(List<MpPredictionDetail> predictionDetailList) {
+        Set<String> finalProductionVersions = Sets.newHashSet();
+        Map<String,List<MpPredictionDetail>>  map = predictionDetailList.stream().collect(Collectors.groupingBy(MpPredictionDetail::getBatchNumber));
+        map.forEach((batchNumber, value) -> {
+            value.sort(Comparator.comparing(MpPredictionDetail::getYear).thenComparing(MpPredictionDetail::getMonth));
+            MpPredictionDetail finalPredictionDetail = value.get(0);
+            Set<String> notFinalProductionVersions  = value.stream().filter(item -> !finalPredictionDetail.getMonthPlanVersion().equals(item.getMonthPlanVersion())).map(MpPredictionDetail::getProductionVersion).collect(Collectors.toSet());
+            if(CollectionUtils.isEmpty(notFinalProductionVersions)) {
+                finalProductionVersions.addAll(notFinalProductionVersions);
+            }
+        });
+        if(CollectionUtils.isEmpty(finalProductionVersions)) {
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanMouldDayResult> list = new ArrayList<>();
+        final int batchSize = 1000;
+        List<String> versionList = new ArrayList<>(finalProductionVersions);
+        for (int i = 0; i < versionList.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, versionList.size());
+            List<String> batchVersions = versionList.subList(i, end);
+            LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> wrapper =
+                Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
+                    .in(FactoryMonthPlanMouldDayResult::getProductionVersion, batchVersions)
+                    .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            list.addAll(resultMapper.selectList(wrapper));
+        }
+        return list;
+    }
+
+    private List<FactoryMonthPlanMouldDayResult> findFinalMouldDayResult(List<MpPredictionDetail> predictionDetailList) {
+         Set<String> finalProductionVersions = Sets.newHashSet();
+         Map<String,List<MpPredictionDetail>>  map = predictionDetailList.stream().collect(Collectors.groupingBy(MpPredictionDetail::getBatchNumber));
+         map.forEach((batchNumber, value) -> {
+             value.sort(Comparator.comparing(MpPredictionDetail::getYear).thenComparing(MpPredictionDetail::getMonth));
+             finalProductionVersions.add(value.get(0).getProductionVersion());
+         });
+         if(CollectionUtils.isEmpty(finalProductionVersions)) {
+             return Collections.emptyList();
+         }
+        List<FactoryMonthPlanProductionFinalResult> list = new ArrayList<>();
+        final int batchSize = 1000;
+        List<String> versionList = new ArrayList<>(finalProductionVersions);
+        for (int i = 0; i < versionList.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, versionList.size());
+            List<String> batchVersions = versionList.subList(i, end);
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper =
+                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                    .in(FactoryMonthPlanProductionFinalResult::getProductionVersion, batchVersions)
+                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            list.addAll(this.finalMapper.selectList(wrapper));
+        }
+        if(CollectionUtils.isEmpty(list)) {
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanMouldDayResult> result = Lists.newArrayList();
+        list.forEach(item -> {
+            FactoryMonthPlanMouldDayResult entity = BeanCopyUtils.copyBean(item, FactoryMonthPlanMouldDayResult.class);
+            result.add(entity);
+        });
+        return result;
     }
 }
