@@ -143,7 +143,6 @@ public class ExcelUtilManySheet {
    * 对list数据源将其里面的数据导入到excel表单
    *
    * @param list     导出数据集合名
-   * @return 结果
    */
   public void exportExcelFromList(List<WorksheetData> list) {
     this.init(list, Excel.Type.EXPORT);
@@ -156,45 +155,54 @@ public class ExcelUtilManySheet {
       Map<String,List<String[]>> downDataListMap = Maps.newHashMap();
       Map<String,List<Integer>> downDataLocationsMap = Maps.newHashMap();
       getDownDataListMap(downDataListMap, downDataLocationsMap);
-      WorksheetData worksheetData;
-      List<Object[]> fields;
       // 取出一共有多少个sheet.
       int sheetNumber = this.sheets.size();
-      List<String[]> downDataList;
-      List<Integer> downDataLocationList;
-      short maxHeight;
       for (int index = 0; index <= sheetNumber - 1; index++) {
-        worksheetData = this.list.get(index);
-        fields = this.fieldsMap.get(worksheetData.getSheetName());
-        downDataList = downDataListMap.get(worksheetData.getSheetName());
-        downDataLocationList = downDataLocationsMap.get(worksheetData.getSheetName());
-        maxHeight = this.maxHeightMap.get(worksheetData.getSheetName()).shortValue();
-        //填充表头
-        Row row = sheets.get(index).createRow(0);
-        int column = 0;
-        for (Object[] os : fields) {
-          Excel excel = (Excel) os[1];
-          this.createCell(excel,sheets.get(index), row, column++);
-        }
-        //为工作页绑定下拉框，并且填充字典页
-        if (!CollectionUtils.isEmpty(downDataList)) {
-          createExcelWithDict(sheets.get(index),fields, dictSheet, downDataList, downDataLocationList);
-        }
-        long bmin = System.currentTimeMillis();
-        //填充数据
-        if (Excel.Type.EXPORT.equals(type)) {
-          dictDataCach.set(new HashMap<>());
-          fillExcelData(index,sheets.get(index), maxHeight,worksheetData,fields);
-          // //自适应宽度(中文支持)
-          //setSizeColumn((SXSSFSheet) this.sheet, column);
-          dictDataCach.remove();
-          addStatisticsRow(sheets.get(index));
-        }
-        log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
+          addDataRow(index,sheets.get(index),downDataListMap,downDataLocationsMap);
       }
     } catch (Exception e) {
       String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.exception"), e.getMessage());
       log.error(errorMsg);
+    }
+  }
+
+  private void addDataRow(int sheetNumber,Sheet sheet,Map<String,List<String[]>> downDataListMap,Map<String,List<Integer>> downDataLocationsMap) {
+    WorksheetData worksheetData = this.list.get(sheetNumber);
+    List<String[]> downDataList = downDataListMap.get(worksheetData.getSheetName());
+    List<Integer> downDataLocations = downDataLocationsMap.get(worksheetData.getSheetName());
+    List<Object[]> fields = this.fieldsMap.get(worksheetData.getSheetName());
+    short maxHeight = this.maxHeightMap.get(worksheetData.getSheetName()).shortValue();
+    int size = 0;
+    if(!CollectionUtils.isEmpty(worksheetData.getSimulatedResults())) {
+      size = worksheetData.getSimulatedResults().size();
+    }else if(!CollectionUtils.isEmpty(worksheetData.getMouldDayResults())) {
+      size = worksheetData.getMouldDayResults().size();
+    }
+    // 取出一共有多少个sheet.
+    double sheetNo = Math.ceil((double) size / SHEET_SIZE);
+    for (int index = 0; index <= sheetNo; index++) {
+      //填充表头
+      Row row = sheet.createRow(0);
+      int column = 0;
+      for (Object[] os : fields) {
+        Excel excel = (Excel) os[1];
+        this.createCell(excel,sheet, row, column++);
+      }
+      //为工作页绑定下拉框，并且填充字典页
+      if (!CollectionUtils.isEmpty(downDataList)) {
+        createExcelWithDict(sheet,fields, dictSheet, downDataList, downDataLocations);
+      }
+      long bmin = System.currentTimeMillis();
+      //填充数据
+      if (Excel.Type.EXPORT.equals(type)) {
+        dictDataCach.set(new HashMap<>());
+        fillExcelData(index,sheet, maxHeight,worksheetData,fields);
+        // //自适应宽度(中文支持)
+        //setSizeColumn((SXSSFSheet) this.sheet, column);
+        dictDataCach.remove();
+        addStatisticsRow(sheet);
+      }
+      log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
     }
   }
 
