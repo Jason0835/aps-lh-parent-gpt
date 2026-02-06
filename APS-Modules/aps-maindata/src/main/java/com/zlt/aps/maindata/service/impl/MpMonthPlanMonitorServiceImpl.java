@@ -179,6 +179,7 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
             long diffMillTime = DateUtils.getDiffMillTime(monitor.getExpectedCloseDate(), monitor.getPlanCloseDate());
             monitor.setDiffDay(Integer.parseInt(String.valueOf(diffMillTime)) / 1000 / 60 / 60 / 24);
             monitor.setDayVulcanizationQty(finalResult.getDayVulcanizationQty());
+            monitor.setFinalResultId(finalResult.getId());
             list.add(monitor);
         }
         baseDao.insertBatch(list);
