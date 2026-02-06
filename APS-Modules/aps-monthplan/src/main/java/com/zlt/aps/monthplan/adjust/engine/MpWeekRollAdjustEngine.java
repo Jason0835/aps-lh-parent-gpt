@@ -980,12 +980,14 @@ public class MpWeekRollAdjustEngine {
         String dayField;
         int dayMachines = 0;
         int totalRemainQty = 0;
+        int dayValue;
         for (int i = iAdjustNextDay; i<=iLockEndDay; i++){
             if (hasPlanByDay(mpFinalVo,i)){
                 dayField = FactoryConstant.DAY_FIELD+i;
                 //第1天有值的机台数
-                dayMachines = (int)Math.ceil((double) mpFinalVo.getFieldValueByFieldName(dayField) / dailyQty);
-                totalRemainQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+                dayValue = (Integer)mpFinalVo.getFieldValueByFieldName(dayField);
+                dayMachines = (int)Math.ceil((double) dayValue / dailyQty);
+                totalRemainQty += dayValue;
             }
         }
         //2.预警阀值 X台硫化机 * 50条 * 3天
@@ -1852,6 +1854,7 @@ public class MpWeekRollAdjustEngine {
             return false;
         }else{
             //3.重置各优先级总排产量
+            productionQty += getProductionQty(lockNextDay, newOnLineDay-1,mpFinalVo);
             resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
             //4.重置开始日\结束日\汇总值
             resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
@@ -2082,6 +2085,7 @@ public class MpWeekRollAdjustEngine {
                 contextDTO.getFactoryMonthPlanProdFinalList().removeIf(item -> item.getMaterialCode().equals(adjustStructOutVo.getMaterialCode()));
             }else{
                 //重置各优先级总排产量
+                productionQty += getProductionQty(lockNextDay, newOnLineDay-1,mpFinalVo);
                 resetTotalProductionQty(adjustStructOutVo,mpFinalVo,productionQty);
                 //重置开始日\结束日\汇总值
                 resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
