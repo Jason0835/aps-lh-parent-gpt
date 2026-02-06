@@ -497,5 +497,9 @@ public class ApsConstant {
      * 结构调整-自动调整
      */
     public static final String REDIS_ADJUST_STRUCT_AUTO = "APS:STRUCT:AUTO:";
+    /**
+     * 实单模拟排产
+     */
+    public static final String REDIS_CREATE_VM_MONTH_PREDICTION = "aps:simulatedResult:create:";
 
 }
