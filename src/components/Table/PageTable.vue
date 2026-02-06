@@ -494,6 +494,12 @@ export default {
   flex-direction: column;
   height: 100%;
 }
+::v-deep .light-green{
+    background: #e2efda;
+  }
+  ::v-deep .light-blue{
+    background: #9bc2e6;
+  }
 ::v-deep .warning-row {
     background: #FFCCCC;
   }

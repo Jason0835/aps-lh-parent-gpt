@@ -7,6 +7,7 @@
       :calcHeight="showOutResult ? false : true"
       v-loading="loading"
       element-loading-text="正在获取数据，请稍候!"
+       :row-class-name="tableRowClassName"
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
@@ -200,8 +201,8 @@
       <el-table
         :data="outResultData"
         border
-        stripe
         style="width: 100%"
+         :row-class-name="tableRowClassName"
         max-height="250"
       >
         <el-table-column
@@ -209,13 +210,14 @@
           :key="item.prop"
           :prop="item.prop"
           :label="item.label"
+
           :width="item.width"
           :fixed="item.fixed ? true : false"
         >
           <template v-slot="scope" v-if="item.prop == 'isLockSchedule'">
             <div>
               <el-select
-                v-if="showConfirmResult"
+                v-if="showConfirmResult && scope.row.id"
                 v-model="scope.row.isLockSchedule"
                 @change="handleLockScheduleChange(scope.row, $event)"
                 size="mini"
@@ -689,7 +691,7 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {!this.isTabChange && (
+                  {!this.isTabChange &&row.id&& (
                     <el-select
                       v-model={row.isLockSchedule}
                       onChange={(val) =>
@@ -1588,6 +1590,9 @@ export default {
         let res = await autoAdjust(params);
         console.log(res);
         this.data = res;
+        if(res.length!=0){
+          this.getStatisticsResult(res[0])
+        }
         // this.data=res.rows
         this.show = true;
         this.loading = false;
@@ -2084,9 +2089,11 @@ export default {
             if (statistList[i].structureName == current.structureName) {
               let embryoCount = {
                 structureName: current.structureName,
+                showBackground:'light-green'
               };
               let lhMachines = {
                 structureName: current.structureName,
+                showBackground:'light-blue'
               };
               if (this.activeName == "three") {
                 embryoCount.cxMachineCode = "胎胚种类数";
@@ -2115,6 +2122,18 @@ export default {
       }
 
       return result;
+    },
+
+
+    //渲染统计颜色
+    tableRowClassName({ row, rowIndex }) {
+      if (row.showBackground) {
+        return row.showBackground
+      }
+      if (row.adjustFlag==1) {
+        return 'warning-row'
+      }
+      return "";
     },
   },
   mounted() {
@@ -2146,6 +2165,7 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+
 .more-btn {
   margin: 2px 0;
   width: 100%;
@@ -2159,4 +2179,14 @@ export default {
 :deep(.el-table__expand-icon) {
   display: none;
 }
+::v-deep .light-green{
+    background: #e2efda;
+  }
+  ::v-deep .light-blue{
+    background: #9bc2e6;
+  }
+::v-deep .warning-row {
+    background: #FFCCCC;
+  }
+
 </style>
