@@ -176,6 +176,14 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         String groupName = addNewGroupPlan.getGroupName();
         //最小分配天数
         Integer minAllocationDays = baseDataContainer.getParamConfiguration().getMinAllocationDays();
+        Integer leftOverDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
+        //20260206 小于最短上机天数，则不进行分配
+        if(!addNewGroupPlan.isNextAllocation(minAllocationDays)){
+            log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            return;
+        }
         /**
          * 20260120 判断成型鼓是否符合条件
          * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
@@ -225,9 +233,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
         Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
+        //更新特殊材料库存
+        productionContext.updateSpecialMaterialInfoMap(addNewGroupPlan, realAllocationDays);
         //更新剩余天数
-        Integer leftOver1 = remainingDays - realAllocationDays;
-        productionContext.updateSpecialMaterialInfoMap(addNewGroupPlan, realAllocationDays); // 更新特殊材料库存
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);
