@@ -411,7 +411,9 @@ public class MpWeekRollAdjustEngine {
         //7.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        moveForwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
+        //结构间调整，锁定次日有可能小于结构起产日，将其调到结构起产日
+        int startDay = lockNextDay < contextDTO.getStructureStartDay() ? contextDTO.getStructureStartDay():lockNextDay;
+        moveForwardWithOtherSku(contextDTO,startDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
