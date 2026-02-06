@@ -1382,6 +1382,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildStructureAllocationCondition(queryWrapper, queryVO);
         List<MpStructureAllocation> structureAllocationList = mpStructureAllocationEntityMapper.selectList(queryWrapper);
         contextDTO.setStructureAllocationList(structureAllocationList);
+
+        Map<String, List<MpStructureAllocation>> structureAllocationMap = convertToStructureAllocationMap(structureAllocationList);
+        contextDTO.setStructureAllocationMap(structureAllocationMap);
     }
 
     /**
@@ -1495,6 +1498,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildSkuConstructionRefCondition(queryWrapper, queryVO);
         List<MdmSkuConstructionRef> mdmSkuConstructionRefList = mdmSkuConstructionRefEntityMapper.selectList(queryWrapper);
         contextDTO.setMdmSkuConstructionRefList(mdmSkuConstructionRefList);
+
+        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = convertToSkuConstructionRefMap(mdmSkuConstructionRefList);
+        contextDTO.setMdmSkuConstructionRefMap(mdmSkuConstructionRefMap);
     }
 
     /**
@@ -1521,6 +1527,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildSkuStructureRefCondition(queryWrapper, queryVO);
         List<MdmSkuStructureRef> mdmSkuStructureRefList = mdmSkuStructureRefEntityMapper.selectList(queryWrapper);
         contextDTO.setMdmSkuStructureRefList(mdmSkuStructureRefList);
+
+        Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = convertToSkuStructureRefMap(mdmSkuStructureRefList);
+        contextDTO.setMdmSkuStructureRefMap(mdmSkuStructureRefMap);
+
     }
 
     /**
@@ -1577,6 +1587,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildMaterialInfoCondition(queryWrapper, queryVO);
         List<MdmMaterialInfo> mdmMaterialInfoList = mdmMaterialInfoEntityMapper.selectList(queryWrapper);
         contextDTO.setMdmMaterialInfoList(mdmMaterialInfoList);
+
+        Map<String, MdmMaterialInfo> mdmMaterialInfoMap = convertToMaterialInfoMap(mdmMaterialInfoList);
+        contextDTO.setMdmMaterialInfoMap(mdmMaterialInfoMap);
     }
 
     /**
@@ -1625,6 +1638,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildSkuLhCapacityCondition(queryWrapper, queryVO);
         List<MdmSkuLhCapacity> mdmSkuLhCapacityList = mdmSkuLhCapacityEntityMapper.selectList(queryWrapper);
         contextDTO.setMdmSkuLhCapacityList(mdmSkuLhCapacityList);
+
+        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = convertToSkuLhCapacityMap(mdmSkuLhCapacityList);
+        contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
     }
 
     /**
@@ -1653,6 +1669,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         buildTrialPlanCondition(queryWrapper, queryVO);
         List<MpTrialPlan> mpTrialPlanList = mpTrialPlanEntityMapper.selectList(queryWrapper);
         contextDTO.setMpTrialPlanList(mpTrialPlanList);
+
+        Map<String, MpTrialPlan> mpTrialPlanMap = convertToTrialPlanMap(mpTrialPlanList);
+        contextDTO.setMpTrialPlanMap(mpTrialPlanMap);
     }
 
     /**
@@ -2052,28 +2071,28 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 物料编码
         String materialCode = adjustDetailVo.getMaterialCode();
         // SKU与施工（示方书）关系
-        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = convertToSkuConstructionRefMap(contextDTO.getMdmSkuConstructionRefList());
+        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = contextDTO.getMdmSkuConstructionRefMap();
         MdmSkuConstructionRef skuConstructionRef = MapUtils.getObject(mdmSkuConstructionRefMap, materialCode, new MdmSkuConstructionRef());
         // 胎胚号
         adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
         // SKU与结构关系列表
-        Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = convertToSkuStructureRefMap(contextDTO.getMdmSkuStructureRefList());
+        Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = contextDTO.getMdmSkuStructureRefMap();
         MdmSkuStructureRef skuStructureRef = MapUtils.getObject(mdmSkuStructureRefMap, materialCode, new MdmSkuStructureRef());
         // 结构名称
         adjustDetailVo.setStructureName(skuStructureRef.getStructureName());
         // 月计划结构转产
-        Map<String, List<MpStructureAllocation>> structureAllocationMap = convertToStructureAllocationMap(contextDTO.getStructureAllocationList());
+        Map<String, List<MpStructureAllocation>> structureAllocationMap = contextDTO.getStructureAllocationMap();
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
         // 排产机台,多个机台用逗号分隔
         adjustDetailVo.setScheduledMachines(getCxMachineCodes(structureAllocationList));
 
         if (monthPlan == null) {
             // SKU日硫化产能
-            Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = convertToSkuLhCapacityMap(contextDTO.getMdmSkuLhCapacityList());
+            Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
             // 物料信息
-            Map<String, MdmMaterialInfo> mdmMaterialInfoMap = convertToMaterialInfoMap(contextDTO.getMdmMaterialInfoList());
+            Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
             // 试制量试计划
-            Map<String, MpTrialPlan> mpTrialPlanMap = convertToTrialPlanMap(contextDTO.getMpTrialPlanList());
+            Map<String, MpTrialPlan> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
             MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
             MpTrialPlan trialPlan = MapUtils.getObject(mpTrialPlanMap, materialCode, new MpTrialPlan());
