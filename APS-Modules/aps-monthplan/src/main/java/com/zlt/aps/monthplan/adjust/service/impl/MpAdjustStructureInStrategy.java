@@ -106,7 +106,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         List<MpStructureAllocation> structureAllocationList;
         List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
         List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList;
-        List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
+        List<MpMonthPlanStatistics> monthPlanStatisticsResultList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //2.1 初始结构上下文
@@ -145,7 +145,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList);
 
             //2.5 构建月计划统计结果
-            monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList);
+            List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList);
+            monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
 
             //2.6 保存调整日志
             saveMpAdjustLog(contextDTO);
@@ -153,7 +154,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
 
         contextDTO.setSaveMpProdFinalList(newMpFinalList);
-        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
     }
 
     /**
