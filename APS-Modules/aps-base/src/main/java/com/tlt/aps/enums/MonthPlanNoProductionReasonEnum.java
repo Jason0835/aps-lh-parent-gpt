@@ -128,6 +128,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     GROUP_NO_CONFIGURATION_LH_RATION("MP2303", "结构没有成型硫化配比配置", "alg.data.groupCapacity.groupNoConfigurationLhRatio"),
     /**
+     * MP2304 结构下Sku特殊材料种类配置不一致
+     */
+    GROUP_SPECIAL_MATERIAL_NO_SAME("MP2304", "结构下Sku特殊材料种类配置不一致", "alg.data.groupCapacity.groupSpecialMaterialNoSame"),
+    /**
      * MP3101 特殊轮胎产能控制
      */
     TIRE_TYPE_CONTROL("MP3101", "特殊轮胎产能控制", "alg.data.mouldProduction.tireTypeControl"),
