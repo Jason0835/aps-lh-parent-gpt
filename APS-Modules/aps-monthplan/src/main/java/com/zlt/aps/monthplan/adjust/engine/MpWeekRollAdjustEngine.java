@@ -1450,7 +1450,7 @@ public class MpWeekRollAdjustEngine {
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
                     // 将值还原，并退出，继续加模
                     dayValue -= dayVulcanizationQty;
-                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     continue;
                 }
@@ -1464,7 +1464,7 @@ public class MpWeekRollAdjustEngine {
                         mpFinalVo = bakMpFinalVo;
                     }else{
                         dayValue -= dayVulcanizationQty;
-                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue==0?null:dayValue);
                     }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,主花纹:%s,其主花纹模具数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,mpFinalVo.getMainPattern())).append(ApsConstant.DIVISION);
                     return newPlanQty < 0 ? 0:newPlanQty;
