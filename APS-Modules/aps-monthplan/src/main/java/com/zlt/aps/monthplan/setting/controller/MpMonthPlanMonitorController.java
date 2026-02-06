@@ -93,7 +93,7 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
                 FactoryMonthPlanProductionFinalResult result = finalResultMap.get(mapKey);
                 int dayVulcanizationQty = ObjectUtils.defaultIfNull(result.getDayVulcanizationQty(), 0) * 2;
                 for (int i = daySubOne; i > 0; i--) {
-                    Object fieldValue = ReflectUtils.getFieldValue(monitor, "day" + daySubOne);
+                    Object fieldValue = ReflectUtils.getFieldValue(result, "day" + daySubOne);
                     if (Objects.nonNull(fieldValue)) {
                         int fieldValueInt = Integer.parseInt(fieldValue.toString());
                         if (fieldValueInt > 0) {
