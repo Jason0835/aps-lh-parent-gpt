@@ -34,4 +34,11 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @return
      */
     MpStructureAllocation getNextStructure(MpStructureAllocation param);
+
+    /**
+     * 获取日期最接近的上一个结构
+     * @param param
+     * @return
+     */
+    MpStructureAllocation getPreviousStructure(MpStructureAllocation param);
 }

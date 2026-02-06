@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 
@@ -93,15 +92,14 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
 
     @Override
     public void createVmMonthPrediction(MpSimulatedResult createCondition) {
-      YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
-      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
-      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
-      // 3、检查是否已有T月月度计划(定稿)
       //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-      List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(tMonth);
+      List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(createCondition);
       if (CollectionUtils.isEmpty(finalVersions)) {
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
       }
+      YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
+      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
+      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
       MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
       asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange);
     }
@@ -161,14 +159,13 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
   /**
      *   3、检查是否已有T月月度计划(定稿)
      *       (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-     * @param tMonth T月
      */
-    private List<MpFactoryProductionVersion> validateProductionVersionFinalized(YearMonth tMonth) {
+    private List<MpFactoryProductionVersion> validateProductionVersionFinalized(MpSimulatedResult createCondition) {
         return factoryProductionVersionMapper.selectList(
             Wrappers.<MpFactoryProductionVersion>lambdaQuery()
-                .eq(MpFactoryProductionVersion::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE)
-                .eq(MpFactoryProductionVersion::getYear, tMonth.getYear())
-                .eq(MpFactoryProductionVersion::getMonth, tMonth.getMonthValue())
+                .eq(MpFactoryProductionVersion::getFactoryCode,createCondition.getProductionVersion())
+                .eq(MpFactoryProductionVersion::getYear, createCondition.getYear())
+                .eq(MpFactoryProductionVersion::getMonth, createCondition.getMonth())
                 .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
         );
     }

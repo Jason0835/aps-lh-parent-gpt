@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
+import com.ruoyi.common.redis.service.RedisService;
+import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.common.utils.poi.ExcelUtilManySheet;
@@ -30,6 +33,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -55,7 +59,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     private final IMpSimulatedResultService mpSimulatedResultService;
     private final MpSimulatedResultEntityMapper entityMapper;
     private final IMpPredictionDetailService mpPredictionDetailService;
-
+    private final RedisService redisService;
     /**
      * 查询S2-1004.实单模拟排产列表
      */
@@ -143,14 +147,13 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
      * 实单模拟排产
      */
     @ApiOperation("实单模拟排产")
-    @RedissonLockAnno(uniqueMark = "redissonLock:simulatedResult:createVmMonthPrediction:",
-            expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-            msgKey = "ui.data.alert.createVmMonthPrediction.run",
-            waitTime = 5,
-            leaseTime = 300
-    )
     @PostMapping("/createVmMonthPrediction")
     public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition){
+        String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
+        if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
+        }
+        redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
         return AjaxResult.success("操作成功，等待数据生成通知");
     }

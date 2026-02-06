@@ -344,7 +344,10 @@ public class ProductionCxMachineCalculationHandler {
             //理论会出现在第一天，此时尝试扣减一台，看最低要求生产天数
             if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
                 deductionMachineCount = deductionMachineCount + BigDecimal.ONE.intValue();
-                deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
+                Integer newDeductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
+                if (null != newDeductionDay) {
+                    deductionDay = newDeductionDay;
+                }
             }
             //不释放
             release.setReleaseMachineCount(BigDecimal.ZERO.intValue());
@@ -361,7 +364,10 @@ public class ProductionCxMachineCalculationHandler {
             //理论会出现在第一天，此时尝试扣减一台，看最低要求生产天数
             if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
                 deductionMachineCount = deductionMachineCount + BigDecimal.ONE.intValue();
-                deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
+                Integer newDeductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
+                if (null != newDeductionDay) {
+                    deductionDay = newDeductionDay;
+                }
             }
             //释放台数
             release.setReleaseMachineCount(releaseCount);
@@ -376,6 +382,7 @@ public class ProductionCxMachineCalculationHandler {
         if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
             release.setReleaseMachineCount(deductionMachineCount);
             getContinueMachineRelease(context, release, needWholeCount, continueMachineCount, groupPlanInfo, groupContinueInfo);
+            return;
         }
         //不能减，则再加回，看最先收尾时间点
         if (null == deductionDay) {
