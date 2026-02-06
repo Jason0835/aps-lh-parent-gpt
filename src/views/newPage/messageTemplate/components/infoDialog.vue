@@ -95,17 +95,17 @@ export default {
       return [
         {
           prop: "templateCode",
-          label: this.$t("模板编码"),
+          label: this.$t("ui.data.messageTemplate.templateCode"),
           maxlength:30
         },
         {
           prop: "templateName",
-          label: this.$t("模板名称"),
+          label: this.$t("ui.data.messageTemplate.templateName"),
           maxlength:30
         },
         {
           prop: "title",
-          label: this.$t("标题"),
+          label: this.$t("ui.data.messageTemplate.title"),
         },
         {
           prop: "content",

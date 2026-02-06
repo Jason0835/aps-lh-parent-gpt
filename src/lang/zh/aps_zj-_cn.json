@@ -311,9 +311,6 @@
   "ui.data.monthlyProductionPlan.postponeProductionQty":"暂缓订单排产数量",
   "ui.data.monthlyProductionPlan.trialProductionQty":"试制量试排产数量",
   "ui.data.monthlyProductionPlan.reason":"未排产原因",
-
-
-
   "ui.data.material.mesMaterialCategory":"MES物料大类编码",
   "ui.data.material.mesMaterialSubcategory":"MES物料细类编码",
   "ui.data.material.mesMaterialCateName":"MES物料大类名称",
@@ -357,6 +354,8 @@
   "ui.data.checkDialog.reason":"原因",
   "ui.data.checkDialog.checking":"正在检测中..",
   "ui.data.checkDialog.itemName":"项目名称",
+
+
   "ui.data.rollingCycle.structuralIn":"结构内",
   "ui.data.rollingCycle.structuralOut":"结构调整",
   "ui.data.rollingCycle.structuralSingle":"单结构调整",
@@ -382,7 +381,12 @@
   "ui.data.rollingCycle.totalPlanQty":"计划量",
   "ui.data.rollingCycle.isLockSchedule":"锁定上机日期",
   "ui.data.rollingCycle.pleaseEndDate":"请选择调整结束日期",
-  "ui.data.rollingCycle.lastStructura":"已经是最后一个结构"
+  "ui.data.rollingCycle.lastStructura":"已经是最后一个结构",
+
+
+
+   "ui.data.productionMonthPlanInit.minLhMachineCount":"实单最低硫化机台数"
+
 
 
 

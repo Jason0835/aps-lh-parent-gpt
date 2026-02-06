@@ -144,7 +144,7 @@ export default {
         },
         {
           prop: "productionVersion",
-          label: this.$t("排产版本号"),
+          label: this.$t("ui.data.productionMonthPlanInit.productionVersion"),
           width: 180,
         },
         {
@@ -168,12 +168,12 @@ export default {
         },
         {
           prop: "maxEmbryoCodeCount",
-          label: this.$t("最大胎胚种类数"),
+          label: this.$t("ui.data.productionMonthPlanInit.maxEmbryoCodeCount"),
           with: 120,
         },
         {
           prop: "maxLhMachineCount",
-          label: this.$t("最大硫化机台数"),
+          label: this.$t("ui.data.productionMonthPlanInit.maxLhMachineCount"),
           with: 120,
         },
         {
@@ -188,7 +188,7 @@ export default {
         },
         {
           prop: "lossQty",
-          label: this.$t("排产净需求(含损耗)"),
+          label: this.$t("ui.data.productionMonthPlanInit.lossQty"),
           with: 120,
         },
         {
@@ -203,7 +203,7 @@ export default {
         },
         {
           prop: "allotDays",
-          label: this.$t("分配天数"),
+          label: this.$t("ui.data.productionMonthPlanInit.allotDays"),
           with: 120,
         },
         {

@@ -179,7 +179,7 @@ export default {
         },
         {
           prop: "productionVersion",
-          label: this.$t("排产版本号"),
+          label: this.$t("ui.data.productionMonthPlanInit.productionVersion"),
           width: 180,
         },
         {

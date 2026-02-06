@@ -79,7 +79,7 @@ export default {
         },
         {
           prop: "isSpringFestivalMonth",
-          label: this.$t("是否春节月份"),
+          label: this.$t("ui.data.rawMaterialRequirement.isSpringFestivalMonth"),
           type: "select",
           clearable: false,
           dictData: [{

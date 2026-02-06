@@ -109,7 +109,7 @@ export default {
         },
         {
           prop: "saleFinishRate",
-          label: this.$t("库存总数"),
+          label: this.$t("ui.data.orderInventoryWriteDown.stockQty"),
           // align: "right",
           // formatter: (row, column, value) => {
           //   return value
@@ -121,7 +121,7 @@ export default {
         },
         {
           prop: "nextMonthStock",
-          label: this.$t("库存分配量"),
+          label: this.$t("ui.data.orderInventoryWriteDown.allocationQty"),
         },
         {
           prop: "nextMonthStock",

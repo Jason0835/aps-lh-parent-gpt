@@ -123,7 +123,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("材料编码"),
+          label: this.$t("ui.data.specialMaterial.materialCode"),
           maxlength:18
         },
         {
@@ -133,7 +133,7 @@ export default {
         },
         {
           prop: "rubberSpec",
-          label: this.$t("适用范围"),
+          label: this.$t("ui.data.specialMaterial.rubberSpec"),
           maxlength:100
         },
         {

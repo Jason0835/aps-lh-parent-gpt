@@ -50,7 +50,7 @@ export default {
 
       // 检查是否只包含数字
       if (!/^\d+(\.\d{0,2})?$/.test(strValue)) {
-        return callback(new Error(this.$t("只能输入大于等于0,并且最多两位小数")));
+        return callback(new Error(this.$t("common.rule.maxTwo")));
       }
 
       // 转换为数字

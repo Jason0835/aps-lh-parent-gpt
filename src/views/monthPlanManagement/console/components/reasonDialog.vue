@@ -10,7 +10,7 @@
   >
     <div style="height: 600px">
       <el-table :data="tableData" style="width: 100%"  v-loading="loading" border>
-        <el-table-column prop="checkItem" label="项目名称" show-overflow-tooltip width="240">
+        <el-table-column prop="checkItem" :label="this.$t('ui.data.checkDialog.itemName')" show-overflow-tooltip width="240">
           <template v-slot="scope">
             <div>
               <span >{{ selectDictLabel(parentDict.type.check_item_type, scope.row.checkItem) }}</span>
@@ -18,7 +18,7 @@
           </template>
         </el-table-column>
         </el-table-column>
-        <el-table-column prop="checkContent" label="原因" show-overflow-tooltip >
+        <el-table-column prop="checkContent" :label="this.$t('ui.data.checkDialog.reason')" show-overflow-tooltip >
           <template v-slot="scope">
             <div  class="error-message" v-html="scope.row.checkContent"></div>
           </template>

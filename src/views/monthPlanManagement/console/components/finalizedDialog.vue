@@ -83,7 +83,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("定稿");
+      return this.$t("ui.data.console.finalizedDialog");
     },
     columns() {
       return [

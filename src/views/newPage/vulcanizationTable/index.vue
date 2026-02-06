@@ -178,7 +178,7 @@ export default {
         },
         {
           prop: "onboardDate",
-          label: this.$t("上机日期"),
+          label: this.$t("ui.data.vulcanizationTable.onboardDate"),
           width: 120,
           align: "center",
         },

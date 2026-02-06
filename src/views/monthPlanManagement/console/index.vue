@@ -27,7 +27,7 @@
           plain
           v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
           @click="handleAdd"
-          >{{ $t("选择需求计划版本") }}</el-button
+          >{{ $t("ui.data.console.noVersionList") }}</el-button
         >
         <!-- <el-button
           type="primary"
@@ -47,7 +47,7 @@
           v-hasPermi="['monthplan:console:finalized']"
           :disabled="this.selection.length !== 1"
           @click="handleFinalized"
-          >{{ $t("定稿") }}</el-button
+          >{{ $t("ui.data.console.finalizedDialog") }}</el-button
         >
         <el-button
           type="primary"
@@ -261,7 +261,7 @@ export default {
           },
         },
         {
-          label: this.$t("排结构"),
+          label: this.$t("ui.data.console.rankStructure"),
           prop: "init",
           align: "center",
 
@@ -278,7 +278,7 @@ export default {
                       this.handleInit(row);
                     }}
                   >
-                    {this.$t("生成下一步")}
+                    {this.$t("ui.data.console.nextGenerate")}
                   </text-button>
                 </div>
                 <div>
@@ -291,7 +291,7 @@ export default {
           },
         },
         {
-          label: this.$t("排模具"),
+          label: this.$t("ui.data.console.moldArrangement"),
           prop: "mould",
           align: "center",
           render: ({ row }) => {
@@ -307,7 +307,7 @@ export default {
                       this.handleMould(row);
                     }}
                   >
-                    {this.$t("生成下一步")}
+                    {this.$t("ui.data.console.nextGenerate")}
                   </text-button>
                 </div>
               </div>
@@ -332,14 +332,14 @@ export default {
                 <text-button
                   onClick={() => this.handleRouterProductionVersions(row)}
                 >
-                  {this.$t("排产明细")}
+                  {this.$t("ui.data.console.productDetail")}
                 </text-button>
                 <text-button
                   onClick={() =>
                     this.handleRouterMonthPlanNoProductionPlan(row)
                   }
                 >
-                  {this.$t("未排产明细")}
+                  {this.$t("ui.data.console.productNoDetail")}
                 </text-button>
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
@@ -641,7 +641,7 @@ export default {
       });
     },
     handleInit(row) {
-      this.$confirm("确定初始化？").then(() => {
+      this.$confirm(this.$t("ui.data.console.confirmRankStructure")).then(() => {
         this.loading = true;
         initFactoryProduction({
           factoryCode: row.factoryCode,
@@ -672,7 +672,7 @@ export default {
       });
     },
     handleMould(row) {
-      this.$confirm("确定排模具？").then(() => {
+      this.$confirm(this.$t("ui.data.console.confirmMoldArrangement")).then(() => {
         this.loading = true;
         factoryMouldingProduction({
           factoryCode: row.factoryCode,

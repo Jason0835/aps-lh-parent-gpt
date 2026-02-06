@@ -220,22 +220,22 @@ export default {
         {
           prop: "mesMaterialCategory",
           width: 120,
-          label: this.$t("MES物料大类编码"),
+          label: this.$t("ui.data.material.mesMaterialCategory"),
         },
         {
           prop: "mesMaterialSubcategory",
           width: 120,
-          label: this.$t("MES物料细类编码"),
+          label: this.$t("ui.data.material.mesMaterialSubcategory"),
         },
         {
           prop: "mesMaterialCateName",
           width: 120,
-          label: this.$t("MES物料大类名称"),
+          label: this.$t("ui.data.material.mesMaterialCateName"),
         },
         {
           prop: "mesMaterialSubcatName",
           width: 120,
-          label: this.$t("MES物料细类名称"),
+          label: this.$t("ui.data.material.mesMaterialSubcatName"),
         },
         {
           prop: "productCategory",

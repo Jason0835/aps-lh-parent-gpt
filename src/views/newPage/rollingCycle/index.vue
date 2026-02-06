@@ -6,7 +6,7 @@
       ref="tableRef"
       :calcHeight="showOutResult ? false : true"
       v-loading="loading"
-      element-loading-text="正在获取数据，请稍候!"
+      :element-loading-text="loadText"
        :row-class-name="tableRowClassName"
       :columns="columns"
       :searchColumns="searchColumns"
@@ -329,6 +329,7 @@ export default {
   },
   data() {
     return {
+      loadText:'正在加载中...',
       //结构外调整结果列表
       outResultData: [],
       outResultVersion: "",
@@ -1389,6 +1390,7 @@ export default {
     },
     //确认调整结果
     async confirmResult() {
+      this.loadText= this.$t("正在加载中，请稍候");
       try {
         this.show = false;
         this.loading = true;
@@ -1439,6 +1441,7 @@ export default {
     },
     //获取调整订单
     async adjustOrder() {
+      this.loadText= this.$t("正在获取调整订单，请稍候");
       try {
         this.loading = true;
         this.getLoading = true;
@@ -1529,6 +1532,7 @@ export default {
     //tab切换
     handleClick(tab, event) {
       // this.loading = true;
+      this.loadText= this.$t("正在加载中，请稍候");
       this.showConfirmResult = false;
       this.show = false;
       this.isShowResult = false;
@@ -1571,6 +1575,7 @@ export default {
 
     //结构自动调整
     async handShowResult() {
+      this.loadText= this.$t("正在自动调整，请稍候");
       this.show = false;
       this.loading = true;
       this.autoLoading = true;
@@ -1613,7 +1618,7 @@ export default {
 
     //结构外自动调整
     async handOutResult() {
-      console.log(this.data);
+      this.loadText= this.$t("正在加载中，请稍候");
       for (let i = 0; i < this.data.length; i++) {
         if (
           this.data[i].confirmAdjustQty &&
@@ -1801,6 +1806,7 @@ export default {
     //结构外获取调整订单
     async getOutList() {
       this.loading = true;
+      this.loadText= this.$t("正在获取调整订单，请稍候");
       try {
         let params = {
           ...this.query,
@@ -1917,6 +1923,7 @@ export default {
         // this.resizeOutHistoryList();
         return;
       }
+      this.loadText= this.$t("正在加载中，请稍候");
 
       this.getList();
     },

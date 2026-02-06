@@ -55,7 +55,7 @@
       <template slot="headerRight">
         <span class="stat-info">
           <span
-            >区域产能分配总和:
+            >{{ $t("ui.data.regionalCapacityAllocation.sumTotal") }}:
             <span class="stat-value"> {{ stat }} </span></span
           >
         </span>

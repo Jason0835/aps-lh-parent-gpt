@@ -92,7 +92,7 @@ export default {
         },
         {
           prop: "materialCode",
-          label: this.$t("SKU代码"),
+          label: this.$t("ui.data.factoryNoProduction.materialCode"),
         },
         {
           prop: "remark",

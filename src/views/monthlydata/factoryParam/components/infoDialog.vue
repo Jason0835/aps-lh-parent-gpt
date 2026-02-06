@@ -81,26 +81,26 @@ export default {
       return [
         {
           prop: "paramCode",
-          label: this.$t("参数编码"),
+          label: this.$t("ui.data.factoryParam.paramCode"),
           disabled: true,
         },
         {
           prop: "paramName",
-          label: this.$t("参数名称"),
+          label: this.$t("common.api.config.columnname.name"),
           disabled: true,
         },
         {
           prop: "paramValue",
-          label: this.$t("参数值"),
+          label: this.$t("ui.data.factoryParam.paramValue"),
         },
         {
           prop: "defauleValue",
-          label: this.$t("默认值"),
+          label: this.$t("ui.data.factoryParam.defauleValue"),
           disabled: true,
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("common.remark"),
           type: "textarea",
           maxlength: "300",
         },

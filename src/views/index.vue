@@ -15,7 +15,7 @@
               class="icon job-2-icon"
               class-name="job-2-icon"
               icon-class="job-2"
-            />{{ $t("任务中心") }}
+            />{{ $t("ui.message.taskCenter") }}
           </div>
           <!-- <div class="more" @click="$router.push('/messagetask')"> -->
           <div class="more" @click="goTask">

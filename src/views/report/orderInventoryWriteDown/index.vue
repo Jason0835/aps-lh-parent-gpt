@@ -170,22 +170,22 @@ export default {
         {
           prop: "stockQty",
           width: 120,
-          label: this.$t("库存总数"),
+          label: this.$t("ui.data.orderInventoryWriteDown.stockQty"),
         },
         {
           prop: "allocationQty",
           width: 120,
-          label: this.$t("库存分配量"),
+          label: this.$t("ui.data.orderInventoryWriteDown.allocationQty"),
         },
         {
           prop: "productionQty",
           width: 120,
-          label: this.$t("生产分配量"),
+          label: this.$t("ui.data.orderInventoryWriteDown.productionQty"),
         },
         {
           prop: "plannedSurplus",
           width: 120,
-          label: this.$t("月底计划余量分配量"),
+          label: this.$t("ui.data.orderInventoryWriteDown.plannedSurplus"),
         },
         {
           prop: "weekYear",

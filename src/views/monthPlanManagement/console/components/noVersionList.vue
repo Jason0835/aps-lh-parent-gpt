@@ -79,7 +79,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("选择需求计划版本");
+      return this.$t("ui.data.console.noVersionList");
     },
     columns() {
       let columns = [

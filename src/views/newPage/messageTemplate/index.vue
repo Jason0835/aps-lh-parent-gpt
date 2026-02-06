@@ -148,18 +148,18 @@ export default {
 
         {
           prop: "templateCode",
-          label: this.$t("模板编码"),
+          label: this.$t("ui.data.messageTemplate.templateCode"),
           width:200,
         },
 
         {
           prop: "templateName",
-          label: this.$t("模板名称"),
+          label: this.$t("ui.data.messageTemplate.templateName"),
           width: 200,
         },
         {
           prop: "title",
-          label: this.$t("标题"),
+          label: this.$t("ui.data.messageTemplate.title"),
           width: 200,
         },
         {
@@ -221,15 +221,15 @@ export default {
       return [
         {
           prop: "templateCode",
-          label: this.$t("模板编码"),
+          label: this.$t("ui.data.messageTemplate.templateCode"),
         },
         {
           prop: "templateName",
-          label: this.$t("模板名称"),
+          label: this.$t("ui.data.messageTemplate.templateName"),
         },
         {
           prop: "title",
-          label: this.$t("标题"),
+          label: this.$t("ui.data.messageTemplate.title"),
         },
       ];
     },

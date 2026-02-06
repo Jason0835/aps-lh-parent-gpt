@@ -139,7 +139,7 @@ export default {
         },
         {
           prop: "paramCode",
-          label: this.$t("参数编码"),
+          label: this.$t("ui.data.factoryParam.paramCode"),
           width: 200,
         },
         {
@@ -149,11 +149,11 @@ export default {
         },
         {
           prop: "paramValue",
-          label: this.$t("参数值"),
+          label: this.$t("ui.data.factoryParam.paramValue"),
         },
         {
           prop: "defauleValue",
-          label: this.$t("默认值"),
+          label: this.$t("ui.data.factoryParam.defauleValue"),
         },
         {
           prop: "remark",
@@ -205,7 +205,7 @@ export default {
         },
         {
           prop: "paramCode",
-          label: this.$t("参数编码"),
+          label: this.$t("ui.data.factoryParam.paramCode"),
         },
       ];
     },

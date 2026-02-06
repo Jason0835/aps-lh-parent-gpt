@@ -12,15 +12,15 @@
       <!-- 进度统计 -->
       <div class="progress-stat">
         <div class="stat-item">
-          <div class="stat-label">总检查项</div>
+          <div class="stat-label">{{ this.$t("ui.data.checkDialog.allCheck") }}</div>
           <div class="stat-value total">{{ checkItems.length }}</div>
         </div>
         <div class="stat-item">
-          <div class="stat-label">已通过</div>
+          <div class="stat-label">>{{ this.$t("ui.data.checkDialog.success") }}</div>
           <div class="stat-value success">{{ passedCount }}</div>
         </div>
         <div class="stat-item" style="cursor: pointer" @click="showReason">
-          <div class="stat-label">未通过</div>
+          <div class="stat-label">{{this.$t("ui.data.checkDialog.faile")}}</div>
           <div class="stat-value failed">{{ failedCount }}</div>
         </div>
       </div>
@@ -78,7 +78,7 @@
             </div>
           </div>
           <div v-if="item.expanded">
-            <div class="reason-title">原因：</div>
+            <div class="reason-title">{{this.$t('ui.data.checkDialog.reason')}}：</div>
             <div class="reason-content" v-html="item.reason"></div>
           </div>
         </div>
@@ -248,14 +248,14 @@ export default {
 
     // 获取状态文本
     getStatusText(status) {
-      let text = "检查中";
+      let text =  this.$t("ui.data.checkDialog.check");
       if (status == "checking") {
         return text;
       }
       if (status == true) {
-        text = "已通过";
+        text =  this.$t("ui.data.checkDialog.success");
       } else {
-        text = "未通过";
+        text =this.$t("ui.data.checkDialog.faile");
       }
       return text;
     },
@@ -335,7 +335,7 @@ export default {
     },
     showReason() {
       if (this.loading) {
-        return this.$modal.msgWarning("正在检测中...");
+        return this.$modal.msgWarning(this.$t('ui.data.checkDialog.checking'));
       }
       if (this.$refs.reasonRef) {
         this.$refs.reasonRef.show(this.actionData);
@@ -343,7 +343,7 @@ export default {
     },
     goReason(status) {
       if (this.loading) {
-        return this.$modal.msgWarning("正在检测中...");
+        return this.$modal.msgWarning(this.$t('ui.data.checkDialog.checking'));
       }
       if (status) return;
       if (this.$refs.reasonRef) {
