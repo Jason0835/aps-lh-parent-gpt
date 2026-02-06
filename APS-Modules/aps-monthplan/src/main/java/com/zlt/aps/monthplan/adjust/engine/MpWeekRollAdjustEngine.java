@@ -346,8 +346,6 @@ public class MpWeekRollAdjustEngine {
         List<String> onMaterialCodeList = new ArrayList<>();
         if (PubUtil.isNotEmpty(mpProdFinalList)){
             onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
-        }else {
-            mpProdFinalList = new ArrayList<>();
         }
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
