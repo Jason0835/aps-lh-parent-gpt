@@ -516,8 +516,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         target.setStructureName(source.getStructureName());
         target.setProSize(source.getProSize());
         target.setStructureType(source.getStructureType());
-        target.setMonthPlanVersion(target.getMonthPlanVersion());
-        target.setLastMonthPlanVersion(target.getLastMonthPlanVersion());
+        target.setMonthPlanVersion(source.getMonthPlanVersion());
+        target.setLastMonthPlanVersion(source.getLastMonthPlanVersion());
         target.setProductionVersion(source.getProductionVersion());
         target.setProductTypeCode(source.getProductTypeCode());
     }
