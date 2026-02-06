@@ -288,8 +288,12 @@ public class ExcelUtilManySheet {
           cell.setCellValue(convertByExp(Convert.toStr(value), readConverterExp, separator));
         } else if (value instanceof BigDecimal && -1 != attr.scale()) {
           cell.setCellValue((((BigDecimal) value).setScale(attr.scale(), attr.roundingMode())).toString());
-        } else if (StringUtils.isNotEmpty(dictType) && StringUtils.isNotNull(value)) {
-          cell.setCellValue(convertByDictOrCheckbox(String.valueOf(value), dictType));
+        } else if (StringUtils.isNotEmpty(dictType) && value != null && StringUtils.isNotBlank(value.toString())) {
+           String dictLabel = convertByDict(value.toString(), dictType);
+           log.info("value={},dictType={},dictLabel:{}", value, dictType, dictLabel);
+           if(StringUtils.isNotBlank(dictLabel)){
+             cell.setCellValue(dictLabel);
+           }
         } else {
           // 设置列类型
           setCellVo(value, attr, cell);
