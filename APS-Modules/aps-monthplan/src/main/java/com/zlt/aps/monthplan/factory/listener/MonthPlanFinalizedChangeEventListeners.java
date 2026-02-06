@@ -107,7 +107,7 @@ public class MonthPlanFinalizedChangeEventListeners {
             versionVo.setYear(String.valueOf(year));
             Integer month = result.getMonth();
             versionVo.setMonth(String.valueOf(month));
-            versionVo.setProductionCategory(result.getProductCategory());
+            versionVo.setProductionCategory(result.getProductTypeCode());
             Integer lastDayDayOfMonth = 0;
             try {
                 LocalDate of = LocalDate.of(year, month, 1);
