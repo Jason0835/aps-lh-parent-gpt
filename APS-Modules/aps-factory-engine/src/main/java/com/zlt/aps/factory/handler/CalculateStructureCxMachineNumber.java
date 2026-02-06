@@ -78,6 +78,8 @@ public class CalculateStructureCxMachineNumber {
         Integer minAllocationDays = paramConfiguration.getMinAllocationDays();
         mapGroupByStructureName.forEach((structureName, groupDatas) -> {
             ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(productionContext, structureName, productionContext.getProductType(), groupDatas);
+            //20260206 特殊材料的结构检测
+            groupInfo.checkSpecialMaterialData(productionContext);
             //是否零度结构
             boolean zeroRack = groupDatas.stream()
                     .anyMatch(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsZeroRack()));
