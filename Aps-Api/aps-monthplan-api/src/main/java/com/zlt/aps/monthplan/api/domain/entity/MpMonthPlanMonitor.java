@@ -1,17 +1,18 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
-import java.util.Date;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.NoArgsConstructor;
+
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -208,5 +209,10 @@ public class MpMonthPlanMonitor extends BaseEntity {
     @TableField(value = "DIFF_DAY")
     private Integer diffDay;
 
-
+    /**
+     * 日硫化量
+     */
+    @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
+    @TableField(value = "DAY_VULCANIZATION_QTY")
+    private Integer dayVulcanizationQty;
 }
