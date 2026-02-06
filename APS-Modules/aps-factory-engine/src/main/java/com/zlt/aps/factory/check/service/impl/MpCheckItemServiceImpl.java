@@ -329,6 +329,15 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = productionContext.getBaseDataContainer().getStructureLhRatioList();
         boolean hasSulfurizationRatio = CollectionUtils.isNotEmpty(structureLhRatioList);
         addCheckResult(hasSulfurizationRatio, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 确保 OTHER_PARAMS_CONFIG 检测项被正确处理
+        // 检查 OTHER_PARAMS_CONFIG 是否已经存在，如果不存在则添加成功状态
+        boolean isOtherParamsConfigChecked = mpCheckItemVos.stream()
+                .anyMatch(vo -> CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode().equals(vo.getCheckItem()));
+
+        if (!isOtherParamsConfigChecked) {
+            addCheckResult(true, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, null, mpCheckItemVos, mpCheckItemRecords);
+        }
     }
 
     /**
