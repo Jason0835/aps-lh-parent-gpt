@@ -702,6 +702,7 @@ public class ExcelUtilManySheet {
     if (CollectionUtils.isEmpty(list)) {
       list = Lists.newArrayList();
     }
+    createWorkbook();
     this.list = list;
     this.type = type;
     this.sheets = Lists.newArrayList();
@@ -715,7 +716,7 @@ public class ExcelUtilManySheet {
     }
     this.dictSheet = wb.createSheet("Dictionary");
     createExcelField();
-    createWorkbook();
+
   }
 
   private void createExcelField() {
