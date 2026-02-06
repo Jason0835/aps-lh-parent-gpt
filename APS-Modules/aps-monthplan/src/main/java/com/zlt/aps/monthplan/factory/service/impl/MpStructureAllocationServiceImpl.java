@@ -13,18 +13,26 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.SpringContextSupplierUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
+import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
+import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
@@ -37,6 +45,7 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StopWatch;
@@ -49,6 +58,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
@@ -79,6 +89,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MdmMonCycleSchStruConfEntityMapper mdmMonCycleSchStruConfEntityMapper;
     private final MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
     private final FactoryParamMapper factoryParamMapper;
+    private final RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
+    private final MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
+    private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
+    private final MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
 
     @Override
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
@@ -170,6 +184,23 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         CompletableFuture<List<FactoryParam>> factoryParamFuture = CompletableFuture.supplyAsync(
                 () -> queryFactoryParam(mpStructureAllocation)
         );
+        // 查询BOM物料消耗明细
+        CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(
+                () -> queryMaterialConsumeDetailList(mpStructureAllocation)
+        );
+        // 查询特殊材料记录
+        CompletableFuture<List<RawSpecialMaterialRecord>> rawSpecialMaterialRecordFuture = CompletableFuture.supplyAsync(
+                () -> querySpecialMaterialRecordList(mpStructureAllocation)
+        );
+        // 查询sku与结构关系
+        CompletableFuture<List<MdmSkuStructureRef>> skuStructureRefFuture = CompletableFuture.supplyAsync(
+                () -> querySkuStructureRef(mpStructureAllocation)
+        );
+
+        // 查询SKU与施工（示方书）关系
+        CompletableFuture<List<MdmSkuConstructionRef>> skuConstructionRefFuture = CompletableFuture.supplyAsync(
+                () -> querySkuConstructionRef(mpStructureAllocation)
+        );
 
         try {
             // 等待所有异步任务执行完成
@@ -179,7 +210,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     structureLhRatioFuture,
                     monCycleSchStruConfFuture,
                     cycleSchStruConfFuture,
-                    factoryParamFuture
+                    factoryParamFuture,
+                    materialConsumeDetailFuture,
+                    rawSpecialMaterialRecordFuture,
+                    skuStructureRefFuture,
+                    skuConstructionRefFuture
             ).join();
 
             log.info("并行查询数据执行完成");
@@ -201,6 +236,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         List<MdmMonCycleSchStruConf> monCycleSchStruConfList = monCycleSchStruConfFuture.join();
         List<MdmCycleSchStruConf> cycleSchStruConfList = cycleSchStruConfFuture.join();
         List<FactoryParam> factoryParamList = factoryParamFuture.join();
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
+        List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
+        List<MdmSkuStructureRef> skuStructureRefList = skuStructureRefFuture.join();
+        List<MdmSkuConstructionRef> skuConstructionRefList= skuConstructionRefFuture.join();
 
         // 判断时间是否有交叉，若有则抛出异常
         List<String> dateCrossedErrorMsgList = getDateCrossedErrorMsgList(mpStructureAllocation, structureAllocationList);
@@ -265,9 +304,103 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         mpStructureAllocation.setLossQty(0);
         // 数据来源
         mpStructureAllocation.setDataSource(DataSourceEnum.HAND.getCode());
+        // 设置是否含有特殊材料
+        String materialCode = skuStructureRefList.stream()
+                .filter(vo -> vo.getStructureName().equals(mpStructureAllocation.getStructureName()))
+                .findFirst()
+                .map(MdmSkuStructureRef::getMaterialCode)
+                .orElse(null);
+        String embryoCode = skuConstructionRefList.stream()
+                .filter(vo -> vo.getMaterialCode().equals(materialCode))
+                .findFirst()
+                .map(MdmSkuConstructionRef::getEmbryoCode)
+                .orElse(null);
+        boolean isHasSpecialMaterial = hasSpecialMaterial(embryoCode, mdmMaterialConsumeDetailList, specialMaterialList);
+        mpStructureAllocation.setIsHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
         return baseDao.save(mpStructureAllocation);
     }
 
+    /**
+     * 查询SKU与施工（示方书）关系
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmSkuConstructionRef> querySkuConstructionRef(MpStructureAllocation mpStructureAllocation) {
+        MdmSkuConstructionRef queryVO = new MdmSkuConstructionRef();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+
+        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+        buildSkuConstructionRefCondition(queryWrapper, queryVO);
+        return mdmSkuConstructionRefEntityMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建SKU与施工（示方书）关系条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildSkuConstructionRefCondition(LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper, MdmSkuConstructionRef queryVO) {
+        queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmSkuConstructionRef::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 判断是否特殊材料
+     * @param targetEmbryoCode 目标胚胎编码
+     * @param mdmMaterialConsumeDetailList BOM物料消耗明细列表
+     * @param specialMaterialList 特殊材料清单列表
+     * @return
+     */
+    protected boolean hasSpecialMaterial(String targetEmbryoCode, List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList,
+                                         List<RawSpecialMaterialRecord> specialMaterialList) {
+
+        if (StringUtils.isEmpty(targetEmbryoCode) || PubUtil.isEmpty(mdmMaterialConsumeDetailList)
+                || PubUtil.isEmpty(specialMaterialList)) {
+            return Boolean.FALSE;
+        }
+
+        // 从BOM物料消耗明细列表中通过胎胚代码筛选出匹配的所有数据
+        Set<String> childMaterialCodes = mdmMaterialConsumeDetailList.stream()
+                .filter(detail -> StringUtils.equals(targetEmbryoCode, detail.getEmbryoCode()))
+                .map(MdmMaterialConsumeDetail::getChildMaterialCode)
+                .collect(Collectors.toSet());
+
+        // 如果没有匹配到直接返回false
+        if (PubUtil.isEmpty(childMaterialCodes)) {
+            return Boolean.FALSE;
+        }
+
+        // 检查特殊材料清单列表中是否存在匹配的数据
+        return specialMaterialList.stream()
+                .map(RawSpecialMaterialRecord::getMaterialCode)
+                .anyMatch(childMaterialCodes::contains);
+    }
+
+    /**
+     * 查询sku与结构关系
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmSkuStructureRef> querySkuStructureRef(MpStructureAllocation mpStructureAllocation) {
+        MdmSkuStructureRef queryVO = new MdmSkuStructureRef();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+
+        LambdaQueryWrapper<MdmSkuStructureRef> queryWrapper = new LambdaQueryWrapper<>();
+        buildSkuStructureRefCondition(queryWrapper, queryVO);
+        return mdmSkuStructureRefEntityMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建sku与结构关系条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildSkuStructureRefCondition(LambdaQueryWrapper<MdmSkuStructureRef> queryWrapper, MdmSkuStructureRef queryVO) {
+        queryWrapper.eq(MdmSkuStructureRef::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmSkuStructureRef::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
 
 
     /**
@@ -388,6 +521,57 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private void buildFactoryParamCondition(LambdaQueryWrapper<FactoryParam> queryWrapper, FactoryParam queryVO) {
         queryWrapper.eq(FactoryParam::getFactoryCode, queryVO.getFactoryCode());
         queryWrapper.eq(FactoryParam::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+
+    /**
+     * 查询特殊材料记录
+     *
+     * @param mpStructureAllocation
+     */
+    private List<RawSpecialMaterialRecord> querySpecialMaterialRecordList(MpStructureAllocation mpStructureAllocation) {
+        RawSpecialMaterialRecord queryVO = new RawSpecialMaterialRecord();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+
+        LambdaQueryWrapper<RawSpecialMaterialRecord> queryWrapper = new LambdaQueryWrapper<>();
+        buildSpecialMaterialCondition(queryWrapper, queryVO);
+        return rawSpecialMaterialRecordMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建特殊材料条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildSpecialMaterialCondition(LambdaQueryWrapper<RawSpecialMaterialRecord> queryWrapper, RawSpecialMaterialRecord queryVO) {
+        queryWrapper.eq(RawSpecialMaterialRecord::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(RawSpecialMaterialRecord::getIsDelete, YesOrNoEnum.NO.getValue());
+    }
+
+    /**
+     * 查询BOM物料消耗明细
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmMaterialConsumeDetail> queryMaterialConsumeDetailList(MpStructureAllocation mpStructureAllocation) {
+        MdmMaterialConsumeDetail queryVO = new MdmMaterialConsumeDetail();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+
+        LambdaQueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new LambdaQueryWrapper<>();
+        buildMaterialConsumeDetailCondition(queryWrapper, queryVO);
+        return mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建BOM物料消耗明细条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildMaterialConsumeDetailCondition(LambdaQueryWrapper<MdmMaterialConsumeDetail> queryWrapper, MdmMaterialConsumeDetail queryVO) {
+        queryWrapper.eq(MdmMaterialConsumeDetail::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmMaterialConsumeDetail::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
 
