@@ -957,11 +957,22 @@ public class MpWeekRollAdjustEngine {
         }
         //3.重置开始日\结束日\汇总值
         resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+
+        //4.组装消息：SKU原余量未满的消息
+        combineMsgWithInLockDayNoFull(contextDTO,mpFinalVo);
     }
 
-    private void sendMsgWithInLockDayNoFull(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+    /**
+     * 组装消息：SKU原余量未满的消息
+     * @param contextDTO 周程滚动上下文
+     * @param mpFinalVo 定稿Vo
+     */
+    private void combineMsgWithInLockDayNoFull(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        if (YesOrNoEnum.YES.getCode().equals(mpFinalVo.getHasSpecialMaterial())){
+            return;
+        }
         //50条 <= 不含特殊材料收尾新增的SKU原余量 <= 150条，触发预警；
-        //从调整次日开始，到锁定截止日，认第1天有值的机台数
+        //1.从调整次日开始，到锁定截止日，认第1天有值的机台数
         int iAdjustNextDay = contextDTO.getAdjustDay()+1;
         int iLockEndDay = contextDTO.getLockEndDay();
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
@@ -976,10 +987,14 @@ public class MpWeekRollAdjustEngine {
                 totalRemainQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
             }
         }
-        //预警阀值 X台硫化机 * 50条 * 3天
+        //2.预警阀值 X台硫化机 * 50条 * 3天
         int totalQty = dailyQty * dayMachines * (iLockEndDay - iAdjustNextDay + 1);
         if (totalRemainQty < totalQty){
             //提示消息
+            if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithRemainQtyNoFull())){
+                String strHint = String.format(contextDTO.getMsgTemplateWithRemainQtyNoFull(),mpFinalVo.getMaterialCode(),totalRemainQty,totalQty);
+                contextDTO.getMsgRemainQtyNoFull().append(strHint);
+            }
         }
     }
 
@@ -1153,6 +1168,9 @@ public class MpWeekRollAdjustEngine {
 
         //3、重置开始日\结束日\汇总值
         resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+
+        //4、组装消息：SKU原余量未满的消息
+        combineMsgWithInLockDayNoFull(contextDTO,mpFinalVo);
     }
     /**
      * 获取新上机日

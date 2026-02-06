@@ -10,6 +10,7 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.common.collect.Maps;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -24,6 +25,8 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.utils.DateUtils;
+import com.zlt.aps.maindata.enums.MsgTemplateEnums;
+import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
@@ -81,6 +84,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
+
+import com.zlt.msg.message.domain.vo.MessageContext;
+import com.zlt.msg.message.enums.MsgChannelEnums;
+import com.zlt.msg.message.enums.MsgTypeEnums;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -169,6 +176,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IncrementService incrementService;
+
+    @Autowired
+    private MessageServiceUtils messageServiceAdapter;
 
 
     @Override
@@ -402,6 +412,38 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         saveMpAdjustResult(contextDTO);
         //3、回填实际调整
         backfillRealAdjustResult(contextDTO);
+        //4、发送消息
+        if (StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
+            sendMsgRemainQtyNoFull(contextDTO);
+        }
+    }
+
+    /**
+     * 发送 SKU原余量小于调整次日至锁定截止日的计划量提醒
+     * @param contextDTO
+     */
+    private void sendMsgRemainQtyNoFull(MpRollAdjustContextDTO contextDTO) {
+        // 构建完整上下文
+        MessageContext context = messageServiceAdapter.buildMessageContext(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                SecurityUtils.getUsername(),
+                null
+        );
+
+        // 发送消息
+        messageServiceAdapter.sendBatchMessage(
+                MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode(),
+                MsgTypeEnums.NOTICE.getCode(),
+                contextDTO.getMsgRemainQtyNoFull().toString(),
+                null,
+                null,
+                context
+        );
     }
 
     /**
