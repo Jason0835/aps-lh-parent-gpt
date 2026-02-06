@@ -2214,11 +2214,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             String mouldCavityKey = adjust.getStructureName() + adjust.getMainPattern();
             if (cavityResults != null && cavityResults.containsKey(mouldCavityKey)) {
                 adjust.setMouldCavityQty(MapUtils.getInteger(cavityResults, mouldCavityKey, 0));
+            }else {
+                adjust.setMouldCavityQty(0);
             }
             // 设置活块数量
             String typeBlockKey = adjust.getMaterialDesc();
             if (insertResults != null && insertResults.containsKey(typeBlockKey)) {
                 adjust.setTypeBlockQty(MapUtils.getInteger(insertResults, typeBlockKey, 0));
+            }else {
+                adjust.setTypeBlockQty(0);
             }
         }
     }
