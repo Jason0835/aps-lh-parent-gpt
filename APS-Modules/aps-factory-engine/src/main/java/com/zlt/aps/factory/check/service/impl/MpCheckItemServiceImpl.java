@@ -147,6 +147,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         addCheckResult(false, CheckItemTypeEnums.MOLD_SHELL_DATA, errorMsg, vos, records);
         addCheckResult(false, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, errorMsg, vos, records);
         addCheckResult(false, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, errorMsg, vos, records);
     }
 
     /**
@@ -286,7 +287,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         //基础数据容器存储
         productionContext.setBaseDataContainer(new BaseDataContainer());
         // 调用父类方法加载数据
-        super.initProductionBaseData(productionContext, requirePlanList);
+        super.initProductionBaseDataWithExceptions(productionContext, requirePlanList, mpCheckItemVos, mpCheckItemRecords);
 
         // 2. 开始从 BaseDataContainer 中检查关键数据
         // 检查 1: 特殊原材料数据
