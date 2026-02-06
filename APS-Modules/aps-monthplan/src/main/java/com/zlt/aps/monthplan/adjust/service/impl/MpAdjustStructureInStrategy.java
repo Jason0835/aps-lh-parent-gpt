@@ -15,6 +15,7 @@ import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -104,14 +105,17 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         Date startTime,endTime;
         List<MpStructureAllocation> structureAllocationList;
         List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
+        List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList;
+        List<MpMonthPlanStatistics> monthPlanStatisticsResultList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //2.1 初始结构上下文
             //1）结构内，按结构分别调整
             contextDTO.setStructureName(entry.getKey());
+            oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
             if (YesOrNoEnum.YES.getCode().equals(entry.getValue().get(0).getHasSpecialMaterial())){
                 //若是特殊结构,预存特殊结构的总实际排产量
-                setSpecStructureTotalQty(contextDTO,mpProdFinalMap.get(entry.getKey()));
+                setSpecStructureTotalQty(contextDTO,oneStructMpFinalList);
             }
             structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
             contextDTO.setOneStructureAllocationList(structureAllocationList);
@@ -125,7 +129,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             //2.2 执行结构内调整
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-            weekRollAdjustEngine.doStructureInForOne(contextDTO,entry.getValue(), mpProdFinalMap.get(entry.getKey()));
+            weekRollAdjustEngine.doStructureInForOne(contextDTO,entry.getValue(), oneStructMpFinalList);
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
@@ -135,16 +139,22 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
             //=========================================================
 
-            newMpFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
+            newMpFinalList.addAll(oneStructMpFinalList);
 
             //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-            reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalMap.get(entry.getKey()));
+            reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList);
 
-            //2.5 保存调整日志
+            //2.5 构建月计划统计结果
+            List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList);
+            monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
+
+            //2.6 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
 
+
         contextDTO.setSaveMpProdFinalList(newMpFinalList);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
     }
 
     /**
@@ -251,7 +261,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         adjustList.removeIf(adjust -> {
             Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
             Integer monthUnScheduledQty = Convert.toInt(adjust.getMonthUnScheduledQty(),0);
-            return Math.abs(currentNetQty - monthUnScheduledQty) == 0;
+            boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
+            return (Math.abs(currentNetQty - monthUnScheduledQty) == 0) || isOnlyConventionReserveHasValue;
         });
     }
 

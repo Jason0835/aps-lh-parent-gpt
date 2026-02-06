@@ -414,8 +414,7 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
                 List<MpHistorySaleRecord> value = entry.getValue();
 
                 // 年月排序，取最近的月份
-                value = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getYear).reversed()
-                        .thenComparing(MpHistorySaleRecord::getMonth).reversed()).collect(Collectors.toList());
+                value = value.stream().sorted(Comparator.comparing(MpHistorySaleRecord::getYearMonth).reversed()).collect(Collectors.toList());
 
                 MpMonthlySaleQty monthlySaleQty = new MpMonthlySaleQty();
                 monthlySaleQty.setBaseVale(null);

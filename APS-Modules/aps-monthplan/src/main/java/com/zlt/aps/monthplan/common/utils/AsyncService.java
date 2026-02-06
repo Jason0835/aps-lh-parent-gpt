@@ -1,9 +1,11 @@
 package com.zlt.aps.monthplan.common.utils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionPlanType;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
@@ -26,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -43,76 +46,84 @@ public class AsyncService {
   private final ProductionSchedulingService productionSchedulingService;
   // 定稿的月度排产计划
   private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
-
+  private final RedisService redisService;
   private final BaseDao baseDao;
 
 
 
   @Async("taskExecutor")
   public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange){
-    PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
-    Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
-    productionVersions.put(monthRange.getTMonth(),finalVersion);
-    // 生成T月模拟需求计划
-    // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
-    // T+1月需求生成：T月需求-T月已排+T+1（周期+常规）
-    // 对冲规则：供应链优先级+提报日期逐笔扣除(先冲实单)
-    DpDemandPlan param = new DpDemandPlan();
-    param.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-    param.setPlanType(ProductionPlanType.SIMULATE.getPlanType());
-    param.setPrefix(PREFIX);
-    List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
-    // 定义要处理的所有月份
-    YearMonth[] monthsToProcess = {
-        monthRange.getTPlus1Month(),
-        monthRange.getTPlus2Month(),
-        monthRange.getTPlus3Month(),
-        monthRange.getTPlus4Month(),
-        monthRange.getTPlus5Month(),
-        monthRange.getTPlus6Month(),
-        monthRange.getTPlus7Month(),
-        monthRange.getTPlus8Month(),
-        monthRange.getTPlus9Month(),
-        monthRange.getTPlus10Month(),
-        monthRange.getTPlus11Month(),
-        monthRange.getTPlus12Month(),
-        monthRange.getTPlus13Month(),
-        monthRange.getTPlus14Month(),
-        monthRange.getTPlus15Month(),
-        monthRange.getTPlus16Month(),
-        monthRange.getTPlus17Month(),
-        monthRange.getTPlus18Month(),
-        monthRange.getTPlus19Month(),
-        monthRange.getTPlus20Month(),
-        monthRange.getTPlus21Month(),
-        monthRange.getTPlus22Month(),
-        monthRange.getTPlus23Month()
-    };
-    MpFactoryProductionVersion currentFinalVersion = finalVersion;
-    List<DpDemandPlan> currentMonthDemands;
-    // 对应的历史数据偏移量（从5开始递减）
-    for (YearMonth currentMonth : monthsToProcess) {
-      // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
-      currentMonthDemands =  dpDemandPlanService.createPredictionRequire(currentMonth,param,currentFinalVersion,predictionContext);
-      // 排产汇总
-      if(!org.springframework.util.CollectionUtils.isEmpty(currentMonthDemands)) {
+        String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
         try{
-          Context context = buildContext(currentMonthDemands);
-          productionSchedulingService.executeSchedulingInNewTransaction(param,context);
-          currentFinalVersion = createProductionVersion(context,currentMonthDemands);
-          productionVersions.put(currentMonth,currentFinalVersion);
+          PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
+          Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
+          productionVersions.put(monthRange.getTMonth(),finalVersion);
+          // 生成T月模拟需求计划
+          // T月需求要生成,订单-库存冲减-月底计划余量(T-1月)+T月（快照周期+常规)
+          // T+1月需求生成：T月需求-T月已排+T+1（周期+常规）
+          // 对冲规则：供应链优先级+提报日期逐笔扣除(先冲实单)
+          DpDemandPlan param = new DpDemandPlan();
+          param.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+          param.setPlanType(ProductionPlanType.SIMULATE.getPlanType());
+          param.setPrefix(PREFIX);
+          List<DpDemandPlan> tMonthDemands =  dpDemandPlanService.createInitPredictionRequire(param,finalVersion,predictionContext);
+          // 定义要处理的所有月份
+          YearMonth[] monthsToProcess = {
+              monthRange.getTPlus1Month(),
+              monthRange.getTPlus2Month(),
+              monthRange.getTPlus3Month(),
+              monthRange.getTPlus4Month(),
+              monthRange.getTPlus5Month(),
+              monthRange.getTPlus6Month(),
+              monthRange.getTPlus7Month(),
+              monthRange.getTPlus8Month(),
+              monthRange.getTPlus9Month(),
+              monthRange.getTPlus10Month(),
+              monthRange.getTPlus11Month(),
+              monthRange.getTPlus12Month(),
+              monthRange.getTPlus13Month(),
+              monthRange.getTPlus14Month(),
+              monthRange.getTPlus15Month(),
+              monthRange.getTPlus16Month(),
+              monthRange.getTPlus17Month(),
+              monthRange.getTPlus18Month(),
+              monthRange.getTPlus19Month(),
+              monthRange.getTPlus20Month(),
+              monthRange.getTPlus21Month(),
+              monthRange.getTPlus22Month(),
+              monthRange.getTPlus23Month()
+          };
+          MpFactoryProductionVersion currentFinalVersion = finalVersion;
+          List<DpDemandPlan> currentMonthDemands;
+          // 对应的历史数据偏移量（从5开始递减）
+          for (YearMonth currentMonth : monthsToProcess) {
+            // 	12、以第11步的T+1月的需求量，按月度排产逻辑进行排产(此时暂缓订单需要排产)，得到T+1月的月排产计划
+            currentMonthDemands =  dpDemandPlanService.createPredictionRequire(currentMonth,param,currentFinalVersion,predictionContext);
+            // 排产汇总
+            if(!CollectionUtils.isEmpty(currentMonthDemands)) {
+              try{
+                Context context = buildContext(currentMonthDemands);
+                productionSchedulingService.executeSchedulingInNewTransaction(param,context);
+                currentFinalVersion = createProductionVersion(context,currentMonthDemands);
+                productionVersions.put(currentMonth,currentFinalVersion);
+              }catch (Exception e){
+                DpDemandPlan demandPlan = currentMonthDemands.get(0);
+                log.info("=====工厂{}, 计划年月：{}-{}, 需求计划版本：{},异常原因:{}====",demandPlan.getFactoryCode(),demandPlan.getYear(),demandPlan.getMonth(),demandPlan.getMonthPlanVersion(),e.getMessage());
+                break;
+              }
+            }
+          }
+          Map<String, MdmMaterialInfo> materialInfoMap = predictionContext.getMaterialInfoMap();
+          List<MpSimulatedResult> list = buildSimulatedResult(monthRange,productionVersions,tMonthDemands,materialInfoMap);
+          if(CollectionUtils.isNotEmpty(list)) {
+            this.baseDao.insertBatch(list);
+          }
         }catch (Exception e){
-            DpDemandPlan demandPlan = currentMonthDemands.get(0);
-            log.info("=====工厂{}, 计划年月：{}-{}, 需求计划版本：{},异常原因:{}====",demandPlan.getFactoryCode(),demandPlan.getYear(),demandPlan.getMonth(),demandPlan.getMonthPlanVersion(),e.getMessage());
-            break;
+          log.info("生成实单模拟排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
+        }finally {
+          redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
-      }
-    }
-    Map<String, MdmMaterialInfo> materialInfoMap = predictionContext.getMaterialInfoMap();
-    List<MpSimulatedResult> list = buildSimulatedResult(monthRange,productionVersions,tMonthDemands,materialInfoMap);
-    if(CollectionUtils.isNotEmpty(list)) {
-      this.baseDao.insertBatch(list);
-    }
+
   }
 
   private Context buildContext(List<DpDemandPlan> tPlus1MonthDemands) {

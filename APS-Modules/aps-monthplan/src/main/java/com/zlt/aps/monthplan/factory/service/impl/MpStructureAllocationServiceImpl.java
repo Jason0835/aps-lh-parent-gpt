@@ -604,12 +604,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         && alloc.getBeginDay() <= alloc.getEndDay())
                 .collect(Collectors.toList());
 
-        Set<String> structureNameSet = sameMachineList.stream()
-                .map(MpStructureAllocation::getStructureName)
-                .collect(Collectors.toSet());
-        if (!structureNameSet.contains(targetAlloc.getStructureName())) {
-            return Collections.emptyList();
-        }
         // 遍历集合，判断交叉
         for (MpStructureAllocation alloc : sameMachineList) {
             if (targetAlloc.getStructureName().equals(alloc.getStructureName())) {
@@ -733,8 +727,105 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
 
+    /**
+     * 获取日期最接近的上一个结构
+     * @param param 目标结构参数（包含工厂、年月、成型机编码、目标开始/结束日等）
+     * @return 最接近的上一个结构
+     */
+    @Override
+    public MpStructureAllocation getPreviousStructure(MpStructureAllocation param) {
+        // 通过工厂、年月、成型机编码获取结构排产列表
+        QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+        builderCondition(queryWrapper, param);
+        List<MpStructureAllocation> structureAllocationList = entityMapper.selectList(queryWrapper);
+
+        // 目标开始日期
+        Integer targetBeginDay = param.getBeginDay();
+        // 目标结束日期
+        Integer targetEndDay = param.getEndDay();
+        // 调整开始日期（为空则使用目标开始日）
+        Integer adjustStartDay = param.getAdjustStartDay() == null ? targetBeginDay : param.getAdjustStartDay();
+
+        // 排序（按开始日期升序，开始日期相同则按结束日期升序排序）
+        structureAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay,
+                Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(MpStructureAllocation::getEndDay,
+                        Comparator.nullsLast(Integer::compareTo)));
+
+        // 从集合中找出日期最接近目标开始日期和结束日期的上一个结构
+        MpStructureAllocation structureAllocation = getClosestPreviousStructureAllocation(
+                structureAllocationList, param.getId(), targetBeginDay, targetEndDay);
+
+        if (structureAllocation != null) {
+            // 获取当月总天数
+            int monthTotalDay = DateUtil.lengthOfMonth(param.getMonth(), DateUtil.isLeapYear(param.getYear()));
+            structureAllocation.setAdjustStartDay((Math.min(structureAllocation.getEndDay() + 1, monthTotalDay)));
+        }
+        return structureAllocation;
+    }
 
 
+    /**
+     * 从集合中找出日期最接近目标开始/结束日的上一个结构
+     * @param list 结构排产列表
+     * @param excludeId 排除的目标结构ID
+     * @param targetBeginDay 目标开始日
+     * @param targetEndDay 目标结束日
+     * @return 最接近的上一个结构
+     */
+    private MpStructureAllocation getClosestPreviousStructureAllocation(List<MpStructureAllocation> list,
+                                                                        Long excludeId, Integer targetBeginDay,
+                                                                        Integer targetEndDay) {
+        if (PubUtil.isEmpty(list) || targetBeginDay == null || targetEndDay == null || excludeId == null) {
+            return null;
+        }
+
+        Optional<MpStructureAllocation> result = list.stream()
+                // 排除目标结构自身
+                .filter(e -> !excludeId.equals(e.getId()))
+                // 筛选出上一个结构（日期小于目标日期）
+                .filter(e -> isPreviousElement(e, targetBeginDay, targetEndDay))
+                // 按日期接近度排序（差值绝对值之和越小越接近）
+                .min((a1, a2) -> {
+                    int distance1 = calculateDistance(a1.getBeginDay(), a1.getEndDay(), targetBeginDay, targetEndDay);
+                    int distance2 = calculateDistance(a2.getBeginDay(), a2.getEndDay(), targetBeginDay, targetEndDay);
+                    return Integer.compare(distance1, distance2);
+                });
+
+        log.info("获取日期最接近的上一个结构 ==> 目标id[{}] 目标开始时间[{}] 目标结束时间[{}] 结构[{}]",
+                excludeId, targetBeginDay, targetEndDay, JSONObject.toJSONString(result.orElse(null)));
+        return result.orElse(null);
+    }
 
 
+    /**
+     * 判断当前数据是否是目标日期的上一个（日期小于目标日期）
+     */
+    private boolean isPreviousElement(MpStructureAllocation allocation,
+                                      Integer targetBegin, Integer targetEnd) {
+        Integer begin = allocation.getBeginDay();
+        Integer end = allocation.getEndDay();
+
+        // 日期为空的结构直接排除
+        if (begin == null || end == null) {
+            return Boolean.FALSE;
+        }
+
+        // 完全相等的情况（业务上视为上一个）
+        if (begin.equals(targetBegin) && end.equals(targetEnd)) {
+            return Boolean.TRUE;
+        }
+        // 开始日小于目标开始日 → 是上一个
+        else if (begin < targetBegin) {
+            return Boolean.TRUE;
+        }
+        // 开始日相等，结束日小于目标结束日 → 是上一个
+        else if (begin.equals(targetBegin)) {
+            return end < targetEnd;
+        }
+        // 其他情况（开始日更大）→ 不是上一个
+        else {
+            return Boolean.FALSE;
+        }
+    }
 }

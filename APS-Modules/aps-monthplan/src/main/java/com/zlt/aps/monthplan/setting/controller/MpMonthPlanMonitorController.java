@@ -1,30 +1,38 @@
 package com.zlt.aps.monthplan.setting.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
-import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
-import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
-
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-
+import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
+import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
+import java.text.ParseException;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -51,19 +59,61 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
     @Autowired
     private MpMonthPlanMonitorEntityMapper entityMapper;
 
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultEntityMapper finalResultEntityMapper;
+
     /**
      * 查询月度硫化监控列表
      */
-    @RequiresPermissions( "monthplan:mpMonthPlanMonitor:list")
+//    @RequiresPermissions( "monthplan:mpMonthPlanMonitor:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanMonitor queryVO) {
         startPage(getOrderBy(queryVO));
         List<MpMonthPlanMonitor> list = entityMapper.listReport(queryVO);
+        int daySubOne = DateUtils.getDay(DateUtils.addDays(new Date(), -1));
+
+        Map<String, FactoryMonthPlanProductionFinalResult> finalResultMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(list)) {
+            String productionVersion = list.get(0).getProductionVersion();
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion);
+            List<FactoryMonthPlanProductionFinalResult> finalResultList = finalResultEntityMapper.selectList(queryWrapper);
+            if (CollectionUtils.isNotEmpty(finalResultList)) {
+                finalResultMap = finalResultList.stream().collect(Collectors
+                        .toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getYearMonth(), item.getMaterialCode()), Function.identity()));
+            }
+        }
+
+        for (MpMonthPlanMonitor monitor : list) {
+            Integer lhMargin = monitor.getLhMargin();
+            String mapKey = GenerageMapKeyUtils.createMapKey(monitor.getFactoryCode(), monitor.getYearMonth(), monitor.getMaterialCode());
+            if (finalResultMap.containsKey(mapKey)) {
+                FactoryMonthPlanProductionFinalResult result = finalResultMap.get(mapKey);
+                int dayVulcanizationQty = ObjectUtils.defaultIfNull(result.getDayVulcanizationQty(), 0) * 2;
+                for (int i = daySubOne; i > 0; i--) {
+                    Object fieldValue = ReflectUtils.getFieldValue(result, "day" + daySubOne);
+                    if (Objects.nonNull(fieldValue)) {
+                        int fieldValueInt = Integer.parseInt(fieldValue.toString());
+                        if (fieldValueInt > 0) {
+                            if (fieldValueInt < dayVulcanizationQty) {
+                                fieldValueInt = dayVulcanizationQty;
+                            }
+                        }
+                        monitor.setExpectedCloseDay(lhMargin / fieldValueInt);
+                    }
+                }
+            }
+            try {
+                Integer expectedCloseDay = ObjectUtils.defaultIfNull(monitor.getExpectedCloseDay(), 0);
+                monitor.setExpectedCloseDate(DateUtils.addDays(DateUtils.getNowDate("yyyy-MM-dd"), expectedCloseDay));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        }
         clearPage();
         return getDataTable(list);
-    
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpSimulatedResultMapper.java
@@ -19,5 +21,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MpSimulatedResultEntityMapper extends CommBaseMapper<MpSimulatedResult> {
-
+    /**
+     *  导出实单模拟
+     * @param queryVO 查询条件
+     * @return 实单模拟数据
+     */
+    List<MpSimulatedResult> listExportData(MpSimulatedResult queryVO);
 }

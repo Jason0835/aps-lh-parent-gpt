@@ -132,5 +132,15 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         return mpStructureAllocationService.getNextStructure(queryCondition);
     }
 
+    /**
+     * 获取日期最接近的上一个结构
+     * @param queryCondition 查询条件
+     */
+    @ApiOperation("获取日期最接近的上一个结构")
+    @PostMapping("/getPreviousStructure")
+    public MpStructureAllocation getPreviousStructure(@RequestBody MpStructureAllocation queryCondition) {
+        return mpStructureAllocationService.getPreviousStructure(queryCondition);
+    }
+
 
 }

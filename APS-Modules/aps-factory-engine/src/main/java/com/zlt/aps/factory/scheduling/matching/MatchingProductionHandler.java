@@ -257,59 +257,50 @@ public class MatchingProductionHandler {
                 continue;
             }
             List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(materialDesc);
+            Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty();
+            Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
 
-//            for (Entry<String, List<MonthPlanProductionRequirePlanVo>> entry : productionPlanMap.entrySet()) {
-//                String materialDesc = entry.getKey();
-//                List<MonthPlanProductionRequirePlanVo> productionPlanList = entry.getValue();
-//                SkuNeedProductionInfo needProductionInfo = this.getNeedProductionQty(productionPlanList, materialDesc); // 需排产规格
-//                if (needProductionInfo == null) {
-//                    continue;
-//                }
-                Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty();
-                Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
+            List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext,
+                    materialDesc, maxProductionQty, startDay, endDay); // 统计每一天所有可用模具
+            for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) { // 遍历各模具可用列表
+                Integer usedBeginDate = mouldDayUsed.getBeginDate();
+                Integer usedEndDate = mouldDayUsed.getEndDate();
+                MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
+                if (!limitHelper.isProduct()) {
+                    continue; // 当天已经无法添加排产，跳过
+                }
+                List<ProductionMouldInfoVo> doubleMouldList = mouldDayUsed.getMouldInfoList();
+                List<ProductionMouldInfoVo> limitDoubleMouldList = doubleMouldList.stream()
+                        .collect(Collectors.toList());
 
-                List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext,
-                        materialDesc, maxProductionQty, startDay, endDay); // 统计每一天所有可用模具
-                for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) { // 遍历各模具可用列表
-                    Integer usedBeginDate = mouldDayUsed.getBeginDate();
-                    Integer usedEndDate = mouldDayUsed.getEndDate();
-                    MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
-                    if (!limitHelper.isProduct()) {
-                        continue; // 当天已经无法添加排产，跳过
+                // 判断是否续作
+                List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
+                for (ProductionMouldInfoVo mouldInfo : limitDoubleMouldList) {
+                    // 判断切换计划前上一天的排产计划
+                    List<CxMouldDayProductionHelper> lastDayProductionList = mouldInfo.getDayProductionInfo()
+                            .get(usedBeginDate - 1);
+                    if (!CollectionUtils.isEmpty(lastDayProductionList)
+                            && lastDayProductionList.stream().anyMatch(p -> materialDesc.equals(p.getMaterialDesc()))) { // 上一天有排产，且物料描述一致，说明是续作
+                        continueMouldList.add(mouldInfo); // 符合条件的放到续作列表
                     }
-                    List<ProductionMouldInfoVo> doubleMouldList = mouldDayUsed.getMouldInfoList();
-                    List<ProductionMouldInfoVo> limitDoubleMouldList = doubleMouldList.stream()
-                            .collect(Collectors.toList());
-
-                    // 判断是否续作
-                    List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
-                    for (ProductionMouldInfoVo mouldInfo : limitDoubleMouldList) {
-                        // 判断切换计划前上一天的排产计划
-                        List<CxMouldDayProductionHelper> lastDayProductionList = mouldInfo.getDayProductionInfo()
-                                .get(usedBeginDate - 1);
-                        if (!CollectionUtils.isEmpty(lastDayProductionList)
-                                && lastDayProductionList.stream().anyMatch(p -> materialDesc.equals(p.getMaterialDesc()))) { // 上一天有排产，且物料描述一致，说明是续作
-                            continueMouldList.add(mouldInfo); // 符合条件的放到续作列表
+                }
+                // 执行非首日续作排程算法
+                if (!CollectionUtils.isEmpty(continueMouldList)) {
+                    continueMouldList.stream().forEach(mould -> {
+                        List<CxMouldDayProductionHelper> dayProduction = mould.getDayProductionInfo()
+                                .get(usedBeginDate);
+                        if (dayProduction == null
+                                || dayProduction.stream().filter(s -> materialDesc.equals(s.getMaterialDesc()))
+                                        .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() <= 0) { // 当天没有排产
+                            limitHelper.setMouldQty(limitHelper.getMouldQty() + 1);
                         }
-                    }
-                    // 执行非首日续作排程算法
-                    if (!CollectionUtils.isEmpty(continueMouldList)) {
-                        continueMouldList.stream().forEach(mould -> {
-                            List<CxMouldDayProductionHelper> dayProduction = mould.getDayProductionInfo()
-                                    .get(usedBeginDate);
-                            if (dayProduction == null
-                                    || dayProduction.stream().filter(s -> materialDesc.equals(s.getMaterialDesc()))
-                                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() <= 0) { // 当天没有排产
-                                limitHelper.setMouldQty(limitHelper.getMouldQty() + 1);
-                            }
-                        });
+                    });
 
-                        Integer totalProductionQty = this.matchingScheduleNextDayContinue(productionContext, materialDesc,
-                                newSkuQtyMap, groupInfo, productionPlanList, productionQty, maxProductionQty, usedBeginDate,
-                                usedEndDate, continueMouldList);
-                        limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
-                    }
-//                }
+                    Integer totalProductionQty = this.matchingScheduleNextDayContinue(productionContext, materialDesc,
+                            newSkuQtyMap, groupInfo, productionPlanList, productionQty, maxProductionQty, usedBeginDate,
+                            usedEndDate, continueMouldList);
+                    limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
+                }
             }
             
         } while (true);
@@ -414,14 +405,14 @@ public class MatchingProductionHandler {
         }
         Integer endDay = dayPlanMap.lastKey(); // 结束日期，默认是结构收尾日期
         // 从开始日期到结束日期，检查每一天是否满足配上机的约束条件
-        for (int day = startDay; day <= endDay; day++) {
-            // 只要有一天不满足条件，直接将结束日期提前到上一天
-            MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
-            if (dayLimit != null && !dayLimit.isProduct()) { // 当天有排产，且不满足生产要求时触发调整
-                endDay = day - 1;
-                break;
-            }
-        }
+//        for (int day = startDay; day <= endDay; day++) {
+//            // 只要有一天不满足条件，直接将结束日期提前到上一天
+//            MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
+//            if (dayLimit != null && !dayLimit.isProduct()) { // 当天有排产，且不满足生产要求时触发调整
+//                endDay = day - 1;
+//                break;
+//            }
+//        }
 
         // 统计每一天的已排产量
         TreeMap<Integer, MatchingPlanLimitHelper> usedPlanMap = new TreeMap<>();
@@ -464,16 +455,25 @@ public class MatchingProductionHandler {
 
             // 判断是否续作
             List<ProductionMouldInfoVo> newDoubleMouldList = new ArrayList<>(); // 新上模具
-            if (usedBeginDate == 1) { // 第一天，判断是否首日续作
-                boolean isContinue = this.matchingScheduleFirstDayContinue(productionContext, materialDesc,
-                        newSkuQtyMap, groupInfo, continueInfo, productionQty, maxProductionQty, usedBeginDate,
-                        usedEndDate, limitDoubleMouldList);
-                if (!isContinue) {
-                    newDoubleMouldList = limitDoubleMouldList; // 非续作，则都标记为新上模具
+//            if (usedBeginDate == 1) { // 第一天，判断是否首日续作
+//                boolean isContinue = this.matchingScheduleFirstDayContinue(productionContext, materialDesc,
+//                        newSkuQtyMap, groupInfo, continueInfo, productionQty, maxProductionQty, usedBeginDate,
+//                        usedEndDate, limitDoubleMouldList);
+//                if (!isContinue) {
+//                    newDoubleMouldList = limitDoubleMouldList; // 非续作，则都标记为新上模具
+//                }
+//            }
+            if (newMouldNum > 0) { // 非第一天
+                for (ProductionMouldInfoVo mould: limitDoubleMouldList) {
+                    if (newMouldNum == 0) {
+                        break;
+                    }
+                    List<CxMouldDayProductionHelper> dayProductionList = mould.getDayProductionInfo().get(startDay);
+                    if (CollectionUtils.isEmpty(dayProductionList)) { // 当天没有排产才添加模具
+                        newDoubleMouldList.add(mould);
+                        newMouldNum --;
+                    }
                 }
-            } else { // 非第一天
-                newDoubleMouldList = limitDoubleMouldList.subList(0, newMouldNum);
-                newMouldNum -= newDoubleMouldList.size();
             }
 
             // 新模排产
@@ -801,6 +801,10 @@ public class MatchingProductionHandler {
             if (oldPlan != null) {
                 plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
                 plan.setTotalQty(oldPlan.getTotalQty() + plan.getConventionProductionQty());
+                plan.setHeightProductionQty(oldPlan.getHeightProductionQty());
+                plan.setMidProductionQty(oldPlan.getMidProductionQty());
+                plan.setCycleProductionQty(oldPlan.getCycleProductionQty());
+                plan.setPostponeProductionQty(oldPlan.getPostponeProductionQty());
                 plan.setDifferenceQty(oldPlan.getDifferenceQty());
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
                 plan.setTypeBlockQty(oldPlan.getTypeBlockQty());

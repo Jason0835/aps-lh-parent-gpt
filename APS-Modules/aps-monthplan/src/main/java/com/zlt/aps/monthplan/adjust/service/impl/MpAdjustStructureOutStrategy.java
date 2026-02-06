@@ -23,6 +23,7 @@ import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
@@ -255,7 +256,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         adjustList.removeIf(adjust -> {
             Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
             Integer monthScheduledQty = Convert.toInt(adjust.getMonthScheduledQty(),0);
-            return Math.abs(currentNetQty - monthScheduledQty) == 0;
+            boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
+            return (Math.abs(currentNetQty - monthScheduledQty) == 0) || isOnlyConventionReserveHasValue;
         });
     }
 
@@ -275,9 +277,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         Date startTime,endTime;
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         //contextDTO.setStructureName(contextDTO.getStructureName());
+        List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
         if (YesOrNoEnum.YES.getCode().equals(contextDTO.getMpAdjustStructureOutList().get(0).getHasSpecialMaterial())){
             //若是特殊结构,预存特殊结构的总实际排产量
-            setSpecStructureTotalQty(contextDTO,mpProdFinalMap.get(contextDTO.getStructureName()));
+            setSpecStructureTotalQty(contextDTO,oneStructMpFinalList);
         }
         List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
         //3.更新结构转产表对应成型机台的调整开始日、结束日
@@ -294,7 +297,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //5.处理单个结构间调整
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        weekRollAdjustEngine.doStructureOutForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), mpProdFinalMap.get(contextDTO.getStructureName()));
+        weekRollAdjustEngine.doStructureOutForOne(contextDTO,contextDTO.getMpAdjustStructureOutList(), oneStructMpFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
@@ -305,9 +308,14 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //=========================================================
 
         //7.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-        reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalMap.get(contextDTO.getStructureName()));
+        reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList);
 
-        contextDTO.setSaveMpProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
+        //8.构建月计划统计结果
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()));
+
+        contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
+
         //9.保存调整日志
         saveMpAdjustLog(contextDTO);
     }

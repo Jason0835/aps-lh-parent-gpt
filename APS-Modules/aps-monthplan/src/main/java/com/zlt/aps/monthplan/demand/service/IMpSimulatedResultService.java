@@ -2,7 +2,10 @@ package com.zlt.aps.monthplan.demand.service;
 
 
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -23,5 +26,12 @@ public interface IMpSimulatedResultService  extends IDocService<MpSimulatedResul
    * @param createCondition
    * @return
    */
-  void createVmMonthPrediction(MpSimulatedResult createCondition) throws Exception;
+  void createVmMonthPrediction(MpSimulatedResult createCondition);
+  /**
+   *  导出实单模拟数据
+   * @param queryVO
+   * @param fileName
+   * @return
+   */
+  List<WorksheetData> listExportData(MpSimulatedResult queryVO, String fileName);
 }
