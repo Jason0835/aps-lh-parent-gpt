@@ -92,5 +92,11 @@ public interface IMpStructureAllocationRemoteService {
     @PostMapping("/mpStructureAllocation/getNextStructure")
     MpStructureAllocation getNextStructure(@RequestBody MpStructureAllocation queryVO);
 
+    /**
+     * 获取日期最接近的上一个结构
+     */
+    @ApiOperation("获取日期最接近的上一个结构")
+    @PostMapping("/mpStructureAllocation/getPreviousStructure")
+    MpStructureAllocation getPreviousStructure(@RequestBody MpStructureAllocation queryVO);
 
 }
