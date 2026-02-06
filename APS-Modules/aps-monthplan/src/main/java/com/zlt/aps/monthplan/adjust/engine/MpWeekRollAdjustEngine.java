@@ -9,6 +9,7 @@ import com.tlt.aps.enums.UrgencyTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.check.DayTotalCapacityChecker;
 import com.zlt.aps.factory.check.SkuSecondChecker;
@@ -411,7 +412,9 @@ public class MpWeekRollAdjustEngine {
         //7.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        moveForwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
+        //结构间调整，锁定次日有可能小于结构起产日，将其调到结构起产日
+        int startDay = lockNextDay < contextDTO.getStructureStartDay() ? contextDTO.getStructureStartDay():lockNextDay;
+        moveForwardWithOtherSku(contextDTO,startDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
@@ -424,7 +427,7 @@ public class MpWeekRollAdjustEngine {
     private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureIn structureIn){
         if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
-                    structureIn.getMaterialCode()));
+                    structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }
 
@@ -436,7 +439,7 @@ public class MpWeekRollAdjustEngine {
     private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureOut structureOut){
         if (structureOut.getDayVulcanizationQty() == null || structureOut.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
-                    structureOut.getMaterialCode()));
+                    structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }
 

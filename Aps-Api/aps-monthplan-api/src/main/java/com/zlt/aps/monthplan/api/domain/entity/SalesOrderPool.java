@@ -82,7 +82,7 @@ public class SalesOrderPool extends BaseEntity{
     private String natCode;
 
     /** 品牌 */
-    @Excel(name = "ui.data.column.SalesOrderPool.brand")
+    @Excel(name = "ui.data.column.SalesOrderPool.brand", dictType = "biz_brand_type")
     @ApiModelProperty(value = "品牌", name = "brand")
     @TableField(value = "BRAND")
     private String brand;

@@ -322,7 +322,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			newVO.setMonth(month);
 			newVO.setArea(String.valueOf(vo.getEmployeeDept()));
 			newVO.setBillDate(vo.getBillDate());
-			newVO.setBrand(vo.getEngBrand());
+			newVO.setBrand(materialInfo.getBrand()); // 品牌需要从物料信息表获取
 			newVO.setDeliverGoodsType(shipType);
 			newVO.setIsEudr(vo.getEudrFlag());
 			newVO.setMaterialDesc(materialDesc);
