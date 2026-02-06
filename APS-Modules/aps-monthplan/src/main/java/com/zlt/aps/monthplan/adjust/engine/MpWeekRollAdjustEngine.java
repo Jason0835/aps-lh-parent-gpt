@@ -1878,10 +1878,13 @@ public class MpWeekRollAdjustEngine {
         if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(adjustStructInVo.getConstructionStage())){
             mpFinalVo.setTrialProductionQty(productionQty);
         }else{
+
             if (adjustStructInVo.getPostponeQty()>=0 && productionQty >=0){
-                //有暂缓需求
-                mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
-                productionQty -= adjustStructInVo.getPostponeQty();
+                //有暂缓需求 且 有设调整优先级
+                if (adjustStructInVo.getAdjustPriority() != null && adjustStructInVo.getAdjustPriority()>0){
+                    mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
+                    productionQty -= adjustStructInVo.getPostponeQty();
+                }
             }
             if (adjustStructInVo.getHeightQty()>=0 && productionQty >=0){
                 //有高优先级需求
