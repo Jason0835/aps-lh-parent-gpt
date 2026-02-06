@@ -36,6 +36,8 @@
           FROM t_mdm_special_material_stock sms
          WHERE IFNULL(sms.IS_DELETE, 0) = 0
            AND sms.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND sms.YEAR = #{year,jdbcType=DECIMAL}
+           AND sms.MONTH = #{month,jdbcType=DECIMAL}
     </select>
 
 </mapper>
