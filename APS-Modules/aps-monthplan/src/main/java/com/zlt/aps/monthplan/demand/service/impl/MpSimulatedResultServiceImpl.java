@@ -172,7 +172,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     private List<MpFactoryProductionVersion> validateProductionVersionFinalized(MpSimulatedResult createCondition) {
         return factoryProductionVersionMapper.selectList(
             Wrappers.<MpFactoryProductionVersion>lambdaQuery()
-                .eq(MpFactoryProductionVersion::getFactoryCode,createCondition.getProductionVersion())
+                .eq(MpFactoryProductionVersion::getFactoryCode,createCondition.getFactoryCode())
                 .eq(MpFactoryProductionVersion::getYear, createCondition.getYear())
                 .eq(MpFactoryProductionVersion::getMonth, createCondition.getMonth())
                 .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())

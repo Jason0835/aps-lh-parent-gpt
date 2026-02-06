@@ -111,7 +111,7 @@ public class MpWeekRollAdjustEngine {
         //3、初始日产能限制
         // 锁定次日 作为 可开始日
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO.getLockEndDay(),mpProdFinalList,contextDTO.getOneStructureAllocationList());
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO.getStructureStartDay(),mpProdFinalList,contextDTO.getOneStructureAllocationList());
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
         contextDTO.setDailyCapacityLimitVoMap(dailyCapacityLimitVoMap);
         //4、拆出搭配量，用于快速判断是否搭配
@@ -382,7 +382,7 @@ public class MpWeekRollAdjustEngine {
         //3、初始日产能限制
         // 锁定次日 作为 可开始日
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO.getLockEndDay(),mpProdFinalList,contextDTO.getOneStructureAllocationList());
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO.getStructureStartDay(),mpProdFinalList,contextDTO.getOneStructureAllocationList());
         // 初始日最大排产量、开停产标识、比例
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
         contextDTO.setDailyCapacityLimitVoMap(dailyCapacityLimitVoMap);
