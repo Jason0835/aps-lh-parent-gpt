@@ -193,18 +193,16 @@ public class ExcelUtilManySheet {
         createExcelWithDict(sheet,fields, dictSheet, downDataList, downDataLocations);
       }
       long bmin = System.currentTimeMillis();
-      //填充数据
-      if (Excel.Type.EXPORT.equals(type)) {
         dictDataCach.set(new HashMap<>());
         fillExcelData(index,sheet, maxHeight,worksheetData,fields);
         // //自适应宽度(中文支持)
         //setSizeColumn((SXSSFSheet) this.sheet, column);
         dictDataCach.remove();
         addStatisticsRow(sheet);
-      }
       log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
     }
   }
+
 
   /**
    * 填充 Workbook
