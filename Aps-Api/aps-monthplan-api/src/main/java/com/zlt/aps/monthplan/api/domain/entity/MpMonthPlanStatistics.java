@@ -52,7 +52,7 @@ public class MpMonthPlanStatistics extends BaseEntity {
     /** 年月:YYYYMM */
     @Excel(name = "ui.data.column.mpMonthPlanStatistics.yearMonth")
     @ApiModelProperty(value = "年月:YYYYMM", name = "yearMonth")
-    @TableField(value = "YEAR_MONTH")
+    @TableField(value = "`YEAR_MONTH`")
     private Integer yearMonth;
 
     /** 需求计划版本 */
