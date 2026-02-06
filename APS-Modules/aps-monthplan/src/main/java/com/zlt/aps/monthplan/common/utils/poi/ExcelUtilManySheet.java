@@ -301,6 +301,7 @@ public class ExcelUtilManySheet {
         addStatisticsData(column, Convert.toStr(value), attr);
       }
     } catch (Exception e) {
+      e.printStackTrace();
       //log.error("导出Excel失败{}", e);
       String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.fail"), e);
       log.error(errorMsg);
