@@ -128,6 +128,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     GROUP_NO_CONFIGURATION_LH_RATION("MP2303", "结构没有成型硫化配比配置", "alg.data.groupCapacity.groupNoConfigurationLhRatio"),
     /**
+     * MP2304 结构下Sku特殊材料种类配置不一致
+     */
+    GROUP_SPECIAL_MATERIAL_NO_SAME("MP2304", "结构下Sku特殊材料种类配置不一致", "alg.data.groupCapacity.groupSpecialMaterialNoSame"),
+    /**
      * MP3101 特殊轮胎产能控制
      */
     TIRE_TYPE_CONTROL("MP3101", "特殊轮胎产能控制", "alg.data.mouldProduction.tireTypeControl"),
@@ -199,6 +203,38 @@ public enum MonthPlanNoProductionReasonEnum {
      * MP3708 缺少结构成型硫化配比数据
      */
     STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY("MP3708", "缺少结构成型硫化配比数据", "alg.data.before.production.structureFormingVulcanizationRatioNotEmpty"),
+    /**
+     * MP3709 获取排产参数设定失败
+     */
+    PARAMS_CONFIG("MP3709", "获取排产参数设定失败", "alg.data.before.production.paramsConfigException"),
+    /**
+     * MP3710 超6个成品库存信息处理失败
+     */
+    OVER_SIX_MONTH_STOCK_ERROR("MP3710", "超6个成品库存信息处理失败", "alg.data.before.production.overSixMonthStockError"),
+    /**
+     * MP3711 初始化库销比处理失败
+     */
+    INIT_PRODUCTION_REQUIRE_PLAN_ERROR("MP3711", "初始化库销比处理失败", "alg.data.before.production.initProductionRequirePlanError"),
+    /**
+     * MP3712 构建全局日排产限制信息失败
+     */
+    DAY_CAPACITY_LIMIT_ERROR("MP3712", "构建全局日排产限制信息失败", "alg.data.before.production.dayCapacityLimitError"),
+    /**
+     * MP3713 获取成型鼓信息失败
+     */
+    WORKWEAR_TYPE_INFO_ERROR("MP3713", "获取成型鼓信息失败", "alg.data.before.production.workearTypeInfoError"),
+    /**
+     * MP3714 获取机台近3个月的生产历史信息失败
+     */
+    PRODUCTION_HISTORY_ERROR("MP3714", "获取机台近3个月的生产历史信息失败", "alg.data.before.production.productionHistoryError"),
+    /**
+     * MP3715 根据计划的物料描述补充模具关系中的物料结构名失败
+     */
+    MOULD_STRUCTURE_NAME_ERROR("MP3715", "根据计划的物料描述补充模具关系中的物料结构名失败", "alg.data.before.production.mouldStructureNameError"),
+    /**
+     * MP3716 构建结构、主花纹的模具信息失败
+     */
+    GROUP_MAIN_PATTERN_ERROR("MP3716", "构建结构、主花纹的模具信息失败", "alg.data.before.production.groupMainPatternError"),
     /**
      * MP3798 成型或是模具产能不足
      */

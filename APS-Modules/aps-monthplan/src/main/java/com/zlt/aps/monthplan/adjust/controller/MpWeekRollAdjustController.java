@@ -10,6 +10,7 @@ import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.monthplan.adjust.service.impl.MpWeekAdjustFactory;
@@ -21,6 +22,8 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.msg.message.api.IMsgTemplateRemoteService;
+import com.zlt.msg.message.domain.entity.MsgTemplate;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +59,9 @@ public class MpWeekRollAdjustController extends BaseController {
 
     @Autowired
     private IMpAdjustStructureInService mpAdjustStructureInService;
+
+    @Autowired
+    private IMsgTemplateRemoteService templateRemoteService;
 
     /**
      * 获取调整明细列表
@@ -176,8 +182,8 @@ public class MpWeekRollAdjustController extends BaseController {
 
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
         //当日作为调整日
-        contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
-        //contextDTO.setAdjustDay(3);
+        //contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
+        contextDTO.setAdjustDay(5);
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(),contextDTO.getProductType()));
 
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
@@ -187,6 +193,12 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
         //初始型腔与活块数量
         contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO));
+        //初始消息模板
+        MsgTemplate msgTemplate = templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode());
+        if (msgTemplate != null){
+            contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
+        }
+
         return contextDTO;
     }
 

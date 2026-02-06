@@ -2,9 +2,11 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.sysdef.domain.SysDocType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
@@ -32,6 +34,10 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MpMonthPlanStatisticsServiceImpl extends AbstractDocService<MpMonthPlanStatistics>  implements IMpMonthPlanStatisticsService {
+
+    @Autowired
+    private MpMonthPlanStatisticsEntityMapper monthPlanStatisticsEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "s2-0612";
@@ -58,4 +64,10 @@ public class MpMonthPlanStatisticsServiceImpl extends AbstractDocService<MpMonth
         // 唯一校验字段
         return Collections.emptyList();
     }
+
+    @Override
+    public void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion) {
+        monthPlanStatisticsEntityMapper.deleteMonthPlanStatisticsByCondition(factoryCode,year,month,productionVersion);
+    }
+
 }

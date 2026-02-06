@@ -28,7 +28,7 @@ import java.util.Date;
 
 @ApiModel(value = "特殊材料库存对象", description = "特殊材料库存对象 ")
 @Data
-@TableName(value = "T_RAW_SPECIAL_MATERIAL_STOCK")
+@TableName(value = "T_MDM_SPECIAL_MATERIAL_STOCK")
 public class RawSpecialMaterialStock extends BaseEntity {
 
     private static final long serialVersionUID = 1L;

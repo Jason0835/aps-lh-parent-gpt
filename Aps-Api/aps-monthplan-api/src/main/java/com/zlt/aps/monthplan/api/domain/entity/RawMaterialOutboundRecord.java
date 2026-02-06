@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -9,6 +10,7 @@ import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -104,9 +106,16 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     @TableField("REMARK")
     private String remark;
 
-    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate")
-    @ApiModelProperty(value = "更新日期", name = "updateDate")
-    @TableField(exist = false)
-    private String updateDate;
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(
+            pattern = "yyyy-MM-dd HH:mm:ss"
+    )
+    @TableField(
+            value = "UPDATE_TIME",
+            fill = FieldFill.INSERT_UPDATE,
+            jdbcType = JdbcType.TIMESTAMP
+    )
+    private Date updateTime;
 
 }

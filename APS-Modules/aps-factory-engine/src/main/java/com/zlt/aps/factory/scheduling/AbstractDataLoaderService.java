@@ -3,6 +3,8 @@ package com.zlt.aps.factory.scheduling;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.Constant;
 import com.tlt.aps.constant.StringConstant;
+import com.tlt.aps.enums.CheckItemTypeEnums;
+import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.ProductionGroupTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -20,11 +22,10 @@ import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
+import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.vo.MpCheckItemVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -132,6 +133,289 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         });
         //15、构建结构、主花纹的模具信息
         buildGroupMainPatternInfo(productionContext);
+    }
+
+    /**
+     * 排产前基础数据初始化(带异常)
+     * @param productionContext
+     * @param requirePlanList
+     * @param mpCheckItemVos
+     * @param mpCheckItemRecords
+     */
+    protected void initProductionBaseDataWithExceptions(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList,List<MpCheckItemVo> mpCheckItemVos,
+                                                        List<MpCheckItemRecord> mpCheckItemRecords) {
+        //1、获取排产参数设定
+        try {
+            ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
+            log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionParamLog(productionContext, paramConfiguration));
+            if (null == paramConfiguration) {
+                paramConfiguration = new ProductionCapacityParamConfiguration();
+            }
+            productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
+        } catch (Exception e) {
+            log.error("获取排产参数设定失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PARAMS_CONFIG),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //2、特殊材料的胎胚配置信息
+        try {
+            specialMaterialInfoHandler(productionContext);
+        } catch (Exception e) {
+            log.error("特殊材料的胎胚配置信息处理失败", e);
+            addCheckResult(false, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.SPECIAL_RAW_MATERIAL_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //3、超6个成品库存信息
+        try {
+            overSixMonthStockHandler(productionContext);
+        } catch (Exception e) {
+            log.error("超6个成品库存信息处理失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.OVER_SIX_MONTH_STOCK_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //4、初始化库销比、标记是否按总需求排产
+        try {
+            initProductionRequirePlanInfo(productionContext, requirePlanList);
+        } catch (Exception e) {
+            log.error("初始化库销比处理失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.INIT_PRODUCTION_REQUIRE_PLAN_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //5、获取周期内的生产日历信息
+        try {
+            setMonthProductionDays(productionContext);
+        } catch (Exception e) {
+            log.error("获取周期内的生产日历信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_CALENDAR_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //6、构建全局日排产限制信息
+        try {
+            buildDayCapacityLimitInfo(productionContext);
+        } catch (Exception e) {
+            log.error("构建全局日排产限制信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.DAY_CAPACITY_LIMIT_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //7、获取成型机台信息--日产信息
+        try {
+            Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = getDataService().getCxMachineBaseInfo(productionContext);
+            productionContext.getBaseDataContainer().setCxMachineBaseInfo(cxMachineBaseInfo);
+        } catch (Exception e) {
+            log.error("获取成型机台信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_MACHINE_BASEDATA_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //8、成型鼓
+        try {
+            Map<String, Map<String, TireDrumInfoVo>> workWearTypeInfoMap = getWorkWearInfo(productionContext);
+            productionContext.getBaseDataContainer().setTireDrumInfoMap(workWearTypeInfoMap);
+        } catch (Exception e) {
+            log.error("获取成型鼓信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_TYPE_INFO_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap=new HashMap<>();
+        //9、获取SKU模具配置信息
+        try {
+            mouldRelationMap = getEnableProductionMouldInfo(productionContext);
+            Map<String, ProductionMouldInfoVo> mouldInfoMap = createProductionMouldInfo(productionContext, mouldRelationMap);
+            productionContext.getBaseDataContainer().setMouldInfoMap(mouldInfoMap);
+            productionContext.getBaseDataContainer().setSkuMouldRelationMap(mouldRelationMap);
+        } catch (Exception e) {
+            log.error("获取SKU模具配置信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_INVENTORY_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //10、结构模具分配配比
+        try {
+            Map<String, MouldAllocationInfoVo> mouldAllocationMap = getGroupMainPatternAllocationInfo(productionContext);
+            productionContext.getBaseDataContainer().setGroupMainPatternAllocationLimitMap(mouldAllocationMap);
+        } catch (Exception e) {
+            log.error("获取结构模具分配配比信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //11、获取模壳配置信息
+        try {
+            Map<String, MouldShellBaseInfoVo> mouldShellMap = getMouldShellInfo(productionContext);
+            productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
+        } catch (Exception e) {
+            log.error("获取模壳配置信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.MOLD_SHELL_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_SHELL_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //12、获取胶囊卡盘配置信息
+        try {
+            Map<String, CapsuleChuckInfoVo> capsuleChuckInfoMap = getCapsuleChuckInfo(productionContext);
+            productionContext.getBaseDataContainer().setCapsuleChuckInfoMap(capsuleChuckInfoMap);
+        } catch (Exception e) {
+            log.error("获取胶囊卡盘配置信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.CAPSULE_CHUCK_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.CAPSULE_CHUCK_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //13、获取结构的硫化配比
+        try {
+            List<MonthPlanStructureLhRatioVo> structureLhRatioList = getLhRatioConfiguration(productionContext, requirePlanList);
+            productionContext.getBaseDataContainer().setStructureLhRatioList(structureLhRatioList);
+        } catch (Exception e) {
+            log.error("获取结构的硫化配比信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //16、机台近3个月的生产历史信息
+        try {
+            List<MpStructureAllocation> historyAllocationList = getMonthProductionDataService().getHistoryStructureAllocationInfo(productionContext);
+            Map<String, CxMachineProductionHistoryInfo> cxMachineProductionHistoryInfo = productionHistoryHandler.buildCxMachineProductionHistory(productionContext, historyAllocationList);
+            productionContext.getBaseDataContainer().setCxMachineProductionHistoryInfo(cxMachineProductionHistoryInfo);
+            Map<String, GroupPlanProductionHistoryInfo> groupPlanHistoryInfoMap = productionHistoryHandler.buildGroupPlanProductionHistory(productionContext, historyAllocationList);
+            productionContext.getBaseDataContainer().setGroupPlanHistoryInfoMap(groupPlanHistoryInfoMap);
+        } catch (Exception e) {
+            log.error("获取机台近3个月的生产历史信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_HISTORY_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+
+        Set<String> isSetStructureNameSet = new HashSet<>();
+        //14、根据计划的物料描述，补充模具关系中的物料结构名
+        try {
+            Map<String, List<MonthPlanProductMouldInfoVo>> finalMouldRelationMap = mouldRelationMap;
+            requirePlanList.forEach(requirePlan -> {
+                String materialDesc = requirePlan.getMaterialDesc();
+                if (StringUtils.isBlank(materialDesc)) {
+                    return;
+                }
+                if (isSetStructureNameSet.contains(materialDesc)) {
+                    return;
+                }
+                isSetStructureNameSet.add(materialDesc);
+                List<MonthPlanProductMouldInfoVo> mouldRelationList = finalMouldRelationMap.get(requirePlan.getMaterialDesc());
+                if (CollectionUtils.isEmpty(mouldRelationList)) {
+                    return;
+                }
+                mouldRelationList.forEach(mouldRelation -> {
+                    mouldRelation.setStructureName(requirePlan.getStructureName());
+                });
+            });
+        } catch (Exception e) {
+            log.error("根据计划的物料描述补充模具关系中的物料结构名失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOULD_STRUCTURE_NAME_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+
+        //15、构建结构、主花纹的模具信息
+        try {
+            buildGroupMainPatternInfo(productionContext);
+        } catch (Exception e) {
+            log.error("构建结构、主花纹的模具信息失败", e);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
+                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GROUP_MAIN_PATTERN_ERROR),
+                    mpCheckItemVos, mpCheckItemRecords);
+        }
+    }
+
+    /**
+     * 辅助方法：添加检测结果
+     */
+    private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
+        // 先判断该类型的检测是否已经存在结果
+        boolean isAlreadyChecked = mpCheckItemVos.stream()
+                .anyMatch(vo -> checkItemType.getCode().equals(vo.getCheckItem()) && !StringUtils.equals(vo.getCheckItem(),CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode()));
+
+        // 如果已经检测过，直接返回，保留原来的结果（保留第1、2项的成功状态）
+        if (isAlreadyChecked) {
+            return;
+        }
+        if (!isPass) {
+            if (checkItemType == CheckItemTypeEnums.OTHER_PARAMS_CONFIG) {
+                // 特殊处理：OTHER_PARAMS_CONFIG 枚举，将多个异常记录在同一条记录中
+                addErrorRecordWithMultipleErrors(mpCheckItemRecords, checkItemType.getCode(), failReason);
+            } else {
+                // 普通处理：每个异常单独记录
+                addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason);
+            }
+        }
+        addCheckItemResult(mpCheckItemVos, checkItemType, isPass);
+    }
+
+    /**
+     * 添加错误记录（特殊方式：OTHER_PARAMS_CONFIG 枚举，多个异常用逗号分隔）
+     */
+    private void addErrorRecordWithMultipleErrors(List<MpCheckItemRecord> records, String checkItem, String errorReason) {
+        // 检查是否已经存在该类型的记录
+        MpCheckItemRecord existingRecord = records.stream()
+                .filter(record -> checkItem.equals(record.getCheckItem()))
+                .findFirst()
+                .orElse(null);
+
+        if (existingRecord != null) {
+            // 如果记录已存在，将新异常追加到现有记录中
+            String existingReason = existingRecord.getCheckContent();
+            if (existingReason != null && !existingReason.isEmpty()) {
+                // 如果已有内容，用逗号分隔
+                existingRecord.setCheckContent(existingReason + "," + errorReason);
+            } else {
+                // 如果没有内容，直接设置
+                existingRecord.setCheckContent(errorReason);
+            }
+        } else {
+            // 如果记录不存在，创建新记录
+            MpCheckItemRecord record = new MpCheckItemRecord();
+            record.setCheckItem(checkItem);
+            record.setCheckContent(errorReason);
+            records.add(record);
+        }
+    }
+
+    /**
+     * 辅助方法：添加单个检测项VO
+     */
+    private void addCheckItemResult(List<MpCheckItemVo> list, CheckItemTypeEnums checkItemType, boolean isPass) {
+        MpCheckItemVo vo = new MpCheckItemVo();
+        vo.setCheckItem(checkItemType.getCode());
+        vo.setPass(isPass);
+        list.add(vo);
+    }
+
+    /**
+     * 添加错误记录
+     */
+    private void addErrorRecord(List<MpCheckItemRecord> records, String checkItem, String errorReason) {
+        MpCheckItemRecord record = new MpCheckItemRecord();
+        record.setCheckItem(checkItem);
+        record.setCheckContent(errorReason);
+        records.add(record);
     }
 
     /**
@@ -466,7 +750,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldDeliveryLog(productionContext, mouldDeliveryList));
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList);
+        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList,productionContext);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
