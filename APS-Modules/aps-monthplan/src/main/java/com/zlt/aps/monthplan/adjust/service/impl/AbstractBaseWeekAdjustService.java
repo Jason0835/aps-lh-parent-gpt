@@ -561,8 +561,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         Map<String, Object> jsonData = new HashMap<>(3);
-        jsonData.put("LhMachines", capacityVo.getMaxLhMachines());
-        jsonData.put("EmbryoCount", capacityVo.getMaxEmbryoTypes());
+        jsonData.put("LhMachines", capacityVo.getUsedLhMachines() == 0 ? null:capacityVo.getUsedLhMachines());
+        jsonData.put("EmbryoCount", capacityVo.getUsedEmbryoTypes() == 0 ? null:capacityVo.getUsedEmbryoTypes());
         jsonData.put("ChangeMould", "");
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(jsonData));
     }
