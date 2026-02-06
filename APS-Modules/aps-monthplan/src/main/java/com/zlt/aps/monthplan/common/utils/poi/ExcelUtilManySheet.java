@@ -146,12 +146,12 @@ public class ExcelUtilManySheet {
    * @param list     导出数据集合名
    * @return 结果
    */
-  public Workbook exportExcelFromList(List<WorksheetData> list) {
+  public void exportExcelFromList(List<WorksheetData> list) {
     this.init(list, Excel.Type.EXPORT);
-    return exportExcel2();
+    exportExcel2();
   }
 
-  private Workbook exportExcel2() {
+  private void exportExcel2() {
     try {
       //获取下拉数据集、下拉列位置集
       Map<String,List<String[]>> downDataListMap = Maps.newHashMap();
@@ -193,22 +193,19 @@ public class ExcelUtilManySheet {
         }
         log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
       }
-      return wb;
     } catch (Exception e) {
       String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.exception"), e.getMessage());
       log.error(errorMsg);
     }
-    return null;
   }
 
   /**
    * 填充 Workbook
    *
-   * @return Workbook
    */
-  public Workbook exportExcel2(HttpServletResponse response, List<WorksheetData>  list, String fileName) {
+  public void exportExcel2(HttpServletResponse response, List<WorksheetData>  list, String fileName) {
     ExcelUtil.setResponseHeader(response, fileName, ExcelUtil.XLSX_FILE);
-    return exportExcelFromList(list);
+    exportExcelFromList(list);
   }
 
   /**
@@ -702,6 +699,7 @@ public class ExcelUtilManySheet {
     if (CollectionUtils.isEmpty(list)) {
       list = Lists.newArrayList();
     }
+    createWorkbook();
     this.list = list;
     this.type = type;
     this.sheets = Lists.newArrayList();
@@ -715,7 +713,7 @@ public class ExcelUtilManySheet {
     }
     this.dictSheet = wb.createSheet("Dictionary");
     createExcelField();
-    createWorkbook();
+
   }
 
   private void createExcelField() {
@@ -863,8 +861,8 @@ public class ExcelUtilManySheet {
   }
 
   public byte[] exportData(List<WorksheetData> worksheetDatas, String fileName, HttpServletResponse response) throws IOException {
-    Workbook workbook = this.exportExcel2(response, worksheetDatas, fileName);
-    return ExcelReadUtils.writeExcel(workbook);
+    this.exportExcel2(response, worksheetDatas, fileName);
+    return ExcelReadUtils.writeExcel(this.wb);
   }
 
   /**
