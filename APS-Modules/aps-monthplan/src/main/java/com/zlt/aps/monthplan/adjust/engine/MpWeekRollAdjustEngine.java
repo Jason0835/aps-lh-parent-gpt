@@ -1452,8 +1452,13 @@ public class MpWeekRollAdjustEngine {
                 //检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
                     // 将值还原，并退出，继续加模
-                    dayValue -= dayVulcanizationQty;
-                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
+                    if (i == newOnLineDay){
+                        //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
+                        mpFinalVo = bakMpFinalVo;
+                    }else{
+                        dayValue -= dayVulcanizationQty;
+                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
+                    }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     continue;
                 }
