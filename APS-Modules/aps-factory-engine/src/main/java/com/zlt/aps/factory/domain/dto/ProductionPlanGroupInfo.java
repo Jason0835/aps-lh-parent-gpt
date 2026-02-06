@@ -127,12 +127,12 @@ public class ProductionPlanGroupInfo {
      * 是否分配完毕 1 分配完成
      */
     private Integer isAllocationFinish;
-    
+
     /**
      * 特殊材料清单，同结构的特殊材料用量相同
      */
     private Map<String, BigDecimal> embryoSpecialMaterialInfoMap;
-    
+
     /**
      * 是否最后一个特殊材料结构
      */
@@ -168,6 +168,61 @@ public class ProductionPlanGroupInfo {
             groupInfo.setEmbryoSpecialMaterialInfoMap(materilMap);
         }
         return groupInfo;
+    }
+
+    /**
+     * 检测特殊材料数据是否正常
+     *
+     * @param context 排产上下文
+     */
+    public void checkSpecialMaterialData(Context context) {
+        if (!isSpecialMaterial()) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = groupPlanData.stream().filter(singlePlan -> singlePlan.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return;
+        }
+        Set<String> embryoCodeSet = effectiveList.stream().map(MonthPlanProductionRequirePlanVo::getEmbryoCode).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(embryoCodeSet)) {
+            return;
+        }
+        // 胎胚与特殊材料对应关系清单
+        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = ((TbrProductionContext) context).getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
+        Map<String, BigDecimal> firstConfiguration = null;
+        boolean isSameConfiguration = true;
+        for (String embryoCode : embryoCodeSet) {
+            Map<String, BigDecimal> singleConfiguration = embryoSpecialMaterialInfoMap.get(embryoCode);
+            if (CollectionUtils.isEmpty(singleConfiguration)) {
+                singleConfiguration = Collections.emptyMap();
+            }
+            if (null == firstConfiguration) {
+                firstConfiguration = singleConfiguration;
+                continue;
+            }
+            Set<String> theorySet = firstConfiguration.keySet();
+            int theorySize = theorySet.size();
+            Set<String> singleConfigurationSet = singleConfiguration.keySet();
+            if (theorySize != singleConfigurationSet.size()) {
+                isSameConfiguration = false;
+                break;
+            }
+            Set<String> intersectionSet = theorySet.stream().filter(singleConfigurationSet::contains).collect(Collectors.toSet());
+            int resultSize = intersectionSet.size();
+            if (theorySize != resultSize) {
+                isSameConfiguration = false;
+                break;
+            }
+        }
+        if (isSameConfiguration) {
+            return;
+        }
+        //特殊材料配置不一致，不排
+        String specialMaterialNoSameReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GROUP_SPECIAL_MATERIAL_NO_SAME);
+        effectiveList.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(specialMaterialNoSameReason));
     }
 
     /**
@@ -859,9 +914,10 @@ public class ProductionPlanGroupInfo {
         }
         return materialSet.size();
     }
-    
+
     /**
      * 是否含有特殊材料
+     *
      * @return
      */
     public boolean isSpecialMaterial() {

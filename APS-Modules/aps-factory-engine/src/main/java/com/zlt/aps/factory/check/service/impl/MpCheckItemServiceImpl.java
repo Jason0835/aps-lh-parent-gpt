@@ -147,6 +147,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         addCheckResult(false, CheckItemTypeEnums.MOLD_SHELL_DATA, errorMsg, vos, records);
         addCheckResult(false, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, errorMsg, vos, records);
         addCheckResult(false, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, errorMsg, vos, records);
+        addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, errorMsg, vos, records);
     }
 
     /**
@@ -286,7 +287,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         //基础数据容器存储
         productionContext.setBaseDataContainer(new BaseDataContainer());
         // 调用父类方法加载数据
-        super.initProductionBaseData(productionContext, requirePlanList);
+        super.initProductionBaseDataWithExceptions(productionContext, requirePlanList, mpCheckItemVos, mpCheckItemRecords);
 
         // 2. 开始从 BaseDataContainer 中检查关键数据
         // 检查 1: 特殊原材料数据
@@ -328,6 +329,15 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = productionContext.getBaseDataContainer().getStructureLhRatioList();
         boolean hasSulfurizationRatio = CollectionUtils.isNotEmpty(structureLhRatioList);
         addCheckResult(hasSulfurizationRatio, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
+
+        // 确保 OTHER_PARAMS_CONFIG 检测项被正确处理
+        // 检查 OTHER_PARAMS_CONFIG 是否已经存在，如果不存在则添加成功状态
+        boolean isOtherParamsConfigChecked = mpCheckItemVos.stream()
+                .anyMatch(vo -> CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode().equals(vo.getCheckItem()));
+
+        if (!isOtherParamsConfigChecked) {
+            addCheckResult(true, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, null, mpCheckItemVos, mpCheckItemRecords);
+        }
     }
 
     /**

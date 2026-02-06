@@ -106,7 +106,7 @@ public class RawMaterialOutboundRecord extends BaseEntity {
     @TableField("REMARK")
     private String remark;
 
-    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate")
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty("更新时间")
     @JsonFormat(
             pattern = "yyyy-MM-dd HH:mm:ss"
