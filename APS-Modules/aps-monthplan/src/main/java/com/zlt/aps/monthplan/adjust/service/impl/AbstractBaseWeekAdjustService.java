@@ -579,9 +579,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 删除月计划统计结果（物理删除）
         mpMonthPlanStatisticsService.deleteMonthPlanStatisticsByCondition(contextDTO.getFactoryCode(),
                 String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion());
-
+        // 去重月计划统计结果
+        monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
         baseDao.insertBatch(monthPlanStatisticsList);
+    }
+
+    /**
+     * 去重月计划统计结果（按结构名称去重）
+     * @param monthPlanStatisticsList 原始列表
+     * @return 去重后的列表
+     */
+    protected List<MpMonthPlanStatistics> distinctMonthPlanStatistics(List<MpMonthPlanStatistics> monthPlanStatisticsList) {
+        if (PubUtil.isEmpty(monthPlanStatisticsList)) {
+            return new ArrayList<>();
+        }
+        return monthPlanStatisticsList.stream()
+                .filter(item -> StringUtils.isNotEmpty(item.getStructureName()))
+                .collect(Collectors.toMap(
+                        MpMonthPlanStatistics::getStructureName,
+                        item -> item,
+                        (existing, newItem) -> existing
+                ))
+                .values().stream()
+                .collect(Collectors.toList());
     }
 
     /**
