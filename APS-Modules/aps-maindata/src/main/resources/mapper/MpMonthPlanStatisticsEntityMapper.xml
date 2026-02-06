@@ -4,4 +4,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper">
 
+    <delete id="deleteMonthPlanStatisticsByCondition" parameterType="String">
+        DELETE FROM T_MP_MONTH_PLAN_STATISTICS
+        WHERE FACTORY_CODE = #{factoryCode}
+                  AND YEAR= #{year}
+                  AND MONTH= #{month}
+          AND PRODUCTION_VERSION= #{productionVersion}
+    </delete>
+
 </mapper>

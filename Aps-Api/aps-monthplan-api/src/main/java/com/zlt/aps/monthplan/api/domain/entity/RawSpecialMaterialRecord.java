@@ -29,7 +29,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 @ApiModel(value = "特殊材料清单对象", description = "特殊材料清单对象 ")
 @Data
-@TableName(value = "T_RAW_SPECIAL_MATERIAL_RECORD")
+@TableName(value = "T_MDM_SPECIAL_MATERIAL_RECORD")
 public class RawSpecialMaterialRecord extends BaseEntity {
 
     private static final long serialVersionUID = 1L;

@@ -9,6 +9,7 @@ import com.tlt.aps.enums.UrgencyTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.check.DayTotalCapacityChecker;
 import com.zlt.aps.factory.check.SkuSecondChecker;
@@ -268,7 +269,7 @@ public class MpWeekRollAdjustEngine {
             mpProdFinalList.add(mpFinalVo);
             contextDTO.getFactoryMonthPlanProdFinalList().add(mpFinalVo);
             //重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,排产上机日:%s,排产量:%s!",contextDTO.getStructureName(), structureIn.getMaterialCode(), newOnlineDay,structureIn.getConfirmAdjustQty())).append(ApsConstant.DIVISION);
         }
     }
@@ -345,8 +346,6 @@ public class MpWeekRollAdjustEngine {
         List<String> onMaterialCodeList = new ArrayList<>();
         if (PubUtil.isNotEmpty(mpProdFinalList)){
             onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
-        }else {
-            mpProdFinalList = new ArrayList<>();
         }
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
@@ -411,7 +410,9 @@ public class MpWeekRollAdjustEngine {
         //7.优化：其他SKU往前移动
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-        moveForwardWithOtherSku(contextDTO,lockNextDay,mpProdFinalList);
+        //结构间调整，锁定次日有可能小于结构起产日，将其调到结构起产日
+        int startDay = lockNextDay < contextDTO.getStructureStartDay() ? contextDTO.getStructureStartDay():lockNextDay;
+        moveForwardWithOtherSku(contextDTO,startDay,mpProdFinalList);
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
     }
@@ -424,7 +425,7 @@ public class MpWeekRollAdjustEngine {
     private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureIn structureIn){
         if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
-                    structureIn.getMaterialCode()));
+                    structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }
 
@@ -436,7 +437,7 @@ public class MpWeekRollAdjustEngine {
     private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureOut structureOut){
         if (structureOut.getDayVulcanizationQty() == null || structureOut.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
-                    structureOut.getMaterialCode()));
+                    structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }
 
@@ -490,7 +491,7 @@ public class MpWeekRollAdjustEngine {
                 incMouldProduction(mpProdFinalList, contextDTO, i, finalVo.getTotalQty(), finalVo);
                 contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】--增模排产,排产日:%s,物料编码:%s,结束！",contextDTO.getStructureName(), i,finalVo.getMaterialCode())).append(ApsConstant.DIVISION);
                 //重置开始日\结束日\汇总值
-                resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),finalVo);
+                resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),finalVo);
                 //3.5、检查是否还有剩余空间，若没有，则退出
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),i)).append(ApsConstant.DIVISION);
@@ -575,7 +576,7 @@ public class MpWeekRollAdjustEngine {
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4.重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
     }
 
@@ -618,7 +619,7 @@ public class MpWeekRollAdjustEngine {
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4、重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
     }
 
@@ -956,12 +957,23 @@ public class MpWeekRollAdjustEngine {
             splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
         }
         //3.重置开始日\结束日\汇总值
-        resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+        resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+
+        //4.组装消息：SKU原余量未满的消息
+        combineMsgWithInLockDayNoFull(contextDTO,mpFinalVo);
     }
 
-    private void sendMsgWithInLockDayNoFull(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+    /**
+     * 组装消息：SKU原余量未满的消息
+     * @param contextDTO 周程滚动上下文
+     * @param mpFinalVo 定稿Vo
+     */
+    private void combineMsgWithInLockDayNoFull(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        if (YesOrNoEnum.YES.getCode().equals(mpFinalVo.getHasSpecialMaterial())){
+            return;
+        }
         //50条 <= 不含特殊材料收尾新增的SKU原余量 <= 150条，触发预警；
-        //从调整次日开始，到锁定截止日，认第1天有值的机台数
+        //1.从调整次日开始，到锁定截止日，认第1天有值的机台数
         int iAdjustNextDay = contextDTO.getAdjustDay()+1;
         int iLockEndDay = contextDTO.getLockEndDay();
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
@@ -976,10 +988,14 @@ public class MpWeekRollAdjustEngine {
                 totalRemainQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
             }
         }
-        //预警阀值 X台硫化机 * 50条 * 3天
+        //2.预警阀值 X台硫化机 * 50条 * 3天
         int totalQty = dailyQty * dayMachines * (iLockEndDay - iAdjustNextDay + 1);
         if (totalRemainQty < totalQty){
             //提示消息
+            if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithRemainQtyNoFull())){
+                String strHint = String.format(contextDTO.getMsgTemplateWithRemainQtyNoFull(),mpFinalVo.getMaterialCode(),totalRemainQty,totalQty);
+                contextDTO.getMsgRemainQtyNoFull().append(strHint);
+            }
         }
     }
 
@@ -1152,7 +1168,10 @@ public class MpWeekRollAdjustEngine {
         }
 
         //3、重置开始日\结束日\汇总值
-        resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+        resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+
+        //4、组装消息：SKU原余量未满的消息
+        combineMsgWithInLockDayNoFull(contextDTO,mpFinalVo);
     }
     /**
      * 获取新上机日
@@ -1261,13 +1280,13 @@ public class MpWeekRollAdjustEngine {
                 optimalFinalVo.setConventionProductionQty(0);
             }
             //重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),optimalFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),optimalFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,总搭配量:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),oriMatchQty,deductMatchQty)).append(ApsConstant.DIVISION);
             // 4.增模模拟排产
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-开始！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay)).append(ApsConstant.DIVISION);
             remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, planQty, curFinalVo);
             //重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),curFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),curFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-结束,剩余排产计划量:%s,本次剩余排产计划量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,planQty,remainPlanQty)).append(ApsConstant.DIVISION);
             if (remainPlanQty > 0){
                 String optimalMaterialCode = optimalFinalVo.getMaterialCode();
@@ -1432,7 +1451,7 @@ public class MpWeekRollAdjustEngine {
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
                     // 将值还原，并退出，继续加模
                     dayValue -= dayVulcanizationQty;
-                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     continue;
                 }
@@ -1446,7 +1465,7 @@ public class MpWeekRollAdjustEngine {
                         mpFinalVo = bakMpFinalVo;
                     }else{
                         dayValue -= dayVulcanizationQty;
-                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue==0?null:dayValue);
                     }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,主花纹:%s,其主花纹模具数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,mpFinalVo.getMainPattern())).append(ApsConstant.DIVISION);
                     return newPlanQty < 0 ? 0:newPlanQty;
@@ -1835,7 +1854,7 @@ public class MpWeekRollAdjustEngine {
             //3.重置各优先级总排产量
             resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
             //4.重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
         return true;
     }
@@ -1848,32 +1867,32 @@ public class MpWeekRollAdjustEngine {
      */
     private void resetTotalProductionQty(MpAdjustStructureIn adjustStructInVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int productionQty){
 
-        /*mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
-        mpFinalVo.setHeightProductionQty(mpFinalVo.getHeightProductionQty() == null ? 0:mpFinalVo.getHeightProductionQty());
-        mpFinalVo.setCycleProductionQty(mpFinalVo.getCycleProductionQty() == null ? 0:mpFinalVo.getCycleProductionQty());
-        mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
-        mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
-*/
         if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(adjustStructInVo.getConstructionStage())){
             mpFinalVo.setTrialProductionQty(productionQty);
         }else{
-            if (adjustStructInVo.getPostponeQty()>=0 && productionQty >=0){
-                //有暂缓需求
-                mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
-                productionQty -= adjustStructInVo.getPostponeQty();
+
+            int bQty;
+            if (adjustStructInVo.getPostponeQty()>0 && productionQty >0){
+                //有暂缓需求 且 有设调整优先级
+                if (adjustStructInVo.getAdjustPriority() != null && adjustStructInVo.getAdjustPriority()>0){
+                    mpFinalVo.setPostponeProductionQty(adjustStructInVo.getPostponeQty());
+                    productionQty -= adjustStructInVo.getPostponeQty();
+                }
             }
-            if (adjustStructInVo.getHeightQty()>=0 && productionQty >=0){
+            if (adjustStructInVo.getHeightQty()>0 && productionQty >0){
                 //有高优先级需求
-                mpFinalVo.setHeightProductionQty(adjustStructInVo.getHeightQty());
-                productionQty -= adjustStructInVo.getHeightQty();
+                bQty = productionQty >= adjustStructInVo.getHeightQty() ? adjustStructInVo.getHeightQty():productionQty;
+                mpFinalVo.setHeightProductionQty(bQty);
+                productionQty -= bQty;
             }
-            if (adjustStructInVo.getCycleReserveQty()>=0 && productionQty >=0){
+            if (adjustStructInVo.getCycleReserveQty()>0 && productionQty >0){
                 //有周期性需求
-                mpFinalVo.setCycleProductionQty(adjustStructInVo.getCycleReserveQty());
-                productionQty -= adjustStructInVo.getCycleReserveQty();
+                bQty = productionQty >= adjustStructInVo.getCycleReserveQty() ? adjustStructInVo.getCycleReserveQty():productionQty;
+                mpFinalVo.setCycleProductionQty(bQty);
+                productionQty -= bQty;
             }
             //其他全归到 中优先级需求
-            if (productionQty >=0){
+            if (productionQty >0){
                 mpFinalVo.setMidProductionQty(productionQty);
             }
         }
@@ -1887,30 +1906,34 @@ public class MpWeekRollAdjustEngine {
      */
     private void resetTotalProductionQty(MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int productionQty){
 
-        /*mpFinalVo.setPostponeProductionQty( mpFinalVo.getPostponeProductionQty() == null ? 0:mpFinalVo.getPostponeProductionQty());
-        mpFinalVo.setHeightProductionQty(mpFinalVo.getHeightProductionQty() == null ? 0:mpFinalVo.getHeightProductionQty());
-        mpFinalVo.setCycleProductionQty(mpFinalVo.getCycleProductionQty() == null ? 0:mpFinalVo.getCycleProductionQty());
-        mpFinalVo.setMidProductionQty(mpFinalVo.getMidProductionQty() == null ? 0:mpFinalVo.getMidProductionQty());
-        mpFinalVo.setConventionProductionQty(mpFinalVo.getConventionProductionQty() == null ? 0:mpFinalVo.getConventionProductionQty());
-*/
-        if (adjustStructOutVo.getPostponeQty()>=0 && productionQty >=0){
-            //有暂缓需求
-            mpFinalVo.setPostponeProductionQty(adjustStructOutVo.getPostponeQty());
-            productionQty -= adjustStructOutVo.getPostponeQty();
-        }
-        if (adjustStructOutVo.getHeightQty()>=0 && productionQty >=0){
-            //有高优先级需求
-            mpFinalVo.setHeightProductionQty(adjustStructOutVo.getHeightQty());
-            productionQty -= adjustStructOutVo.getHeightQty();
-        }
-        if (adjustStructOutVo.getCycleReserveQty()>=0 && productionQty >=0){
-            //有周期性需求
-            mpFinalVo.setCycleProductionQty(adjustStructOutVo.getCycleReserveQty());
-            productionQty -= adjustStructOutVo.getCycleReserveQty();
-        }
-        //其他全归到 中优先级需求
-        if (productionQty >=0){
-            mpFinalVo.setMidProductionQty(productionQty);
+        if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(adjustStructOutVo.getConstructionStage())){
+            mpFinalVo.setTrialProductionQty(productionQty);
+        }else{
+
+            int bQty;
+            if (adjustStructOutVo.getPostponeQty()>0 && productionQty >0){
+                //有暂缓需求 且 有设调整优先级
+                if (adjustStructOutVo.getAdjustPriority() != null && adjustStructOutVo.getAdjustPriority()>0){
+                    mpFinalVo.setPostponeProductionQty(adjustStructOutVo.getPostponeQty());
+                    productionQty -= adjustStructOutVo.getPostponeQty();
+                }
+            }
+            if (adjustStructOutVo.getHeightQty()>0 && productionQty >0){
+                //有高优先级需求
+                bQty = productionQty >= adjustStructOutVo.getHeightQty() ? adjustStructOutVo.getHeightQty():productionQty;
+                mpFinalVo.setHeightProductionQty(bQty);
+                productionQty -= bQty;
+            }
+            if (adjustStructOutVo.getCycleReserveQty()>0 && productionQty >0){
+                //有周期性需求
+                bQty = productionQty >= adjustStructOutVo.getCycleReserveQty() ? adjustStructOutVo.getCycleReserveQty():productionQty;
+                mpFinalVo.setCycleProductionQty(bQty);
+                productionQty -= bQty;
+            }
+            //其他全归到 中优先级需求
+            if (productionQty >0){
+                mpFinalVo.setMidProductionQty(productionQty);
+            }
         }
     }
 
@@ -2060,10 +2083,10 @@ public class MpWeekRollAdjustEngine {
             }else{
                 //重置各优先级总排产量
                 resetTotalProductionQty(adjustStructOutVo,mpFinalVo,productionQty);
+                //重置开始日\结束日\汇总值
+                resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
             }
 
-            //3.重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
         }
     }
 
@@ -2147,6 +2170,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTypeBlockQty(adjustStructOutVo.getTypeBlockQty());
         mpFinalVo.setDayVulcanizationQty(adjustStructOutVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructOutVo.getCuringTime());
+        mpFinalVo.setHasSpecialMaterial(adjustStructOutVo.getHasSpecialMaterial());
 
         mpFinalVo.setPostponeProductionQty( 0);
         mpFinalVo.setHeightProductionQty(0);

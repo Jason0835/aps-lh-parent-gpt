@@ -15,6 +15,7 @@ import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -104,6 +105,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         Date startTime,endTime;
         List<MpStructureAllocation> structureAllocationList;
         List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //2.1 初始结构上下文
@@ -119,8 +121,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             contextDTO.setLockEndDay(getLockEndDay(contextDTO));
             //3）初始结构开始日、收尾日
             initStructureStartAndEndDay(contextDTO);
-            //4）初始化日志
+            //4）初始化日志和消息
             contextDTO.setLogDetail(new StringBuilder());
+            contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
             //2.2 执行结构内调整
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
@@ -133,13 +136,22 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             //=========================================================
 
             //=========================================================
+
             newMpFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
 
-            //2.4 保存调整日志
+            //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+            reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalMap.get(entry.getKey()));
+
+            //2.5 构建月计划统计结果
+            monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(entry.getKey()));
+
+            //2.6 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
 
+
         contextDTO.setSaveMpProdFinalList(newMpFinalList);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
     }
 
     /**

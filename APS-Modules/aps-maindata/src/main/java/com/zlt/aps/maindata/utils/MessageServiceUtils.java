@@ -170,6 +170,38 @@ public class MessageServiceUtils {
         }
     }
 
+    /**
+     * 发送完善的指定消息到指定渠道（完整参数）
+     *
+     * @param templateCode 消息模板代码
+     * @param msgType 消息类型
+     * @param channel 消息渠道
+     * @param receivers 接收人用户名数组
+     * @param context 消息上下文
+     */
+    public void sendBatchMessage(String templateCode, String msgType, String msgContent,String channel,
+                            String[] receivers, MessageContext context) {
+        if (receivers == null || receivers.length ==0){
+            receivers = determineReceivers(templateCode, null, null);
+        }
+        try {
+            if (StringUtils.isEmpty(templateCode) || receivers == null || receivers.length == 0) {
+                log.warn("消息发送参数不完整: 模板编码templateCode={}, 接收人receivers={}", templateCode,
+                        receivers != null ? Arrays.toString(receivers) : "null");
+                return;
+            }
+
+            msgUtils.addInnerSiteMessageByTemplateContent(templateCode, channel,
+                    receivers, context, msgType,msgContent);
+
+            log.debug("消息发送成功 - 模板: {}, 类型: {}, 接收人: {}, 渠道: {}",
+                    templateCode, msgType, Arrays.toString(receivers), channel);
+        } catch (Exception e) {
+            log.error("消息发送失败 - 模板: {}, 类型: {}, 接收人: {}", templateCode, msgType,
+                    receivers != null ? Arrays.toString(receivers) : "null", e);
+        }
+    }
+
     // ==================== 接收人处理逻辑 ====================
 
     /**

@@ -236,6 +236,9 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
                     // 计算型腔可用量（按结构+主花纹）
                     if (StringUtils.isNotBlank(structureName)) {
+                        if("315/70R22.5JF568".equals(structureName)){
+                            System.out.println(materialDesc);
+                        }
                         cavityTempMap.computeIfAbsent(structureName, k -> new HashSet<>()).add(mouldCode);
                     }
                 }
