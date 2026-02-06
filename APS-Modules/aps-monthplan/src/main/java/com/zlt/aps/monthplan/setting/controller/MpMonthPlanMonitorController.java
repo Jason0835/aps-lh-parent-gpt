@@ -6,11 +6,11 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.tlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -73,20 +73,24 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
         startPage(getOrderBy(queryVO));
         List<MpMonthPlanMonitor> list = entityMapper.listReport(queryVO);
         int daySubOne = DateUtils.getDay(DateUtils.addDays(new Date(), -1));
-        List<Long> finalResultIdList = list.stream().map(MpMonthPlanMonitor::getFinalResultId).collect(Collectors.toList());
-        Map<Long, FactoryMonthPlanProductionFinalResult> finalResultMap = new HashMap<>();
-        if (CollectionUtils.isNotEmpty(finalResultIdList)) {
+
+        Map<String, FactoryMonthPlanProductionFinalResult> finalResultMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(list)) {
+            String productionVersion = list.get(0).getProductionVersion();
             LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.in(BaseEntity::getId, finalResultIdList);
+            queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion);
             List<FactoryMonthPlanProductionFinalResult> finalResultList = finalResultEntityMapper.selectList(queryWrapper);
-            finalResultMap = finalResultList.stream().collect(Collectors.toMap(BaseEntity::getId, Function.identity()));
+            if (CollectionUtils.isNotEmpty(finalResultList)) {
+                finalResultMap = finalResultList.stream().collect(Collectors
+                        .toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getYearMonth(), item.getMaterialCode()), Function.identity()));
+            }
         }
 
         for (MpMonthPlanMonitor monitor : list) {
             Integer lhMargin = monitor.getLhMargin();
-            Long finalResultId = monitor.getFinalResultId();
-            if (finalResultMap.containsKey(finalResultId)) {
-                FactoryMonthPlanProductionFinalResult result = finalResultMap.get(finalResultId);
+            String mapKey = GenerageMapKeyUtils.createMapKey(monitor.getFactoryCode(), monitor.getYearMonth(), monitor.getMaterialCode());
+            if (finalResultMap.containsKey(mapKey)) {
+                FactoryMonthPlanProductionFinalResult result = finalResultMap.get(mapKey);
                 int dayVulcanizationQty = ObjectUtils.defaultIfNull(result.getDayVulcanizationQty(), 0) * 2;
                 for (int i = daySubOne; i > 0; i--) {
                     Object fieldValue = ReflectUtils.getFieldValue(monitor, "day" + daySubOne);
