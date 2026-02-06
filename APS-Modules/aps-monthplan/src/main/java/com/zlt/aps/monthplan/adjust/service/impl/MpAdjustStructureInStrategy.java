@@ -134,9 +134,13 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             //=========================================================
 
             //=========================================================
+
             newMpFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
 
-            //2.4 保存调整日志
+            //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+            reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalMap.get(entry.getKey()));
+
+            //2.5 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
 

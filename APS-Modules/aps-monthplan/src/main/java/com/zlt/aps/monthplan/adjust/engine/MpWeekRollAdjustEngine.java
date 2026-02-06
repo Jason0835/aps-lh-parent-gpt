@@ -2168,6 +2168,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTypeBlockQty(adjustStructOutVo.getTypeBlockQty());
         mpFinalVo.setDayVulcanizationQty(adjustStructOutVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructOutVo.getCuringTime());
+        mpFinalVo.setHasSpecialMaterial(adjustStructOutVo.getHasSpecialMaterial());
 
         mpFinalVo.setPostponeProductionQty( 0);
         mpFinalVo.setHeightProductionQty(0);
