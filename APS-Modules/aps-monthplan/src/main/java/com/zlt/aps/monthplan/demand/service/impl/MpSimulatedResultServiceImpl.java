@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +63,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     private final AsyncService asyncService;
     private final MpSimulatedResultEntityMapper entityMapper;
+    private final RedisService redisService;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
 
@@ -97,6 +101,11 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       if (CollectionUtils.isEmpty(finalVersions)) {
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
       }
+      String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
+      if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+        throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
+      }
+      redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
       YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
       // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
       MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);

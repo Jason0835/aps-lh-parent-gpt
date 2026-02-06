@@ -256,7 +256,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         adjustList.removeIf(adjust -> {
             Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
             Integer monthScheduledQty = Convert.toInt(adjust.getMonthScheduledQty(),0);
-            return Math.abs(currentNetQty - monthScheduledQty) == 0;
+            boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
+            return (Math.abs(currentNetQty - monthScheduledQty) == 0) || isOnlyConventionReserveHasValue;
         });
     }
 
