@@ -107,6 +107,54 @@ public class MessageUtils {
     }
 
     /**
+     * 添加自定义消息（根据消息模板，支持自定义消息类型）,已自定义好消息内容
+     *
+     * @param templateCode 消息模板编码
+     * @param msgChannel 消息渠道
+     * @param receivedBys 接收人数组
+     * @param context 单据上下文
+     * @param msgType 消息类型（支持：0-通知消息, 1-工作任务, 2-预警消息）
+     */
+    public void addInnerSiteMessageByTemplateContent(String templateCode, String msgChannel,
+                                              String[] receivedBys, MessageContext context, String msgType, String msgContent) {
+        if (StringUtils.isEmpty(templateCode)
+                || StringUtils.isEmpty(receivedBys)) {
+            throw new CustomException("消息模板或接收人员为空！");
+        }
+
+        // 验证消息类型是否有效
+        if (StringUtils.isEmpty(msgType)) {
+            msgType = MsgTypeEnums.NOTICE.getCode();
+        } else {
+            validateMsgType(msgType);
+        }
+
+        // 1. 获取系统模板
+        MsgTemplate template = templateRemoteService.getTemplateInfo(templateCode);
+        if (template == null) {
+            throw new CustomException("消息模板不存在：" + templateCode);
+        }
+
+
+        // 2. 替换消息内容参数
+        //String msgContent = buildMessageContent(template.getContent(), paramValues);
+
+        // 3. 获取系统编码和发送人员
+        String systemCode = getSystemCode(context);
+        String sendBy = getSendBy(context);
+
+        // 4. 根据接收人组装消息列表
+        List<MsgMessage> messageList = buildMessageList(
+                template, msgContent, msgChannel, msgType,
+                systemCode, sendBy, receivedBys, context
+        );
+
+        if (StringUtils.isNotEmpty(messageList)) {
+            messageCenterRemoteService.saveMessage(messageList);
+        }
+    }
+
+    /**
      * 添加自定义消息（根据消息模板，支持自定义消息类型）
      *
      * @param templateCode 消息模板编码

@@ -136,6 +136,7 @@ public class AsyncService {
     DpDemandPlan tMonthDemandPlan = tMonthDemands.get(0);
     monthPlanVersions.add(tMonthDemandPlan.getMonthPlanVersion());
     Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
+    Map<String,List<DpDemandPlan>>  tMonthDemandsGroupByMaterialCode =  tMonthDemands.stream().collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
     List<MpSimulatedResult> result = Lists.newArrayList();
     YearMonth yearMonth = YearMonth.now();
     map.forEach((materialCode, value) -> {
@@ -143,6 +144,7 @@ public class AsyncService {
         return;
       }
       List<FactoryMonthPlanMouldDayResult> listGroupByMaterialCode = map.get(materialCode);
+      List<DpDemandPlan> netDemands = tMonthDemandsGroupByMaterialCode.get(materialCode);
       MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
       MpSimulatedResult productionPrediction = new MpSimulatedResult();
       BeanUtils.copyProperties(materialInfo,productionPrediction);
@@ -157,8 +159,8 @@ public class AsyncService {
       productionPrediction.setProductionVersion(currentFinalVersion.getProductionVersion());
       productionPrediction.setMouldQty(calculateMouldQty(listGroupByMaterialCode));
       productionPrediction.setTypeBlockQty(calculateTypeBlockQty(listGroupByMaterialCode));
-      productionPrediction.setNetQty(calculateNetQty(tMonthDemands));
-      productionPrediction.setHeightQty(calculateHeightQty(tMonthDemands));
+      productionPrediction.setNetQty(calculateNetQty(netDemands));
+      productionPrediction.setHeightQty(calculateHeightQty(netDemands));
       productionPrediction.setProductionQty(calculateProductionQty(listGroupByMaterialCode));
       productionPrediction.setMonth1(calculateProductionQty(listGroupByMaterialCode,monthRange.getTMonth()));
       productionPrediction.setMonth2(calculateProductionQty(listGroupByMaterialCode,monthRange.getTPlus1Month()));

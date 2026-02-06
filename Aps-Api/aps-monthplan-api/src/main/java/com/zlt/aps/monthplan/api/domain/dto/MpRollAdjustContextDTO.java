@@ -85,6 +85,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "结构收尾日")
     private Integer structureDeadLine;
 
+    @ApiModelProperty(value = "SKU原余量未满的消息模板")
+    private String msgTemplateWithRemainQtyNoFull;
+
     @ApiModelProperty(value = "结构内调整记录")
     private List<MpAdjustStructureIn> mpAdjustStructureInList;
 
@@ -144,6 +147,9 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "排程过程日志")
     private StringBuilder logDetail;
+
+    @ApiModelProperty(value = "SKU原余量未满消息")
+    private StringBuilder msgRemainQtyNoFull;
 
     @ApiModelProperty(value = "调整明细列表")
     private List<MpAdjustDetailVo> adjustDetailList;

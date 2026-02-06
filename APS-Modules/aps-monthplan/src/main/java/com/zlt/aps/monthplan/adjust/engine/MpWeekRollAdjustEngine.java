@@ -268,7 +268,7 @@ public class MpWeekRollAdjustEngine {
             mpProdFinalList.add(mpFinalVo);
             contextDTO.getFactoryMonthPlanProdFinalList().add(mpFinalVo);
             //重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,排产上机日:%s,排产量:%s!",contextDTO.getStructureName(), structureIn.getMaterialCode(), newOnlineDay,structureIn.getConfirmAdjustQty())).append(ApsConstant.DIVISION);
         }
     }
@@ -490,7 +490,7 @@ public class MpWeekRollAdjustEngine {
                 incMouldProduction(mpProdFinalList, contextDTO, i, finalVo.getTotalQty(), finalVo);
                 contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】--增模排产,排产日:%s,物料编码:%s,结束！",contextDTO.getStructureName(), i,finalVo.getMaterialCode())).append(ApsConstant.DIVISION);
                 //重置开始日\结束日\汇总值
-                resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),finalVo);
+                resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),finalVo);
                 //3.5、检查是否还有剩余空间，若没有，则退出
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),i)).append(ApsConstant.DIVISION);
@@ -575,7 +575,7 @@ public class MpWeekRollAdjustEngine {
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4.重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
     }
 
@@ -618,7 +618,7 @@ public class MpWeekRollAdjustEngine {
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4、重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
     }
 
@@ -956,12 +956,23 @@ public class MpWeekRollAdjustEngine {
             splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
         }
         //3.重置开始日\结束日\汇总值
-        resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+        resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+
+        //4.组装消息：SKU原余量未满的消息
+        combineMsgWithInLockDayNoFull(contextDTO,mpFinalVo);
     }
 
-    private void sendMsgWithInLockDayNoFull(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+    /**
+     * 组装消息：SKU原余量未满的消息
+     * @param contextDTO 周程滚动上下文
+     * @param mpFinalVo 定稿Vo
+     */
+    private void combineMsgWithInLockDayNoFull(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        if (YesOrNoEnum.YES.getCode().equals(mpFinalVo.getHasSpecialMaterial())){
+            return;
+        }
         //50条 <= 不含特殊材料收尾新增的SKU原余量 <= 150条，触发预警；
-        //从调整次日开始，到锁定截止日，认第1天有值的机台数
+        //1.从调整次日开始，到锁定截止日，认第1天有值的机台数
         int iAdjustNextDay = contextDTO.getAdjustDay()+1;
         int iLockEndDay = contextDTO.getLockEndDay();
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
@@ -976,10 +987,14 @@ public class MpWeekRollAdjustEngine {
                 totalRemainQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
             }
         }
-        //预警阀值 X台硫化机 * 50条 * 3天
+        //2.预警阀值 X台硫化机 * 50条 * 3天
         int totalQty = dailyQty * dayMachines * (iLockEndDay - iAdjustNextDay + 1);
         if (totalRemainQty < totalQty){
             //提示消息
+            if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithRemainQtyNoFull())){
+                String strHint = String.format(contextDTO.getMsgTemplateWithRemainQtyNoFull(),mpFinalVo.getMaterialCode(),totalRemainQty,totalQty);
+                contextDTO.getMsgRemainQtyNoFull().append(strHint);
+            }
         }
     }
 
@@ -1152,7 +1167,10 @@ public class MpWeekRollAdjustEngine {
         }
 
         //3、重置开始日\结束日\汇总值
-        resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+        resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+
+        //4、组装消息：SKU原余量未满的消息
+        combineMsgWithInLockDayNoFull(contextDTO,mpFinalVo);
     }
     /**
      * 获取新上机日
@@ -1261,13 +1279,13 @@ public class MpWeekRollAdjustEngine {
                 optimalFinalVo.setConventionProductionQty(0);
             }
             //重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),optimalFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),optimalFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,总搭配量:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),oriMatchQty,deductMatchQty)).append(ApsConstant.DIVISION);
             // 4.增模模拟排产
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-开始！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay)).append(ApsConstant.DIVISION);
             remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, planQty, curFinalVo);
             //重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),curFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),curFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-结束,剩余排产计划量:%s,本次剩余排产计划量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,planQty,remainPlanQty)).append(ApsConstant.DIVISION);
             if (remainPlanQty > 0){
                 String optimalMaterialCode = optimalFinalVo.getMaterialCode();
@@ -1432,7 +1450,7 @@ public class MpWeekRollAdjustEngine {
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
                     // 将值还原，并退出，继续加模
                     dayValue -= dayVulcanizationQty;
-                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                    mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     continue;
                 }
@@ -1446,7 +1464,7 @@ public class MpWeekRollAdjustEngine {
                         mpFinalVo = bakMpFinalVo;
                     }else{
                         dayValue -= dayVulcanizationQty;
-                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
+                        mpFinalVo.setFieldValueByFieldName(dayField,dayValue==0?null:dayValue);
                     }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,主花纹:%s,其主花纹模具数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,mpFinalVo.getMainPattern())).append(ApsConstant.DIVISION);
                     return newPlanQty < 0 ? 0:newPlanQty;
@@ -1835,7 +1853,7 @@ public class MpWeekRollAdjustEngine {
             //3.重置各优先级总排产量
             resetTotalProductionQty(adjustStructInVo,mpFinalVo,productionQty);
             //4.重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
         return true;
     }
@@ -2063,7 +2081,7 @@ public class MpWeekRollAdjustEngine {
             }
 
             //3.重置开始日\结束日\汇总值
-            resetBegin2EndDay2TotalQty(contextDTO.getStartDay(),contextDTO.getEndDay(),mpFinalVo);
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
         }
     }
 

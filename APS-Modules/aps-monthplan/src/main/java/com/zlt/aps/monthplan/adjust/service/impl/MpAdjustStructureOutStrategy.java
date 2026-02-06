@@ -286,9 +286,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setLockEndDay(getLockEndDay(contextDTO));
         //4.2初始结构收尾日
         initStructureStartAndEndDay(contextDTO);
-        //4.3初始化日志
+        //4.3初始化日志和消息
         contextDTO.setLogDetail(new StringBuilder());
-
+        contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
         //5.处理单个结构间调整
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
