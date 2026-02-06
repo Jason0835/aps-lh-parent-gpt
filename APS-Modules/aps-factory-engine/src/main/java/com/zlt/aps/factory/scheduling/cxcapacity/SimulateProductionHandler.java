@@ -24,7 +24,6 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -94,7 +93,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
             List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
             if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null,null));
+                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
                 return;
             }
             groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
@@ -120,38 +119,43 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {
-            // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
-            Boolean isSpecial1 = allGroupPlanMap.get(entry1.getKey()).isSpecialMaterial();
-            Boolean isSpecial2 = allGroupPlanMap.get(entry2.getKey()).isSpecialMaterial();
-            return isSpecial2.compareTo(isSpecial1); // Boolean的true比false大，因此需要倒序，优先处理true的
-        })
-        .forEach(entry -> {
-            String structureName = entry.getKey();
-            ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
-            List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
-            if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
-                return;
-            }
-            //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
-            groupPlanInfo.setThisRoundCanProduction();
-            //在机结构-新增Sku模拟排产
-            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
-            //再次设置可排产的计划在本轮次可进行排产
-            groupPlanInfo.setThisRoundCanProduction();
-            //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
-            GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
-            //设置收尾机台
-            continueCxMachineAllocation.forEach(cxMachineAllocation -> {
-                String cxMachineCode = cxMachineAllocation.getCxMachineCode();
-                CxMachineBaseInfoVo machineInfo = allCxMachineInfo.get(cxMachineCode);
-                Integer newRemainingDays = machineInfo.getRemainingDays();
-                //加入收尾匹配
-                if (newRemainingDays > BigDecimal.ZERO.intValue()) {
-                    productionContext.addReverseMachine(machineInfo.getCxMachineCode());
-                }
-            });
-        });
+                    // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
+                    ProductionPlanGroupInfo continueGroup = allGroupPlanMap.get(entry1.getKey());
+                    ProductionPlanGroupInfo continueGroup2 = allGroupPlanMap.get(entry2.getKey());
+                    Boolean isSpecial1 = null == continueGroup ? false : continueGroup.isSpecialMaterial();
+                    Boolean isSpecial2 = null == continueGroup2 ? false : continueGroup2.isSpecialMaterial();
+                    return isSpecial2.compareTo(isSpecial1); // Boolean的true比false大，因此需要倒序，优先处理true的
+                })
+                .forEach(entry -> {
+                    String structureName = entry.getKey();
+                    ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
+                    if (null == groupPlanInfo) {
+                        return;
+                    }
+                    List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
+                    if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+                        log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
+                        return;
+                    }
+                    //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
+                    groupPlanInfo.setThisRoundCanProduction();
+                    //在机结构-新增Sku模拟排产
+                    CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
+                    //再次设置可排产的计划在本轮次可进行排产
+                    groupPlanInfo.setThisRoundCanProduction();
+                    //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
+                    GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
+                    //设置收尾机台
+                    continueCxMachineAllocation.forEach(cxMachineAllocation -> {
+                        String cxMachineCode = cxMachineAllocation.getCxMachineCode();
+                        CxMachineBaseInfoVo machineInfo = allCxMachineInfo.get(cxMachineCode);
+                        Integer newRemainingDays = machineInfo.getRemainingDays();
+                        //加入收尾匹配
+                        if (newRemainingDays > BigDecimal.ZERO.intValue()) {
+                            productionContext.addReverseMachine(machineInfo.getCxMachineCode());
+                        }
+                    });
+                });
     }
 
     /**

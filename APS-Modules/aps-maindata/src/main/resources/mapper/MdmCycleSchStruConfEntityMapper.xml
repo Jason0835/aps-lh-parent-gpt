@@ -18,6 +18,9 @@
                               AND msa.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
                               AND msa.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
                               AND msa.IS_DELETE = 0
-          WHERE csf.IS_DELETE = 0;
+          WHERE csf.IS_DELETE = 0
+          <if test="structureName != null and structureName != ''">
+            AND csf.STRUCTURE_NAME = #{structureName}
+          </if>
   </select>
 </mapper>

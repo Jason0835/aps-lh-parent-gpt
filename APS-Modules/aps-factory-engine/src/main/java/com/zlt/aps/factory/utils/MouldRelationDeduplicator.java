@@ -2,6 +2,7 @@ package com.zlt.aps.factory.utils;
 
 
 import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
@@ -21,16 +22,16 @@ public class MouldRelationDeduplicator {
    */
   public static List<MonthPlanProductMouldInfoVo> deduplicateAndMerge(
       List<MonthPlanProductMouldInfoVo> productMouldInfoList,
-      List<MonthPlanProductMouldInfoVo> mouldDeliveryList) {
+      List<MonthPlanProductMouldInfoVo> mouldDeliveryList, TbrProductionContext productionContext) {
 
     if (isEmpty(productMouldInfoList) && isEmpty(mouldDeliveryList)) {
       return Collections.emptyList();
     }
-
+    List<MonthPlanProductMouldInfoVo> processMouldDeliveryList = MouldDateProcessor.processBoardingDateBatch(mouldDeliveryList,productionContext.getProductionStartDate(),productionContext.getProductionEndDate());
     // 使用LinkedHashMap保持插入顺序
     Map<String, MonthPlanProductMouldInfoVo> deduplicatedMap = Stream.concat(
             safeStream(productMouldInfoList),
-            safeStream(mouldDeliveryList)
+            safeStream(processMouldDeliveryList)
         )
         .filter(Objects::nonNull)
         .collect(Collectors.toMap(

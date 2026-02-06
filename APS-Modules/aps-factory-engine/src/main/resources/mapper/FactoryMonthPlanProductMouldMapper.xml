@@ -200,6 +200,7 @@
                 mdp.MATERIAL_DESC,
                 mdp.MOULD_CODE,
                 mdp.MAIN_PATTERN,
+                mdp.BOARDING_DATE,
                 mdp.MOULD_CODE AS BASE_MOULD_CODE,
                 '' AS MOULD_TYPE,
                 1 AS MOULD_STATUS,
