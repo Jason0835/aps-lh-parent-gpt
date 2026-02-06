@@ -846,4 +846,9 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
         return String.format(keyFormat, structureName, mainPattern);
     }
 
+    public String getExportGroupKey() {
+        String keyFormat = "%d|*|%d";
+        return String.format(keyFormat, year, month);
+    }
+
 }

@@ -85,6 +85,14 @@ public class MpSimulatedResult extends BaseEntity {
     @TableField(value = "BRAND")
     private String brand;
 
+    /**
+     * 生胎代码
+     */
+    @Excel(name = "ui.data.column.simulatedResult.embryoCode")
+    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
     /** 胎胚描述 */
     @Excel(name = "ui.data.column.simulatedResult.mainMaterialDesc")
     @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
@@ -139,6 +147,16 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "模拟排产需求版本号", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
+
+    @Excel(name = "ui.data.column.simulatedResult.productionStartDate")
+    @ApiModelProperty(value = "模拟排产需求版本号", name = "productionStartDate")
+    @TableField(exist = false)
+    private String productionStartDate;
+
+    @Excel(name = "ui.data.column.simulatedResult.productionEndDate")
+    @ApiModelProperty(value = "模拟排产需求版本号", name = "productionEndDate")
+    @TableField(exist = false)
+    private String productionEndDate;
 
     /** 第1个月排产量 */
     @Excel(name = "ui.data.column.simulatedResult.month1", cellType = Excel.ColumnType.NUMERIC)
@@ -288,12 +306,6 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
-    /**
-     * 生胎代码
-     */
-    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
-    @TableField(value = "EMBRYO_CODE")
-    private String embryoCode;
 
     /** 更新时间，用于导出展示 */
     @Excel(name = "ui.data.column.simulatedResult.updateDate")

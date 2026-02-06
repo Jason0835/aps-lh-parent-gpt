@@ -116,4 +116,10 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @return 月度计划量汇总
      */
     Map<String, Integer> calculateStructureFrequency(String factoryCode, Set<String> skus);
+    /**
+     *  实单模拟导出排产数据
+     * @param monthPlanVersions
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResult> listExportData(Set<String> monthPlanVersions);
 }

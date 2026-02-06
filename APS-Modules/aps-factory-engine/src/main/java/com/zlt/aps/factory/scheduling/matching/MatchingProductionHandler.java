@@ -414,14 +414,14 @@ public class MatchingProductionHandler {
         }
         Integer endDay = dayPlanMap.lastKey(); // 结束日期，默认是结构收尾日期
         // 从开始日期到结束日期，检查每一天是否满足配上机的约束条件
-        for (int day = startDay; day <= endDay; day++) {
-            // 只要有一天不满足条件，直接将结束日期提前到上一天
-            MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
-            if (dayLimit != null && !dayLimit.isProduct()) { // 当天有排产，且不满足生产要求时触发调整
-                endDay = day - 1;
-                break;
-            }
-        }
+//        for (int day = startDay; day <= endDay; day++) {
+//            // 只要有一天不满足条件，直接将结束日期提前到上一天
+//            MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
+//            if (dayLimit != null && !dayLimit.isProduct()) { // 当天有排产，且不满足生产要求时触发调整
+//                endDay = day - 1;
+//                break;
+//            }
+//        }
 
         // 统计每一天的已排产量
         TreeMap<Integer, MatchingPlanLimitHelper> usedPlanMap = new TreeMap<>();
@@ -471,9 +471,12 @@ public class MatchingProductionHandler {
                 if (!isContinue) {
                     newDoubleMouldList = limitDoubleMouldList; // 非续作，则都标记为新上模具
                 }
-            } else { // 非第一天
-                newDoubleMouldList = limitDoubleMouldList.subList(0, newMouldNum);
-                newMouldNum -= newDoubleMouldList.size();
+            } else if (newMouldNum > 0) { // 非第一天
+                if (limitDoubleMouldList.size() > newMouldNum) {
+                    newDoubleMouldList = limitDoubleMouldList.stream().limit(newMouldNum).collect(Collectors.toList());
+                } else {
+                    newDoubleMouldList = limitDoubleMouldList;
+                }
             }
 
             // 新模排产
@@ -801,6 +804,11 @@ public class MatchingProductionHandler {
             if (oldPlan != null) {
                 plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
                 plan.setTotalQty(oldPlan.getTotalQty() + plan.getConventionProductionQty());
+                plan.setHeightProductionQty(oldPlan.getHeightProductionQty());
+                plan.setMidProductionQty(oldPlan.getMidProductionQty());
+                plan.setCycleProductionQty(oldPlan.getCycleProductionQty());
+                plan.setConventionProductionQty(oldPlan.getConventionProductionQty());
+                plan.setPostponeProductionQty(oldPlan.getPostponeProductionQty());
                 plan.setDifferenceQty(oldPlan.getDifferenceQty());
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
                 plan.setTypeBlockQty(oldPlan.getTypeBlockQty());
