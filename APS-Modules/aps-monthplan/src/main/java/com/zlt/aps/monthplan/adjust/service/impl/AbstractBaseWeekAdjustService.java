@@ -660,10 +660,27 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtil.isEmptyWithTrim(mpAdjustResult.getIsLockSchedule())){
                 mpAdjustResult.setIsLockSchedule(YesOrNoEnum.NO.getCode());
             }
+            // 将日期字段中值为0的字段设为null
+            handleZeroToNull(mpAdjustResult);
             mpAdjustResultList.add(mpAdjustResult);
         }
         baseDao.insertBatch(mpAdjustResultList);
         contextDTO.setAdjustResultList(mpAdjustResultList);
+    }
+
+
+    /**
+     * 将日期字段中值为0的字段设为null
+     * @param result
+     */
+    protected void handleZeroToNull(MpAdjustResult result) {
+        // 遍历日期，设置每个dayN字段
+        for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+            String fieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day;
+            if (Convert.toInt(result.getFieldValueByFieldName(fieldName)) == 0) {
+                result.setFieldValueByFieldName(fieldName, null);
+            }
+        }
     }
 
     /**
