@@ -7,7 +7,7 @@ import lombok.Data;
 /**
  * Copyright (c) 2022, All rights reserved。 文件名称：OutFacScheduleVersion.java 描
  * 述：生产排程_版本对象 t_out_fac_schedule_version
- * 
+ *
  * @author zlt
  * @date 2025-12-12
  * @version 1.0
@@ -31,7 +31,7 @@ public class SyncOutFacScheduleVersionVo {
 	private String productPlanNo;
 
 	/** 状态 */
-	@ApiModelProperty(value = "状态", name = "status")
+	@ApiModelProperty(value = "状态，0-草拟，1-生效", name = "status")
 	private String status;
 
 	/** 排产年份 */
