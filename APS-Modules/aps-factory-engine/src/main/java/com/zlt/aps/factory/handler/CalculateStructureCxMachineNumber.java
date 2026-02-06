@@ -71,7 +71,7 @@ public class CalculateStructureCxMachineNumber {
             return Collections.emptyMap();
         }
         //得到结构主花纹下最大可用模具数-按物料描述分组取最大
-        Map<String, Long> maxEnableMouldNumberMap = calculateMaxEnableMouldNumber(productionContext);
+        Map<String, Integer> maxEnableMouldNumberMap = calculateMaxEnableMouldNumber(productionContext);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(productionContext);
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer minProductionDays = paramConfiguration.getMinProductionDays();
@@ -239,7 +239,7 @@ public class CalculateStructureCxMachineNumber {
      * @param productionContext 排产上下文
      * @return 最大可用模具数-按物料描述分组取最大
      */
-    private Map<String, Long> calculateMaxEnableMouldNumber(TbrProductionContext productionContext) {
+    private Map<String, Integer> calculateMaxEnableMouldNumber(TbrProductionContext productionContext) {
         Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
         if (CollectionUtils.isEmpty(skuMouldRelationMap)) {
             return Collections.emptyMap();
@@ -251,17 +251,17 @@ public class CalculateStructureCxMachineNumber {
         if (CollectionUtils.isEmpty(groupMouldMap)) {
             return Collections.emptyMap();
         }
-        Map<String, Long> result = Maps.newHashMap();
+        Map<String, Integer> result = Maps.newHashMap();
         Map<String, MouldAllocationInfoVo> structureMainPatternAllocationLimit = productionContext.getBaseDataContainer().getGroupMainPatternAllocationLimitMap();
         groupMouldMap.forEach((groupKey, mouldInfoVoList) -> {
             Map<String, Long> materialGroup = mouldInfoVoList.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialDesc())).collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc, Collectors.counting()));
             if (CollectionUtils.isEmpty(materialGroup)) {
-                result.put(groupKey, 0L);
+                result.put(groupKey, BigDecimal.ZERO.intValue());
                 return;
             }
-            long maxMouldNumber = materialGroup.values().stream().max(Comparator.comparingLong(Long::longValue)).orElse(0L);
+            Integer maxMouldNumber = materialGroup.values().stream().max(Comparator.comparingLong(Long::longValue)).orElse(BigDecimal.ZERO.longValue()).intValue();
             if (!structureMainPatternAllocationLimit.containsKey(groupKey)) {
-                result.put(groupKey, maxMouldNumber);
+                result.put(groupKey, maxMouldNumber.intValue());
                 return;
             }
             //分配比例与最大数，二者取最小
@@ -270,11 +270,8 @@ public class CalculateStructureCxMachineNumber {
                 result.put(groupKey, maxMouldNumber);
                 return;
             }
-            long maxEnableMouldNumber = Math.min(maxMouldNumber, limitNumber);
-            String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构+主花纹：%s 下理论最大模具数：%s 分配模具数：%s 最终最大可使用模具数 %s",
-                    productionContext.getFactoryCode(), productionContext.getYear(), productionContext.getMonth(), productionContext.getMonthPlanVersion(), productionContext.getProductionVersion(),
-                    groupKey, maxMouldNumber, limitNumber, maxEnableMouldNumber);
-            log.info(logContent);
+            Integer maxEnableMouldNumber = Math.min(maxMouldNumber, limitNumber);
+            log.info(TbrProductionGroupLogRecorder.addGroupMainPatternMaxMouldNumberLog(productionContext, groupKey, limitNumber, maxEnableMouldNumber));
             result.put(groupKey, maxEnableMouldNumber);
         });
         return result;
@@ -288,32 +285,32 @@ public class CalculateStructureCxMachineNumber {
      * @param productionContext 排产上下文
      * @return 模具最大产能
      */
-    private int calculateMaxMouldCapacity(ProductionPlanGroupInfo groupInfo, List<MonthPlanProductionRequirePlanVo> groupDatas, Map<String, Long> maxEnableMouldNumberMap, TbrProductionContext productionContext) {
+    private int calculateMaxMouldCapacity(ProductionPlanGroupInfo groupInfo, List<MonthPlanProductionRequirePlanVo> groupDatas, Map<String, Integer> maxEnableMouldNumberMap, TbrProductionContext productionContext) {
         // 模具最大产能=日硫化量<取最小>*模具数/2 * 月度最大天数，若是共用模，合并计算；
         if (CollectionUtils.isEmpty(maxEnableMouldNumberMap)) {
-            return 0;
+            return BigDecimal.ZERO.intValue();
         }
         //剔除不排产的计划
         List<MonthPlanProductionRequirePlanVo> productionPlanList = groupDatas.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getProductionFlag()) && StringUtils.isNotBlank(productionPlan.getMainPattern())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productionPlanList)) {
-            return 0;
+            return BigDecimal.ZERO.intValue();
         }
         groupInfo.setMinLhDayCapacityQty(calculateMinLhDayCapacityQty(productionPlanList));
-        if (0 == groupInfo.getMinLhDayCapacityQty()) {
-            return 0;
+        if (BigDecimal.ZERO.intValue() == groupInfo.getMinLhDayCapacityQty()) {
+            return BigDecimal.ZERO.intValue();
         }
         Map<String, List<MonthPlanProductionRequirePlanVo>> groupMap = productionPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getGroupKey));
         if (CollectionUtils.isEmpty(groupMap)) {
-            return 0;
+            return BigDecimal.ZERO.intValue();
         }
         List<Long> totalMaxMouldCapacity = Lists.newArrayList();
         groupMap.forEach((groupKey, requirePlanList) -> {
             if (!maxEnableMouldNumberMap.containsKey(groupKey)) {
                 return;
             }
-            long maxMouldNumber = maxEnableMouldNumberMap.get(groupKey);
-            long lhMachineCount = maxMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            if (0 == lhMachineCount) {
+            Integer maxMouldNumber = maxEnableMouldNumberMap.get(groupKey);
+            Integer lhMachineCount = maxMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            if (BigDecimal.ZERO.intValue() == lhMachineCount) {
                 return;
             }
             //（1）计算结构向下主花纹模具的最大产能；模具最大产能=日硫化量<取最小>*模具数/2 * 月度最大天数，若是共用模，合并计算；
@@ -324,7 +321,7 @@ public class CalculateStructureCxMachineNumber {
             totalMaxMouldCapacity.add(Math.min(maxMouldCapacity, sumNetQty));
         });
         if (CollectionUtils.isEmpty(totalMaxMouldCapacity)) {
-            return 0;
+            return BigDecimal.ZERO.intValue();
         }
         //（3）按结构汇总需求量 = SUM(结构向下主花纹模具最大可排产量)；
         BigDecimal result = BigDecimal.ZERO;

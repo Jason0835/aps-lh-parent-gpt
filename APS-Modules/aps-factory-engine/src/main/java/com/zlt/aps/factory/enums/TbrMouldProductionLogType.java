@@ -279,6 +279,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_SELECTED_CX_MACHINE("20-16-01", "分组计划找机台"),
     /**
+     * 20-16-02 机台找分组计划
+     */
+    CX_MACHINE_SELECTED_GROUP("20-16-02", "机台找分组计划"),
+    /**
      * 30-01-00 开始分组计划模具排产
      */
     START_CX_MACHINE_GROUP_MOULD_PRODUCTION("30-01-00", "开始分组计划模具排产"),

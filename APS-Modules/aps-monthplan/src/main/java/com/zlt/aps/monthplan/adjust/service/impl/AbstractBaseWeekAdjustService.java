@@ -920,7 +920,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 净需求
             monthPlan.setProdReqPlan(adjustDetailVo.getCurrentNetQty());
             // 计算实际生产需求含损耗
-            Integer factProdReqQty = calculateFactProdReqQty(adjustDetailVo.getCurrentNetQty(), adjustDetailVo.getHeightQty());
+            Integer factProdReqQty = calculateFactProdReqQty(adjustDetailVo.getCurrentNetQty());
             monthPlan.setFactProdReqQty(factProdReqQty);
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
@@ -956,38 +956,29 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 根据净需求和高优先级的奇偶性计算实际生产需求含损耗
+     * 根据净需求奇偶性计算实际生产需求含损耗
      * @param currentNetQty 净需求
-     * @param heightQty 高优先级
      * @return 实际生产需求含损耗
      */
-    private Integer calculateFactProdReqQty(Integer currentNetQty, Integer heightQty) {
+    private Integer calculateFactProdReqQty(Integer currentNetQty) {
         // 空值按0处理
         Integer netQty = (currentNetQty == null) ? 0 : currentNetQty;
-        Integer hQty = (heightQty == null) ? 0 : heightQty;
 
         // 净需求为0时，直接返回0（不参与奇偶判断）
         if (netQty == 0) {
             return 0;
         }
-
         // 用位运算判断奇偶
         // 净需求是否为偶数
         boolean isNetEven = (netQty & 1) == 0;
-        // 高优先级是否为偶数
-        boolean isHeightEven = (hQty & 1) == 0;
-
         // 计算实际生产需求含损耗
         Integer factProdReqQty;
-        if (isNetEven == isHeightEven) {
-            // 同奇偶，实际生产需求含损耗=净需求
-            factProdReqQty = netQty;
-        } else if (!isNetEven && isHeightEven) {
-            // 净需求奇数，高优先级偶数，实际生产需求含损耗=净需求-1
-            factProdReqQty = netQty - 1;
+        if (isNetEven) {
+            // 偶数，实际生产需求含损耗 = 净需求 + 2
+            factProdReqQty = netQty + 2;
         } else {
-            // 净需求偶数，高优先级奇数，实际生产需求含损耗=净需求+1
-            factProdReqQty = netQty + 1;
+            // 奇数，实际生产需求含损耗 = 净需求 + 3
+            factProdReqQty = netQty + 3;
         }
 
         return factProdReqQty;

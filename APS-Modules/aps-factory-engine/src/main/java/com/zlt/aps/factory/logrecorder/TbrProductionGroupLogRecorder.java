@@ -679,7 +679,7 @@ public class TbrProductionGroupLogRecorder {
 
     /**
      * 增加没有找到满足最小排产天数日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 因成型工装、日产能最打排产天数[%s]不满足最小排产天数[%s]====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 因成型工装、日产能最大排产天数[%s]不满足最小排产天数[%s]====
      *
      * @param context   排程上下文
      * @param groupName 分组名
@@ -692,6 +692,31 @@ public class TbrProductionGroupLogRecorder {
                 groupName, maxLeftOverDays, minAllocationDays);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构剩余待分配天数小于最下排产天数日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 剩余待排产天数[%s]不满足最小排产天数[%s]====
+     *
+     * @param context              排程上下文
+     * @param groupName            分组名
+     * @param isGroupFindCxMachine 是否计划找机台
+     * @param leftOverDays         剩余待排产天数
+     * @param minAllocationDays    最小上机天数
+     * @return
+     */
+    public static String addGroupLeftOverNoReachMinAllocationDayLog(Context context, String groupName, boolean isGroupFindCxMachine, Integer leftOverDays, Integer minAllocationDays) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 剩余待排产天数[%s]不满足最小排产天数[%s]====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, leftOverDays, minAllocationDays);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        if (isGroupFindCxMachine) {
+            TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        } else {
+            TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CX_MACHINE_SELECTED_GROUP, logContent);
+        }
         return logContent;
     }
 
