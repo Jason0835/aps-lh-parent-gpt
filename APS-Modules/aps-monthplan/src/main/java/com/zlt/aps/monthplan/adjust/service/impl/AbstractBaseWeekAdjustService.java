@@ -87,6 +87,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import com.zlt.msg.message.domain.vo.MessageContext;
@@ -2574,6 +2575,28 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 adjust.setCurrentNetQty(Convert.toInt(netQtySum,0));
             }
         }
+    }
+
+    /**
+     * 判断是否只有常规储备有值，其他字段无值（0或null视为无值）
+     * @param adjust
+     * @return
+     */
+    protected boolean isOnlyConventionReserveHasValue(MpAdjustDetailVo adjust) {
+        // 判断Integer是否为无值（null或0）
+        Predicate<Integer> isZeroOrNull = num -> num == null || num == 0;
+
+        // 判断其他字段都无值
+        boolean otherFieldsAreEmpty = isZeroOrNull.test(adjust.getHeightQty())
+                && isZeroOrNull.test(adjust.getMidQty())
+                && isZeroOrNull.test(adjust.getPostponeQty())
+                && isZeroOrNull.test(adjust.getCycleReserveQty());
+
+        // 判断常规储备有值（非null且非0）
+        boolean conventionReserveHasValue = !isZeroOrNull.test(adjust.getConventionReserveQty());
+
+        // 只有同时满足：其他字段无值 + 常规储备有值，才返回true
+        return otherFieldsAreEmpty && conventionReserveHasValue;
     }
 
     /**
