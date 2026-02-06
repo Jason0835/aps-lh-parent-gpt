@@ -116,6 +116,20 @@ public class MpAdjustResult extends BaseEntity {
     @TableField(value = "HAS_SPECIAL_MATERIAL")
     private String hasSpecialMaterial;
 
+    /**
+     * 模具使用变化信息如2-4-2,或是2-4或是2
+     */
+    @ApiModelProperty(value = "模具使用变化信息如2-4-2,或是2-4或是2", name = "mouldChangeInfo")
+    @TableField(value = "MOULD_CHANGE_INFO")
+    private String mouldChangeInfo;
+
+    /**
+     * 调整标识，0-没有调整,1-有调整
+     */
+    @ApiModelProperty(value = "调整标识", name = "adjustFlag")
+    @TableField(value = "ADJUST_FLAG")
+    private String adjustFlag;
+
     /** 总计划量 */
     @Excel(name = "ui.data.column.mpAdjustResult.totalPlanQty")
     @ApiModelProperty(value = "总计划量", name = "totalPlanQty")
