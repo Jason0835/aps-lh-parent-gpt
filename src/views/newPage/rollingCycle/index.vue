@@ -298,6 +298,7 @@ import {
   outNextStructure,
   saveAdjustResult,
   statisticsResult,
+  outGetStayDay
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -1698,6 +1699,7 @@ export default {
       this.loading = true;
       this.isEdit = false;
       this.data = [];
+      this.getStartDay(this.selection[0])
       if (this.selection[0].productionVersion) {
         console.log("selection", this.selection[0]);
         // this.cxMachineCodeList(this.selection[0]);
@@ -2141,6 +2143,20 @@ export default {
         return 'warning-row'
       }
       return "";
+    },
+
+    //获取开始日期
+   async getStartDay(date) {
+    console.log("date",date)
+     try {
+       let res = await outGetStayDay(date);
+       if(res.adjustStartDay){
+        this.$set(this.formInline, "adjustStartDay", res.adjustStartDay);
+       }
+
+     } catch (err) {
+       console.log(err);
+     }
     },
   },
   mounted() {

@@ -187,3 +187,12 @@ export function statisticsResult(query) {
     data: query
   })
 }
+
+//结构外单选调整获取日期
+export function outGetStayDay(query) {
+  return request({
+    url: '/monthplan/mpStructureAllocation/getPreviousStructure',
+    method: 'post',
+    data: query
+  })
+}
