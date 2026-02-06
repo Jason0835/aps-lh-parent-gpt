@@ -723,7 +723,7 @@ public class ExcelUtilManySheet {
     for(WorksheetData sheetData : list) {
       List<Object[]>  fields = Lists.newArrayList();
       List<Field> tempFields;
-      if(CollectionUtils.isEmpty(sheetData.getSimulatedResults())) {
+      if(!CollectionUtils.isEmpty(sheetData.getSimulatedResults())) {
          tempFields = getClassField(MpSimulatedResult.class);
       }else{
          tempFields = getClassField(FactoryMonthPlanMouldDayResult.class);

@@ -335,4 +335,24 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         return AjaxResult.success(mpStructureAllocation);
     }
 
+    /**
+     * 获取日期最接近的上一个结构
+     */
+    @ApiOperation("获取日期最接近的上一个结构")
+    @PostMapping("/getPreviousStructure")
+    @ResponseBody
+    public AjaxResult getPreviousStructure(MpStructureAllocation queryVO) {
+        if (StringUtils.isEmpty(queryVO.getFactoryCode()) || queryVO.getYear() == null || queryVO.getMonth() == null
+                || StringUtils.isEmpty(queryVO.getCxMachineCode()) || queryVO.getBeginDay() == null || queryVO.getEndDay() == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.notQueryCondition"));
+        }
+        MpStructureAllocation mpStructureAllocation = iMpStructureAllocationService.getPreviousStructure(queryVO);
+        // 测试暂时写死
+        if (mpStructureAllocation == null) {
+            mpStructureAllocation = new MpStructureAllocation();
+            mpStructureAllocation.setAdjustStartDay(10);
+        }
+        return AjaxResult.success(mpStructureAllocation);
+    }
+
 }

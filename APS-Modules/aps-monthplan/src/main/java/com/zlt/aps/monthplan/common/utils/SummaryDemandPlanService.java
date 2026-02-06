@@ -36,9 +36,10 @@ public class SummaryDemandPlanService {
 
   private final SaveAllocationResultService saveAllocationResultService;
 
-  public void summaryDemandPlan(DpDemandPlan createCondition, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
+  public void summaryDemandPlan(DpDemandPlan createCondition,PredictionContext data, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
     Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupFactoryAndMaterialKey));
-    Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(allocationResult.getStockMap());
+    Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(data.getFinishedProductStockMap());
+    Map<String, Integer> originalMonthSurplus  =   data.getOriginalMonthSurplusMap();
     List<DpDemandPlanSum> datas = Lists.newArrayList();
     map.forEach((key, value) -> {
       DpDemandPlan demandPlan = value.get(0);
@@ -52,6 +53,7 @@ public class SummaryDemandPlanService {
       entity.setSub1YearStockQty(stockMap.getOrDefault(StringConstant.TWO,BigDecimal.ZERO.intValue()));
       entity.setSub2YearStockQty(stockMap.getOrDefault(StringConstant.THREE,BigDecimal.ZERO.intValue()));
       entity.setNetQty(calculateNetQty(value));
+      entity.setPlannedSurplus(originalMonthSurplus.getOrDefault(key, BigDecimal.ZERO.intValue()));
       entity.setPostponeNetQty(calculatePostponeNetQty(value));
       entity.setUnPostponeNetQty(calculateUnPostponeNetQty(value));
       entity.setHeightQty(calculateHeightQty(value));
