@@ -64,18 +64,26 @@
               :model="formInline"
               class="demo-form-inline"
             >
-              <el-form-item :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')">
+              <el-form-item
+                :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
+              >
                 <el-input
                   v-model="formInline.cxMachineCode"
                   disabled
-                  :placeholder="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
+                  :placeholder="
+                    this.$t('ui.data.column.workWearInfo.cxMachineCode')
+                  "
                 ></el-input>
               </el-form-item>
-              <el-form-item :label="this.$t('ui.data.column.finishStock.structureName')">
+              <el-form-item
+                :label="this.$t('ui.data.column.finishStock.structureName')"
+              >
                 <el-input
                   v-model="formInline.structureName"
                   disabled
-                 :placeholder="this.$t('ui.data.column.finishStock.structureName')"
+                  :placeholder="
+                    this.$t('ui.data.column.finishStock.structureName')
+                  "
                 ></el-input>
               </el-form-item>
               <el-form-item :label="this.$t('common.startDate')">
@@ -210,7 +218,6 @@
                 v-if="showConfirmResult"
                 v-model="scope.row.isLockSchedule"
                 @change="handleLockScheduleChange(scope.row, $event)"
-
                 size="mini"
               >
                 <el-option
@@ -288,6 +295,7 @@ import {
   versionOutHistory,
   outNextStructure,
   saveAdjustResult,
+  statisticsResult,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -1527,11 +1535,7 @@ export default {
       console.log("this.activeName", this.activeName);
       if (this.activeName == "three") {
         this.isTabChange = true;
-        this.page = {
-          current: 1,
-          pageSize: 20,
-          total: 0,
-        };
+        this.page = null;
         this.getVersionList(true);
 
         return;
@@ -1630,7 +1634,6 @@ export default {
         return this.$modal.msgWarning("请选择调整结束日期");
       }
       this.loading = true;
-      this.autoLoading = true;
       try {
         let params = {
           ...this.query,
@@ -1650,6 +1653,9 @@ export default {
         params.scheduledMachines = params.cxMachineCode;
         let res = await autoAdjust(params);
         this.outResultData = res;
+        if(res.length!=0){
+          this.getStatisticsResult(res[0])
+        }
         this.showConfirmResult = true;
         // this.data = res;
         // // this.data=res.rows
@@ -1663,7 +1669,6 @@ export default {
         console.log(err);
         this.show = true;
         this.loading = false;
-        this.autoLoading = false;
       } finally {
         this.loading = false;
       }
@@ -1850,9 +1855,13 @@ export default {
         params.version = version;
         params.structureName = this.formInline.structureName;
         let res = await getStructureDetail(params);
+        console.log("初始化结果");
         this.outResultData = res.rows;
-        console.log("初始化");
-        console.log(res);
+        if (res.rows.length != 0) {
+          console.log("开始调用统计");
+          this.getStatisticsResult(res.rows[0]);
+        }
+
       } catch (err) {
         console.log(err);
       }
@@ -1869,8 +1878,7 @@ export default {
         });
       });
     },
-    handleOutDelete(row,index) {
-
+    handleOutDelete(row, index) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
@@ -1878,7 +1886,7 @@ export default {
 
         removeOutHistory({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
-          this.data = this.data.filter(item => item.id != row.id);
+          this.data = this.data.filter((item) => item.id != row.id);
           // this.resizeOutHistoryList();
         });
       });
@@ -1941,7 +1949,7 @@ export default {
         ...this.sort,
       };
 
-      if (this.activeName == "second" || this.activeName == "three") {
+      if (this.activeName == "second") {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
@@ -1969,13 +1977,16 @@ export default {
             return;
           }
           data = await listResult(this.formatParams());
-          console.log(this.insertDataAfterEachName(data.rows));
+          if (data.rows.length != 0) {
+            this.getStatisticsResult(data.rows[0]);
+          }
+
         } else {
           return;
         }
 
         this.data = data.rows;
-        if (this.activeName == "second" || this.activeName == "three") {
+        if (this.activeName == "second") {
           this.page.total = data.total;
         }
 
@@ -2023,35 +2034,83 @@ export default {
       }
     },
 
+    //调整结果统计
+    async getStatisticsResult(data) {
+      try {
+        let params = {
+          factoryCode: data.factoryCode,
+          year: data.year,
+          month: data.month,
+          productionVersion: data.productionVersion,
+        };
+        let res = await statisticsResult(params);
+        let resultList=[]
+        if(this.activeName=="three"){
+          resultList= this.data
+        }else{
+          resultList= this.outResultData
+        }
+
+        let list = this.insertDataAfterEachName(resultList, res.rows);
+        console.log("list", list);
+        if(this.activeName=="three"){
+          this.data = list;
+        }else{
+          this.outResultData=list
+        }
+
+      } catch (err) {
+        console.log(err);
+      } finally {
+      }
+    },
+
     //调整结果插入数据
-    insertDataAfterEachName(arr) {
+    insertDataAfterEachName(arr, statistList) {
       if (!arr.length) return [];
 
       const result = [];
       for (let i = 0; i < arr.length; i++) {
         const current = arr[i];
         const next = arr[i + 1];
-
         // 添加当前数据
         result.push(current);
-
+        console.log(current.structureName)
         // 如果下一个元素不存在或structureName不同，说明这是当前分组的最后一项
         if (!next || next.structureName !== current.structureName) {
+          console.log(i);
           // 在当前分组后插入两条数据
-          result.push(
-            {
-              id: `${current.structureName}_after_1_${i}`,
-              type: "footer",
-              message: `${current.structureName} 结构分组结束`,
-              isInserted: true,
-            },
-            {
-              id: `${current.structureName}_after_2_${i}`,
-              type: "divider",
-              value: "========",
-              isInserted: true,
+          for (let i = 0; i < statistList.length; i++) {
+            if (statistList[i].structureName == current.structureName) {
+              let embryoCount = {
+                structureName: current.structureName,
+              };
+              let lhMachines = {
+                structureName: current.structureName,
+              };
+              if (this.activeName == "three") {
+                embryoCount.cxMachineCode = "胎胚种类数";
+                lhMachines.cxMachineCode = "硫化机台数";
+              } else {
+                embryoCount.materialCode = "胎胚种类数";
+                lhMachines.materialCode = "硫化机台数";
+              }
+              for (let j = 1; j <= 31; j++) {
+                const key = `day${j}`;
+
+                if (statistList[i][key]) {
+                  let dayData = JSON.parse(statistList[i][key]);
+                  // embryoCount.push{
+                  //   `day${j}`:dayData.EmbryoCount
+                  // }
+                  embryoCount[key] = dayData.EmbryoCount;
+                  lhMachines[key] = dayData.LhMachines;
+                }
+              }
+              result.push(embryoCount);
+              result.push(lhMachines);
             }
-          );
+          }
         }
       }
 

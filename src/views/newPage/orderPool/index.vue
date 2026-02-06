@@ -104,7 +104,8 @@ export default {
     "biz_factory_name",
     "biz_deliver_goods_type",
     "biz_scm_type",
-    "biz_stor_type"
+    "biz_stor_type",
+    "biz_brand_type"
   ],
   provide() {
     return {
@@ -163,7 +164,7 @@ export default {
           label: this.$t("ui.data.column.monthplan.scmPriority"),
           render: ({ row }) => {
             return (
-              <el-select placeholder="请选择" v-model={row.scmPriority} onChange={(val) => this.handlePriorityChange(row, val)}>
+              <el-select  v-model={row.scmPriority} onChange={(val) => this.handlePriorityChange(row, val)}>
                 {this.dict.type.biz_scm_type.map((item) => (
                   <el-option
                     key={item.value}
@@ -229,7 +230,10 @@ export default {
         {
           prop: "brand",
           label: this.$t("common.brand"),
-          width:120
+          width:120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
         },
         {
           prop: "salCodePo",

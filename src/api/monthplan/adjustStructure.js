@@ -178,3 +178,12 @@ export function saveAdjustResult(query) {
     data: query
   })
 }
+
+//统计调整结果
+export function statisticsResult(query) {
+  return request({
+    url: '/monthplan/mpMonthPlanStatistics/list',
+    method: 'post',
+    data: query
+  })
+}
