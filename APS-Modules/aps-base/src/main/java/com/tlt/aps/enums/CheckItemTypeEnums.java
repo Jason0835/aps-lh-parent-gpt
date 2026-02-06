@@ -21,7 +21,9 @@ public enum CheckItemTypeEnums {
     MOLD_ALLOCATION_RATIO_DATA("07", "模具分配比例配置数据"),
     MOLD_SHELL_DATA("08", "模壳数据"),
     CAPSULE_CHUCK_DATA("09", "胶囊卡盘数据"),
-    SULFURIZATION_RATIO_DATA("10", "结构成型硫化配比数据");
+    SULFURIZATION_RATIO_DATA("10", "结构成型硫化配比数据"),
+    OTHER_PARAMS_CONFIG("11", "其他参数配置");
+
 
     private String code;
     private String name;
