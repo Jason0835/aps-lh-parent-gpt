@@ -78,7 +78,7 @@
             </div>
           </div>
           <div v-if="item.expanded">
-            <div class="reason-title">{{this.$t('ui.data.checkDialog.reason')}}：</div>
+            <div class="reason-title">{{$t('ui.data.checkDialog.reason')}}：</div>
             <div class="reason-content" v-html="item.reason"></div>
           </div>
         </div>
