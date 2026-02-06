@@ -2264,7 +2264,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected List<DailyMouldAvailabilityResult> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         LocalDate monthStart = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), ProductionConstant.MONTH_START_DAY);
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(),  DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), null);
+                contextDTO.getFactoryCode(),  DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getMonthPlanVersion());
     }
 
     /**
