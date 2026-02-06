@@ -521,7 +521,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResult.setAdjustType(contextDTO.getAdjustType());
             mpAdjustResult.setVersion(contextDTO.getVersion());
             mpAdjustResult.setTotalPlanQty(finalAdjustVo.getTotalQty());
-            mpAdjustResult.setAdjustFlag(finalAdjustVo.getActualAdjustQty()>0 ? YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
+
+            mpAdjustResult.setAdjustFlag((finalAdjustVo.getActualAdjustQty() != null && finalAdjustVo.getActualAdjustQty()>0) ? YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
             if (StringUtil.isEmptyWithTrim(mpAdjustResult.getIsLockSchedule())){
                 mpAdjustResult.setIsLockSchedule(YesOrNoEnum.NO.getCode());
             }
