@@ -85,7 +85,7 @@ public class MonthPlanFinalizedChangeEventListeners {
 
     private List<SyncOutFacScheduleVersionVo> buildOutFacScheduleVersionVoList(MonthPlanFinalizedEventDto eventDto) {
         List<FactoryMonthPlanProductionFinalResult> finalList = eventDto.getFinalList();
-        if (CollectionUtils.isNotEmpty(finalList)) {
+        if (CollectionUtils.isEmpty(finalList)) {
             return Collections.emptyList();
         }
         List<String> uniqueKeyList = eventDto.getMaterialTotalQtyMap().keySet().stream().map(item -> eventDto.getFactoryCode() + "|" + item).collect(Collectors.toList());
@@ -107,7 +107,7 @@ public class MonthPlanFinalizedChangeEventListeners {
             versionVo.setYear(String.valueOf(year));
             Integer month = result.getMonth();
             versionVo.setMonth(String.valueOf(month));
-            versionVo.setProductionCategory(result.getProductCategory());
+            versionVo.setProductionCategory(result.getProductTypeCode());
             Integer lastDayDayOfMonth = 0;
             try {
                 LocalDate of = LocalDate.of(year, month, 1);
@@ -147,6 +147,7 @@ public class MonthPlanFinalizedChangeEventListeners {
                 Object fieldValue = ReflectUtils.getFieldValue(result, fieldName);
                 ReflectUtils.setFieldValue(versionVo, fieldName, fieldValue);
             }
+            syncOutFacScheduleVersionVoList.add(versionVo);
         }
         return syncOutFacScheduleVersionVoList;
     }

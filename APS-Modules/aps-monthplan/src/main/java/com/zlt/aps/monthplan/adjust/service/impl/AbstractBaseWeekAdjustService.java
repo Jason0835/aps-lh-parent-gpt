@@ -215,10 +215,36 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     private void postProcess(MpRollAdjustContextDTO contextDTO) {
         // 后置检查
         postCheck(contextDTO);
+        // 后置处理
+        doPostProcess(contextDTO);
         // 排序调整明细
         sortAdjustDetailList(contextDTO);
         // 保存调整明细
         saveAdjustDetailList(contextDTO);
+    }
+
+
+    protected void doPostProcess(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
+        // 将集合中指定字段的null值替换为0
+        setNullFieldsToZero(adjustDetailList);
+    }
+
+    /**
+     * 将集合中指定字段的null值替换为0
+     * @param adjustDetailList
+     */
+    protected void setNullFieldsToZero(List<MpAdjustDetailVo> adjustDetailList) {
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return;
+        }
+        for (MpAdjustDetailVo vo : adjustDetailList) {
+            vo.setHeightQty(Objects.nonNull(vo.getHeightQty()) ? vo.getHeightQty() : 0);
+            vo.setMidQty(Objects.nonNull(vo.getMidQty()) ? vo.getMidQty() : 0);
+            vo.setPostponeQty(Objects.nonNull(vo.getPostponeQty()) ? vo.getPostponeQty() : 0);
+            vo.setCycleReserveQty(Objects.nonNull(vo.getCycleReserveQty()) ? vo.getCycleReserveQty() : 0);
+            vo.setConventionReserveQty(Objects.nonNull(vo.getConventionReserveQty()) ? vo.getConventionReserveQty() : 0);
+        }
     }
 
 
@@ -2575,6 +2601,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 adjust.setCurrentNetQty(Convert.toInt(netQtySum,0));
             }
         }
+
+
+
+
     }
 
     /**
