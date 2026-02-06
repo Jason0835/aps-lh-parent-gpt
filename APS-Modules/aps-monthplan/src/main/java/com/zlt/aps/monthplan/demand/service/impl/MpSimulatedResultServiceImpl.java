@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
+import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 
@@ -96,8 +97,12 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
 
     @Override
     public void createVmMonthPrediction(MpSimulatedResult createCondition) {
+      log.info("createVmMonthPrediction: factoryCode={},year={},month={}", createCondition.getFactoryCode(), createCondition.getYear(), createCondition.getMonth());
+      YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
+      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
+      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
       //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-      List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(createCondition);
+      List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(tMonth);
       if (CollectionUtils.isEmpty(finalVersions)) {
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
       }
@@ -106,9 +111,6 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
       }
       redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
-      YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
-      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
-      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
       MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
       asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange);
     }
@@ -166,17 +168,18 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
   }
 
   /**
-     *   3、检查是否已有T月月度计划(定稿)
-     *       (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
-     */
-    private List<MpFactoryProductionVersion> validateProductionVersionFinalized(MpSimulatedResult createCondition) {
-        return factoryProductionVersionMapper.selectList(
-            Wrappers.<MpFactoryProductionVersion>lambdaQuery()
-                .eq(MpFactoryProductionVersion::getFactoryCode,createCondition.getFactoryCode())
-                .eq(MpFactoryProductionVersion::getYear, createCondition.getYear())
-                .eq(MpFactoryProductionVersion::getMonth, createCondition.getMonth())
-                .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
-        );
-    }
+   *   3、检查是否已有T月月度计划(定稿)
+   *       (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
+   * @param tMonth T月
+   */
+  private List<MpFactoryProductionVersion> validateProductionVersionFinalized(YearMonth tMonth) {
+    return factoryProductionVersionMapper.selectList(
+        Wrappers.<MpFactoryProductionVersion>lambdaQuery()
+            .eq(MpFactoryProductionVersion::getFactoryCode, FactoryConstant.DEFAULT_FACTORY_CODE)
+            .eq(MpFactoryProductionVersion::getYear, tMonth.getYear())
+            .eq(MpFactoryProductionVersion::getMonth, tMonth.getMonthValue())
+            .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
+    );
+  }
 
 }
