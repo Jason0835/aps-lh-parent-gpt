@@ -12,7 +12,6 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.file.FileTypeUtils;
 import com.ruoyi.common.core.utils.file.ImageUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
@@ -243,21 +242,13 @@ public class ExcelUtilManySheet {
 
     for (int i = startNo; i < endNo; i++) {
       Row row = sheet.createRow(i + 1 - startNo);
-      BaseEntity vo;
-      if(!CollectionUtils.isEmpty(worksheetData.getSimulatedResults())) {
-        // 得到导出对象.
-          vo = worksheetData.getSimulatedResults().get(i);
-      }else{
-        // 得到导出对象.
-        vo = worksheetData.getMouldDayResults().get(i);
-      }
       int column = 0;
       for (Object[] os : fields) {
         Field field = (Field) os[0];
         Excel excel = (Excel) os[1];
         // 设置实体类私有属性可访问
         field.setAccessible(true);
-        this.addCell(excel, row,maxHeight, vo, field, column++);
+        this.addCell(excel, row,maxHeight,worksheetData, i, field, column++);
       }
     }
   }
@@ -265,7 +256,7 @@ public class ExcelUtilManySheet {
   /**
    * 添加单元格
    */
-  public Cell addCell(Excel attr, Row row,short maxHeight,BaseEntity vo, Field field, int column) {
+  public Cell addCell(Excel attr, Row row,short maxHeight,WorksheetData worksheetData, int index, Field field, int column) {
     Cell cell = null;
     try {
       // 设置行高
@@ -277,7 +268,7 @@ public class ExcelUtilManySheet {
         int align = attr.align().value();
         cell.setCellStyle(styles.get(Constants.DATA + (align >= 1 && align <= 3 ? align : "")));
         // 用于读取对象中的属性
-        Object value = getTargetValue(vo, field, attr);
+        Object value = getTargetValue(worksheetData,index, field, attr);
         String dateFormat = attr.dateFormat();
         String readConverterExp = attr.readConverterExp();
         String separator = attr.separator();
@@ -301,6 +292,7 @@ public class ExcelUtilManySheet {
         addStatisticsData(column, Convert.toStr(value), attr);
       }
     } catch (Exception e) {
+      e.printStackTrace();
       //log.error("导出Excel失败{}", e);
       String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.fail"), e);
       log.error(errorMsg);
@@ -449,14 +441,20 @@ public class ExcelUtilManySheet {
   /**
    * 获取bean中的属性值
    *
-   * @param vo    实体对象
    * @param field 字段
    * @param excel 注解
    * @return 最终的属性值
    * @throws Exception
    */
-  private Object getTargetValue(BaseEntity vo, Field field, Excel excel) throws Exception {
-    Object o = field.get(vo);
+  private Object getTargetValue(WorksheetData worksheetData, int index,Field field, Excel excel) throws Exception {
+    Object o;
+    if(!CollectionUtils.isEmpty(worksheetData.getSimulatedResults())) {
+       MpSimulatedResult simulatedResult = worksheetData.getSimulatedResults().get(index);
+       o = field.get(simulatedResult);
+    }else{
+      FactoryMonthPlanMouldDayResult mouldDayResult = worksheetData.getMouldDayResults().get(index);
+      o = field.get(mouldDayResult);
+    }
     if (StringUtils.isNotEmpty(excel.targetAttr())) {
       String target = excel.targetAttr();
       if (target.contains(".")) {
@@ -725,7 +723,7 @@ public class ExcelUtilManySheet {
     for(WorksheetData sheetData : list) {
       List<Object[]>  fields = Lists.newArrayList();
       List<Field> tempFields;
-      if(CollectionUtils.isEmpty(sheetData.getSimulatedResults())) {
+      if(!CollectionUtils.isEmpty(sheetData.getSimulatedResults())) {
          tempFields = getClassField(MpSimulatedResult.class);
       }else{
          tempFields = getClassField(FactoryMonthPlanMouldDayResult.class);
