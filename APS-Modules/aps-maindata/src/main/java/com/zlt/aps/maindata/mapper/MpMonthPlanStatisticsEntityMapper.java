@@ -3,6 +3,7 @@ package com.zlt.aps.maindata.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -19,5 +20,17 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MpMonthPlanStatisticsEntityMapper extends CommBaseMapper<MpMonthPlanStatistics> {
+
+    /**
+     * 删除月计划统计结果
+     * @param factoryCode
+     * @param year
+     * @param month
+     * @param productionVersion
+     */
+    void deleteMonthPlanStatisticsByCondition(@Param("factoryCode") String factoryCode,
+                                     @Param("year") String year,
+                                     @Param("month") String month,
+                                     @Param("productionVersion") String productionVersion);
 
 }

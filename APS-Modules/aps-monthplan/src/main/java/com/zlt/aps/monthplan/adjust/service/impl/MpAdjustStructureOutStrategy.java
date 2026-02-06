@@ -23,6 +23,7 @@ import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
@@ -307,7 +308,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //7.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
         reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalMap.get(contextDTO.getStructureName()));
 
+        //8.构建月计划统计结果
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()));
+
         contextDTO.setSaveMpProdFinalList(mpProdFinalMap.get(contextDTO.getStructureName()));
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
+
         //9.保存调整日志
         saveMpAdjustLog(contextDTO);
     }

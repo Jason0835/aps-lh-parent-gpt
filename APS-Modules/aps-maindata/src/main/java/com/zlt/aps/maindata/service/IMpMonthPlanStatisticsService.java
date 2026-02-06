@@ -18,4 +18,13 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMpMonthPlanStatisticsService  extends IDocService<MpMonthPlanStatistics>{
 
+    /**
+     * 删除月计划统计结果
+     * @param factoryCode 工厂
+     * @param year 年份
+     * @param month 月份
+     * @param productionVersion 排程版本
+     */
+    void deleteMonthPlanStatisticsByCondition(String factoryCode,String year,String month,String productionVersion);
+
 }
