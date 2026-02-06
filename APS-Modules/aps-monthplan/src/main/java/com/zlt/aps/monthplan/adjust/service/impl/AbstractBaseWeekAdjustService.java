@@ -23,10 +23,12 @@ import com.tlt.aps.utils.IncrementService;
 import com.tlt.aps.utils.ThreadPoolUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
+import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
@@ -452,6 +454,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO){
 
+    }
+
+    /**
+     * 重算每日产能限制，包括硫化机台数、胎胚种类数
+     * @param contextDTO 周程滚动上下文
+     * @param mpProdFinalList 定稿记录列表
+     */
+    protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        for (int i = contextDTO.getStructureStartDay(); i< contextDTO.getStructureDeadLine(); i++){
+            if (dailyCapacityLimitVoMap.get(i) == null){
+                continue;
+            }
+            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null);
+        }
     }
 
     /**
