@@ -106,6 +106,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "月计划结构转产表")
     private List<MpStructureAllocation> structureAllocationList;
 
+    @ApiModelProperty(value = "月计划结构转产Map")
+    private Map<String, List<MpStructureAllocation>> structureAllocationMap;
+
     @ApiModelProperty(value = "月计划结构转产表-单结构")
     private List<MpStructureAllocation> oneStructureAllocationList;
 
@@ -117,6 +120,9 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "试制量试计划列表")
     private List<MpTrialPlan> mpTrialPlanList;
+
+    @ApiModelProperty(value = "试制量试计划Map")
+    private Map<String, MpTrialPlan> mpTrialPlanMap;
 
     @ApiModelProperty(value = "月底计划余量列表")
     private List<MdmMonthSurplus> mdmMonthSurplusesList;
@@ -130,14 +136,26 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "物料信息列表")
     private List<MdmMaterialInfo> mdmMaterialInfoList;
 
+    @ApiModelProperty(value = "物料信息Map")
+    private Map<String, MdmMaterialInfo> mdmMaterialInfoMap;
+
     @ApiModelProperty(value = "SKU日硫化产能列表")
     private List<MdmSkuLhCapacity> mdmSkuLhCapacityList;
+
+    @ApiModelProperty(value = "SKU日硫化产能Map")
+    private Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap;
 
     @ApiModelProperty(value = "SKU与结构关系列表")
     private List<MdmSkuStructureRef> mdmSkuStructureRefList;
 
+    @ApiModelProperty(value = "SKU与结构关系Map")
+    private Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap;
+
     @ApiModelProperty(value = "SKU与施工（示方书）关系列表")
     private List<MdmSkuConstructionRef> mdmSkuConstructionRefList;
+
+    @ApiModelProperty(value = "SKU与施工（示方书）关系Map")
+    private Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap;
 
     @ApiModelProperty(value = "特殊材料清单列表")
     private List<RawSpecialMaterialRecord> specialMaterialList;
