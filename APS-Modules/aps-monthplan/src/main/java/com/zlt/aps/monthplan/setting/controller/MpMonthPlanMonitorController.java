@@ -96,13 +96,14 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
                             if (fieldValueInt < dayVulcanizationQty) {
                                 fieldValueInt = dayVulcanizationQty;
                             }
-                            monitor.setExpectedCloseDay(lhMargin / fieldValueInt);
                         }
+                        monitor.setExpectedCloseDay(lhMargin / fieldValueInt);
                     }
                 }
             }
             try {
-                monitor.setExpectedCloseDate(DateUtils.addDays(DateUtils.getNowDate("yyyy-MM-dd"), monitor.getExpectedCloseDay()));
+                Integer expectedCloseDay = ObjectUtils.defaultIfNull(monitor.getExpectedCloseDay(), 0);
+                monitor.setExpectedCloseDate(DateUtils.addDays(DateUtils.getNowDate("yyyy-MM-dd"), expectedCloseDay));
             } catch (ParseException e) {
                 throw new RuntimeException(e);
             }
