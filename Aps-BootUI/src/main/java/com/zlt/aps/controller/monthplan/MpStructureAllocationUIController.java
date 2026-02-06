@@ -347,6 +347,11 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
             throw new BusinessException(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.notQueryCondition"));
         }
         MpStructureAllocation mpStructureAllocation = iMpStructureAllocationService.getPreviousStructure(queryVO);
+        // 测试暂时写死
+        if (mpStructureAllocation == null) {
+            mpStructureAllocation = new MpStructureAllocation();
+            mpStructureAllocation.setAdjustStartDay(10);
+        }
         return AjaxResult.success(mpStructureAllocation);
     }
 

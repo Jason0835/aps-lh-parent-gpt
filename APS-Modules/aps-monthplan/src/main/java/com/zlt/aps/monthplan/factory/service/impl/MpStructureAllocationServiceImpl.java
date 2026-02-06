@@ -765,7 +765,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         if (structureAllocation != null) {
             // 获取当月总天数
             int monthTotalDay = DateUtil.lengthOfMonth(param.getMonth(), DateUtil.isLeapYear(param.getYear()));
-            structureAllocation.setAdjustStartDay((Math.min(structureAllocation.getBeginDay() + 1, monthTotalDay)));
+            structureAllocation.setAdjustStartDay((Math.min(structureAllocation.getEndDay() + 1, monthTotalDay)));
         }
         return structureAllocation;
     }
