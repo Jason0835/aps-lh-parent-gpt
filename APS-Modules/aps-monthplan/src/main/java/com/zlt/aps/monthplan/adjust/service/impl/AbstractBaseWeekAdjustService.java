@@ -767,7 +767,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 获取周数
             int week = getWeekNumber(new Date());
             // 调整量
-            monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetailVo.getActualAdjustQty());
+            Integer actualAdjustQty = adjustDetailVo.getActualAdjustQty();
+            if (Convert.toInt(actualAdjustQty, 0) == 0) {
+                actualAdjustQty = null;
+            }
+            monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -1006,7 +1010,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 获取周数
             int week = getWeekNumber(new Date());
             // 调整量
-            monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, adjustDetail.getActualAdjustQty());
+            Integer actualAdjustQty = adjustDetail.getActualAdjustQty();
+            if (Convert.toInt(actualAdjustQty, 0) == 0) {
+                actualAdjustQty = null;
+            }
+            monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
         }
         // 更新月度生产计划
         try {
