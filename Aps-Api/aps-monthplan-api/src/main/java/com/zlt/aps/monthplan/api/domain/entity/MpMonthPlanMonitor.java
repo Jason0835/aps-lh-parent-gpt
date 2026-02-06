@@ -210,9 +210,9 @@ public class MpMonthPlanMonitor extends BaseEntity {
     private Integer diffDay;
 
     /**
-     * 日硫化量
+     * 定稿ID
      */
-    @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
-    @TableField(value = "DAY_VULCANIZATION_QTY")
-    private Integer dayVulcanizationQty;
+    @ApiModelProperty(value = "定稿ID", name = "finalResultId")
+    @TableField(value = "FINAL_RESULT_ID")
+    private Long finalResultId;
 }

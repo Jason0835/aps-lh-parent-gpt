@@ -1,23 +1,28 @@
 package com.zlt.aps.monthplan.setting.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -25,9 +30,9 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -54,6 +59,9 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
     @Autowired
     private MpMonthPlanMonitorEntityMapper entityMapper;
 
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultEntityMapper finalResultEntityMapper;
+
     /**
      * 查询月度硫化监控列表
      */
@@ -65,19 +73,31 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
         startPage(getOrderBy(queryVO));
         List<MpMonthPlanMonitor> list = entityMapper.listReport(queryVO);
         int daySubOne = DateUtils.getDay(DateUtils.addDays(new Date(), -1));
+        List<Long> finalResultIdList = list.stream().map(MpMonthPlanMonitor::getFinalResultId).collect(Collectors.toList());
+        Map<Long, FactoryMonthPlanProductionFinalResult> finalResultMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(finalResultIdList)) {
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.in(BaseEntity::getId, finalResultIdList);
+            List<FactoryMonthPlanProductionFinalResult> finalResultList = finalResultEntityMapper.selectList(queryWrapper);
+            finalResultMap = finalResultList.stream().collect(Collectors.toMap(BaseEntity::getId, Function.identity()));
+        }
 
         for (MpMonthPlanMonitor monitor : list) {
             Integer lhMargin = monitor.getLhMargin();
-            int dayVulcanizationQty = ObjectUtils.defaultIfNull(monitor.getDayVulcanizationQty(), 0) * 2;
-            for (int i = daySubOne; i > 0; i--) {
-                Object fieldValue = ReflectUtils.getFieldValue(monitor, "day" + daySubOne);
-                if (Objects.nonNull(fieldValue)) {
-                    int fieldValueInt = Integer.parseInt(fieldValue.toString());
-                    if (fieldValueInt > 0) {
-                        if (fieldValueInt < dayVulcanizationQty) {
-                            fieldValueInt = dayVulcanizationQty;
+            Long finalResultId = monitor.getFinalResultId();
+            if (finalResultMap.containsKey(finalResultId)) {
+                FactoryMonthPlanProductionFinalResult result = finalResultMap.get(finalResultId);
+                int dayVulcanizationQty = ObjectUtils.defaultIfNull(result.getDayVulcanizationQty(), 0) * 2;
+                for (int i = daySubOne; i > 0; i--) {
+                    Object fieldValue = ReflectUtils.getFieldValue(monitor, "day" + daySubOne);
+                    if (Objects.nonNull(fieldValue)) {
+                        int fieldValueInt = Integer.parseInt(fieldValue.toString());
+                        if (fieldValueInt > 0) {
+                            if (fieldValueInt < dayVulcanizationQty) {
+                                fieldValueInt = dayVulcanizationQty;
+                            }
+                            monitor.setExpectedCloseDay(lhMargin / fieldValueInt);
                         }
-                        monitor.setExpectedCloseDay(lhMargin / fieldValueInt);
                     }
                 }
             }

@@ -223,7 +223,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 9. 保存分厂排产版本
         saveFactoryProductionVersion(finalPlans);
         // 10、汇总需求计划
-        summaryDemandPlanService.summaryDemandPlan(createCondition,allocationResult,finalPlans);
+        summaryDemandPlanService.summaryDemandPlan(createCondition,data, allocationResult,finalPlans);
     }
 
 
