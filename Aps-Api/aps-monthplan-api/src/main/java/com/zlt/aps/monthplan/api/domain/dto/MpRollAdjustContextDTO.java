@@ -38,6 +38,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "需求计划版本")
     private String monthPlanVersion;
 
+    @ApiModelProperty(value = "调整需求计划版本")
+    private String adjustMonthPlanVersion;
+
     @ApiModelProperty(value = "产品品类")
     private String productType;
     /**

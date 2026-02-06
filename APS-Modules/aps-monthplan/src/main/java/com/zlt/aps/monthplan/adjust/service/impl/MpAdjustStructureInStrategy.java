@@ -105,15 +105,17 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         Date startTime,endTime;
         List<MpStructureAllocation> structureAllocationList;
         List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
+        List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList;
         List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
             //2.1 初始结构上下文
             //1）结构内，按结构分别调整
             contextDTO.setStructureName(entry.getKey());
+            oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
             if (YesOrNoEnum.YES.getCode().equals(entry.getValue().get(0).getHasSpecialMaterial())){
                 //若是特殊结构,预存特殊结构的总实际排产量
-                setSpecStructureTotalQty(contextDTO,mpProdFinalMap.get(entry.getKey()));
+                setSpecStructureTotalQty(contextDTO,oneStructMpFinalList);
             }
             structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
             contextDTO.setOneStructureAllocationList(structureAllocationList);
@@ -127,7 +129,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             //2.2 执行结构内调整
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-            weekRollAdjustEngine.doStructureInForOne(contextDTO,entry.getValue(), mpProdFinalMap.get(entry.getKey()));
+            weekRollAdjustEngine.doStructureInForOne(contextDTO,entry.getValue(), oneStructMpFinalList);
             endTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
@@ -137,13 +139,13 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
             //=========================================================
 
-            newMpFinalList.addAll(mpProdFinalMap.get(entry.getKey()));
+            newMpFinalList.addAll(oneStructMpFinalList);
 
             //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-            reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalMap.get(entry.getKey()));
+            reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList);
 
             //2.5 构建月计划统计结果
-            monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(entry.getKey()));
+            monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList);
 
             //2.6 保存调整日志
             saveMpAdjustLog(contextDTO);

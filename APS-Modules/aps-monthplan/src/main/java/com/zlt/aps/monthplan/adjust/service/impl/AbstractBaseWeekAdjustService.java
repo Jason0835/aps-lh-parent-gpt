@@ -516,8 +516,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         target.setStructureName(source.getStructureName());
         target.setProSize(source.getProSize());
         target.setStructureType(source.getStructureType());
-        target.setMonthPlanVersion(target.getMonthPlanVersion());
-        target.setLastMonthPlanVersion(target.getLastMonthPlanVersion());
+        target.setMonthPlanVersion(source.getMonthPlanVersion());
+        target.setLastMonthPlanVersion(source.getLastMonthPlanVersion());
         target.setProductionVersion(source.getProductionVersion());
         target.setProductTypeCode(source.getProductTypeCode());
     }
@@ -2389,7 +2389,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected List<DailyMouldAvailabilityResult> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         LocalDate monthStart = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), ProductionConstant.MONTH_START_DAY);
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(),  DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getMonthPlanVersion());
+                contextDTO.getFactoryCode(),  DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getAdjustMonthPlanVersion());
     }
 
     /**
@@ -2503,6 +2503,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             String materialCode = adjust.getMaterialCode();
             List<DpDemandPlan> demandPlanList = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            if (PubUtil.isNotEmpty(demandPlanList)) {
+                contextDTO.setAdjustMonthPlanVersion(demandPlanList.get(0).getMonthPlanVersion());
+            }
             if (PubUtil.isNotEmpty(demandPlanList)) {
                 DpDemandPlan dpDemandPlan = demandPlanList.get(0);
                 // 设置排产分类
