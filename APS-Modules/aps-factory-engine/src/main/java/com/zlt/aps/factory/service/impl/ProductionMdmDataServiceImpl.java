@@ -203,10 +203,10 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
 
     @Override
     public List<SpecialMaterialStockVo> getSpecialMaterialStockInfo(Context context) {
-        if (isEmptyFactoryCode(context)) {
+        if (isEmptyFactoryAndYearMonth(context)) {
             return Collections.emptyList();
         }
-        return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode());
+        return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode(), context.getYear(), context.getMonth());
     }
 
     /**

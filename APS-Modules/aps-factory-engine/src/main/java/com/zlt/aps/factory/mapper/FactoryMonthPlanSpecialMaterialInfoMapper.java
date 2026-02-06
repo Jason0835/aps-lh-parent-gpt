@@ -30,10 +30,12 @@ public interface FactoryMonthPlanSpecialMaterialInfoMapper {
     /**
      * 获取工厂下排产版本：特殊原材料的库存信息
      *
-     * @param factoryCode       工厂编码
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
      * @return
      */
-    List<SpecialMaterialStockVo> getSpecialMaterialStockInfo(@Param("factoryCode") String factoryCode);
+    List<SpecialMaterialStockVo> getSpecialMaterialStockInfo(@Param("factoryCode") String factoryCode, @Param("year") Integer year, @Param("month") Integer month);
 
 
 }

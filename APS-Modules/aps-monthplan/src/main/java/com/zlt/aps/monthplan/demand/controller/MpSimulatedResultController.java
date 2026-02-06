@@ -10,6 +10,8 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.common.utils.poi.ExcelUtilManySheet;
+import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
@@ -71,7 +73,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
 
     @Override
     protected String getOrderBy() {
-        return "update_time DESC,ID DESC,PATTERN ASC,MAIN_PATTERN ASC,SPECIFICATIONS ASC,STRUCTURE_NAME ASC";
+        return "STRUCTURE_NAME ASC,SPECIFICATIONS ASC,MAIN_PATTERN ASC,PATTERN ASC,update_time DESC,ID DESC";
     }
 
     /**
@@ -132,7 +134,9 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
     @Override
     public byte[] exportData(@RequestBody MpSimulatedResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        List<WorksheetData> list = this.mpSimulatedResultService.listExportData(queryVO,fileName);
+        ExcelUtilManySheet  util = new ExcelUtilManySheet();
+        return util.exportData(list,fileName,response);
     }
 
     /**
@@ -146,7 +150,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
             leaseTime = 300
     )
     @PostMapping("/createVmMonthPrediction")
-    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition) throws Exception {
+    public AjaxResult createVmMonthPrediction(@RequestBody MpSimulatedResult createCondition){
         this.mpSimulatedResultService.createVmMonthPrediction(createCondition);
         return AjaxResult.success("操作成功，等待数据生成通知");
     }

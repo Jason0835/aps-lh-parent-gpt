@@ -422,7 +422,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //4、保存月计划统计结果
         saveMonthPlanStatisticsResult(contextDTO);
         //5、发送消息
-        if (StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
+        if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
             sendMsgRemainQtyNoFull(contextDTO);
         }
     }
@@ -516,8 +516,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         target.setStructureName(source.getStructureName());
         target.setProSize(source.getProSize());
         target.setStructureType(source.getStructureType());
-        target.setMonthPlanVersion(target.getMonthPlanVersion());
-        target.setLastMonthPlanVersion(target.getLastMonthPlanVersion());
+        target.setMonthPlanVersion(source.getMonthPlanVersion());
+        target.setLastMonthPlanVersion(source.getLastMonthPlanVersion());
         target.setProductionVersion(source.getProductionVersion());
         target.setProductTypeCode(source.getProductTypeCode());
     }
@@ -854,8 +854,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setSkuConstructionRefField(contextDTO, monthPlan);
             // 净需求
             monthPlan.setProdReqPlan(adjustDetailVo.getCurrentNetQty());
-            // 实际生产需求含损耗 = 净需求量汇总
-            Integer factProdReqQty = Convert.toInt(adjustDetailVo.getCurrentNetQty(), 0);
+            // 计算实际生产需求含损耗
+            Integer factProdReqQty = calculateFactProdReqQty(adjustDetailVo.getCurrentNetQty(), adjustDetailVo.getHeightQty());
             monthPlan.setFactProdReqQty(factProdReqQty);
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
@@ -888,6 +888,44 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new RuntimeException("新增月度生产计划失败", e);
         }
 
+    }
+
+    /**
+     * 根据净需求和高优先级的奇偶性计算实际生产需求含损耗
+     * @param currentNetQty 净需求
+     * @param heightQty 高优先级
+     * @return 实际生产需求含损耗
+     */
+    private Integer calculateFactProdReqQty(Integer currentNetQty, Integer heightQty) {
+        // 空值按0处理
+        Integer netQty = (currentNetQty == null) ? 0 : currentNetQty;
+        Integer hQty = (heightQty == null) ? 0 : heightQty;
+
+        // 净需求为0时，直接返回0（不参与奇偶判断）
+        if (netQty == 0) {
+            return 0;
+        }
+
+        // 用位运算判断奇偶
+        // 净需求是否为偶数
+        boolean isNetEven = (netQty & 1) == 0;
+        // 高优先级是否为偶数
+        boolean isHeightEven = (hQty & 1) == 0;
+
+        // 计算实际生产需求含损耗
+        Integer factProdReqQty;
+        if (isNetEven == isHeightEven) {
+            // 同奇偶，实际生产需求含损耗=净需求
+            factProdReqQty = netQty;
+        } else if (!isNetEven && isHeightEven) {
+            // 净需求奇数，高优先级偶数，实际生产需求含损耗=净需求-1
+            factProdReqQty = netQty - 1;
+        } else {
+            // 净需求偶数，高优先级奇数，实际生产需求含损耗=净需求+1
+            factProdReqQty = netQty + 1;
+        }
+
+        return factProdReqQty;
     }
 
     /**
@@ -2351,7 +2389,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected List<DailyMouldAvailabilityResult> calculateMoldCavityInsertMaxValue(MpRollAdjustContextDTO contextDTO) throws Exception {
         LocalDate monthStart = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), ProductionConstant.MONTH_START_DAY);
         return moldCavityInsertMaxValueCalculator.moldCavityInsertMaxValueCalculator(contextDTO.getMpYear(), contextDTO.getMpMonth(),
-                contextDTO.getFactoryCode(),  DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getMonthPlanVersion());
+                contextDTO.getFactoryCode(),  DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth())), contextDTO.getAdjustMonthPlanVersion());
     }
 
     /**
@@ -2465,6 +2503,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             String materialCode = adjust.getMaterialCode();
             List<DpDemandPlan> demandPlanList = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
+            if (PubUtil.isNotEmpty(demandPlanList)) {
+                contextDTO.setAdjustMonthPlanVersion(demandPlanList.get(0).getMonthPlanVersion());
+            }
             if (PubUtil.isNotEmpty(demandPlanList)) {
                 DpDemandPlan dpDemandPlan = demandPlanList.get(0);
                 // 设置排产分类

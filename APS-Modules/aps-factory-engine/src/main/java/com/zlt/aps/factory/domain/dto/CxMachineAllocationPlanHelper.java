@@ -166,6 +166,15 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 更新分配天数，因特殊材料进行调整
+     *
+     * @param newAllocationDays 新的分配天数
+     */
+    public void updateAllocationDayBySpecialMaterial(Integer newAllocationDays) {
+        allocationDay = newAllocationDays;
+    }
+
+    /**
      * 结构提前收尾处理
      * 新的收尾时间点及提前收尾的天数
      *

@@ -283,11 +283,12 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer theoryUsedLhMachineCount = currentDaySkuLhMachineInfoMap.values().stream().mapToInt(Integer::intValue).sum();
         Integer realUsedLhMachineCount;
         if (null == nextDayLimitInfo) {
-            Integer previousDayChangeQty = getChangeUsedLhMachineQtyByPreviousDay(previousDayLimitInfo);
             //结构收尾日
+            Integer previousDayChangeQty = getChangeUsedLhMachineQtyByPreviousDay(previousDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + previousDayChangeQty;
         } else {
-            Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDay(nextDayLimitInfo);
+            //中间排产
+            Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDayMouldNumber(nextDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + nextDayChangeQty;
         }
         return realUsedLhMachineCount >= maxLhMachineCount;
@@ -564,16 +565,47 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
-     * 计算变化的硫化组信息
+     * 根据后一日的排产信息，获取硫化变化组数
      *
-     * @param addSkuMap 新增Sku的新增硫化组数
-     * @param changeMap 旧Sku减的硫化组数
+     * @param nextDayLimitInfo 下一日排产信息
      * @return
      */
-    private Integer calculateChangeLhMachineQty(Map<String, Integer> addSkuMap, Map<String, Integer> changeMap) {
+    private Integer getChangeUsedLhMachineQtyByNextDayMouldNumber(GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+        //后一日Sku使用的硫化组数-根据模具数
+        Map<String, Integer> nextDaySkuLhMachineInfoMap = nextDayLimitInfo.getSkuUsedLhMachineCountByMouldNumber();
+        Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
+        //相比前一日，新增Sku增加的机台数
+        Map<String, Integer> addSkuMap = new HashMap<>();
+        Map<String, Integer> reductionSkuMap = new HashMap<>();
+        currentDaySkuLhMachineInfoMap.forEach((materialDesc, lhMachineQty) -> {
+            Integer nextDayLhMachineQty = nextDaySkuLhMachineInfoMap.get(materialDesc);
+            if (null == nextDayLhMachineQty) {
+                nextDayLhMachineQty = BigDecimal.ZERO.intValue();
+            }
+            if (null == lhMachineQty) {
+                lhMachineQty = BigDecimal.ZERO.intValue();
+            }
+            if (lhMachineQty > nextDayLhMachineQty) {
+                reductionSkuMap.put(materialDesc, nextDayLhMachineQty - lhMachineQty);
+            }
+            if (lhMachineQty < nextDayLhMachineQty) {
+                addSkuMap.put(materialDesc, nextDayLhMachineQty - lhMachineQty);
+            }
+        });
+        return calculateChangeLhMachineQty(addSkuMap, reductionSkuMap);
+    }
+
+    /**
+     * 计算变化的硫化组信息
+     *
+     * @param addSkuMap       Sku新增硫化组数
+     * @param reductionSkuMap Sku减的硫化组数
+     * @return
+     */
+    private Integer calculateChangeLhMachineQty(Map<String, Integer> addSkuMap, Map<String, Integer> reductionSkuMap) {
         Integer realChangeLhMachineCount = BigDecimal.ZERO.intValue();
-        if (!CollectionUtils.isEmpty(changeMap)) {
-            Integer reduction = changeMap.values().stream().mapToInt(Integer::intValue).sum();
+        if (!CollectionUtils.isEmpty(reductionSkuMap)) {
+            Integer reduction = reductionSkuMap.values().stream().mapToInt(Integer::intValue).sum();
             realChangeLhMachineCount = realChangeLhMachineCount + reduction;
         }
         if (!CollectionUtils.isEmpty(addSkuMap)) {
