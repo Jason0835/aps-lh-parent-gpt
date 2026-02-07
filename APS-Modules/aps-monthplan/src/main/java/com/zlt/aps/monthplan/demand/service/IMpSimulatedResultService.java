@@ -34,4 +34,11 @@ public interface IMpSimulatedResultService  extends IDocService<MpSimulatedResul
    * @return
    */
   List<WorksheetData> listExportData(MpSimulatedResult queryVO, String fileName);
+  /**
+   *  获取模拟版本号列表
+   * @param queryCondition 查询条件
+   * @return 模拟版本号列表
+   */
+  List<String> findSimulatedVersion(MpSimulatedResult queryCondition);
+
 }

@@ -17,6 +17,7 @@ import com.zlt.aps.monthplan.common.utils.AsyncService;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
+import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
@@ -65,6 +66,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     private final AsyncService asyncService;
     private final MpSimulatedResultEntityMapper entityMapper;
     private final RedisService redisService;
+    private final IMpPredictionDetailService mpPredictionDetailService;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
 
@@ -118,6 +120,8 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
   @Override
   public List<WorksheetData> listExportData(MpSimulatedResult queryVO, String fileName) {
       List<WorksheetData> result = Lists.newArrayList();
+      List<String>   batchNumbers  = findSimulatedVersion(queryVO);
+      queryVO.setBatchNumbers(batchNumbers);
       List<MpSimulatedResult> list = this.entityMapper.listExportData(queryVO);
       result.add(this.buildSimulatedResult(fileName,list));
       List<FactoryMonthPlanMouldDayResult> mouldDayResults = null;
@@ -131,6 +135,30 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       }
       return result;
   }
+
+  @Override
+  public List<String> findSimulatedVersion(MpSimulatedResult queryCondition) {
+    List<MpSimulatedResult> list = this.findSimulatedResult(queryCondition);
+    if(CollectionUtils.isEmpty(list)) {
+        return Collections.emptyList();
+    }
+    Set<String>  batchNumbers = list.stream().map(MpSimulatedResult::getMonthPlanVersion).collect(Collectors.toSet());
+    if(CollectionUtils.isEmpty(batchNumbers)) {
+      return Collections.emptyList();
+    }
+    return mpPredictionDetailService.findSimulatedVersion(batchNumbers);
+  }
+
+  private List<MpSimulatedResult> findSimulatedResult(MpSimulatedResult queryCondition) {
+    return this.entityMapper.selectList(
+        Wrappers.<MpSimulatedResult>lambdaQuery()
+            .eq(MpSimulatedResult::getFactoryCode, queryCondition.getFactoryCode())
+            .eq(MpSimulatedResult::getYear, queryCondition.getYear())
+            .eq(MpSimulatedResult::getMonth, queryCondition.getMonth())
+            .eq(MpSimulatedResult::getIsDelete,YesOrNoEnum.NO.getCode())
+    );
+  }
+
 
   private WorksheetData buildSimulatedResult(List<FactoryMonthPlanMouldDayResult> value) {
       WorksheetData worksheetData = new WorksheetData();
