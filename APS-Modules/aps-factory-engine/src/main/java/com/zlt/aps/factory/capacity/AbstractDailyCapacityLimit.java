@@ -627,6 +627,16 @@ public abstract class AbstractDailyCapacityLimit {
                 dailyCapacityLimitVo.getUsedLhMachines() <= dailyCapacityLimitVo.getMaxLhMachines();
     }
 
+    /**
+     * 预检产能是否满足,
+     * @param dailyCapacityLimitVo 日产能限制
+     * @return true-满足，false-不满足
+     */
+    public boolean preCheckCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        return dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
+                dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines();
+    }
+
     public Integer getDayVulcanizationQty(BaseEntity mpFinalVo){
         throw new BusinessException("需要处理日硫化量");
     }
