@@ -201,13 +201,13 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private Integer plannedSurplus;
 
     /** 预计需要生产量 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.produceQtyDue", cellType = Excel.ColumnType.NUMERIC)
+    //@Excel(name = "ui.data.column.orderOffsetDetail.produceQtyDue", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "预计需要生产量", name = "produceQtyDue")
     @TableField(value = "PRODUCE_QTY_DUE")
     private Integer produceQtyDue;
 
     /** 计划排产量 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.productionQty", cellType = Excel.ColumnType.NUMERIC)
+    //@Excel(name = "ui.data.column.orderOffsetDetail.productionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "计划排产量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
@@ -256,7 +256,7 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String deliverGoodsType;
 
     /** SCMID */
-    @Excel(name = "ui.data.column.orderOffsetDetail.scmId")
+    //@Excel(name = "ui.data.column.orderOffsetDetail.scmId")
     @ApiModelProperty(value = "SCMID", name = "scmId")
     @TableField(value = "SCM_ID")
     private Long scmId;
