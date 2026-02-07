@@ -86,12 +86,13 @@ public class AsyncService {
     if (optional.isPresent()) {
       factoryName = optional.get().getDictLabel();
     }
+    String[] receivers = {SecurityUtils.getUsername()};
     // 发送消息
     messageServiceAdapter.sendMessage(
         templateCode,
         MsgTypeEnums.NOTICE.getCode(),
         MsgChannelEnums.SYSTEM.getCode(),
-        null,
+        receivers,
         context,
         factoryName,
         finalVersion.getYear(),
