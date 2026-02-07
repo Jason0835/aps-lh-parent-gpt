@@ -782,9 +782,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 调整明细按照物料编码分组并提取试制量试ID列表
-        Map<String, List<Long>> adjustDetailMap = adjustDetailList.stream()
+        Map<String, List<String>> adjustDetailMap = adjustDetailList.stream()
                 .filter(obj -> StringUtils.isNotEmpty(obj.getMaterialCode())
-                        && obj.getTrialPlanId() != null)
+                        && StringUtils.isNotEmpty(obj.getTrialPlanId()))
                 .collect(Collectors.groupingBy(
                         MpAdjustDetailVo::getMaterialCode,
                         Collectors.mapping(
@@ -807,7 +807,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (!adjustDetailMap.containsKey(materialCode)) {
                 continue;
             }
-            List<Long> trialPlanIdList = adjustDetailMap.get(materialCode);
+            List<String> trialPlanIdList = adjustDetailMap.get(materialCode);
             if (PubUtil.isEmpty(trialPlanIdList)) {
                 continue;
             }
@@ -815,9 +815,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             Integer day = getFirstHasValueDay(adjustResult);
             // 获取当前日期
             Date productionDate = getCurrentDate(contextDTO.getMpYear(), contextDTO.getMpMonth(), day);
-            for (Long trialPlanId : trialPlanIdList) {
+            for (String trialPlanId : trialPlanIdList) {
                 MpTrialPlan trialPlan = new MpTrialPlan();
-                trialPlan.setId(trialPlanId);
+                trialPlan.setId(Long.valueOf(trialPlanId));
                 trialPlan.setProductionDate(productionDate);
                 trialPlanList.add(trialPlan);
             }
@@ -924,7 +924,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
             // 试制量试关联字段设置
-            if (adjustDetailVo.getTrialPlanId() != null) {
+            if (StringUtils.isNotEmpty(adjustDetailVo.getTrialPlanId())) {
                 // 试制量试计划需求数量
                 monthPlan.setTrialQty(adjustDetailVo.getCurrentNetQty());
                 // 差异量(未排产数量) = 生产实际排产量 - 试制量试计划需求数量
@@ -933,6 +933,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
+            // 模具变化信息
+            monthPlan.setMouldChangeInfo(adjustResult.getMouldChangeInfo());
             // 获取周数
             int week = getWeekNumber(new Date());
             // 调整量
@@ -1199,14 +1201,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
             // 试制量试排产量
             monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
-            // 净需求
-            monthPlanVo.setProdReqPlan(adjustDetail.getCurrentNetQty());
             // 计算实际生产需求含损耗
             Integer factProdReqQty = calculateFactProdReqQty(adjustDetail.getCurrentNetQty());
-            monthPlanVo.setFactProdReqQty(factProdReqQty);
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = Convert.toInt(factProdReqQty, 0) - Convert.toInt(monthPlanVo.getTotalQty(), 0);
             monthPlanVo.setDifferenceQty(differenceQty);
+            // 模具变化信息
+            monthPlanVo.setMouldChangeInfo(adjustResult.getMouldChangeInfo());
             // 获取周数
             int week = getWeekNumber(new Date());
             // 调整量
@@ -1852,7 +1853,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpTrialPlan> mpTrialPlanList = mpTrialPlanEntityMapper.selectList(queryWrapper);
         contextDTO.setMpTrialPlanList(mpTrialPlanList);
 
-        Map<String, MpTrialPlan> mpTrialPlanMap = convertToTrialPlanMap(mpTrialPlanList);
+        Map<String, List<MpTrialPlan>> mpTrialPlanMap = convertToTrialPlanMap(mpTrialPlanList);
         contextDTO.setMpTrialPlanMap(mpTrialPlanMap);
     }
 
@@ -2274,10 +2275,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 物料信息
             Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
             // 试制量试计划
-            Map<String, MpTrialPlan> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
+            Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
             MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
-            MpTrialPlan trialPlan = MapUtils.getObject(mpTrialPlanMap, materialCode, new MpTrialPlan());
+            List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
@@ -2297,6 +2298,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+                // 获取试制量试
+                MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, skuConstructionRef.getTrialStatus());
                 // 施工阶段
                 adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
                 // 产品状态
@@ -2313,7 +2316,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 制造示方书号
                 adjustDetailVo.setEmbryoNo(trialPlan.getEmbryoNo());
                 // 试制量试ID
-                adjustDetailVo.setTrialPlanId(trialPlan.getId());
+                adjustDetailVo.setTrialPlanId(String.valueOf(trialPlan.getId()));
             }
             return;
         }
@@ -2337,6 +2340,26 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
         // 制造示方书号
         adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
+    }
+
+
+    protected MpTrialPlan getMpTrialPlan(List<MpTrialPlan> trialPlanList, String trialStatus) {
+        if (PubUtil.isEmpty(trialPlanList) || StringUtils.isBlank(trialStatus)) {
+            return new MpTrialPlan();
+        }
+        String targetTrialStatus = null;
+        if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialStatus)) {
+            targetTrialStatus = ConstructionStageEnum.MEASUREMENT.getStage();
+        }
+        if (ConstructionStageEnum.TRIAL_FLAG.equals(trialStatus)) {
+            targetTrialStatus = ConstructionStageEnum.TRIAL_PRODUCTION.getStage();
+        }
+        for (MpTrialPlan trialPlan : trialPlanList) {
+            if (trialPlan.getTrialStatus().equals(targetTrialStatus)) {
+                return trialPlan;
+            }
+        }
+        return trialPlanList.get(0);
     }
 
     /**
@@ -2680,17 +2703,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     /**
      * 将MpTrialPlan转Map
      */
-    private Map<String, MpTrialPlan> convertToTrialPlanMap(List<MpTrialPlan> trialPlanList) {
+    private Map<String, List<MpTrialPlan>> convertToTrialPlanMap(List<MpTrialPlan> trialPlanList) {
         if (PubUtil.isEmpty(trialPlanList)) {
             return Collections.emptyMap();
         }
         return trialPlanList.stream()
                 .filter(trialPlan -> StringUtils.isNotEmpty(trialPlan.getMaterialCode()))
-                .collect(Collectors.toMap(
-                        MpTrialPlan::getMaterialCode,
-                        trialPlan -> trialPlan,
-                        (existingVal, newVal) -> newVal
-                ));
+                .collect(Collectors.groupingBy(MpTrialPlan::getMaterialCode));
     }
 
     /**
@@ -2938,6 +2957,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (sumMap.containsKey(groupKey)) {
                 MpAdjustDetailVo existVo = sumMap.get(groupKey);
                 existVo.setOrdQty(existVo.getOrdQty() + ordQty);
+                if (StringUtils.isNotEmpty(vo.getTrialPlanId())) {
+                    String split = StringUtils.isBlank(existVo.getTrialPlanId()) ? "" : BusiConstant.WeekRollAdjust.SPLIT_COMMA;
+                    existVo.setTrialPlanId(String.join(split, StringUtils.defaultString(existVo.getTrialPlanId(), ""), vo.getTrialPlanId()));
+                }
             } else {
                 MpAdjustDetailVo newVo = new MpAdjustDetailVo();
                 BeanUtil.copyProperties(vo, newVo, Boolean.FALSE);

@@ -57,7 +57,7 @@ public class MdmBomInfo extends BaseEntity {
     private String childMaterialName;
 
     /** 子物料名称编码(名称中文映射) */
-    @Excel(name = "ui.data.column.mdmBomInfo.childMaterialNameCode")
+    //@Excel(name = "ui.data.column.mdmBomInfo.childMaterialNameCode")
     @ApiModelProperty(value = "子物料名称编码(名称中文映射)", name = "childMaterialNameCode")
     @TableField(value = "CHILD_MATERIAL_NAME_CODE")
     private String childMaterialNameCode;

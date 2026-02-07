@@ -357,7 +357,7 @@ public class MpAdjustStructureIn extends BaseEntity {
      */
     @ApiModelProperty(value = "试制量试ID", name = "trialPlanId")
     @TableField(value = "TRIAL_PLAN_ID")
-    private Long trialPlanId;
+    private String trialPlanId;
 
 
     /**

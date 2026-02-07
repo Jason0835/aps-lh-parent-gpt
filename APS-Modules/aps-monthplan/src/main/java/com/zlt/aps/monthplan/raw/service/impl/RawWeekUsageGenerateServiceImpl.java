@@ -116,6 +116,9 @@ public class RawWeekUsageGenerateServiceImpl {
         for (FactoryMonthPlanProdFinal plan : monthPlans) {
             // 遍历该计划的每一天
             for (int day = 1; day <= daysInMonth; day++) {
+                if(plan.getEmbryoCode().equals("215101337")){
+                    log.info("215101337");
+                }
                 int dailyQty = getDailyProductionQty(plan, day);
                 if (dailyQty > 0) {
                     // 计算这一天属于第几周
@@ -175,16 +178,24 @@ public class RawWeekUsageGenerateServiceImpl {
     }
 
     /**
-     * 计算月份中的第几周（按自然周，周一开始）
+     * 计算月份中的第几周（按固定日期区间划分）
+     * 1-7日：第1周
+     * 8-14日：第2周
+     * 15-21日：第3周
+     * 22日及以后：第4周
      */
     private int getWeekOfMonth(LocalDate date) {
-        // 使用ISO周标准
-        // 周一开始，最少4天
-        WeekFields weekFields = WeekFields.of(DayOfWeek.MONDAY, 4);
-        int weekOfMonth = date.get(weekFields.weekOfMonth());
+        int dayOfMonth = date.getDayOfMonth();
 
-        // 调整：第一周可能跨月，所以第0周应该算作第1周
-        return Math.max(weekOfMonth, 1);
+        if (dayOfMonth <= 7) {
+            return 1;
+        } else if (dayOfMonth <= 14) {
+            return 2;
+        } else if (dayOfMonth <= 21) {
+            return 3;
+        } else {
+            return 4;
+        }
     }
 
     /**
