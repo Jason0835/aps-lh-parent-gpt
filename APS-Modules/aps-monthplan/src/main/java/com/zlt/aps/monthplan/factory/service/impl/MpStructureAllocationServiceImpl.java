@@ -158,12 +158,16 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         StopWatch watch = new StopWatch();
         watch.start();
 
-        // 创建查询数据的异步任务
         // 查询月度生产计划
-        CompletableFuture<List<FactoryMonthPlanProductionFinalResult>> monthPlanFinalResultFuture = CompletableFuture.supplyAsync(
-                // 解决父子上下文传递问题
-                SpringContextSupplierUtil.wrap(() -> queryMonthPlanFinalResult(mpStructureAllocation))
-        );
+        List<FactoryMonthPlanProductionFinalResult> monthPlanProductionFinalResultList = queryMonthPlanFinalResult(mpStructureAllocation);
+        // 设置需求计划版本、排产版本号
+        if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
+            FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
+            mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
+            mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
+        }
+
+        // 创建查询数据的异步任务
         // 查询排产结构
         CompletableFuture<List<MpStructureAllocation>> structureAllocationFuture = CompletableFuture.supplyAsync(
                 () -> queryMpStructureAllocation(mpStructureAllocation)
@@ -205,7 +209,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         try {
             // 等待所有异步任务执行完成
             CompletableFuture.allOf(
-                    monthPlanFinalResultFuture,
                     structureAllocationFuture,
                     structureLhRatioFuture,
                     monCycleSchStruConfFuture,
@@ -230,7 +233,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
 
-        List<FactoryMonthPlanProductionFinalResult> monthPlanProductionFinalResultList = monthPlanFinalResultFuture.join();
         List<MpStructureAllocation> structureAllocationList = structureAllocationFuture.join();
         List<MdmStructureLhRatio> structureLhRatioList = structureLhRatioFuture.join();
         List<MdmMonCycleSchStruConf> monCycleSchStruConfList = monCycleSchStruConfFuture.join();
@@ -245,13 +247,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         List<String> dateCrossedErrorMsgList = getDateCrossedErrorMsgList(mpStructureAllocation, structureAllocationList);
         if (PubUtil.isNotEmpty(dateCrossedErrorMsgList)) {
             throw new BusinessException(String.join("</br>", dateCrossedErrorMsgList));
-        }
-
-        // 设置需求计划版本、排产版本号
-        if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
-            FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
-            mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
-            mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
         }
 
         // 设置最大胎胚种类数、最大硫化机台数
@@ -606,9 +601,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         // 遍历集合，判断交叉
         for (MpStructureAllocation alloc : sameMachineList) {
-            if (targetAlloc.getStructureName().equals(alloc.getStructureName())) {
-                continue;
-            }
             if (isTimeCrossed(targetAlloc, alloc)) {
                 String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.dateCrossed"),
                         targetAlloc.getStructureName(), alloc.getStructureName());

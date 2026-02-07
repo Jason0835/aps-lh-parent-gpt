@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -57,8 +58,10 @@ public class AsyncService {
   private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
   private final RedisService redisService;
   private final BaseDao baseDao;
-  private final MessageServiceUtils messageServiceAdapter;
-  private final ISysDictDataCacheService iSysDictDataCacheService;
+  @Autowired
+  private   ISysDictDataCacheService iSysDictDataCacheService;
+  @Autowired
+  private  MessageServiceUtils messageServiceAdapter;
 
   /**
    * 发送生成成功通知
