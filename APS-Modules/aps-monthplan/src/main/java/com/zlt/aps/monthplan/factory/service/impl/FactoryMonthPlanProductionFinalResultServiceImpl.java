@@ -601,8 +601,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             return Collections.emptyList();
         }
         List<FactoryMonthPlanMouldDayResult> list = Lists.newArrayList();
-        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList = this.findFinalMouldDayResult(predictionDetailList);
-        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(predictionDetailList);
+        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList = this.findFinalMouldDayResult(queryVO,predictionDetailList);
+        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(queryVO,predictionDetailList);
         if(!CollectionUtils.isEmpty(finalMouldDayResultList)) {
             list.addAll(finalMouldDayResultList);
         }
