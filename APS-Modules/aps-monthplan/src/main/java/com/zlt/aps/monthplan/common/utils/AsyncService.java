@@ -27,8 +27,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.time.YearMonth;
 import java.util.Collections;
@@ -57,8 +60,10 @@ public class AsyncService {
   private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
   private final RedisService redisService;
   private final BaseDao baseDao;
-  private final MessageServiceUtils messageServiceAdapter;
-  private final ISysDictDataCacheService iSysDictDataCacheService;
+  @Autowired
+  private   ISysDictDataCacheService iSysDictDataCacheService;
+  @Autowired
+  private  MessageServiceUtils messageServiceAdapter;
 
   /**
    * 发送生成成功通知
@@ -76,7 +81,7 @@ public class AsyncService {
   }
 
   @Async("taskExecutor")
-  public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange){
+  public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion, MonthCalculator.MonthRangeResult monthRange, RequestAttributes requestAttributes){
         String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
         try{
           PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
@@ -142,6 +147,7 @@ public class AsyncService {
           if(CollectionUtils.isNotEmpty(list)) {
             this.baseDao.insertBatch(list);
           }
+          RequestContextHolder.setRequestAttributes(requestAttributes);
           this.sendCreateSuccessMessage(MsgTemplateEnums.MP_CREATE_SIMULATED_PRODUCTION.getCode(),finalVersion,tMonthDemands.get(0).getMonthPlanVersion());
         }catch (Exception e){
           log.info("生成实单模拟排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
@@ -152,7 +158,7 @@ public class AsyncService {
   }
 
   @Async("taskExecutor")
-  public void executeAsyncTaskForPredictionProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange){
+  public void executeAsyncTaskForPredictionProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange,RequestAttributes requestAttributes){
     String key = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
     try{
       YearMonth tMonth = monthRange.getTMonth();
@@ -197,6 +203,7 @@ public class AsyncService {
       if(!org.springframework.util.CollectionUtils.isEmpty(list)) {
         this.baseDao.insertBatch(list);
       }
+      RequestContextHolder.setRequestAttributes(requestAttributes);
       this.sendCreateSuccessMessage(MsgTemplateEnums.MP_CREATE_PRODUCTION_PREDICT.getCode(),finalVersion,tMonthDemands.get(0).getMonthPlanVersion());
     }catch (Exception e){
       log.info("生成预测排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
