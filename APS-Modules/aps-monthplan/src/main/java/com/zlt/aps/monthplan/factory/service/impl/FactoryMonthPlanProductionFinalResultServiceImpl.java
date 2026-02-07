@@ -8,7 +8,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -614,16 +613,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     private List<FactoryMonthPlanMouldDayResult> findNotFinalMouldDayResult(List<MpPredictionDetail> predictionDetailList) {
-        Set<String> finalProductionVersions = Sets.newHashSet();
-        Map<String,List<MpPredictionDetail>>  map = predictionDetailList.stream().collect(Collectors.groupingBy(MpPredictionDetail::getBatchNumber));
-        map.forEach((batchNumber, value) -> {
-            value.sort(Comparator.comparing(MpPredictionDetail::getYear).thenComparing(MpPredictionDetail::getMonth));
-            MpPredictionDetail finalPredictionDetail = value.get(0);
-            Set<String> notFinalProductionVersions  = value.stream().filter(item -> !finalPredictionDetail.getMonthPlanVersion().equals(item.getMonthPlanVersion())).map(MpPredictionDetail::getProductionVersion).collect(Collectors.toSet());
-            if(CollectionUtils.isEmpty(notFinalProductionVersions)) {
-                finalProductionVersions.addAll(notFinalProductionVersions);
-            }
-        });
+        Set<String> finalProductionVersions  = predictionDetailList.stream().filter(item -> StringUtils.isNotBlank(item.getProductionVersion())).map(MpPredictionDetail::getProductionVersion).collect(Collectors.toSet());
         if(CollectionUtils.isEmpty(finalProductionVersions)) {
             return Collections.emptyList();
         }
@@ -643,12 +633,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     private List<FactoryMonthPlanMouldDayResult> findFinalMouldDayResult(List<MpPredictionDetail> predictionDetailList) {
-         Set<String> finalProductionVersions = Sets.newHashSet();
-         Map<String,List<MpPredictionDetail>>  map = predictionDetailList.stream().collect(Collectors.groupingBy(MpPredictionDetail::getBatchNumber));
-         map.forEach((batchNumber, value) -> {
-             value.sort(Comparator.comparing(MpPredictionDetail::getYear).thenComparing(MpPredictionDetail::getMonth));
-             finalProductionVersions.add(value.get(0).getProductionVersion());
-         });
+         Set<String> finalProductionVersions  = predictionDetailList.stream().filter(item -> StringUtils.isNotBlank(item.getProductionVersion())).map(MpPredictionDetail::getProductionVersion).collect(Collectors.toSet());
          if(CollectionUtils.isEmpty(finalProductionVersions)) {
              return Collections.emptyList();
          }
