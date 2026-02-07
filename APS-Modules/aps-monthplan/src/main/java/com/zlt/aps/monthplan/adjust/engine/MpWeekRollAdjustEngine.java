@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.adjust.engine;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ConstructionStageEnum;
 import com.tlt.aps.enums.UrgencyTypeEnum;
@@ -52,6 +53,7 @@ import java.util.stream.Collectors;
 @Service
 public class MpWeekRollAdjustEngine {
 
+    private static final String Z_K_H = "\\{}";
 
     /**
      * 结构内调整，按结构分别调整
@@ -995,10 +997,30 @@ public class MpWeekRollAdjustEngine {
         if (totalRemainQty < totalQty){
             //提示消息
             if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithRemainQtyNoFull())){
-                String strHint = String.format(contextDTO.getMsgTemplateWithRemainQtyNoFull(),mpFinalVo.getMaterialCode(),totalRemainQty,totalQty);
-                contextDTO.getMsgRemainQtyNoFull().append(strHint);
+                String strHint = buildMessageContent(contextDTO.getMsgTemplateWithRemainQtyNoFull(),new String[]{mpFinalVo.getMaterialCode(),String.valueOf(totalRemainQty),String.valueOf(totalQty)});
+                contextDTO.getMsgRemainQtyNoFull().append(strHint).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
         }
+    }
+
+    /**
+     * 转译消息内容
+     * @param templateContent 模板内容
+     * @param paramValues 模板值
+     * @return
+     */
+    private String buildMessageContent(String templateContent, String[] paramValues) {
+        if (StringUtils.isEmpty(templateContent)) {
+            return "";
+        }
+
+        String msgContent = templateContent;
+        if (StringUtils.isNotEmpty(paramValues) && StringUtils.isNotEmpty(msgContent)) {
+            for (String oneValue : paramValues) {
+                msgContent = msgContent.replaceFirst(Z_K_H, oneValue);
+            }
+        }
+        return msgContent;
     }
 
     /**
