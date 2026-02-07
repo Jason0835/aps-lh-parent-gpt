@@ -27,6 +27,7 @@ import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
 import com.zlt.aps.monthplan.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.common.utils.GroupedMapWithOrder;
 import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.aps.monthplan.demand.mapper.MpPredictionDetailEntityMapper;
 import com.zlt.aps.monthplan.factory.event.MonthPlanFinalizedEvent;
@@ -606,8 +607,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     private void addNotFinalExportData(List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList, List<WorksheetData> result) {
-         notFinalMouldDayResultList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResult::getYearMonth));
-         Map<String,List<FactoryMonthPlanMouldDayResult>> map =  notFinalMouldDayResultList.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getExportGroupKey));
+         Map<String,List<FactoryMonthPlanMouldDayResult>> map = GroupedMapWithOrder.groupWithOrder(notFinalMouldDayResultList);
          map.forEach((yearMonth, value) -> result.add(this.buildSimulatedResult(value)));
     }
 
