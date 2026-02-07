@@ -231,7 +231,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                 continue;
             }
             // 实际调整
-            adjustStructureOut.setActualAdjustQty(adjustResult.getTotalPlanQty());
+            adjustStructureOut.setActualAdjustQty(Convert.toInt(adjustResult.getTotalPlanQty(), 0));
             // 调整原因 TODO
             adjustStructureOut.setAdjustReason("");
         }
@@ -342,7 +342,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
             mpFinalVo = mpFinalAdjustMap.get(structureOut.getMaterialCode());
             if (mpFinalVo != null){
-                structureOut.setActualAdjustQty(mpFinalVo.getActualAdjustQty());
+                structureOut.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));
             }
         }
         baseDao.updateBatch(mpAdjustStructureOutList);

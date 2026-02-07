@@ -1074,7 +1074,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 actualAdjustQty = totalPlanQty - totalQty;
             }
             // 设置实际调整
-            adjustDetailVo.setActualAdjustQty(actualAdjustQty);
+            adjustDetailVo.setActualAdjustQty(Convert.toInt(actualAdjustQty, 0));
             // 调整原因 TODO
 //            adjustDetailVo.setAdjustReason("");
         }
