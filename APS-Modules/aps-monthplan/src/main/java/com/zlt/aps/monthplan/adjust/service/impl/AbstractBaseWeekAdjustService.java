@@ -2136,7 +2136,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             matchMonthPlanList(contextDTO, resultList, materialCode, monthPlanMap,
-                    Convert.toInt(salesOrder.getOrdQty(),0), ApsConstant.FALSE);
+                    Convert.toInt(salesOrder.getOrdQty(),0), ApsConstant.FALSE, salesOrder.getId());
         }
         return resultList;
     }
@@ -2181,7 +2181,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 创建基础通用字段
             MpAdjustDetailVo adjustDetailVo = createBaseMpAdjustDetailVo(contextDTO, materialCode, 0, ApsConstant.FALSE);
             // 设置月度生产计划关联的字段
-            setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan);
+            setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan, monthPlan.getId());
             // 调整前净需求量
             setPreviousNetQty(adjustDetailVo, monthPlan);
             // 添加到结果集
@@ -2192,14 +2192,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     protected void matchMonthPlanList(MpRollAdjustContextDTO contextDTO, List<MpAdjustDetailVo> resultList,
                                       String materialCode, Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap,
-                                      Integer ordQty, String isTrial) {
+                                      Integer ordQty, String isTrial, Long busiId) {
         // 根据物料编码获取对应的月度生产计划列表
         List<FactoryMonthPlanFinalAdjustVo> matchMonthPlanProdList = monthPlanMap.get(materialCode);
         if (PubUtil.isEmpty(matchMonthPlanProdList)) {
             // 创建基础通用字段
             MpAdjustDetailVo emptyAdjustVo = createBaseMpAdjustDetailVo(contextDTO, materialCode, ordQty, isTrial);
             // 设置月度生产计划关联的字段
-            setPlanRelatedFields(contextDTO, emptyAdjustVo, null);
+            setPlanRelatedFields(contextDTO, emptyAdjustVo, null, busiId);
             // 调整前净需求量
             setPreviousNetQty(emptyAdjustVo, null);
             // 添加到结果集
@@ -2211,7 +2211,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 创建基础通用字段
             MpAdjustDetailVo adjustDetailVo = createBaseMpAdjustDetailVo(contextDTO, materialCode, ordQty, isTrial);
             // 设置月度生产计划关联的字段
-            setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan);
+            setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan, busiId);
             // 调整前净需求量
             setPreviousNetQty(adjustDetailVo, monthPlan);
             // 添加到结果集
@@ -2247,10 +2247,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     /**
      * 设置关联的字段
+     * @param contextDTO
      * @param adjustDetailVo
      * @param monthPlan
+     * @param busiId
      */
-    protected void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+    protected void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan, Long busiId) {
         // 物料编码
         String materialCode = adjustDetailVo.getMaterialCode();
         // SKU与施工（示方书）关系
@@ -2299,7 +2301,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
                 // 获取试制量试
-                MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, skuConstructionRef.getTrialStatus());
+                MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, busiId);
                 // 施工阶段
                 adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
                 // 产品状态
@@ -2343,23 +2345,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
 
-    protected MpTrialPlan getMpTrialPlan(List<MpTrialPlan> trialPlanList, String trialStatus) {
-        if (PubUtil.isEmpty(trialPlanList) || StringUtils.isBlank(trialStatus)) {
+    protected MpTrialPlan getMpTrialPlan(List<MpTrialPlan> trialPlanList, Long trialId) {
+        if (PubUtil.isEmpty(trialPlanList) || trialId == null) {
             return new MpTrialPlan();
         }
-        String targetTrialStatus = null;
-        if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialStatus)) {
-            targetTrialStatus = ConstructionStageEnum.MEASUREMENT.getStage();
-        }
-        if (ConstructionStageEnum.TRIAL_FLAG.equals(trialStatus)) {
-            targetTrialStatus = ConstructionStageEnum.TRIAL_PRODUCTION.getStage();
-        }
-        for (MpTrialPlan trialPlan : trialPlanList) {
-            if (trialPlan.getTrialStatus().equals(targetTrialStatus)) {
-                return trialPlan;
-            }
-        }
-        return trialPlanList.get(0);
+        return trialPlanList.stream()
+                .filter(vo -> vo.getId().equals(trialId))
+                .findFirst()
+                .orElse(new MpTrialPlan());
     }
 
     /**
