@@ -39,6 +39,6 @@ public interface IMpSimulatedResultService  extends IDocService<MpSimulatedResul
    * @param queryCondition 查询条件
    * @return 模拟版本号列表
    */
-  List<String> findSimulatedVersion(MpSimulatedResult queryCondition);
+  String getLatestBatchNumber(MpSimulatedResult queryCondition);
 
 }

@@ -8,7 +8,6 @@ import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -332,7 +331,4 @@ public class MpSimulatedResult extends BaseEntity {
     @ApiModelProperty(value = "版本映射", name = "versionMap")
     @TableField(exist = false)
     private Map<String,MpPredictionDetail> versionMap;
-    @ApiModelProperty(value = "最新批次号", name = "batchNumbers")
-    @TableField(exist = false)
-    private List<String> batchNumbers;
 }
