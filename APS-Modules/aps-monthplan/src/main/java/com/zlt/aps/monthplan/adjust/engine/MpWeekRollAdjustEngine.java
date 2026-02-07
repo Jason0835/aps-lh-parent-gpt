@@ -1683,8 +1683,9 @@ public class MpWeekRollAdjustEngine {
                 if (preDayMouldValue != 0){
                     //若不是第1笔
                     sb.append("-").append(dayMouldValue);
+                }else {
+                    sb.append(dayMouldValue);
                 }
-                sb.append(dayMouldValue);
                 preDayMouldValue = dayMouldValue;
             }
         }
