@@ -24,6 +24,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.time.YearMonth;
 import java.util.*;
@@ -97,7 +99,8 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         }
         redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
-        asyncService.executeAsyncTaskForPredictionProduction(finalVersion,monthRange);
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        asyncService.executeAsyncTaskForPredictionProduction(finalVersion,monthRange,requestAttributes);
     }
 
 
