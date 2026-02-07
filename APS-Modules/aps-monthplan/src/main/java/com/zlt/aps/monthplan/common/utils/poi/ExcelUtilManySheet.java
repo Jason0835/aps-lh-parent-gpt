@@ -7,7 +7,6 @@ import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.annotation.Excels;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.utils.DictUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.file.FileTypeUtils;
 import com.ruoyi.common.core.utils.file.ImageUtils;
@@ -18,6 +17,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.common.utils.DictUtils;
 import com.zlt.common.utils.ExcelReadUtils;
 import lombok.Getter;
 import org.apache.poi.ss.usermodel.BorderStyle;
@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -124,6 +125,11 @@ public class ExcelUtilManySheet {
    * 排除的字段
    */
   private final Collection<String> exceptField = Lists.newArrayList();
+
+  /**
+   * 用于dictType属性数据存储，避免重复查缓存
+   */
+  public Map<String, String> sysDictMap = new HashMap<>();
 
   private final TimeZone timeZone;
 
@@ -273,13 +279,14 @@ public class ExcelUtilManySheet {
           cell.setCellValue(convertByExp(Convert.toStr(value), readConverterExp, separator));
         } else if (value instanceof BigDecimal && -1 != attr.scale()) {
           cell.setCellValue((((BigDecimal) value).setScale(attr.scale(), attr.roundingMode())).toString());
-        } else if (StringUtils.isNotEmpty(dictType) && value != null && StringUtils.isNotBlank(value.toString())) {
+        } else if (StringUtils.isNotEmpty(dictType) && StringUtils.isNotNull(value)) {
           log.info("value={},dictType={}", value, dictType);
-           String dictLabel = convertByDict(value.toString(), dictType);
-          log.info("value={},dictType={},dictLabel:{}", value, dictType, dictLabel);
-          if(StringUtils.isNotBlank(dictLabel)){
-             cell.setCellValue(dictLabel);
-           }
+          if (!sysDictMap.containsKey(dictType + value))
+          {
+            String lable = convertDictByExp(Convert.toStr(value), dictType, separator);
+            sysDictMap.put(dictType + value, lable);
+          }
+          cell.setCellValue(sysDictMap.get(dictType + value));
         } else {
           // 设置列类型
           setCellVo(value, attr, cell);
@@ -294,6 +301,19 @@ public class ExcelUtilManySheet {
       throw new CustomException("common.error.util.export.excel.fail", e);
     }
     return cell;
+  }
+
+  /**
+   * 解析字典值
+   *
+   * @param dictValue 字典值
+   * @param dictType 字典类型
+   * @param separator 分隔符
+   * @return 字典标签
+   */
+  public static String convertDictByExp(String dictValue, String dictType, String separator)
+  {
+    return DictUtils.getDictLabel(dictType, dictValue, separator);
   }
 
   /**
@@ -357,19 +377,6 @@ public class ExcelUtilManySheet {
       sheet.createDrawingPatriarch();
     }
     return sheet.getDrawingPatriarch();
-  }
-
-  /**
-   * 通过字典类型解析导出值（propertyValue为单个值）
-   *
-   * @param propertyValue 参数值（字典数据键值）
-   * @param dictType      字典类型
-   * @return 解析后值（字典数据标签）
-   * @throws Exception
-   */
-  public String convertByDict(String propertyValue, String dictType) throws Exception {
-
-    return DictUtils.convertByDictExport(propertyValue, dictType, dictDataCach.get(), lang);
   }
 
   /**
