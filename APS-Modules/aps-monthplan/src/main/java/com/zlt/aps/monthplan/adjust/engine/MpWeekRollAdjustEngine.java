@@ -997,7 +997,7 @@ public class MpWeekRollAdjustEngine {
         if (totalRemainQty < totalQty){
             //提示消息
             if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithRemainQtyNoFull())){
-                String strHint = buildMessageContent(contextDTO.getMsgTemplateWithRemainQtyNoFull(),new String[]{contextDTO.getFactoryCode(),String.valueOf(contextDTO.getMpYear()),
+                String strHint = buildMessageContent(contextDTO.getMsgTemplateWithRemainQtyNoFull(),new String[]{contextDTO.getFactoryName(),String.valueOf(contextDTO.getMpYear()),
                         String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion(),mpFinalVo.getMaterialCode(),String.valueOf(totalRemainQty),String.valueOf(totalQty)});
                 contextDTO.getMsgRemainQtyNoFull().append(strHint).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
