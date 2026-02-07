@@ -925,6 +925,21 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 判断是否可进行下一次分配
+     * 特殊材料结构不进行最小分配天数控制
+     * 非特殊材料结构，需要判断剩余可分配天数要 >= minAllocationDays
+     *
+     * @param minAllocationDays 最小要求分配天数
+     * @return
+     */
+    public boolean isNextAllocation(int minAllocationDays) {
+        if (isSpecialMaterial()) {
+            return leftOverNeedAllocationDays > BigDecimal.ZERO.intValue();
+        }
+        return leftOverNeedAllocationDays >= minAllocationDays;
+    }
+
+    /**
      * 两个结构分组是否含有同规格
      * true 含有同规格
      * false 不含有同规格

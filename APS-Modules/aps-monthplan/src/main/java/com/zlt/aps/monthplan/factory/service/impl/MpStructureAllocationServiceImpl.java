@@ -604,12 +604,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         && alloc.getBeginDay() <= alloc.getEndDay())
                 .collect(Collectors.toList());
 
-        Set<String> structureNameSet = sameMachineList.stream()
-                .map(MpStructureAllocation::getStructureName)
-                .collect(Collectors.toSet());
-        if (!structureNameSet.contains(targetAlloc.getStructureName())) {
-            return Collections.emptyList();
-        }
         // 遍历集合，判断交叉
         for (MpStructureAllocation alloc : sameMachineList) {
             if (targetAlloc.getStructureName().equals(alloc.getStructureName())) {

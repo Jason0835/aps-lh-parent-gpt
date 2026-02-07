@@ -139,10 +139,11 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                         String structureName = materialToStructureMap.get(materialDesc);
 
                         // 计算活块可用量（按物料描述）
-                        insertTempMap.computeIfAbsent(materialDesc, k -> new HashSet<>()).add(mouldCode);
-
+                        if (mouldInfo.getProductionDaySet().contains(day)) {
+                            insertTempMap.computeIfAbsent(materialDesc, k -> new HashSet<>()).add(mouldCode);
+                        }
                         // 计算型腔可用量（按结构+主花纹）
-                        if (StringUtils.isNotBlank(structureName)) {
+                        if (StringUtils.isNotBlank(structureName) && mouldInfo.getProductionDaySet().contains(day)) {
                             cavityTempMap.computeIfAbsent(structureName, k -> new HashSet<>()).add(mouldCode);
                         }
                     }
@@ -236,9 +237,6 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
                     // 计算型腔可用量（按结构+主花纹）
                     if (StringUtils.isNotBlank(structureName)) {
-                        if("315/70R22.5JF568".equals(structureName)){
-                            System.out.println(materialDesc);
-                        }
                         cavityTempMap.computeIfAbsent(structureName, k -> new HashSet<>()).add(mouldCode);
                     }
                 }

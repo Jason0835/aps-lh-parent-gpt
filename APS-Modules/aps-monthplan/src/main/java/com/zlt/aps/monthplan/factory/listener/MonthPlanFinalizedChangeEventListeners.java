@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -56,7 +55,7 @@ public class MonthPlanFinalizedChangeEventListeners {
     /**
      * 异步处理月计划定稿事件
      */
-    @Async
+//    @Async
     @EventListener
     public void handleMonthPlanFinalizedEvent(MonthPlanFinalizedEvent event) {
         try {

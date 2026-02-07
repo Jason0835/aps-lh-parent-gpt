@@ -148,6 +148,7 @@ public class CxCapacityAllocationHandler {
 
     /**
      * 判断机台是否包含特殊结构
+     *
      * @param machine
      * @return
      */
@@ -172,8 +173,17 @@ public class CxCapacityAllocationHandler {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
             return;
         }
-        String groupName = allocationGroupPlan.getGroupName();
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        String groupName = allocationGroupPlan.getGroupName();
+        Integer leftOverDays = allocationGroupPlan.getLeftOverNeedAllocationDays();
+        //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
+        Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        if (!allocationGroupPlan.isNextAllocation(minAllocationDays)) {
+            log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, false, leftOverDays, minAllocationDays));
+            allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
+            return;
+        }
         log.info(TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan));
         //重新计算分配的起始时间
         Integer startDay = cxMachineInfo.getNextStartDay();
@@ -197,14 +207,14 @@ public class CxCapacityAllocationHandler {
         Integer leftOver = remainingDays - needAllocationDays;
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
-        //20260109 标记分配完成
-        ((TbrProductionContext) context).updateSpecialMaterialInfoMap(allocationGroupPlan, needAllocationDays); // 更新特殊材料库存
+        //更新特殊材料库存
+        ((TbrProductionContext) context).updateSpecialMaterialInfoMap(allocationGroupPlan, needAllocationDays);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
+        //20260109 标记分配完成
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
         CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //还有剩余产能，继续挑选下一个分组结构
-        Integer minAllocationDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
         if (leftOver >= minAllocationDays) {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineFindNextGroupPlanLog(context, cxMachineInfo));
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
@@ -494,7 +504,7 @@ public class CxCapacityAllocationHandler {
                 specialMaterialList = tempSpecialMaterialList;
             }
         }
-        
+
         //1、取固定的
         Integer minFixedPriority = specialMaterialList.stream().mapToInt(ProductionPlanGroupInfo::getFixedPriority).min().getAsInt();
         List<ProductionPlanGroupInfo> fixedGroupPlanList = specialMaterialList.stream().filter(groupPlan -> minFixedPriority.equals(groupPlan.getFixedPriority())).collect(Collectors.toList());
