@@ -1,8 +1,11 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.Map;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import lombok.Data;
@@ -13,6 +16,7 @@ import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.zlt.common.domain.CommonBusiEntity;
+import org.apache.ibatis.type.JdbcType;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -121,6 +125,24 @@ public class RawMaterialRequirePlan extends BaseEntity {
     @TableField(value = "T2_MONTH_EUDR_QTY")
     private BigDecimal t2MonthEudrQty;
 
+
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
+    @ImportExcelValidated(maxLength = 300)
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
+
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(
+            pattern = "yyyy-MM-dd HH:mm:ss"
+    )
+    @TableField(
+            value = "UPDATE_TIME",
+            fill = FieldFill.INSERT_UPDATE,
+            jdbcType = JdbcType.TIMESTAMP
+    )
+    private Date updateTime;
 
 
     public RawMaterialRequirePlan() {
