@@ -22,9 +22,6 @@ import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.core.dao.basedao.BaseDao;
-import com.zlt.msg.message.domain.vo.MessageContext;
-import com.zlt.msg.message.enums.MsgChannelEnums;
-import com.zlt.msg.message.enums.MsgTypeEnums;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -37,7 +34,6 @@ import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -68,37 +64,15 @@ public class AsyncService {
    * 发送生成成功通知
    */
   private void sendCreateSuccessMessage(String templateCode ,MpFactoryProductionVersion finalVersion,String predictionVersion) {
-    // 构建完整上下文
-    MessageContext context = messageServiceAdapter.buildMessageContext(
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        SecurityUtils.getUsername(),
-        null
-    );
-
+    //1.获取工厂国际化
     List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
-    Optional<SysDictData> optional = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(finalVersion.getFactoryCode())).findFirst();
-    String factoryName = StringUtils.EMPTY;
-    if (optional.isPresent()) {
-      factoryName = optional.get().getDictLabel();
-    }
-    String[] receivers = {SecurityUtils.getUsername()};
-    // 发送消息
-    messageServiceAdapter.sendMessage(
-        templateCode,
-        MsgTypeEnums.NOTICE.getCode(),
-        MsgChannelEnums.SYSTEM.getCode(),
-        receivers,
-        context,
-        factoryName,
+    String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(finalVersion.getFactoryCode())).findFirst().get().getDictLabel();
+
+    // 2.发送消息
+    messageServiceAdapter.sendNotice(templateCode ,SecurityUtils.getUsername() , factoryName,
         finalVersion.getYear(),
         finalVersion.getMonth(),
-        predictionVersion
-    );
+        predictionVersion);
   }
 
   @Async("taskExecutor")

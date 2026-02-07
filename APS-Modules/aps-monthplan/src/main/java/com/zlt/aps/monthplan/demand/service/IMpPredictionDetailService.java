@@ -7,6 +7,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.bill.common.service.IDocService;
 
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,4 +37,10 @@ public interface IMpPredictionDetailService  extends IDocService<MpPredictionDet
    * @return
    */
   Map<String, Map<String, MpPredictionDetail>> fetchVersion(Set<String> batchNumbers);
+  /**
+   * 根据批次号获取预测版本
+   * @param batchNumbers
+   * @return
+   */
+  List<String> findSimulatedVersion(Set<String> batchNumbers);
 }
