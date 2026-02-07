@@ -10,6 +10,7 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
@@ -125,7 +126,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             initStructureStartAndEndDay(contextDTO);
             //4）初始化日志和消息
             contextDTO.setLogDetail(new StringBuilder());
-            contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
             //2.2 执行结构内调整
             startTime = new Date();
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
@@ -139,16 +139,21 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
             //=========================================================
 
+            //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+            reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
+            //2.5.设置模具变化信息
+            for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
+                weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
+            }
+
             newMpFinalList.addAll(oneStructMpFinalList);
 
-            //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-            reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList);
-
-            //2.5 构建月计划统计结果
+            //2.6 构建月计划统计结果
             List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList);
             monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
 
-            //2.6 保存调整日志
+            //2.7 保存调整日志
             saveMpAdjustLog(contextDTO);
         }
 
