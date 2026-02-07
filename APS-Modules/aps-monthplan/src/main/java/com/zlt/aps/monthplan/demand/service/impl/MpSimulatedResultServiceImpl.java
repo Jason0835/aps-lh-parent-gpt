@@ -118,7 +118,9 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       String   batchNumber  = getLatestBatchNumber(queryVO);
       queryVO.setMonthPlanVersion(batchNumber);
       List<MpSimulatedResult> list = this.entityMapper.listExportData(queryVO);
-      result.add(this.buildSimulatedResult(fileName,list));
+      if(CollectionUtils.isNotEmpty(list)){
+        result.add(this.buildSimulatedResult(fileName,list));
+      }
       if(StringUtils.isNotBlank(batchNumber)){
         this.factoryMonthPlanProductionFinalResultService.listExportData(queryVO,batchNumber,result);
       }
