@@ -997,7 +997,8 @@ public class MpWeekRollAdjustEngine {
         if (totalRemainQty < totalQty){
             //提示消息
             if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithRemainQtyNoFull())){
-                String strHint = buildMessageContent(contextDTO.getMsgTemplateWithRemainQtyNoFull(),new String[]{mpFinalVo.getMaterialCode(),String.valueOf(totalRemainQty),String.valueOf(totalQty)});
+                String strHint = buildMessageContent(contextDTO.getMsgTemplateWithRemainQtyNoFull(),new String[]{contextDTO.getFactoryName(),String.valueOf(contextDTO.getMpYear()),
+                        String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion(),mpFinalVo.getMaterialCode(),String.valueOf(totalRemainQty),String.valueOf(totalQty)});
                 contextDTO.getMsgRemainQtyNoFull().append(strHint).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
         }
@@ -1275,7 +1276,7 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,cavityQty)).append(ApsConstant.DIVISION);
         if (!adjustDailyCapacityLimitObj.preCheckCapacitySatisfy(dailyCapacityLimitVo) ||
                 !preCheckMouldSatisfy(dailyCapacityLimitVo,cavityQty)){
-            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),curFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,每日硫化机台数或每日胎胚种类数或型腔数不符合产能限制,退出！",contextDTO.getStructureName(),curFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             return;
         }
 

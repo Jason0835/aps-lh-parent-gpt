@@ -1,6 +1,8 @@
 package com.zlt.aps.monthplan.adjust.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -25,11 +27,13 @@ import com.zlt.common.utils.PubUtil;
 import com.zlt.msg.message.api.IMsgTemplateRemoteService;
 import com.zlt.msg.message.domain.entity.MsgTemplate;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -62,6 +66,10 @@ public class MpWeekRollAdjustController extends BaseController {
 
     @Autowired
     private IMsgTemplateRemoteService templateRemoteService;
+
+    @Autowired
+    private ISysDictDataCacheService iSysDictDataCacheService;
+
 
     /**
      * 获取调整明细列表
@@ -198,7 +206,10 @@ public class MpWeekRollAdjustController extends BaseController {
             contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
         }
         contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
-
+        //初始工厂名称
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode())).findFirst().get().getDictLabel();
+        contextDTO.setFactoryName(factoryName);
         return contextDTO;
     }
 

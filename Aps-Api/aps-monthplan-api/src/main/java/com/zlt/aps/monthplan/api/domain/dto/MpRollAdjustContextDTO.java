@@ -70,6 +70,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "工厂编码")
     private String factoryCode;
 
+    @ApiModelProperty(value = "工厂名称")
+    private String factoryName;
+
     @ApiModelProperty(value = "版本号")
     private String version;
 
