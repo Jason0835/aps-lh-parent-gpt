@@ -130,7 +130,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       List<FactoryMonthPlanMouldDayResult> mouldDayResults = null;
       if(CollectionUtils.isNotEmpty(list)){
           Set<String> monthPlanVersions = list.stream().map(MpSimulatedResult::getMonthPlanVersion).collect(Collectors.toSet());
-          mouldDayResults = this.factoryMonthPlanProductionFinalResultService.listExportData(monthPlanVersions);
+          mouldDayResults = this.factoryMonthPlanProductionFinalResultService.listExportData(queryVO,monthPlanVersions);
       }
       if(CollectionUtils.isNotEmpty(mouldDayResults)) {
           Map<String, List<FactoryMonthPlanMouldDayResult>> map = this.quickGroup(mouldDayResults);
