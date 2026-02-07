@@ -1419,6 +1419,8 @@ public class MpWeekRollAdjustEngine {
         Integer dayVulcanizationQty;
         boolean bFirstAddMould = true;
         while (newPlanQty > 0){
+            //已有排产标识，防止中间断开
+            boolean bHasProduction = false;
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
             for (int i = newOnLineDay; i<= structureDeadLine; i++){
                 //SKU的模具数限制：SKU的模具数<=SKU活块的数量
@@ -1433,6 +1435,9 @@ public class MpWeekRollAdjustEngine {
                 }
                 //检查总产能限制(允许上下波动)
                 if (!checkTotalCapacityLimit(contextDTO,i,mpFinalVo.getMaterialCode(),dailyCapacityLimitVoMap.get(i))){
+                    if (bHasProduction){
+                        break;
+                    }
                     continue;
                 }
                 dayField = FactoryConstant.DAY_FIELD + i;
@@ -1452,6 +1457,9 @@ public class MpWeekRollAdjustEngine {
                 if(dayVulcanizationQty == null){
                     //若获取到首日量是空值,表示主花纹向下，当日不让增模或换活字块
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到的首日计划量为空,表示当前排产日主花纹下不允许换活块！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    if (bHasProduction){
+                        break;
+                    }
                     continue;
                 }
 
@@ -1482,6 +1490,9 @@ public class MpWeekRollAdjustEngine {
                         mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
                     }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    if (bHasProduction){
+                        break;
+                    }
                     continue;
                 }
                 //检查：主花纹向下模具数量(/2转成机台数) 符合性
@@ -1504,6 +1515,9 @@ public class MpWeekRollAdjustEngine {
                     return 0;
                 }
                 bFirstAddMould = false;
+                if (mpFinalVo.getFieldValueByFieldName(dayField) !=null && (Integer) mpFinalVo.getFieldValueByFieldName(dayField) !=0){
+                    bHasProduction = true;
+                }
             }
 
             startMould += 2;
