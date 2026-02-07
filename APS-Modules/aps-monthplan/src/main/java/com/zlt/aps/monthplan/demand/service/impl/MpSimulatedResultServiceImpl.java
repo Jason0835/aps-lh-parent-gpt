@@ -42,6 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -114,7 +116,8 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       }
       redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
       MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
-      asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange);
+      RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+      asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange,requestAttributes);
     }
 
   @Override

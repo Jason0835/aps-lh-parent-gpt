@@ -1876,7 +1876,7 @@ public class MpWeekRollAdjustEngine {
         //2、排实单
         Integer newOnLineDay;
         Iterator<MpAdjustStructureIn> incAdjustFormalIter,incAdjustBatchTrailIter;
-        for (int i=lockNextDay; i<contextDTO.getStructureDeadLine();i++){
+        for (int i=lockNextDay; i<=contextDTO.getStructureDeadLine();i++){
             //2.1、敲定SKU新的上机日期
             newOnLineDay = getNewOnLineDay(contextDTO, i, null);
             if (newOnLineDay == null){
