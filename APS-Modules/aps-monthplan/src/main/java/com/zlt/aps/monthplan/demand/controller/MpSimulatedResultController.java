@@ -72,7 +72,7 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
 
     @Override
     protected String getOrderBy() {
-        return "STRUCTURE_NAME ASC,SPECIFICATIONS ASC,MAIN_PATTERN ASC,PATTERN ASC,update_time DESC,ID DESC";
+        return "update_time DESC,STRUCTURE_NAME ASC,SPECIFICATIONS ASC,MAIN_PATTERN ASC,PATTERN ASC";
     }
 
     /**
@@ -233,6 +233,10 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month22")), "MONTH_22", queryVO.getFieldValueByFieldName("month22"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month23")), "MONTH_23", queryVO.getFieldValueByFieldName("month23"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month24")), "MONTH_24", queryVO.getFieldValueByFieldName("month24"));
+        List<String> monthPlanVersions = this.mpSimulatedResultService.findSimulatedVersion(queryVO);
+        if(!CollectionUtils.isEmpty(monthPlanVersions)){
+            queryWrapper.in("MONTH_PLAN_VERSION", monthPlanVersions);
+        }
     }
 
 

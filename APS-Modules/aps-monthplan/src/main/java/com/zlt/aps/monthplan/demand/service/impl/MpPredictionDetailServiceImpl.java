@@ -1,13 +1,17 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
+import com.zlt.aps.monthplan.common.utils.BatchNumberProcessor;
 import com.zlt.aps.monthplan.demand.mapper.MpPredictionDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -105,7 +109,7 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
         wrapper.in(MpPredictionDetail::getBatchNumber,batchNumbers);
         wrapper.eq(MpPredictionDetail::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MpPredictionDetail> list =  this.mpPredictionDetailEntityMapper.selectList(wrapper);
-        if(org.apache.commons.collections.CollectionUtils.isEmpty(list)){
+        if(CollectionUtils.isEmpty(list)){
             return Collections.emptyMap();
         }
         Map<String, Map<String, MpPredictionDetail>> result = Maps.newHashMap();
@@ -127,7 +131,25 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
 
     @Override
     public List<String> findSimulatedVersion(Set<String> batchNumbers) {
-        return Collections.emptyList();
+        if(CollectionUtils.isEmpty(batchNumbers)){
+            return Collections.emptyList();
+        }
+        List<MpPredictionDetail> result = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> versionList = new ArrayList<>(batchNumbers);
+        for (int i = 0; i < versionList.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, versionList.size());
+            List<String> batchVersions = versionList.subList(i, end);
+            LambdaQueryWrapper<MpPredictionDetail> wrapper =
+                Wrappers.lambdaQuery(MpPredictionDetail.class)
+                    .in(MpPredictionDetail::getBatchNumber, batchVersions)
+                    .eq(MpPredictionDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(mpPredictionDetailEntityMapper.selectList(wrapper));
+        }
+        if(CollectionUtils.isEmpty(result)){
+            return Collections.emptyList();
+        }
+        return BatchNumberProcessor.getLatestBatchNumbers(result);
     }
 
 }

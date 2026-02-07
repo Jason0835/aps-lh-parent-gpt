@@ -84,4 +84,6 @@ public class MpPredictionDetail extends BaseEntity {
     private String planType;
 
 
+
+
 }

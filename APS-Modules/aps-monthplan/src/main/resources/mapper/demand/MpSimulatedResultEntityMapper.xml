@@ -6,6 +6,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="listExportData" resultType="com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult">
             SELECT
                 sr.FACTORY_CODE,
+                sr.`YEAR`,
+                sr.`MONTH`,
                 sr.PRODUCT_TYPE_CODE,
                 sr.STRUCTURE_NAME,
                 sr.SPECIFICATIONS,
@@ -53,6 +55,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             WHERE sr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
               AND sr.`YEAR` =  #{year,jdbcType=DECIMAL}
               AND sr.`MONTH` =  #{month,jdbcType=DECIMAL}
+                <if test="batchNumbers != null and !batchNumbers.isEmpty()">
+                  AND sr.MONTH_PLAN_VERSION IN
+                  <foreach item="batchNumber" collection="batchNumbers" open="(" separator="," close=")">
+                        #{batchNumber}
+                  </foreach>
+                </if>
                 <if test="structureName != null and structureName != ''">
                     AND INSTR(sr.STRUCTURE_NAME,#{structureName}) > 0
                 </if>
