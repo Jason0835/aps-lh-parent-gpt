@@ -12,6 +12,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 sr.STRUCTURE_NAME,
                 sr.SPECIFICATIONS,
                 sr.PATTERN,
+                sr.MAIN_MATERIAL_DESC,
                 sr.MAIN_PATTERN,
                 sr.BRAND,
                 sr.EMBRYO_CODE,
