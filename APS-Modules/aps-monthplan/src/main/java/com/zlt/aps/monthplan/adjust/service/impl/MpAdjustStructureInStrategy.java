@@ -185,7 +185,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
             mpFinalVo = mpFinalAdjustMap.get(structureIn.getMaterialCode());
             if (mpFinalVo != null){
-                structureIn.setActualAdjustQty(mpFinalVo.getActualAdjustQty());
+                structureIn.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));
             }
         }
         baseDao.updateBatch(mpAdjustStructureInList);
