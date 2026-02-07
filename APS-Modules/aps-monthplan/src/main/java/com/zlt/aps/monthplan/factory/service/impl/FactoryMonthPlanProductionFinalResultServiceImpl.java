@@ -581,7 +581,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     @Override
-    public List<FactoryMonthPlanMouldDayResult> listExportData(Set<String> monthPlanVersions) {
+    public List<FactoryMonthPlanMouldDayResult> listExportData(MpSimulatedResult queryVO, Set<String> monthPlanVersions) {
         if(CollectionUtils.isEmpty(monthPlanVersions)) {
             return Collections.emptyList();
         }
@@ -601,8 +601,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             return Collections.emptyList();
         }
         List<FactoryMonthPlanMouldDayResult> list = Lists.newArrayList();
-        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList = this.findFinalMouldDayResult(predictionDetailList);
-        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(predictionDetailList);
+        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList = this.findFinalMouldDayResult(queryVO,predictionDetailList);
+        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(queryVO,predictionDetailList);
         if(!CollectionUtils.isEmpty(finalMouldDayResultList)) {
             list.addAll(finalMouldDayResultList);
         }
@@ -612,7 +612,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         return list;
     }
 
-    private List<FactoryMonthPlanMouldDayResult> findNotFinalMouldDayResult(List<MpPredictionDetail> predictionDetailList) {
+    private List<FactoryMonthPlanMouldDayResult> findNotFinalMouldDayResult(MpSimulatedResult queryVO, List<MpPredictionDetail> predictionDetailList) {
         Set<String> finalProductionVersions  = predictionDetailList.stream().filter(item -> StringUtils.isNotBlank(item.getProductionVersion())).map(MpPredictionDetail::getProductionVersion).collect(Collectors.toSet());
         if(CollectionUtils.isEmpty(finalProductionVersions)) {
             return Collections.emptyList();
@@ -627,12 +627,36 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
                     .in(FactoryMonthPlanMouldDayResult::getProductionVersion, batchVersions)
                     .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            if(StringUtils.isNotBlank(queryVO.getStructureName())) {
+                wrapper.eq(FactoryMonthPlanMouldDayResult::getStructureName, queryVO.getStructureName());
+            }
+            if(StringUtils.isNotBlank(queryVO.getProductTypeCode())) {
+                wrapper.eq(FactoryMonthPlanMouldDayResult::getProductTypeCode, queryVO.getProductTypeCode());
+            }
+            if(StringUtils.isNotBlank(queryVO.getSpecifications())) {
+                wrapper.like(FactoryMonthPlanMouldDayResult::getSpecifications, queryVO.getSpecifications());
+            }
+            if(StringUtils.isNotBlank(queryVO.getPattern())) {
+                wrapper.like(FactoryMonthPlanMouldDayResult::getPattern, queryVO.getPattern());
+            }
+            if(StringUtils.isNotBlank(queryVO.getMainPattern())) {
+                wrapper.like(FactoryMonthPlanMouldDayResult::getMainPattern, queryVO.getMainPattern());
+            }
+            if(StringUtils.isNotBlank(queryVO.getMaterialCode())) {
+                wrapper.like(FactoryMonthPlanMouldDayResult::getMaterialCode, queryVO.getMaterialCode());
+            }
+            if(StringUtils.isNotBlank(queryVO.getMaterialDesc())) {
+                wrapper.like(FactoryMonthPlanMouldDayResult::getMaterialDesc, queryVO.getMaterialDesc());
+            }
+            if (StringUtils.isNotBlank(queryVO.getBrand())) {
+                wrapper.eq(FactoryMonthPlanMouldDayResult::getBrand, queryVO.getBrand());
+            }
             list.addAll(resultMapper.selectList(wrapper));
         }
         return list;
     }
 
-    private List<FactoryMonthPlanMouldDayResult> findFinalMouldDayResult(List<MpPredictionDetail> predictionDetailList) {
+    private List<FactoryMonthPlanMouldDayResult> findFinalMouldDayResult(MpSimulatedResult queryVO, List<MpPredictionDetail> predictionDetailList) {
          Set<String> finalProductionVersions  = predictionDetailList.stream().filter(item -> StringUtils.isNotBlank(item.getProductionVersion())).map(MpPredictionDetail::getProductionVersion).collect(Collectors.toSet());
          if(CollectionUtils.isEmpty(finalProductionVersions)) {
              return Collections.emptyList();
@@ -647,6 +671,30 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                     .in(FactoryMonthPlanProductionFinalResult::getProductionVersion, batchVersions)
                     .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            if(StringUtils.isNotBlank(queryVO.getStructureName())) {
+                wrapper.eq(FactoryMonthPlanProductionFinalResult::getStructureName, queryVO.getStructureName());
+            }
+            if(StringUtils.isNotBlank(queryVO.getProductTypeCode())) {
+                wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductTypeCode, queryVO.getProductTypeCode());
+            }
+            if(StringUtils.isNotBlank(queryVO.getSpecifications())) {
+                wrapper.like(FactoryMonthPlanProductionFinalResult::getSpecifications, queryVO.getSpecifications());
+            }
+            if(StringUtils.isNotBlank(queryVO.getPattern())) {
+                wrapper.like(FactoryMonthPlanProductionFinalResult::getPattern, queryVO.getPattern());
+            }
+            if(StringUtils.isNotBlank(queryVO.getMainPattern())) {
+                wrapper.like(FactoryMonthPlanProductionFinalResult::getMainPattern, queryVO.getMainPattern());
+            }
+            if(StringUtils.isNotBlank(queryVO.getMaterialCode())) {
+                wrapper.like(FactoryMonthPlanProductionFinalResult::getMaterialCode, queryVO.getMaterialCode());
+            }
+            if(StringUtils.isNotBlank(queryVO.getMaterialDesc())) {
+                wrapper.like(FactoryMonthPlanProductionFinalResult::getMaterialDesc, queryVO.getMaterialDesc());
+            }
+            if (StringUtils.isNotBlank(queryVO.getBrand())) {
+                wrapper.eq(FactoryMonthPlanProductionFinalResult::getBrand, queryVO.getBrand());
+            }
             list.addAll(this.finalMapper.selectList(wrapper));
         }
         if(CollectionUtils.isEmpty(list)) {

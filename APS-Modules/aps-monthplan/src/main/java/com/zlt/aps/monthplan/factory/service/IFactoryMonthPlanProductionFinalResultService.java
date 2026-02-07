@@ -7,6 +7,7 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalRe
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -121,5 +122,5 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @param monthPlanVersions
      * @return
      */
-    List<FactoryMonthPlanMouldDayResult> listExportData(Set<String> monthPlanVersions);
+    List<FactoryMonthPlanMouldDayResult> listExportData(MpSimulatedResult queryVO, Set<String> monthPlanVersions);
 }

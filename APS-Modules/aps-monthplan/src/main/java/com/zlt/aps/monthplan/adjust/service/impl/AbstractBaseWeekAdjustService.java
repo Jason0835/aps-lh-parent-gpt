@@ -933,6 +933,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
+            // 模具变化信息
+            monthPlan.setMouldChangeInfo(adjustResult.getMouldChangeInfo());
             // 获取周数
             int week = getWeekNumber(new Date());
             // 调整量
@@ -1199,12 +1201,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlanVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
             // 试制量试排产量
             monthPlanVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
-            // 实际生产需求含损耗 = 净需求量汇总
-            Integer factProdReqQty = Convert.toInt(adjustDetail.getCurrentNetQty(), 0);
+            // 净需求
+            monthPlanVo.setProdReqPlan(adjustDetail.getCurrentNetQty());
+            // 计算实际生产需求含损耗
+            Integer factProdReqQty = calculateFactProdReqQty(adjustDetail.getCurrentNetQty());
             monthPlanVo.setFactProdReqQty(factProdReqQty);
             // 差异量(未排产数量) = 实际生产需求含损耗 - 生产实际排产量
             Integer differenceQty = Convert.toInt(factProdReqQty, 0) - Convert.toInt(monthPlanVo.getTotalQty(), 0);
             monthPlanVo.setDifferenceQty(differenceQty);
+            // 模具变化信息
+            monthPlanVo.setMouldChangeInfo(adjustResult.getMouldChangeInfo());
             // 获取周数
             int week = getWeekNumber(new Date());
             // 调整量
