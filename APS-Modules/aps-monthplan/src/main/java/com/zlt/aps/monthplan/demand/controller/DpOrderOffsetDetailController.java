@@ -150,7 +150,9 @@ public class DpOrderOffsetDetailController extends AbstractDocBizController<DpOr
     protected List<DpOrderOffsetDetail> listExportData(DpOrderOffsetDetail obj) {
         QueryWrapper<DpOrderOffsetDetail> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<DpOrderOffsetDetail> list = entityMapper.selectList(wrapper);
+        JsonI18nConvertUtils.conventJsonI18n(list, DpOrderOffsetDetail.class);
+        return list;
     }
 
     @Override

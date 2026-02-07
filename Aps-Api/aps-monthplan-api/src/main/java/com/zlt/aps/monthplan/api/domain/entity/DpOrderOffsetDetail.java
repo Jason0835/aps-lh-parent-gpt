@@ -92,7 +92,7 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String customCode;
 
     /** 客户名称 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.customName")
+    //@Excel(name = "ui.data.column.orderOffsetDetail.customName")
     @ApiModelProperty(value = "客户名称", name = "customName")
     @TableField(value = "CUSTOM_NAME")
     private String customName;
