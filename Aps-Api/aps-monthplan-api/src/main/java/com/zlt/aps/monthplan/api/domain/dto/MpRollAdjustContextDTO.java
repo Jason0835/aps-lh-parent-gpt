@@ -131,7 +131,7 @@ public class MpRollAdjustContextDTO implements Serializable {
     private List<MpTrialPlan> mpTrialPlanList;
 
     @ApiModelProperty(value = "试制量试计划Map")
-    private Map<String, MpTrialPlan> mpTrialPlanMap;
+    private Map<String, List<MpTrialPlan>> mpTrialPlanMap;
 
     @ApiModelProperty(value = "月底计划余量列表")
     private List<MdmMonthSurplus> mdmMonthSurplusesList;
