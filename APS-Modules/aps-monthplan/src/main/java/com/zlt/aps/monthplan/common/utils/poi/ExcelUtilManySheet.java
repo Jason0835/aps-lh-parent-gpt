@@ -231,8 +231,14 @@ public class ExcelUtilManySheet {
   public void fillExcelData(Sheet sheet, short maxHeight, WorksheetData worksheetData, List<Object[]> fields) {
         //只取一次语言,存到缓存
         this.lang = SecurityUtils.getUserLang().toString();
+        int size = 0;
+        if (!CollectionUtils.isEmpty(worksheetData.getSimulatedResults())) {
+          size = worksheetData.getSimulatedResults().size();
+        }else if(!CollectionUtils.isEmpty(worksheetData.getMouldDayResults())) {
+          size = worksheetData.getMouldDayResults().size();
+        }
         Row row;
-        for (int i = 0; i < list.size(); i++) {
+        for (int i = 0; i < size; i++) {
           row = sheet.createRow(i + 1);
           // 得到导出对象.
           int column = 0;
