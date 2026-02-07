@@ -1618,11 +1618,26 @@ public class MpWeekRollAdjustEngine {
     private int getStartMould(MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,Map<String,Object> paramMap,Integer newOnLineDay, FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo dailyCapacityLimitVo){
         int startMould = 2;
         String dayField = FactoryConstant.DAY_FIELD + newOnLineDay;
-        String day1Field = FactoryConstant.DAY_FIELD + (newOnLineDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:newOnLineDay -1);
-        String day2Field = FactoryConstant.DAY_FIELD + (newOnLineDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:newOnLineDay +1);
         if (mpFinalVo.getFieldValueByFieldName(dayField) == null || (Integer) mpFinalVo.getFieldValueByFieldName(dayField) == 0){
             return startMould;
         }
+        // 原模具数据+新增2副模
+        return getMouldByDay(adjustDailyCapacityLimitObj,paramMap,newOnLineDay,mpFinalVo,dailyCapacityLimitVo) + startMould;
+    }
+
+    /**
+     * 按日获取模具数
+     * @param adjustDailyCapacityLimitObj 日产能限制实例
+     * @param paramMap 参数Map
+     * @param iDay 每日
+     * @param mpFinalVo 定稿对象
+     * @param dailyCapacityLimitVo 日产能限制Vo
+     * @return 日模具数
+     */
+    private int getMouldByDay(MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,Map<String,Object> paramMap,Integer iDay, FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        String dayField = FactoryConstant.DAY_FIELD + iDay;
+        String day1Field = FactoryConstant.DAY_FIELD + (iDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:iDay -1);
+        String day2Field = FactoryConstant.DAY_FIELD + (iDay +1 > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:iDay +1);
         int dailyLhQty = getDayVulcanizationQty(mpFinalVo);
         if (dailyCapacityLimitVo.isOpenProductionFirstDay()){
             //若开产首日，将日硫化量等比例减，奇数+1
@@ -1631,7 +1646,7 @@ public class MpWeekRollAdjustEngine {
         int dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
         int fullMachines = dayPlanQty / dailyLhQty;
         int otherMachines;
-        if (adjustDailyCapacityLimitObj.isDecMould(mpFinalVo,dayField,day1Field,day2Field)){
+        if (adjustDailyCapacityLimitObj.isDecMould(mpFinalVo,dayField,day1Field)){
             // 统计有余数的SKU个数
             otherMachines = dayPlanQty % dailyLhQty > 0 ? 1:0;
         }else{
@@ -1639,10 +1654,42 @@ public class MpWeekRollAdjustEngine {
             int[]addMouldArr = adjustDailyCapacityLimitObj.getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day2Field);
             otherMachines = addMouldArr[0];
         }
-        // 原模具数据+新增2副模
-        return (fullMachines+otherMachines)*2 + startMould;
+        return (fullMachines+otherMachines)*2;
     }
 
+    /**
+     * 设置模具变化信息
+     * @param adjustDailyCapacityLimitObj 日产能限制实例
+     * @param paramMap 参数Map
+     * @param startDay 开始日
+     * @param mpFinalVo 定稿对象
+     * @param dailyCapacityMap 日产能限制Map
+     * @return 模具变化信息
+     */
+    public void setMouldChangeInfo(MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj,Map<String,Object> paramMap,Integer startDay, FactoryMonthPlanFinalAdjustVo mpFinalVo,Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap){
+        int dayMouldValue;
+        int preDayMouldValue = 0;
+        StringBuilder sb = new StringBuilder();
+        for (int i=startDay;i<=FactoryConstant.MONTH_MAX_DAY;i++){
+            if (!hasPlanByDay(mpFinalVo,i)){
+                continue;
+            }
+            if (dailyCapacityMap.get(i) == null){
+                continue;
+            }
+            //按日获取模具信息
+            dayMouldValue = getMouldByDay(adjustDailyCapacityLimitObj,paramMap,i,mpFinalVo,dailyCapacityMap.get(i));
+            if (dayMouldValue != preDayMouldValue){
+                if (preDayMouldValue != 0){
+                    //若不是第1笔
+                    sb.append("-").append(dayMouldValue);
+                }
+                sb.append(dayMouldValue);
+                preDayMouldValue = dayMouldValue;
+            }
+        }
+        mpFinalVo.setMouldChangeInfo(sb.toString());
+    }
     /**
      * 检查模具满足情况
      *

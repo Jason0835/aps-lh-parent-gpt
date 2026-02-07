@@ -495,8 +495,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO 周程滚动上下文
      * @param mpProdFinalList 定稿记录列表
      */
-    protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+    protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
+
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         for (int i = contextDTO.getStructureStartDay(); i< contextDTO.getStructureDeadLine(); i++){
             if (dailyCapacityLimitVoMap.get(i) == null){
@@ -667,7 +667,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         baseDao.insertBatch(mpAdjustResultList);
         contextDTO.setAdjustResultList(mpAdjustResultList);
     }
-
 
     /**
      * 将日期字段中值为0的字段设为null

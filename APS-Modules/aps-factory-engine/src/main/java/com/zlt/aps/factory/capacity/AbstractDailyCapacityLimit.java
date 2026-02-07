@@ -269,7 +269,7 @@ public abstract class AbstractDailyCapacityLimit {
                 dailyLhQty = getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
             }
             int tmpCount;
-            if (isDecMould(mpFinalVo,dayField,day1Field,day2Field)){
+            if (isDecMould(mpFinalVo,dayField,day1Field)){
                 //减模处理：
                 // 取整(日计划量/日单台硫化量)
                 fullMachinesDecMould += dayPlanQty / dailyLhQty;
@@ -567,10 +567,9 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mpFinalVo 定稿对象Vo
      * @param dayField 当日计划量字段
      * @param day1Field 昨日计划量字段
-     * @param day2Field 次日计划量字段
      * @return
      */
-    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field,String day2Field){
+    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field){
         if (mpFinalVo.getFieldValueByFieldName(dayField) == null){
             return false;
         }
