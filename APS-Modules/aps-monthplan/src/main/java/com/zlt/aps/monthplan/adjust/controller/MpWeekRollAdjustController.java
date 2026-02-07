@@ -197,6 +197,7 @@ public class MpWeekRollAdjustController extends BaseController {
         if (msgTemplate != null){
             contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
         }
+        contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
 
         return contextDTO;
     }
