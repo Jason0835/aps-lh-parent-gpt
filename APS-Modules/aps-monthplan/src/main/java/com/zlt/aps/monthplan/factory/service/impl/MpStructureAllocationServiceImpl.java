@@ -728,6 +728,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     public MpStructureAllocation getPreviousStructure(MpStructureAllocation param) {
         // 通过工厂、年月、成型机编码获取结构排产列表
         QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+        param.setStructureName(null);
         builderCondition(queryWrapper, param);
         List<MpStructureAllocation> structureAllocationList = entityMapper.selectList(queryWrapper);
 
