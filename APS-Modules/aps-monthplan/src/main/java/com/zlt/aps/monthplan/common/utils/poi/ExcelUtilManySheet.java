@@ -71,11 +71,6 @@ public class ExcelUtilManySheet {
 
   private static final Logger log = LoggerFactory.getLogger(ExcelUtilManySheet.class);
 
-  /**
-   * Excel sheet最大行数，默认65536
-   */
-  public static final int SHEET_SIZE = 65536;
-
   private String lang = null;
 
   /**
@@ -172,15 +167,25 @@ public class ExcelUtilManySheet {
     List<Integer> downDataLocations = downDataLocationsMap.get(worksheetData.getSheetName());
     List<Object[]> fields = this.fieldsMap.get(worksheetData.getSheetName());
     short maxHeight = this.maxHeightMap.get(worksheetData.getSheetName()).shortValue();
-    int size = 0;
-    if(!CollectionUtils.isEmpty(worksheetData.getSimulatedResults())) {
-      size = worksheetData.getSimulatedResults().size();
-    }else if(!CollectionUtils.isEmpty(worksheetData.getMouldDayResults())) {
-      size = worksheetData.getMouldDayResults().size();
+    createHead(sheet,fields);
+    //为工作页绑定下拉框，并且填充字典页
+    if (!CollectionUtils.isEmpty(downDataList)) {
+      createExcelWithDict(sheet,fields, dictSheet, downDataList, downDataLocations);
     }
-    // 取出一共有多少个sheet.
-    double sheetNo = Math.ceil((double) size / SHEET_SIZE);
-    for (int index = 0; index <= sheetNo; index++) {
+    dictDataCach.set(new HashMap<>());
+    fillExcelData(sheet, maxHeight,worksheetData,fields);
+    // //自适应宽度(中文支持)
+    //setSizeColumn((SXSSFSheet) this.sheet, column);
+    dictDataCach.remove();
+    addStatisticsRow(sheet);
+  }
+
+
+  /**
+   * 创建表头
+   */
+  private void createHead(Sheet sheet,List<Object[]> fields)
+  {
       //填充表头
       Row row = sheet.createRow(0);
       int column = 0;
@@ -188,19 +193,6 @@ public class ExcelUtilManySheet {
         Excel excel = (Excel) os[1];
         this.createCell(excel,sheet, row, column++);
       }
-      //为工作页绑定下拉框，并且填充字典页
-      if (!CollectionUtils.isEmpty(downDataList)) {
-        createExcelWithDict(sheet,fields, dictSheet, downDataList, downDataLocations);
-      }
-      long bmin = System.currentTimeMillis();
-        dictDataCach.set(new HashMap<>());
-        fillExcelData(index,sheet, maxHeight,worksheetData,fields);
-        // //自适应宽度(中文支持)
-        //setSizeColumn((SXSSFSheet) this.sheet, column);
-        dictDataCach.remove();
-        addStatisticsRow(sheet);
-      log.debug("填充数据消耗{}", System.currentTimeMillis() - bmin);
-    }
   }
 
 
@@ -235,28 +227,32 @@ public class ExcelUtilManySheet {
 
   /**
    * 填充excel数据
-   *
-   * @param index
-   *     序号
    */
-  public void fillExcelData(int index, Sheet sheet, short maxHeight, WorksheetData worksheetData, List<Object[]> fields) {
-    int startNo = index * SHEET_SIZE;
-    int endNo = Math.min(startNo + SHEET_SIZE, list.size());
-
-    //只取一次语言,存到缓存
-    this.lang = SecurityUtils.getUserLang().toString();
-
-    for (int i = startNo; i < endNo; i++) {
-      Row row = sheet.createRow(i + 1 - startNo);
-      int column = 0;
-      for (Object[] os : fields) {
-        Field field = (Field) os[0];
-        Excel excel = (Excel) os[1];
-        // 设置实体类私有属性可访问
-        field.setAccessible(true);
-        this.addCell(excel, row,maxHeight,worksheetData, i, field, column++);
-      }
-    }
+  public void fillExcelData(Sheet sheet, short maxHeight, WorksheetData worksheetData, List<Object[]> fields) {
+        //只取一次语言,存到缓存
+        this.lang = SecurityUtils.getUserLang().toString();
+        int size = 0;
+        if (!CollectionUtils.isEmpty(worksheetData.getSimulatedResults())) {
+          size = worksheetData.getSimulatedResults().size();
+        }else if(!CollectionUtils.isEmpty(worksheetData.getMouldDayResults())) {
+          size = worksheetData.getMouldDayResults().size();
+        }
+        Row row;
+        for (int i = 0; i < size; i++) {
+          row = sheet.createRow(i + 1);
+          // 得到导出对象.
+          int column = 0;
+          for (Object[] os : fields) {
+            Field field = (Field) os[0];
+            Excel excel = (Excel) os[1];
+            // 设置实体类私有属性可访问
+            field.setAccessible(true);
+            this.addCell(excel, row, maxHeight, worksheetData,i,field, column++);
+            //                SXSSFSheet sxssfSheet = (SXSSFSheet) sheet;
+            //                sxssfSheet.trackAllColumnsForAutoSizing();
+            //                sxssfSheet.autoSizeColumn(column);
+          }
+        }
   }
 
   /**
@@ -286,9 +282,10 @@ public class ExcelUtilManySheet {
         } else if (value instanceof BigDecimal && -1 != attr.scale()) {
           cell.setCellValue((((BigDecimal) value).setScale(attr.scale(), attr.roundingMode())).toString());
         } else if (StringUtils.isNotEmpty(dictType) && value != null && StringUtils.isNotBlank(value.toString())) {
+          log.info("value={},dictType={}", value, dictType);
            String dictLabel = convertByDict(value.toString(), dictType);
-           log.info("value={},dictType={},dictLabel:{}", value, dictType, dictLabel);
-           if(StringUtils.isNotBlank(dictLabel)){
+          log.info("value={},dictType={},dictLabel:{}", value, dictType, dictLabel);
+          if(StringUtils.isNotBlank(dictLabel)){
              cell.setCellValue(dictLabel);
            }
         } else {
@@ -368,27 +365,6 @@ public class ExcelUtilManySheet {
       sheet.createDrawingPatriarch();
     }
     return sheet.getDrawingPatriarch();
-  }
-
-  /**
-   * 根据复选框解析字段项的值（propertyValue可为为多个值如：2,3）
-   *
-   * @param propertyValue
-   * @param dictType
-   * @return
-   * @throws Exception
-   */
-  public String convertByDictOrCheckbox(String propertyValue, String dictType) throws Exception {
-    StringBuilder cellValue = new StringBuilder();
-    if (propertyValue.contains(",")) {
-      String[] ss = propertyValue.split(",");
-      for (String s : ss) {
-        cellValue.append(convertByDict(s, dictType)).append(",");
-      }
-    } else {
-      return convertByDict(propertyValue, dictType);
-    }
-    return cellValue.substring(0, cellValue.length() - 1).toString();
   }
 
   /**
