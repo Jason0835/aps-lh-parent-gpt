@@ -6,6 +6,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="listExportData" resultType="com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult">
             SELECT
                 sr.FACTORY_CODE,
+                sr.`YEAR`,
+                sr.`MONTH`,
                 sr.PRODUCT_TYPE_CODE,
                 sr.STRUCTURE_NAME,
                 sr.SPECIFICATIONS,
