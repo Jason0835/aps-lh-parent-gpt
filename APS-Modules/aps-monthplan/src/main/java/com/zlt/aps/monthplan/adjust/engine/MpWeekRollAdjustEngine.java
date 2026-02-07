@@ -1413,8 +1413,9 @@ public class MpWeekRollAdjustEngine {
         int otherTotalQty = getOtherTotalQtyForSpecMaterial(mpProdFinalList,mpFinalVo);
         //新上机日的产能限制Vo
         MpDailyCapacityLimitVo dailyCapacityLimitVo = contextDTO.getDailyCapacityLimitVoMap().get(newOnLineDay);
+        int startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),newOnLineDay,mpFinalVo,dailyCapacityLimitVo);
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
-        int startMould,blockQty,cavityQty;
+        int blockQty,cavityQty;
         Integer dayVulcanizationQty;
         boolean bFirstAddMould = true;
         while (newPlanQty > 0){
@@ -1423,7 +1424,6 @@ public class MpWeekRollAdjustEngine {
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
             for (int i = newOnLineDay; i<= structureDeadLine; i++){
                 //SKU的模具数限制：SKU的模具数<=SKU活块的数量
-                startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),i,mpFinalVo,dailyCapacityLimitVo);
                 blockQty = getNewTypeBlockQty(contextDTO,mpFinalVo,i);
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的活块数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,blockQty)).append(ApsConstant.DIVISION);
                 if (startMould > blockQty){
