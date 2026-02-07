@@ -196,6 +196,7 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month1")), "MONTH_1", queryVO.getFieldValueByFieldName("month1"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month2")), "MONTH_2", queryVO.getFieldValueByFieldName("month2"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month3")), "MONTH_3", queryVO.getFieldValueByFieldName("month3"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("predictionVersion")), "PREDICTION_VERSION", queryVO.getFieldValueByFieldName("predictionVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
@@ -210,14 +211,6 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("heightQty")), "HEIGHT_QTY", queryVO.getFieldValueByFieldName("heightQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionQty")), "PRODUCTION_QTY", queryVO.getFieldValueByFieldName("productionQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType")), "PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
-        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("predictionVersion"))) {
-            queryWrapper.eq("PREDICTION_VERSION", queryVO.getFieldValueByFieldName("predictionVersion"));
-        }else{
-            List<String> predictionVersions =  this.mpProductionPredictionService.findPredictionVersion(queryVO);
-            if(!CollectionUtils.isEmpty(predictionVersions)) {
-                queryWrapper.eq("PREDICTION_VERSION", predictionVersions.get(0));
-            }
-        }
     }
 
     @ApiOperation("生成订单预测")

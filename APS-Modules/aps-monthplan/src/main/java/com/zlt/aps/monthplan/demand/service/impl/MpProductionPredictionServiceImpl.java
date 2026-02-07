@@ -28,6 +28,7 @@ import org.springframework.util.CollectionUtils;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -107,12 +108,13 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         wrapper.eq(MpProductionPrediction::getYear, queryCondition.getYear());
         wrapper.eq(MpProductionPrediction::getMonth, queryCondition.getMonth());
         wrapper.eq(MpProductionPrediction::getIsDelete, YesOrNoEnum.NO.getValue());
+        wrapper.isNotNull(MpProductionPrediction::getPredictionVersion);
         wrapper.orderByDesc(MpProductionPrediction::getCreateTime);
         List<MpProductionPrediction> list =  this.mpProductionPredictionEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptyList();
         }
-        return Lists.newArrayList(list.get(0).getPredictionVersion());
+        return list.stream().map(MpProductionPrediction::getPredictionVersion).distinct().collect(Collectors.toList());
     }
 
 
