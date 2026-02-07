@@ -98,7 +98,6 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String customName;
 
     /** 客户国别 */
-
     @ApiModelProperty(value = "客户国别", name = "customNationCode")
     @TableField(value = "CUSTOM_NATION_CODE")
     private String customNationCode;
