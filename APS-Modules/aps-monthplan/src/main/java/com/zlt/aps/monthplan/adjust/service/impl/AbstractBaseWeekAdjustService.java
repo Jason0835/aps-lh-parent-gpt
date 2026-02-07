@@ -2359,7 +2359,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 return trialPlan;
             }
         }
-        return new MpTrialPlan();
+        return trialPlanList.get(0);
     }
 
     /**
