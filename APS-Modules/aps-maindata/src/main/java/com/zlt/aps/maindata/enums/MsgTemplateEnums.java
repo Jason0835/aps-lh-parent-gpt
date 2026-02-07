@@ -24,7 +24,15 @@ public enum MsgTemplateEnums {
     /**
      * SKU原余量小于调整次日至锁定截止日的计划量提醒
      */
-    MP_SKU_REMAIN_QTY_NO_FULL("MP_SKU_REMAIN_QTY_NO_FULL", "SKU原余量小于调整次日至锁定截止日的计划量提醒");
+    MP_SKU_REMAIN_QTY_NO_FULL("MP_SKU_REMAIN_QTY_NO_FULL", "SKU原余量小于调整次日至锁定截止日的计划量提醒"),
+    /**
+     * 产量预测生成成功通知
+     */
+    MP_CREATE_PRODUCTION_PREDICT("MP_CREATE_PRODUCTION_PREDICT", "产量预测"),
+    /**
+     * 实单模拟排产成功通知
+     */
+    MP_CREATE_SIMULATED_PRODUCTION("MP_CREATE_SIMULATED_PRODUCTION","实单模拟排产");
 
     private final String code;
     private final String name;

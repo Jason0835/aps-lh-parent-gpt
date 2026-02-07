@@ -501,5 +501,9 @@ public class ApsConstant {
      * 实单模拟排产
      */
     public static final String REDIS_CREATE_VM_MONTH_PREDICTION = "aps:simulatedResult:create:";
+    /**
+     * 预测排产
+     */
+    public static final String REDIS_CREATE_PRE_MONTH_PREDICTION = "aps:productionPrediction:create:";
 
 }
