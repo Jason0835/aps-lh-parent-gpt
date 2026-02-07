@@ -1484,7 +1484,7 @@ public class MpWeekRollAdjustEngine {
                     // 将值还原，并退出，继续加模
                     if (i == newOnLineDay){
                         //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
-                        mpFinalVo = bakMpFinalVo;
+                        BeanUtils.copyProperties(bakMpFinalVo,mpFinalVo);
                     }else{
                         dayValue -= dayVulcanizationQty;
                         mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
@@ -1502,7 +1502,7 @@ public class MpWeekRollAdjustEngine {
                     // 将值还原，并退出 外循环
                     if (i == newOnLineDay){
                         //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
-                        mpFinalVo = bakMpFinalVo;
+                        BeanUtils.copyProperties(bakMpFinalVo,mpFinalVo);
                     }else{
                         dayValue -= dayVulcanizationQty;
                         mpFinalVo.setFieldValueByFieldName(dayField,dayValue==0?null:dayValue);
@@ -1876,7 +1876,7 @@ public class MpWeekRollAdjustEngine {
         //2、排实单
         Integer newOnLineDay;
         Iterator<MpAdjustStructureIn> incAdjustFormalIter,incAdjustBatchTrailIter;
-        for (int i=lockNextDay; i<contextDTO.getStructureDeadLine();i++){
+        for (int i=lockNextDay; i<=contextDTO.getStructureDeadLine();i++){
             //2.1、敲定SKU新的上机日期
             newOnLineDay = getNewOnLineDay(contextDTO, i, null);
             if (newOnLineDay == null){
