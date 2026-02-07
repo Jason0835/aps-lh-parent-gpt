@@ -125,4 +125,9 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
         return result;
     }
 
+    @Override
+    public List<String> findSimulatedVersion(Set<String> batchNumbers) {
+        return Collections.emptyList();
+    }
+
 }
