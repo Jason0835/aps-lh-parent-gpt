@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
@@ -197,7 +196,6 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month1")), "MONTH_1", queryVO.getFieldValueByFieldName("month1"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month2")), "MONTH_2", queryVO.getFieldValueByFieldName("month2"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month3")), "MONTH_3", queryVO.getFieldValueByFieldName("month3"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("predictionVersion")), "PREDICTION_VERSION", queryVO.getFieldValueByFieldName("predictionVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
@@ -212,18 +210,21 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("heightQty")), "HEIGHT_QTY", queryVO.getFieldValueByFieldName("heightQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionQty")), "PRODUCTION_QTY", queryVO.getFieldValueByFieldName("productionQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType")), "PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("predictionVersion"))) {
+            queryWrapper.eq("PREDICTION_VERSION", queryVO.getFieldValueByFieldName("predictionVersion"));
+        }else{
+            List<String> predictionVersions =  this.mpProductionPredictionService.findPredictionVersion(queryVO);
+            if(!CollectionUtils.isEmpty(predictionVersions)) {
+                queryWrapper.eq("PREDICTION_VERSION", predictionVersions.get(0));
+            }
+        }
     }
 
     @ApiOperation("生成订单预测")
-    @RedissonLockAnno(uniqueMark = "redissonLock:productionPrediction:createMonthPrediction:",
-        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-        msgKey = "ui.data.alert.createMonthPrediction.run",
-        waitTime = 5,
-        leaseTime = 300
-    )
     @PostMapping("/createMonthPrediction")
     public AjaxResult createMonthPrediction(@RequestBody MpProductionPrediction createCondition) throws InterruptedException {
-        return mpProductionPredictionService.createMonthPrediction(createCondition);
+         mpProductionPredictionService.createMonthPrediction(createCondition);
+         return AjaxResult.success("操作成功，等待数据生成通知");
     }
 
     @ApiOperation("查询预测版本号")
