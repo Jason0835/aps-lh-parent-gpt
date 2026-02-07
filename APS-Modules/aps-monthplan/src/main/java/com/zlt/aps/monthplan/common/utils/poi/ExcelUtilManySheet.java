@@ -274,9 +274,10 @@ public class ExcelUtilManySheet {
         } else if (value instanceof BigDecimal && -1 != attr.scale()) {
           cell.setCellValue((((BigDecimal) value).setScale(attr.scale(), attr.roundingMode())).toString());
         } else if (StringUtils.isNotEmpty(dictType) && value != null && StringUtils.isNotBlank(value.toString())) {
+          log.info("value={},dictType={}", value, dictType);
            String dictLabel = convertByDict(value.toString(), dictType);
-           log.info("value={},dictType={},dictLabel:{}", value, dictType, dictLabel);
-           if(StringUtils.isNotBlank(dictLabel)){
+          log.info("value={},dictType={},dictLabel:{}", value, dictType, dictLabel);
+          if(StringUtils.isNotBlank(dictLabel)){
              cell.setCellValue(dictLabel);
            }
         } else {
