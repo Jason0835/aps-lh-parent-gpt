@@ -1261,7 +1261,7 @@ public class MpWeekRollAdjustEngine {
         //获取新的活块数
         int blockQty = getNewTypeBlockQty(contextDTO,curFinalVo,endDay);
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,获取到新的活块数:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,blockQty)).append(ApsConstant.DIVISION);
-        if (startMould >= blockQty){
+        if (startMould > blockQty){
             // 在机的已排模具数已达到活块数，则退出
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】-在机的已排模具数:%s 已达到活块数:%s,退出！",contextDTO.getStructureName(), curFinalVo.getMaterialCode(),startMould,blockQty)).append(ApsConstant.DIVISION);
             return;
@@ -1413,9 +1413,8 @@ public class MpWeekRollAdjustEngine {
         int otherTotalQty = getOtherTotalQtyForSpecMaterial(mpProdFinalList,mpFinalVo);
         //新上机日的产能限制Vo
         MpDailyCapacityLimitVo dailyCapacityLimitVo = contextDTO.getDailyCapacityLimitVoMap().get(newOnLineDay);
-        int startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),newOnLineDay,mpFinalVo,dailyCapacityLimitVo);
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
-        int blockQty,cavityQty;
+        int startMould,blockQty,cavityQty;
         Integer dayVulcanizationQty;
         boolean bFirstAddMould = true;
         while (newPlanQty > 0){
@@ -1424,9 +1423,10 @@ public class MpWeekRollAdjustEngine {
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
             for (int i = newOnLineDay; i<= structureDeadLine; i++){
                 //SKU的模具数限制：SKU的模具数<=SKU活块的数量
+                startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),i,mpFinalVo,dailyCapacityLimitVo);
                 blockQty = getNewTypeBlockQty(contextDTO,mpFinalVo,i);
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的活块数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,blockQty)).append(ApsConstant.DIVISION);
-                if (startMould >= blockQty){
+                if (startMould > blockQty){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,SKU增模后的模具数:%s 大于SKU活块的数量:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,startMould,blockQty)).append(ApsConstant.DIVISION);
                     return newPlanQty < 0 ? 0:newPlanQty;
                 }
