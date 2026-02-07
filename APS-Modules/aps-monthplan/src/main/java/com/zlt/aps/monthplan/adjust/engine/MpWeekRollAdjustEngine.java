@@ -462,8 +462,8 @@ public class MpWeekRollAdjustEngine {
         for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
             adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null);
             contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),i,contextDTO.getDailyCapacityLimitVoMap().get(i).toString())).append(ApsConstant.DIVISION);
-            //1、检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
-            if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
+            //1、预检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
+            if (!adjustDailyCapacityLimitObj.preCheckCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),i)).append(ApsConstant.DIVISION);
                 continue;
             }
@@ -1261,7 +1261,7 @@ public class MpWeekRollAdjustEngine {
         //获取新的活块数
         int blockQty = getNewTypeBlockQty(contextDTO,curFinalVo,endDay);
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,获取到新的活块数:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,blockQty)).append(ApsConstant.DIVISION);
-        if (startMould > blockQty){
+        if (startMould >= blockQty){
             // 在机的已排模具数已达到活块数，则退出
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】-在机的已排模具数:%s 已达到活块数:%s,退出！",contextDTO.getStructureName(), curFinalVo.getMaterialCode(),startMould,blockQty)).append(ApsConstant.DIVISION);
             return;
@@ -1273,8 +1273,8 @@ public class MpWeekRollAdjustEngine {
         //检查：主花纹向下模具数量(/2转成机台数) 符合性
         int cavityQty = getNewCavityQty(contextDTO,curFinalVo,endDay);
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,cavityQty)).append(ApsConstant.DIVISION);
-        if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVo) ||
-                !checkMouldSatisfy(dailyCapacityLimitVo,cavityQty)){
+        if (!adjustDailyCapacityLimitObj.preCheckCapacitySatisfy(dailyCapacityLimitVo) ||
+                !preCheckMouldSatisfy(dailyCapacityLimitVo,cavityQty)){
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),curFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             return;
         }
@@ -1424,7 +1424,7 @@ public class MpWeekRollAdjustEngine {
                 //SKU的模具数限制：SKU的模具数<=SKU活块的数量
                 blockQty = getNewTypeBlockQty(contextDTO,mpFinalVo,i);
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的活块数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,blockQty)).append(ApsConstant.DIVISION);
-                if (startMould > blockQty){
+                if (startMould >= blockQty){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,SKU增模后的模具数:%s 大于SKU活块的数量:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,startMould,blockQty)).append(ApsConstant.DIVISION);
                     return newPlanQty < 0 ? 0:newPlanQty;
                 }
@@ -1725,6 +1725,20 @@ public class MpWeekRollAdjustEngine {
         int patternCount = cavityQty /2;
         //主花纹向下所有SKU的模具数量 <= 主花纹.型腔数量
         return dailyCapacityLimitVo.getPatternUsedLhMachines() <= patternCount;
+    }
+
+    /**
+     * 预检查 模具满足情况
+     *
+     * @param dailyCapacityLimitVo 产能限制Vo
+     * @param cavityQty 型腔数
+     * @return true-满足，false-不满足
+     */
+    private boolean preCheckMouldSatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo,int cavityQty){
+        //型腔台数
+        int patternCount = cavityQty /2;
+        //主花纹向下所有SKU的模具数量 <= 主花纹.型腔数量
+        return dailyCapacityLimitVo.getPatternUsedLhMachines() < patternCount;
     }
     /**
      * 获取日硫化量
