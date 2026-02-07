@@ -44,7 +44,7 @@ public class RawMaterialOutboundRecord extends BaseEntity {
 
     /** 物料编码 */
     @Excel(name = "ui.data.column.rawMaterialOutboundRecord.materialCode")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(required = true, maxLength = 30)
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
