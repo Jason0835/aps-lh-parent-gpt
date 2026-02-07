@@ -166,6 +166,7 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
             }
             monitor.setMouldQty(finalResult.getMouldChangeInfo());
             monitor.setNetDemandQty(finalResult.getProdReqPlan());
+            monitor.setScheduleQty(finalResult.getTotalQty());
 //            monitor.setProductionQty(finalResult.getProductionQty());
             Integer productionQty = ObjectUtils.defaultIfNull(monitor.getProductionQty(), 0);
             Integer scheduleQty = ObjectUtils.defaultIfNull(monitor.getScheduleQty(), 0);
