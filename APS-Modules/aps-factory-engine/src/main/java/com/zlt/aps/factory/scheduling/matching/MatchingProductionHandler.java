@@ -255,6 +255,12 @@ public class MatchingProductionHandler {
         boolean isNewSku = false;
         for (String machineCode : cxMachineInfoSet) {
             cxMachineInfo = cxMachineBaseInfo.get(machineCode);
+            if (cxMachineInfo == null) {
+                continue;
+            }
+            if (cxMachineInfo.getAllocationList() == null) {
+                continue;
+            }
             isNewSku &= cxMachineInfo.getAllocationList().stream().anyMatch(allocation -> {
                 if (allocation.getAllocationDay() < startDay || allocation.getAllocationDay() > endDay) {
                     return false;
