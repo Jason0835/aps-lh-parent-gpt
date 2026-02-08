@@ -343,13 +343,19 @@ public class MatchingProductionHandler {
 
                 // 判断是否续作
                 List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
+                List<ProductionMouldInfoVo> twoMouldList = new ArrayList<>(); // 一次添加双模
                 for (ProductionMouldInfoVo mouldInfo : limitDoubleMouldList) {
                     // 判断切换计划前上一天的排产计划
                     List<CxMouldDayProductionHelper> lastDayProductionList = mouldInfo.getDayProductionInfo()
                             .get(usedBeginDate - 1);
                     if (!CollectionUtils.isEmpty(lastDayProductionList)
                             && lastDayProductionList.stream().anyMatch(p -> materialDesc.equals(p.getMaterialDesc()))) { // 上一天有排产，且物料描述一致，说明是续作
-                        continueMouldList.add(mouldInfo); // 符合条件的放到续作列表
+                        twoMouldList.add(mouldInfo);
+                    }
+                    if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加
+                        continueMouldList.addAll(twoMouldList);
+                        twoMouldList.clear();
+                        
                     }
                 }
                 // 执行非首日续作排程算法
@@ -500,7 +506,7 @@ public class MatchingProductionHandler {
 //        }
         // 同结构的最大单模硫化量
         Integer dayVulcanizationQty = allSinglePlanMap.values().stream()
-                .filter(m -> m.getStructureName().equals(groupInfo.getGroupName()))
+                .filter(m -> groupInfo.getGroupName().equals(m.getStructureName()))
                 .map(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).filter(Objects::nonNull)
                 .max(Integer::compareTo).orElse(0);
         // 统计每一天的已排产量
@@ -569,14 +575,19 @@ public class MatchingProductionHandler {
 //                }
 //            }
             if (newMouldNum > 0) { // 非第一天
+                List<ProductionMouldInfoVo> twoMouldList = new ArrayList<>(); // 一次添加双模
                 for (ProductionMouldInfoVo mould: limitDoubleMouldList) {
                     if (newMouldNum == 0) {
                         break;
                     }
                     List<CxMouldDayProductionHelper> dayProductionList = mould.getDayProductionInfo().get(usedBeginDate);
-                    if (CollectionUtils.isEmpty(dayProductionList)) { // 当天没有排产才添加模具
-                        newDoubleMouldList.add(mould);
+                    if (CollectionUtils.isEmpty(dayProductionList)) { // 当天没有排产才添加模具，一次加两幅
+                        twoMouldList.add(mould);
                         newMouldNum --;
+                    }
+                    if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加
+                        newDoubleMouldList.addAll(twoMouldList);
+                        twoMouldList.clear();
                     }
                 }
             }
@@ -1082,6 +1093,7 @@ public class MatchingProductionHandler {
         // 加载需求计划
         LambdaQueryWrapper<DpDemandPlan> DemandQueryWrapper = new LambdaQueryWrapper<DpDemandPlan>();
         DemandQueryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
+        DemandQueryWrapper.isNotNull(DpDemandPlan::getStructureName); // 过滤空结构的数据
         List<DpDemandPlan> demandPlanList = monthPlanRequireMapper.selectList(DemandQueryWrapper);
         if (CollectionUtils.isEmpty(demandPlanList)) {
             return new ArrayList<>(0);
