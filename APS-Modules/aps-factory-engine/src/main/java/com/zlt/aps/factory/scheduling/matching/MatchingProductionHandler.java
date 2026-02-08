@@ -1,6 +1,5 @@
 package com.zlt.aps.factory.scheduling.matching;
 
-import com.alibaba.nacos.shaded.com.google.common.base.Objects;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -105,10 +104,10 @@ public class MatchingProductionHandler {
         }
         // 构建上下文等各项参数
         TbrProductionContext productionContext = this.initProductionContext(planList); // 初始化上下文
-        Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap = this.selectRequirePlan(productionContext, planList); // 查询需求计划
-        this.buildProductionContext(productionContext, planList, requirePlanMap); // 填充上下文各项必要数据
+        List<MonthPlanProductionRequirePlanVo> requirePlanList = this.selectRequirePlan(productionContext, planList); // 查询需求计划
+        this.buildProductionContext(productionContext, planList, requirePlanList); // 填充上下文各项必要数据
 
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, new ArrayList<>(requirePlanMap.values())); // 分配成型产能
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList); // 分配成型产能
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         this.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap);
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = this.getContinueInfo(productionContext);
@@ -131,7 +130,6 @@ public class MatchingProductionHandler {
      */
     public Map<String, Integer> matchingProduction(Context context,
                                                    Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap,
-
                                                    Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
         log.info(context.getProductionVersion() + "搭配排产start");
         TbrProductionContext productionContext = (TbrProductionContext) context;
@@ -168,19 +166,21 @@ public class MatchingProductionHandler {
 
             // 取出最早成型硫化配比不足的日期
             // 本结构按天汇总的日排产量，计算产量限制以及模具限制，需要按key(日期)排序
-            TreeMap<Integer, MatchingPlanLimitHelper> limitMap = this.caculateProductDay(productionContext, groupInfo, ratioVo,
-                    mouldDayProductionList, allSinglePlanMap, continueInfo); // 计算排产日
+            TreeMap<Integer, MatchingPlanLimitHelper> limitMap = this.caculateProductDay(productionContext, groupInfo,
+                    ratioVo, mouldDayProductionList, allSinglePlanMap, continueInfo); // 计算排产日
             Integer startDay = limitMap.firstKey();
             Integer endDay = limitMap.lastKey();
             if (startDay.compareTo(endDay) > 0) { // 如果开始时间>结束时间，说明该结构满产，直接看下一个结构
                 continue;
             }
-            
+
             // 续作规格搭配排产
             this.matchingScheduleContinue(productionContext, newSkuQtyMap, groupInfo, limitMap);
             // 新增模具搭配排产
-            this.matchingScheduleNewSku(productionContext, newSkuQtyMap, groupInfo,
-                    continueInfo, productionPlanList, limitMap, startDay, endDay);
+            Set<String> newMouldCodeSet = this.matchingScheduleNewMould(productionContext, newSkuQtyMap, groupInfo, continueInfo, limitMap);
+            if (!CollectionUtils.isEmpty(newMouldCodeSet)) { // 如果有新增模具，则再跑一次续作
+                this.matchingScheduleContinue(productionContext, newSkuQtyMap, groupInfo, limitMap); // 再跑一次续作
+            }
         }
         log.info(context.getProductionVersion() + "搭配排产end");
         return newSkuQtyMap;
@@ -188,22 +188,22 @@ public class MatchingProductionHandler {
 
     /**
      * 新增模具搭配排产
+     * 
      * @param productionContext
      * @param newSkuQtyMap
      * @param groupInfo
      * @param continueInfo
-     * @param productionPlanList
      * @param limitMap
-     * @param startDay
-     * @param endDay
      * @return
      */
-    private Set<String> matchingScheduleNewSku(TbrProductionContext productionContext,
+    private Set<String> matchingScheduleNewMould(TbrProductionContext productionContext,
                                                Map<String, Integer> newSkuQtyMap, ProductionPlanGroupInfo groupInfo,
                                                CxContinueInfoHelper continueInfo,
-                                               List<MonthPlanProductionRequirePlanVo> productionPlanList,
-                                               TreeMap<Integer, MatchingPlanLimitHelper> limitMap, Integer startDay,
-                                               Integer endDay) {
+                                               TreeMap<Integer, MatchingPlanLimitHelper> limitMap) {
+        List<MonthPlanProductionRequirePlanVo> productionPlanList = groupInfo.getGroupPlanData();
+        Integer startDay = limitMap.firstKey();
+        Integer endDay = limitMap.lastKey();
+        Set<String> newMouldCodeSet = new HashSet<>(); // 新增模具
         // 循环取结构向下所有符合搭配生产条件的sku进行搭配排产
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
         do {
@@ -214,16 +214,66 @@ public class MatchingProductionHandler {
                 break;
             }
             scheduleMaterialDesc.add(materialDesc);
+            // 判断如果是新增sku，则需要检查成型机胎胚总数限制
+            CxMachineBaseInfoVo cxMachineInfo = this.getNewSkuCxMachine(productionContext, groupInfo, limitMap,
+                    materialDesc);
+            
             // 计算需要排产的量
             SkuNeedProductionInfo needProductionInfo = this.getNeedProductionQty(productionPlanList, materialDesc);
             if (null == needProductionInfo) {
                 continue;
             }
             // 执行搭配排产算法
-            this.matchingSchedule(productionContext, materialDesc, needProductionInfo, newSkuQtyMap,
-                    groupInfo, continueInfo, limitMap);
+            Set<String> tempMouldCodeSet = this.matchingSchedule(productionContext, materialDesc, needProductionInfo, newSkuQtyMap, groupInfo,
+                    continueInfo, limitMap, cxMachineInfo);
+            if (!CollectionUtils.isEmpty(tempMouldCodeSet)) {
+                newMouldCodeSet.addAll(tempMouldCodeSet);
+            }
         } while (true);
-        return scheduleMaterialDesc;
+        return newMouldCodeSet;
+    }
+
+    /**
+     * 获取新增sku的可排产成型机台
+     * @param productionContext
+     * @param groupInfo
+     * @param limitMap
+     * @param materialDesc
+     * @return
+     */
+    private CxMachineBaseInfoVo getNewSkuCxMachine(TbrProductionContext productionContext,
+                                                   ProductionPlanGroupInfo groupInfo,
+                                                   TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
+                                                   String materialDesc) {
+        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer()
+                .getCxMachineBaseInfo();
+        Set<String> cxMachineInfoSet = groupInfo.getAllocationCxMachineCodeSet();
+        Integer startDay = limitMap.firstKey();
+        Integer endDay = limitMap.lastKey();
+        CxMachineBaseInfoVo cxMachineInfo = null;
+        boolean isNewSku = false;
+        for (String machineCode : cxMachineInfoSet) {
+            cxMachineInfo = cxMachineBaseInfo.get(machineCode);
+            isNewSku &= cxMachineInfo.getAllocationList().stream().anyMatch(allocation -> {
+                if (allocation.getAllocationDay() < startDay || allocation.getAllocationDay() > endDay) {
+                    return false;
+                }
+                if (allocation.getRealProductionPlanList().stream()
+                        .noneMatch(p -> materialDesc.equals(p.getMaterialDesc()))) {
+                    return false;
+                }
+                long embryoCodeCount = allocation.getRealProductionPlanList().stream().map(p -> p.getEmbryoCode())
+                        .distinct().count();
+                if (allocation.getMaxEmbryoCodeCount() <= embryoCodeCount) {
+                    return false;
+                }
+                return true;
+            });
+            if (isNewSku) {
+                break;
+            }
+        }
+        return cxMachineInfo;
     }
 
     /**
@@ -266,7 +316,7 @@ public class MatchingProductionHandler {
                 Integer usedBeginDate = mouldDayUsed.getBeginDate();
                 Integer usedEndDate = mouldDayUsed.getEndDate();
                 MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
-                if (!limitHelper.isProduct()) {
+                if (limitHelper == null || !limitHelper.isProduct()) {
                     continue; // 当天已经无法添加排产，跳过
                 }
                 List<ProductionMouldInfoVo> doubleMouldList = mouldDayUsed.getMouldInfoList();
@@ -366,7 +416,7 @@ public class MatchingProductionHandler {
                 } else { // 非首日，先看前一天数量
                     List<CxMouldDayProductionHelper> mouldDayList = dayModPlanMap.get(day - 1);
                     isContinue = !CollectionUtils.isEmpty(mouldDayList) && mouldDayList.stream()
-                            .anyMatch(p -> Objects.equal(dayPlan.getMaterialDesc(), p.getMaterialDesc()));
+                            .anyMatch(p -> Objects.equals(dayPlan.getMaterialDesc(), p.getMaterialDesc()));
                 }
                 BigDecimal unit = BigDecimalUtils.valueOf(isContinue ? dayVulcanizationQty : firtOneMouldQty); // 单模每日最大排产量：续作，直接按最大满产排；非续作只能按新模首日排产
                 Integer newMouldQty = BigDecimalUtils.div(dayPlan.getProductionQty(), unit, 0).intValue(); // 模具数
@@ -431,11 +481,14 @@ public class MatchingProductionHandler {
      * @param newSkuQtyMap       已搭配排产规格数量
      * @param groupInfo          排产计划分组
      * @param continueInfo       首日续作规格
+     * @param limitMap           排产限制
+     * @param cxMachineInfo      新增sku安排的机台
      */
-    private void matchingSchedule(TbrProductionContext productionContext, String materialDesc,
+    private Set<String> matchingSchedule(TbrProductionContext productionContext, String materialDesc,
                                   SkuNeedProductionInfo needProductionInfo, Map<String, Integer> newSkuQtyMap,
                                   ProductionPlanGroupInfo groupInfo, CxContinueInfoHelper continueInfo,
-                                  TreeMap<Integer, MatchingPlanLimitHelper> limitMap) {
+                                  TreeMap<Integer, MatchingPlanLimitHelper> limitMap, CxMachineBaseInfoVo cxMachineInfo) {
+        Set<String> newMouldCodeSet = new HashSet<>(); // 新增模具号
         int startDay = limitMap.firstKey();
         int endDay = limitMap.lastKey();
         Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
@@ -468,7 +521,7 @@ public class MatchingProductionHandler {
                     if (newMouldNum == 0) {
                         break;
                     }
-                    List<CxMouldDayProductionHelper> dayProductionList = mould.getDayProductionInfo().get(startDay);
+                    List<CxMouldDayProductionHelper> dayProductionList = mould.getDayProductionInfo().get(usedBeginDate);
                     if (CollectionUtils.isEmpty(dayProductionList)) { // 当天没有排产才添加模具
                         newDoubleMouldList.add(mould);
                         newMouldNum --;
@@ -486,11 +539,23 @@ public class MatchingProductionHandler {
                 Integer realSumProductionQty = newSkuQtyMap.getOrDefault(materialDesc, 0); // 已排产量
                 Set<String> cxMachineInfoSet = groupInfo.getAllocationCxMachineCodeSet();
                 // 查找是否有相同模具的已关联成型硫化组
-                CxLhProductionHelper cxLhGroup = this.findCxLhGroup(doubleMouldList, cxMachineBaseInfo,
-                        cxMachineInfoSet);
+                CxLhProductionHelper cxLhGroup = this.findCxLhGroup(materialDesc, groupInfo.getGroupName(),
+                        doubleMouldList, cxMachineBaseInfo, cxMachineInfoSet);
                 if (cxLhGroup == null) {
-                    continue;
+                    if (cxMachineInfo == null) {
+                        continue;
+                    }
+                    // 没有建立关系则新建一个，组编码从1开始累计
+                    Map<Integer, CxLhProductionHelper> cxLhRatioMap = cxMachineInfo.getCxLhRatioMap();
+                    Integer lhGroupNo = cxLhRatioMap.keySet().stream().max(Integer::compareTo).orElse(0) + 1;
+                    cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupInfo.getGroupName(),
+                            lhGroupNo, cxMachineInfoSet);
+                    cxLhGroup.setProductionMouldSet(new HashSet<>());
+                    cxLhRatioMap.put(lhGroupNo, cxLhGroup);
                 }
+//                if (cxLhGroup.getDayMaxProductionQty() == null) {
+//                    cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+//                }
                 LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupInfo, cxMachineInfoSet,
                         cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
                 CxLhMouldProductionCalculator.lhProductionByGroupHandler(productionContext, lhProductionQtyHelper,
@@ -500,8 +565,10 @@ public class MatchingProductionHandler {
                 // 更新模具与排产量的累计量
                 limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                 limitHelper.setPlanQty(limitHelper.getPlanQty() + lhProductionQtyHelper.getRealSumProductionQty());
+                newMouldCodeSet.addAll(newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet()));
             }
         }
+        return newMouldCodeSet;
     }
 
     /**
@@ -518,9 +585,9 @@ public class MatchingProductionHandler {
         List<CxMouldDayProductionHelper> dayProduction1 = m1.getDayProductionInfo().get(usedBeginDate);
         List<CxMouldDayProductionHelper> dayProduction2 = m2.getDayProductionInfo().get(usedBeginDate);
         Boolean sameMaterial1 = dayProduction1 != null
-                && dayProduction1.stream().anyMatch(s -> Objects.equal(materialDesc, s.getMaterialDesc()));
+                && dayProduction1.stream().anyMatch(s -> Objects.equals(materialDesc, s.getMaterialDesc()));
         Boolean sameMaterial2 = dayProduction2 != null
-                && dayProduction2.stream().anyMatch(s -> Objects.equal(materialDesc, s.getMaterialDesc()));
+                && dayProduction2.stream().anyMatch(s -> Objects.equals(materialDesc, s.getMaterialDesc()));
         int result = sameMaterial2.compareTo(sameMaterial1); // boolean是true比false大，因此需要倒序
         if (result != 0) {
             return result;
@@ -528,21 +595,22 @@ public class MatchingProductionHandler {
         dayProduction1 = m1.getDayProductionInfo().get(usedBeginDate - 1);
         dayProduction2 = m2.getDayProductionInfo().get(usedBeginDate - 1);
         sameMaterial1 = dayProduction1 != null
-                && dayProduction1.stream().anyMatch(s -> Objects.equal(materialDesc, s.getMaterialDesc()));
+                && dayProduction1.stream().anyMatch(s -> Objects.equals(materialDesc, s.getMaterialDesc()));
         sameMaterial2 = dayProduction2 != null
-                && dayProduction2.stream().anyMatch(s -> Objects.equal(materialDesc, s.getMaterialDesc()));
+                && dayProduction2.stream().anyMatch(s -> Objects.equals(materialDesc, s.getMaterialDesc()));
         return sameMaterial2.compareTo(sameMaterial1); // boolean是true比false大，因此需要倒序
     }
 
     /**
      * 查询符合条件的成型硫化组关系
      * 
+     * @param materialDesc
      * @param newDoubleMouldList
      * @param cxMachineBaseInfo
      * @param cxMachineInfoSet
      * @return
      */
-    private CxLhProductionHelper findCxLhGroup(List<ProductionMouldInfoVo> newDoubleMouldList,
+    private CxLhProductionHelper findCxLhGroup(String materialDesc, String structureName, List<ProductionMouldInfoVo> newDoubleMouldList,
                                                Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo,
                                                Set<String> cxMachineInfoSet) {
         // 选择符合条件的硫化组：1、找同模具的组。2、找空组
@@ -563,6 +631,36 @@ public class MatchingProductionHandler {
                 }
             }
         }
+//        if (cxLhGroup == null) { // 如果没有关联的，需要取同物料描述的
+//            for (CxMachineBaseInfoVo machine : cxMachineBaseInfo.values()) {
+//                if (!cxMachineInfoSet.contains(machine.getCxMachineCode())) {
+//                    continue;
+//                }
+//                Map<Integer, CxLhProductionHelper> cxLhRatioMap = machine.getCxLhRatioMap();
+//                if (!CollectionUtils.isEmpty(cxLhRatioMap)) {
+//                    cxLhGroup = cxLhRatioMap.values().stream()
+//                            .filter(r -> materialDesc.contains(r.getMaterialDesc())).findAny().orElse(null);
+//                    if (cxLhGroup != null) {
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//        if (cxLhGroup == null) { // 如果没有关联的，需要取同结构的
+//            for (CxMachineBaseInfoVo machine : cxMachineBaseInfo.values()) {
+//                if (!cxMachineInfoSet.contains(machine.getCxMachineCode())) {
+//                    continue;
+//                }
+//                Map<Integer, CxLhProductionHelper> cxLhRatioMap = machine.getCxLhRatioMap();
+//                if (!CollectionUtils.isEmpty(cxLhRatioMap)) {
+//                    cxLhGroup = cxLhRatioMap.values().stream()
+//                            .filter(r -> structureName.contains(r.getGroupName())).findAny().orElse(null);
+//                    if (cxLhGroup != null) {
+//                        break;
+//                    }
+//                }
+//            }
+//        }
         if (cxLhGroup == null) { // 如果没有关联的，需要取空的
             for (CxMachineBaseInfoVo machine : cxMachineBaseInfo.values()) {
                 if (!cxMachineInfoSet.contains(machine.getCxMachineCode())) {
@@ -633,63 +731,9 @@ public class MatchingProductionHandler {
                 newSkuQtyMap.put(materialDesc, newSkuQtyMap.getOrDefault(materialDesc, 0) + realProductionQty); // 累计已排量
                 sumProductionQty -= realProductionQty; // 待排量扣减已排量，要乘上硫化机数
                 totalProductionQty += realProductionQty;
-//                usedMould += remainMouldList.size();
             }
         }
-//        return usedMould;
         return totalProductionQty;
-    }
-
-    /**
-     * 首日续作排程算法
-     *
-     * @param productionContext
-     * @param materialDesc
-     * @param newSkuQtyMap
-     * @param groupInfo
-     * @param continueInfo
-     * @param productionQty
-     * @param maxProductionQty
-     * @param beginDay
-     * @param endDay
-     * @param doubleMouldList
-     * @return
-     */
-    private boolean matchingScheduleFirstDayContinue(TbrProductionContext productionContext, String materialDesc,
-                                                     Map<String, Integer> newSkuQtyMap,
-                                                     ProductionPlanGroupInfo groupInfo,
-                                                     CxContinueInfoHelper continueInfo, Integer productionQty,
-                                                     Integer maxProductionQty, Integer beginDay, Integer endDay,
-                                                     List<ProductionMouldInfoVo> doubleMouldList) {
-        if (continueInfo == null) {
-            return false;
-        }
-        CxContinueSkuInfoHelper continueSkuInfo = continueInfo.getContinueSkuMouldNumberMap().get(materialDesc);
-        if (continueSkuInfo == null || CollectionUtils.isEmpty(continueSkuInfo.getContinueSkuPlanList())) {
-            return false;
-        }
-        Integer sumProductionQty = productionQty; // 待排量 = 需求量
-        Integer lhQty = doubleMouldList.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 模具数换算成机台数
-        // 顺序遍历每一个排产日
-        for (int productionDay = beginDay; productionDay <= endDay; productionDay++) { // 按顺序每天续作排产
-            // 检查当天模具是否有排产，如果有则需要从模具已排量补到上限
-            Integer checkDay = productionDay;
-            Map<Integer, List<ProductionMouldInfoVo>> capacityMap = this.getMoldRemainingCapacity(doubleMouldList,
-                    maxProductionQty, checkDay); // 计算所有模具当天的产能剩余量
-            for (Entry<Integer, List<ProductionMouldInfoVo>> entrySet : capacityMap.entrySet()) {
-                Integer capacityQty = entrySet.getKey(); // 产能剩余量
-                Integer realProductionQty = NumberUtils.min(sumProductionQty, capacityQty, maxProductionQty); // 取计划量、产能剩余量、最大排产量的最小值
-                if (realProductionQty <= 0) {
-                    continue;
-                }
-                CxLhMouldProductionCalculator.continueSkuLhProductionHandler(productionContext, groupInfo,
-                        continueSkuInfo, productionDay, realProductionQty, doubleMouldList);
-                realProductionQty *= lhQty; // 合计计划量时，要乘上硫化机数
-                newSkuQtyMap.put(materialDesc, newSkuQtyMap.getOrDefault(materialDesc, 0) + realProductionQty); // 累计已排量
-                sumProductionQty -= realProductionQty; // 待排量扣减已排量
-            }
-        }
-        return true;
     }
 
     /**
@@ -738,34 +782,7 @@ public class MatchingProductionHandler {
             canUseMouldMap.put(day, this.selectedAllMouldByDay(productionContext, materialDesc, dayMoldQty, day));
         }
         // 遍历每一天的可用模具，与前一天可用模具相同的日期分作一组，然后按组遍历排产
-        String currentMouldCode = "";
-        int currentStartDay = startDay;
-        int currentEndDay = startDay;
         for (int day = startDay; day <= endDay; day++) {
-//            List<ProductionMouldInfoVo> canUseMould = canUseMouldMap.get(day);
-//            String canUseMouldCode = "";
-//            if (!CollectionUtils.isEmpty(canUseMould)) {
-//                canUseMouldCode = canUseMould.stream().map(ProductionMouldInfoVo::getMouldCode).sorted()
-//                        .collect(Collectors.joining(","));
-//            } else {
-//                canUseMouldCode = ""; // 没有可用模具，置为空
-//            }
-//            // 与上一天一样，且不是最后一天，仅仅更新结束日期后继续下一天
-//            if (canUseMouldCode.equals(currentMouldCode) && day != endDay) {
-//                currentEndDay = day;
-//                continue;
-//            }
-//            if (!StringUtils.isEmpty(currentMouldCode) && !canUseMouldCode.equals(currentMouldCode)) { // 模具号有变化，且原模具号非空，则记录上一个可用时间段
-//                List<ProductionMouldInfoVo> latestCanUseMould = canUseMouldMap.get(day - 1);
-//                mouldDayUsedList.add(new MatchingMouldDayUsedHelper(latestCanUseMould, currentStartDay, currentEndDay)); // 记录可用时间段
-//                currentStartDay = day; // 更新下一组的起始时间
-//            }
-//            if (day == endDay && !StringUtils.isEmpty(canUseMouldCode)) { // 如果已经是最后一天，且当前模具号非空，则还需要添加这最后一天的时间段
-//                mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, currentStartDay, day)); // 记录可用时间段
-//                break;
-//            }
-//            currentMouldCode = canUseMouldCode;
-//            currentEndDay = day;
           List<ProductionMouldInfoVo> canUseMould = canUseMouldMap.get(day);
           mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day)); // 记录可用时间段
         }
@@ -796,7 +813,11 @@ public class MatchingProductionHandler {
         }
         Map<String, FactoryMonthPlanMouldDayResult> oldPlanMap = planList.stream()
                 .collect(Collectors.toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, Function.identity()));
-        dayResultList.stream().filter(plan -> oldPlanMap.containsKey(plan.getMaterialCode())).forEach(plan -> {
+        Long productionSequence = planList.stream().map(FactoryMonthPlanMouldDayResult::getProductionSequence).filter(Objects::nonNull).max(Long::compareTo).orElse(0L);
+        for (FactoryMonthPlanMouldDayResult plan: dayResultList) {
+            if (!newSkuQtyMap.containsKey(plan.getMaterialDesc())) {
+                continue;
+            }
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
             if (oldPlan != null) {
                 plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
@@ -812,13 +833,30 @@ public class MatchingProductionHandler {
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
                 plan.setBaseVale(plan.getId());
+            } else {
+                plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
+                plan.setTotalQty(plan.getConventionProductionQty());
+                plan.setHeightProductionQty(0);
+                plan.setMidProductionQty(0);
+                plan.setCycleProductionQty(0);
+                if (plan.getProductionSequence() == null) {
+                    productionSequence ++;
+                    plan.setProductionSequence(productionSequence);
+                }
+                plan.setPostponeProductionQty(0);
+                plan.setDifferenceQty(0);
+                plan.setMouldCavityQty(0);
+                plan.setTypeBlockQty(0);
+                plan.setFactProdReqQty(0);
+                plan.setReason(null);
+                plan.setBaseVale(null);
             }
 
             if (null != plan.getInventorySalesRatio()
                     && plan.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
                 plan.setInventorySalesRatio(BigDecimal.ZERO);
             }
-        });
+        }
         baseDao.saveBatch(dayResultList);
     }
 
@@ -884,18 +922,20 @@ public class MatchingProductionHandler {
      * @param productionContext 月计划生产版本
      * @return
      */
-    private Map<String, MonthPlanProductionRequirePlanVo> selectRequirePlan(TbrProductionContext productionContext,
+    private List<MonthPlanProductionRequirePlanVo> selectRequirePlan(TbrProductionContext productionContext,
                                                                             List<FactoryMonthPlanMouldDayResult> planList) {
         Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap = new HashMap<>();
         String productionVersion = productionContext.getProductionVersion();
         String monthPlanVersion = productionContext.getMonthPlanVersion();
+        Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = getProductionConstructionInfo(productionContext);
+
 
         // 加载需求计划
         LambdaQueryWrapper<DpDemandPlan> DemandQueryWrapper = new LambdaQueryWrapper<DpDemandPlan>();
         DemandQueryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
         List<DpDemandPlan> demandPlanList = monthPlanRequireMapper.selectList(DemandQueryWrapper);
         if (CollectionUtils.isEmpty(demandPlanList)) {
-            return requirePlanMap;
+            return new ArrayList<>(0);
         }
         ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext,
@@ -913,6 +953,7 @@ public class MatchingProductionHandler {
                 requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
                 requirePlan.setInventorySalesRatio(0D);// 默认0
                 requirePlan.setProductionQty(0);
+                requirePlan.setConstructionInfo(constructionInfoMap.get(materialCode)); //加载施工
 //                requirePlan.setHeightProductionQty(demandPlan.getHeightQty());
                 requirePlanMap.put(materialCode, requirePlan);
                 continue;
@@ -949,7 +990,8 @@ public class MatchingProductionHandler {
                 requirePlan.setProductionQty(newProductionQty);
             }
         });
-        return requirePlanMap;
+//        return requirePlanMap;
+        return new ArrayList<>(requirePlanMap.values());
     }
 
     /**
@@ -989,23 +1031,23 @@ public class MatchingProductionHandler {
      */
     private TbrProductionContext buildProductionContext(TbrProductionContext productionContext,
                                                         List<FactoryMonthPlanMouldDayResult> planList,
-                                                        Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap) {
+                                                        List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         // 构建各项排产过程数据
         BaseDataContainer container = productionContext.getBaseDataContainer();
 
-        container.setStructureLhRatioList(this.getLhRatioConfiguration(productionContext, requirePlanMap.values())); // 结构硫化配比
+        container.setStructureLhRatioList(this.getLhRatioConfiguration(productionContext, requirePlanList)); // 结构硫化配比
         container.setSkuMouldRelationMap(this.getProductionMouldInfo(productionContext)); // 模具施工关系
         container.setCxMachineBaseInfo(this.getDataService().getCxMachineBaseInfo(productionContext)); // 已排结构排程
-        container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, planList, requirePlanMap)); // 已排模具计划（净需求）
+        container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, planList, requirePlanList)); // 已排模具计划（净需求）
         container.setGroupMainPatternAllocationLimitMap(this.getGroupMainPatternAllocationInfo(productionContext)); // 结构模具分配配比
         this.specialMaterialInfoHandler(productionContext);
         this.buildCxLhRatioMap(productionContext, container.getMouldInfoMap()); // 构建成型硫化组
         this.overSixMonthStockHandler(productionContext); // 超6个成品库存信息
 
         // 各项已排产统计数据
-        productionContext.setAllProductionPlan(requirePlanMap.values().stream()
+        productionContext.setAllProductionPlan(requirePlanList.stream()
                 .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity())));
-        productionContext.setAllSkuProductionPlan(requirePlanMap.values().stream()
+        productionContext.setAllSkuProductionPlan(requirePlanList.stream()
                 .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc)));
         productionContext.setSkuPlannedQtyMap(planList.stream()
                 .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getStructureName,
@@ -1021,12 +1063,12 @@ public class MatchingProductionHandler {
      *
      * @param productionContext
      * @param planList
-     * @param requirePlanMap
+     * @param requirePlanList
      * @return
      */
     private Map<String, ProductionMouldInfoVo> buildMouldInfoMap(TbrProductionContext productionContext,
                                                                  List<FactoryMonthPlanMouldDayResult> planList,
-                                                                 Map<String, MonthPlanProductionRequirePlanVo> requirePlanMap) {
+                                                                 List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         Integer lhMouldQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 硫化机模具配比
         Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = productionContext.getBaseDataContainer()
                 .getSkuMouldRelationMap(); // 模具sku关系，key=物料描述
@@ -1040,18 +1082,20 @@ public class MatchingProductionHandler {
         boardingCalendar.set(Calendar.YEAR, productionContext.getYear());
         boardingCalendar.set(Calendar.MONTH, productionContext.getMonth() - 1);
         boardingCalendar.set(Calendar.DAY_OF_MONTH, 1);
-        for (FactoryMonthPlanMouldDayResult plan : planList) {
+        Map<String, FactoryMonthPlanMouldDayResult> planMap = planList.stream().collect(Collectors.toMap(FactoryMonthPlanMouldDayResult::getMaterialDesc, Function.identity(), (p1, p2) -> p1));
+        for (MonthPlanProductionRequirePlanVo requirePlan : requirePlanList) {
             // 根据物料取出需求计划
-            MonthPlanProductionRequirePlanVo requirePlan = requirePlanMap.get(plan.getMaterialCode());
-            if (requirePlan == null) {
-                continue;
-            }
-            List<MonthPlanProductMouldInfoVo> mouldList = skuMouldRelationMap.get(plan.getMaterialDesc());
+//            MonthPlanProductionRequirePlanVo requirePlan = requirePlanMap.get(plan.getMaterialCode());
+            List<MonthPlanProductMouldInfoVo> mouldList = skuMouldRelationMap.get(requirePlan.getMaterialDesc());
             if (CollectionUtils.isEmpty(mouldList)) {
                 continue;
             }
 
-            Date boardingDate = DateUtils.addDays(boardingCalendar.getTime(), plan.getBeginDay() - 1); // 上机时间
+            Date boardingDate = boardingCalendar.getTime();
+            FactoryMonthPlanMouldDayResult plan = planMap.get(requirePlan.getMaterialDesc());
+            if (plan != null) {
+                boardingDate = DateUtils.addDays(boardingCalendar.getTime(), plan.getBeginDay() - 1); // 上机时间
+            }
             // 将相关模具全部添加到模具排产数据中
             for (MonthPlanProductMouldInfoVo mould : mouldList) {
                 String mouldCode = mould.getMouldCode();
@@ -1062,6 +1106,9 @@ public class MatchingProductionHandler {
                     productionMouldInfo.setDayProductionInfo(new HashMap<>()); // 先初始化日排程列表
                     mouldInfoMap.put(mouldCode, productionMouldInfo);
                 }
+            }
+            if (plan == null) {
+                continue;
             }
             Integer beginDay = plan.getBeginDay(); // 排产开始日
             Integer endDay = plan.getEndDay(); // 排产结束日
@@ -1082,7 +1129,6 @@ public class MatchingProductionHandler {
             } else {
                 cxMachineCodeInfo = new HashSet<>(Arrays.asList(StringUtils.split(plan.getCxMachineCode(), ","))); // 成型机台
             }
-
             // 按天统计排产量，并按产能分配到各个模具上
             for (int day = beginDay; day <= endDay; day++) {
                 Integer productionQty = dayPlanQtyMap.get(day); // 每日排产量日期取对应日排产量
@@ -1117,9 +1163,9 @@ public class MatchingProductionHandler {
                         List<CxMouldDayProductionHelper> dayProduction1 = m1.getDayProductionInfo().get(currentDay);
                         List<CxMouldDayProductionHelper> dayProduction2 = m2.getDayProductionInfo().get(currentDay);
                         Boolean sameMaterial1 = dayProduction1 != null
-                                && dayProduction1.stream().anyMatch(s -> Objects.equal(plan.getMaterialDesc(), s.getMaterialDesc()));
+                                && dayProduction1.stream().anyMatch(s -> Objects.equals(plan.getMaterialDesc(), s.getMaterialDesc()));
                         Boolean sameMaterial2 = dayProduction2 != null
-                                && dayProduction2.stream().anyMatch(s -> Objects.equal(plan.getMaterialDesc(), s.getMaterialDesc()));
+                                && dayProduction2.stream().anyMatch(s -> Objects.equals(plan.getMaterialDesc(), s.getMaterialDesc()));
                         return sameMaterial1.compareTo(sameMaterial2); // boolean是true比false大
                     }).limit(lhMouldQty)
                             .collect(Collectors.toList());// 每次取两个模具
@@ -1192,6 +1238,10 @@ public class MatchingProductionHandler {
                             lhGroupNo = cxLhRatio.getLhGroupNo();
                         }
                         Set<String> mouldSet = cxLhRatio.getProductionMouldSet();
+//                        cxLhRatio.setMaterialCode(dayProduction.getMaterialCode());
+//                        cxLhRatio.setMaterialDesc(dayProduction.getMaterialDesc());
+//                        cxLhRatio.setProductionQty(Optional.ofNullable(cxLhRatio.getProductionQty()).orElse(0)
+//                                + dayProduction.getProductionQty());
                         mouldSet.add(mouldInfo.getMouldCode());
                         dayProduction.setLhGroupNo(String.valueOf(lhGroupNo));
                     }
@@ -1231,8 +1281,8 @@ public class MatchingProductionHandler {
 //                Integer cxLhGroupNo = cxLhRatioEntry.getKey();
                 CxLhProductionHelper cxLhProduction = cxLhRatioEntry.getValue();
                 MonthPlanStructureLhRatioVo ratioVo = ratioList.stream()
-                        .filter(s -> Objects.equal(cxMachineInfo.getCxMachineTypeCode(), s.getCxMachineTypeCode())
-                                && Objects.equal(s.getStructureName(), cxLhProduction.getGroupName()))
+                        .filter(s -> Objects.equals(cxMachineInfo.getCxMachineTypeCode(), s.getCxMachineTypeCode())
+                                && Objects.equals(s.getStructureName(), cxLhProduction.getGroupName()))
                         .findAny().orElse(null);
                 if (ratioVo == null) {
                     continue;
@@ -1892,8 +1942,6 @@ public class MatchingProductionHandler {
         }
         effectiveList.sort((m1, m2) -> this.usedMouldCompare(materialDesc, day, m1, m2));
         return effectiveList;
-//        int lhSize = (effectiveList.size() / lhMouldQty) * lhMouldQty; // 按模具双模排产模式取整
-//        return effectiveList.subList(BigDecimal.ZERO.intValue(), lhSize); // 限制可用模具
     }
 
     /**
@@ -2100,6 +2148,22 @@ public class MatchingProductionHandler {
             standardLengthMap.put(specialMaterialStockInfo.getStandardLength(), SpecialMaterialInfoVo.createInitInfo(specialMaterialStockInfo));
         });
         productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
+    }
+    
+    /**
+     * 获取需要排产的SKU的施工配置信息
+     * key = materialCode: value = List<MonthPlanProductConstructionInfoVo>
+     *
+     * @param productionContext
+     * @return
+     */
+    protected Map<String, List<MonthPlanProductConstructionInfoVo>> getProductionConstructionInfo(TbrProductionContext productionContext) {
+        List<MonthPlanProductConstructionInfoVo> constructionInfoList = getDataService().getProductionConstructionInfo(productionContext);
+        if (CollectionUtils.isEmpty(constructionInfoList)) {
+            log.info(TbrProductionInitLogRecorder.addConstructionInfoEmptyLog(productionContext));
+            return Collections.emptyMap();
+        }
+        return constructionInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductConstructionInfoVo::getMaterialCode));
     }
 
     /**
