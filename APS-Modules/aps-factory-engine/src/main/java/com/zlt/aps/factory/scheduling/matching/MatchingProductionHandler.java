@@ -490,7 +490,8 @@ public class MatchingProductionHandler {
         // 同结构的最大单模硫化量
         Integer dayVulcanizationQty = allSinglePlanMap.values().stream()
                 .filter(m -> m.getStructureName().equals(groupInfo.getGroupName()))
-                .map(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).max(Integer::compareTo).orElse(0);
+                .map(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).filter(Objects::nonNull)
+                .max(Integer::compareTo).orElse(0);
         // 统计每一天的已排产量
         TreeMap<Integer, MatchingPlanLimitHelper> usedPlanMap = new TreeMap<>();
         for (int day = startDay; day <= endDay; day++) {
@@ -601,7 +602,7 @@ public class MatchingProductionHandler {
                 CxLhMouldProductionCalculator.lhProductionByGroupHandler(productionContext, lhProductionQtyHelper,
                         usedBeginDate, usedEndDate, newDoubleMouldList, needProductionInfo.getNeedProductionList(),
                         false);
-                Integer realProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
+                Integer realProductionQty = lhProductionQtyHelper.getRealSumProductionQty() - realSumProductionQty;
                 if (realProductionQty > 0) {
                     Integer unProductQty = realProductionQty;
                     for (MonthPlanProductionRequirePlanVo plan: needProductionInfo.getNeedProductionList()) {
@@ -618,7 +619,7 @@ public class MatchingProductionHandler {
                             break;
                         }
                     }
-                    newSkuQtyMap.put(materialDesc, realProductionQty); // 累计已排量
+                    newSkuQtyMap.put(materialDesc, lhProductionQtyHelper.getRealSumProductionQty()); // 累计已排量
                     // 更新模具与排产量的累计量
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);
