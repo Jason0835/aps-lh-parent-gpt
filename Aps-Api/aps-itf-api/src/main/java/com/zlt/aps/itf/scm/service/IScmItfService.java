@@ -19,8 +19,8 @@ import io.swagger.annotations.ApiOperation;
  * @author ZLT
  * @date 20250213
  */
-//@FeignClient(contextId = "IScmItfService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.itf:/itf}")
-@FeignClient(contextId = "IScmItfService", value = "aps-itf")
+@FeignClient(contextId = "IScmItfService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.itf:/itf}")
+//@FeignClient(contextId = "IScmItfService", value = "aps-itf")
 public interface IScmItfService {
     /**
      * 同步已计划未发货数据

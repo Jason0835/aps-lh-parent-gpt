@@ -29,7 +29,7 @@ import java.util.List;
  */
 
 @Data
-@TableName(value = "T_MP_MOULDING_DAY_RESULT_0112")
+@TableName(value = "T_MP_MOULDING_DAY_RESULT")
 @ApiModel(value = "S2-0604.排产结果-生产计划排产结果对象", description = "S2-0604.排产结果-生产计划排产结果对象 ")
 public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
