@@ -53,15 +53,26 @@ public class ContinuousProductionDayHandler {
             return Collections.emptySet();
         }
         Set<Integer> result = new HashSet<>();
+        result.addAll(sumProductionDay);
         if (sumProductionDay.size() == BigDecimal.ONE.intValue()) {
-            result.addAll(sumProductionDay);
             return result;
         }
-        //拼接停工日
-        if (!CollectionUtils.isEmpty(stopDay)) {
-            sumProductionDay.addAll(stopDay);
+        //没有停工日
+        if (CollectionUtils.isEmpty(stopDay)) {
+            return getEarliestContinuousRange(result);
         }
-        return getEarliestContinuousRange(sumProductionDay);
+        //拼接停工日
+        List<Integer> sortList = new ArrayList<>(sumProductionDay);
+        //从小达到
+        sortList.sort(Comparator.comparing(Integer::intValue));
+        Integer minDay = sortList.get(BigDecimal.ZERO.intValue());
+        Integer maxDay = sortList.get(sortList.size() - BigDecimal.ONE.intValue());
+        for (int productionDay = minDay; productionDay <= maxDay; productionDay++) {
+            if (stopDay.contains(productionDay)) {
+                result.add(productionDay);
+            }
+        }
+        return getEarliestContinuousRange(result);
     }
 
     /**
