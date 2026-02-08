@@ -476,7 +476,8 @@ public class MatchingProductionHandler {
                 break;
             }
         }
-        Integer endDay = dayPlanMap.lastKey(); // 结束日期，默认是结构收尾日期
+        Integer limitDay = groupInfo.getDayProductionLimitInfo().keySet().stream().max(Integer::compareTo).orElse(0);
+        Integer endDay = Math.max(limitDay, dayPlanMap.lastKey()); // 结束日期，默认是结构收尾日期
         // 从开始日期到结束日期，检查每一天是否满足配上机的约束条件
 //        for (int day = startDay; day <= endDay; day++) {
 //            // 只要有一天不满足条件，直接将结束日期提前到上一天
@@ -486,11 +487,26 @@ public class MatchingProductionHandler {
 //                break;
 //            }
 //        }
-
+        // 同结构的最大单模硫化量
+        Integer dayVulcanizationQty = allSinglePlanMap.values().stream()
+                .filter(m -> m.getStructureName().equals(groupInfo.getGroupName()))
+                .map(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).max(Integer::compareTo).orElse(0);
         // 统计每一天的已排产量
         TreeMap<Integer, MatchingPlanLimitHelper> usedPlanMap = new TreeMap<>();
         for (int day = startDay; day <= endDay; day++) {
-            usedPlanMap.put(day, dayPlanMap.get(day));
+            MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
+            if (dayLimit == null) { // 如果为空，说明是结构预留的的天数，需要添加
+                List<CxMouldDayProductionHelper> mouldDayList = dayModPlanMap.get(day - 1);
+                boolean isContinue = !CollectionUtils.isEmpty(mouldDayList);
+                BigDecimal unit = BigDecimalUtils.valueOf(isContinue ? dayVulcanizationQty : firtOneMouldQty); // 单模每日最大排产量：续作，直接按最大满产排；非续作只能按新模首日排产
+                Integer maxPlanQty = BigDecimalUtils.multiply(maxMouldNum, unit).intValue(); // 最大可排产量 = 最大模具数 * 最大日硫化量
+                dayLimit = new MatchingPlanLimitHelper();
+                dayLimit.setMaxPlanQty(maxPlanQty);
+                dayLimit.setMaxMouldQty(maxMouldNum);
+                dayLimit.setMouldQty(0);
+                dayLimit.setPlanQty(0);
+            }
+            usedPlanMap.put(day, dayLimit);
         }
         return usedPlanMap;
     }
