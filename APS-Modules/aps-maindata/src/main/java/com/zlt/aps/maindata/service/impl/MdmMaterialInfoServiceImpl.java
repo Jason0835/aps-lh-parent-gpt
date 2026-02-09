@@ -675,9 +675,6 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
     public Map<String, MdmMaterialInfo> skuToMaterialInfo(DpDemandPlan createCondition) {
         LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(MdmMaterialInfo::getFactoryCode, createCondition.getFactoryCode());
-        if(StringUtils.isNotBlank(createCondition.getStructureName())){
-            wrapper.eq(MdmMaterialInfo::getStructureName, createCondition.getStructureName());
-        }
         wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MdmMaterialInfo> materialInfos =  mdmMaterialInfoEntityMapper.selectList(wrapper);
         if(CollectionUtils.isEmpty(materialInfos)){

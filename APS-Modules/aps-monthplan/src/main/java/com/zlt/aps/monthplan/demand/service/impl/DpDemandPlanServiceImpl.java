@@ -340,7 +340,6 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         String monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST);
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(monthPlanVersion);
-        createCondition.setIncludePostpone(true);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());
         data.setPostponeOrders(null);
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
