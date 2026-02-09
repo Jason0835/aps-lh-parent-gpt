@@ -196,3 +196,24 @@ export function outGetStayDay(query) {
     data: query
   })
 }
+
+
+//调整日志
+export function logList(query) {
+  return request({
+    url: '/monthplan/mpAdjustMaterialLog/list',
+    method: 'post',
+    data: query
+  })
+}
+
+
+//调整日志版本列表
+export function versionLog(query) {
+  return request({
+    // url: '/monthplan/mpStructureAllocation/getVersionList',
+    url: '/monthplan/mpAdjustMaterialLog/getVersionList',
+    method: 'post',
+    data: query
+  })
+}

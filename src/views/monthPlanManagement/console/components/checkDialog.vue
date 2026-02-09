@@ -12,15 +12,21 @@
       <!-- 进度统计 -->
       <div class="progress-stat">
         <div class="stat-item">
-          <div class="stat-label">{{ this.$t("ui.data.checkDialog.allCheck") }}</div>
+          <div class="stat-label">
+            {{ this.$t("ui.data.checkDialog.allCheck") }}
+          </div>
           <div class="stat-value total">{{ checkItems.length }}</div>
         </div>
         <div class="stat-item">
-          <div class="stat-label">{{ this.$t("ui.data.checkDialog.success") }}</div>
+          <div class="stat-label">
+            {{ this.$t("ui.data.checkDialog.success") }}
+          </div>
           <div class="stat-value success">{{ passedCount }}</div>
         </div>
-        <div class="stat-item" style="cursor: pointer" @click="showReason">
-          <div class="stat-label">{{this.$t("ui.data.checkDialog.faile")}}</div>
+        <div class="stat-item">
+          <div class="stat-label">
+            {{ this.$t("ui.data.checkDialog.faile") }}
+          </div>
           <div class="stat-value failed">{{ failedCount }}</div>
         </div>
       </div>
@@ -78,13 +84,13 @@
             </div>
           </div>
           <div v-if="item.expanded">
-            <div class="reason-title">{{$t('ui.data.checkDialog.reason')}}：</div>
+            <div class="reason-title">
+              {{ $t("ui.data.checkDialog.reason") }}：
+            </div>
             <div class="reason-content" v-html="item.reason"></div>
           </div>
         </div>
       </div>
-
-
     </div>
     <template slot="footer">
       <!-- 操作按钮 -->
@@ -202,21 +208,27 @@ export default {
     toggleItem(item) {
       // 只有失败状态的项目可以展开
       if (!item.status) {
+        if (item.value == "06") {
+          this.showReason();
+          return;
+        }
         if (!item.expanded) {
-          let obj={
+          let obj = {
             ...this.actionData,
-            checkItem:item.value
-          }
+            checkItem: item.value,
+          };
           this.$set(item, "loading", true);
-          checkReason(obj).then((response) => {
-           let reason=''
-           for (let i = 0; i < response.rows.length; i++) {
-            reason+=response.rows[i].checkContent
-           }
-           this.$set(item, "reason", reason);
-          }).finally(()=>{
-            this.$set(item, "loading", false);
-          })
+          checkReason(obj)
+            .then((response) => {
+              let reason = "";
+              for (let i = 0; i < response.rows.length; i++) {
+                reason += response.rows[i].checkContent;
+              }
+              this.$set(item, "reason", reason);
+            })
+            .finally(() => {
+              this.$set(item, "loading", false);
+            });
         }
         this.$set(item, "expanded", !item.expanded);
       }
@@ -245,14 +257,14 @@ export default {
 
     // 获取状态文本
     getStatusText(status) {
-      let text =  this.$t("ui.data.checkDialog.check");
+      let text = this.$t("ui.data.checkDialog.check");
       if (status == "checking") {
         return text;
       }
       if (status == true) {
-        text =  this.$t("ui.data.checkDialog.success");
+        text = this.$t("ui.data.checkDialog.success");
       } else {
-        text =this.$t("ui.data.checkDialog.faile");
+        text = this.$t("ui.data.checkDialog.faile");
       }
       return text;
     },
@@ -301,7 +313,7 @@ export default {
         list[i].status = "checking";
         list[i].expanded = false;
         list[i].loading = false;
-        list[i].response=''
+        list[i].response = "";
       }
       this.checkItems = list;
       this.$nextTick(() => {
@@ -332,7 +344,7 @@ export default {
     },
     showReason() {
       if (this.loading) {
-        return this.$modal.msgWarning(this.$t('ui.data.checkDialog.checking'));
+        return this.$modal.msgWarning(this.$t("ui.data.checkDialog.checking"));
       }
       if (this.$refs.reasonRef) {
         this.$refs.reasonRef.show(this.actionData);
@@ -340,7 +352,7 @@ export default {
     },
     goReason(status) {
       if (this.loading) {
-        return this.$modal.msgWarning(this.$t('ui.data.checkDialog.checking'));
+        return this.$modal.msgWarning(this.$t("ui.data.checkDialog.checking"));
       }
       if (status) return;
       if (this.$refs.reasonRef) {
@@ -576,13 +588,13 @@ export default {
 .check-list::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
-.reason-title{
+.reason-title {
   font-size: 16px;
-  color:#262626;
+  color: #262626;
   margin-bottom: 8px;
 }
-.reason-content{
+.reason-content {
   font-size: 14px;
-  color:#8c8c8c;
+  color: #8c8c8c;
 }
 </style>
