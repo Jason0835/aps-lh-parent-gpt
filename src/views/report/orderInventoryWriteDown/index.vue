@@ -54,7 +54,8 @@ export default {
     "biz_product_type",
     "biz_deliver_goods_type",
     "biz_order_type",
-    "biz_yes_no"
+    "biz_yes_no",
+    "biz_scm_type"
   ],
   data() {
     return {
@@ -237,7 +238,7 @@ export default {
           label: this.$t("ui.data.column.monthplan.scmPriority"),
           type: "select",
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            return this.selectDictLabel(this.dict.type.biz_scm_type, value);
           },
         },
         {

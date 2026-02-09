@@ -16,7 +16,7 @@
           <div class="stat-value total">{{ checkItems.length }}</div>
         </div>
         <div class="stat-item">
-          <div class="stat-label">>{{ this.$t("ui.data.checkDialog.success") }}</div>
+          <div class="stat-label">{{ this.$t("ui.data.checkDialog.success") }}</div>
           <div class="stat-value success">{{ passedCount }}</div>
         </div>
         <div class="stat-item" style="cursor: pointer" @click="showReason">

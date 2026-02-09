@@ -33,20 +33,28 @@
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
-        <!-- <el-button
+        <el-button
+          v-hasPermi="['maindata:rawWarningConfig:import']"
+          @click="$refs.tltUpload.handleImport()"
+          >{{ $t("ui.frame.btn.import") }}</el-button
+        >
+        <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:ProductMoldingLimit:export']"
+          v-hasPermi="['maindata:rawWarningConfig:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
-        > -->
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
-      downloadUrl="/mdm/productMoldingLimit/importTemplate"
-      uploadUrl="/mdm/productMoldingLimit/importData"
+      :updateSupport="true"
+      downloadUrl="/maindata/rawWarningConfig/importTemplate"
+      uploadUrl="​/maindata​/rawWarningConfig​/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -62,6 +70,7 @@ import {
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
@@ -70,6 +79,7 @@ export default {
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
   dicts: ["LINE_TYPE", "biz_yes_no", "biz_factory_name",'warn_level','warn_type'],
   provide() {
@@ -79,6 +89,23 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            console.log(form);
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -283,7 +310,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/mdm/productMoldingLimit/export", this.formatParams(false));
+      downloadLink("/maindata/rawWarningConfig/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
