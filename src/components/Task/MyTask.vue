@@ -86,16 +86,16 @@
         </template>
       </t-table-column>
       <t-table-column :label="$t('common.messageTask.sendBy')" align="center" prop="sendBy" />
-      <t-table-column :label="$t('common.messageTask.sendTime')" align="center" prop="sendTime" width="120">
-        <template slot-scope="scope">
+      <t-table-column :label="$t('common.messageTask.sendTime')" align="center" prop="sendTime" width="180">
+        <!-- <template slot-scope="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
-        </template>
+        </template> -->
       </t-table-column>
       <t-table-column :label="$t('common.messageTask.receivedBy')" align="center" prop="receivedBy" />
-      <t-table-column :label="$t('common.messageTask.doTime')" align="center" prop="doTime" width="120">
-        <template slot-scope="scope">
+      <t-table-column :label="$t('common.messageTask.doTime')" align="center" prop="doTime" width="180">
+        <!-- <template slot-scope="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
-        </template>
+        </template> -->
       </t-table-column>
     </t-table>
 

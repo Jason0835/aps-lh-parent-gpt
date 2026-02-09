@@ -15,3 +15,11 @@ export function getFinishList(query) {
     data: query
   })
 }
+
+export function genOverDueSkuByStock(query) {
+  return request({
+    url: '/monthplan/mdmProductStock/genOverDueSkuByStock',
+    method: 'post',
+    data: query
+  })
+}

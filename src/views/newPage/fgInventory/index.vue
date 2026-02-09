@@ -45,6 +45,13 @@
           v-hasPermi="['monthplan:mdmFinishStock:export4Mes']"
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
+          <el-button
+          type="primary"
+          plain
+          v-hasPermi="['monthplan:mdmFinishStock:genOverDueSkuByStock']"
+          @click="handleAdd"
+          >{{ $t("生成超期SKU") }}
+        </el-button>
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -54,7 +61,8 @@
       uploadUrl="/monthplan/productionMouldConfiguration/importData"
       @uploadSuccess="getList"
     />
-    <!-- <infoDialog ref="infoRef" @success="getList" /> -->
+    <infoDialog ref="infoRef" @success="getList" />
+
   </basic-container>
 </template>
 <script>
@@ -62,13 +70,13 @@ import { downloadLink } from "@/utils/request";
 import { getListMes } from "@/api/monthplan/finishStock";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
-// import infoDialog from "./components/infoDialog.vue";
+import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "FgInventory",
   components: {
     tltUpload,
-    // infoDialog,
+    infoDialog,
   },
   dicts: ["biz_factory_name", "biz_product_type", "biz_yes_no",'biz_stor_type','biz_brand_type'],
   provide() {
