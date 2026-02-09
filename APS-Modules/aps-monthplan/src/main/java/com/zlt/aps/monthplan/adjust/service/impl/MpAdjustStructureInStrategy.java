@@ -250,7 +250,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 continue;
             }
             matchMonthPlanList(contextDTO,resultList,materialCode,monthPlanMap,
-                    Convert.toInt(trialPlan.getTrialQty(),0), ApsConstant.TRUE);
+                    Convert.toInt(trialPlan.getTrialQty(),0), ApsConstant.TRUE, trialPlan.getId());
         }
         return resultList;
     }
