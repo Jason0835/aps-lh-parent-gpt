@@ -115,6 +115,7 @@ public class SpecialMaterialScheduleHandler {
         BigDecimal unitConsumeQty = entry.getValue();
         // 标准长度
         Long standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().get();
+        Integer standardQty = BigDecimal.valueOf(standardLength).divide(unitConsumeQty, BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
         //计算余数
         BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
         // 区间阈值 = 硫化量 * 配比*单耗
@@ -128,15 +129,15 @@ public class SpecialMaterialScheduleHandler {
         Integer realProductionQty = BigDecimal.ZERO.intValue();
         // 超过阈值，尝试补量
         if (remainderQty.compareTo(threshold) >= BigDecimal.ZERO.intValue()) {
-            if (limitProductionQty >= productionQty + standardLength - threshold.intValue()) {
+            if (limitProductionQty >= productionQty + standardQty - floatThreshold) {
                 //检查补量后不超过可生产上限才进行补量
                 isAddQty = true;
-                realProductionQty = (int) (productionQty + standardLength - threshold.intValue());
+                realProductionQty = productionQty + standardQty - floatThreshold;
             }
         }
         // 不补量，则需要将计划量扣减掉余数部分
         if (!isAddQty) {
-            realProductionQty = productionQty - threshold.intValue();
+            realProductionQty = productionQty - floatThreshold;
         }
         // 可生产上限不足，则不能排产
         if (realProductionQty <= BigDecimal.ZERO.intValue()) {
@@ -233,6 +234,7 @@ public class SpecialMaterialScheduleHandler {
         BigDecimal unitConsumeQty = entry.getValue();
         // 标准长度
         Long standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().get();
+        Integer standardQty = BigDecimal.valueOf(standardLength).divide(unitConsumeQty).setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
         // 计算余数
         BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
         Integer floatThreshold = productionPlanInfo.getThreshold();
@@ -244,15 +246,15 @@ public class SpecialMaterialScheduleHandler {
         Integer realProductionQty = BigDecimal.ZERO.intValue();
         // 超过阈值，尝试补量
         if (remainderQty.compareTo(threshold) >= BigDecimal.ZERO.intValue()) {
-            if (limitProductionQty >= productionQty + standardLength - threshold.intValue()) {
+            if (limitProductionQty >= productionQty + standardQty - floatThreshold) {
                 // 检查补量后不超过可生产上限才进行补量
                 isAddQty = true;
-                realProductionQty = (int) (productionQty + standardLength - threshold.intValue());
+                realProductionQty = productionQty + standardQty - floatThreshold;
             }
         }
         // 不补量，则需要将计划量扣减掉余数部分
         if (!isAddQty) {
-            realProductionQty = productionQty - threshold.intValue();
+            realProductionQty = productionQty - floatThreshold;
         }
         // 可生产上限不足，则不能排产
         if (realProductionQty <= BigDecimal.ZERO.intValue()) {
