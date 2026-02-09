@@ -1,7 +1,10 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.tlt.aps.annotation.DataImportCheck;
+import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -64,5 +67,15 @@ public class RawSpecialMaterialStockServiceImpl extends AbstractDocService<RawSp
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "materialCode", "year", "month"));
+    }
+
+    @DataImportCheck(
+            maxCount = 5000,
+            messageKey = "ui.data.import.count.exceed",
+            params = {"#list.size()", "5000"}
+    )
+    @Override
+    public AjaxResult importData(List<RawSpecialMaterialStock> list, boolean updateSupport, Long importLogId) {
+        return super.importData(list, updateSupport, importLogId);
     }
 }

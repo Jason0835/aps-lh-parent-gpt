@@ -88,7 +88,6 @@ public class MpSimulatedResult extends BaseEntity {
     /**
      * 生胎代码
      */
-    @Excel(name = "ui.data.column.simulatedResult.embryoCode")
     @ApiModelProperty(value = "生胎代码", name = "embryoCode")
     @TableField(value = "EMBRYO_CODE")
     private String embryoCode;

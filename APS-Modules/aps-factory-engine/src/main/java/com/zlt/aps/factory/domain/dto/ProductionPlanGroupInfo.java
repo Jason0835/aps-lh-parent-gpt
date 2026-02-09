@@ -597,10 +597,11 @@ public class ProductionPlanGroupInfo {
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
+        String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays());
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), limitHelper.getLimitType()));
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
             preSelected.updateProductionDateRange(null, null);
             return;
         }
@@ -620,7 +621,7 @@ public class ProductionPlanGroupInfo {
         Integer changeMouldDay = preSelected.getClosingDay();
         if (null == changeMouldDay || null == preSelected.getEndDay()) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
             productionContext.addSkuProductionLimitInfo(addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
             return;
         }

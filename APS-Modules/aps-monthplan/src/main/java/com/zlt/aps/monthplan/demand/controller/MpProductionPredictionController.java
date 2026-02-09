@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.demand.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.tlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.maindata.mapper.MpProductionPredictionEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
 import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
@@ -215,15 +214,10 @@ public class MpProductionPredictionController extends AbstractDocBizController<M
     }
 
     @ApiOperation("生成订单预测")
-    @RedissonLockAnno(uniqueMark = "redissonLock:productionPrediction:createMonthPrediction:",
-        expressions = {"#createCondition.factoryCode", "#createCondition.year", "#createCondition.month"},
-        msgKey = "ui.data.alert.createMonthPrediction.run",
-        waitTime = 5,
-        leaseTime = 300
-    )
     @PostMapping("/createMonthPrediction")
     public AjaxResult createMonthPrediction(@RequestBody MpProductionPrediction createCondition) throws InterruptedException {
-        return mpProductionPredictionService.createMonthPrediction(createCondition);
+         mpProductionPredictionService.createMonthPrediction(createCondition);
+         return AjaxResult.success("操作成功，等待数据生成通知");
     }
 
     @ApiOperation("查询预测版本号")

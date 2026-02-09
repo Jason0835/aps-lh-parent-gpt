@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.demand.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.monthplan.api.domain.entity.DpArea;
@@ -8,8 +9,10 @@ import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.monthplan.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.monthplan.demand.service.IDpOrderOffsetDetailService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -150,7 +153,15 @@ public class DpOrderOffsetDetailController extends AbstractDocBizController<DpOr
     protected List<DpOrderOffsetDetail> listExportData(DpOrderOffsetDetail obj) {
         QueryWrapper<DpOrderOffsetDetail> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<DpOrderOffsetDetail> list = entityMapper.selectList(wrapper);
+        //执行公式
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        JsonI18nConvertUtils.conventJsonI18n(list, DpOrderOffsetDetail.class);
+        return list;
     }
 
     @Override

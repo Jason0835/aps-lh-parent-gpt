@@ -105,7 +105,7 @@ public class MpPredictionDetailServiceImpl extends AbstractDocService<MpPredicti
         wrapper.in(MpPredictionDetail::getBatchNumber,batchNumbers);
         wrapper.eq(MpPredictionDetail::getIsDelete, YesOrNoEnum.NO.getValue());
         List<MpPredictionDetail> list =  this.mpPredictionDetailEntityMapper.selectList(wrapper);
-        if(org.apache.commons.collections.CollectionUtils.isEmpty(list)){
+        if(CollectionUtils.isEmpty(list)){
             return Collections.emptyMap();
         }
         Map<String, Map<String, MpPredictionDetail>> result = Maps.newHashMap();

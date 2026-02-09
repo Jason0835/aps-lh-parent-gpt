@@ -159,6 +159,8 @@ public class RawWarningRecordController extends AbstractDocBizController<RawWarn
                                           @RequestParam("week") Integer week,
                                           @RequestParam("month") Integer month){
         try {
+            // 同步实际用量数据
+            rawWarningService.syncWeekActualUsage(factoryCode, year, week, month);
             int warningCount = rawWarningService.executeUsageDeviationWarning(factoryCode, year, week, month);
             String resultMessage = StringUtils.format(
                     I18nUtil.getMessage("raw.warning.usage.deviation.result"),

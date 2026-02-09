@@ -45,7 +45,7 @@ public class MdmBomInfo extends BaseEntity {
     private String factoryCode;
 
      /** 子物料品号 */
-    @Excel(name = "ui.data.column.mdmBomInfo.childMaterialCode")
+    //@Excel(name = "ui.data.column.mdmBomInfo.childMaterialCode")
     @ApiModelProperty(value = "子物料品号", name = "childMaterialCode")
     @TableField(value = "CHILD_MATERIAL_CODE")
     private String childMaterialCode;
@@ -57,7 +57,7 @@ public class MdmBomInfo extends BaseEntity {
     private String childMaterialName;
 
     /** 子物料名称编码(名称中文映射) */
-    @Excel(name = "ui.data.column.mdmBomInfo.childMaterialNameCode")
+    //@Excel(name = "ui.data.column.mdmBomInfo.childMaterialNameCode")
     @ApiModelProperty(value = "子物料名称编码(名称中文映射)", name = "childMaterialNameCode")
     @TableField(value = "CHILD_MATERIAL_NAME_CODE")
     private String childMaterialNameCode;
@@ -89,7 +89,7 @@ public class MdmBomInfo extends BaseEntity {
     private BigDecimal dosageForm;
 
     /** 父物料品号 */
-    @Excel(name = "ui.data.column.mdmBomInfo.parentMaterialCode")
+    //@Excel(name = "ui.data.column.mdmBomInfo.parentMaterialCode")
     @ApiModelProperty(value = "父物料品号", name = "parentMaterialCode")
     @TableField(value = "PARENT_MATERIAL_CODE")
     private String parentMaterialCode;
