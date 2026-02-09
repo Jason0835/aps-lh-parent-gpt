@@ -61,6 +61,7 @@ import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
+import com.zlt.aps.monthplan.api.enums.AdjustItemSourceEnum;
 import com.zlt.aps.monthplan.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.aps.monthplan.demand.service.IDpDemandPlanService;
@@ -1762,6 +1763,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     @Override
     public void initVersion(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isNotEmpty(contextDTO.getFactoryProductionVersionList())) {
+            return;
+        }
         // 查询排产版本
         MpFactoryProductionVersion version = new MpFactoryProductionVersion();
         version.setFactoryCode(contextDTO.getFactoryCode());
@@ -1783,6 +1787,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void initMonthPlan(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isNotEmpty(contextDTO.getFactoryMonthPlanProdFinalList())) {
+            return;
+        }
         // 查询月度生产计划
         MpFactoryProductionVersion factoryProductionVersion = getIsFinalVersion(contextDTO);
         if (factoryProductionVersion == null) {
@@ -1790,7 +1797,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         FactoryMonthPlanProductionFinalResult queryVO = new FactoryMonthPlanProductionFinalResult();
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
-        queryVO.setYearMonth(contextDTO.getYearMonth());
+        queryVO.setYear(contextDTO.getMpYear());
+        queryVO.setMonth(contextDTO.getMpMonth());
         queryVO.setMonthPlanVersion(factoryProductionVersion.getMonthPlanVersion());
 
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
@@ -2019,6 +2027,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan, monthPlan.getId());
             // 调整前净需求量
             setPreviousNetQty(adjustDetailVo, monthPlan);
+            // 调整明细来源
+            adjustDetailVo.setAdjustItemSource(AdjustItemSourceEnum.MONTH_PLAN.getCode());
             // 添加到结果集
             resultList.add(adjustDetailVo);
         }
@@ -2037,6 +2047,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setPlanRelatedFields(contextDTO, emptyAdjustVo, null, busiId);
             // 调整前净需求量
             setPreviousNetQty(emptyAdjustVo, null);
+            // 设置调整明细来源
+            setAdjustItemSource(emptyAdjustVo);
             // 添加到结果集
             resultList.add(emptyAdjustVo);
             return;
@@ -2049,8 +2061,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan, busiId);
             // 调整前净需求量
             setPreviousNetQty(adjustDetailVo, monthPlan);
+            // 设置调整明细来源
+            setAdjustItemSource(adjustDetailVo);
             // 添加到结果集
             resultList.add(adjustDetailVo);
+        }
+    }
+
+    /**
+     * 设置调整明细来源
+     * @param adjustDetailVo
+     */
+    private void setAdjustItemSource(MpAdjustDetailVo adjustDetailVo) {
+        if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+            adjustDetailVo.setAdjustItemSource(AdjustItemSourceEnum.TRIAL.getCode());
+        } else {
+            adjustDetailVo.setAdjustItemSource(AdjustItemSourceEnum.SALE_POOL.getCode());
         }
     }
 
@@ -2478,6 +2504,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 && isZeroOrNull.test(adjust.getMidQty())
                 && isZeroOrNull.test(adjust.getPostponeQty())
                 && isZeroOrNull.test(adjust.getCycleReserveQty());
+
+        boolean conventionReserveQtyEmpty = isZeroOrNull.test(adjust.getConventionReserveQty());
+        boolean isMonthPlan = AdjustItemSourceEnum.MONTH_PLAN.getCode().equals(adjust.getAdjustItemSource()) ? Boolean.TRUE : Boolean.FALSE;
+
+        if (otherFieldsAreEmpty && conventionReserveQtyEmpty && isMonthPlan) {
+            return Boolean.FALSE;
+        }
 
         // 只要其他字段都无值，无论常规储备是否有值，都返回true
         return otherFieldsAreEmpty;
