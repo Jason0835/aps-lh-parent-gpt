@@ -165,6 +165,7 @@ public class MpAdjustMaterialLogController extends AbstractDocBizController<MpAd
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hasSpecialMaterial")), "HAS_SPECIAL_MATERIAL", queryVO.getFieldValueByFieldName("hasSpecialMaterial"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustDetail")), "ADJUST_DETAIL", queryVO.getFieldValueByFieldName("adjustDetail"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustType")), "ADJUST_TYPE", queryVO.getFieldValueByFieldName("adjustType"));
     }
 
 
