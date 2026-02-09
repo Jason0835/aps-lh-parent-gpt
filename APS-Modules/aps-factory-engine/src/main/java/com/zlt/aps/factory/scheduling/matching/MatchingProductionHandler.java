@@ -360,7 +360,6 @@ public class MatchingProductionHandler {
                     if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加
                         continueMouldList.addAll(twoMouldList);
                         twoMouldList.clear();
-                        
                     }
                 }
                 // 执行非首日续作排程算法
@@ -608,6 +607,7 @@ public class MatchingProductionHandler {
                     if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加
                         newDoubleMouldList.addAll(twoMouldList);
                         twoMouldList.clear();
+                        break;
                     }
                 }
             }
@@ -662,13 +662,13 @@ public class MatchingProductionHandler {
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);
                     newMouldCodeSet.addAll(newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet()));
-                    
                     MonthPlanProductionRequirePlanVo production = CollectionUtils.firstElement(needProductionInfo.getNeedProductionList());
                     if (production != null) {
                         cxLhGroup.setMaterialCode(production.getMaterialCode());
                         cxLhGroup.setMaterialDesc(production.getMaterialDesc());
                         cxLhGroup.setProductionQty(realProductionQty);
                         cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+                        cxLhGroup.getProductionMouldSet().addAll(newMouldCodeSet);
                     }
                     
                     break; // 新增模具后直接结束，后面走续作逻辑
