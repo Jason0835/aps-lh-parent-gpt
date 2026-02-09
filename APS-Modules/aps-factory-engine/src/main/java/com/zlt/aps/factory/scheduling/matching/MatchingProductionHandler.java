@@ -244,6 +244,7 @@ public class MatchingProductionHandler {
                     continueInfo, limitMap, cxMachineInfo);
             if (!CollectionUtils.isEmpty(tempMouldCodeSet)) {
                 newMouldCodeSet.addAll(tempMouldCodeSet);
+                break; // 只要有新增模具，则直接结束走续作逻辑
             }
         } while (true);
         return newMouldCodeSet;
