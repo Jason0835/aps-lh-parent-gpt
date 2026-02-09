@@ -338,6 +338,9 @@ public class MatchingProductionHandler {
             List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext,
                     materialDesc, maxProductionQty, startDay, endDay); // 统计每一天所有可用模具
             for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) { // 遍历各模具可用列表
+                if (productionQty <= 0) {
+                    break;
+                }
                 Integer usedBeginDate = mouldDayUsed.getBeginDate();
                 Integer usedEndDate = mouldDayUsed.getEndDate();
                 MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
@@ -626,20 +629,19 @@ public class MatchingProductionHandler {
                 // 查找模具上一天的生产计划，并构建硫化分组
                 CxLhProductionHelper cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupInfo.getGroupName(),
                         1, cxMachineInfoSet);
-                List<CxMouldDayProductionHelper> latestPlanList = CollectionUtils.firstElement(newDoubleMouldList)
-                        .getDayProductionInfo().get(usedBeginDate - 1);
-                if (!CollectionUtils.isEmpty(latestPlanList)) {
-                    CxMouldDayProductionHelper production = latestPlanList.stream().filter(p -> Objects.equals(p.getMaterialDesc(), materialDesc)).findFirst().orElse(null);
+                cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+                cxLhGroup.setProductionMouldSet(newMouldCodeSet);
+                for (ProductionMouldInfoVo mould: newDoubleMouldList) {
+                    List<CxMouldDayProductionHelper> latestPlanList = mould.getDayProductionInfo().get(usedBeginDate - 1); // 上一天计划
+                    CxMouldDayProductionHelper production = CollectionUtils.firstElement(latestPlanList);
                     if (production != null) {
                         cxLhGroup.setMaterialCode(production.getMaterialCode());
                         cxLhGroup.setMaterialDesc(production.getMaterialDesc());
-                        cxLhGroup.setProductionQty(production.getProductionQty());
-                        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-                        cxLhGroup.getProductionMouldSet().addAll(newMouldCodeSet);
+                        cxLhGroup.setProductionQty(0);
                     }
                 }
                 
-                cxLhGroup.setProductionMouldSet(new HashSet<>());
+                // 走新模排产逻辑
                 LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupInfo, cxMachineInfoSet,
                         cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
                 CxLhMouldProductionCalculator.lhProductionByGroupHandler(productionContext, lhProductionQtyHelper,
