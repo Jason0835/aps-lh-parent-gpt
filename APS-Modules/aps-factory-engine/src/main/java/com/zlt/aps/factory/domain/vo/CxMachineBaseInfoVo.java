@@ -681,10 +681,11 @@ public class CxMachineBaseInfoVo implements Serializable {
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = selectedLhGroup.getProductionDay();
         Integer preEndDay = endDay;
+        String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, addSkuInfo.getStructureName(), cxMachineCode, addSkuInfo.getMaterialDesc(), limitHelper.getLimitType()));
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, addSkuInfo.getStructureName(), cxMachineCode, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
             return null;
         }
         //拷贝，否则数据丢失
@@ -705,7 +706,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         Integer changeMouldDay = newLhGroup.getProductionDay();
         if (null == changeMouldDay || null == newLhGroup.getEndDay()) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, cxMachineCode, addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, cxMachineCode, addSkuInfo, mouldSetCode, MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
             return null;
         }
         //换模次数处理

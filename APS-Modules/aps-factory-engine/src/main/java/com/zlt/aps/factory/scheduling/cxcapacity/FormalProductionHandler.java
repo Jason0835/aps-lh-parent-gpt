@@ -133,7 +133,12 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                     return;
                 }
                 List<MouldProductionLimitTypeEnum> limitInfoList = skuProductionLimitInfo.get(singlePlan.getMaterialDesc());
-                String noProductionReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GENERAL_NO_PRODUCTION_REASON, limitInfoList);
+                //20260208 部分未排及不排判断
+                MonthPlanNoProductionReasonEnum generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_NO_PRODUCTION_REASON;
+                if(realProductionQty > BigDecimal.ZERO.intValue()){
+                    generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_PART_NO_PRODUCTION_REASON;
+                }
+                String noProductionReason = NoProductionReasonUtils.getNoProductionReasonByLimit(generalNoProductionReason, limitInfoList);
                 singlePlan.singleAddNoProductionReason(noProductionReason);
             });
         });

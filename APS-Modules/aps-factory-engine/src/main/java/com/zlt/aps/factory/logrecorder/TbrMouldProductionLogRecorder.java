@@ -3,6 +3,7 @@ package com.zlt.aps.factory.logrecorder;
 import com.zlt.aps.factory.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.ProductionPlanLogDto;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.factory.enums.ContinueTypeEnum;
 import com.zlt.aps.factory.enums.ProductionStageEnum;
 import com.zlt.aps.factory.enums.TbrMouldProductionLogType;
@@ -219,14 +220,16 @@ public class TbrMouldProductionLogRecorder {
      * @param context           排程上下文
      * @param groupName         分组名-结构
      * @param onLineMachineInfo 成型机台编码
-     * @param materialDesc      Sku信息
+     * @param skuInfo           Sku信息
+     * @param mouldShellInfo    模壳信息
      * @return
      */
-    public static String addLhGroupSkuLimitLog(Context context, String groupName, String onLineMachineInfo, String materialDesc, MouldProductionLimitTypeEnum limitType) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 超出%s====";
+    public static String addLhGroupSkuLimitLog(Context context, String groupName, String onLineMachineInfo, MonthPlanProductionRequirePlanVo skuInfo, String mouldShellInfo, MouldProductionLimitTypeEnum limitType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 模壳型号：%s 超出%s====";
+        String materialDesc = skuInfo.getMaterialDesc();
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, materialDesc, limitType.getLimitDesc());
+                groupName, onLineMachineInfo, materialDesc, mouldShellInfo, limitType.getLimitDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_LH_GROUP, logContent);
         return logContent;

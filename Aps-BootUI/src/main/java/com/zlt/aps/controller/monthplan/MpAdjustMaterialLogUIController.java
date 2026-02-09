@@ -1,68 +1,72 @@
-package com.zlt.aps.controller.maindata;
+package com.zlt.aps.controller.monthplan;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.monthplan.api.domain.entity.IMdmProductStockRemoteService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
+import com.zlt.aps.monthplan.api.service.IMpAdjustMaterialLogRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.text.ParseException;
+import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.commons.io.IOUtils;
+
 import java.util.Arrays;
+import java.util.List;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmProductStockUIController.java
- * 描    述：成品库存 UI控制层类：....
+ * 文件名称：MpAdjustMaterialLogUIController.java
+ * 描    述：调整-调整日志（未调整及已调整） UI控制层类：....
+ *@author zlt
+ *@date 2026-02-09
+ *@version 1.0
  *
- * @author zlt
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：zlt
- * 修改内容：...
- * @date 2025-12-22
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
  */
 @Slf4j
-@Api(tags = "成品库存")
+@Api(tags = "调整-调整日志（未调整及已调整）")
 @Controller
-@RequestMapping("/monthplan/mdmProductStock")
-public class MdmProductStockUIController extends BaseUIController<MdmProductStock> {
-
-    private final String prefix = "aps/monthplan/mdmProductStock";
-    @Autowired
-    private IMdmProductStockRemoteService iMdmProductStockService;
+@RequestMapping("/monthplan/mpAdjustMaterialLog")
+public class MpAdjustMaterialLogUIController extends BaseUIController<MpAdjustMaterialLog> {
 
     @Autowired
-    private IMesItfService iMesItfService;
+    private IMpAdjustMaterialLogRemoteService iMpAdjustMaterialLogService;
+
+    private final String prefix = "aps/monthplan/mpAdjustMaterialLog";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:mdmProductStock:view")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/mdmProductStock";
+        return prefix + "/mpAdjustMaterialLog";
     }
 
     /**
@@ -70,7 +74,7 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("mdmProductStock", new MdmProductStock());
+        mmap.put("mpAdjustMaterialLog", new MpAdjustMaterialLog());
         return prefix + "/add";
     }
 
@@ -79,7 +83,7 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("mdmProductStock", iMdmProductStockService.getInfo(id));
+        mmap.put("mpAdjustMaterialLog", iMpAdjustMaterialLogService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -87,58 +91,57 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmFinishStock:list4Mes")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(MdmProductStock mdmProductStock) {
-        return iMdmProductStockService.list(mdmProductStock);
+    public TableDataInfo list(MpAdjustMaterialLog mpAdjustMaterialLog) {
+        return iMpAdjustMaterialLogService.list(mpAdjustMaterialLog);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("monthplan:mdmProductStock:edit")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmProductStock mdmProductStock) {
-        if (UserConstants.NOT_UNIQUE.equals(iMdmProductStockService.checkUnique(mdmProductStock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmProductStock.checkUnique"));
+    public AjaxResult save(MpAdjustMaterialLog mpAdjustMaterialLog) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpAdjustMaterialLogService.checkUnique(mpAdjustMaterialLog))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpAdjustMaterialLog.checkUnique"));
         }
 
-        return iMdmProductStockService.save(mdmProductStock);
+        return iMpAdjustMaterialLogService.save(mpAdjustMaterialLog);
     }
 
     /**
-     * 删除成品库存
+     * 删除调整-调整日志（未调整及已调整）
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("monthplan:mdmProductStock:remove")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iMdmProductStockService.removeByIds(Arrays.asList(arr));
+        return iMpAdjustMaterialLogService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验成品库存唯一性
+     * 校验调整-调整日志（未调整及已调整）唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(MdmProductStock mdmProductStock) {
-        return iMdmProductStockService.checkUnique(mdmProductStock);
+    public String checkUnique(MpAdjustMaterialLog mpAdjustMaterialLog) {
+        return iMpAdjustMaterialLogService.checkUnique(mpAdjustMaterialLog);
     }
 
     /**
      * 导出模板文件的文件名，派生类重写名称。
      * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-     *
      * @return
      */
     @Override
-    public String getExportTemplateFileName() {
+    public String getExportTemplateFileName(){
         return this.getFunctionName();
     }
 
@@ -160,7 +163,7 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.productStock.modelName");
+        return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
     /**
@@ -170,19 +173,18 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<MdmProductStock> util = new ExcelUtil<>(MdmProductStock.class);
+        ExcelUtil<MpAdjustMaterialLog> util = new ExcelUtil<>(MpAdjustMaterialLog.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("monthplan:mdmFinishStock:export4Mes")
     @ApiOperation("数据导出")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, MdmProductStock entity) throws IOException {
+    public void export(HttpServletResponse response, MpAdjustMaterialLog entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iMdmProductStockService.exportData(entity, fileName);
+        byte[] excelBytes = iMpAdjustMaterialLogService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -202,20 +204,7 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iMdmProductStockService.importData(context, updateSupport);
+        AjaxResult ajaxResult = iMpAdjustMaterialLogService.importData(context,false);
         return ajaxResult;
-    }
-
-    /**
-     * 生成超期SKU
-     * @param mdmProductStock 参数
-     * @return 结果
-     */
-    @RequiresPermissions("monthplan:mdmFinishStock:genOverDueSkuByStock")
-    @ApiOperation("生成超期SKU")
-    @PostMapping("/genOverDueSkuByStock")
-    @ResponseBody
-    public AjaxResult genOverDueSkuByStock(MdmProductStock mdmProductStock) throws ParseException {
-        return iMesItfService.genOverDueSkuByStock(mdmProductStock);
     }
 }

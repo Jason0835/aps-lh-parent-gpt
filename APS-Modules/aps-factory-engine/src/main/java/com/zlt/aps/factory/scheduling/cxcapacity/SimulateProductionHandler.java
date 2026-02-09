@@ -44,9 +44,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
+    private final CxMouldProductionHandler cxMouldProductionHandler;
+
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
+
+    private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
     /**
      * 模拟排产计划
@@ -144,7 +148,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                     //再次设置可排产的计划在本轮次可进行排产
                     groupPlanInfo.setThisRoundCanProduction();
                     //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
-                    GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
+                    groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
                     //设置收尾机台
                     continueCxMachineAllocation.forEach(cxMachineAllocation -> {
                         String cxMachineCode = cxMachineAllocation.getCxMachineCode();
@@ -240,7 +244,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);
         //对成型机台进行模拟模具排产
-        CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
         if (needAllocationDays <= remainingDays) {
             //20260108 标记分配完成
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());

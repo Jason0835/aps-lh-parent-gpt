@@ -15,6 +15,7 @@ import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MdmProductStockContext;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
@@ -225,7 +226,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public AjaxResult syncProductStock(MdmProductStock mdmProductStock) throws ParseException {
+    public AjaxResult syncProductStock(MdmProductStock mdmProductStock) {
         List<MdmProductStock> productStockList = this.getProductStock(mdmProductStock);
         try {
             List<MdmProductStock> saveList = new ArrayList<>();
@@ -248,98 +249,126 @@ public class MesItfServiceImpl implements MesItfService {
             }
             if (CollectionUtils.isNotEmpty(saveList)) {
 
-                // 先删后增，日期
-                Date stockDate = mdmProductStock.getStockDate();
-                if (stockDate == null) {
-                    stockDate = DateUtils.getNowDate("yyyy-MM-dd");
-                }
-                String factoryCode = mdmProductStock.getFactoryCode();
-                String productTypeCode = mdmProductStock.getProductTypeCode();
+                // 初始化上下文
+                MdmProductStockContext context = new MdmProductStockContext();
+                context.initContext(mdmProductStock);
 
-                Calendar stockDateCalendar = Calendar.getInstance();
-                stockDateCalendar.setTime(stockDate);
-                int stockYear = stockDateCalendar.get(Calendar.YEAR);
-                int stockMonth = stockDateCalendar.get(Calendar.MONTH) + 1;
+                // 先删后增，日期，删除成品库存
+                this.deleteMdmProductStock(context.getFactoryCode(), context.getStockDate());
 
-                this.deleteMdmProductStock(factoryCode, stockDate);
-
-                this.deleteOverDueSku(factoryCode, stockYear, stockMonth);
-
-                int subMonthParam1 = 3, subMonthParam2 = 6, subMonthParam3 = 9, subMonthParam4 = 12;
-
-                stockDateCalendar.add(Calendar.MONTH, -subMonthParam1);
-                Date subTime1 = stockDateCalendar.getTime();
-
-                stockDateCalendar.setTime(stockDate);
-                stockDateCalendar.add(Calendar.MONTH, -subMonthParam2);
-                Date subTime2 = stockDateCalendar.getTime();
-
-                stockDateCalendar.setTime(stockDate);
-                stockDateCalendar.add(Calendar.MONTH, -subMonthParam3);
-                Date subTime3 = stockDateCalendar.getTime();
-
-                stockDateCalendar.setTime(stockDate);
-                stockDateCalendar.add(Calendar.MONTH, -subMonthParam4);
-                Date subTime4 = stockDateCalendar.getTime();
-
-                FactoryParam param = new FactoryParam();
-                param.setFactoryCode(factoryCode);
-                param.setProductTypeCode(productTypeCode);
-                param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
-                param.setProductTypeCode(mdmProductStock.getProductTypeCode());
-                Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
-
-                param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
-                Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
-
-                param.setParamCode(MonthPlanEnums.OVERDUE_TIRE_WARNING.getCode());
-                Date overdueTireWaringTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
-
-                List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
-                for (List<MdmProductStock> importList : splitList) {
-                    List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
-                    for (MdmProductStock productStock : importList) {
-                        String weekYear = productStock.getWeekYear();
-                        if (weekYear.length() != 4) {
-                            continue;
-                        }
-                        int week, year;
-                        try {
-                            week = Integer.parseInt(weekYear.substring(0, 2));
-                            year = Integer.parseInt("20" + weekYear.substring(2, 4));
-                        } catch (NumberFormatException e) {
-                            log.error("解析年周号失败：{}", weekYear);
-                            continue;
-                        }
-                        Calendar instance = Calendar.getInstance();
-                        instance.set(Calendar.YEAR, year);
-                        instance.set(Calendar.WEEK_OF_YEAR, week);
-                        // 根据年周号对应月份判断超期时间
-                        Date time = instance.getTime();
-                        // 赋值是否超期胎
-                        productStock.initExceedTireStatus(YesOrNoEnum.NO.getCode());
-
-                        boolean isExceedTire = time.before(overdueTireWaringTime);
-                        if (time.before(subTime4)) {
-                            productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, true, true);
-                        } else if (time.before(subTime3)) {
-                            productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, true, false);
-                        } else if (time.before(subTime2)) {
-                            productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, false, false);
-                        } else if (time.before(subTime1)) {
-                            productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, false, false, false);
-                        }
-                        addOverdueSku(productStock, stockYear, stockMonth, overdueRegularTime, overdueCycleTime, time, mpOverdueSkuList);
-                    }
-                    baseDao.insertBatch(importList);
-                    baseDao.insertBatch(mpOverdueSkuList);
-                }
+                // 生成超期SKU，保存成品库存
+                context.setIsSaveStock(Boolean.TRUE);
+                genOverDueSku(context, saveList);
             }
         } finally {
             DynamicDataSourceContextHolder.clear();
             // 切换APS数据源 end
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 生成超期SKU
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult genOverDueSkuByStock(MdmProductStock mdmProductStock) {
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            // 初始化上下文
+            MdmProductStockContext context = new MdmProductStockContext();
+            context.initContext(mdmProductStock);
+            // 生成超期SKU，不保存成品库存
+            context.setIsSaveStock(Boolean.FALSE);
+            // 查询成品库存列表
+            Map<String, Object> map = new HashMap<>();
+            map.put("FACTORY_CODE", context.getFactoryCode());
+            map.put("STOCK_DATE", context.getStockDate());
+            List<MdmProductStock> saveList = baseDao.selectByMap(MdmProductStock.class, map);
+            genOverDueSku(context, saveList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 根据库存计算生成超期SKU
+     * @param context 上下文
+     * @param saveList 库存列表
+     */
+    private void genOverDueSku(MdmProductStockContext context, List<MdmProductStock> saveList) {
+        // 删除超期SKU
+        this.deleteOverDueSku(context.getFactoryCode(), context.getStockYear(), context.getStockMonth());
+
+        // 赋值上下文超期时间
+        this.setContextOverDueTime(context);
+
+        List<List<MdmProductStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
+        for (List<MdmProductStock> importList : splitList) {
+            List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
+            for (MdmProductStock productStock : importList) {
+                String weekYear = productStock.getWeekYear();
+                if (weekYear.length() != 4) {
+                    continue;
+                }
+                int week, year;
+                try {
+                    week = Integer.parseInt(weekYear.substring(0, 2));
+                    year = Integer.parseInt("20" + weekYear.substring(2, 4));
+                } catch (NumberFormatException e) {
+                    log.error("解析年周号失败：{}", weekYear);
+                    continue;
+                }
+                Calendar instance = Calendar.getInstance();
+                instance.set(Calendar.YEAR, year);
+                instance.set(Calendar.WEEK_OF_YEAR, week);
+                // 根据年周号对应月份判断超期时间
+                Date time = instance.getTime();
+                // 赋值是否超期胎
+                productStock.initExceedTireStatus(YesOrNoEnum.NO.getCode());
+
+                boolean isExceedTire = time.before(context.getOverdueTireWaringTime());
+                if (time.before(context.getSubTime4())) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, true, true);
+                } else if (time.before(context.getSubTime3())) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, true, false);
+                } else if (time.before(context.getSubTime2())) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, true, false, false);
+                } else if (time.before(context.getSubTime1())) {
+                    productStock.setExceedStatusToYes(YesOrNoEnum.YES.getCode(), isExceedTire, true, false, false, false);
+                }
+                addOverdueSku(productStock, context.getStockYear(), context.getStockMonth(), context.getOverdueRegularTime(), context.getOverdueCycleTime(), time, mpOverdueSkuList);
+            }
+            if (context.getIsSaveStock()) {
+                baseDao.insertBatch(importList);
+            }
+            baseDao.insertBatch(mpOverdueSkuList);
+        }
+    }
+
+    private void setContextOverDueTime(MdmProductStockContext context) {
+        Date stockDate = context.getStockDate();
+        Calendar stockDateCalendar = context.getStockDateCalendar();
+
+        FactoryParam param = new FactoryParam();
+        param.setFactoryCode(context.getFactoryCode());
+        param.setProductTypeCode(context.getProductTypeCode());
+        param.setParamCode(MonthPlanEnums.OVERDUE_REGULAR.getCode());
+        Date overdueRegularTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+        param.setParamCode(MonthPlanEnums.OVERDUE_CYCLE.getCode());
+        Date overdueCycleTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+        param.setParamCode(MonthPlanEnums.OVERDUE_TIRE_WARNING.getCode());
+        Date overdueTireWaringTime = this.getOverdueTime(param, stockDateCalendar, stockDate);
+
+        context.setOverdueRegularTime(overdueRegularTime);
+        context.setOverdueCycleTime(overdueCycleTime);
+        context.setOverdueTireWaringTime(overdueTireWaringTime);
     }
 
     /**
@@ -633,6 +662,8 @@ public class MesItfServiceImpl implements MesItfService {
                     if (existsMap.containsKey(mapKey)) {
                         MdmMaterialInfo existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
+                        // 结构不更新---艺琴说的
+                        entity.setStructureName(existsData.getStructureName());
                     }
                 }
                 baseDao.saveBatch(saveList);

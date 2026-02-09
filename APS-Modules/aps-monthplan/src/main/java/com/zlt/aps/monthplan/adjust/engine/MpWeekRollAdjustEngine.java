@@ -479,13 +479,6 @@ public class MpWeekRollAdjustEngine {
             //3、移动SKU列表，直到第I天没有剩余空间
             for (FactoryMonthPlanFinalAdjustVo finalVo:canMoveFinalList){
 
-                /*adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),finalVo.getMainPattern());
-                //检查：主花纹向下模具数量(/2转成机台数) 符合性
-                cavityQty = getNewCavityQty(contextDTO,finalVo,i);
-                contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),finalVo.getMaterialCode(),i,cavityQty)).append(ApsConstant.DIVISION);
-                if (!checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
-                    continue;
-                }*/
                 bakMpFinalVo = new FactoryMonthPlanFinalAdjustVo();
                 BeanUtils.copyProperties(finalVo,bakMpFinalVo);
                 //3.3、清空定稿表日计划量
