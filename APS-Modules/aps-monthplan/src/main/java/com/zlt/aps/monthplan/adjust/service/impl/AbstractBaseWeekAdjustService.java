@@ -1749,7 +1749,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
         List<SalesOrderPool> salesOrderPoolList = dataManager.listSalesOrderPools(dataDTO);
 
-        // 排除暂缓订单
+        // 排除订单优先级：暂缓订单
         CollUtil.filter(salesOrderPoolList, pool -> !"5".equals(pool.getScmPriority()));
         contextDTO.setSalesOrderPoolList(salesOrderPoolList);
     }
@@ -2496,6 +2496,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @return
      */
     protected boolean isOnlyConventionReserveHasValue(MpAdjustDetailVo adjust) {
+        // 试制量试不进行判断，直接返回false
+        if (ApsConstant.TRUE.equals(adjust.getIsTrial())) {
+            return Boolean.FALSE;
+        }
+
         // 判断Integer是否为无值（null或0）
         Predicate<Integer> isZeroOrNull = num -> num == null || num == 0;
 
