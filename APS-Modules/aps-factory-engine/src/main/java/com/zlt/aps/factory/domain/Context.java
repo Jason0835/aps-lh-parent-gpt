@@ -297,6 +297,24 @@ public class Context {
     }
 
     /**
+     * 判断排产日是否为周期最后一天
+     * 最后一个可排产日或是周期最后一天
+     * 都为排产最后一天
+     *
+     * @param productionDay 排产日
+     * @return
+     */
+    public boolean isProductionEndDay(Integer productionDay) {
+        if (null == productionDay) {
+            return false;
+        }
+        if (getMonthDays().equals(productionDay)) {
+            return true;
+        }
+        return getProductionEndDay().equals(productionDay);
+    }
+
+    /**
      * 根据排产日及日硫化量，得到开产日放置的最大量
      *
      * @param productionDay 排产日
