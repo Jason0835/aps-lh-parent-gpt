@@ -633,6 +633,8 @@ public class MesItfServiceImpl implements MesItfService {
                     if (existsMap.containsKey(mapKey)) {
                         MdmMaterialInfo existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
+                        // 结构不更新---艺琴说的
+                        entity.setStructureName(existsData.getStructureName());
                     }
                 }
                 baseDao.saveBatch(saveList);
