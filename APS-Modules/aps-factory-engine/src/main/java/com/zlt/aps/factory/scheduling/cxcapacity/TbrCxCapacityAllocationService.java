@@ -60,8 +60,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
-    private final SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler;
-
     private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
 
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
@@ -78,7 +76,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
                                           InitNoProductionRecordHandler initNoProductionRecordHandler,
-                                          SpecialMaterialScheduleHandler cxSpecialMaterialScheduleHandler,
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
@@ -87,7 +84,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
-        this.cxSpecialMaterialScheduleHandler = cxSpecialMaterialScheduleHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
@@ -156,8 +152,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        // 结构特殊材料排产
-//        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
@@ -183,9 +177,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //11、最后搭配排产 TODO 报错，先注释掉
 //        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
         //12、保存模具排产结果
-        Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext);
-        //设置不排原因
-        formalProductionHandler.setNoProductionReasonAfterResult(productionContext, estimateGroupCxAllocationMap, sumProductionMap);
+        Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext, estimateGroupCxAllocationMap);
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
     }
@@ -387,17 +379,20 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
     /**
      * 12：根据模具信息，保存模具排产结果
      *
-     * @param productionContext
+     * @param productionContext 排产上下文
+     * @param allGroupPlanMap 所有排产分组
      */
-    private Map<Long, Integer> saveMouldProductionInfo(TbrProductionContext productionContext) {
+    private Map<Long, Integer> saveMouldProductionInfo(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap) {
         //模具排产明细日志
         List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler.getMouldProductionResult(productionContext);
         if (CollectionUtils.isEmpty(detailLogList)) {
             return Collections.emptyMap();
         }
         getMonthProductionDataService().saveMouldProductionDetailLog(detailLogList);
-        //构建未排信息
+        //构建已排产计划及对应排产量
         Map<Long, Integer> sumProductionMap = calculateProductionResult(detailLogList);
+        //设置不排原因
+        formalProductionHandler.setNoProductionReasonAfterResult(productionContext, allGroupPlanMap, sumProductionMap);
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
         getMonthProductionDataService().saveMouldProductionResult(dayResultList);
