@@ -195,6 +195,7 @@ public class MatchingProductionHandler {
                 if (CollectionUtils.isEmpty(newMouldCodeSet)) { // 如果有新增模具，则再跑一次续作；没有新增模具则结束。
                     break;
                 }
+                log.info("搭配新增模具" + newMouldCodeSet);
             } while(true);
         }
         log.info(context.getProductionVersion() + "搭配排产end");
@@ -633,9 +634,6 @@ public class MatchingProductionHandler {
                     cxLhGroup.setProductionMouldSet(new HashSet<>());
                     cxLhRatioMap.put(lhGroupNo, cxLhGroup);
                 }
-//                if (cxLhGroup.getDayMaxProductionQty() == null) {
-//                    cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-//                }
                 LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupInfo, cxMachineInfoSet,
                         cxLhGroup, sumProductionQty, realSumProductionQty, dayMaxProductionQty);
                 CxLhMouldProductionCalculator.lhProductionByGroupHandler(productionContext, lhProductionQtyHelper,
@@ -663,6 +661,15 @@ public class MatchingProductionHandler {
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);
                     newMouldCodeSet.addAll(newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet()));
+                    
+                    MonthPlanProductionRequirePlanVo production = CollectionUtils.firstElement(needProductionInfo.getNeedProductionList());
+                    if (production != null) {
+                        cxLhGroup.setMaterialCode(production.getMaterialCode());
+                        cxLhGroup.setMaterialDesc(production.getMaterialDesc());
+                        cxLhGroup.setProductionQty(realProductionQty);
+                        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+                    }
+                    
                     break; // 新增模具后直接结束，后面走续作逻辑
                 }
             }
@@ -1109,6 +1116,7 @@ public class MatchingProductionHandler {
                 }
                 requirePlan.setOriginProductionQty(productionQty);
                 requirePlan.setProductionQty(productionQty);
+                requirePlan.resetProductionDataInfo();
 //                requirePlan.setHeightProductionQty(demandPlan.getHeightQty());
 //                requirePlanMap.put(materialCode, requirePlan);
                 requirePlanList.add(requirePlan);
@@ -1190,14 +1198,16 @@ public class MatchingProductionHandler {
                                                         List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         // 构建各项排产过程数据
         BaseDataContainer container = productionContext.getBaseDataContainer();
+        Map<Long, MonthPlanProductionRequirePlanVo> requirePlanMap = requirePlanList.stream()
+                .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
 
         container.setStructureLhRatioList(this.getLhRatioConfiguration(productionContext, requirePlanList)); // 结构硫化配比
         container.setSkuMouldRelationMap(this.getProductionMouldInfo(productionContext)); // 模具施工关系
         container.setCxMachineBaseInfo(this.getDataService().getCxMachineBaseInfo(productionContext)); // 已排结构排程
-        container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, detailLogList, requirePlanList)); // 已排模具计划（净需求）
+        container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, detailLogList, requirePlanMap)); // 已排模具计划（净需求）
         container.setGroupMainPatternAllocationLimitMap(this.getGroupMainPatternAllocationInfo(productionContext)); // 结构模具分配配比
         this.specialMaterialInfoHandler(productionContext);
-        this.buildCxLhRatioMap(productionContext, container.getMouldInfoMap()); // 构建成型硫化组
+        this.buildCxLhRatioMap(productionContext, container.getMouldInfoMap(), requirePlanMap); // 构建成型硫化组
         this.overSixMonthStockHandler(productionContext); // 超6个成品库存信息
         this.fillMouldRelationStructureName(productionContext, requirePlanList); // 补充模具关系中的物料结构名
         this.buildGroupMainPatternInfo(productionContext);
@@ -1261,9 +1271,7 @@ public class MatchingProductionHandler {
      */
     private Map<String, ProductionMouldInfoVo> buildMouldInfoMap(TbrProductionContext productionContext,
                                                                  List<FactoryMonthPlanMouldDayDetail> detailLogList,
-                                                                 List<MonthPlanProductionRequirePlanVo> requirePlanList) {
-        Map<Long, MonthPlanProductionRequirePlanVo> requirePlanMap = requirePlanList.stream()
-                .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
+                                                                 Map<Long, MonthPlanProductionRequirePlanVo> requirePlanMap) {
         Map<String, List<MonthPlanProductMouldInfoVo>> skuMouldRelationMap = productionContext.getBaseDataContainer()
                 .getSkuMouldRelationMap(); // 模具sku关系，key=物料描述
         // 构建模具排产数据
@@ -1329,7 +1337,8 @@ public class MatchingProductionHandler {
      * @param mouldInfoMap
      */
     private void buildCxLhRatioMap(TbrProductionContext productionContext,
-                                   Map<String, ProductionMouldInfoVo> mouldInfoMap) {
+                                   Map<String, ProductionMouldInfoVo> mouldInfoMap,
+                                   Map<Long, MonthPlanProductionRequirePlanVo> requirePlanMap) {
         // 关联硫化与成型排程
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer()
                 .getCxMachineBaseInfo();
@@ -1368,15 +1377,18 @@ public class MatchingProductionHandler {
                             cxLhRatio = CxLhProductionHelper.createEmptyLhGroup(dayProduction.getStructureName(),
                                     lhGroupNo, cxMachineCodeInfo);
                             cxLhRatio.setProductionMouldSet(new HashSet<>());
-                            cxLhRatioMap.put(lhGroupNo, cxLhRatio);
+                            MonthPlanProductionRequirePlanVo plan = requirePlanMap.get(dayProduction.getMonthPlanId());
+                            if (plan != null) {
+                                cxLhRatio.setMaterialCode(dayProduction.getMaterialCode());
+                                cxLhRatio.setMaterialDesc(dayProduction.getMaterialDesc());
+                                cxLhRatio.setProductionQty(dayProduction.getProductionQty());
+                                cxLhRatio.setDayMaxProductionQty(plan.getDayVulcanizationQty());
+                                cxLhRatioMap.put(lhGroupNo, cxLhRatio);
+                            }
                         } else {
                             lhGroupNo = cxLhRatio.getLhGroupNo();
                         }
                         Set<String> mouldSet = cxLhRatio.getProductionMouldSet();
-//                        cxLhRatio.setMaterialCode(dayProduction.getMaterialCode());
-//                        cxLhRatio.setMaterialDesc(dayProduction.getMaterialDesc());
-//                        cxLhRatio.setProductionQty(Optional.ofNullable(cxLhRatio.getProductionQty()).orElse(0)
-//                                + dayProduction.getProductionQty());
                         mouldSet.add(mouldInfo.getMouldCode());
                         dayProduction.setLhGroupNo(String.valueOf(lhGroupNo));
                     }
