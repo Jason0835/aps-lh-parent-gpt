@@ -84,6 +84,9 @@
         </div>
       </div>
 
+
+    </div>
+    <template slot="footer">
       <!-- 操作按钮 -->
       <div class="action-buttons">
         <el-button @click="hide">{{
@@ -98,13 +101,7 @@
           {{ this.$t("common.button.generate") }}
         </el-button>
       </div>
-    </div>
-    <!-- <template slot="footer">
-      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        this.$t("common.button.confirm")
-      }}</el-button>
-    </template> -->
+    </template>
     <reasonDialog ref="reasonRef" />
   </el-dialog>
 </template>
@@ -355,7 +352,7 @@ export default {
 </script>
 <style scoped>
 .check-container {
-  padding: 10px 0;
+  padding: 0 0;
 }
 
 /* 进度统计 */
@@ -414,7 +411,7 @@ export default {
 
 /* 检查项列表 */
 .check-list {
-  max-height: 400px;
+  /* max-height: 400px; */
   overflow-y: auto;
   margin-bottom: 20px;
   padding: 0 20px;

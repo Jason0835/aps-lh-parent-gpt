@@ -383,6 +383,7 @@ export default {
           label: this.$t("common.brand"),
           type: "select",
           dictData: this.dict.type.biz_brand_type,
+          filterable: true,
         },
       ];
     },
