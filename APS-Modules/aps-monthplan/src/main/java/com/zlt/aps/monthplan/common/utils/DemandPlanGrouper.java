@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.common.utils;
 
 import com.google.common.collect.Sets;
+import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
@@ -31,14 +32,20 @@ public class DemandPlanGrouper {
     if (CollectionUtils.isEmpty(demandPlans)) {
       return Collections.emptyMap();
     }
+    if(ProductionPlanType.ADJUST.getPlanType().equals(createCondition.getPlanType())){
+      // 1. 按原始groupKey分组
+      Map<String, List<DpDemandPlan>> originalGroups = demandPlans.stream()
+          .collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
+      // 2. 分类处理
+      return processGroups(createCondition,originalGroups);
+    }
     List<DpDemandPlan> filterDemandPlans = processDemandPlansOptimized(demandPlans);
     if (CollectionUtils.isEmpty(filterDemandPlans)) {
       return Collections.emptyMap();
     }
     // 1. 按原始groupKey分组
-    Map<String, List<DpDemandPlan>> originalGroups = demandPlans.stream()
+    Map<String, List<DpDemandPlan>> originalGroups = filterDemandPlans.stream()
         .collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
-
     // 2. 分类处理
     return processGroups(createCondition,originalGroups);
   }
