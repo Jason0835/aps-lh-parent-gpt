@@ -263,7 +263,17 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public Integer getTheoryMaxProductionQty() {
-        return theoryDays * minLhMachineCount * minLhDayCapacityQty;
+        return theoryDays * minLhMachineCount * getDayCapacityBySingleLh();
+    }
+
+    /**
+     * 获取一天的浮动余量
+     * = 1 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
+     *
+     * @return
+     */
+    public Integer getThreshold() {
+        return minLhMachineCount * getDayCapacityBySingleLh();
     }
 
     /**
@@ -492,20 +502,6 @@ public class ProductionPlanGroupInfo {
             return lhRatio;
         }
         return cxMachineLhRationMap.get(ProductionConstant.ALL_BRAND_CODE_MATCH);
-    }
-
-    /**
-     * 结构最晚收尾日
-     *
-     * @return
-     */
-    public Integer getLatestEndDay() {
-        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        List<Integer> productionDayList = dayProductionLimitInfo.keySet().stream().collect(Collectors.toList());
-        productionDayList.sort(Comparator.reverseOrder());
-        return productionDayList.get(BigDecimal.ZERO.intValue());
     }
 
     /**
@@ -1480,7 +1476,16 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     private BigDecimal getDayCapacityByLhRatio(Integer lhRatio) {
-        return BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).multiply(BigDecimal.valueOf(lhRatio));
+        return BigDecimal.valueOf(getDayCapacityBySingleLh()).multiply(BigDecimal.valueOf(lhRatio));
+    }
+
+    /**
+     * 获取单日产能--Sku最小日硫化量
+     *
+     * @return
+     */
+    private Integer getDayCapacityBySingleLh() {
+        return minLhDayCapacityQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 
     /**

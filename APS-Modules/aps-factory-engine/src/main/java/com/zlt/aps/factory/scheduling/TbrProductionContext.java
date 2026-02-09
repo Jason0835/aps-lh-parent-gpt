@@ -563,7 +563,8 @@ public class TbrProductionContext extends Context {
      * @param allocationDays 分配天数
      */
     public void updateSpecialMaterialInfoMap(ProductionPlanGroupInfo groupInfo, Integer allocationDays) {
-        if (!groupInfo.isSpecialMaterial()) { // 非特殊结构，直接结束
+        // 非特殊结构，直接结束
+        if (!groupInfo.isSpecialMaterial()) {
             return;
         }
         // 计算分配后剩余可分配天数的变化
