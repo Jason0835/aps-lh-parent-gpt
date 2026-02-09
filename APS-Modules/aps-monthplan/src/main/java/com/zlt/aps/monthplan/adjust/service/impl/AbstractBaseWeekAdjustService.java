@@ -2157,7 +2157,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 制造示方书号
                 adjustDetailVo.setEmbryoNo(trialPlan.getEmbryoNo());
                 // 试制量试ID
-                adjustDetailVo.setTrialPlanId(String.valueOf(trialPlan.getId()));
+                adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
             }
             return;
         }

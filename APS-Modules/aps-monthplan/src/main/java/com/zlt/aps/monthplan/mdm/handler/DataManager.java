@@ -40,7 +40,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 数据缓存管理器
+ * 数据管理器
  * @author wengpc
  */
 @Component
