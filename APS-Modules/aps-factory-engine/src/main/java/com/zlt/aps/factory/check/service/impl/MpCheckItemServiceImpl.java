@@ -69,7 +69,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
                 checkInitializationData(productionContext, mpCheckItemVos, mpCheckItemRecords);
             } catch (Exception e) {
                 log.error("初始化数据检测(Phase 1)发生异常", e);
-                addSystemError(mpCheckItemVos, mpCheckItemRecords, "初始化数据检测异常");
+//                addSystemError(mpCheckItemVos, mpCheckItemRecords, "初始化数据检测异常");
             }
 
             // 3. 排产前数据检测 (Phase 2)
@@ -206,66 +206,92 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
     /**
      * 初始化数据检测
-     * 负责加载基础数据（物料、施工、模具）并校验计划有效性
+     * 优化点：优先赋值 Context，分阶段捕获异常
      */
     private void checkInitializationData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
 
-        // 1. 获取计划列表
-        List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthPlanRequirePlan(productionContext);
+        List<MonthPlanProductionRequirePlanVo> requirePlanList = null;
 
-        if (CollectionUtils.isEmpty(requirePlanList)) {
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "未查询到月度排产需求计划");
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "未查询到月度排产需求计划");
-            return;
-        }
+        // 阶段 1: 数据查询与 Context 赋值 (放在 try-catch 外面或单独 catch，确保 Context 不为空)
+        try {
+            // 1. 获取计划列表
+            requirePlanList = getMonthPlanRequirePlan(productionContext);
 
-        // 2. 获取初始化辅助配置数据
-        ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
-        Map<String, ProductBaseInfoVo> productBaseInfoMap = getMaterialInfo(productionContext);
-        Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = getProductionConstructionInfo(productionContext);
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
-        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
-
-        // 3. 数据赋值与预处理
-        requirePlanList.forEach(requirePlan -> {
-            String materialCode = requirePlan.getMaterialCode();
-            String materialDesc = requirePlan.getMaterialDesc();
-            requirePlan.setProductBaseInfo(productBaseInfoMap.get(materialDesc));
-            requirePlan.setConstructionInfo(constructionInfoMap.get(materialCode));
-            requirePlan.setMouldInfo(mouldInfoMap.get(materialDesc));
-            requirePlan.setVulcanizationInfo(lhCapacityMap.get(materialDesc));
-        });
-
-        // 4. 过滤有效数据
-        List<MonthPlanProductionRequirePlanVo> validCheckList = requirePlanList.stream().filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsProduction())).filter(plan -> plan.getPlanNeedProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
-
-        // 5. 执行检测逻辑
-        boolean isInitDataPass = true;
-        String failReason = null;
-
-        for (MonthPlanProductionRequirePlanVo plan : validCheckList) {
-            plan.checkProductionConditionByBase();
-            if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
-                isInitDataPass = false;
-                failReason = StringUtils.isBlank(plan.getNoProductionReason()) ? "未知原因导致无法排产" : plan.getNoProductionReason();
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason);
-                break;
+            if (CollectionUtils.isEmpty(requirePlanList)) {
+                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "未查询到月度排产需求计划");
+                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "未查询到月度排产需求计划");
+                return; // 没数据直接结束
             }
-        }
 
-        // 6. 添加结果
-        addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, isInitDataPass, failReason);
-
-        // 将处理过的 requirePlanList 存入 Context，供排产前检测复用
-        if (true) {
-            // 按物料描述分组 Map
-            Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream().filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc())).collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+            // 只要查到了 list，就立即放入 Context，防止后续校验报错导致 Phase 2 无法复用数据
+            Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream()
+                    .filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc()))
+                    .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
 
             productionContext.setAllSkuProductionPlan(allSkuMap);
 
-            // 按ID分组 Map
-            Map<Long, MonthPlanProductionRequirePlanVo> allPlanMap = requirePlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
+            Map<Long, MonthPlanProductionRequirePlanVo> allPlanMap = requirePlanList.stream()
+                    .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
             productionContext.setAllProductionPlan(allPlanMap);
+
+        } catch (Exception e) {
+            // 如果查询阶段报错，明确抛出包含 "06" 的异常
+            log.error("获取月度排产计划数据异常", e);
+            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
+            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "获取计划数据异常: " + e.getMessage());
+            // 抛出带有特定标记的异常，让上层识别为 INIT_DATA 失败
+            throw new RuntimeException("[" + CheckItemTypeEnums.INIT_DATA.getCode() + "] 获取数据异常", e);
+        }
+
+        // 阶段 2: 数据补全与校验逻辑
+        try {
+            // 2. 获取初始化辅助配置数据
+            ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
+            Map<String, ProductBaseInfoVo> productBaseInfoMap = getMaterialInfo(productionContext);
+            Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = getProductionConstructionInfo(productionContext);
+            Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
+            Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
+
+            // 3. 数据赋值与预处理
+            requirePlanList.forEach(requirePlan -> {
+                String materialCode = requirePlan.getMaterialCode();
+                String materialDesc = requirePlan.getMaterialDesc();
+                requirePlan.setProductBaseInfo(productBaseInfoMap.get(materialDesc));
+                requirePlan.setConstructionInfo(constructionInfoMap.get(materialCode));
+                requirePlan.setMouldInfo(mouldInfoMap.get(materialDesc));
+                requirePlan.setVulcanizationInfo(lhCapacityMap.get(materialDesc));
+            });
+
+            // 4. 过滤有效数据
+            List<MonthPlanProductionRequirePlanVo> validCheckList = requirePlanList.stream()
+                    .filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsProduction()))
+                    .filter(plan -> plan.getPlanNeedProductionQty() > BigDecimal.ZERO.intValue())
+                    .collect(Collectors.toList());
+
+            // 5. 执行检测逻辑
+            boolean isInitDataPass = true;
+            String failReason = null;
+
+            for (MonthPlanProductionRequirePlanVo plan : validCheckList) {
+                plan.checkProductionConditionByBase();
+                if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
+                    isInitDataPass = false;
+                    failReason = StringUtils.isBlank(plan.getNoProductionReason()) ? "未知原因导致无法排产" : plan.getNoProductionReason();
+                    addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason);
+                    break;
+                }
+            }
+
+            // 6. 添加结果
+            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, isInitDataPass, failReason);
+
+        } catch (Exception e) {
+            log.error("初始化数据校验逻辑异常", e);
+            // 校验逻辑报错，也记录为 INIT_DATA 失败
+            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "数据校验异常: " + e.getMessage());
+            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "数据校验异常: " + e.getMessage());
+            // 抛出带有特定标记的异常
+            throw new RuntimeException("[" + CheckItemTypeEnums.INIT_DATA.getCode() + "] 校验异常", e);
         }
     }
 
@@ -277,12 +303,24 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
      */
     private void checkBeforeSchedulingData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
         List<MonthPlanProductionRequirePlanVo> requirePlanList;
-        if (!productionContext.getAllSkuProductionPlan().isEmpty()) {
+
+        // 【安全检查】即使 Phase 1 报错跳过了，这里如果 Context 里没数据，尝试补救查询
+        if (productionContext.getAllSkuProductionPlan() != null && !productionContext.getAllSkuProductionPlan().isEmpty()) {
             requirePlanList = productionContext.getAllSkuProductionPlan().values().stream().flatMap(List::stream).collect(Collectors.toList());
             log.info("检测: 复用上下文中的初始化计划数据，条数: {}", requirePlanList.size());
         } else {
-            log.warn("检测: 上下文中未找到计划数据，重新查询数据库");
-            requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
+            log.warn("检测: 上下文中未找到计划数据，尝试重新查询数据库");
+            try {
+                requirePlanList = getMonthPlanRequirePlan(productionContext);
+                if (CollectionUtils.isEmpty(requirePlanList)) {
+                    // 如果重试查询也没数据，Phase 2 的后续逻辑无法进行，直接返回（保留前面的失败状态）
+                    return;
+                }
+            } catch (Exception e) {
+                log.error("重试查询计划数据失败", e);
+                // 查询失败，无法继续
+                return;
+            }
         }
         //基础数据容器存储
         productionContext.setBaseDataContainer(new BaseDataContainer());
