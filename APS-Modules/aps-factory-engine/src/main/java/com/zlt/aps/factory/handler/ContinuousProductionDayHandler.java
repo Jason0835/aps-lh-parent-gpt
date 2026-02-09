@@ -63,10 +63,11 @@ public class ContinuousProductionDayHandler {
         }
         //拼接停工日
         List<Integer> sortList = new ArrayList<>(sumProductionDay);
-        //从小达到
+        //从小到大排序
         sortList.sort(Comparator.comparing(Integer::intValue));
         Integer minDay = sortList.get(BigDecimal.ZERO.intValue());
         Integer maxDay = sortList.get(sortList.size() - BigDecimal.ONE.intValue());
+        //在[minDay,maxDay]之间的停工日加入
         for (int productionDay = minDay; productionDay <= maxDay; productionDay++) {
             if (stopDay.contains(productionDay)) {
                 result.add(productionDay);
