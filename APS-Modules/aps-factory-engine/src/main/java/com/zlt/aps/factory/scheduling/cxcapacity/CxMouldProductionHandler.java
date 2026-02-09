@@ -2,8 +2,12 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +30,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CxMouldProductionHandler {
 
+    private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
+
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
+
     /**
      * 非在机结构，模具排产
      *
@@ -70,7 +77,7 @@ public class CxMouldProductionHandler {
         buildNewLhConclusionInfo(context, cxMachineInfo, cxLhRatio, productionPlan);
         //20260108 开启本轮可排产
         productionPlanInfo.setThisRoundCanProduction();
-        CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+        cxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
         //处理结构提前收尾
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
     }
