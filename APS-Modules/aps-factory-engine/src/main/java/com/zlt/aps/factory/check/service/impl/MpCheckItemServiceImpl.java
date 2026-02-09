@@ -222,30 +222,11 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
             // 【关键】如果查不到数据，直接返回 false
             if (CollectionUtils.isEmpty(requirePlanList)) {
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.MOLD_SHELL_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.MOLD_SHELL_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.CAPSULE_CHUCK_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, false, "未查询到月度排产需求计划");
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, false, "未查询到月度排产需求计划");
+                markAllChecksAsFailed(mpCheckItemVos, mpCheckItemRecords, "未查询到月度排产需求计划");
                 return false;
             }
 
-            // 【关键】查到数据，立即放入 Context
+            // 查到数据，立即放入 Context
             Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream()
                     .filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc()))
                     .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
@@ -258,26 +239,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         } catch (Exception e) {
             // 【关键】如果查询阶段报错，记录错误并返回 false
             log.error("获取月度排产计划数据异常", e);
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.MOLD_SHELL_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.MOLD_SHELL_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.CAPSULE_CHUCK_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, false, "获取计划数据异常: " + e.getMessage());
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, false, "获取计划数据异常: " + e.getMessage());
+            markAllChecksAsFailed(mpCheckItemVos, mpCheckItemRecords, "获取计划数据异常: " + e.getMessage());
             return false;
         }
 
@@ -313,8 +275,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
                 if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
                     isInitDataPass = false;
                     failReason = StringUtils.isBlank(plan.getNoProductionReason()) ? "未知原因导致无法排产" : plan.getNoProductionReason();
-                    addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason);
-                    break;
+                    addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason, plan.getMaterialDesc());
                 }
             }
 
@@ -325,7 +286,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
         } catch (Exception e) {
             log.error("初始化数据校验逻辑异常", e);
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "数据校验异常: " + e.getMessage());
+            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "数据校验异常: " + e.getMessage(), null);
             addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "数据校验异常: " + e.getMessage());
             // 校验异常通常视为流程可继续，但数据不完整
             return true;
@@ -333,19 +294,28 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
     }
 
     /**
-     * 标记所有检测项为失败（当初始化计划列表为空时调用）
+     * 【新增】批量标记所有检测项为失败
+     * 用于在初始化阶段崩溃时，统一设置所有后续依赖检测项的状态
      */
-    private void markAllAsFailed(List<MpCheckItemVo> vos, String reason) {
-        // 标记 Phase 2 的所有项为 false
-        addCheckItemResult(vos, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.MOLD_SHELL_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, false, reason);
-        addCheckItemResult(vos, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, false, reason);
+    private void markAllChecksAsFailed(List<MpCheckItemVo> vos, List<MpCheckItemRecord> records, String failReason) {
+        // 定义所有受影响的检测项枚举
+        CheckItemTypeEnums[] checkItems = {
+                CheckItemTypeEnums.INIT_DATA,
+                CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA,
+                CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA,
+                CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE,
+                CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA,
+                CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA,
+                CheckItemTypeEnums.MOLD_SHELL_DATA,
+                CheckItemTypeEnums.CAPSULE_CHUCK_DATA,
+                CheckItemTypeEnums.SULFURIZATION_RATIO_DATA,
+                CheckItemTypeEnums.OTHER_PARAMS_CONFIG
+        };
+
+        for (CheckItemTypeEnums item : checkItems) {
+            addErrorRecord(records, item.getCode(), failReason, null);
+            addCheckItemResult(vos, item, false, failReason);
+        }
     }
 
     /**
@@ -444,7 +414,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             return;
         }
         if (!isPass) {
-            addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason);
+            addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason, null);
         }
         addCheckItemResult(mpCheckItemVos, checkItemType, isPass, isPass ? null : failReason);
     }
@@ -462,10 +432,11 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
     /**
      * 添加错误记录
      */
-    private void addErrorRecord(List<MpCheckItemRecord> records, String checkItem, String errorReason) {
+    private void addErrorRecord(List<MpCheckItemRecord> records, String checkItem, String errorReason, String materialDesc) {
         MpCheckItemRecord record = new MpCheckItemRecord();
         record.setCheckItem(checkItem);
         record.setCheckContent(errorReason);
+        record.setMaterialDesc(materialDesc);
         records.add(record);
     }
 
