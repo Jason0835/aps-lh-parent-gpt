@@ -118,8 +118,9 @@ public class SpecialMaterialScheduleHandler {
         //计算余数
         BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
         // 区间阈值 = 硫化量 * 配比*单耗
-        BigDecimal threshold = BigDecimalUtils.multiply(productionPlanInfo.getMinLhDayCapacityQty(),
-                productionPlanInfo.getMinLhMachineCount(), unitConsumeQty);
+        Integer floatThreshold = productionPlanInfo.getThreshold();
+        // 区间阈值 = 硫化量 * 配比*单耗
+        BigDecimal threshold = BigDecimalUtils.multiply(floatThreshold, unitConsumeQty);
         boolean isAddQty = false;
         //productionPlanInfo.getSumPlanQty()
         Integer productionQty = productionPlanInfo.getTheoryMaxProductionQty();
@@ -142,9 +143,7 @@ public class SpecialMaterialScheduleHandler {
             return BigDecimal.ZERO.intValue();
         }
         //计算新的排产天数 = ceil(计划量 / 日硫化量 / 配比)
-        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, BigDecimalUtils
-                        .multiply(productionPlanInfo.getMinLhDayCapacityQty(), productionPlanInfo.getMinLhMachineCount(), true),
-                2, false);
+        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
         theoryDays = theoryDays.setScale(0, RoundingMode.UP);
         if (isAddQty) {
             //拉量时，不能进行提前收尾处理
@@ -260,8 +259,7 @@ public class SpecialMaterialScheduleHandler {
             return startDay - BigDecimal.ONE.intValue();
         }
         // 计算排产天数 = ceil(计划量 / 日硫化量 / 配比)
-        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, BigDecimalUtils.multiply(floatThreshold, true),
-                2, false);
+        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
         theoryDays = theoryDays.setScale(0, RoundingMode.UP);
         return startDay + theoryDays.intValue();
     }
@@ -332,7 +330,7 @@ public class SpecialMaterialScheduleHandler {
             BigDecimal unitConsumeQty = entry.getValue();
             //取出各标准用量的特殊材料库存
             Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = specialMaterialInfoMap.get(materialCode);
-            if (specialMaterialInfo == null) {
+            if (null == specialMaterialInfo) {
                 limitProductionQty = BigDecimal.ZERO.intValue();
                 break;
             }
@@ -346,7 +344,7 @@ public class SpecialMaterialScheduleHandler {
             Integer stockCanProductionQty = BigDecimalUtils.div(totalStock, unitConsumeQty, 2)
                     .setScale(0, RoundingMode.DOWN).intValue();
             // 如果未分配量还有剩余，需要更新可排产量
-            if (limitProductionQty == null) {
+            if (null == limitProductionQty) {
                 limitProductionQty = stockCanProductionQty;
             } else {
                 limitProductionQty = Math.min(limitProductionQty, stockCanProductionQty);
