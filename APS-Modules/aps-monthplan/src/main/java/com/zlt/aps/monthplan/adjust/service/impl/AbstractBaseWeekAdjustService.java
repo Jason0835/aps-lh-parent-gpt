@@ -1482,7 +1482,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
         } finally {
             watch.stop();
-            ThreadPoolUtil.shutdown();
         }
         log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
     }
@@ -1637,7 +1636,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
         List<MdmSkuStructureRef> mdmSkuStructureRefList = dataManager.listSkuStructureRefs(dataDTO);
 
-        contextDTO.setMdmSkuStructureRefList(mdmSkuStructureRefList);
         Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = convertToSkuStructureRefMap(mdmSkuStructureRefList);
         contextDTO.setMdmSkuStructureRefMap(mdmSkuStructureRefMap);
 
@@ -1689,7 +1687,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
         List<MdmMaterialInfo> mdmMaterialInfoList = dataManager.listMaterialInfos(dataDTO);
-        contextDTO.setMdmMaterialInfoList(mdmMaterialInfoList);
 
         Map<String, MdmMaterialInfo> mdmMaterialInfoMap = convertToMaterialInfoMap(mdmMaterialInfoList);
         contextDTO.setMdmMaterialInfoMap(mdmMaterialInfoMap);
@@ -1710,7 +1707,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
         List<MdmSkuLhCapacity> mdmSkuLhCapacityList = dataManager.listSkuLhCapacitys(dataDTO);
 
-        contextDTO.setMdmSkuLhCapacityList(mdmSkuLhCapacityList);
         Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = convertToSkuLhCapacityMap(mdmSkuLhCapacityList);
         contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
     }
@@ -2466,9 +2462,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
         }
 
-
-
-
     }
 
     /**
@@ -2486,11 +2479,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 && isZeroOrNull.test(adjust.getPostponeQty())
                 && isZeroOrNull.test(adjust.getCycleReserveQty());
 
-        // 判断常规储备有值（非null且非0）
-        boolean conventionReserveHasValue = !isZeroOrNull.test(adjust.getConventionReserveQty());
-
-        // 只有同时满足：其他字段无值 + 常规储备有值，才返回true
-        return otherFieldsAreEmpty && conventionReserveHasValue;
+        // 只要其他字段都无值，无论常规储备是否有值，都返回true
+        return otherFieldsAreEmpty;
     }
 
     /**
