@@ -80,10 +80,6 @@ public class CalculateStructureCxMachineNumber {
             ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(productionContext, structureName, productionContext.getProductType(), groupDatas);
             //20260206 特殊材料的结构检测
             groupInfo.checkSpecialMaterialData(productionContext);
-            //是否零度结构
-            boolean zeroRack = groupDatas.stream()
-                    .anyMatch(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsZeroRack()));
-            groupInfo.setIsZero(zeroRack ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
             Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = getCxMachineLhRationMap(structureName, productionContext);
             if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
                 log.info(TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(productionContext, structureName));

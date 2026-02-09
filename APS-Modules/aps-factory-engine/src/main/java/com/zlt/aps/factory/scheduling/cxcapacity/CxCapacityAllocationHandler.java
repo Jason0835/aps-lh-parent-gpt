@@ -37,6 +37,8 @@ public class CxCapacityAllocationHandler {
 
     private final ProductionHistoryHandler productionHistoryHandler;
 
+    private final CxMouldProductionHandler cxMouldProductionHandler;
+
     /**
      * 对成型机台创建分配集合对象-按最小硫化配比分配
      *
@@ -213,7 +215,7 @@ public class CxCapacityAllocationHandler {
         //20260109 标记分配完成
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
-        CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //还有剩余产能，继续挑选下一个分组结构
         if (leftOver >= minAllocationDays) {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineFindNextGroupPlanLog(context, cxMachineInfo));
