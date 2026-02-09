@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.adjust.mapper;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -29,4 +30,15 @@ public interface MpAdjustMaterialLogEntityMapper extends CommBaseMapper<MpAdjust
      */
     List<MpAdjustMaterialLog> getVersionList(MpAdjustMaterialLog queryVO);
 
+    /**
+     * 通过版本删除调整过程日志
+     * @param factoryCode
+     * @param year
+     * @param month
+     * @param version
+     */
+    void deleteAdjustProcLogByVersion(@Param("factoryCode") String factoryCode,
+                                     @Param("year") String year,
+                                     @Param("month") String month,
+                                     @Param("version") String version);
 }

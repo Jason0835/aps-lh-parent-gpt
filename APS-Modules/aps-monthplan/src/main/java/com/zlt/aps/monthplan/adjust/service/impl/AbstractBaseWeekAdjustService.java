@@ -27,7 +27,9 @@ import com.zlt.aps.factory.utils.DateUtils;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
+import com.zlt.aps.monthplan.adjust.service.IMpAdjustMaterialLogService;
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -126,6 +128,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IMpAdjustResultService mpAdjustResultService;
+
+    @Autowired
+    protected IMpAdjustMaterialLogService mpAdjustMaterialLogService;
 
     @Autowired
     protected IMpAdjustStructureLogService mpAdjustLogService;
@@ -407,11 +412,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         doAutoAdjust(contextDTO);
         //2、保存调整结果
         saveMpAdjustResult(contextDTO);
-        //3、回填实际调整
+        //3、保存调整过程日志
+        saveMpAdjustProcLog(contextDTO);
+        //4、回填实际调整
         backfillRealAdjustResult(contextDTO);
-        //4、保存月计划统计结果
+        //5、保存月计划统计结果
         saveMonthPlanStatisticsResult(contextDTO);
-        //5、发送消息
+        //6、发送消息
         if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
             sendMsgRemainQtyNoFull(contextDTO);
         }
@@ -629,6 +636,33 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         baseDao.insertBatch(mpAdjustResultList);
         contextDTO.setAdjustResultList(mpAdjustResultList);
+    }
+
+    /**
+     * 保存调整过程日志
+     * @param contextDTO
+     */
+    private void saveMpAdjustProcLog(MpRollAdjustContextDTO contextDTO){
+        List<FactoryMonthPlanFinalAdjustVo> adjustProcLogList = contextDTO.getAdjustProcLogList();
+        if (PubUtil.isEmpty(adjustProcLogList)){
+            return;
+        }
+        //1、根据调整版本 先删除(物理)
+        mpAdjustMaterialLogService.deleteAdjustProcLogByVersion(contextDTO.getFactoryCode(),
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
+        //2、保存调整记录
+        MpAdjustMaterialLog mpMaterialLog;
+        List<MpAdjustMaterialLog> mpMaterialLogList = new ArrayList<>();
+        for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:adjustProcLogList){
+            mpMaterialLog = new MpAdjustMaterialLog();
+            BeanUtils.copyProperties(finalAdjustVo,mpMaterialLog);
+            mpMaterialLog.setId(null);
+            mpMaterialLog.setAdjustType(contextDTO.getAdjustType());
+            mpMaterialLog.setAdjVersion(contextDTO.getVersion());
+            mpMaterialLog.setAdjustDetail(finalAdjustVo.getAdjustDetail().toString());
+            mpMaterialLogList.add(mpMaterialLog);
+        }
+        baseDao.insertBatch(mpMaterialLogList);
     }
 
     /**
