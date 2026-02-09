@@ -99,6 +99,29 @@ public class MesItfController {
     }
 
     /**
+     * 生成超期SKU
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    @ApiOperation("生成超期SKU")
+    @PostMapping("/genOverDueSkuByStock")
+    public AjaxResult genOverDueSkuByStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException {
+        String factoryCode = mdmProductStock.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmProductStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        Date stockDate = mdmProductStock.getStockDate();
+        if (Objects.isNull(stockDate)) {
+            mdmProductStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
+        }
+        String productTypeCode = mdmProductStock.getProductTypeCode();
+        if (StringUtils.isBlank(productTypeCode)) {
+            mdmProductStock.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        }
+        return mesItfService.genOverDueSkuByStock(mdmProductStock);
+    }
+
+    /**
      * 获取实时成品库存
      *
      * @param mdmProductStock 参数
