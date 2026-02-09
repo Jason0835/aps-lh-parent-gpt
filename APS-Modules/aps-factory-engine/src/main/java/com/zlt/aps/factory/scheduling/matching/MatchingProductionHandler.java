@@ -5,6 +5,8 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
+import com.tlt.aps.enums.CheckItemTypeEnums;
+import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -37,6 +39,7 @@ import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
+import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -950,7 +953,7 @@ public class MatchingProductionHandler {
      * @return
      */
     private String getMouldKey(FactoryMonthPlanMouldDayDetail detail) {
-        return GenerageMapKeyUtils.createMapKey(detail.getMaterialCode(), detail.getMouldCode());
+        return GenerageMapKeyUtils.createMapKey(detail.getMonthPlanId(), detail.getMouldCode());
     }
 
     /**
@@ -1000,8 +1003,6 @@ public class MatchingProductionHandler {
                 }
                 plan.setPostponeProductionQty(0);
                 plan.setDifferenceQty(0);
-                plan.setMouldCavityQty(0);
-                plan.setTypeBlockQty(0);
                 plan.setFactProdReqQty(0);
                 plan.setReason(null);
                 plan.setBaseVale(null);
@@ -1189,7 +1190,6 @@ public class MatchingProductionHandler {
         productionContext.getBaseDataContainer().setParamConfiguration(this.createParamConfiguration(productionContext)); // 排程参数
         this.setProductionCycleInfo(productionContext); // 设置生产周期
         this.setMonthProductionDays(productionContext); // 设置生产日
-        this.buildGroupMainPatternInfo(productionContext);
 
         return productionContext;
     }
@@ -1216,6 +1216,8 @@ public class MatchingProductionHandler {
         this.specialMaterialInfoHandler(productionContext);
         this.buildCxLhRatioMap(productionContext, container.getMouldInfoMap()); // 构建成型硫化组
         this.overSixMonthStockHandler(productionContext); // 超6个成品库存信息
+        this.fillMouldRelationStructureName(productionContext, requirePlanList); // 补充模具关系中的物料结构名
+        this.buildGroupMainPatternInfo(productionContext);
 
         // 各项已排产统计数据
         productionContext.setAllProductionPlan(requirePlanList.stream()
@@ -1229,6 +1231,41 @@ public class MatchingProductionHandler {
         productionContext.setSkuWastageQtyMap(new HashMap<>());
 
         return productionContext;
+    }
+
+    /**
+     * 根据计划的物料描述，补充模具关系中的物料结构名
+     * 
+     * @param requirePlanList
+     * @param productionContext
+     */
+    private void fillMouldRelationStructureName(TbrProductionContext productionContext,
+                                                List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+        Set<String> isSetStructureNameSet = new HashSet<>();
+        try {
+            Map<String, List<MonthPlanProductMouldInfoVo>> finalMouldRelationMap = productionContext
+                    .getBaseDataContainer().getSkuMouldRelationMap();
+            requirePlanList.forEach(requirePlan -> {
+                String materialDesc = requirePlan.getMaterialDesc();
+                if (StringUtils.isBlank(materialDesc)) {
+                    return;
+                }
+                if (isSetStructureNameSet.contains(materialDesc)) {
+                    return;
+                }
+                isSetStructureNameSet.add(materialDesc);
+                List<MonthPlanProductMouldInfoVo> mouldRelationList = finalMouldRelationMap
+                        .get(requirePlan.getMaterialDesc());
+                if (CollectionUtils.isEmpty(mouldRelationList)) {
+                    return;
+                }
+                mouldRelationList.forEach(mouldRelation -> {
+                    mouldRelation.setStructureName(requirePlan.getStructureName());
+                });
+            });
+        } catch (Exception e) {
+            log.error("根据计划的物料描述补充模具关系中的物料结构名失败", e);
+        }
     }
 
     /**
@@ -1248,6 +1285,22 @@ public class MatchingProductionHandler {
                 .getSkuMouldRelationMap(); // 模具sku关系，key=物料描述
         // 构建模具排产数据
         Map<String, ProductionMouldInfoVo> mouldInfoMap = new HashMap<>();
+        
+        // 先模具初始化
+        List<MonthPlanProductMouldInfoVo> allProductMouldInfoList = new ArrayList<>();
+        skuMouldRelationMap.values().forEach(list -> allProductMouldInfoList.addAll(list));
+        Date boardingDate = productionContext.getProductionStartDate();
+        for (MonthPlanProductMouldInfoVo mould: allProductMouldInfoList) {
+            String mouldCode = mould.getMouldCode();
+            ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
+            if (productionMouldInfo == null) {
+                productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mould);
+                productionMouldInfo.setProductionDayInfo(productionContext, boardingDate);
+                productionMouldInfo.setDayProductionInfo(new HashMap<>()); // 先初始化日排程列表
+                mouldInfoMap.put(mouldCode, productionMouldInfo);
+            }
+        }
+        
         for (FactoryMonthPlanMouldDayDetail detail : detailLogList) {
             MonthPlanProductionRequirePlanVo requirePlan = requirePlanMap.get(detail.getMonthPlanId());
             if (requirePlan == null) {
@@ -1261,18 +1314,9 @@ public class MatchingProductionHandler {
             if (CollectionUtils.isEmpty(mouldList)) {
                 continue;
             }
-            MonthPlanProductMouldInfoVo mould = mouldList.stream().filter(m -> m.getMouldCode().equals(mouldCode))
-                    .findFirst().orElse(null);
-            if (mould == null) {
-                continue;
-            }
             ProductionMouldInfoVo productionMouldInfo = mouldInfoMap.get(mouldCode);
-            Date boardingDate = productionContext.getProductionStartDate();
             if (productionMouldInfo == null) {
-                productionMouldInfo = ProductionMouldInfoVo.createEmptyProductionMouldInfo(mould);
-                productionMouldInfo.setProductionDayInfo(productionContext, boardingDate);
-                productionMouldInfo.setDayProductionInfo(new HashMap<>()); // 先初始化日排程列表
-                mouldInfoMap.put(mouldCode, productionMouldInfo);
+                continue;
             }
             Integer beginDay = Optional.ofNullable(detail.getBeginDay()).orElse(1);
             Integer endDay = Optional.ofNullable(detail.getEndDay()).orElse(productionContext.getProductionEndDay());
@@ -1484,18 +1528,19 @@ public class MatchingProductionHandler {
             return "";
         }
         // 提取所有sku的物料描述
-        Set<String> allMaterialDescSet = productionPlanList.stream()
-                .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
-        Set<String> enableMaterialDescSet = productionContext
-                .getHasMouldCapacity(ProductionConstant.DOUBLE_MOULD_PRODUCTION, allMaterialDescSet, startDay, endDay);
-        if (CollectionUtils.isEmpty(enableMaterialDescSet)) {
-            return "";
-        }
-        List<MonthPlanProductionRequirePlanVo> enablePlanList = productionPlanList.stream()
-                .filter(plan -> enableMaterialDescSet.contains(plan.getMaterialDesc())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(enablePlanList)) {
-            return "";
-        }
+//        Set<String> allMaterialDescSet = productionPlanList.stream()
+//                .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
+//        Set<String> enableMaterialDescSet = productionContext
+//                .getHasMouldCapacity(ProductionConstant.DOUBLE_MOULD_PRODUCTION, allMaterialDescSet, startDay, endDay);
+//        if (CollectionUtils.isEmpty(enableMaterialDescSet)) {
+//            return "";
+//        }
+//        List<MonthPlanProductionRequirePlanVo> enablePlanList = productionPlanList.stream()
+//                .filter(plan -> enableMaterialDescSet.contains(plan.getMaterialDesc())).collect(Collectors.toList());
+//        if (CollectionUtils.isEmpty(enablePlanList)) {
+//            return "";
+//        }
+        List<MonthPlanProductionRequirePlanVo> enablePlanList = productionPlanList;
         // 只看有常规储备的sku
         List<MonthPlanProductionRequirePlanVo> hasReserveQtyPlanList = enablePlanList.stream()
                 .filter(s -> !scheduleMaterialDesc.contains(s.getMaterialDesc())) // 已经排过的跳过
