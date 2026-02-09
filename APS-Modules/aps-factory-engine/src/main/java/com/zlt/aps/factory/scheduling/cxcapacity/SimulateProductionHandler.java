@@ -46,6 +46,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final CxMouldProductionHandler cxMouldProductionHandler;
 
+    private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
+
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
@@ -128,7 +130,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                     ProductionPlanGroupInfo continueGroup2 = allGroupPlanMap.get(entry2.getKey());
                     Boolean isSpecial1 = null == continueGroup ? false : continueGroup.isSpecialMaterial();
                     Boolean isSpecial2 = null == continueGroup2 ? false : continueGroup2.isSpecialMaterial();
-                    return isSpecial2.compareTo(isSpecial1); // Boolean的true比false大，因此需要倒序，优先处理true的
+                    // Boolean的true比false大，因此需要倒序，优先处理true的
+                    return isSpecial2.compareTo(isSpecial1);
                 })
                 .forEach(entry -> {
                     String structureName = entry.getKey();
@@ -144,7 +147,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                     //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
                     groupPlanInfo.setThisRoundCanProduction();
                     //在机结构-新增Sku模拟排产
-                    CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
+                    cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
                     //再次设置可排产的计划在本轮次可进行排产
                     groupPlanInfo.setThisRoundCanProduction();
                     //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)

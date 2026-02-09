@@ -29,4 +29,8 @@ public class MpAdjustDetailVo extends MpAdjustStructureIn {
     @TableField(exist = false)
     private String embryoCode;
 
+    @ApiModelProperty(value = "调整明细来源：01-销售订单池 02-试制量试 03-月度生产计划")
+    @TableField(exist = false)
+    private String adjustItemSource;
+
 }
