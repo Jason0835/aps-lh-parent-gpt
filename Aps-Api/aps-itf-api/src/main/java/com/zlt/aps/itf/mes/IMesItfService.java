@@ -10,6 +10,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.text.ParseException;
 import java.util.List;
 
 /**
@@ -139,4 +140,13 @@ public interface IMesItfService {
     @ApiOperation("查询MES品牌字典")
     @PostMapping("/mesItf/selectMesBrandDict")
     public List<MesBrandDict> selectMesBrandDict();
+
+    /**
+     * 生成超期SKU
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    @ApiOperation("生成超期SKU")
+    @PostMapping("/mesItf/genOverDueSkuByStock")
+    public AjaxResult genOverDueSkuByStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException;
 }

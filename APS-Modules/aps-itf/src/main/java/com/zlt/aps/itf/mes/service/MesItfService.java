@@ -56,6 +56,13 @@ public interface MesItfService {
     AjaxResult syncProductStock(MdmProductStock productStockMonth) throws ParseException;
 
     /**
+     * 生成超期SKU
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    AjaxResult genOverDueSkuByStock(MdmProductStock mdmProductStock);
+
+    /**
      * 获取成品库存
      *
      * @param productStockMonth 参数
