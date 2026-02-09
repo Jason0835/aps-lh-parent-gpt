@@ -207,4 +207,15 @@ public class MpAdjustMaterialLogUIController extends BaseUIController<MpAdjustMa
         AjaxResult ajaxResult = iMpAdjustMaterialLogService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    @ResponseBody
+    public TableDataInfo getVersionList(MpAdjustMaterialLog queryVO) {
+        return iMpAdjustMaterialLogService.getVersionList(queryVO);
+    }
+
 }

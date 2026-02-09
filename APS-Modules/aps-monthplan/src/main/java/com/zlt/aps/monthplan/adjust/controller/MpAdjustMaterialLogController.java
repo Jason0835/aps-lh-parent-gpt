@@ -174,5 +174,17 @@ public class MpAdjustMaterialLogController extends AbstractDocBizController<MpAd
         return "S2-0808";
     }
 
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody MpAdjustMaterialLog queryVO) {
+        this.startPage();
+        List<MpAdjustMaterialLog> list = entityMapper.getVersionList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
+    }
+
 
 }
