@@ -2835,41 +2835,91 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return Collections.emptyList();
         }
         // 分组汇总Map
-        Map<String, MpAdjustDetailVo> sumMap = new HashMap<>();
-        // 试制量试列表
+        Map<String, MpAdjustDetailVo> summaryMap = new HashMap<>();
+        // 未合并的试制数据列表
         List<MpAdjustDetailVo> trialList = new ArrayList<>();
-        // 遍历集合，进行分组汇总
+        // 遍历原始列表进行分组汇总
         for (MpAdjustDetailVo vo : originalList) {
-            if (ApsConstant.TRUE.equals(vo.getIsTrial()) && !isMergeTrial) {
+            boolean isTrial = ApsConstant.TRUE.equals(vo.getIsTrial());
+            // 试制数据且不合并，跳过汇总逻辑
+            if (isTrial && !isMergeTrial) {
                 trialList.add(vo);
                 continue;
             }
-            String structureName = vo.getStructureName();
-            String materialCode = vo.getMaterialCode();
-            String groupKey = vo.getGroupKey();
-            Integer ordQty = Convert.toInt(vo.getOrdQty(),0);
-            if (sumMap.containsKey(groupKey)) {
-                MpAdjustDetailVo existVo = sumMap.get(groupKey);
-                existVo.setOrdQty(existVo.getOrdQty() + ordQty);
-                if (StringUtils.isNotEmpty(vo.getTrialPlanId())) {
-                    String split = StringUtils.isBlank(existVo.getTrialPlanId()) ? "" : BusiConstant.WeekRollAdjust.SPLIT_COMMA;
-                    existVo.setTrialPlanId(String.join(split, StringUtils.defaultString(existVo.getTrialPlanId(), ""), vo.getTrialPlanId()));
-                }
+            // 生成分组Key：试制量试用：结构 + 物料 + 施工阶段，非试制量试用：结构 + 物料
+            String groupKey = generateGroupKey(vo, isTrial);
+            // 订单量
+            Integer currentOrdQty = Convert.toInt(vo.getOrdQty(), 0);
+            // 分组已存在，累加订单量并拼接试制计划ID
+            if (summaryMap.containsKey(groupKey)) {
+                MpAdjustDetailVo existVo = summaryMap.get(groupKey);
+                // 累加订单量
+                Integer existOrdQty = Convert.toInt(existVo.getOrdQty(), 0);
+                existVo.setOrdQty(existOrdQty + currentOrdQty);
+                // 拼接试制计划ID
+                mergeTrialPlanId(existVo, vo.getTrialPlanId());
             } else {
+                // 分组不存在
                 MpAdjustDetailVo newVo = new MpAdjustDetailVo();
-                BeanUtil.copyProperties(vo, newVo, Boolean.FALSE);
-                newVo.setStructureName(structureName);
-                newVo.setMaterialCode(materialCode);
-                newVo.setOrdQty(ordQty);
-                sumMap.put(groupKey, newVo);
+                BeanUtil.copyProperties(vo, newVo, false);
+                newVo.setStructureName(vo.getStructureName());
+                newVo.setMaterialCode(vo.getMaterialCode());
+                newVo.setConstructionStage(vo.getConstructionStage());
+                newVo.setOrdQty(currentOrdQty);
+                summaryMap.put(groupKey, newVo);
             }
         }
-        // 结果集：先加汇总后的正式数据，再加试制量试数据
-        List<MpAdjustDetailVo> resultList = new ArrayList<>();
-        resultList.addAll(sumMap.values());
+        // 结果集：汇总数据 + 未合并的试制量试数据
+        List<MpAdjustDetailVo> resultList = new ArrayList<>(summaryMap.values());
         resultList.addAll(trialList);
         return resultList;
     }
+
+
+
+
+    /**
+     * 生成分组Key
+     * @param vo 待分组的VO
+     * @param isTrial 是否为试制量试
+     * @return 分组key
+     */
+    private String generateGroupKey(MpAdjustDetailVo vo, boolean isTrial) {
+        if (isTrial || StringUtils.isNotEmpty(vo.getTrialPlanId())) {
+            // 试制量试：结构名称 + 物料编码 + 施工阶段
+            String constructStage = StringUtils.defaultString(vo.getConstructionStage(), "");
+            return String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, vo.getGroupKey(), constructStage);
+        } else {
+            // 非试制量试：结构名称 + 物料编码
+            return vo.getGroupKey();
+        }
+    }
+
+
+
+    /**
+     * 合并试制量试计划ID
+     * @param existVo 已存在的VO
+     * @param newTrialPlanId 新的试制量试计划ID
+     */
+    private void mergeTrialPlanId(MpAdjustDetailVo existVo, String newTrialPlanId) {
+        if (StringUtils.isEmpty(newTrialPlanId)) {
+            return;
+        }
+        // 已存在的ID列表
+        Set<String> existIds = new HashSet<>();
+        String existTrialPlanId = existVo.getTrialPlanId();
+        if (StringUtils.isNotEmpty(existTrialPlanId)) {
+            existIds.addAll(Arrays.asList(existTrialPlanId.split(BusiConstant.WeekRollAdjust.SPLIT_COMMA)));
+        }
+        // 添加新ID并去重
+        existIds.add(newTrialPlanId);
+        // 重新拼接为字符串
+        String mergedId = String.join(BusiConstant.WeekRollAdjust.SPLIT_COMMA, existIds);
+        existVo.setTrialPlanId(mergedId);
+    }
+
+
 
     /**
      * 初始锁定日
