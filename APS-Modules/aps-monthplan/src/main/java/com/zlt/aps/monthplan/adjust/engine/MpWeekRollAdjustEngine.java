@@ -1298,7 +1298,7 @@ public class MpWeekRollAdjustEngine {
         }
 
         adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,endDay, dailyCapacityLimitVo, contextDTO.getParamMap(), curFinalVo.getMainPattern());
-        contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,dailyCapacityLimitVoMap.get(endDay).toString())).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,dailyCapacityLimitVoMap.get(endDay) == null ? "" : dailyCapacityLimitVoMap.get(endDay).toString())).append(ApsConstant.DIVISION);
         //检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
         //检查：主花纹向下模具数量(/2转成机台数) 符合性
         int cavityQty = getNewCavityQty(contextDTO,curFinalVo,endDay);
