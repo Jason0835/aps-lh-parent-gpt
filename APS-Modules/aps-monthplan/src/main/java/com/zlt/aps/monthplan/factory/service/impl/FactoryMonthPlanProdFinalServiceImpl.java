@@ -79,6 +79,7 @@ import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
  */
 @Slf4j
 @Service
+@Deprecated
 @RequiredArgsConstructor
 public class FactoryMonthPlanProdFinalServiceImpl implements IFactoryMonthPlanProdFinalService {
 

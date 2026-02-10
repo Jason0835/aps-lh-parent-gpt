@@ -62,6 +62,7 @@ import java.util.*;
  * @date 2025-02-14
  */
 @Slf4j
+@Deprecated
 @RestController
 @RequiredArgsConstructor
 @Api(tags = "分厂月生产计划排产结果-生产计划排产结果")
