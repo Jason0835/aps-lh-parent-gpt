@@ -1,12 +1,36 @@
 package com.zlt.aps.factory.scheduling.matching;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
-import com.tlt.aps.enums.CheckItemTypeEnums;
-import com.tlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
@@ -17,8 +41,28 @@ import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.MouldAllocationDayInfoHelper;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.domain.dto.ContinueGroupInfo;
+import com.zlt.aps.factory.domain.dto.ContinueProductInfo;
+import com.zlt.aps.factory.domain.dto.CxContinueInfoHelper;
+import com.zlt.aps.factory.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
+import com.zlt.aps.factory.domain.dto.CxMouldDayProductionHelper;
+import com.zlt.aps.factory.domain.dto.LhProductionQtyHelper;
+import com.zlt.aps.factory.domain.dto.MatchingMouldDayUsedHelper;
+import com.zlt.aps.factory.domain.dto.MatchingPlanLimitHelper;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.factory.domain.vo.EmbryoSpecialMaterialInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductConstructionInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductLhCapacityVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.factory.domain.vo.ProductionDayInfoVo;
+import com.zlt.aps.factory.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.factory.domain.vo.SpecialMaterialStockVo;
 import com.zlt.aps.factory.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.factory.enums.ProductionQtyModelEnum;
 import com.zlt.aps.factory.handler.CalculateStructureCxMachineNumber;
@@ -39,27 +83,24 @@ import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
-import com.zlt.aps.factory.utils.NoProductionReasonUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.core.dao.basedao.BaseDao;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 搭配排产处理类
@@ -132,6 +173,198 @@ public class MatchingProductionHandler {
 
         // 构建排产结果并保存
         this.saveMouldProductionResult(productionContext, planList, detailLogList, newSkuQtyMap);
+    }
+    
+    /**
+     * 周程滚动的结构内搭配算法
+     * 
+     * @param contextDTO              周程滚动调整上下文
+     * @param mpAdjustStructureInList 结构内调整记录列表
+     * @param mpProdFinalList         月计划定稿表列表（只有当前结构的记录）
+     * @param isInner                 是否结构内调整
+     */
+    public void matchingProduction(MpRollAdjustContextDTO contextDTO, List<MpAdjustStructureIn> mpAdjustStructureInList,
+                                   List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+
+        // contextDTO.getSpecStructureTotalQty(); // 特殊结构总计划量
+        MdmStructureLhRatio structureLhRatio = contextDTO.getStructureLhRatio().stream()
+                .filter(s -> Objects.equals(contextDTO.getStructureName(), s.getStructureName())).findAny()
+                .orElse(null); // 结构硫化配比
+        if (structureLhRatio == null) {
+            return;
+        }
+        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap(); // 日硫化产能表，key:物料描述
+        if (mdmSkuLhCapacityMap == null) {
+            return;
+        }
+        TbrProductionContext productionContext = this.initProductionContext(contextDTO);
+        overSixMonthStockHandler(productionContext); // 加载6个月库存
+//        contextDTO.getMdmProductStockList(); // 库存
+        productionContext.getBaseDataContainer().setParamConfiguration(this.buildParam(contextDTO.getParamMap()));
+        Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap = contextDTO.getCavity2BlockMap(); // 可用型腔活块数量
+        List<CxMouldDayProductionHelper> newProductResultList = new ArrayList<>();
+
+        // 结构排产的开始、结束时间
+        Integer startDay = contextDTO.getStructureStartDay();
+        Integer endDay = contextDTO.getAdjustEndDay();
+
+        // 按天统计已排产量
+        Map<Integer, List<CxMouldDayProductionHelper>> dayProductionMap = this.getDayProductionMap(mpProdFinalList,
+                startDay, endDay);
+        Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
+        do {
+            FactoryMonthPlanFinalAdjustVo plan = mpProdFinalList.stream().filter(
+                    p -> !scheduleMaterialDesc.contains(p.getMaterialDesc()) && p.getConventionProductionQty() > 0) // 有储备量的
+                    .min((p1, p2) -> {
+                        // 排序1、优先库销比低的
+                        int result = p1.getInventorySalesRatio().compareTo(p1.getInventorySalesRatio());
+                        if (result != 0) {
+                            return result;
+                        }
+                        // 排序2、优先超6个月库存少的
+                        Integer stock1 = productionContext.getOverSixMonthStockMap().getOrDefault(p1.getMaterialCode(),
+                                0);
+                        Integer stock2 = productionContext.getOverSixMonthStockMap().getOrDefault(p2.getMaterialCode(),
+                                0);
+                        return stock1.compareTo(stock2);
+                    }).orElse(null);
+            if (plan == null) {
+                break;
+            }
+            Integer unAllocationQty = plan.getConventionProductionQty(); // 未分配
+            if (unAllocationQty <= 0) {
+                continue;
+            }
+            // 从开始日期往后遍历，达不到的情况下需要储备量
+            String materialDesc = plan.getMaterialDesc(); // 规格描述
+            mdmSkuLhCapacityMap.get(materialDesc);
+            // 先尝试分配，每天一次只分配一个机台
+            out: do {
+                for (int day = startDay; day <= endDay; day++) {
+                    if (unAllocationQty <= 0) {
+                        break out;
+                    }
+                    List<CxMouldDayProductionHelper> oneProductResultList = matchingAdjust(productionContext,
+                            contextDTO, day, plan, cavity2BlockMap, dayProductionMap, unAllocationQty);
+                    if (!CollectionUtils.isEmpty(oneProductResultList)) {
+                        Integer allocationQty = oneProductResultList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+                        unAllocationQty -= allocationQty;
+                        newProductResultList.addAll(oneProductResultList);
+                    }
+                }
+            } while (true);
+        } while (true);
+    }
+    
+    /**
+     * 
+     * @param productionContext
+     * @param contextDTO
+     * @param scheduleDay
+     * @param plan
+     * @param cavity2BlockMap
+     * @param dayProductionMap
+     * @param unAllocationQty
+     * @return
+     */
+    private List<CxMouldDayProductionHelper> matchingAdjust(TbrProductionContext productionContext,
+                                                            MpRollAdjustContextDTO contextDTO, Integer scheduleDay,
+                                                            FactoryMonthPlanFinalAdjustVo plan,
+                                                            Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap,
+                                                            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionMap,
+                                                            Integer unAllocationQty) {
+
+        List<CxMouldDayProductionHelper> newProductResultList = new ArrayList<>(); // 本次新增排产列表
+        if (!this.checkDayCanProduct(contextDTO, scheduleDay)) {
+            return newProductResultList;
+        }
+        DailyMouldAvailabilityResult cavity2Block = cavity2BlockMap.get(scheduleDay); // key:结构名称 + 主花纹
+        if (cavity2Block == null) {
+            return newProductResultList;
+        }
+        Integer lhMouldQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 硫化机模具配比
+        String materialDesc = plan.getMaterialDesc();
+        String mouldKey = contextDTO.getStructureName() + plan.getMainPattern();
+        int totalMouldCavityQty = cavity2Block.getCavityResults().getOrDefault(mouldKey, 0); // 可用型腔数量
+        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration(); // 参数
+//      int typeBlockQty = plan.getTypeBlockQty(); // 活块数量
+        // TODO 根据当天排产情况计算当天剩余型腔数
+        // TODO 判断是否需要换模
+        boolean isChangeMould = false;
+        // TODO 判断是否需要换活字块
+        boolean isChangeBlock = false;
+
+        // TODO 根据可用型腔数量、已占用型腔数量计算可用型腔数量
+        List<CxMouldDayProductionHelper> dayProductionList = dayProductionMap.get(scheduleDay);
+        int unUseMouldCavityQty = 0;
+        if (isChangeMould && unUseMouldCavityQty < lhMouldQty) { // 需要换模，且剩余型腔数不足最低排产模具数，结束
+            return newProductResultList;
+        }
+
+        int allocationQty = 0;
+        int mouldCavityQty = 0;
+        if (isChangeMould) { // 如果是换模具，则只能增加首日排产量
+            mouldCavityQty = lhMouldQty; // 一次只能排2付模具
+            allocationQty = param.getChangeMouldFirstQty();
+        } else if (isChangeBlock) { // 如果只是换或字块，则按换字块的逻辑处理
+            mouldCavityQty = 0; // TODO 更换数量
+            allocationQty = param.getChangeTypeBlockQty();
+        }
+        for (int i = 0; i < mouldCavityQty; i++) {
+            CxMouldDayProductionHelper dayProduct = new CxMouldDayProductionHelper();
+            dayProduct.setMaterialCode(plan.getMaterialCode());
+            dayProduct.setMaterialDesc(materialDesc);
+            dayProduct.setProductionDate(scheduleDay);
+            dayProduct.setProductionQty(allocationQty);
+            dayProductionList.add(dayProduct);
+            newProductResultList.add(dayProduct); // 记录新增的排产信息
+        }
+        return newProductResultList;
+    }
+
+    private Map<Integer, List<CxMouldDayProductionHelper>> getDayProductionMap(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+                                                                               Integer startDay, Integer endDay) {
+        Map<Integer, List<CxMouldDayProductionHelper>> dayProductionMap = new HashMap<>();
+//        Map<Integer, Integer> dayProductionQtyMap = new HashMap<>();
+        for (FactoryMonthPlanFinalAdjustVo plan : mpProdFinalList) {
+            String materialDesc = plan.getMaterialDesc();
+            for (int day = startDay; day <= endDay; day++) {
+                Integer productionQty = (Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day);
+                List<CxMouldDayProductionHelper> dayProductionList = dayProductionMap.get(day);
+                if (dayProductionList == null) {
+                    dayProductionList = new ArrayList<>();
+                    dayProductionMap.put(day, dayProductionList);
+                }
+                CxMouldDayProductionHelper dayProduct = dayProductionList.stream()
+                        .filter(d -> Objects.equals(d.getMaterialDesc(), materialDesc)).findAny().orElse(null);
+                if (dayProduct == null) {
+                    dayProduct = new CxMouldDayProductionHelper();
+                    dayProduct.setMaterialCode(plan.getMaterialCode());
+                    dayProduct.setMaterialDesc(materialDesc);
+                    dayProduct.setProductionDate(day);
+                    dayProduct.setProductionQty(0);
+                    dayProductionList.add(dayProduct);
+                }
+                dayProduct.setProductionQty(dayProduct.getProductionQty() + productionQty);
+            }
+        }
+        return dayProductionMap;
+    }
+
+    /**
+     * 检查日历是否可生产
+     * @param contextDTO
+     * @param day
+     * @return
+     */
+    private boolean checkDayCanProduct(MpRollAdjustContextDTO contextDTO, int day) {
+        boolean isProduct = true;
+        Map<Integer, MdmWorkCalendar> workCalendarMap = contextDTO.getWorkCalendarMap(); // 工作日历
+        MdmWorkCalendar calendar = workCalendarMap.get(day);
+        if (calendar != null && YesOrNoEnum.NO.getCode().equals(calendar.getDayFlag())) {
+            isProduct = false;
+        }
+        return isProduct;
     }
 
     /**
@@ -1014,7 +1247,7 @@ public class MatchingProductionHandler {
      * @return
      */
     private List<MonthPlanStructureLhRatioVo> getLhRatioConfiguration(Context context,
-                                                                      Collection<MonthPlanProductionRequirePlanVo> requirePlanList) {
+                                                                      List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyList();
         }
@@ -1165,8 +1398,24 @@ public class MatchingProductionHandler {
      */
     private TbrProductionContext initProductionContext(List<FactoryMonthPlanMouldDayResult> planList) {
         // 构建上下文对象
-        TbrProductionContext productionContext = new TbrProductionContext();
         FactoryMonthPlanMouldDayResult result = CollectionUtils.firstElement(planList);
+        TbrProductionContext productionContext = this.initProductionContext(result);
+
+        productionContext.getBaseDataContainer().setParamConfiguration(this.createParamConfiguration(productionContext)); // 排程参数
+        this.setProductionCycleInfo(productionContext); // 设置生产周期
+        this.setMonthProductionDays(productionContext); // 设置生产日
+
+        return productionContext;
+    }
+    
+    /**
+     * 将定稿计划构建成算法要求的上下文结构
+     *
+     * @param result 定稿计划
+     * @return
+     */
+    private TbrProductionContext initProductionContext(FactoryMonthPlanMouldDayResult result) {
+        TbrProductionContext productionContext = new TbrProductionContext();
         productionContext.setProductionVersion(result.getProductionVersion()); // 生产版本号
         productionContext.setMonthPlanVersion(result.getMonthPlanVersion()); // 月需求计划版本
         productionContext.setYear(result.getYear());
@@ -1176,13 +1425,29 @@ public class MatchingProductionHandler {
         productionContext.setLogBuilder(new StringBuilder());
         productionContext.setBaseDataContainer(new BaseDataContainer());
         productionContext.setNoProductionRecordMap(new HashMap<>());
-
-        productionContext.getBaseDataContainer().setParamConfiguration(this.createParamConfiguration(productionContext)); // 排程参数
-        this.setProductionCycleInfo(productionContext); // 设置生产周期
-        this.setMonthProductionDays(productionContext); // 设置生产日
-
         return productionContext;
     }
+
+    /**
+     * 将周程滚动上下文构建成算法要求的上下文结构
+     *
+     * @param result 定稿计划
+     * @return
+     */
+    private TbrProductionContext initProductionContext(MpRollAdjustContextDTO contextDTO) {
+        FactoryMonthPlanMouldDayResult result = new FactoryMonthPlanMouldDayResult();
+        result.setProductionVersion(contextDTO.getProductionVersion());
+        result.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
+        result.setYear(Integer.parseInt(String.valueOf(contextDTO.getYearMonth()).substring(0, 3)));
+        result.setMonth(contextDTO.getYearMonth());
+        result.setFactoryCode(contextDTO.getFactoryCode());
+        FactoryMonthPlanFinalAdjustVo plan = CollectionUtils.firstElement(contextDTO.getFactoryMonthPlanProdFinalList());
+        if (plan != null) {
+            result.setProductTypeCode(plan.getProductTypeCode());
+        }
+        return initProductionContext(result);
+    }
+    
 
     /**
      * 将定稿计划和需求计划构建成算法要求的上下文结构
@@ -1651,6 +1916,15 @@ public class MatchingProductionHandler {
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         // 获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
+        return this.buildParam(paramConfigurationMap);
+    }
+
+    /**
+     * 业务的参数封装未配置对象
+     * @param paramConfigurationMap
+     * @return
+     */
+    private ProductionCapacityParamConfiguration buildParam(Map<String, Object> paramConfigurationMap) {
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
             return null;
         }

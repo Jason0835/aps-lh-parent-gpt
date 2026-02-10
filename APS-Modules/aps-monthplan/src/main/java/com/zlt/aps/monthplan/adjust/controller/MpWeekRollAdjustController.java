@@ -196,6 +196,9 @@ public class MpWeekRollAdjustController extends BaseController {
 
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
+        
+        //结构硫化配比
+        contextDTO.setStructureLhRatio(mpAdjustStructureInService.getStructureLhRatio(contextDTO));
 
         //初始工作日历
         contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));

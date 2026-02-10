@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.adjust.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -11,8 +12,10 @@ import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.monthplan.adjust.mapper.MpAdjustStructureInEntityMapper;
+import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
@@ -72,6 +75,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Autowired
     private MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
+
+    @Autowired
+    private MdmStructureLhRatioEntityMapper mdmStructureLhRatioEntityMapper;
 
 
 
@@ -226,5 +232,12 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
                     return m.get(0);
                 })));
         return workCalendarMap;
+    }
+    
+    @Override
+    public List<MdmStructureLhRatio> getStructureLhRatio(MpRollAdjustContextDTO contextDTO) {
+        LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, contextDTO.getFactoryCode());
+        return mdmStructureLhRatioEntityMapper.selectList(queryWrapper);
     }
 }
