@@ -2223,8 +2223,8 @@ export default {
                   // embryoCount.push{
                   //   `day${j}`:dayData.EmbryoCount
                   // }
-                  embryoCount[key] = dayData.EmbryoCount;
-                  lhMachines[key] = dayData.LhMachines;
+                  embryoCount[key] = dayData.embryoCount;
+                  lhMachines[key] = dayData.lhMachines;
                 }
               }
               result.push(embryoCount);

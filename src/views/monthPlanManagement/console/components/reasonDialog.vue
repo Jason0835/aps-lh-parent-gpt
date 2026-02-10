@@ -9,7 +9,7 @@
     :append-to-body="true"
   >
     <div style="height: 400px;overflow: auto;">
-      <el-table :data="tableData" style="width: 100%;height: 400px;overflow: auto;"  v-loading="loading" border >
+      <el-table :data="tableData" style="width: 100%" max-height="400"  v-loading="loading" border >
         <el-table-column prop="materialDesc" :label="this.$t('物料描述')" show-overflow-tooltip width="320">
 
         </el-table-column>
