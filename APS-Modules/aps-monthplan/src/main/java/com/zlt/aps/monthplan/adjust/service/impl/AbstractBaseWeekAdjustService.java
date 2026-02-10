@@ -63,6 +63,7 @@ import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
+import com.zlt.aps.monthplan.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.monthplan.api.enums.AdjustItemSourceEnum;
 import com.zlt.aps.monthplan.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
@@ -480,18 +481,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 构建月计划统计结果
      * @param dailyCapacityMap 日产能限制Map（key=1-31日期，value=日产能限制实体）
      * @param mpProdFinalList  月计划定稿列表
+     * @param oneStructureAllocationList 月计划结构转产表-单结构列表
      * @return 统计结果列表
      */
-    protected List<MpMonthPlanStatistics> buildMonthPlanStatistics(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+    protected List<MpMonthPlanStatistics> buildMonthPlanStatistics(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+                                                                   List<MpStructureAllocation> oneStructureAllocationList) {
         List<MpMonthPlanStatistics> resultList = new ArrayList<>();
-        if (PubUtil.isEmpty(mpProdFinalList) || PubUtil.isEmpty(dailyCapacityMap)) {
-            log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划定稿列表为空，跳过不处理");
+        if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList)) {
+            log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划结构转产表-单结构列表为空，跳过不处理");
             return resultList;
         }
-        for (FactoryMonthPlanFinalAdjustVo monthPlan : mpProdFinalList) {
+        FactoryMonthPlanFinalAdjustVo monthPlan = new FactoryMonthPlanFinalAdjustVo();
+        if (PubUtil.isNotEmpty(mpProdFinalList)) {
+            monthPlan = mpProdFinalList.get(0);
+        }
+        for (MpStructureAllocation structureAllocation : oneStructureAllocationList) {
             MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
             // 设置月计划统计相关字段
-            setMonthPlanStatisticsField(monthPlan, statistics);
+            setMonthPlanStatisticsField(monthPlan, structureAllocation, statistics);
             // 遍历日期，设置每个dayN字段
             for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
                 setDayField(statistics, day, dailyCapacityMap);
@@ -505,12 +512,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     /**
      * 设置月计划统计相关字段
      */
-    private void setMonthPlanStatisticsField(FactoryMonthPlanFinalAdjustVo source, MpMonthPlanStatistics target) {
+    private void setMonthPlanStatisticsField(FactoryMonthPlanFinalAdjustVo source, MpStructureAllocation structureAllocation, MpMonthPlanStatistics target) {
         target.setFactoryCode(source.getFactoryCode());
         target.setYear(source.getYear());
         target.setMonth(source.getMonth());
         target.setYearMonth(source.getYearMonth());
-        target.setStructureName(source.getStructureName());
+        target.setStructureName(structureAllocation.getStructureName());
         target.setProSize(source.getProSize());
         target.setStructureType(source.getStructureType());
         target.setMonthPlanVersion(source.getMonthPlanVersion());
@@ -530,11 +537,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (capacityVo == null) {
             return;
         }
-        Map<String, Object> jsonData = new HashMap<>(3);
-        jsonData.put("LhMachines", capacityVo.getUsedLhMachines() == 0 ? null:capacityVo.getUsedLhMachines());
-        jsonData.put("EmbryoCount", capacityVo.getUsedEmbryoTypes() == 0 ? null:capacityVo.getUsedEmbryoTypes());
-        jsonData.put("ChangeMould", "");
-        statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(jsonData));
+        MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
+        dayProductionStatisticsDetailVo.setLhMachines(capacityVo.getUsedLhMachines() == 0 ? null: capacityVo.getUsedLhMachines());
+        dayProductionStatisticsDetailVo.setEmbryoCount(capacityVo.getUsedEmbryoTypes() == 0 ? null: capacityVo.getUsedEmbryoTypes());
+        dayProductionStatisticsDetailVo.setChangeMould(null);
+        statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 
 
