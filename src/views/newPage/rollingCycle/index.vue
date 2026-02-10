@@ -300,7 +300,7 @@ import {
   statisticsResult,
   outGetStayDay,
   logList,
-  versionLog
+  versionLog,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -324,7 +324,7 @@ export default {
     "biz_factory_name",
     "biz_machine_brand",
     "biz_class_type",
-    "week_roll_adjust_type"
+    "week_roll_adjust_type",
   ],
   provide() {
     return {
@@ -987,7 +987,6 @@ export default {
             label: this.$t("调整明细"),
             width: 180,
           },
-
         ];
       }
 
@@ -1028,7 +1027,12 @@ export default {
           filterable: true,
         },
         {
-          prop: this.activeName == "second" ? "productionVersion" :this.activeName == "four" ?"adjVersion": "version",
+          prop:
+            this.activeName == "second"
+              ? "productionVersion"
+              : this.activeName == "four"
+              ? "adjVersion"
+              : "version",
           label: this.$t("版本号"),
           type: "select",
           clearable: this.activeName == "first" ? false : true,
@@ -1354,44 +1358,53 @@ export default {
             label:
               this.activeName == "second"
                 ? res.rows[i].productionVersion
-                : this.activeName == "four"?res.rows[i].adjVersion: res.rows[i].version,
+                : this.activeName == "four"
+                ? res.rows[i].adjVersion
+                : res.rows[i].version,
             value:
               this.activeName == "second"
                 ? res.rows[i].productionVersion
-                : this.activeName == "four"?res.rows[i].adjVersion: res.rows[i].version,
+                : this.activeName == "four"
+                ? res.rows[i].adjVersion
+                : res.rows[i].version,
           };
           list.push(obj);
         }
 
         this.versionList = list;
+        console.log("list.length", list.length);
+
         if (list.length > 0) {
-          if (this.activeName != "second") {
-            this.$set(this.search, "version", list[0].value);
-            this.$set(this.query, "version", list[0].value);
-          }else if(this.activeName=='four'){
+          console.log("this.activeName", this.activeName);
+          if (this.activeName == "second") {
+            this.$set(this.search, "productionVersion", list[0].value);
+            this.$set(this.query, "productionVersion", list[0].value);
+          } else if (this.activeName == "four") {
+            console.log("list[0].value", list[0].value);
             this.$set(this.search, "adjVersion", list[0].value);
             this.$set(this.query, "adjVersion", list[0].value);
           } else {
-            this.$set(this.search, "productionVersion", list[0].value);
-            this.$set(this.query, "productionVersion", list[0].value);
+            this.$set(this.search, "version", list[0].value);
+            this.$set(this.query, "version", list[0].value);
           }
         } else {
-          if (this.activeName != "second") {
-            this.$set(this.search, "version", "");
-            this.$set(this.query, "version", "");
-          }else if(this.activeName=='four'){
-            this.$set(this.search, "adjVersion", '');
-            this.$set(this.query, "adjVersion", '');
-          } else {
-            this.$set(this.search, "productionVersion", "");
-            this.$set(this.query, "productionVersion", "");
-          }
+          this.$set(this.search, "version", "");
+          this.$set(this.query, "version", "");
+          this.$set(this.search, "adjVersion", "");
+          this.$set(this.query, "adjVersion", "");
+          this.$set(this.search, "productionVersion", "");
+          this.$set(this.query, "productionVersion", "");
+          // if (this.activeName != "second") {
+          //   this.$set(this.search, "version", "");
+          //   this.$set(this.query, "version", "");
+          // } else if (this.activeName == "four") {
+          //   this.$set(this.search, "adjVersion", "");
+          //   this.$set(this.query, "adjVersion", "");
+          // } else {
+          //   this.$set(this.search, "productionVersion", "");
+          //   this.$set(this.query, "productionVersion", "");
+          // }
         }
-        // if (isGet) {
-        // this.$nextTick(() => {
-        //   this.getList();
-        // });
-        // }
       } catch (err) {
         console.log(err);
       } finally {
@@ -2087,12 +2100,12 @@ export default {
           }
         } else if (this.activeName == "four") {
           data = await logList(this.formatParams());
-        }else {
+        } else {
           return;
         }
 
         this.data = data.rows;
-        if (this.activeName == "second") {
+        if (this.activeName == "second" || this.activeName == "four") {
           this.page.total = data.total;
         }
 

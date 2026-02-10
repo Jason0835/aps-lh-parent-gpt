@@ -180,7 +180,7 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.masterdata.materialCode"),
-          maxlength:10
+          maxlength:30
         },
         {
           prop: "materialName",

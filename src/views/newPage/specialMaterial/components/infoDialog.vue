@@ -124,7 +124,7 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.specialMaterial.materialCode"),
-          maxlength:18
+          maxlength:30
         },
         {
           prop: "materialDesc",
