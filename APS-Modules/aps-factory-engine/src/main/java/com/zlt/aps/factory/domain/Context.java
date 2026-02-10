@@ -111,6 +111,18 @@ public class Context {
     private Set<Integer> replenishmentDay;
 
     /**
+     * 获取四位年+两位月的数值
+     * 如 year = 2026 month = 1
+     * 则返回 202601
+     *
+     * @return
+     */
+    public Integer getFullYearAndMonth(){
+        //设置年月值
+        String yearAndMonth = String.format("%s%02d", year, month);
+        return Integer.valueOf(yearAndMonth);
+    }
+    /**
      * 判断排产日是否为排产周期的第一天
      *
      * @param productionDay

@@ -61,77 +61,83 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_month_plan_statistics
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 
     <delete id="deletedLastVersionByProductionVersion"
             parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
         UPDATE t_mp_proc_version
-        SET IS_SELECTED_DEMAND      = NULL,
-            PRODUCTION_INIT_VERSION = NULL,
-            PRODUCTION_ST_VERSION   = NULL,
-            PRODUCTION_VERSION      = NULL,
-            IS_NATURAL_MONTH        = NULL,
-            PRODUCTION_START_DATE   = NULL,
-            PRODUCTION_END_DATE     = NULL
-        WHERE IS_DELETE = 0
-                  AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE
-        FROM t_mp_proc_month_plan_init
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE
-        FROM t_mp_proc_no_production_plan
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE
-        FROM t_mp_moulding_day_result
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE
-        FROM t_mp_mould_day_detail_log
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE
-        FROM t_mp_mould_use_status_log
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-        DELETE
-        FROM t_mp_mould_lh_log
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+           SET IS_SELECTED_DEMAND      = NULL,
+               PRODUCTION_INIT_VERSION = NULL,
+               PRODUCTION_ST_VERSION   = NULL,
+               PRODUCTION_VERSION      = NULL,
+               IS_NATURAL_MONTH        = NULL,
+               PRODUCTION_START_DATE   = NULL,
+               PRODUCTION_END_DATE     = NULL
+         WHERE IS_DELETE = 0
+           AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_month_plan_init
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_proc_no_production_plan
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_moulding_day_result
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mould_day_detail_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mould_use_status_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mould_lh_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_month_plan_statistics
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 
     <select id="selectCountByProductionVersion" resultType="java.lang.Integer">
         SELECT COUNT(1)
-        FROM t_mp_proc_version
-        WHERE IS_DELETE = 0
-                  AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                  AND YEAR = #{year,jdbcType=DECIMAL}
-                  AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-          AND PRODUCTION_VERSION IS NOT NULL
+          FROM t_mp_proc_version
+         WHERE IS_DELETE = 0
+           AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION IS NOT NULL
     </select>
 
     <update id="deletedProductionVersionAndUpdateLastFlag" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
@@ -184,6 +190,11 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_mould_use_status_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_month_plan_statistics
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
