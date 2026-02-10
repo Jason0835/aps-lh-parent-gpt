@@ -399,11 +399,18 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
         getMonthProductionDataService().saveMouldProductionResult(dayResultList);
+        //日排产统计信息
         List<MpMonthPlanStatistics> productionStatisticsList = dayProductionStatisticsHandler.buildDayProductionStatisticsResult(productionContext);
         getMonthProductionDataService().saveProductionStatisticsResult(productionStatisticsList);
         return sumProductionMap;
     }
 
+    /**
+     * 保存未排数据
+     *
+     * @param productionContext 排产上下文
+     * @param sumProductionMap  已排产计划及排产量
+     */
     private void saveNoProductionPlanResult(TbrProductionContext productionContext, Map<Long, Integer> sumProductionMap) {
         Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
         if (CollectionUtils.isEmpty(productionPlanMap)) {
@@ -414,23 +421,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
             return;
         }
         getMonthProductionDataService().saveNoProductionPlan(noProductionPlanList);
-    }
-
-    private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {
-        Map<Long, Integer> sumMonthPlanMap = new HashMap<>();
-        detailList.forEach(productionDetail -> {
-            Long monthPlanId = productionDetail.getMonthPlanId();
-            Integer productionQty = productionDetail.getTotalQty();
-            if (null == productionQty) {
-                productionQty = BigDecimal.ZERO.intValue();
-            }
-            Integer plannedProductionQty = sumMonthPlanMap.get(monthPlanId);
-            if (null == plannedProductionQty) {
-                plannedProductionQty = BigDecimal.ZERO.intValue();
-            }
-            sumMonthPlanMap.put(monthPlanId, plannedProductionQty + productionQty);
-        });
-        return sumMonthPlanMap;
     }
 
     /**
@@ -554,6 +544,29 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
             log.info(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet));
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
+    }
+
+    /**
+     * 汇总计划的排产量信息
+     *
+     * @param detailList 排产结果信息
+     * @return
+     */
+    private Map<Long, Integer> calculateProductionResult(List<FactoryMonthPlanMouldDayDetail> detailList) {
+        Map<Long, Integer> sumMonthPlanMap = new HashMap<>();
+        detailList.forEach(productionDetail -> {
+            Long monthPlanId = productionDetail.getMonthPlanId();
+            Integer productionQty = productionDetail.getTotalQty();
+            if (null == productionQty) {
+                productionQty = BigDecimal.ZERO.intValue();
+            }
+            Integer plannedProductionQty = sumMonthPlanMap.get(monthPlanId);
+            if (null == plannedProductionQty) {
+                plannedProductionQty = BigDecimal.ZERO.intValue();
+            }
+            sumMonthPlanMap.put(monthPlanId, plannedProductionQty + productionQty);
+        });
+        return sumMonthPlanMap;
     }
 
 }
