@@ -599,7 +599,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         if(CollectionUtils.isEmpty(predictionDetailList)) {
             return;
         }
-        result.add(buildFinalExportData(queryVO,finalProductionVersion));
+        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList =  this.getFinalExportData(queryVO,finalProductionVersion);
+        if(!CollectionUtils.isEmpty(finalMouldDayResultList)) {
+            WorksheetData worksheetData = new WorksheetData();
+            worksheetData.setSheetName(String.format(SHEET_NAME, finalProductionVersion.getYear(), finalProductionVersion.getMonth()));
+            worksheetData.setMouldDayResults(finalMouldDayResultList);
+            result.add(worksheetData);
+        }
         List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(queryVO,finalProductionVersion,predictionDetailList);
         if(!CollectionUtils.isEmpty(notFinalMouldDayResultList)) {
             addNotFinalExportData(notFinalMouldDayResultList,result);
@@ -616,13 +622,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         FactoryMonthPlanMouldDayResult mouldDayResult = value.get(0);
         worksheetData.setSheetName(String.format(SHEET_NAME, mouldDayResult.getYear(), mouldDayResult.getMonth()));
         worksheetData.setMouldDayResults(value);
-        return worksheetData;
-    }
-
-    private WorksheetData buildFinalExportData(MpSimulatedResult queryVO, MpFactoryProductionVersion finalProductionVersion) {
-        WorksheetData worksheetData = new WorksheetData();
-        worksheetData.setSheetName(String.format(SHEET_NAME, finalProductionVersion.getYear(), finalProductionVersion.getMonth()));
-        worksheetData.setMouldDayResults(this.getFinalExportData(queryVO,finalProductionVersion));
         return worksheetData;
     }
 
