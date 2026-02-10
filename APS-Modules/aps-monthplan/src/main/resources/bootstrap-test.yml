@@ -47,3 +47,8 @@ spring:
           data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
         refresh-enabled: true
+
+cache:
+  caffeine:
+    # 开启缓存
+    cache-enabled: true

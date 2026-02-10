@@ -14,7 +14,9 @@ import com.zlt.aps.factory.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.utils.TbrProductionLogUtils;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -28,6 +30,8 @@ import java.util.stream.Collectors;
  * @date 20260115
  */
 @Slf4j
+@Component
+@RequiredArgsConstructor
 public class GroupPlanBeforeConclusionHandler {
 
     /**
@@ -37,7 +41,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param context
      * @param groupPlanInfo
      */
-    public static void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo) {
         String groupName = groupPlanInfo.getGroupName();
         log.info(addGroupStartBeforeConclusionLog(context, groupName));
         //获取当前模拟排产的数据
@@ -113,7 +117,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param context
      * @param groupPlanInfo
      */
-    public static void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio) {
+    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio) {
         String groupName = groupPlanInfo.getGroupName();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
@@ -189,7 +193,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param allocationInfo       成型机台分配详情
      * @param isSingleMachine      是否单机台
      */
-    private static void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
+    private void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
         //重新计算(分组)分配的天数: 需要排产天数 - 还需排产天数 - 收尾天数
         Integer deductionDay = beforeConclusionInfo.getDeductionDay();
         Integer beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
@@ -282,7 +286,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param cxMachineInfo        成型机台
      * @param allocationInfo       成型机台分配段
      */
-    private static void updateBeforeConclusionForAllocation(BeforeConclusionInfoHelper beforeConclusionInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo) {
+    private void updateBeforeConclusionForAllocation(BeforeConclusionInfoHelper beforeConclusionInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo) {
         Integer allocationStartDay = allocationInfo.getStartDay();
         Integer allocationEndDay = allocationInfo.getEndDay();
         Integer beforeConclusionDay = allocationStartDay;
@@ -307,7 +311,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param allocationInfo    当前排产段信息
      * @return
      */
-    private static boolean hasOtherProductionCxMachine(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo) {
+    private boolean hasOtherProductionCxMachine(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo) {
         if (null == groupPlanInfo) {
             return false;
         }
@@ -344,7 +348,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param groupName 分组
      * @return
      */
-    private static String addGroupStartBeforeConclusionLog(Context context, String groupName) {
+    private String addGroupStartBeforeConclusionLog(Context context, String groupName) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 进入提前收尾判断业务 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
@@ -362,7 +366,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param cxMachineCode 排产机台
      * @return
      */
-    private static String addGroupStartBeforeConclusionLog(Context context, String groupName, String cxMachineCode) {
+    private String addGroupStartBeforeConclusionLog(Context context, String groupName, String cxMachineCode) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 进入提前收尾判断业务 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, cxMachineCode);
@@ -379,7 +383,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param groupName 分组
      * @return
      */
-    private static String addNoAllocationInfoLog(Context context, String groupName) {
+    private String addNoAllocationInfoLog(Context context, String groupName) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有分配信息，退出结构收尾业务 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
@@ -396,7 +400,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param groupName 分组
      * @return
      */
-    private static String addNoLhRatioInfoLog(Context context, String groupName) {
+    private String addNoLhRatioInfoLog(Context context, String groupName) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有结构成型硫化配比信息，退出结构收尾业务 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
@@ -414,7 +418,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param minLhRatio 最低硫化配比
      * @return
      */
-    private static String addNoBeforeConclusionInfoLog(Context context, String groupName, Integer minLhRatio) {
+    private String addNoBeforeConclusionInfoLog(Context context, String groupName, Integer minLhRatio) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 高于最低成型硫化配比：%s，无需提前收尾 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, minLhRatio);
@@ -432,7 +436,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param cxMachineCode 成型机台
      * @return
      */
-    private static String addCxMachineNoAllocationInfoLog(Context context, String groupName, String cxMachineCode) {
+    private String addCxMachineNoAllocationInfoLog(Context context, String groupName, String cxMachineCode) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 成型机台：%s 没有分配信息导致错误 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, cxMachineCode);
@@ -452,7 +456,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param deductionDay        提前收尾天数
      * @return
      */
-    private static String addBeforeConclusionResultLog(Context context, String groupName, Integer minLhRatio, Integer beforeConclusionDay, Integer deductionDay) {
+    private String addBeforeConclusionResultLog(Context context, String groupName, Integer minLhRatio, Integer beforeConclusionDay, Integer deductionDay) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 已低于最低成型硫化配比：%s，需在[%s]提前收尾，提前收尾天数[%s] ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, minLhRatio, beforeConclusionDay, deductionDay);

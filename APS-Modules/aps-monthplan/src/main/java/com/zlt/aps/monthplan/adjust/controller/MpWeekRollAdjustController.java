@@ -33,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -195,6 +196,9 @@ public class MpWeekRollAdjustController extends BaseController {
 
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
+        
+        //结构硫化配比
+        contextDTO.setStructureLhRatio(mpAdjustStructureInService.getStructureLhRatio(contextDTO));
 
         //初始工作日历
         contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
@@ -206,6 +210,8 @@ public class MpWeekRollAdjustController extends BaseController {
             contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
         }
         contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
+        //初始调整过程日志
+        contextDTO.setAdjustProcLogList(new ArrayList<>());
         //初始工厂名称
         List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
         String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode())).findFirst().get().getDictLabel();

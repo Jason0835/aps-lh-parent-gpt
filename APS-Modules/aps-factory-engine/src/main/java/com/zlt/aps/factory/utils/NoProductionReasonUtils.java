@@ -44,17 +44,19 @@ public class NoProductionReasonUtils {
 
     /**
      * 根据限制类型，组装复杂的不排产原因
+     * 因%s不排 或是 因%s部分未排
      *
-     * @param noProductionReason 不排产原因
+     * @param noProductionReason 不排产原因 因%s不排 或是 因%s部分未排
      * @param limitTypeList      限制类型
      * @return
      */
-    public static String getNoProductionReason(MonthPlanNoProductionReasonEnum noProductionReason, List<MouldProductionLimitTypeEnum> limitTypeList) {
+    public static String getNoProductionReasonByLimit(MonthPlanNoProductionReasonEnum noProductionReason, List<MouldProductionLimitTypeEnum> limitTypeList) {
         List<String> languageList = getLanguageList();
         String noProductionReasonI18nKey = noProductionReason.getI18nKey();
         String errorCode = noProductionReason.getErrorCode();
         JSONObject noProductionReasonInfo = JsonUtils.getLanguageJsonObject(noProductionReasonI18nKey);
         if (CollectionUtils.isEmpty(limitTypeList)) {
+            //成型或是模具产能不足
             String i18nKey = MonthPlanNoProductionReasonEnum.NO_ENOUGH_PRODUCTION_CAPACITY.getI18nKey();
             JSONObject i18nInfo = JsonUtils.getLanguageJsonObject(i18nKey);
             fullText(noProductionReasonInfo, errorCode, i18nInfo, languageList);
@@ -67,9 +69,6 @@ public class NoProductionReasonUtils {
         JSONObject i18nInfo = JsonUtils.getLanguageJsonObject(i18nKey);
         fullText(noProductionReasonInfo, errorCode, i18nInfo, languageList);
         return noProductionReasonInfo.toString();
-//        JSONObject fullI18nInfo = buildAllFullText(limitTypeList, languageList);
-//        fullText(noProductionReasonInfo, errorCode, fullI18nInfo, languageList);
-//        return noProductionReasonInfo.toString();
     }
 
     /**

@@ -111,6 +111,18 @@ public class Context {
     private Set<Integer> replenishmentDay;
 
     /**
+     * 获取四位年+两位月的数值
+     * 如 year = 2026 month = 1
+     * 则返回 202601
+     *
+     * @return
+     */
+    public Integer getFullYearAndMonth(){
+        //设置年月值
+        String yearAndMonth = String.format("%s%02d", year, month);
+        return Integer.valueOf(yearAndMonth);
+    }
+    /**
      * 判断排产日是否为排产周期的第一天
      *
      * @param productionDay
@@ -294,6 +306,24 @@ public class Context {
         List<Integer> dayList = new ArrayList<>(allProductionDaySet);
         dayList.sort(Comparator.comparing(Integer::intValue));
         return dayList.get(dayList.size() - BigDecimal.ONE.intValue());
+    }
+
+    /**
+     * 判断排产日是否为周期最后一天
+     * 最后一个可排产日或是周期最后一天
+     * 都为排产最后一天
+     *
+     * @param productionDay 排产日
+     * @return
+     */
+    public boolean isProductionEndDay(Integer productionDay) {
+        if (null == productionDay) {
+            return false;
+        }
+        if (getMonthDays().equals(productionDay)) {
+            return true;
+        }
+        return getProductionEndDay().equals(productionDay);
     }
 
     /**

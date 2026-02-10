@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.monthplan.api.domain.entity.IMdmProductStockRemoteService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -25,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.Arrays;
 
 /**
@@ -50,6 +52,9 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
     private final String prefix = "aps/monthplan/mdmProductStock";
     @Autowired
     private IMdmProductStockRemoteService iMdmProductStockService;
+
+    @Autowired
+    private IMesItfService iMesItfService;
 
     /**
      * 跳转至主页面
@@ -199,5 +204,18 @@ public class MdmProductStockUIController extends BaseUIController<MdmProductStoc
         context.setFileBytes(data);
         AjaxResult ajaxResult = iMdmProductStockService.importData(context, updateSupport);
         return ajaxResult;
+    }
+
+    /**
+     * 生成超期SKU
+     * @param mdmProductStock 参数
+     * @return 结果
+     */
+    @RequiresPermissions("monthplan:mdmFinishStock:genOverDueSkuByStock")
+    @ApiOperation("生成超期SKU")
+    @PostMapping("/genOverDueSkuByStock")
+    @ResponseBody
+    public AjaxResult genOverDueSkuByStock(MdmProductStock mdmProductStock) throws ParseException {
+        return iMesItfService.genOverDueSkuByStock(mdmProductStock);
     }
 }

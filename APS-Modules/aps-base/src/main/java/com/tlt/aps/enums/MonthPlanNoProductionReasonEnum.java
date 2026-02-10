@@ -242,7 +242,11 @@ public enum MonthPlanNoProductionReasonEnum {
     /**
      * MP3799 因%s不排
      */
-    GENERAL_NO_PRODUCTION_REASON("MP3799", "因%s不排", "alg.data.mouldProduction.generalNoProductionReasons");
+    GENERAL_NO_PRODUCTION_REASON("MP3799", "因%s不排", "alg.data.mouldProduction.generalNoProductionReasons"),
+    /**
+     * MP3797 因%s部分未排
+     */
+    GENERAL_PART_NO_PRODUCTION_REASON("MP3797", "因%s部分未排", "alg.data.mouldProduction.generalPartNoProductionReasons");
 
     private String errorCode;
 

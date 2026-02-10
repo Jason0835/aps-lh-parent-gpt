@@ -74,5 +74,11 @@ public class MpCheckItemRecord extends BaseEntity {
     @TableField(value = "CHECK_CONTENT")
     private String checkContent;
 
-
+    /**
+     * 物料描述
+     */
+    @Excel(name = "ui.data.column.checkItemRecord.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 }

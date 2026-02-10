@@ -563,7 +563,8 @@ public class TbrProductionContext extends Context {
      * @param allocationDays 分配天数
      */
     public void updateSpecialMaterialInfoMap(ProductionPlanGroupInfo groupInfo, Integer allocationDays) {
-        if (!groupInfo.isSpecialMaterial()) { // 非特殊结构，直接结束
+        // 非特殊结构，直接结束
+        if (!groupInfo.isSpecialMaterial()) {
             return;
         }
         // 计算分配后剩余可分配天数的变化
@@ -582,33 +583,44 @@ public class TbrProductionContext extends Context {
         if (leftOverNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
             leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
         }
-        Integer diffDays = leftOverNeedAllocationDays - groupInfo.getLeftOverNeedAllocationDays(); // 计算变化量
-        if (diffDays == 0) { // 无变化直接结束
+        // 计算变化量
+        Integer diffDays = leftOverNeedAllocationDays - groupInfo.getLeftOverNeedAllocationDays();
+        if (diffDays == BigDecimal.ZERO.intValue()) {
+            // 无变化直接结束
             return;
         }
-        BigDecimal realProductionQty = BigDecimalUtils.multiply(diffDays, groupInfo.getMinLhDayCapacityQty(),
-                groupInfo.getMinLhMachineCount());// 天数换算成排产量 = 天数 * 日硫化量 * 配比
+        // 天数换算成排产量 = 天数 * 日硫化量 * 配比
+        BigDecimal realProductionQty = BigDecimalUtils.multiply(diffDays, groupInfo.getThreshold());
         Map<String, BigDecimal> embryoSpecialMaterialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
+        // 预估本结构的用量
         for (Entry<String, BigDecimal> entry : embryoSpecialMaterialInfoMap.entrySet()) {
-            // 预估本结构的用量
-            String materialCode = entry.getKey(); // 特殊材料物料
-            BigDecimal unitConsumeQty = entry.getValue(); // 单胎消耗量
-            Long materialConsumeQty = BigDecimalUtils.multiply(unitConsumeQty, realProductionQty, true).longValue(); // 总消耗量
-            Map<Long, SpecialMaterialInfoVo> specialMaterialinfo = specialMaterialInfoMap.get(materialCode); // 取出各标准用量的特殊材料库存
-            List<SpecialMaterialInfoVo> stockList = specialMaterialinfo.values().stream()
-                    .filter(s -> s.getSumProductionQty() < s.getStock()) // 取出库存还有剩余的库存信息
+            // 特殊材料物料
+            String materialCode = entry.getKey();
+            // 单胎消耗量
+            BigDecimal unitConsumeQty = entry.getValue();
+            // 总消耗量
+            Long materialConsumeQty = BigDecimalUtils.multiply(unitConsumeQty, realProductionQty, true).longValue();
+            // 取出各标准用量的特殊材料库存
+            Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = specialMaterialInfoMap.get(materialCode);
+            if(CollectionUtils.isEmpty(specialMaterialInfo)){
+                continue;
+            }
+            // 取出库存还有剩余的库存信息
+            List<SpecialMaterialInfoVo> stockList = specialMaterialInfo.values().stream()
+                    .filter(s -> s.getSumProductionQty() < s.getStock())
                     .sorted((s1, s2) -> {
                         // 第一顺位：从已排量最大的开始分配
                         Long sumProductionQty1 = s1.getSumProductionQty();
                         Long sumProductionQty2 = s2.getSumProductionQty();
                         int result = sumProductionQty2.compareTo(sumProductionQty1);
-                        if (result != 0) {
+                        if (result != BigDecimal.ZERO.intValue()) {
                             return result;
                         }
                         // 第二顺位：从剩余库存大于本结构用量且最接近的开始分配：abs(库存-已分配-需求量)
                         Boolean isEnoughStock1 = s1.getStock() - sumProductionQty1 > materialConsumeQty;
                         Boolean isEnoughStock2 = s2.getStock() - sumProductionQty2 > materialConsumeQty;
-                        if (!isEnoughStock1 || !isEnoughStock2) { // 任意一个可用库存小于结构用量，都结束，且优先使用大于结构用量的
+                        // 任意一个可用库存小于结构用量，都结束，且优先使用大于结构用量的
+                        if (!isEnoughStock1 || !isEnoughStock2) {
                             return isEnoughStock2.compareTo(isEnoughStock1);
                         }
                         Long remainQty1 = s1.getStock() - sumProductionQty1 - materialConsumeQty;

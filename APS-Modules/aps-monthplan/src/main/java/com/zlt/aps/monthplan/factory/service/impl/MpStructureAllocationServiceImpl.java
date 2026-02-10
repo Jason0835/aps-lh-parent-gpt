@@ -145,27 +145,37 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Arrays.asList("factoryCode","year","month","structureName", "productionVersion");
+        return Arrays.asList("factoryCode","year","month","structureName", "productionVersion", "cxMachineCode");
     }
 
 
     @Override
     public int save(MpStructureAllocation mpStructureAllocation) {
-        // 唯一性校验
-        this.checkUnique(mpStructureAllocation);
-
-        // 创建计时器
-        StopWatch watch = new StopWatch();
-        watch.start();
-
         // 查询月度生产计划
         List<FactoryMonthPlanProductionFinalResult> monthPlanProductionFinalResultList = queryMonthPlanFinalResult(mpStructureAllocation);
+        if (PubUtil.isEmpty(monthPlanProductionFinalResultList)) {
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.notFinalMonthPlan"),
+                    String.format("%d%02d", mpStructureAllocation.getYear(), mpStructureAllocation.getMonth()));
+            throw new BusinessException(errorMsg);
+        }
         // 设置需求计划版本、排产版本号
         if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
             FactoryMonthPlanProductionFinalResult monthPlanProductionFinalResult = monthPlanProductionFinalResultList.get(0);
             mpStructureAllocation.setMonthPlanVersion(monthPlanProductionFinalResult.getMonthPlanVersion());
             mpStructureAllocation.setProductionVersion(monthPlanProductionFinalResult.getProductionVersion());
         }
+
+        // 唯一性校验
+        String unique = super.checkUnique(mpStructureAllocation);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.uniqueCheck"),
+                    mpStructureAllocation.getCxMachineCode(), mpStructureAllocation.getStructureName());
+            throw new ServiceException(errorMsg);
+        }
+
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
 
         // 创建查询数据的异步任务
         // 查询排产结构

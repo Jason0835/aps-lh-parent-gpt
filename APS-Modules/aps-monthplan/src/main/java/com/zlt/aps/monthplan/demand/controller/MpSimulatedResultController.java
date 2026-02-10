@@ -21,6 +21,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -233,9 +234,9 @@ public class MpSimulatedResultController extends AbstractDocBizController<MpSimu
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month22")), "MONTH_22", queryVO.getFieldValueByFieldName("month22"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month23")), "MONTH_23", queryVO.getFieldValueByFieldName("month23"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month24")), "MONTH_24", queryVO.getFieldValueByFieldName("month24"));
-        List<String> monthPlanVersions = this.mpSimulatedResultService.findSimulatedVersion(queryVO);
-        if(!CollectionUtils.isEmpty(monthPlanVersions)){
-            queryWrapper.in("MONTH_PLAN_VERSION", monthPlanVersions);
+        String monthPlanVersion = this.mpSimulatedResultService.getLatestBatchNumber(queryVO);
+        if(StringUtils.isNotBlank(monthPlanVersion)){
+            queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         }
     }
 

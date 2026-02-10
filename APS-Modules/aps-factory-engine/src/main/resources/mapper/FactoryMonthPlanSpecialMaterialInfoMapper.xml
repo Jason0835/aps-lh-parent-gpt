@@ -14,6 +14,7 @@
            AND EXISTS (SELECT 1
                          FROM T_MDM_SPECIAL_MATERIAL_RECORD smr
                         WHERE IFNULL(smr.IS_DELETE, 0) = 0
+                          AND smr.MATERIAL_TYPE = '02'
                           AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND smr.MATERIAL_CODE = mcd.CHILD_MATERIAL_CODE)
            AND EXISTS (SELECT 1
@@ -38,6 +39,12 @@
            AND sms.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND sms.YEAR = #{year,jdbcType=DECIMAL}
            AND sms.MONTH = #{month,jdbcType=DECIMAL}
+           AND EXISTS (SELECT 1
+                         FROM T_MDM_SPECIAL_MATERIAL_RECORD smr
+                        WHERE IFNULL(smr.IS_DELETE, 0) = 0
+                          AND smr.MATERIAL_TYPE = '02'
+                          AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND smr.MATERIAL_CODE = sms.MATERIAL_CODE)
     </select>
 
 </mapper>

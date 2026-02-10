@@ -34,6 +34,7 @@ import java.util.List;
  * @date 20250211
  */
 @Controller
+@Deprecated
 @RequestMapping("/factory/monthPlanProdResult")
 @Api(tags = "分厂月生产计划最终版前端业务接口服务类")
 public class FactoryMonthPlanProdResultUIController extends BaseController {

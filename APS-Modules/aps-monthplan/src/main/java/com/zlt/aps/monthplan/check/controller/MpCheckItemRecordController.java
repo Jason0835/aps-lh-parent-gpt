@@ -52,7 +52,7 @@ public class MpCheckItemRecordController extends BaseController<MpCheckItemRecor
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody MpCheckItemRecord mpCheckItemRecord)
     {
-        startPage("create_time desc");
+        startPage("MATERIAL_DESC asc");
         List<MpCheckItemRecord> list = mpCheckItemRecordService.selectMpCheckItemRecordList(mpCheckItemRecord);
         return getDataTable(list);
     }

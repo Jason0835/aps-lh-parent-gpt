@@ -319,6 +319,11 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (YesOrNoEnum.YES.getValue().equals(finalVersion.getIsNaturalMonth())) {
             return type;
         }
+        type.setYear(finalVersion.getYear());
+        type.setMonth(finalVersion.getMonth());
+        type.setFactoryCode(finalVersion.getFactoryCode());
+        type.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
+        type.setProductionVersion(finalVersion.getProductionVersion());
         type.setProductionStartDate(finalVersion.getProductionStartDate());
         return type;
     }

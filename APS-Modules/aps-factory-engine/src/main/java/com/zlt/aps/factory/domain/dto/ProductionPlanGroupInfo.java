@@ -137,9 +137,15 @@ public class ProductionPlanGroupInfo {
      * 是否最后一个特殊材料结构
      */
     private Boolean isLatestSpecialMaterial;
+    /**
+     * 是否需要提前收尾处理
+     * 特殊材料的结构进行拉量时，不能进行提前收尾处理
+     */
+    private boolean hasBeforeConclusionHandler;
 
     /**
      * 构建初始化分组信息对象
+     * TBR 结构 PCR 英寸
      *
      * @param groupName     分组名 TBR 结构 PCR 英寸
      * @param productType   产品品类 TBR PCR
@@ -154,24 +160,33 @@ public class ProductionPlanGroupInfo {
         groupInfo.setGroupPlanData(groupPlanData);
         groupInfo.setFixedCxMachineSet(new HashSet<>());
         groupInfo.setIsLatestSpecialMaterial(false);
-        // 处理特殊材料清单
-        if (!CollectionUtils.isEmpty(groupPlanData)) {
-            TbrProductionContext productionContext = (TbrProductionContext) context;
-            // 判断如果是特殊结构，需要判断是否最后一个结构
-            Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer()
-                    .getEmbryoSpecialMaterialInfoMap(); // 胎胚与特殊材料对应关系清单
-            Map<String, BigDecimal> materilMap = embryoSpecialMaterialInfoMap
-                    .get(CollectionUtils.firstElement(groupPlanData).getEmbryoCode()); // 本结构涉及的特殊材料清单
-            if (materilMap == null) {
-                materilMap = new HashMap<>();
-            }
-            groupInfo.setEmbryoSpecialMaterialInfoMap(materilMap);
+        groupInfo.setHasBeforeConclusionHandler(true);
+        //默认不含特殊材料信息
+        groupInfo.setEmbryoSpecialMaterialInfoMap(Collections.emptyMap());
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return groupInfo;
         }
+        //是否零度结构的处理
+        boolean isHasZeroRack = groupPlanData.stream().anyMatch(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsZeroRack()));
+        if (isHasZeroRack) {
+            groupInfo.setIsZero(YesOrNoEnum.YES.getCode());
+        }
+        // 判断如果是特殊结构，需要判断是否最后一个结构
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        // 胎胚与特殊材料对应关系清单
+        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
+        // 本结构涉及的特殊材料清单
+        Map<String, BigDecimal> materialMap = embryoSpecialMaterialInfoMap.get(CollectionUtils.firstElement(groupPlanData).getEmbryoCode());
+        if (CollectionUtils.isEmpty(materialMap)) {
+            return groupInfo;
+        }
+        groupInfo.setEmbryoSpecialMaterialInfoMap(materialMap);
         return groupInfo;
     }
 
     /**
      * 检测特殊材料数据是否正常
+     * 同组下各个Sku对应的胎胚使用的特殊材料要一致
      *
      * @param context 排产上下文
      */
@@ -239,6 +254,40 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return effectiveList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
+
+    /**
+     * 获取分组的理论最大可排产量
+     * = 理论分配天数 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
+     *
+     * @return
+     */
+    public Integer getTheoryMaxProductionQty() {
+        return theoryDays * minLhMachineCount * getDayCapacityBySingleLh();
+    }
+
+    /**
+     * 获取余量的可排产量
+     * = 剩余需天数 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
+     *
+     * @return
+     */
+    public Integer getRemainingMaxProductionQty() {
+        Integer remainingNeedDays = getRemainingNeedAllocationDays();
+        if (remainingNeedDays <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return remainingNeedDays * minLhMachineCount * getDayCapacityBySingleLh();
+    }
+
+    /**
+     * 获取一天的浮动余量
+     * = 1 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
+     *
+     * @return
+     */
+    public Integer getThreshold() {
+        return minLhMachineCount * getDayCapacityBySingleLh();
     }
 
     /**
@@ -470,20 +519,6 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
-     * 结构最晚收尾日
-     *
-     * @return
-     */
-    public Integer getLatestEndDay() {
-        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        List<Integer> productionDayList = dayProductionLimitInfo.keySet().stream().collect(Collectors.toList());
-        productionDayList.sort(Comparator.reverseOrder());
-        return productionDayList.get(BigDecimal.ZERO.intValue());
-    }
-
-    /**
      * 获取结构下，最早续作收尾的硫化组信息
      *
      * @return
@@ -597,10 +632,11 @@ public class ProductionPlanGroupInfo {
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
+        String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays());
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), limitHelper.getLimitType()));
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
             preSelected.updateProductionDateRange(null, null);
             return;
         }
@@ -620,7 +656,7 @@ public class ProductionPlanGroupInfo {
         Integer changeMouldDay = preSelected.getClosingDay();
         if (null == changeMouldDay || null == preSelected.getEndDay()) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
+            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
             productionContext.addSkuProductionLimitInfo(addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
             return;
         }
@@ -1341,11 +1377,6 @@ public class ProductionPlanGroupInfo {
         Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
         groupPlanMap.forEach((structureName, planList) -> {
             ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(context, structureName, context.getProductType(), planList);
-            //是否零度结构
-            List<MonthPlanProductionRequirePlanVo> isZeroRackList = planList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsZeroRack())).collect(Collectors.toList());
-            if (!CollectionUtils.isEmpty(isZeroRackList)) {
-                groupInfo.setIsZero(YesOrNoEnum.YES.getCode());
-            }
             //设置对应的硫化配比信息：分不同机型有不同配比
             List<MonthPlanStructureLhRatioVo> cxLhRatioList = structureGroupMap.get(structureName);
             if (CollectionUtils.isEmpty(cxLhRatioList)) {
@@ -1459,7 +1490,19 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     private BigDecimal getDayCapacityByLhRatio(Integer lhRatio) {
-        return BigDecimal.valueOf(minLhDayCapacityQty).multiply(BigDecimal.valueOf(ProductionConstant.DOUBLE_MOULD_PRODUCTION)).multiply(BigDecimal.valueOf(lhRatio));
+        return BigDecimal.valueOf(getDayCapacityBySingleLh()).multiply(BigDecimal.valueOf(lhRatio));
+    }
+
+    /**
+     * 获取单日产能--Sku最小日硫化量
+     *
+     * @return
+     */
+    private Integer getDayCapacityBySingleLh() {
+        if (null == minLhDayCapacityQty) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return minLhDayCapacityQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 
     /**

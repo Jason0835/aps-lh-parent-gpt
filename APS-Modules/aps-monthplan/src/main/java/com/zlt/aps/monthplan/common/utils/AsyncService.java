@@ -279,7 +279,6 @@ public class AsyncService {
     Map<String,List<FactoryMonthPlanMouldDayResult>>  map =   list.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getMaterialCode));
     Map<String,List<DpDemandPlan>>  tMonthDemandsGroupByMaterialCode =  tMonthDemands.stream().collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
     List<MpSimulatedResult> result = Lists.newArrayList();
-    YearMonth yearMonth = YearMonth.now();
     map.forEach((materialCode, value) -> {
       if(!materialInfoMap.containsKey(materialCode)) {
         return;
@@ -292,8 +291,8 @@ public class AsyncService {
       productionPrediction.setId(null);
       productionPrediction.setBaseVale(null);
       productionPrediction.setFactoryCode(currentFinalVersion.getFactoryCode());
-      productionPrediction.setYear(yearMonth.getYear());
-      productionPrediction.setMonth(yearMonth.getMonthValue());
+      productionPrediction.setYear(currentFinalVersion.getYear());
+      productionPrediction.setMonth(currentFinalVersion.getMonth());
       productionPrediction.setMonthPlanVersion(tMonthDemandPlan.getMonthPlanVersion());
       productionPrediction.setEmbryoCode(listGroupByMaterialCode.get(0).getEmbryoCode());
       productionPrediction.setMainMaterialDesc(listGroupByMaterialCode.get(0).getMainMaterialDesc());

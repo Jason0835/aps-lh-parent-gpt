@@ -152,7 +152,7 @@ public class FactoryConsoleController extends BaseController {
     @ApiOperation("按工厂 + 年月 + 需求版本的方式进行工厂一键排产 初始化->排结构->排模具")
     @DistributedLock(key = "'redissonLock:factoryConsole:oneClickProductionProcess:' + #factoryProductionParam.factoryCode + #factoryProductionParam.year + #factoryProductionParam.month + #factoryProductionParam.monthPlanVersion",
             failMsg = "ui.data.alert.factoryConsole.oneClickProductionProcess.run",
-            args = {"#factoryProductionParam.monthPlanVersion", "#factoryProductionParam.factoryCode"},
+            args = {"#factoryProductionParam.monthPlanVersion", "#factoryProductionParam.factoryName"},
             waitTime = 5,
             leaseTime = 300
     )
@@ -175,7 +175,7 @@ public class FactoryConsoleController extends BaseController {
     @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行排产数据的重新初始化")
     @DistributedLock(key = "'redissonLock:factoryConsole:resetProduction:' + #factoryProductionParam.factoryCode + #factoryProductionParam.year + #factoryProductionParam.month + #factoryProductionParam.monthPlanVersion + #factoryProductionParam.productionVersion",
             failMsg = "ui.data.alert.factoryConsole.resetProduction.run",
-            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryCode"},
+            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryName"},
             waitTime = 5,
             leaseTime = 300
     )
@@ -198,7 +198,7 @@ public class FactoryConsoleController extends BaseController {
     @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划产能分配重新排产")
     @DistributedLock(key = "'redissonLock:factoryConsole:resetProduction:' + #factoryProductionParam.factoryCode + #factoryProductionParam.year + #factoryProductionParam.month + #factoryProductionParam.monthPlanVersion + #factoryProductionParam.productionVersion",
             failMsg = "ui.data.alert.factoryConsole.resetProduction.run",
-            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryCode"},
+            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryName"},
             waitTime = 5,
             leaseTime = 300
     )
@@ -221,7 +221,7 @@ public class FactoryConsoleController extends BaseController {
     @ApiOperation("按工厂 + 年月 + 需求版本 + 排产版本的方式进行分组计划重新模具排产")
     @DistributedLock(key = "'redissonLock:factoryConsole:resetProduction:' + #factoryProductionParam.factoryCode + #factoryProductionParam.year + #factoryProductionParam.month + #factoryProductionParam.monthPlanVersion + #factoryProductionParam.productionVersion",
             failMsg = "ui.data.alert.factoryConsole.resetProduction.run",
-            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryCode"},
+            args = {"#factoryProductionParam.productionVersion", "#factoryProductionParam.factoryName"},
             waitTime = 5,
             leaseTime = 300
     )

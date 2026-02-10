@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.monthplan.factory.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;

@@ -86,9 +86,10 @@ public class MouldProductionResultHandler {
             return Collections.emptyList();
         }
         Map<String, List<FactoryMonthPlanMouldDayDetail>> skuGroupDetailMap = detailLogList.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialDesc())).collect(Collectors.groupingBy(FactoryMonthPlanMouldDayDetail::getMaterialDesc));
-        if(CollectionUtils.isEmpty(skuGroupDetailMap)) {
+        if (CollectionUtils.isEmpty(skuGroupDetailMap)) {
             return Collections.emptyList();
         }
+        String noProductionQtyReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_QTY);
         List<FactoryMonthPlanMouldDayResult> resultList = new ArrayList<>();
         SkuProductionCounter productionCounter = productionContext.getProductionCounter();
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
@@ -104,16 +105,17 @@ public class MouldProductionResultHandler {
             }
             FactoryMonthPlanMouldDayResult dayResult = buildBaseInfo(requireList);
             //20260129 得到排产顺序
-            if(null != productionCounter){
+            if (null != productionCounter) {
                 dayResult.setProductionSequence(Long.valueOf(productionCounter.getSkuProductionSort(materialDesc)));
             }
             //未排原因
-            mergeNoProductionReason(dayResult, requireList);
+
+            mergeNoProductionReason(dayResult, requireList, noProductionQtyReason);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));
             dayResult.allocateProductionByPriority();
             dayResult.setDifferenceQty(dayResult.getFactProdReqQty() - dayResult.getTotalQty());
-            if(dayResult.getDifferenceQty() <= 0) {
+            if (dayResult.getDifferenceQty() <= 0) {
                 dayResult.setReason(StringUtils.EMPTY);
             }
             List<ProductionMouldInfoVo> maxMouldList = groupMainPatternMouldRelationMap.get(dayResult.getGroupAndMainPattern());
@@ -243,11 +245,11 @@ public class MouldProductionResultHandler {
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
         int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
         int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
-        if(lossQty != 0) {
-            if(sumCycleReserveQty % 2 != 0) {
+        if (lossQty != 0) {
+            if (sumCycleReserveQty % 2 != 0) {
                 sumCycleReserveQty = sumCycleReserveQty + lossQty;
-            }else{
-                sumMidQty = sumMidQty +  lossQty;
+            } else {
+                sumMidQty = sumMidQty + lossQty;
             }
         }
         dayResult.setHeightLossQty(totalHeightLossQty);
@@ -348,27 +350,29 @@ public class MouldProductionResultHandler {
     /**
      * 合并未排原因
      *
-     * @param dayResult   汇总数据
-     * @param requireList 未排原因集合
+     * @param dayResult                汇总数据
+     * @param requireList              未排原因集合
+     * @param rejectNoProductionReason 需要剔除的未排原因
      */
-    private static void mergeNoProductionReason(FactoryMonthPlanMouldDayResult dayResult, List<MonthPlanProductionRequirePlanVo> requireList) {
+    private static void mergeNoProductionReason(FactoryMonthPlanMouldDayResult dayResult, List<MonthPlanProductionRequirePlanVo> requireList, String rejectNoProductionReason) {
         if (CollectionUtils.isEmpty(requireList)) {
             return;
         }
+        //未排原因去重
         String reason = "";
         for (MonthPlanProductionRequirePlanVo requirement : requireList) {
             String noProductionReason = requirement.getNoProductionReason();
             if (StringUtils.isBlank(noProductionReason)) {
                 continue;
             }
-            String noProductionQtyReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_QTY);
-            if(noProductionQtyReason.equals(noProductionReason)) {
+            String leftOverNoProductionReason = rejectNoProductionQtyReason(noProductionReason, rejectNoProductionReason);
+            if (StringUtils.isBlank(leftOverNoProductionReason)) {
                 continue;
             }
             if (StringUtils.isBlank(reason)) {
-                reason = noProductionReason;
+                reason = leftOverNoProductionReason;
             } else {
-                reason = String.format("%s,%s", reason, noProductionReason);
+                reason = String.format("%s,%s", reason, leftOverNoProductionReason);
             }
         }
         if (!StringUtils.isBlank(reason)) {
@@ -430,7 +434,7 @@ public class MouldProductionResultHandler {
         }
         Integer singleLhMachineCapacity = result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         List<MouldDayUsedNumber> lhMachineCountList = new ArrayList<>();
-        dayProductionQty.forEach((day, productionQty) ->{
+        dayProductionQty.forEach((day, productionQty) -> {
             Integer usedLhMachineNumber = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue();
             MouldDayUsedNumber used = new MouldDayUsedNumber(day, usedLhMachineNumber);
             lhMachineCountList.add(used);
@@ -450,7 +454,7 @@ public class MouldProductionResultHandler {
         //对排产量，保留第一个排产日，日期从小到大
         Map<Integer, Integer> lhMachineNumberDayMap = new HashMap<>();
         resultList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
-        resultList.forEach(mouldDayUsedNumber ->{
+        resultList.forEach(mouldDayUsedNumber -> {
             Integer lhMachineCount = mouldDayUsedNumber.getUsedLhMachineCount();
             if (null == lhMachineCount) {
                 return;
@@ -474,6 +478,33 @@ public class MouldProductionResultHandler {
             resultLhMachineCount.add(String.valueOf(mouldNumber));
         });
         result.setMouldChangeInfo(String.join(StringConstant.DASH, resultLhMachineCount));
+    }
+
+    /**
+     * 剔除掉某个不排产原因
+     *
+     * @param allNoProductionReason    完整的未排原因
+     * @param rejectNoProductionReason 需要剔除的不排产原因
+     * @return
+     */
+    private static String rejectNoProductionQtyReason(String allNoProductionReason, String rejectNoProductionReason) {
+        if (StringUtils.isBlank(rejectNoProductionReason)) {
+            return allNoProductionReason;
+        }
+        if (StringUtils.isBlank(allNoProductionReason)) {
+            return allNoProductionReason;
+        }
+        if (allNoProductionReason.equals(rejectNoProductionReason)) {
+            return "";
+        }
+        return allNoProductionReason;
+//        String midValue = String.format(",%s,", rejectNoProductionReason);
+//        String result = allNoProductionReason.replaceAll(midValue, ",");
+//        String startWithValue = String.format("%s,", rejectNoProductionReason);
+//        result = result.replaceAll(startWithValue, ",");
+//        String endWithValue = String.format(",%s", rejectNoProductionReason);
+//        result = result.replaceAll(endWithValue, "");
+//        return result;
     }
 }
 

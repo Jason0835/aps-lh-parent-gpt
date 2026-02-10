@@ -82,7 +82,8 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
         try {
-            startPage();
+            String orderByInfo = "STRUCTURE_NAME,SPECIFICATIONS,MAIN_PATTERN,PATTERN,MAIN_MATERIAL_DESC,PRO_SIZE,UPDATE_TIME DESC";
+            startPage(orderByInfo);
             List<FactoryMonthPlanProductionFinalResult> list = factoryMonthPlanProductionFinalResultService.getDataList(queryCondition);
             return getDataTable(list);
         } finally {

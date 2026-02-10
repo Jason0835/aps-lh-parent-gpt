@@ -33,6 +33,7 @@ import java.util.List;
  */
 
 @Data
+@Deprecated
 @TableName(value = "T_MP_MONTH_PLAN_PROD_FINAL")
 @ApiModel(value = "分厂月生产计划排产结果-生产计划排产结果对象", description = "分厂月生产计划排产结果-生产计划排产结果对象 ")
 public class FactoryMonthPlanProdFinal extends FactoryMonthPlanProductionFinalResult {

@@ -8,6 +8,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,8 +120,6 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
     Map<String, Integer> calculateStructureFrequency(String factoryCode, Set<String> skus);
     /**
      *  实单模拟导出排产数据
-     * @param monthPlanVersions
-     * @return
      */
-    List<FactoryMonthPlanMouldDayResult> listExportData(MpSimulatedResult queryVO, Set<String> monthPlanVersions);
+    void listExportData(MpSimulatedResult queryVO, String   batchNumber,List<WorksheetData> result);
 }

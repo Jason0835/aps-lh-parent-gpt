@@ -10,14 +10,12 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
 import com.zlt.aps.monthplan.common.utils.AsyncService;
 import com.zlt.aps.monthplan.common.utils.MonthCalculator;
 import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.aps.monthplan.demand.mapper.MpSimulatedResultEntityMapper;
-import com.zlt.aps.monthplan.demand.service.IMpPredictionDetailService;
 import com.zlt.aps.monthplan.demand.service.IMpSimulatedResultService;
 
 import com.zlt.aps.monthplan.factory.mapper.MpFactoryProductionVersionMapper;
@@ -25,18 +23,14 @@ import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalRes
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.YearMonth;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,12 +57,10 @@ import org.springframework.web.context.request.RequestContextHolder;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulatedResult>  implements IMpSimulatedResultService {
-    private final static String SHEET_NAME = "%d年%d月排产";
-    private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
+  private final MpFactoryProductionVersionMapper factoryProductionVersionMapper;
     private final AsyncService asyncService;
     private final MpSimulatedResultEntityMapper entityMapper;
     private final RedisService redisService;
-    private final IMpPredictionDetailService mpPredictionDetailService;
     // 定稿的月度排产计划
     private final IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
 
@@ -123,73 +115,34 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
   @Override
   public List<WorksheetData> listExportData(MpSimulatedResult queryVO, String fileName) {
       List<WorksheetData> result = Lists.newArrayList();
-      List<String>   batchNumbers  = findSimulatedVersion(queryVO);
-      queryVO.setBatchNumbers(batchNumbers);
+      String   batchNumber  = getLatestBatchNumber(queryVO);
+      queryVO.setMonthPlanVersion(batchNumber);
       List<MpSimulatedResult> list = this.entityMapper.listExportData(queryVO);
-      result.add(this.buildSimulatedResult(fileName,list));
-      List<FactoryMonthPlanMouldDayResult> mouldDayResults = null;
       if(CollectionUtils.isNotEmpty(list)){
-          Set<String> monthPlanVersions = list.stream().map(MpSimulatedResult::getMonthPlanVersion).collect(Collectors.toSet());
-          mouldDayResults = this.factoryMonthPlanProductionFinalResultService.listExportData(queryVO,monthPlanVersions);
+        result.add(this.buildSimulatedResult(fileName,list));
       }
-      if(CollectionUtils.isNotEmpty(mouldDayResults)) {
-          Map<String, List<FactoryMonthPlanMouldDayResult>> map = this.quickGroup(mouldDayResults);
-          map.forEach((yearMonth, value) -> result.add(this.buildSimulatedResult(value)));
+      if(StringUtils.isNotBlank(batchNumber)){
+        this.factoryMonthPlanProductionFinalResultService.listExportData(queryVO,batchNumber,result);
       }
       return result;
   }
 
   @Override
-  public List<String> findSimulatedVersion(MpSimulatedResult queryCondition) {
-    List<MpSimulatedResult> list = this.findSimulatedResult(queryCondition);
-    if(CollectionUtils.isEmpty(list)) {
-        return Collections.emptyList();
-    }
-    Set<String>  batchNumbers = list.stream().map(MpSimulatedResult::getMonthPlanVersion).collect(Collectors.toSet());
-    if(CollectionUtils.isEmpty(batchNumbers)) {
-      return Collections.emptyList();
-    }
-    return mpPredictionDetailService.findSimulatedVersion(batchNumbers);
-  }
-
-  private List<MpSimulatedResult> findSimulatedResult(MpSimulatedResult queryCondition) {
-    return this.entityMapper.selectList(
+  public String getLatestBatchNumber(MpSimulatedResult queryCondition) {
+    List<MpSimulatedResult> list =  this.entityMapper.selectList(
         Wrappers.<MpSimulatedResult>lambdaQuery()
             .eq(MpSimulatedResult::getFactoryCode, queryCondition.getFactoryCode())
             .eq(MpSimulatedResult::getYear, queryCondition.getYear())
             .eq(MpSimulatedResult::getMonth, queryCondition.getMonth())
             .eq(MpSimulatedResult::getIsDelete,YesOrNoEnum.NO.getCode())
+            .orderByDesc(MpSimulatedResult::getCreateTime)
     );
+    if(CollectionUtils.isEmpty(list)) {
+      return StringUtils.EMPTY;
+    }
+    return list.get(0).getMonthPlanVersion();
   }
 
-
-  private WorksheetData buildSimulatedResult(List<FactoryMonthPlanMouldDayResult> value) {
-      WorksheetData worksheetData = new WorksheetData();
-      FactoryMonthPlanMouldDayResult mouldDayResult = value.get(0);
-      worksheetData.setSheetName(String.format(SHEET_NAME, mouldDayResult.getYear(), mouldDayResult.getMonth()));
-      worksheetData.setMouldDayResults(value);
-      return worksheetData;
-  }
-
-  /**
-   * 工具方法：快速获取排序后的分组数据
-   */
-  public  Map<String, List<FactoryMonthPlanMouldDayResult>> quickGroup(
-      List<FactoryMonthPlanMouldDayResult> mouldDayResults) {
-
-    return Optional.ofNullable(mouldDayResults)
-        .orElse(Collections.emptyList())
-        .stream()
-        .sorted(Comparator
-            .comparingInt(FactoryMonthPlanMouldDayResult::getYear)
-            .thenComparingInt(FactoryMonthPlanMouldDayResult::getMonth))
-        .collect(Collectors.groupingBy(
-            FactoryMonthPlanMouldDayResult::getExportGroupKey,
-            // 保持插入顺序
-            java.util.LinkedHashMap::new,
-            Collectors.toList()
-        ));
-  }
 
   private WorksheetData buildSimulatedResult(String fileName, List<MpSimulatedResult> list) {
     WorksheetData worksheetData = new WorksheetData();

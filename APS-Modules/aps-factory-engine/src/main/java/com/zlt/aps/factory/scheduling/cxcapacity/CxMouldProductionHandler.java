@@ -2,11 +2,17 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 
 import com.zlt.aps.factory.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.factory.domain.dto.*;
-import com.zlt.aps.factory.domain.vo.*;
+import com.zlt.aps.factory.domain.dto.CxLhProductionHelper;
+import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
+import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.factory.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.factory.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -14,13 +20,19 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 成型模具排产业务处理
+ * 单成型产能-模具排产业务处理
  *
  * @author ZLT
  * @date 20251217
  */
 @Slf4j
+@Component
+@RequiredArgsConstructor
 public class CxMouldProductionHandler {
+
+    private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
+
+    private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
     /**
      * 非在机结构，模具排产
@@ -29,7 +41,7 @@ public class CxMouldProductionHandler {
      * @param cxMachineCode
      * @param productionPlan
      */
-    public static void noContinueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan) {
+    public void noContinueGroupPlanMouldProduction(Context context, String cxMachineCode, CxMachineAllocationPlanHelper productionPlan) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         String groupName = productionPlanInfo.getGroupName();
@@ -65,9 +77,9 @@ public class CxMouldProductionHandler {
         buildNewLhConclusionInfo(context, cxMachineInfo, cxLhRatio, productionPlan);
         //20260108 开启本轮可排产
         productionPlanInfo.setThisRoundCanProduction();
-        CxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+        cxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
         //处理结构提前收尾
-        GroupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
+        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
     }
 
     /**
