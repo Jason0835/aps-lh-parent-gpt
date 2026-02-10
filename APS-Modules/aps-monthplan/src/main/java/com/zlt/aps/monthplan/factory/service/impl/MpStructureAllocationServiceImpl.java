@@ -166,7 +166,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
 
         // 唯一性校验
-        this.checkUnique(mpStructureAllocation);
+        String unique = super.checkUnique(mpStructureAllocation);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.uniqueCheck"),
+                    mpStructureAllocation.getCxMachineCode(), mpStructureAllocation.getStructureName());
+            throw new ServiceException(errorMsg);
+        }
 
         // 创建计时器
         StopWatch watch = new StopWatch();
