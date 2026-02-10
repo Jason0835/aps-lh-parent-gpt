@@ -28,6 +28,7 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -479,7 +480,7 @@ public class MpWeekRollAdjustEngine {
         //从锁定次日到结构收尾日，依次遍历
         for (int i = lockNextDay; i<= contextDTO.getStructureDeadLine(); i++){
             adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null);
-            contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),i,contextDTO.getDailyCapacityLimitVoMap().get(i).toString())).append(ApsConstant.DIVISION);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),i,contextDTO.getDailyCapacityLimitVoMap().get(i) == null ? "" : contextDTO.getDailyCapacityLimitVoMap().get(i).toString())).append(ApsConstant.DIVISION);
             //1、预检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
             if (!adjustDailyCapacityLimitObj.preCheckCapacitySatisfy(contextDTO.getDailyCapacityLimitVoMap().get(i))){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),i)).append(ApsConstant.DIVISION);
@@ -1307,7 +1308,8 @@ public class MpWeekRollAdjustEngine {
                 !preCheckMouldSatisfy(dailyCapacityLimitVo,cavityQty)){
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,每日硫化机台数或每日胎胚种类数或型腔数不符合产能限制,退出！",contextDTO.getStructureName(),curFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             //提示：物料编码:%s,挤搭配日:%s,每日硫化机台数【%s】或胎胚种类数【%s】或型腔数【%s】不符合产能限制,停止！
-            addAdjustProcLog(contextDTO,curFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.deductMatch.checkCapacityLimit"),curFinalVo.getMaterialCode(),endDay,dailyCapacityLimitVo.getUsedLhMachines(),dailyCapacityLimitVo.getUsedEmbryoTypes(),dailyCapacityLimitVo.getPatternUsedLhMachines()));
+            dailyCapacityLimitVo = ObjectUtils.defaultIfNull(dailyCapacityLimitVo, new MpDailyCapacityLimitVo());
+            addAdjustProcLog(contextDTO,curFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.deductMatch.checkCapacityLimit"),curFinalVo.getMaterialCode(),endDay, dailyCapacityLimitVo.getUsedLhMachines(),dailyCapacityLimitVo.getUsedEmbryoTypes(),dailyCapacityLimitVo.getPatternUsedLhMachines()));
             return;
         }
 
