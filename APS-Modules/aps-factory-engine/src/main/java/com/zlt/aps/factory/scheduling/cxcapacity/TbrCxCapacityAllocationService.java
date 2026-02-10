@@ -8,16 +8,15 @@ import com.zlt.aps.factory.basedataassemble.history.ProductionHistoryHandler;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.dto.*;
 import com.zlt.aps.factory.domain.vo.*;
-import com.zlt.aps.factory.handler.CalculateStructureCxMachineNumber;
-import com.zlt.aps.factory.handler.ContinueSkuCalculator;
-import com.zlt.aps.factory.handler.GroupProductionConversionHandler;
-import com.zlt.aps.factory.handler.MouldProductionResultHandler;
+import com.zlt.aps.factory.handler.*;
 import com.zlt.aps.factory.logrecorder.*;
-import com.zlt.aps.factory.scheduling.*;
+import com.zlt.aps.factory.scheduling.AbstractDataLoaderService;
+import com.zlt.aps.factory.scheduling.BaseDataContainer;
+import com.zlt.aps.factory.scheduling.ProductionContext;
+import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
-import com.zlt.aps.factory.handler.InitNoProductionRecordHandler;
 import com.zlt.aps.factory.utils.NoProductionPlanUtils;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
@@ -60,6 +59,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
+    private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
+
     private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
 
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
@@ -76,6 +77,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           SimulateProductionHandler simulateProductionHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
                                           InitNoProductionRecordHandler initNoProductionRecordHandler,
+                                          DayProductionStatisticsHandler dayProductionStatisticsHandler,
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
@@ -84,6 +86,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         this.simulateProductionHandler = simulateProductionHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
+        this.dayProductionStatisticsHandler = dayProductionStatisticsHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
@@ -380,7 +383,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
      * 12：根据模具信息，保存模具排产结果
      *
      * @param productionContext 排产上下文
-     * @param allGroupPlanMap 所有排产分组
+     * @param allGroupPlanMap   所有排产分组
      */
     private Map<Long, Integer> saveMouldProductionInfo(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap) {
         //模具排产明细日志
@@ -396,6 +399,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //构建汇总的排产结果
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
         getMonthProductionDataService().saveMouldProductionResult(dayResultList);
+        List<MpMonthPlanStatistics> productionStatisticsList = dayProductionStatisticsHandler.buildDayProductionStatisticsResult(productionContext);
+        getMonthProductionDataService().saveProductionStatisticsResult(productionStatisticsList);
         return sumProductionMap;
     }
 

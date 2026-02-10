@@ -44,6 +44,7 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * t_mp_moulding_day_result
      * t_mp_moulding_day_result_detail
      * t_mp_moulding_helper
+     * t_mp_month_plan_statistics
      *
      * @param factoryProductionParam
      * @return
@@ -59,6 +60,7 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * t_mp_moulding_day_result
      * t_mp_moulding_day_result_detail
      * t_mp_moulding_helper
+     * t_mp_month_plan_statistics
      *
      * @param factoryProductionParam
      * @return
@@ -82,6 +84,7 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * t_mp_mould_day_detail_log 需求版本对应的模具排产版本日志 所有删除
      * t_mp_mould_use_status_log 模具状态日志 所有删除
      * t_mp_mould_lh_log 模具硫化组日志 所有删除
+     * t_mp_month_plan_statistics 排产统计 所有删除
      *
      * @param factoryProductionParam
      * @return
@@ -92,11 +95,15 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * 查询对应年月+分厂的需求计划版本
      *
      * @param query 查询条件
+     * @return
      */
     List<String> versionList(MpFactoryProductionVersion query);
 
     /**
      * 查询对应年月+分厂+需求计划版本的分厂月计划版本
+     *
+     * @param query 查询条件
+     * @return
      */
     List<String> productionVersionList(MpFactoryProductionVersion query);
 }
