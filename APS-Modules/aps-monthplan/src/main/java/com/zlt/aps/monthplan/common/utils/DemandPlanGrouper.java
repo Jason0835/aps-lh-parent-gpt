@@ -46,8 +46,8 @@ public class DemandPlanGrouper {
 
 
   private static List<DpDemandPlan> processDemandPlansOptimized(List<DpDemandPlan> demandPlans) {
-    if (demandPlans == null || demandPlans.isEmpty()) {
-      return new ArrayList<>();
+    if (CollectionUtils.isEmpty(demandPlans)) {
+      return Collections.emptyList();
     }
     // 使用自定义的GroupInfo来跟踪分组信息
     Map<String, GroupInfo> groupInfoMap = new HashMap<>();
@@ -93,7 +93,6 @@ public class DemandPlanGrouper {
     for (Map.Entry<String, List<DpDemandPlan>> entry : originalGroups.entrySet()) {
       List<DpDemandPlan> plans = entry.getValue();
       GroupType type = analyzeGroupType(plans);
-
       switch (type) {
         case PURE_RESERVE:
           pureReserveGroups.put(entry.getKey(), plans);
@@ -106,7 +105,6 @@ public class DemandPlanGrouper {
           break;
       }
     }
-
     // 构建销售订单分组的快速索引
     SalesGroupIndex salesGroupIndex = buildSalesGroupIndex(salesGroups, mixedGroups);
 
@@ -176,27 +174,17 @@ public class DemandPlanGrouper {
       Map<String, List<DpDemandPlan>> resultGroups) {
 
     for (Map.Entry<String, List<DpDemandPlan>> reserveEntry : pureReserveGroups.entrySet()) {
+      log.info("monthPlanVersion:{},key: {},size:{}",createCondition.getMonthPlanVersion(),reserveEntry.getKey(),reserveEntry.getValue().size());
       List<DpDemandPlan> reservePlans = reserveEntry.getValue();
-
-      if (reservePlans.isEmpty()) {
-        continue;
-      }
-
       // 获取储备订单的物料编码
       DpDemandPlan firstPlan = reservePlans.get(0);
       String materialCode = firstPlan.getMaterialCode();
-
       // 查找最佳目标分组
       SalesGroupInfo bestGroup = salesGroupIndex.findBestGroupForReserve(materialCode);
-
       if (bestGroup != null) {
         // 合并到目标分组
         List<DpDemandPlan> targetGroup = resultGroups.get(bestGroup.groupKey);
         targetGroup.addAll(reservePlans);
-        continue;
-      }
-      // 如果找不到合适的分组，则舍弃这个纯储备订单分组
-      if(createCondition.isIncludePostpone()) {
         continue;
       }
       resultGroups.put(reserveEntry.getKey(),reservePlans);
