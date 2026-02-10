@@ -636,6 +636,9 @@ public abstract class AbstractDailyCapacityLimit {
      * @return true-满足，false-不满足
      */
     public boolean preCheckCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        if (dailyCapacityLimitVo == null) {
+            return Boolean.FALSE;
+        }
         return dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
                 dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines();
     }
