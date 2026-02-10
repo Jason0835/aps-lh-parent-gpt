@@ -60,6 +60,11 @@ public class MpAdjustMaterialLog extends BaseEntity {
     @TableField(value = "ADJ_VERSION")
     private String adjVersion;
 
+    @Excel(name = "ui.data.column.mpAdjustMaterialLog.adjustType")
+    @ApiModelProperty(value = "调整类型：调整类型01-结构内，02-结构延长，03-结构缩短，04-新增结构", name = "adjustType")
+    @TableField(value = "ADJUST_TYPE")
+    private String adjustType;
+
     /** 产品结构 */
     @Excel(name = "ui.data.column.mpAdjustMaterialLog.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")

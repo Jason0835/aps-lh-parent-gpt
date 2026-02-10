@@ -64,12 +64,15 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
             TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
 
-            // 2. 初始化数据检测 (Phase 1)
-            try {
-                checkInitializationData(productionContext, mpCheckItemVos, mpCheckItemRecords);
-            } catch (Exception e) {
-                log.error("初始化数据检测(Phase 1)发生异常", e);
-//                addSystemError(mpCheckItemVos, mpCheckItemRecords, "初始化数据检测异常");
+            // 1. 初始化数据检测 (Phase 1)
+            // 【修改点】接收返回值，判断核心数据是否有效
+            boolean isPhase1CoreDataValid = checkInitializationData(productionContext, mpCheckItemVos, mpCheckItemRecords);
+
+            // 如果核心数据无效（查不到或报错），则后续所有检测都无意义，直接标记全部失败并返回
+            if (!isPhase1CoreDataValid) {
+                log.warn("初始化核心数据无效，终止后续检测流程，标记所有检测项为失败");
+                saveRecords(mpCheckItemRecords, context);
+                return mpCheckItemVos;
             }
 
             // 3. 排产前数据检测 (Phase 2)
@@ -208,26 +211,25 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
      * 初始化数据检测
      * 优化点：优先赋值 Context，分阶段捕获异常
      */
-    private void checkInitializationData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
+    private boolean checkInitializationData(TbrProductionContext productionContext, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
 
         List<MonthPlanProductionRequirePlanVo> requirePlanList = null;
 
-        // 阶段 1: 数据查询与 Context 赋值 (放在 try-catch 外面或单独 catch，确保 Context 不为空)
+        // 阶段 1: 数据查询与 Context 赋值
         try {
             // 1. 获取计划列表
             requirePlanList = getMonthPlanRequirePlan(productionContext);
 
+            // 【关键】如果查不到数据，直接返回 false
             if (CollectionUtils.isEmpty(requirePlanList)) {
-                addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "未查询到月度排产需求计划");
-                addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "未查询到月度排产需求计划");
-                return; // 没数据直接结束
+                markAllChecksAsFailed(mpCheckItemVos, mpCheckItemRecords, "未查询到月度排产需求计划");
+                return false;
             }
 
-            // 只要查到了 list，就立即放入 Context，防止后续校验报错导致 Phase 2 无法复用数据
+            // 查到数据，立即放入 Context
             Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuMap = requirePlanList.stream()
                     .filter(plan -> StringUtils.isNotBlank(plan.getMaterialDesc()))
                     .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
-
             productionContext.setAllSkuProductionPlan(allSkuMap);
 
             Map<Long, MonthPlanProductionRequirePlanVo> allPlanMap = requirePlanList.stream()
@@ -235,24 +237,22 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             productionContext.setAllProductionPlan(allPlanMap);
 
         } catch (Exception e) {
-            // 如果查询阶段报错，明确抛出包含 "06" 的异常
+            // 【关键】如果查询阶段报错，记录错误并返回 false
             log.error("获取月度排产计划数据异常", e);
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "获取计划数据异常: " + e.getMessage());
-            addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "获取计划数据异常: " + e.getMessage());
-            // 抛出带有特定标记的异常，让上层识别为 INIT_DATA 失败
-            throw new RuntimeException("[" + CheckItemTypeEnums.INIT_DATA.getCode() + "] 获取数据异常", e);
+            markAllChecksAsFailed(mpCheckItemVos, mpCheckItemRecords, "获取计划数据异常: " + e.getMessage());
+            return false;
         }
 
         // 阶段 2: 数据补全与校验逻辑
+        // 即使这里校验失败（比如物料缺失），只要查到了计划，对于后续流程来说“基础数据是有的”，所以这里返回 true
+        // 但需要在 vo 里标记 INIT_DATA 为 false
         try {
-            // 2. 获取初始化辅助配置数据
             ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
             Map<String, ProductBaseInfoVo> productBaseInfoMap = getMaterialInfo(productionContext);
             Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = getProductionConstructionInfo(productionContext);
             Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
             Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
 
-            // 3. 数据赋值与预处理
             requirePlanList.forEach(requirePlan -> {
                 String materialCode = requirePlan.getMaterialCode();
                 String materialDesc = requirePlan.getMaterialDesc();
@@ -262,13 +262,11 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
                 requirePlan.setVulcanizationInfo(lhCapacityMap.get(materialDesc));
             });
 
-            // 4. 过滤有效数据
             List<MonthPlanProductionRequirePlanVo> validCheckList = requirePlanList.stream()
                     .filter(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsProduction()))
                     .filter(plan -> plan.getPlanNeedProductionQty() > BigDecimal.ZERO.intValue())
                     .collect(Collectors.toList());
 
-            // 5. 执行检测逻辑
             boolean isInitDataPass = true;
             String failReason = null;
 
@@ -277,21 +275,46 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
                 if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
                     isInitDataPass = false;
                     failReason = StringUtils.isBlank(plan.getNoProductionReason()) ? "未知原因导致无法排产" : plan.getNoProductionReason();
-                    addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason);
-                    break;
+                    addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason, plan.getMaterialDesc());
                 }
             }
 
-            // 6. 添加结果
             addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, isInitDataPass, failReason);
+
+            // 即使校验不通过，也返回 true，允许后续流程继续跑（可能会查出其他配置缺失的问题）
+            return true;
 
         } catch (Exception e) {
             log.error("初始化数据校验逻辑异常", e);
-            // 校验逻辑报错，也记录为 INIT_DATA 失败
-            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "数据校验异常: " + e.getMessage());
+            addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), "数据校验异常: " + e.getMessage(), null);
             addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, false, "数据校验异常: " + e.getMessage());
-            // 抛出带有特定标记的异常
-            throw new RuntimeException("[" + CheckItemTypeEnums.INIT_DATA.getCode() + "] 校验异常", e);
+            // 校验异常通常视为流程可继续，但数据不完整
+            return true;
+        }
+    }
+
+    /**
+     * 【新增】批量标记所有检测项为失败
+     * 用于在初始化阶段崩溃时，统一设置所有后续依赖检测项的状态
+     */
+    private void markAllChecksAsFailed(List<MpCheckItemVo> vos, List<MpCheckItemRecord> records, String failReason) {
+        // 定义所有受影响的检测项枚举
+        CheckItemTypeEnums[] checkItems = {
+                CheckItemTypeEnums.INIT_DATA,
+                CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA,
+                CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA,
+                CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE,
+                CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA,
+                CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA,
+                CheckItemTypeEnums.MOLD_SHELL_DATA,
+                CheckItemTypeEnums.CAPSULE_CHUCK_DATA,
+                CheckItemTypeEnums.SULFURIZATION_RATIO_DATA,
+                CheckItemTypeEnums.OTHER_PARAMS_CONFIG
+        };
+
+        for (CheckItemTypeEnums item : checkItems) {
+            addErrorRecord(records, item.getCode(), failReason, null);
+            addCheckItemResult(vos, item, false, failReason);
         }
     }
 
@@ -391,7 +414,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             return;
         }
         if (!isPass) {
-            addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason);
+            addErrorRecord(mpCheckItemRecords, checkItemType.getCode(), failReason, null);
         }
         addCheckItemResult(mpCheckItemVos, checkItemType, isPass, isPass ? null : failReason);
     }
@@ -409,10 +432,11 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
     /**
      * 添加错误记录
      */
-    private void addErrorRecord(List<MpCheckItemRecord> records, String checkItem, String errorReason) {
+    private void addErrorRecord(List<MpCheckItemRecord> records, String checkItem, String errorReason, String materialDesc) {
         MpCheckItemRecord record = new MpCheckItemRecord();
         record.setCheckItem(checkItem);
         record.setCheckContent(errorReason);
+        record.setMaterialDesc(materialDesc);
         records.add(record);
     }
 

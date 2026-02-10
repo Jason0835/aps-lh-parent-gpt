@@ -165,12 +165,25 @@ public class MpAdjustMaterialLogController extends AbstractDocBizController<MpAd
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hasSpecialMaterial")), "HAS_SPECIAL_MATERIAL", queryVO.getFieldValueByFieldName("hasSpecialMaterial"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustDetail")), "ADJUST_DETAIL", queryVO.getFieldValueByFieldName("adjustDetail"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustType")), "ADJUST_TYPE", queryVO.getFieldValueByFieldName("adjustType"));
     }
 
 
     @Override
     protected String getTypeCode(){
         return "S2-0808";
+    }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    public TableDataInfo getVersionList(@RequestBody MpAdjustMaterialLog queryVO) {
+        this.startPage();
+        List<MpAdjustMaterialLog> list = entityMapper.getVersionList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
     }
 
 

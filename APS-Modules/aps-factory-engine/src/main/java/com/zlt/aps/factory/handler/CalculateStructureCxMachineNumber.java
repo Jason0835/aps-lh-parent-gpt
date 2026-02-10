@@ -107,7 +107,8 @@ public class CalculateStructureCxMachineNumber {
                     groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
                 } else {
                     if (null != minAllocationDays && groupInfo.getTheoryDays() < minAllocationDays) {
-                        if (!groupInfo.isSpecialMaterial()) {// 特殊材料结构理论分配天数低于5天时，不能强制拉到5天。
+                        // 特殊材料结构理论分配天数低于5天时，不能强制拉到5天。
+                        if (!groupInfo.isSpecialMaterial()) {
                             groupInfo.setTheoryDays(minAllocationDays);
                             groupInfo.setLeftOverNeedAllocationDays(minAllocationDays);
                             //重新计算估算的机台数

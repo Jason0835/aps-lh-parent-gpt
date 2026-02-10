@@ -115,9 +115,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Override
     public List<FactoryMonthPlanFinalAdjustVo> selectMpFinalList(MpRollAdjustContextDTO contextDTO) {
         List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = factoryMonthPlanProdFinalMapper.selectMpFinalList(contextDTO.getMpYear(),contextDTO.getMpMonth(),contextDTO.getFactoryCode());
-       /* if (PubUtil.isNotEmpty(mpFinalAdjustList) && !StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
-            mpFinalAdjustList = mpFinalAdjustList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
-        }*/
+        for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpFinalAdjustList){
+            mpFinalVo.setAdjustDetail(new StringBuilder());
+        }
         return mpFinalAdjustList;
     }
 

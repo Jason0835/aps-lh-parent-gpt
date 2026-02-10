@@ -52,6 +52,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
 
+    private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
+
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
     /**
@@ -185,7 +187,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         Integer minAllocationDays = baseDataContainer.getParamConfiguration().getMinAllocationDays();
         Integer leftOverDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
         //20260206 小于最短上机天数，则不进行分配
-        if(!addNewGroupPlan.isNextAllocation(minAllocationDays)){
+        if (!addNewGroupPlan.isNextAllocation(minAllocationDays)) {
             log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
@@ -198,7 +200,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
         //获取成型工装的排产日集合
         Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
-        if (CollectionUtils.isEmpty(productionDayInfo) || productionDayInfo.size() < minAllocationDays) {
+        if (!isReachMinAllocationDays(addNewGroupPlan, productionDayInfo, minAllocationDays)) {
             if (productionDayInfo.size() > BigDecimal.ZERO.intValue()) {
                 log.info(TbrProductionGroupLogRecorder.addGroupNoReachMinAllocationDayLog(context, groupName, productionDayInfo.size(), minAllocationDays));
             }
@@ -232,13 +234,26 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            return;
         }
+        ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
         startDay = realChangeDay;
         Set<Integer> realProductionDaySet = hasProductionDaySet.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
         Integer remainingDays = realProductionDaySet.size();
         //分配产能
-        ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
         Integer needAllocationDays = addNewGroupPlan.getRemainingNeedAllocationDays();
+        //20260209 特殊材料是否需要拉量或是舍弃
+        CxMachineAllocationPlanHelper calculationAllocation = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, leftOverDays, startDay, context.getMonthDays());
+        Integer confirmNeedAllocationDays = specialMaterialScheduleHandler.calculateConfirmAllocationDaysBySpecialMaterial(calculationAllocation, productionContext, addNewGroupPlan);
+        if (null == confirmNeedAllocationDays || confirmNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
+            log.info(TbrProductionGroupLogRecorder.addSpecialMaterialStockLimitLog(context, groupName, true));
+            //标记分配完成--没有找到合适，说明后面也找不到
+            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            //下一新增结构
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            return ;
+        }
+        needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
         //更新特殊材料库存
         productionContext.updateSpecialMaterialInfoMap(addNewGroupPlan, realAllocationDays);
@@ -260,6 +275,24 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         //下一新增结构
         addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+    }
+
+    /**
+     * 可满足的排产天信息
+     *
+     * @param groupPlanInfo     分组计划信息
+     * @param productionDayInfo 工装排产天数
+     * @param minAllocationDays 最小排产天数
+     * @return
+     */
+    private boolean isReachMinAllocationDays(ProductionPlanGroupInfo groupPlanInfo, Set<Integer> productionDayInfo, Integer minAllocationDays) {
+        if (CollectionUtils.isEmpty(productionDayInfo)) {
+            return false;
+        }
+        if (groupPlanInfo.isSpecialMaterial()) {
+            return true;
+        }
+        return productionDayInfo.size() >= minAllocationDays;
     }
 
 }

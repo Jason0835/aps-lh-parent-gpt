@@ -40,6 +40,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CxAddSkuProductionHandler {
 
+    private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
+
     /**
      * 在机结构 - 在产机台的新增规格排产
      * 按优先级估算,此时经过在机结构对续作部分排产，
@@ -140,7 +142,7 @@ public class CxAddSkuProductionHandler {
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = productionPlan.getEndDay();
         // 根据结构特殊材料情况重算结束日期
-        endDay = caculateEndDayBySpecialMaterial(startDay, endDay, productionPlanList, productionContext, productionPlanInfo);
+        endDay = specialMaterialScheduleHandler.calculateEndDayBySpecialMaterial(startDay, endDay, productionContext, productionPlanInfo);
 
         if (startDay > endDay) {
             //记录日志

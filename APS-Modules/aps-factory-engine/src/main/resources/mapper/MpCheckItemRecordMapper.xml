@@ -12,6 +12,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="monthPlanVersion" column="MONTH_PLAN_VERSION"/>
         <result property="checkItem" column="CHECK_ITEM"/>
         <result property="checkContent" column="CHECK_CONTENT"/>
+        <result property="materialDesc" column="MATERIAL_DESC"/>
         <result property="createBy" column="CREATE_BY"/>
         <result property="createTime" column="CREATE_TIME"/>
         <result property="updateBy" column="UPDATE_BY"/>
@@ -22,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 
     <sql id="selectMpCheckItemRecordVo">
-        SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_TYPE_CODE, MONTH_PLAN_VERSION, CHECK_ITEM, CHECK_CONTENT, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK FROM T_MP_CHECK_ITEM_RECORD
+        SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_TYPE_CODE, MONTH_PLAN_VERSION, CHECK_ITEM, CHECK_CONTENT, MATERIAL_DESC, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK FROM T_MP_CHECK_ITEM_RECORD
     </sql>
 
     <select id="selectMpCheckItemRecordList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord" resultMap="MpCheckItemRecordResult">
@@ -35,5 +36,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="monthPlanVersion != null  and monthPlanVersion != ''"> AND MONTH_PLAN_VERSION = #{monthPlanVersion}</if>
         <if test="checkItem != null  and checkItem != ''"> AND CHECK_ITEM = #{checkItem}</if>
         <if test="checkContent != null  and checkContent != ''"> AND CHECK_CONTENT = #{checkContent}</if>
+        <if test="materialDesc != null  and materialDesc != ''"> AND MATERIAL_DESC = #{materialDesc}</if>
     </select>
 </mapper>

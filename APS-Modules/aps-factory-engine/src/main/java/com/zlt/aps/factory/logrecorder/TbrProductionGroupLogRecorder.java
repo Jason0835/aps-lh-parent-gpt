@@ -657,27 +657,6 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
-     * 增加结构匹配到成型机-最终被选定日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮最终被选定====
-     *
-     * @param context         排程上下文
-     * @param groupName       分组名
-     * @param isZeroRack      分组是否要求零度
-     * @param cxMachineCode   成型机台
-     * @param machineTypeCode 机型
-     * @return
-     */
-    public static String addGroupSelectedFinalCxMachineCodeLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 本轮(规格、英寸、断面宽)最终被选定====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, isZeroRack, cxMachineCode, machineTypeCode);
-        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_FINAL_CX_MACHINE, logContent);
-        return logContent;
-    }
-
-    /**
      * 增加没有找到满足最小排产天数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 因成型工装、日产能最大排产天数[%s]不满足最小排产天数[%s]====
      *
@@ -758,40 +737,25 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
-     * 增加结构获取指定机台日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 从[%s]指定机台中挑选====
+     * 增加达到特殊原材料库存限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 达到特殊原材料库存限制====
      *
-     * @param context          排程上下文
-     * @param groupName        分组名
-     * @param fixedMachineInfo 限定机台信息
+     * @param context              排程上下文
+     * @param groupName            分组名
+     * @param isGroupFindCxMachine 是否计划找机台
      * @return
      */
-    public static String addGroupSelectedFixedCxMachineLog(Context context, String groupName, String fixedMachineInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 从[%s]指定机台中挑选====";
+    public static String addSpecialMaterialStockLimitLog(Context context, String groupName, boolean isGroupFindCxMachine) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 达到特殊原材料库存限制====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, fixedMachineInfo);
+                groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
-        return logContent;
-    }
-
-    /**
-     * 增加结构没有从指定机台获取到机台日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 指定机台[%s]中没有合适机台====
-     *
-     * @param context          排程上下文
-     * @param groupName        分组名
-     * @param fixedMachineInfo 限定机台信息
-     * @return
-     */
-    public static String addGroupNoSelectedForFixedCxMachineLog(Context context, String groupName, String fixedMachineInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 指定机台[%s]中没有合适机台====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, fixedMachineInfo);
-        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
-        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        if (isGroupFindCxMachine) {
+            TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        } else {
+            TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CX_MACHINE_SELECTED_GROUP, logContent);
+        }
         return logContent;
     }
 
