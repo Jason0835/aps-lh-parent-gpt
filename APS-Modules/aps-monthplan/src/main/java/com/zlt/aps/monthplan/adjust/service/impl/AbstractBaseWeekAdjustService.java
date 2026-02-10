@@ -587,6 +587,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
         baseDao.insertBatch(monthPlanStatisticsList);
+        log.info("保存月计划统计结果成功，共新增:{}条记录", monthPlanStatisticsList.size());
     }
 
     /**
