@@ -161,7 +161,7 @@
             v-if="this.hasPermission('monthplan:mpAdjustResult:list')"
           >
           </el-tab-pane>
-          <el-tab-pane label="调整日志" name="four"> </el-tab-pane>
+          <el-tab-pane label="调整日志" name="four"  v-if="this.hasPermission('monthplan:mpAdjustMaterialLog:list')"> </el-tab-pane>
         </el-tabs>
       </template>
       <template slot="footer" v-if="isShowFoot">
