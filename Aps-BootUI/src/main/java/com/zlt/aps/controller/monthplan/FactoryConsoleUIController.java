@@ -9,9 +9,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdResultDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanTypeVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
@@ -260,7 +260,7 @@ public class FactoryConsoleUIController extends BaseController {
         if (checkParamEmpty(param)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
         }
-        FactoryMonthPlanProdFinal prodFinal = new FactoryMonthPlanProdFinal();
+        FactoryMonthPlanTypeVo prodFinal = new FactoryMonthPlanTypeVo();
         BeanUtils.copyProperties(param, prodFinal);
         return factoryConsoleService.getProductionMonthType(prodFinal);
     }
