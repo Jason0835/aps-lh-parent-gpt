@@ -514,15 +514,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     private void setMonthPlanStatisticsField(FactoryMonthPlanFinalAdjustVo source, MpStructureAllocation structureAllocation, MpMonthPlanStatistics target) {
         target.setFactoryCode(structureAllocation.getFactoryCode());
-        target.setYear(source.getYear());
-        target.setMonth(source.getMonth());
-        target.setYearMonth(source.getYearMonth());
+        target.setYear(structureAllocation.getYear());
+        target.setMonth(structureAllocation.getMonth());
+        target.setProductionVersion(structureAllocation.getProductionVersion());
+        target.setMonthPlanVersion(structureAllocation.getMonthPlanVersion());
         target.setStructureName(structureAllocation.getStructureName());
+        target.setYearMonth(source.getYearMonth());
         target.setProSize(source.getProSize());
         target.setStructureType(source.getStructureType());
-        target.setMonthPlanVersion(source.getMonthPlanVersion());
         target.setLastMonthPlanVersion(source.getLastMonthPlanVersion());
-        target.setProductionVersion(source.getProductionVersion());
         target.setProductTypeCode(source.getProductTypeCode());
     }
 
