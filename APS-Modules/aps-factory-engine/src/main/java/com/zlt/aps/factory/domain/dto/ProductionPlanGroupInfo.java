@@ -267,6 +267,20 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取余量的可排产量
+     * = 剩余需天数 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
+     *
+     * @return
+     */
+    public Integer getRemainingMaxProductionQty() {
+        Integer remainingNeedDays = getRemainingNeedAllocationDays();
+        if (remainingNeedDays <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return remainingNeedDays * minLhMachineCount * getDayCapacityBySingleLh();
+    }
+
+    /**
      * 获取一天的浮动余量
      * = 1 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
      *
@@ -1485,6 +1499,9 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     private Integer getDayCapacityBySingleLh() {
+        if (null == minLhDayCapacityQty) {
+            return BigDecimal.ZERO.intValue();
+        }
         return minLhDayCapacityQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
     }
 
