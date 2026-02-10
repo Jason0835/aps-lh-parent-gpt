@@ -931,7 +931,7 @@ export default {
                 value
               );
             },
-            width: 180,
+            width: 120,
           },
           {
             prop: "year",
@@ -962,12 +962,12 @@ export default {
           {
             prop: "beginDay",
             label: this.$t("调整类型"),
-            width: 180,
+            width: 120,
           },
           {
             prop: "materialCode",
             label: this.$t("物料编码"),
-            width: 180,
+            width: 120,
           },
           {
             prop: "materialDesc",
@@ -985,7 +985,7 @@ export default {
           {
             prop: "adjustDetail",
             label: this.$t("调整明细"),
-            width: 180,
+            width: 320,
           },
         ];
       }
