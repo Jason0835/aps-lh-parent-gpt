@@ -2165,17 +2165,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
         // 排产机台,多个机台用逗号分隔
         adjustDetailVo.setScheduledMachines(getCxMachineCodes(structureAllocationList));
-
+        // 试制量试计划
+        Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
+        List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
         if (monthPlan == null) {
             // SKU日硫化产能
             Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
             // 物料信息
             Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
-            // 试制量试计划
-            Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
             MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
-            List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
@@ -2237,6 +2236,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
         // 制造示方书号
         adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
+        // 试制量制关联字段设置
+        if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+            // 获取试制量试
+            MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, busiId);
+            // 紧急程度
+            adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
+            // 施工阶段
+            adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+            // 试制量试ID
+            adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
+        }
     }
 
 
