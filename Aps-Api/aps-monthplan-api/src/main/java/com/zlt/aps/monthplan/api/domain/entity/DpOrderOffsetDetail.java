@@ -158,7 +158,7 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String pattern;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.mesMaterialCode")
+    //@Excel(name = "ui.data.column.orderOffsetDetail.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
