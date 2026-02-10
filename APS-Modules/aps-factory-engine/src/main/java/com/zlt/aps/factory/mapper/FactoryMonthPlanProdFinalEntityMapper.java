@@ -2,8 +2,7 @@ package com.zlt.aps.factory.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**
@@ -21,6 +20,6 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
  * @date 2025-12-25
  */
 @Mapper
-public interface FactoryMonthPlanProdFinalEntityMapper extends CommBaseMapper<FactoryMonthPlanProdFinal> {
+public interface FactoryMonthPlanProdFinalEntityMapper extends CommBaseMapper<FactoryMonthPlanProductionFinalResult> {
 
 }

@@ -91,7 +91,7 @@ import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
@@ -160,9 +160,9 @@ public class MatchingProductionHandler {
      */
     public void matchingProductionAdjust(String productionVersion) {
         // 查询月度计划排产结果
-        LambdaQueryWrapper<FactoryMonthPlanProdFinal> queryWrapper = new LambdaQueryWrapper<FactoryMonthPlanProdFinal>();
-        queryWrapper.eq(FactoryMonthPlanProdFinal::getProductionVersion, productionVersion);
-        List<FactoryMonthPlanProdFinal> planList = factoryMonthPlanProdFinalEntityMapper.selectList(queryWrapper);
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion);
+        List<FactoryMonthPlanProductionFinalResult> planList = factoryMonthPlanProdFinalEntityMapper.selectList(queryWrapper);
         
         this.matchingProductionAdjust(planList, new ArrayList<>(0));
     }
@@ -199,7 +199,7 @@ public class MatchingProductionHandler {
      *
      * @param planList
      */
-    public void matchingProductionAdjust(List<FactoryMonthPlanProdFinal> planFinalList, List<FactoryMonthPlanMouldDayDetail> detailLogList) {
+    public void matchingProductionAdjust(List<FactoryMonthPlanProductionFinalResult> planFinalList, List<FactoryMonthPlanMouldDayDetail> detailLogList) {
         if (CollectionUtils.isEmpty(planFinalList)) {
             return;
         }
@@ -1207,8 +1207,8 @@ public class MatchingProductionHandler {
         List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(dayResultList, resultList, newSkuQtyMap);
         
         // 未定稿计划转换成定稿计划用于适配搭配算法
-        List<FactoryMonthPlanProdFinal> planFinalList = mouldResultList.stream().map(plan -> {
-            FactoryMonthPlanProdFinal newPlan = new FactoryMonthPlanProdFinal();
+        List<FactoryMonthPlanProductionFinalResult> planFinalList = mouldResultList.stream().map(plan -> {
+            FactoryMonthPlanProductionFinalResult newPlan = new FactoryMonthPlanProductionFinalResult();
             SpringBeanUtils.copyPropertiesIgnoreNull(plan, newPlan);
             return newPlan;
         }).collect(Collectors.toList());
