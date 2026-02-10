@@ -6,6 +6,7 @@
       v-loading="loading"
       :columns="columns"
       :searchColumns="searchColumns"
+      :row-class-name="tableRowClassName"
       :data="data"
       :page="page"
       :search="search"
@@ -98,6 +99,10 @@ import {
   statistics,
 } from "@/api/monthplan/mouldingDayResult";
 import { listProductionPlan } from "@/api/monthplan/monthlyProductionPlan";
+import {
+  statisticsResult,
+} from "@/api/monthplan/adjustStructure";
+
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -150,11 +155,11 @@ export default {
     ...mapGetters("globalList", ["structureList"]),
     columns() {
       let columns = [
-      {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           align: "center",
-
+          width: 120,
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -587,8 +592,13 @@ export default {
         this.loading = true;
         const data = await listProductionPlan(this.formatParams());
         console.log(data);
-        this.data = data.rows;
+        // this.data = data.rows;
         this.page.total = data.total;
+        if (data.rows.length != 0) {
+          this.getStatisticsResult(data.rows[0],data.rows);
+        }else{
+          this.data = [];
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -603,6 +613,92 @@ export default {
       } catch (error) {
         this.stat = {};
       }
+    },
+        //渲染统计颜色
+        tableRowClassName({ row, rowIndex }) {
+      if (row.showBackground) {
+        return row.showBackground;
+      }
+      if (row.adjustFlag == 1) {
+        return "warning-row";
+      }
+      return "";
+    },
+
+    //调整结果统计
+    async getStatisticsResult(data,resultList) {
+      try {
+        let params = {
+          factoryCode: data.factoryCode,
+          year: data.year,
+          month: data.month,
+          productionVersion: data.productionVersion,
+        };
+        let res = await statisticsResult(params);
+
+
+
+        let list = this.insertDataAfterEachName(resultList, res.rows);
+        this.data = list;
+      } catch (err) {
+        console.log(err);
+      } finally {
+      }
+    },
+    //调整结果插入数据
+    insertDataAfterEachName(arr, statistList) {
+      if (!arr.length) return [];
+
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        const current = arr[i];
+        const next = arr[i + 1];
+        // 添加当前数据
+        result.push(current);
+        console.log(current.structureName);
+        // 如果下一个元素不存在或structureName不同，说明这是当前分组的最后一项
+        if (!next || next.structureName !== current.structureName) {
+          console.log(i);
+          // 在当前分组后插入两条数据
+          for (let i = 0; i < statistList.length; i++) {
+            if (statistList[i].structureName == current.structureName) {
+              let changeMould={
+                structureName: current.structureName,
+                showBackground: "light-yellow",
+              }
+              let embryoCount = {
+                structureName: current.structureName,
+                showBackground: "light-green",
+              };
+              let lhMachines = {
+                structureName: current.structureName,
+                showBackground: "light-blue",
+              };
+              embryoCount.factoryCode = "胎胚种类数";
+              lhMachines.factoryCode = "硫化机台数";
+              changeMould.factoryCode = "换模次数";
+              for (let j = 1; j <= 31; j++) {
+                const key = `day${j}`;
+
+                if (statistList[i][key]) {
+                  let dayData = JSON.parse(statistList[i][key]);
+                  // embryoCount.push{
+                  //   `day${j}`:dayData.EmbryoCount
+                  // }
+                  embryoCount[key] = dayData.embryoCount;
+                  lhMachines[key] = dayData.lhMachines;
+                  changeMould[key] = dayData.changeMould;
+                }
+              }
+              result.push(embryoCount);
+              result.push(lhMachines);
+              result.push(changeMould);
+            }
+          }
+        }
+      }
+
+      return result;
     },
 
     async getVersionList(params) {

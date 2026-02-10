@@ -6,6 +6,7 @@
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
+       :row-class-name="tableRowClassName"
       :searchColumns="searchColumns"
       :data="data"
       :page="page"
@@ -42,6 +43,9 @@ import {
   listProduction,
   getProductionMonthType,
 } from "@/api/monthplan/monthlyProductionPlan";
+import {
+  statisticsResult,
+} from "@/api/monthplan/adjustStructure";
 //components
 
 export default {
@@ -85,7 +89,7 @@ export default {
         {
           prop: "productionNo",
           label: this.$t("ui.data.monthlyProductionPlan.productionNo"),
-          width: 120,
+          width: 160,
         },
         {
           prop: "factoryCode",
@@ -627,13 +631,104 @@ export default {
       try {
         this.loading = true;
         const res = await listProduction(this.formatParams());
-        this.data = res.rows;
+        // this.data = res.rows;
         this.page.total = res.total;
+        if (res.rows.length != 0) {
+          this.getStatisticsResult(res.rows[0],res.rows);
+        }else{
+          this.data = [];
+        }
       } catch (error) {
         console.error(error);
       } finally {
         this.loading = false;
       }
+    },
+      //渲染统计颜色
+      tableRowClassName({ row, rowIndex }) {
+      if (row.showBackground) {
+        return row.showBackground;
+      }
+      if (row.adjustFlag == 1) {
+        return "warning-row";
+      }
+      return "";
+    },
+
+    //调整结果统计
+    async getStatisticsResult(data,resultList) {
+      try {
+        let params = {
+          factoryCode: data.factoryCode,
+          year: data.year,
+          month: data.month,
+          productionVersion: data.productionVersion,
+        };
+        let res = await statisticsResult(params);
+
+
+
+        let list = this.insertDataAfterEachName(resultList, res.rows);
+        this.data = list;
+      } catch (err) {
+        console.log(err);
+      } finally {
+      }
+    },
+    //调整结果插入数据
+    insertDataAfterEachName(arr, statistList) {
+      if (!arr.length) return [];
+
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        const current = arr[i];
+        const next = arr[i + 1];
+        // 添加当前数据
+        result.push(current);
+        console.log(current.structureName);
+        // 如果下一个元素不存在或structureName不同，说明这是当前分组的最后一项
+        if (!next || next.structureName !== current.structureName) {
+          console.log(i);
+          // 在当前分组后插入两条数据
+          for (let i = 0; i < statistList.length; i++) {
+            if (statistList[i].structureName == current.structureName) {
+              let changeMould={
+                structureName: current.structureName,
+                showBackground: "light-yellow",
+              }
+              let embryoCount = {
+                structureName: current.structureName,
+                showBackground: "light-green",
+              };
+              let lhMachines = {
+                structureName: current.structureName,
+                showBackground: "light-blue",
+              };
+              embryoCount.productionNo = "胎胚种类数";
+              lhMachines.productionNo = "硫化机台数";
+              changeMould.productionNo = "换模次数";
+              for (let j = 1; j <= 31; j++) {
+                const key = `day${j}`;
+
+                if (statistList[i][key]) {
+                  let dayData = JSON.parse(statistList[i][key]);
+                  // embryoCount.push{
+                  //   `day${j}`:dayData.EmbryoCount
+                  // }
+                  embryoCount[key] = dayData.embryoCount;
+                  lhMachines[key] = dayData.lhMachines;
+                  changeMould[key] = dayData.changeMould;
+                }
+              }
+              result.push(embryoCount);
+              result.push(lhMachines);
+              result.push(changeMould);
+            }
+          }
+        }
+      }
+
+      return result;
     },
     async updateList() {
       this.loading = true;
