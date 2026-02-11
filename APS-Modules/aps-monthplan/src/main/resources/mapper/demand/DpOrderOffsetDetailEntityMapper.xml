@@ -18,44 +18,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <select id="getOffsetVersion" resultType="java.lang.String">
-        SELECT
-            MONTH_PLAN_VERSION
-        FROM
-            (
-                SELECT
-                    MONTH_PLAN_VERSION,
-                    CREATE_TIME
-                FROM
-                    t_dp_demand_plan_sum
-                WHERE
-                    FACTORY_CODE = #{factoryCode}
-                  AND YEAR = #{year}
-                  AND MONTH = #{month}
-                  AND PLAN_TYPE = '01'
-                  AND IS_DELETE = 0
-                UNION ALL
-                SELECT
-                    MONTH_PLAN_VERSION,
-                    CREATE_TIME
-                FROM
-                    T_MP_SIMULATED_RESULT
-                WHERE
-                    FACTORY_CODE = #{factoryCode}
-                  AND YEAR = #{year}
-                  AND MONTH = #{month}
-                  AND IS_DELETE = 0
-                  AND MONTH_PLAN_VERSION IN (
-                    SELECT DISTINCT MONTH_PLAN_VERSION
-                    FROM T_DP_ORDER_OFFSET_DETAIL
-                    WHERE FACTORY_CODE = #{factoryCode}
-                      AND YEAR = #{year}
-                      AND MONTH = #{month}
-                      AND IS_DELETE = 0
-                )
-            ) s
-        GROUP BY
-            s.MONTH_PLAN_VERSION
-        ORDER BY
-            MAX( s.CREATE_TIME ) DESC
+        SELECT MONTH_PLAN_VERSION
+        FROM T_DP_ORDER_OFFSET_DETAIL
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND YEAR = #{year}
+          AND MONTH = #{month}
+          AND IS_DELETE = 0
+        GROUP BY MONTH_PLAN_VERSION
+        ORDER BY MAX(CREATE_TIME) DESC
     </select>
 </mapper>
