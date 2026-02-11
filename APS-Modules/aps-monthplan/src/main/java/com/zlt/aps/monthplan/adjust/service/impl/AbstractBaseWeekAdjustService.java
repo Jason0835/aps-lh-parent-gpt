@@ -878,13 +878,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     private void insertMonthPlanList(MpRollAdjustContextDTO contextDTO) {
         List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
         List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
-        List<FactoryMonthPlanFinalAdjustVo> monthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
         if (PubUtil.isEmpty(adjustDetailList) || PubUtil.isEmpty(adjustResultList)) {
             log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
             return;
         }
-        // 调整结果按照物料编码分组
-        Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
         // 月度生产计划排程结果
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = new ArrayList<>();
         // 批次号前缀
@@ -912,7 +909,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
-            monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
+            if (adjustResult.getYear() != null && adjustResult.getMonth() != null) {
+                monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
+            }
             monthPlan.setId(null);
             monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
@@ -1003,11 +1002,27 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 BeanUtils.copyProperties(result, summaryResult);
                 summaryResult.setMaterialCode(detailVo.getMaterialCode());
                 summaryResult.setAdjustDetailId(null);
+                summaryResult.setTotalPlanQty(0);
+                summaryResult.setTrialProductionQty(0);
+                summaryResult.setTotalQty(0);
+                for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+                    summaryResult.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, 0);
+                }
             }
-            // 汇总总计划量（处理null值）
+            // 汇总总计划量
             summaryResult.setTotalPlanQty(
                     Optional.ofNullable(summaryResult.getTotalPlanQty()).orElse(0) +
                             Optional.ofNullable(result.getTotalPlanQty()).orElse(0)
+            );
+            // 汇总生产实际排产量
+            summaryResult.setTotalQty(
+                    Optional.ofNullable(summaryResult.getTotalQty()).orElse(0) +
+                            Optional.ofNullable(result.getTotalQty()).orElse(0)
+            );
+            // 汇总试制量试排产量
+            summaryResult.setTrialProductionQty(
+                    Optional.ofNullable(summaryResult.getTrialProductionQty()).orElse(0) +
+                            Optional.ofNullable(result.getTrialProductionQty()).orElse(0)
             );
             // 循环汇总day1-day31字段值
             summaryDayFields(summaryResult, result);
@@ -2976,12 +2991,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             String groupKey = generateGroupKey(vo, isTrial);
             // 订单量
             Integer currentOrdQty = Convert.toInt(vo.getOrdQty(), 0);
+            // 当前净需求量
+            Integer currentNetQty = Convert.toInt(vo.getCurrentNetQty(), 0);
+            // 实际调整
+            Integer actualAdjustQty = Convert.toInt(vo.getActualAdjustQty(), 0);
             // 分组已存在，累加订单量并拼接试制计划ID
             if (summaryMap.containsKey(groupKey)) {
                 MpAdjustDetailVo existVo = summaryMap.get(groupKey);
                 // 累加订单量
                 Integer existOrdQty = Convert.toInt(existVo.getOrdQty(), 0);
                 existVo.setOrdQty(existOrdQty + currentOrdQty);
+                // 累加当前净需求量
+                Integer existCurrentNetQty = Convert.toInt(existVo.getCurrentNetQty(), 0);
+                existVo.setCurrentNetQty(existCurrentNetQty + currentNetQty);
+                // 累加实际调整量
+                Integer existActualAdjustQty = Convert.toInt(existVo.getActualAdjustQty(), 0);
+                existVo.setCurrentNetQty(existActualAdjustQty + actualAdjustQty);
                 // 拼接试制计划ID
                 mergeTrialPlanId(existVo, vo.getTrialPlanId());
             } else {
@@ -2992,6 +3017,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 newVo.setMaterialCode(vo.getMaterialCode());
                 newVo.setConstructionStage(vo.getConstructionStage());
                 newVo.setOrdQty(currentOrdQty);
+                newVo.setCurrentNetQty(currentNetQty);
+                newVo.setActualAdjustQty(actualAdjustQty);
                 summaryMap.put(groupKey, newVo);
             }
         }
