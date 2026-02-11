@@ -103,7 +103,6 @@ public class CxLhMouldProductionCalculator {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 return;
             }
-
             //SKU二次上机检查 sandy+ 20260129
             if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
@@ -171,33 +170,6 @@ public class CxLhMouldProductionCalculator {
         //更新还需排产量及实际排产量
         lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
         lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
-    }
-
-    /**
-     * 检查二次上机
-     *
-     * @param productionPlanInfo 排产计划信息
-     * @param productionContext  排产上下文
-     * @param productionPlan     排产计划信息
-     * @param realStartDay       上机日
-     * @return true-允许二次上机，false-不允许二次上机
-     */
-    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo, TbrProductionContext productionContext,
-                                          MonthPlanProductionRequirePlanVo productionPlan, Integer realStartDay) {
-        List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(productionPlan.getMaterialDesc());
-        if (CollectionUtils.isEmpty(dayList)) {
-            return true;
-        }
-        Set<Integer> productionDaySet = dayList.stream().collect(Collectors.toSet());
-        if (productionDaySet.contains(realStartDay)) {
-            return true;
-        }
-        //降序,第一个元素最大
-        dayList.sort(Comparator.reverseOrder());
-        Integer lastCloseDay = dayList.get(0);
-        int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
-        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay, lastCloseDay, skuSecondProductionDays);
-        return skuSecondChecker.doCheck();
     }
 
     /**
@@ -382,46 +354,6 @@ public class CxLhMouldProductionCalculator {
         return new DayProductionQtyHelper(productionDay, true, afterSkuProductionQty, lossQty, nextDayLossQty, true);
     }
 
-    @Deprecated
-    public static void lhProductionByLhGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
-        Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        Integer dayMaxProductionQty = lhProductionQtyHelper.getDayMaxProductionQty();
-        CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
-        String cxMachineCode = String.join(StringConstant.COMMA, cxLhGroup.getCxMachineInfo());
-        String skuMaterialDesc = skuProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
-        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
-        Set<Integer> stopDay = context.getStopDays();
-        //进行排产
-        for (int day = startDay; day <= endDay; day++) {
-            if (sumProductionQty <= BigDecimal.ZERO.longValue()) {
-                break;
-            }
-            //停工日跳过
-            if (stopDay.contains(day)) {
-                continue;
-            }
-            //todo 需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
-            Integer realDayProductionQty = Math.min(sumProductionQty, dayMaxProductionQty);
-            realSumProductionQty = realSumProductionQty + realDayProductionQty;
-            sumProductionQty = sumProductionQty - realDayProductionQty;
-            //todo 判断模具是否排产完毕
-            boolean isDayFinish = true;
-            Integer productionDay = day;
-            doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, productionPlanInfo, cxLhGroup, isDayFinish, realDayProductionQty, dayMaxProductionQty, cxMachineCode, skuProductionPlanList));
-            //更新硫化组日期和日排产量
-            cxLhGroup.setProductionQty(realDayProductionQty);
-            cxLhGroup.setProductionDay(day);
-            cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-            //记录已排产量及损耗量
-            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
-        }
-        //更新还需排产量及实际排产量
-        lhProductionQtyHelper.setSumProductionQty(sumProductionQty);
-        lhProductionQtyHelper.setRealSumProductionQty(realSumProductionQty);
-    }
-
     /**
      * 处理提前收尾，导致需要释放的模壳使用量、模具分配比例使用量、胶囊卡盘使用量
      *
@@ -459,6 +391,33 @@ public class CxLhMouldProductionCalculator {
         updateCapsuleChuckInfoByMould(capsuleChuckInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
         //20260122 换模次数 -1
         updateChangeMouldInfoByMould(context, beforeConclusionDay, productionPlan.getMaterialDesc(), singleMould);
+    }
+
+    /**
+     * 检查二次上机
+     *
+     * @param productionPlanInfo 排产计划信息
+     * @param productionContext  排产上下文
+     * @param productionPlan     排产计划信息
+     * @param realStartDay       上机日
+     * @return true-允许二次上机，false-不允许二次上机
+     */
+    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo, TbrProductionContext productionContext,
+                                          MonthPlanProductionRequirePlanVo productionPlan, Integer realStartDay) {
+        List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(productionPlan.getMaterialDesc());
+        if (CollectionUtils.isEmpty(dayList)) {
+            return true;
+        }
+        Set<Integer> productionDaySet = dayList.stream().collect(Collectors.toSet());
+        if (productionDaySet.contains(realStartDay)) {
+            return true;
+        }
+        //降序,第一个元素最大
+        dayList.sort(Comparator.reverseOrder());
+        Integer lastCloseDay = dayList.get(0);
+        int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
+        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay, lastCloseDay, skuSecondProductionDays);
+        return skuSecondChecker.doCheck();
     }
 
     /**
