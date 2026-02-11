@@ -187,6 +187,10 @@ public class DemandPlanGrouper {
         targetGroup.addAll(reservePlans);
         continue;
       }
+      // 如果找不到合适的分组，则舍弃这个纯储备订单分组
+      if(createCondition.isIncludePostpone()) {
+        continue;
+      }
       resultGroups.put(reserveEntry.getKey(),reservePlans);
     }
   }

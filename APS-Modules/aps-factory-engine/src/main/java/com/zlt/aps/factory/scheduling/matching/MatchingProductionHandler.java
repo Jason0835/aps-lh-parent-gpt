@@ -1555,7 +1555,7 @@ public class MatchingProductionHandler {
                 .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
 
         container.setStructureLhRatioList(this.getLhRatioConfiguration(productionContext, requirePlanList)); // 结构硫化配比
-        container.setSkuMouldRelationMap(this.getProductionMouldInfo(productionContext)); // 模具施工关系
+        container.setSkuMouldRelationMap(this.getProductionMouldInfo(productionContext, isAdjuest)); // 模具施工关系
         container.setCxMachineBaseInfo(this.getDataService().getCxMachineBaseInfo(productionContext)); // 已排结构排程
         if (isAdjuest) {
             container.setMouldInfoMap(this.buildMouldInfoMapAdjust(productionContext, planList, requirePlanList)); // 已排模具计划（调整）
@@ -2076,9 +2076,14 @@ public class MatchingProductionHandler {
      * @param productionContext
      * @return
      */
-    private Map<String, List<MonthPlanProductMouldInfoVo>> getProductionMouldInfo(TbrProductionContext productionContext) {
+    private Map<String, List<MonthPlanProductMouldInfoVo>> getProductionMouldInfo(TbrProductionContext productionContext, boolean isAdjuest) {
         // 已有模具的配置关系
-        List<MonthPlanProductMouldInfoVo> productMouldInfoList = this.getDataService().getEnableProductionMouldInfo(productionContext);
+        List<MonthPlanProductMouldInfoVo> productMouldInfoList;
+        if (isAdjuest) {
+            productMouldInfoList = this.getDataService().getEnableProductionFinalMouldInfo(productionContext);
+        } else {
+            productMouldInfoList = this.getDataService().getEnableProductionMouldInfo(productionContext);
+        }
         // 新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = this.getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
         List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList, productionContext);

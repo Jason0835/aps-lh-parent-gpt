@@ -2,12 +2,7 @@ package com.zlt.aps.monthplan.factory.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.MpSimulatedResult;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.common.utils.poi.WorksheetData;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,4 +117,13 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      *  实单模拟导出排产数据
      */
     void listExportData(MpSimulatedResult queryVO, String   batchNumber,List<WorksheetData> result);
+
+    /**
+     * 下发月计划
+     *
+     * @param factoryMonthPlanProdFinal 参数
+     * @return 结果
+     */
+    @Transactional(rollbackFor = Exception.class)
+    AjaxResult issueMonthPlan(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
 }
