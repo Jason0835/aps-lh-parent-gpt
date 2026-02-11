@@ -445,6 +445,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         }
         createCondition.setYear(currentMonth.getYear());
         createCondition.setMonth(currentMonth.getMonthValue());
+        createCondition.setIncludePostpone(true);
         // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
         String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());

@@ -439,6 +439,10 @@ public class DpDemandPlan extends BaseEntity {
     @TableField(exist = false)
     private String productionVersion;
 
+    @ApiModelProperty(value = "是否包含冲减", name = "includePostpone")
+    @TableField(exist = false)
+    private boolean includePostpone;
+
 
 
 
