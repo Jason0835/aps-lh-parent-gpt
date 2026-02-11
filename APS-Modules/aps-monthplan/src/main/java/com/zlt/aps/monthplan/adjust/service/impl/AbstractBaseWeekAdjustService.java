@@ -734,7 +734,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 4、更新试制量制计划
             updateTrialPlanList(contextDTO);
             // 5、汇总调整明细
-            sumAdjustDetail(contextDTO);
+//            sumAdjustDetail(contextDTO);
             // 6、更新调整明细
             updateAdjustDetailList(contextDTO);
             // 7、更新月度生产计划
@@ -898,6 +898,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
         // 初始化SKU与施工（示方书）关系
         initSkuConstructionRef(contextDTO);
+        // 汇总调整明细
+        adjustDetailList = sumByStructureAndMaterial(adjustDetailList, Boolean.TRUE);
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
         for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
             String isSkuAdd = adjustDetailVo.getIsSkuAdd();
@@ -906,6 +908,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             String materialCode = adjustDetailVo.getMaterialCode();
             MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
+            // 汇总调整结果 TODO
             if (adjustResult == null) {
                 continue;
             }
@@ -948,6 +951,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 actualAdjustQty = null;
             }
             monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
+            // 设置最新需求计划版本
+            monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -1221,6 +1226,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 actualAdjustQty = null;
             }
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
+            // 设置最新需求计划版本
+            monthPlanVo.setLastMonthPlanVersion(adjustDetail.getLastMonthPlanVersion());
         }
         // 更新月度生产计划
         try {
@@ -2478,6 +2485,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     contextDTO.getYearMonth());
             return;
         }
+
+        // 设置调整需求计划版本
+        contextDTO.setAdjustMonthPlanVersion(dpDemandPlanList.get(0).getMonthPlanVersion());
+        log.warn("设置净需求 ==> 调整需求计划版本：{}", contextDTO.getAdjustMonthPlanVersion());
+
         // 调整明细列表
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 需求计划分组Map
@@ -2487,11 +2499,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
                 continue;
             }
+            adjust.setLastMonthPlanVersion(contextDTO.getAdjustMonthPlanVersion());
             String materialCode = adjust.getMaterialCode();
             List<DpDemandPlan> demandPlanList = MapUtils.getObject(demandPlanMap, materialCode, new ArrayList<>());
-            if (PubUtil.isNotEmpty(demandPlanList)) {
-                contextDTO.setAdjustMonthPlanVersion(demandPlanList.get(0).getMonthPlanVersion());
-            }
             if (PubUtil.isNotEmpty(demandPlanList)) {
                 DpDemandPlan dpDemandPlan = demandPlanList.get(0);
                 // 设置排产分类

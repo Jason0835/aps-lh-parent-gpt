@@ -60,7 +60,7 @@ public class MpAdjustStructureIn extends BaseEntity {
     /**
      * 销售生产需求计划版本
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.monthPlanVersion")
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.monthPlanVersion")
     @ApiModelProperty(value = "销售生产需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
     private String monthPlanVersion;
@@ -68,10 +68,18 @@ public class MpAdjustStructureIn extends BaseEntity {
     /**
      * 排产计划版本
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productionVersion")
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.productionVersion")
     @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
     @TableField(value = "PRODUCTION_VERSION")
     private String productionVersion;
+
+    /**
+     * 最新需求计划版本(每次调整后变化)
+     */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.lastMonthPlanVersion")
+    @ApiModelProperty(value = "最新需求计划版本(每次调整后变化)", name = "lastMonthPlanVersion")
+    @TableField(value = "LAST_MONTH_PLAN_VERSION")
+    private String lastMonthPlanVersion;
 
     /** 产品结构 */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.structureName")
