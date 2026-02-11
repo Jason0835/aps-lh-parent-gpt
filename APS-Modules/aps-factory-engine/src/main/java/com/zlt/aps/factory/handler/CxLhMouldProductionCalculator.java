@@ -63,6 +63,8 @@ public class CxLhMouldProductionCalculator {
             productionQty = Math.min(productionQty, openMaxQty);
             lossQty = theoryProductionQty - productionDay;
         }
+        //todo 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
+
         //更新日产信息
         UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(productionDay, productionQty, isDayFinish, cxMachineCodeInfo, lossQty);
         updateDayProductionInfo(productionContext, groupPlanInfo, doubleMouldList, continueSkuPlanList, updateInfo);
@@ -146,6 +148,8 @@ public class CxLhMouldProductionCalculator {
                 Integer openMaxQty = context.getOpenDayMaxQty(day, dayLhQty);
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
+            //todo 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
+
             Integer lossQtyDiffValue = dayProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {
@@ -261,6 +265,8 @@ public class CxLhMouldProductionCalculator {
                 Integer openMaxQty = context.getOpenDayMaxQty(day, dayLhQty);
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
+            //todo 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
+
             Integer lossQtyDiffValue = dayProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {
@@ -700,6 +706,7 @@ public class CxLhMouldProductionCalculator {
         });
         //双模排产量-增加日产能使用量
         addDayCapacityQtyByMould(productionContext, productionDay, productionPlan, updateInfo, doubleMouldList);
+        //todo 更新特殊材料的库存消耗量
     }
 
     /**
@@ -735,6 +742,7 @@ public class CxLhMouldProductionCalculator {
         });
         //双模排产量-增加日产能使用量
         addDayCapacityQtyByMould(productionContext, productionDay, singlePlan, updateInfo, doubleMouldList);
+        //todo 特殊材料的库存消耗量
     }
 
     /**
