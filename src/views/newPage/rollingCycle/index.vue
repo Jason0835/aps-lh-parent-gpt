@@ -927,6 +927,38 @@ export default {
       }
       if (this.activeName == "four") {
         return [
+        {
+            prop: "materialCode",
+            label: this.$t("物料编码"),
+            width: 120,
+            fixed: "left",
+          },
+          {
+            prop: "materialDesc",
+            label: this.$t("物料描述"),
+            width: 320,
+            fixed: "left",
+          },
+          {
+            prop: "adjustDetail",
+            label: this.$t("调整明细"),
+            width: 420,
+            render: ({ row }) => {
+              return (
+                <el-popover
+                placement="right"
+                title="调整明细"
+                width="500"
+                trigger="hover"
+                content={row.adjustDetail}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                  row.adjustDetail
+                }</span>
+              </el-popover>
+              );
+            },
+          },
           {
             prop: "factoryCode",
             label: this.$t("common.factory"),
@@ -969,16 +1001,7 @@ export default {
             label: this.$t("调整类型"),
             width: 120,
           },
-          {
-            prop: "materialCode",
-            label: this.$t("物料编码"),
-            width: 120,
-          },
-          {
-            prop: "materialDesc",
-            label: this.$t("物料描述"),
-            width: 320,
-          },
+
           {
             prop: "hasSpecialMaterial",
             label: this.$t("是否含特殊材料"),
@@ -987,26 +1010,7 @@ export default {
             },
             width: 120,
           },
-          {
-            prop: "adjustDetail",
-            label: this.$t("调整明细"),
-            width: 320,
-            render: ({ row }) => {
-              return (
-                <el-popover
-                placement="bottom"
-                title="调整明细"
-                width="500"
-                trigger="hover"
-                content={row.adjustDetail}
-              >
-                <span slot="reference" style="cursor: pointer;">{
-                  row.adjustDetail
-                }</span>
-              </el-popover>
-              );
-            },
-          },
+
         ];
       }
 

@@ -150,7 +150,7 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width: 120,
+          width: 180,
         },
         {
           prop: "proSize",
@@ -205,17 +205,17 @@ export default {
         {
           prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
-          width: 120,
+          width: 180,
         },
         {
           prop: "textNo",
           label: this.$t("ui.data.column.trialPlan.textNo"),
-          width: 120,
+          width: 180,
         },
         {
           prop: "lhNo",
           label: this.$t("ui.data.column.trialPlan.lhNo"),
-          width: 120,
+          width: 180,
         },
         {
           prop: "brand",

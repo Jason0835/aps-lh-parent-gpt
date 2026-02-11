@@ -54,13 +54,7 @@ export default {
             trigger: "blur",
           },
         ],
-        paramValue: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
+
         factoryCode: [
           {
             required: true,
