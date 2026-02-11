@@ -303,6 +303,15 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     }
 
     @Override
+    public void saveProductionStatisticsResult(List<MpMonthPlanStatistics> productionStatisticsResultList) {
+        if (CollectionUtils.isEmpty(productionStatisticsResultList)) {
+            return;
+        }
+        //数据不会太多
+        baseDao.insertBatch(productionStatisticsResultList);
+    }
+
+    @Override
     public void saveNoProductionPlan(List<MonthPlanNoProductionPlan> noProductionPlanList) {
         if (CollectionUtils.isEmpty(noProductionPlanList)) {
             return;

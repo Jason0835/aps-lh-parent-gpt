@@ -609,6 +609,9 @@ public abstract class AbstractDailyCapacityLimit {
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
         for (int i = startDay; i< endDay; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
+            if (dailyCapacityLimitVo == null) {
+                continue;
+            }
             if (dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
                     dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines()){
                 return i;
@@ -633,6 +636,9 @@ public abstract class AbstractDailyCapacityLimit {
      * @return true-满足，false-不满足
      */
     public boolean preCheckCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        if (dailyCapacityLimitVo == null) {
+            return Boolean.FALSE;
+        }
         return dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
                 dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines();
     }

@@ -8,7 +8,7 @@ import org.apache.poi.ss.formula.functions.T;
 import java.io.Serializable;
 
 /**
- * 数据缓存查询DTO
+ * 数据查询DTO
  * @author wengpc
  */
 @Data

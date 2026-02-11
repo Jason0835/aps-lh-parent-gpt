@@ -121,7 +121,7 @@ public class BigDecimalUtils {
             if (result == null) {
                 result = valueOf(number);
             } else {
-                multiply(result, number, true);
+                result = multiply(result, number, true);
             }
         }
         return result;

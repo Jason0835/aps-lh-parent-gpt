@@ -112,6 +112,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "需要发送消息的月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> sendMsgMpProdFinalList;
 
+    @ApiModelProperty(value = "调整过程日志")
+    private List<FactoryMonthPlanFinalAdjustVo> adjustProcLogList;
+
     @ApiModelProperty(value = "月计划结构转产表")
     private List<MpStructureAllocation> structureAllocationList;
 
@@ -142,20 +145,11 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "月度硫化监控列表")
     private List<MpMonthPlanMonitor> mpMonthPlanMonitorList;
 
-    @ApiModelProperty(value = "物料信息列表")
-    private List<MdmMaterialInfo> mdmMaterialInfoList;
-
     @ApiModelProperty(value = "物料信息Map")
     private Map<String, MdmMaterialInfo> mdmMaterialInfoMap;
 
-    @ApiModelProperty(value = "SKU日硫化产能列表")
-    private List<MdmSkuLhCapacity> mdmSkuLhCapacityList;
-
     @ApiModelProperty(value = "SKU日硫化产能Map")
     private Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap;
-
-    @ApiModelProperty(value = "SKU与结构关系列表")
-    private List<MdmSkuStructureRef> mdmSkuStructureRefList;
 
     @ApiModelProperty(value = "SKU与结构关系Map")
     private Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap;
@@ -198,4 +192,7 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "型腔与活块Map")
     private Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap;
+
+    @ApiModelProperty(value = "结构硫化配比")
+    private List<MdmStructureLhRatio> structureLhRatio;
 }

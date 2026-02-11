@@ -1,5 +1,7 @@
 package com.zlt.aps.monthplan.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -7,6 +9,7 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
 
@@ -158,7 +161,7 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private String pattern;
 
     /** MES物料编码 */
-    @Excel(name = "ui.data.column.orderOffsetDetail.mesMaterialCode")
+    //@Excel(name = "ui.data.column.orderOffsetDetail.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
@@ -206,7 +209,7 @@ public class DpOrderOffsetDetail extends BaseEntity {
     private Integer produceQtyDue;
 
     /** 计划排产量 */
-    //@Excel(name = "ui.data.column.orderOffsetDetail.productionQty", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.orderOffsetDetail.productionQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "计划排产量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
@@ -270,6 +273,19 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "是否替换料", name = "isAlternateMaterial")
     @TableField(exist = false)
     private String isAlternateMaterial;
+
+    @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(
+            pattern = "yyyy-MM-dd HH:mm:ss"
+    )
+    @TableField(
+            value = "UPDATE_TIME",
+            fill = FieldFill.INSERT_UPDATE,
+            jdbcType = JdbcType.TIMESTAMP
+    )
+    private Date updateTime;
+
 
     /**
      * 品牌+规格+花纹

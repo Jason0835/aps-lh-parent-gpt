@@ -8,7 +8,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 分厂月计划方式
+ * 工厂月计划方式
  *
  * @author ZLT
  * @data 20250521
@@ -16,6 +16,31 @@ import java.util.Date;
 @Data
 public class FactoryMonthPlanTypeVo implements Serializable {
 
+    /**
+     * 工厂编码
+     */
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
+    private String factoryCode;
+    /**
+     * 年份
+     */
+    @ApiModelProperty(value = "年份", name = "year")
+    private Integer year;
+    /**
+     * 月份
+     */
+    @ApiModelProperty(value = "月份", name = "month")
+    private Integer month;
+    /**
+     * 制造需求版本
+     */
+    @ApiModelProperty(value = "制造需求版本", name = "monthPlanVersion")
+    private String monthPlanVersion;
+    /**
+     * 工厂排产版本号
+     */
+    @ApiModelProperty(value = "工厂排产版本号", name = "productionVersion")
+    private String productionVersion;
     /**
      * 月份排产起始日
      */

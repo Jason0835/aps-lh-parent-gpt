@@ -1,4 +1,4 @@
-package com.zlt.aps.controller.maindata;
+package com.zlt.aps.controller.monthplan;
 
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -8,8 +8,8 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.monthplan.api.service.IFactoryMonthPlanMouldDayResultRemoteService;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
+import com.zlt.aps.monthplan.api.service.IMpAdjustMaterialLogRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -38,10 +38,10 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：FactoryMonthPlanMouldDayResultUIController.java
- * 描    述：S2-0604.排产结果-生产计划排产结果 UI控制层类：....
+ * 文件名称：MpAdjustMaterialLogUIController.java
+ * 描    述：调整-调整日志（未调整及已调整） UI控制层类：....
  *@author zlt
- *@date 2025-12-31
+ *@date 2026-02-09
  *@version 1.0
  *
  *  修改记录：
@@ -50,23 +50,23 @@ import javax.servlet.http.HttpServletResponse;
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "S2-0604.排产结果-生产计划排产结果")
+@Api(tags = "调整-调整日志（未调整及已调整）")
 @Controller
-@RequestMapping("/monthplan/factoryMonthPlanMouldDayResult")
-public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController<FactoryMonthPlanMouldDayResult> {
+@RequestMapping("/monthplan/mpAdjustMaterialLog")
+public class MpAdjustMaterialLogUIController extends BaseUIController<MpAdjustMaterialLog> {
 
     @Autowired
-    private IFactoryMonthPlanMouldDayResultRemoteService iFactoryMonthPlanMouldDayResultService;
+    private IMpAdjustMaterialLogRemoteService iMpAdjustMaterialLogService;
 
-    private final String prefix = "aps/monthplan/factoryMonthPlanMouldDayResult";
+    private final String prefix = "aps/monthplan/mpAdjustMaterialLog";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("monthplan:factoryMonthPlanMouldDayResult:view")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/factoryMonthPlanMouldDayResult";
+        return prefix + "/mpAdjustMaterialLog";
     }
 
     /**
@@ -74,7 +74,7 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("factoryMonthPlanMouldDayResult", new FactoryMonthPlanMouldDayResult());
+        mmap.put("mpAdjustMaterialLog", new MpAdjustMaterialLog());
         return prefix + "/add";
     }
 
@@ -83,7 +83,7 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("factoryMonthPlanMouldDayResult", iFactoryMonthPlanMouldDayResultService.getInfo(id));
+        mmap.put("mpAdjustMaterialLog", iMpAdjustMaterialLogService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -91,45 +91,48 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
-        return iFactoryMonthPlanMouldDayResultService.list(factoryMonthPlanMouldDayResult);
+    public TableDataInfo list(MpAdjustMaterialLog mpAdjustMaterialLog) {
+        return iMpAdjustMaterialLogService.list(mpAdjustMaterialLog);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
-        if (UserConstants.NOT_UNIQUE.equals(iFactoryMonthPlanMouldDayResultService.checkUnique(factoryMonthPlanMouldDayResult))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.checkUnique"));
+    public AjaxResult save(MpAdjustMaterialLog mpAdjustMaterialLog) {
+        if (UserConstants.NOT_UNIQUE.equals(iMpAdjustMaterialLogService.checkUnique(mpAdjustMaterialLog))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpAdjustMaterialLog.checkUnique"));
         }
 
-        return iFactoryMonthPlanMouldDayResultService.save(factoryMonthPlanMouldDayResult);
+        return iMpAdjustMaterialLogService.save(mpAdjustMaterialLog);
     }
 
     /**
-     * 删除S2-0604.排产结果-生产计划排产结果
+     * 删除调整-调整日志（未调整及已调整）
      */
     @ApiOperation("删除,id不为空")
+    @RequiresPermissions("monthplan:mpAdjustMaterialLog:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iFactoryMonthPlanMouldDayResultService.removeByIds(Arrays.asList(arr));
+        return iMpAdjustMaterialLogService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验S2-0604.排产结果-生产计划排产结果唯一性
+     * 校验调整-调整日志（未调整及已调整）唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
-        return iFactoryMonthPlanMouldDayResultService.checkUnique(factoryMonthPlanMouldDayResult);
+    public String checkUnique(MpAdjustMaterialLog mpAdjustMaterialLog) {
+        return iMpAdjustMaterialLogService.checkUnique(mpAdjustMaterialLog);
     }
 
     /**
@@ -160,7 +163,7 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.modelName");
+        return I18nUtil.getMessage("ui.no.export.sheetName");
     }
 
     /**
@@ -170,7 +173,7 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<FactoryMonthPlanMouldDayResult> util = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
+        ExcelUtil<MpAdjustMaterialLog> util = new ExcelUtil<>(MpAdjustMaterialLog.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -179,9 +182,9 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
+    public void export(HttpServletResponse response, MpAdjustMaterialLog entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportData(entity,fileName);
+        byte[] excelBytes = iMpAdjustMaterialLogService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -201,7 +204,18 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iFactoryMonthPlanMouldDayResultService.importData(context,false);
+        AjaxResult ajaxResult = iMpAdjustMaterialLogService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询版本列表
+     */
+    @ApiOperation("查询版本列表")
+    @PostMapping("/getVersionList")
+    @ResponseBody
+    public TableDataInfo getVersionList(MpAdjustMaterialLog queryVO) {
+        return iMpAdjustMaterialLogService.getVersionList(queryVO);
+    }
+
 }

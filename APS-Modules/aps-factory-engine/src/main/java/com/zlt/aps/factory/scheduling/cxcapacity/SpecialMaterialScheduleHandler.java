@@ -3,6 +3,7 @@ package com.zlt.aps.factory.scheduling.cxcapacity;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.factory.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.factory.domain.vo.SpecialMaterialInfoVo;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
 public class SpecialMaterialScheduleHandler {
 
     /**
-     * 根据结构特殊材料情况重算结束日期
+     * 根据结构特殊材料情况重算特殊结构需要排产的天数
      *
      * @param allocationHelper   分配信息
      * @param productionContext  排产上下文
@@ -37,46 +38,34 @@ public class SpecialMaterialScheduleHandler {
      * @return
      */
     public Integer calculateConfirmAllocationDaysBySpecialMaterial(CxMachineAllocationPlanHelper allocationHelper, TbrProductionContext productionContext, ProductionPlanGroupInfo productionPlanInfo) {
+        if (null == allocationHelper || null == productionPlanInfo) {
+            return null;
+        }
         //理论分配天数
         Integer needAllocationDays = allocationHelper.getAllocationDay();
-        if (null == allocationHelper || null == productionPlanInfo) {
-            return needAllocationDays;
-        }
         //非特殊结构直接跳过
         if (!productionPlanInfo.isSpecialMaterial()) {
             return needAllocationDays;
         }
+        //如果有特殊材料分组(结构)已经排产到月底，则不需要拉量或是舍弃
+        if (hasLastDayProductionSpecialMaterial(productionContext)) {
+            return needAllocationDays;
+        }
+        //如果自己是本月排产最后一天，直接跳过，不需要拉量或者舍弃
         Integer endDay = allocationHelper.getEndDay();
-        //如果是本月排产最后一天，直接跳过，不需要拉量或者舍弃
-        if (endDay.equals(productionContext.getProductionEndDay())) {
+        if (productionContext.isProductionEndDay(endDay)) {
             return needAllocationDays;
         }
-        // 判断如果是特殊结构，需要判断是否最后一个结构-本结构涉及的特殊材料清单
-        Map<String, BigDecimal> materialMap = productionPlanInfo.getEmbryoSpecialMaterialInfoMap();
-        List<ProductionPlanGroupInfo> allGroupPlanList = productionContext.getGroupProductionInfo().values().stream().collect(Collectors.toList());
-        // 取出与本结构使用相同特殊材料的其他结构信息(过滤使用相同特殊材料的结构)
-        List<ProductionPlanGroupInfo> specialPlanList = allGroupPlanList.stream().filter(plan -> {
-            //检查本结构之外的特殊结构
-            if (plan == productionPlanInfo) {
-                return false;
-            }
-            //涉及的特殊材料清单
-            Map<String, BigDecimal> otherMaterialMap = plan.getEmbryoSpecialMaterialInfoMap();
-            if (CollectionUtils.isEmpty(otherMaterialMap)) {
-                return false;
-            }
-            //特殊材料与新增结构的特殊材料清单有交集
-            return materialMap.keySet().stream().anyMatch(material -> otherMaterialMap.containsKey(material));
-        }).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(specialPlanList)) {
-            return needAllocationDays;
-        }
+        //取出与本结构使用相同特殊材料的其他结构信息(过滤使用相同特殊材料的结构)
+        List<ProductionPlanGroupInfo> otherNeedProductionSpecialPlanList = getSameSpecialMaterialOtherGroupList(productionContext, productionPlanInfo);
         //其他特殊规格有任意一个没有排完，说明还不是最后一个结构，跳过
-        if (specialPlanList.stream().anyMatch(plan -> plan.getLeftOverNeedAllocationDays() > BigDecimal.ZERO.intValue())) {
+        if (!isLastSpecialMaterialGroup(otherNeedProductionSpecialPlanList)) {
             return needAllocationDays;
         }
-        //打上最后一个规格的标记
+        //打上最后一个分组的标记
         productionPlanInfo.setIsLatestSpecialMaterial(true);
+        //本结构涉及的特殊材料清单
+        Map<String, BigDecimal> materialMap = productionPlanInfo.getEmbryoSpecialMaterialInfoMap();
         //特殊材料库存列表
         Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap();
         //特殊材料库存的可生产上限
@@ -91,20 +80,20 @@ public class SpecialMaterialScheduleHandler {
          * 2、计划量*单号模除标准长度，如果余数大于等于日硫化量 * 配比*单耗：计划量补标准长度 - 日硫化量 * 配比*单耗
          * 统计已排量 = 日硫化量 * 配比 * 已排天数
          */
-        Integer allocationQty = specialPlanList.stream().mapToInt(plan -> plan.getMinLhDayCapacityQty() * plan.getMinLhMachineCount() * plan.getTheoryDays()).sum();
-        // 同特殊材料结构总预计排产量
-        Integer sumPlanQty = allocationQty + productionPlanInfo.getSumPlanQty();
+        Integer otherAllocationQty = otherNeedProductionSpecialPlanList.stream().mapToInt(ProductionPlanGroupInfo::getTheoryMaxProductionQty).sum();
+        // 同特殊材料结构总预计排产量 productionPlanInfo.getSumPlanQty()
+        Integer sumPlanQty = otherAllocationQty + productionPlanInfo.getTheoryMaxProductionQty();
         // 取出各结构的特殊材料清单交集
         Map<String, BigDecimal> specialIntersectionMap = new HashMap<>();
         specialIntersectionMap.putAll(materialMap);
-        for (ProductionPlanGroupInfo plan : specialPlanList) {
+        for (ProductionPlanGroupInfo plan : otherNeedProductionSpecialPlanList) {
             plan.getEmbryoSpecialMaterialInfoMap().keySet().stream().forEach(materialCode -> {
                 if (!specialIntersectionMap.containsKey(materialCode)) {
                     specialIntersectionMap.remove(materialCode);
                 }
             });
         }
-        // 都没有交集，直接重置未本结构的物料清单
+        // 都没有交集，直接重置为本结构的物料清单
         if (CollectionUtils.isEmpty(specialIntersectionMap)) {
             specialIntersectionMap.putAll(materialMap);
         }
@@ -113,37 +102,225 @@ public class SpecialMaterialScheduleHandler {
         BigDecimal unitConsumeQty = entry.getValue();
         // 标准长度
         Long standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().get();
+        Integer standardQty = BigDecimal.valueOf(standardLength).divide(unitConsumeQty, BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
         //计算余数
         BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
         // 区间阈值 = 硫化量 * 配比*单耗
-        BigDecimal threshold = BigDecimalUtils.multiply(productionPlanInfo.getMinLhDayCapacityQty(),
-                productionPlanInfo.getMinLhMachineCount(), unitConsumeQty);
+        Integer floatThreshold = productionPlanInfo.getThreshold();
+        // 区间阈值 = 硫化量 * 配比*单耗
+        BigDecimal threshold = BigDecimalUtils.multiply(floatThreshold, unitConsumeQty);
         boolean isAddQty = false;
-        Integer productionQty = productionPlanInfo.getSumPlanQty();
+        //productionPlanInfo.getSumPlanQty()
+        Integer productionQty = productionPlanInfo.getTheoryMaxProductionQty();
         // 重算实际的量
-        Integer realProductionQty = 0;
+        Integer realProductionQty = BigDecimal.ZERO.intValue();
         // 超过阈值，尝试补量
-        if (remainderQty.compareTo(threshold) >= 0) {
-            if (limitProductionQty >= productionQty + standardLength - threshold.intValue()) {
+        if (remainderQty.compareTo(threshold) >= BigDecimal.ZERO.intValue()) {
+            if (limitProductionQty >= productionQty + standardQty - floatThreshold) {
                 //检查补量后不超过可生产上限才进行补量
                 isAddQty = true;
-                realProductionQty = (int) (productionQty + standardLength - threshold.intValue());
+                realProductionQty = productionQty + standardQty - floatThreshold;
             }
         }
         // 不补量，则需要将计划量扣减掉余数部分
         if (!isAddQty) {
-            realProductionQty = productionQty - threshold.intValue();
+            realProductionQty = productionQty - floatThreshold;
         }
         // 可生产上限不足，则不能排产
-        if (realProductionQty <= 0) {
+        if (realProductionQty <= BigDecimal.ZERO.intValue()) {
             return BigDecimal.ZERO.intValue();
         }
-        //计算排产天数 = ceil(计划量 / 日硫化量 / 配比)
-        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, BigDecimalUtils
-                        .multiply(productionPlanInfo.getMinLhDayCapacityQty(), productionPlanInfo.getMinLhMachineCount(), true),
-                2, false);
+        //计算新的排产天数 = ceil(计划量 / 日硫化量 / 配比)
+        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
         theoryDays = theoryDays.setScale(0, RoundingMode.UP);
-        return needAllocationDays + theoryDays.intValue();
+        if (isAddQty) {
+            //拉量时，不能进行提前收尾处理
+            productionPlanInfo.setHasBeforeConclusionHandler(false);
+        }
+        return theoryDays.intValue();
+    }
+
+    /**
+     * 根据结构特殊材料情况重算结束日期
+     * Sku排产时的处理
+     *
+     * @param startDay           起始排产日
+     * @param endDay             结束排产日
+     * @param productionContext  排产上下文
+     * @param productionPlanInfo 排产分组计划信息
+     * @return
+     */
+    public Integer calculateEndDayBySpecialMaterial(Integer startDay, Integer endDay, TbrProductionContext productionContext, ProductionPlanGroupInfo productionPlanInfo) {
+        if (startDay > endDay) {
+            return endDay;
+        }
+        //非特殊结构直接跳过
+        if (!productionPlanInfo.isSpecialMaterial()) {
+            return endDay;
+        }
+        //如果自己是本月排产最后一天，直接跳过，不需要拉量或者舍弃
+        if (productionContext.isProductionEndDay(endDay)) {
+            return endDay;
+        }
+        // 取出与本结构使用相同特殊材料的结构排产:过滤使用相同特殊材料的结构
+        List<ProductionPlanGroupInfo> otherNeedProductionSpecialPlanList = getSameSpecialMaterialOtherGroupList(productionContext, productionPlanInfo);
+        // 其他特殊规格有任意一个没有排完，说明还不是最后一个结构，跳过
+        if (!isLastSpecialMaterialGroup(otherNeedProductionSpecialPlanList)) {
+            return endDay;
+        }
+        //打上最后一个规格的标记
+        productionPlanInfo.setIsLatestSpecialMaterial(true);
+        //本结构涉及的特殊材料清单
+        Map<String, BigDecimal> materialMap = productionPlanInfo.getEmbryoSpecialMaterialInfoMap();
+        // 特殊材料库存列表
+        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap();
+        // 特殊材料库存的可生产上限
+        Integer limitProductionQty = calculateLimitProductionQtyByStock(materialMap, specialMaterialInfoMap);
+        // 可生产上限不足，则不能排产
+        if (limitProductionQty <= BigDecimal.ZERO.intValue()) {
+            return startDay - BigDecimal.ONE.intValue();
+        }
+        /**
+         * 判断同特殊材料排排产量落在哪个区间：
+         * 1、计划量*单号模除标准长度，如果余数小于日硫化量 * 配比*单耗：舍弃余数部分
+         * 2、计划量*单号模除标准长度，如果余数大于等于日硫化量 * 配比*单耗：计划量补标准长度 - 日硫化量 * 配比*单耗
+         */
+        // 统计已排量 = 日硫化量 * 配比 * 已排天数
+        Integer allocationQty = otherNeedProductionSpecialPlanList.stream().mapToInt(ProductionPlanGroupInfo::getTheoryMaxProductionQty).sum();
+        // 同特殊材料结构总预计排产量
+        Integer sumPlanQty = allocationQty + productionPlanInfo.getSumPlanQty();
+        // 取出各结构的特殊材料清单交集
+        Map<String, BigDecimal> specialIntersectionMap = new HashMap<>();
+        specialIntersectionMap.putAll(materialMap);
+        for (ProductionPlanGroupInfo plan : otherNeedProductionSpecialPlanList) {
+            plan.getEmbryoSpecialMaterialInfoMap().keySet().stream().forEach(materialCode -> {
+                if (!specialIntersectionMap.containsKey(materialCode)) {
+                    specialIntersectionMap.remove(materialCode);
+                }
+            });
+        }
+        // 都没有交集，直接重置为本结构的物料清单
+        if (CollectionUtils.isEmpty(specialIntersectionMap)) {
+            specialIntersectionMap.putAll(materialMap);
+        }
+        // 单耗
+        Map.Entry<String, BigDecimal> entry = specialIntersectionMap.entrySet().stream().findFirst().get();
+        BigDecimal unitConsumeQty = entry.getValue();
+        // 标准长度及对应的量
+        Long standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().get();
+        Integer standardQty = BigDecimal.valueOf(standardLength).divide(unitConsumeQty).setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
+        // 计算余数
+        BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
+        // 区间阈值 = 硫化量 * 配比*单耗
+        Integer floatThreshold = productionPlanInfo.getThreshold();
+        BigDecimal threshold = BigDecimalUtils.multiply(floatThreshold, unitConsumeQty);
+        boolean isAddQty = false;
+        Integer productionQty = productionPlanInfo.getSumPlanQty();
+        // 重算实际的量
+        Integer realProductionQty = BigDecimal.ZERO.intValue();
+        // 超过阈值，尝试补量
+        if (remainderQty.compareTo(threshold) >= BigDecimal.ZERO.intValue()) {
+            if (limitProductionQty >= productionQty + standardQty - floatThreshold) {
+                // 检查补量后不超过可生产上限才进行补量
+                isAddQty = true;
+                realProductionQty = productionQty + standardQty - floatThreshold;
+            }
+        }
+        // 不补量，则需要将计划量扣减掉余数部分
+        if (!isAddQty) {
+            realProductionQty = productionQty - floatThreshold;
+        }
+        // 可生产上限不足，则不能排产
+        if (realProductionQty <= BigDecimal.ZERO.intValue()) {
+            return startDay - BigDecimal.ONE.intValue();
+        }
+        // 计算排产天数 = ceil(计划量 / 日硫化量 / 配比)
+        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
+        theoryDays = theoryDays.setScale(0, RoundingMode.UP);
+        return startDay + theoryDays.intValue();
+    }
+
+    /**
+     * 判断已排产的特殊材料分组(结构)是否有月底最后一天
+     * 只要已排产的特殊材料分组(结构)中有一个在月底最后一天排产，则表示排产到月底
+     * 看分配的天数是否到月底
+     *
+     * @param productionContext 排产上下文
+     * @return
+     */
+    private boolean hasLastDayProductionSpecialMaterial(TbrProductionContext productionContext) {
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfo)) {
+            return false;
+        }
+        return allCxMachineInfo.values().stream().anyMatch(singleCxMachine -> {
+            //判断只要有一台成型机分配的特殊材料在月底，就表示排产到月底
+            List<CxMachineAllocationPlanHelper> allocationList = singleCxMachine.getAllocationList();
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return false;
+            }
+            return allocationList.stream().anyMatch(singleAllocation -> {
+                //判断只要有一段排产的特殊材料分组(结构)在月底，则表示月底
+                ProductionPlanGroupInfo productionPlanInfo = singleAllocation.getProductionPlanInfo();
+                if (null == productionPlanInfo || !productionPlanInfo.isSpecialMaterial()) {
+                    return false;
+                }
+                if (singleAllocation.getAllocationDay() <= BigDecimal.ZERO.intValue()) {
+                    return false;
+                }
+                return productionContext.isProductionEndDay(singleAllocation.getEndDay());
+            });
+        });
+    }
+
+    /**
+     * 获取与当前分组计划相同原材料的其他还有排产的分组计划
+     * TBR 为结构
+     *
+     * @param productionContext 排产上下文
+     * @param currentProductionGroup 当前排产分组
+     */
+    private List<ProductionPlanGroupInfo> getSameSpecialMaterialOtherGroupList(TbrProductionContext productionContext, ProductionPlanGroupInfo currentProductionGroup){
+        //当前排产分组的特殊材料清单
+        Map<String, BigDecimal> materialMap = currentProductionGroup.getEmbryoSpecialMaterialInfoMap();
+        //所有分组计划
+        List<ProductionPlanGroupInfo> allGroupPlanList = productionContext.getGroupProductionInfo().values().stream().collect(Collectors.toList());
+        // 取出与本结构使用相同特殊材料的其他结构信息(过滤使用相同特殊材料的结构)
+        List<ProductionPlanGroupInfo> specialPlanList = allGroupPlanList.stream().filter(plan -> {
+            //检查本结构之外的特殊结构
+            if (plan == currentProductionGroup) {
+                return false;
+            }
+            if(null == plan.getMinLhDayCapacityQty() || null == plan.getMinLhMachineCount()){
+                return false;
+            }
+            if( plan.getRemainingNeedAllocationDays() <= BigDecimal.ZERO.intValue()){
+                return false;
+            }
+            //涉及的特殊材料清单
+            Map<String, BigDecimal> otherMaterialMap = plan.getEmbryoSpecialMaterialInfoMap();
+            if (CollectionUtils.isEmpty(otherMaterialMap)) {
+                return false;
+            }
+            //特殊材料与新增结构的特殊材料清单有交集
+            return materialMap.keySet().stream().anyMatch(material -> otherMaterialMap.containsKey(material));
+        }).collect(Collectors.toList());
+        return specialPlanList;
+    }
+
+    /**
+     * 判断是否为最后一个特殊材料排产
+     * 1、没有其它特殊材料的结构 = true
+     * 2、其它特殊材料的结构没有还需排产的量(剩余需分配的量) = true
+     *
+     * @param otherSpecialMaterialGroupList 其它特殊材料的结构
+     * @return
+     */
+    private boolean isLastSpecialMaterialGroup(List<ProductionPlanGroupInfo> otherSpecialMaterialGroupList) {
+        if (CollectionUtils.isEmpty(otherSpecialMaterialGroupList)) {
+            return true;
+        }
+        return !otherSpecialMaterialGroupList.stream().anyMatch(plan -> plan.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue());
     }
 
     /**
@@ -164,7 +341,7 @@ public class SpecialMaterialScheduleHandler {
             BigDecimal unitConsumeQty = entry.getValue();
             //取出各标准用量的特殊材料库存
             Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = specialMaterialInfoMap.get(materialCode);
-            if (specialMaterialInfo == null) {
+            if (null == specialMaterialInfo) {
                 limitProductionQty = BigDecimal.ZERO.intValue();
                 break;
             }
@@ -178,7 +355,7 @@ public class SpecialMaterialScheduleHandler {
             Integer stockCanProductionQty = BigDecimalUtils.div(totalStock, unitConsumeQty, 2)
                     .setScale(0, RoundingMode.DOWN).intValue();
             // 如果未分配量还有剩余，需要更新可排产量
-            if (limitProductionQty == null) {
+            if (null == limitProductionQty) {
                 limitProductionQty = stockCanProductionQty;
             } else {
                 limitProductionQty = Math.min(limitProductionQty, stockCanProductionQty);

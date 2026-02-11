@@ -46,6 +46,10 @@ public interface BusiConstant {
          * 分隔符：前端换行
          */
         String SPLIT_FRONT_NEW_LINE = "</br>";
+        /**
+         * 分隔符：分组
+         */
+        String SPLIT_GROUP_KEY = "|*|";
     }
 
 

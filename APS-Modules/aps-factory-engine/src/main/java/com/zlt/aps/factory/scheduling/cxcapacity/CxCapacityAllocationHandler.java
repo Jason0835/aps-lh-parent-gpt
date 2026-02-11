@@ -37,6 +37,10 @@ public class CxCapacityAllocationHandler {
 
     private final ProductionHistoryHandler productionHistoryHandler;
 
+    private final CxMouldProductionHandler cxMouldProductionHandler;
+
+    private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
+
     /**
      * 对成型机台创建分配集合对象-按最小硫化配比分配
      *
@@ -126,7 +130,8 @@ public class CxCapacityAllocationHandler {
             // 最先给有特殊结构在机的机台挑选
             Boolean isSpecial1 = this.hasSpecialStructure(machine1);
             Boolean isSpecial2 = this.hasSpecialStructure(machine2);
-            int result = isSpecial2.compareTo(isSpecial1); // Boolean的true比false大，倒序，优先处理true的
+            // Boolean的true比false大，倒序，优先处理true的
+            int result = isSpecial2.compareTo(isSpecial1);
             if (result != 0) {
                 return result;
             }
@@ -175,7 +180,20 @@ public class CxCapacityAllocationHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = allocationGroupPlan.getGroupName();
+        Integer startDay = cxMachineInfo.getNextStartDay();
         Integer leftOverDays = allocationGroupPlan.getLeftOverNeedAllocationDays();
+        Integer remainingDays = cxMachineInfo.getRemainingDays();
+        ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
+        //20260209 特殊材料是否需要拉量或是舍弃
+        CxMachineAllocationPlanHelper calculationAllocation = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, leftOverDays, startDay, context.getMonthDays());
+        Integer confirmNeedAllocationDays = specialMaterialScheduleHandler.calculateConfirmAllocationDaysBySpecialMaterial(calculationAllocation, productionContext, allocationGroupPlan);
+        if (null == confirmNeedAllocationDays || confirmNeedAllocationDays <= BigDecimal.ZERO.intValue()) {
+            log.info(TbrProductionGroupLogRecorder.addSpecialMaterialStockLimitLog(productionContext, groupName, false));
+            allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+            selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
+            return;
+        }
+        leftOverDays = confirmNeedAllocationDays;
         //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
         Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
         if (!allocationGroupPlan.isNextAllocation(minAllocationDays)) {
@@ -186,7 +204,6 @@ public class CxCapacityAllocationHandler {
         }
         log.info(TbrProductionGroupLogRecorder.addReverseCxMachineSelectedGroupPlanLog(context, cxMachineInfo, allocationGroupPlan));
         //重新计算分配的起始时间
-        Integer startDay = cxMachineInfo.getNextStartDay();
         Set<Integer> hasProductionDaySet = cxMachineInfo.confirmProductionRange(context, allocationGroupPlan);
         Integer realStartDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
         startDay = Math.max(startDay, realStartDay);
@@ -200,9 +217,8 @@ public class CxCapacityAllocationHandler {
             return;
         }
         startDay = realChangeDay;
-        Integer remainingDays = cxMachineInfo.getRemainingDays();
-        ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
-        Integer needAllocationDays = allocationGroupPlan.getRemainingNeedAllocationDays();
+        //20260209 采用新的分配天数 allocationGroupPlan.getRemainingNeedAllocationDays();
+        Integer needAllocationDays = confirmNeedAllocationDays;
         //剩余时间
         Integer leftOver = remainingDays - needAllocationDays;
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
@@ -213,7 +229,7 @@ public class CxCapacityAllocationHandler {
         //20260109 标记分配完成
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
-        CxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //还有剩余产能，继续挑选下一个分组结构
         if (leftOver >= minAllocationDays) {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineFindNextGroupPlanLog(context, cxMachineInfo));
@@ -257,8 +273,6 @@ public class CxCapacityAllocationHandler {
         if (heightList.size() == BigDecimal.ONE.intValue()) {
             return heightList.get(BigDecimal.ZERO.intValue());
         }
-        //todo 共用模具受限
-
         Integer maxSpecialMaterial = heightList.stream().mapToInt(ProductionPlanGroupInfo::getSpecialMaterialsCount).max().getAsInt();
         List<ProductionPlanGroupInfo> specialMaterialList = heightList.stream().filter(groupPlan -> maxSpecialMaterial.equals(groupPlan.getSpecialMaterialsCount())).collect(Collectors.toList());
         if (specialMaterialList.size() == BigDecimal.ONE.intValue()) {
@@ -284,7 +298,13 @@ public class CxCapacityAllocationHandler {
         String structureName = addNewGroupPlan.getGroupName();
         String isZeroRack = addNewGroupPlan.getIsZero();
         //最小分配天数
-        Integer minAllocationDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        Integer minAllocationDays;
+        //20260209 特殊材料结构，将最小分配天数置为零
+        if (addNewGroupPlan.isSpecialMaterial()) {
+            minAllocationDays = BigDecimal.ZERO.intValue();
+        } else {
+            minAllocationDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        }
         //挑选机台
         List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
@@ -492,12 +512,14 @@ public class CxCapacityAllocationHandler {
         // 1、如果在机结构有特殊材料，需要优先选择包含特殊材料的结构
         List<ProductionPlanGroupInfo> specialMaterialList = groupPlanList;
         boolean isSpecial = this.hasSpecialStructure(cxMachineInfo);
-        if (!isSpecial) { // 如果在机结构没有特殊材料，但是其他机台的在机结构有特殊材料，则同样需要优先选择包含特殊材料的结构
+        // 如果在机结构没有特殊材料，但是其他机台的在机结构有特殊材料，则同样需要优先选择包含特殊材料的结构
+        if (!isSpecial) {
             TbrProductionContext productionContext = (TbrProductionContext) context;
             isSpecial = productionContext.getBaseDataContainer().getCxMachineBaseInfo().values().stream()
                     .anyMatch(machine -> this.hasSpecialStructure(machine));
         }
-        if (isSpecial) { // 特殊材料校验为true，则需要优先排特殊结构
+        // 特殊材料校验为true，则需要优先排特殊结构
+        if (isSpecial) {
             List<ProductionPlanGroupInfo> tempSpecialMaterialList = groupPlanList.stream()
                     .filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(tempSpecialMaterialList)) {

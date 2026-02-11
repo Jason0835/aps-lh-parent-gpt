@@ -150,7 +150,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             newMpFinalList.addAll(oneStructMpFinalList);
 
             //2.6 构建月计划统计结果
-            List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList);
+            List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList, contextDTO.getOneStructureAllocationList());
             monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
 
             //2.7 保存调整日志

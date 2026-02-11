@@ -12,6 +12,7 @@ import com.zlt.aps.factory.handler.SkuProductionCounter;
 import com.zlt.aps.factory.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
 import com.zlt.aps.factory.utils.NoProductionReasonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -31,7 +32,11 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
+
+    private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
+
     /**
      * 正式排产，对结构按已经分配好的机台产能进行排产
      * 先在机结构，其次新增结构
@@ -68,7 +73,7 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 return;
             }
             log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName));
-            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
+            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
         });
         //5、非在机结构，新增规格排产
         allGroupPlanInfo.forEach((structureName, groupPlan) -> {
@@ -76,7 +81,7 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 return;
             }
             log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName));
-            CxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
+            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
         });
     }
 

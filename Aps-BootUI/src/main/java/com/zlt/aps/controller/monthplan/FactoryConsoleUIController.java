@@ -1,5 +1,7 @@
 package com.zlt.aps.controller.monthplan;
 
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -7,9 +9,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdResultDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanTypeVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 工厂月生产计划控制台业务服务类
@@ -39,6 +42,8 @@ import java.util.Date;
 public class FactoryConsoleUIController extends BaseController {
 
     private final IFactoryConsoleRemoteService factoryConsoleService;
+
+    private final ISysDictDataCacheService iSysDictDataCacheService;
 
     /**
      * 根据条件查询工厂需要排产及已经排产的销售生产需求计划列表
@@ -94,6 +99,7 @@ public class FactoryConsoleUIController extends BaseController {
         if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
             return checkParamResult;
         }
+        setFactoryName(factoryProductionParam);
         return factoryConsoleService.oneClickProductionProcess(factoryProductionParam);
     }
 
@@ -112,6 +118,7 @@ public class FactoryConsoleUIController extends BaseController {
         if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
             return checkParamResult;
         }
+        setFactoryName(factoryProductionParam);
         return factoryConsoleService.resetConfigurationInitProduction(factoryProductionParam);
     }
 
@@ -130,6 +137,7 @@ public class FactoryConsoleUIController extends BaseController {
         if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
             return checkParamResult;
         }
+        setFactoryName(factoryProductionParam);
         return factoryConsoleService.resetGroupAllocationCapacityProduction(factoryProductionParam);
     }
 
@@ -148,6 +156,7 @@ public class FactoryConsoleUIController extends BaseController {
         if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
             return checkParamResult;
         }
+        setFactoryName(factoryProductionParam);
         return factoryConsoleService.rescheduleMouldingProduction(factoryProductionParam);
     }
 
@@ -184,16 +193,12 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/deleteMonthPlanRequire")
     @ApiOperation("按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本")
     public AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam) {
-        if (null == factoryProductionParam) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
+        AjaxResult checkParamResult = checkEmptyMonthPlanVersion(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
         }
-        String factoryCode = factoryProductionParam.getFactoryCode();
-        Integer year = factoryProductionParam.getYear();
-        Integer month = factoryProductionParam.getMonth();
-        String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion)) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.REQUIRE_VERSION_NO_EMPTY));
-        }
+        setFactoryName(factoryProductionParam);
         return factoryConsoleService.deleteMonthPlanRequire(factoryProductionParam);
     }
 
@@ -208,17 +213,12 @@ public class FactoryConsoleUIController extends BaseController {
     @PostMapping("/deleteMonthPlanProductionVersion")
     @ApiOperation("按分厂 + 年月 + 排产版本的方式删除排产计划版本")
     public AjaxResult deleteMonthPlanProductionVersion(@RequestBody FactoryProductionParamVo factoryProductionParam) {
-        if (null == factoryProductionParam) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.CONDITION_NO_EMPTY));
+        AjaxResult checkParamResult = checkEmptyProductionVersion(factoryProductionParam);
+        //校验没通过
+        if (AjaxResult.Type.ERROR.value() == (Integer) checkParamResult.get(AjaxResult.CODE_TAG)) {
+            return checkParamResult;
         }
-        String factoryCode = factoryProductionParam.getFactoryCode();
-        Integer year = factoryProductionParam.getYear();
-        Integer month = factoryProductionParam.getMonth();
-        String monthPlanVersion = factoryProductionParam.getMonthPlanVersion();
-        String productionVersion = factoryProductionParam.getProductionVersion();
-        if (StringUtils.isBlank(factoryCode) || null == year || null == month || StringUtils.isBlank(monthPlanVersion) || StringUtils.isBlank(productionVersion)) {
-            return AjaxResult.error(I18nUtil.getMessage(I18nConstant.PRODUCTION_VERSION_NO_EMPTY));
-        }
+        setFactoryName(factoryProductionParam);
         return factoryConsoleService.deleteMonthPlanProductionVersion(factoryProductionParam);
     }
 
@@ -260,7 +260,7 @@ public class FactoryConsoleUIController extends BaseController {
         if (checkParamEmpty(param)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
         }
-        FactoryMonthPlanProdFinal prodFinal = new FactoryMonthPlanProdFinal();
+        FactoryMonthPlanTypeVo prodFinal = new FactoryMonthPlanTypeVo();
         BeanUtils.copyProperties(param, prodFinal);
         return factoryConsoleService.getProductionMonthType(prodFinal);
     }
@@ -270,6 +270,17 @@ public class FactoryConsoleUIController extends BaseController {
     @ResponseBody
     public AjaxResult check(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         return factoryConsoleService.checkProductionDemandPlan(factoryProductionParam);
+    }
+
+    /**
+     * 根据工厂编码，获取工厂名称
+     *
+     * @param param
+     */
+    private void setFactoryName(FactoryProductionParamVo param) {
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(param.getFactoryCode())).findFirst().get().getDictLabel();
+        param.setFactoryName(factoryName);
     }
 
     /**

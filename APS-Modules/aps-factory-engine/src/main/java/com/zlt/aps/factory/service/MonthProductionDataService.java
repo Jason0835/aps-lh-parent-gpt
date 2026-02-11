@@ -162,6 +162,7 @@ public interface MonthProductionDataService {
      * @return
      */
     List<MpStructureAllocation> getStructureAllocationInfoByProductionVersion(Context context);
+
     /**
      * 保存分组计划的成型转产结果
      * TBR-为结构
@@ -184,6 +185,13 @@ public interface MonthProductionDataService {
      * @param dayResultList
      */
     void saveMouldProductionResult(List<FactoryMonthPlanMouldDayResult> dayResultList);
+
+    /**
+     * 保存排产统计结果信息
+     *
+     * @param productionStatisticsResultList
+     */
+    void saveProductionStatisticsResult(List<MpMonthPlanStatistics> productionStatisticsResultList);
 
     /**
      * 保存未排计划信息

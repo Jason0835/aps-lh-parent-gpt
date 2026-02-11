@@ -80,10 +80,6 @@ public class CalculateStructureCxMachineNumber {
             ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(productionContext, structureName, productionContext.getProductType(), groupDatas);
             //20260206 特殊材料的结构检测
             groupInfo.checkSpecialMaterialData(productionContext);
-            //是否零度结构
-            boolean zeroRack = groupDatas.stream()
-                    .anyMatch(plan -> YesOrNoEnum.YES.getCode().equals(plan.getIsZeroRack()));
-            groupInfo.setIsZero(zeroRack ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
             Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = getCxMachineLhRationMap(structureName, productionContext);
             if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
                 log.info(TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(productionContext, structureName));
@@ -111,7 +107,8 @@ public class CalculateStructureCxMachineNumber {
                     groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
                 } else {
                     if (null != minAllocationDays && groupInfo.getTheoryDays() < minAllocationDays) {
-                        if (!groupInfo.isSpecialMaterial()) {// 特殊材料结构理论分配天数低于5天时，不能强制拉到5天。
+                        // 特殊材料结构理论分配天数低于5天时，不能强制拉到5天。
+                        if (!groupInfo.isSpecialMaterial()) {
                             groupInfo.setTheoryDays(minAllocationDays);
                             groupInfo.setLeftOverNeedAllocationDays(minAllocationDays);
                             //重新计算估算的机台数

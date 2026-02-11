@@ -27,6 +27,7 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-02-14
  */
+@Deprecated
 public interface IFactoryMonthPlanProdFinalService {
 
     /**

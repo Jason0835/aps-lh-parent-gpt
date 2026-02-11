@@ -4,6 +4,7 @@ import com.google.common.collect.Sets;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
  * 需求计划合并分组
  * @author Yelq
  */
+@Slf4j
 public class DemandPlanGrouper {
   // 供应链优先级常量
   private static final Set<String> RESERVE_PRIORITIES = Sets.newHashSet(ApsConstant.SAL_PRIORITY_CYCLE_STOCK_UP, ApsConstant.SAL_PRIORITY_PRECEDENT_STOCK_UP);
@@ -36,17 +38,16 @@ public class DemandPlanGrouper {
       return Collections.emptyMap();
     }
     // 1. 按原始groupKey分组
-    Map<String, List<DpDemandPlan>> originalGroups = demandPlans.stream()
+    Map<String, List<DpDemandPlan>> originalGroups = filterDemandPlans.stream()
         .collect(Collectors.groupingBy(DpDemandPlan::getGroupKey));
-
     // 2. 分类处理
     return processGroups(createCondition,originalGroups);
   }
 
 
   private static List<DpDemandPlan> processDemandPlansOptimized(List<DpDemandPlan> demandPlans) {
-    if (demandPlans == null || demandPlans.isEmpty()) {
-      return new ArrayList<>();
+    if (CollectionUtils.isEmpty(demandPlans)) {
+      return Collections.emptyList();
     }
     // 使用自定义的GroupInfo来跟踪分组信息
     Map<String, GroupInfo> groupInfoMap = new HashMap<>();
@@ -92,7 +93,6 @@ public class DemandPlanGrouper {
     for (Map.Entry<String, List<DpDemandPlan>> entry : originalGroups.entrySet()) {
       List<DpDemandPlan> plans = entry.getValue();
       GroupType type = analyzeGroupType(plans);
-
       switch (type) {
         case PURE_RESERVE:
           pureReserveGroups.put(entry.getKey(), plans);
@@ -105,7 +105,6 @@ public class DemandPlanGrouper {
           break;
       }
     }
-
     // 构建销售订单分组的快速索引
     SalesGroupIndex salesGroupIndex = buildSalesGroupIndex(salesGroups, mixedGroups);
 
@@ -175,27 +174,17 @@ public class DemandPlanGrouper {
       Map<String, List<DpDemandPlan>> resultGroups) {
 
     for (Map.Entry<String, List<DpDemandPlan>> reserveEntry : pureReserveGroups.entrySet()) {
+      log.info("monthPlanVersion:{},key: {},size:{}",createCondition.getMonthPlanVersion(),reserveEntry.getKey(),reserveEntry.getValue().size());
       List<DpDemandPlan> reservePlans = reserveEntry.getValue();
-
-      if (reservePlans.isEmpty()) {
-        continue;
-      }
-
       // 获取储备订单的物料编码
       DpDemandPlan firstPlan = reservePlans.get(0);
       String materialCode = firstPlan.getMaterialCode();
-
       // 查找最佳目标分组
       SalesGroupInfo bestGroup = salesGroupIndex.findBestGroupForReserve(materialCode);
-
       if (bestGroup != null) {
         // 合并到目标分组
         List<DpDemandPlan> targetGroup = resultGroups.get(bestGroup.groupKey);
         targetGroup.addAll(reservePlans);
-        continue;
-      }
-      // 如果找不到合适的分组，则舍弃这个纯储备订单分组
-      if(createCondition.isIncludePostpone()) {
         continue;
       }
       resultGroups.put(reserveEntry.getKey(),reservePlans);

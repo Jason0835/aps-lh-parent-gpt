@@ -452,7 +452,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 未排产原因
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.reason")
+    // @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.reason")
     @ApiModelProperty(value = "未排产原因", name = "reason")
     @TableField(value = "REASON")
     private String reason;

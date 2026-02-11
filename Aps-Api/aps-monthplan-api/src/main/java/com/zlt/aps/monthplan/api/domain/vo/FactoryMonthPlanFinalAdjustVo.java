@@ -71,4 +71,9 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
      * 记录原始的总量
      */
     private Integer oriTotalQty;
+
+    /**
+     * 调整明细
+     */
+    private StringBuilder adjustDetail;
 }

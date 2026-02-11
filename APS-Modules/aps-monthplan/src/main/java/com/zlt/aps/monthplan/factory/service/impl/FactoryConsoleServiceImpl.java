@@ -8,7 +8,6 @@ import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.factory.check.service.IMpCheckItemService;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.service.IMonthPlanProductionSchedulingService;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
@@ -306,7 +305,7 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
      * @return 结果
      */
     @Override
-    public FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query) {
+    public FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanTypeVo query) {
         FactoryMonthPlanTypeVo type = new FactoryMonthPlanTypeVo();
         FactoryMonthPlanFinalVersionInfoVo finalVersion = getFinalVersionInfo(query.getFactoryCode(), query.getYear(), query.getMonth());
         if (null == finalVersion) {
@@ -319,6 +318,11 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (YesOrNoEnum.YES.getValue().equals(finalVersion.getIsNaturalMonth())) {
             return type;
         }
+        type.setYear(finalVersion.getYear());
+        type.setMonth(finalVersion.getMonth());
+        type.setFactoryCode(finalVersion.getFactoryCode());
+        type.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
+        type.setProductionVersion(finalVersion.getProductionVersion());
         type.setProductionStartDate(finalVersion.getProductionStartDate());
         return type;
     }
