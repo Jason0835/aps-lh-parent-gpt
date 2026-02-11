@@ -4,9 +4,9 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanTypeVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
 import io.swagger.annotations.ApiOperation;
@@ -167,7 +167,7 @@ public interface IFactoryConsoleRemoteService {
      */
     @ApiOperation("获取月份排产模式--Date 不为空则表示非自然月排产，Date为空表示自然月排产")
     @PostMapping("/factoryConsole/getProductionMonthType")
-    AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanProdFinal condition);
+    AjaxResult getProductionMonthType(@RequestBody FactoryMonthPlanTypeVo condition);
 
     @ApiOperation("检测需求月计划排产")
     @PostMapping("/factoryConsole/checkProductionDemandPlan")

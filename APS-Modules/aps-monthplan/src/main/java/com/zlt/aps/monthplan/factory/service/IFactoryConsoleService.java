@@ -1,7 +1,6 @@
 package com.zlt.aps.monthplan.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.vo.*;
 import com.zlt.aps.monthplan.factory.dto.FactoryProductionPlanVersionDto;
@@ -100,7 +99,7 @@ public interface IFactoryConsoleService {
      * @param query
      * @return
      */
-    FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query);
+    FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanTypeVo query);
 
     FactoryMonthPlanFinalVersionInfoVo getFinalVersionInfo(String factoryCode, Integer year, Integer month);
 

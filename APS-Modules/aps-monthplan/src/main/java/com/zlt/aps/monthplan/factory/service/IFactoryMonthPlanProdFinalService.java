@@ -8,7 +8,6 @@ import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
 import com.zlt.aps.monthplan.api.domain.entity.MonthPlanRequireStock;
 import com.zlt.aps.monthplan.api.domain.vo.*;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.List;
  * 修改内容：...
  * @date 2025-02-14
  */
+@Deprecated
 public interface IFactoryMonthPlanProdFinalService {
 
     /**
@@ -128,13 +128,4 @@ public interface IFactoryMonthPlanProdFinalService {
     FactoryMonthPlanTypeVo getProductionMonthType(FactoryMonthPlanProdFinal query);
 
     List<MonthPlanRequireStock> getSaleMonthPlanRequireStock(String monthPlanVersion);
-
-    /**
-     * 下发月计划
-     *
-     * @param factoryMonthPlanProdFinal 参数
-     * @return 结果
-     */
-    @Transactional(rollbackFor = Exception.class)
-    AjaxResult issueMonthPlan(FactoryMonthPlanProdFinal factoryMonthPlanProdFinal);
 }

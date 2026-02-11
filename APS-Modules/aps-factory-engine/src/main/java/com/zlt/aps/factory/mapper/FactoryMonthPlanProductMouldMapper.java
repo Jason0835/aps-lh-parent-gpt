@@ -72,6 +72,24 @@ public interface FactoryMonthPlanProductMouldMapper {
                                                                    @Param("productionVersion") String productionVersion);
 
     /**
+     * 根据定稿结果，获取对应的需求模具配置信息
+     * 其包含的信息为物料配置的模具及对应模具的基础信息(状态、模壳标准、主花纹)
+     * 有效的模具信息(排除不排的计划)
+     *
+     * @param factoryCode       工厂编码
+     * @param year              年份
+     * @param month             月份
+     * @param monthPlanVersion  需求计划版本
+     * @param productionVersion 排产版本
+     * @return
+     */
+    List<MonthPlanProductMouldInfoVo> getEnableProductionFinalMouldInfo(@Param("factoryCode") String factoryCode,
+                                                                   @Param("year") Integer year,
+                                                                   @Param("month") Integer month,
+                                                                   @Param("monthPlanVersion") String monthPlanVersion,
+                                                                   @Param("productionVersion") String productionVersion);
+    
+    /**
      * 根据净需求信息结果，获取对应的需求模具配置信息
      * 其包含的信息为物料配置的模具及对应模具的基础信息(状态、模壳标准、主花纹)
      * 有效的模具信息(排除不排的计划)

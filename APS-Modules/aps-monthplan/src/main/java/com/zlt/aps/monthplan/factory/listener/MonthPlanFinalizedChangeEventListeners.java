@@ -15,10 +15,12 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalRe
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.demand.service.impl.OrderAllocationServiceImpl;
 import com.zlt.aps.monthplan.factory.event.MonthPlanFinalizedEvent;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -52,10 +54,13 @@ public class MonthPlanFinalizedChangeEventListeners {
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
+    @Autowired
+    private IFactoryMonthPlanProductionFinalResultService finalResultService;
+
     /**
      * 异步处理月计划定稿事件
      */
-//    @Async
+    @Async
     @EventListener
     public void handleMonthPlanFinalizedEvent(MonthPlanFinalizedEvent event) {
         try {
@@ -72,7 +77,9 @@ public class MonthPlanFinalizedChangeEventListeners {
             // 上机日期 = 排产周期的开始日 +  (startDay -1 )
             List<FactoryMonthPlanProductionFinalResult> finalList = eventDto.getFinalList();
             mpMonthPlanMonitorService.insertMonitorByFinalList(eventDto.getParam(), finalList);
-            // 6、推送SCM
+            // 6、传给MES
+            finalResultService.issueMonthPlan(eventDto.getParam());
+            // 7、推送SCM
             if (CollectionUtils.isNotEmpty(finalList)) {
                 iScmItfService.publicFacScheduleVersion(buildOutFacScheduleVersionVoList(eventDto));
             }

@@ -270,7 +270,9 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             boolean isInitDataPass = true;
             String failReason = null;
 
-            for (MonthPlanProductionRequirePlanVo plan : validCheckList) {
+            Map<String, List<MonthPlanProductionRequirePlanVo>> monthPlanProductionRequirePlanVoMaps = validCheckList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialCode));
+            for (Map.Entry<String, List<MonthPlanProductionRequirePlanVo>> monthPlanProductionRequirePlanVoMap : monthPlanProductionRequirePlanVoMaps.entrySet()) {
+                MonthPlanProductionRequirePlanVo plan = monthPlanProductionRequirePlanVoMap.getValue().get(0);
                 plan.checkProductionConditionByBase();
                 if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
                     isInitDataPass = false;
@@ -278,7 +280,6 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
                     addErrorRecord(mpCheckItemRecords, CheckItemTypeEnums.INIT_DATA.getCode(), failReason, plan.getMaterialDesc());
                 }
             }
-
             addCheckItemResult(mpCheckItemVos, CheckItemTypeEnums.INIT_DATA, isInitDataPass, failReason);
 
             // 即使校验不通过，也返回 true，允许后续流程继续跑（可能会查出其他配置缺失的问题）

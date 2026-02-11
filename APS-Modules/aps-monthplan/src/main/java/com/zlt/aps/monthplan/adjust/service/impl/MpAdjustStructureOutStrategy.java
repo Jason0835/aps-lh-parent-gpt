@@ -314,7 +314,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
         }
         //9.构建月计划统计结果
-        List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()));
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()), contextDTO.getOneStructureAllocationList());
 
         contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);

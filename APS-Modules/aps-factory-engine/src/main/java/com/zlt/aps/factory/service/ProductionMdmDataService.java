@@ -160,6 +160,15 @@ public interface ProductionMdmDataService {
     List<MonthPlanProductMouldInfoVo> getEnableProductionMouldInfo(Context context);
 
     /**
+     * 根据定稿排产记录，获取可排产SKU的模具关系信息
+     * 其包含的信息为物料配置的模具(模具编号、模壳标准、主花纹)
+     *
+     * @param context
+     * @return
+     */
+    List<MonthPlanProductMouldInfoVo> getEnableProductionFinalMouldInfo(Context context);
+
+    /**
      * 根据排产初始化，获取在排产周期范围内可到货的新模具-物料关系信息
      * 1、上机日期在排产周期范围 [productionStartDate,productionEndDate]
      * 2、新模具到货中的物料在本次可排产范围内

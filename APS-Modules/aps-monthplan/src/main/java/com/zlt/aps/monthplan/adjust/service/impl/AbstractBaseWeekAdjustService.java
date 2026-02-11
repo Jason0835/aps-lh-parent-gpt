@@ -63,6 +63,7 @@ import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
+import com.zlt.aps.monthplan.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.monthplan.api.enums.AdjustItemSourceEnum;
 import com.zlt.aps.monthplan.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.monthplan.common.utils.StringUtil;
@@ -480,18 +481,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 构建月计划统计结果
      * @param dailyCapacityMap 日产能限制Map（key=1-31日期，value=日产能限制实体）
      * @param mpProdFinalList  月计划定稿列表
+     * @param oneStructureAllocationList 月计划结构转产表-单结构列表
      * @return 统计结果列表
      */
-    protected List<MpMonthPlanStatistics> buildMonthPlanStatistics(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+    protected List<MpMonthPlanStatistics> buildMonthPlanStatistics(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+                                                                   List<MpStructureAllocation> oneStructureAllocationList) {
         List<MpMonthPlanStatistics> resultList = new ArrayList<>();
-        if (PubUtil.isEmpty(mpProdFinalList) || PubUtil.isEmpty(dailyCapacityMap)) {
-            log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划定稿列表为空，跳过不处理");
+        if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList)) {
+            log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划结构转产表-单结构列表为空，跳过不处理");
             return resultList;
         }
-        for (FactoryMonthPlanFinalAdjustVo monthPlan : mpProdFinalList) {
+        FactoryMonthPlanFinalAdjustVo monthPlan = new FactoryMonthPlanFinalAdjustVo();
+        if (PubUtil.isNotEmpty(mpProdFinalList)) {
+            monthPlan = mpProdFinalList.get(0);
+        }
+        for (MpStructureAllocation structureAllocation : oneStructureAllocationList) {
             MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
             // 设置月计划统计相关字段
-            setMonthPlanStatisticsField(monthPlan, statistics);
+            setMonthPlanStatisticsField(monthPlan, structureAllocation, statistics);
             // 遍历日期，设置每个dayN字段
             for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
                 setDayField(statistics, day, dailyCapacityMap);
@@ -505,17 +512,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     /**
      * 设置月计划统计相关字段
      */
-    private void setMonthPlanStatisticsField(FactoryMonthPlanFinalAdjustVo source, MpMonthPlanStatistics target) {
-        target.setFactoryCode(source.getFactoryCode());
-        target.setYear(source.getYear());
-        target.setMonth(source.getMonth());
+    private void setMonthPlanStatisticsField(FactoryMonthPlanFinalAdjustVo source, MpStructureAllocation structureAllocation, MpMonthPlanStatistics target) {
+        target.setFactoryCode(structureAllocation.getFactoryCode());
+        target.setYear(structureAllocation.getYear());
+        target.setMonth(structureAllocation.getMonth());
+        target.setProductionVersion(structureAllocation.getProductionVersion());
+        target.setMonthPlanVersion(structureAllocation.getMonthPlanVersion());
+        target.setStructureName(structureAllocation.getStructureName());
         target.setYearMonth(source.getYearMonth());
-        target.setStructureName(source.getStructureName());
         target.setProSize(source.getProSize());
         target.setStructureType(source.getStructureType());
-        target.setMonthPlanVersion(source.getMonthPlanVersion());
         target.setLastMonthPlanVersion(source.getLastMonthPlanVersion());
-        target.setProductionVersion(source.getProductionVersion());
         target.setProductTypeCode(source.getProductTypeCode());
     }
 
@@ -530,11 +537,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (capacityVo == null) {
             return;
         }
-        Map<String, Object> jsonData = new HashMap<>(3);
-        jsonData.put("LhMachines", capacityVo.getUsedLhMachines() == 0 ? null:capacityVo.getUsedLhMachines());
-        jsonData.put("EmbryoCount", capacityVo.getUsedEmbryoTypes() == 0 ? null:capacityVo.getUsedEmbryoTypes());
-        jsonData.put("ChangeMould", "");
-        statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(jsonData));
+        MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
+        dayProductionStatisticsDetailVo.setLhMachines(capacityVo.getUsedLhMachines() == 0 ? null: capacityVo.getUsedLhMachines());
+        dayProductionStatisticsDetailVo.setEmbryoCount(capacityVo.getUsedEmbryoTypes() == 0 ? null: capacityVo.getUsedEmbryoTypes());
+        dayProductionStatisticsDetailVo.setChangeMould(null);
+        statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 
 
@@ -580,6 +587,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
         baseDao.insertBatch(monthPlanStatisticsList);
+        log.info("保存月计划统计结果成功，共新增:{}条记录", monthPlanStatisticsList.size());
     }
 
     /**
@@ -2165,17 +2173,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
         // 排产机台,多个机台用逗号分隔
         adjustDetailVo.setScheduledMachines(getCxMachineCodes(structureAllocationList));
-
+        // 试制量试计划
+        Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
+        List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
         if (monthPlan == null) {
             // SKU日硫化产能
             Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
             // 物料信息
             Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
-            // 试制量试计划
-            Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
             MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
-            List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
@@ -2237,6 +2244,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setProductCategory(monthPlan.getProductCategory());
         // 制造示方书号
         adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
+        // 试制量制关联字段设置
+        if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+            // 获取试制量试
+            MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, busiId);
+            // 紧急程度
+            adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
+            // 施工阶段
+            adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+            // 试制量试ID
+            adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
+        }
     }
 
 

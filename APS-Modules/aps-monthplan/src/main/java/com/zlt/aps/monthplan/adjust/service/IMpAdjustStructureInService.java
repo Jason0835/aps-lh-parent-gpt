@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.adjust.service;
 
 
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
@@ -77,4 +78,11 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
      * @param contextDTO 周程滚动调整上下文对象
      */
     Map<Integer, DailyMouldAvailabilityResult> getCavityAndBlockQtyMap(MpRollAdjustContextDTO contextDTO);
+    
+    /**
+     * 获取结构硫化配比
+     * @param contextDTO
+     * @return
+     */
+    List<MdmStructureLhRatio> getStructureLhRatio(MpRollAdjustContextDTO contextDTO);
 }

@@ -192,4 +192,7 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "型腔与活块Map")
     private Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap;
+
+    @ApiModelProperty(value = "结构硫化配比")
+    private List<MdmStructureLhRatio> structureLhRatio;
 }

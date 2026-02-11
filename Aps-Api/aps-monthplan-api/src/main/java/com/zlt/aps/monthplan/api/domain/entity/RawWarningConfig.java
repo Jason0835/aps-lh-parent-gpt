@@ -52,7 +52,7 @@ public class RawWarningConfig extends BaseEntity {
     /**
      * 预警类型：1-用量偏差预警 2-新材料预警
      */
-    @Excel(name = "预警类型", dictType = "raw_warning_type")
+    @Excel(name = "预警类型", dictType = "warn_type")
     @ApiModelProperty(value = "预警类型", name = "warningType")
     @TableField(value = "WARNING_TYPE")
     private String warningType;
@@ -84,7 +84,7 @@ public class RawWarningConfig extends BaseEntity {
     /**
      * 预警级别：1-低 2-中 3-高
      */
-    @Excel(name = "预警级别", dictType = "warning_level")
+    @Excel(name = "预警级别", dictType = "warn_level")
     @ApiModelProperty(value = "预警级别", name = "warningLevel")
     @TableField(value = "WARNING_LEVEL")
     private String warningLevel;

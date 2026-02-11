@@ -62,6 +62,7 @@ import java.util.*;
  * @date 2025-02-14
  */
 @Slf4j
+@Deprecated
 @RestController
 @RequiredArgsConstructor
 @Api(tags = "分厂月生产计划排产结果-生产计划排产结果")
@@ -360,17 +361,5 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
      */
     private String[] getQueryFormulas() {
         return null;
-    }
-
-    /**
-     * 下发月计划
-     *
-     * @param factoryMonthPlanProdFinal 参数
-     * @return 结果
-     */
-    @ApiOperation("下发月计划 - 年月+分厂+需求计划版本+分厂月计划版本")
-    @PostMapping("/issueMonthPlan")
-    public AjaxResult issueMonthPlan(@RequestBody FactoryMonthPlanProdFinal factoryMonthPlanProdFinal) {
-        return factoryMonthPlanProdFinalService.issueMonthPlan(factoryMonthPlanProdFinal);
     }
 }
