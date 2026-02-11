@@ -9,9 +9,11 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
+import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.adjust.service.IMpWeekAdjustService;
@@ -34,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -190,10 +193,9 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO));
 
         contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
-        //当日作为调整日
-        contextDTO.setAdjustDay(DateUtils.getDay(DateUtils.getNowDate()));
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(),contextDTO.getProductType()));
-
+        //设置调整日
+        setAdjustDate(contextDTO);
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
         
@@ -217,6 +219,21 @@ public class MpWeekRollAdjustController extends BaseController {
         String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode())).findFirst().get().getDictLabel();
         contextDTO.setFactoryName(factoryName);
         return contextDTO;
+    }
+
+    /**
+     * 设置调整日
+     * @param contextDTO 周程滚动上下文
+     */
+    private void setAdjustDate(MpRollAdjustContextDTO contextDTO) {
+        String weekRollAdjustDate = (String) contextDTO.getParamMap().get(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
+        Date adjustDate = StringUtil.isEmptyWithTrim(weekRollAdjustDate) ? DateUtils.getNowDate() : DateUtils.parseDate(weekRollAdjustDate);
+        if (contextDTO.getMpMonth() != DateUtils.getMonth(adjustDate)){
+            //若调整月不等于当前月，则将调整日设置1
+            contextDTO.setAdjustDay(FactoryConstant.MONTH_START_DAY);
+        }else{
+            contextDTO.setAdjustDay(DateUtils.getDay(adjustDate));
+        }
     }
 
 }

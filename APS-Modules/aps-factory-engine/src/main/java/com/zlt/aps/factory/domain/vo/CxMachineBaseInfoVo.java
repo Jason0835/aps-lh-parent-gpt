@@ -614,6 +614,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             if (null != dayCapacityLimit) {
                 dayCapacityLimit.deductionCxMachineGroupNameAllocationUsedQty(context, beforeConclusionDay, allocationInfo);
             }
+            //todo 释放特殊材料日分配量
         });
     }
 

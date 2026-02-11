@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.adjust.engine;
 
+import cn.hutool.core.convert.Convert;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -289,7 +290,7 @@ public class MpWeekRollAdjustEngine {
      * @param procLog 过程日志信息
      */
     private void addAdjustProcLog(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,String procLog){
-        mpFinalVo.getAdjustDetail().append(procLog);
+        mpFinalVo.getAdjustDetail().append(procLog).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         contextDTO.getAdjustProcLogList().removeIf(item->item.getMaterialCode().equals(mpFinalVo.getMaterialCode()));
         contextDTO.getAdjustProcLogList().add(mpFinalVo);
     }
@@ -305,6 +306,7 @@ public class MpWeekRollAdjustEngine {
     private Integer getTrialNewOnlineDay(MpRollAdjustContextDTO contextDTO,Integer startDay, Integer endDay, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         String dayField;
         int iCount;
+        startDay = startDay <= 0 ? FactoryConstant.MONTH_START_DAY:startDay;
         //试制、量试SKU单日上限的数量
         int upLimit = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.TRIAL_SKU_SINGLE_DAY_QTY_UP_LIMIT.getCode());
         //试制、量试SKU在结构起产日是否允许排产
@@ -2284,6 +2286,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         mpFinalVo.setAdjustDetail(new StringBuilder());
+        mpFinalVo.setAdjustDetailId(Convert.toStr(adjustStructInVo.getId(), null));
         return mpFinalVo;
     }
     /**
@@ -2330,6 +2333,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         mpFinalVo.setAdjustDetail(new StringBuilder());
+        mpFinalVo.setAdjustDetailId(Convert.toStr(adjustStructOutVo.getId(), null));
         return mpFinalVo;
     }
 }

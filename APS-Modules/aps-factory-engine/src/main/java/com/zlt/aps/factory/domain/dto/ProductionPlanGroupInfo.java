@@ -281,6 +281,21 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取结构最短上机天数
+     * 如果不是特殊材料的结构则为参数SYS0204010
+     * 特殊材料结构的上机天数为1
+     *
+     * @param productionContext 排产上下文
+     * @return
+     */
+    public Integer getMinAllocationDays(TbrProductionContext productionContext) {
+        if (isSpecialMaterial()) {
+            return BigDecimal.ONE.intValue();
+        }
+        return productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+    }
+
+    /**
      * 获取一天的浮动余量
      * = 1 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
      *
@@ -359,7 +374,8 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
-        BaseDataContainer baseDataContainer = ((TbrProductionContext) context).getBaseDataContainer();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = baseDataContainer.getStructureLhRatioList();
         //根据结构成型硫化配比信息，提取结构最小的硫化配比和结构分组成型硫化配比
         Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
@@ -383,9 +399,9 @@ public class ProductionPlanGroupInfo {
         //4、对分组计划中没有满足最低上机天数的，将天数上调到最低上机天数-由模拟排产阶段决定是否要提前收尾
         ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
         Integer minProductionDays = paramConfiguration.getMinProductionDays();
-        Integer minAllocationDays = paramConfiguration.getMinAllocationDays();
         groupInfoMap.forEach((structureName, groupInfo) -> {
             Integer theoryDays = groupInfo.getTheoryDays();
+            Integer minAllocationDays = groupInfo.getMinAllocationDays(productionContext);
             //分配天数为零，或是小于最小要求天数，则设置不排产
             if (groupInfo.isBelowMinProductionDays(minProductionDays)) {
                 groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
@@ -962,17 +978,17 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 判断是否可进行下一次分配
-     * 特殊材料结构不进行最小分配天数控制
-     * 非特殊材料结构，需要判断剩余可分配天数要 >= minAllocationDays
+     * 特殊材料结构不进行最小分配天数控制即最小排产天数 = 1
+     * 非特殊材料结构，需要判断剩余可分配天数要 >= 参数SYS0204010
      *
-     * @param minAllocationDays 最小要求分配天数
+     * @param productionContext 排产上下文
      * @return
      */
-    public boolean isNextAllocation(int minAllocationDays) {
-        if (isSpecialMaterial()) {
-            return leftOverNeedAllocationDays > BigDecimal.ZERO.intValue();
+    public boolean isNextAllocation(Integer leftOverDays, TbrProductionContext productionContext) {
+        if (leftOverDays <= BigDecimal.ZERO.intValue()) {
+            return false;
         }
-        return leftOverNeedAllocationDays >= minAllocationDays;
+        return leftOverDays >= getMinAllocationDays(productionContext);
     }
 
     /**

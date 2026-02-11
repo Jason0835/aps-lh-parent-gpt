@@ -76,4 +76,12 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
      * 调整明细
      */
     private StringBuilder adjustDetail;
+
+    /**
+     * 调整明细ID
+     */
+    @TableField(exist = false)
+    @ApiModelProperty(value = "调整明细ID", name = "adjustDetailId")
+    private String adjustDetailId;
+
 }

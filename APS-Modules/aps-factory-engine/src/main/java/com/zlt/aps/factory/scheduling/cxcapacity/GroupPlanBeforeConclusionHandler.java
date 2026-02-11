@@ -38,10 +38,14 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context
-     * @param groupPlanInfo
+     * @param context       排产上下文
+     * @param groupPlanInfo 排产分组计划
      */
     public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+        //20260211 需要拉量的特殊结构，不能进行提前收尾处理
+        if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
+            return;
+        }
         String groupName = groupPlanInfo.getGroupName();
         log.info(addGroupStartBeforeConclusionLog(context, groupName));
         //获取当前模拟排产的数据
@@ -114,10 +118,16 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context
-     * @param groupPlanInfo
+     * @param context       排产上下文
+     * @param groupPlanInfo 排产分组计划
+     * @param cxMachineInfo 排产机台
+     * @param cxLhRatio     对应的硫化配比信息
      */
     public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio) {
+        //20260211 需要拉量的特殊结构，不能进行提前收尾处理
+        if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
+            return;
+        }
         String groupName = groupPlanInfo.getGroupName();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
@@ -207,7 +217,7 @@ public class GroupPlanBeforeConclusionHandler {
             Integer allocationDay = allocationInfo.getAllocationDay();
             realAllocationDayBeforeConclusion = allocationDay - deductionDay;
         }
-        Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        Integer minAllocationDays = groupPlanInfo.getMinAllocationDays(productionContext);
         //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
         if (realAllocationDayBeforeConclusion < minAllocationDays) {
             if (!hasOtherProductionCxMachine(productionContext, groupPlanInfo, cxMachineInfo, allocationInfo)) {
@@ -228,7 +238,7 @@ public class GroupPlanBeforeConclusionHandler {
         if (CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
-        //20260119 释放，成型工装使用量，切换结构使用量、分配日产能
+        //20260119 释放，成型工装使用量，切换结构使用量、分配日产能、特殊材料分配量
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
         DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
@@ -275,6 +285,7 @@ public class GroupPlanBeforeConclusionHandler {
                 if (null != dayCapacityLimit) {
                     dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, usedMouldSet, skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
                 }
+                //todo 释放，Sku特殊材料的消耗量
             });
         });
     }
