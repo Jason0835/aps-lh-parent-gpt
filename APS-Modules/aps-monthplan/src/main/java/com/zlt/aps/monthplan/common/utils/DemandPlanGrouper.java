@@ -55,14 +55,14 @@ public class DemandPlanGrouper {
       String key = plan.getGroupFactoryAndMaterialKey();
       GroupInfo info = groupInfoMap.computeIfAbsent(key, k -> new GroupInfo());
       // 累加净需求
-      info.totalNetQty += (plan.getNetQty() != null ? plan.getNetQty() : 0);
+      info.totalOrderQty += (plan.getOrderQty() != null ? plan.getOrderQty() : 0);
       // 收集原始对象
       info.plans.add(plan);
     }
     // 构建结果列表
     List<DpDemandPlan> result = new ArrayList<>();
     for (GroupInfo info : groupInfoMap.values()) {
-      if (info.totalNetQty != 0) {
+      if (info.totalOrderQty != 0) {
         result.addAll(info.plans);
       }
     }
@@ -74,7 +74,7 @@ public class DemandPlanGrouper {
    * 分组信息内部类
    */
   private static class GroupInfo {
-    int totalNetQty = 0;
+    int totalOrderQty = 0;
     List<DpDemandPlan> plans = new ArrayList<>();
   }
 
