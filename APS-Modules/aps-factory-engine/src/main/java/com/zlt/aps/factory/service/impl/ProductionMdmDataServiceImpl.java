@@ -260,6 +260,11 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
     }
 
     @Override
+    public List<MonthPlanProductMouldInfoVo> getEnableProductionFinalMouldDeliveryInfo(Context context) {
+        return factoryMonthPlanProductMouldMapper.getEnableFinalMouldDeliveryInfo(context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), context.getProductionStartDate(), context.getProductionEndDate());
+    }
+
+    @Override
     public List<MouldShellBaseInfoVo> getMouldShellInfo(Context context) {
         if (isEmptyFactoryCode(context)) {
             return Collections.emptyList();

@@ -150,6 +150,30 @@ public interface FactoryMonthPlanProductMouldMapper {
                                                                  @Param("productionEndDate") Date productionEndDate);
 
     /**
+     * 根据定稿获取在排产周期范围内可到货的新物料模具关系信息
+     * 1、上机日期在排产周期范围 [productionStartDate,productionEndDate]
+     * 2、新模具到货中的物料在本次需求范围内
+     * 有效的模具信息(排除不排的计划)
+     *
+     * @param factoryCode         工厂编码
+     * @param year                年份
+     * @param month               月份
+     * @param monthPlanVersion    需求计划版本
+     * @param productionVersion   排产版本
+     * @param productionStartDate 排产周期开始日
+     * @param productionEndDate   排产周期结束日
+     * @return
+     */
+    List<MonthPlanProductMouldInfoVo> getEnableFinalMouldDeliveryInfo(@Param("factoryCode") String factoryCode,
+                                                                 @Param("year") Integer year,
+                                                                 @Param("month") Integer month,
+                                                                 @Param("monthPlanVersion") String monthPlanVersion,
+                                                                 @Param("productionVersion") String productionVersion,
+                                                                 @Param("productionStartDate") Date productionStartDate,
+                                                                 @Param("productionEndDate") Date productionEndDate);
+
+    
+    /**
      * 获取工厂的模壳台账信息
      *
      * @param factoryCode 工厂编码
