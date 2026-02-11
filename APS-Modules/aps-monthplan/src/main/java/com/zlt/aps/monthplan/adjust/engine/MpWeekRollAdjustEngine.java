@@ -290,7 +290,7 @@ public class MpWeekRollAdjustEngine {
      * @param procLog 过程日志信息
      */
     private void addAdjustProcLog(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,String procLog){
-        mpFinalVo.getAdjustDetail().append(procLog);
+        mpFinalVo.getAdjustDetail().append(procLog).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         contextDTO.getAdjustProcLogList().removeIf(item->item.getMaterialCode().equals(mpFinalVo.getMaterialCode()));
         contextDTO.getAdjustProcLogList().add(mpFinalVo);
     }
