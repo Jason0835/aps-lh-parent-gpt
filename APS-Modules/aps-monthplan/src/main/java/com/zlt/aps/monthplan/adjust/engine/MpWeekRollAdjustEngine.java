@@ -1943,33 +1943,20 @@ public class MpWeekRollAdjustEngine {
                 continue;
             }
             //2.2、若有量试列表，优先排产
-            if (PubUtil.isNotEmpty(incAdjustBatchTrailList)){
-                if (getTrialNewOnlineDay(contextDTO,newOnLineDay,newOnLineDay, mpProdFinalList) == null){
-                    //若新的上机日 不符合 量试上机要求
-                    //2.2.1 正式规格列表 占位
-                    incAdjustFormalIter = incAdjustFormalList.iterator();
-                    while (incAdjustFormalIter.hasNext()){
-                        if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustFormalIter.next(),lockNextDay,newOnLineDay)){
-                            incAdjustFormalIter.remove();
-                        }
-                    }
-                }else {
-                    //2.2.1 排产量试列表
-                    incAdjustBatchTrailIter = incAdjustBatchTrailList.iterator();
-                    while (incAdjustBatchTrailIter.hasNext()){
-                        if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustBatchTrailIter.next(),lockNextDay,newOnLineDay)){
-                            incAdjustBatchTrailIter.remove();
-                        }
+            if (PubUtil.isNotEmpty(incAdjustBatchTrailList) && getTrialNewOnlineDay(contextDTO,newOnLineDay,newOnLineDay, mpProdFinalList) != null){
+                incAdjustBatchTrailIter = incAdjustBatchTrailList.iterator();
+                while (incAdjustBatchTrailIter.hasNext()){
+                    if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustBatchTrailIter.next(),lockNextDay,newOnLineDay)){
+                        incAdjustBatchTrailIter.remove();
                     }
                 }
-            }else{
-                //2.3、排产正式列表
-                if (PubUtil.isNotEmpty(incAdjustFormalList)){
-                    Iterator<MpAdjustStructureIn> incAdjustIter = incAdjustFormalList.iterator();
-                    while (incAdjustIter.hasNext()){
-                        if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustIter.next(),lockNextDay,newOnLineDay)){
-                            incAdjustIter.remove();
-                        }
+            }
+            //2.3、排产正式列表
+            if (PubUtil.isNotEmpty(incAdjustFormalList)){
+                Iterator<MpAdjustStructureIn> incAdjustIter = incAdjustFormalList.iterator();
+                while (incAdjustIter.hasNext()){
+                    if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustIter.next(),lockNextDay,newOnLineDay)){
+                        incAdjustIter.remove();
                     }
                 }
             }
