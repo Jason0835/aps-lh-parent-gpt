@@ -306,6 +306,7 @@ public class MpWeekRollAdjustEngine {
     private Integer getTrialNewOnlineDay(MpRollAdjustContextDTO contextDTO,Integer startDay, Integer endDay, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         String dayField;
         int iCount;
+        startDay = startDay <= 0 ? FactoryConstant.MONTH_START_DAY:startDay;
         //试制、量试SKU单日上限的数量
         int upLimit = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.TRIAL_SKU_SINGLE_DAY_QTY_UP_LIMIT.getCode());
         //试制、量试SKU在结构起产日是否允许排产
