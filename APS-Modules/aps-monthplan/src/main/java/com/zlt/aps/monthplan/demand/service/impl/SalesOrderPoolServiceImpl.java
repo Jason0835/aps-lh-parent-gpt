@@ -384,14 +384,16 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					BigDecimal totalOrdQty = newSalesOrderPoolList.stream().map(SalesOrderPool::getOrdQty)
 							.filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); // 总订单量合计
 					List<SalesOrderPool> hightPriorityList = newSalesOrderPoolList.stream()
-							.filter(s -> ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getOrderPriority())
-									&& ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getScmPriority()))
+							.filter(s ->
+//									ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getOrderPriority())
+//									&&
+									ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getScmPriority()))
 							.sorted(Comparator.comparing(SalesOrderPool::getBillDate, Comparator.reverseOrder()))
 							.collect(Collectors.toList());
 					BigDecimal hightPriorityOrdQty = hightPriorityList.stream().map(SalesOrderPool::getOrdQty)
 							.filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); // 高优先级订单量合计
 					for (SalesOrderPool pool : hightPriorityList) {
-						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty, 4)
+						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty, 4, true, BigDecimal.ROUND_UP)
 								.compareTo(hightPriorityOrderRate) <= 0) { // 高优先级总量/所有总量<= 85%则结束，否则要把高优先级调成中优先级
 							break;
 						}

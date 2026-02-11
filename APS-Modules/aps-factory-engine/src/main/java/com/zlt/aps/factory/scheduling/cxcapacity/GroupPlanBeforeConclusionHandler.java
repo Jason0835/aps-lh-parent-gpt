@@ -280,12 +280,12 @@ public class GroupPlanBeforeConclusionHandler {
                         }
                     });
                     mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
+                    //todo 20260211 特殊材料的消耗量释放(Sku已排产量对应释放)
                 });
                 //20260125 释放，日产能占用量
                 if (null != dayCapacityLimit) {
                     dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, usedMouldSet, skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
                 }
-                //todo 释放，Sku特殊材料的消耗量
             });
         });
     }
