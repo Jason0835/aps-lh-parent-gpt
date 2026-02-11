@@ -223,8 +223,6 @@ public class CxCapacityAllocationHandler {
         Integer leftOver = remainingDays - needAllocationDays;
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
-        //更新特殊材料库存
-        ((TbrProductionContext) context).updateSpecialMaterialInfoMap(allocationGroupPlan, needAllocationDays);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         //20260109 标记分配完成
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
