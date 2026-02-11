@@ -538,12 +538,13 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (null == allocationList) {
             allocationList = new ArrayList<>();
         }
+        ProductionPlanGroupInfo productionPlanInfo = addAllocationPlan.getProductionPlanInfo();
         CxMachineAllocationPlanHelper lastAllocation = getLastAllocationInfo();
         allocationList.add(addAllocationPlan);
         //20260119 处理成型工装的日使用量
         Integer startDay = addAllocationPlan.getStartDay();
         Integer endDay = addAllocationPlan.getEndDay();
-        String proSize = addAllocationPlan.getProductionPlanInfo().getProSizeInfo();
+        String proSize = productionPlanInfo.getProSizeInfo();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
@@ -558,6 +559,9 @@ public class CxMachineBaseInfoVo implements Serializable {
             //20260125 分组占用每日产能
             dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, productionDay, addAllocationPlan);
         }
+        //todo 20260211 特殊材料分配库存更新
+        Integer allocationDay = addAllocationPlan.getAllocationDay();
+        productionContext.updateSpecialMaterialInfoMap(productionPlanInfo, allocationDay);
         //20260121 切换结构
         if (isChangeGroup(lastAllocation, addAllocationPlan)) {
             String groupName = addAllocationPlan.getAllocationGroup();
@@ -603,19 +607,22 @@ public class CxMachineBaseInfoVo implements Serializable {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
-        deductionDaySet.forEach(beforeConclusionDay -> {
+        Integer sumDeductionDay = BigDecimal.ZERO.intValue();
+        for (Integer beforeConclusionDay : deductionDaySet) {
             if (stopDayInfo.contains(beforeConclusionDay)) {
                 return;
             }
             allocationDaySet.remove(beforeConclusionDay);
+            sumDeductionDay = sumDeductionDay + BigDecimal.ONE.intValue();
             //20260120 释放成型工装使用量占用
             baseDataContainer.releaseUsedCount(beforeConclusionDay, proSize, cxMachineCode);
             //20260125 释放成型产能分配量占用
             if (null != dayCapacityLimit) {
                 dayCapacityLimit.deductionCxMachineGroupNameAllocationUsedQty(context, beforeConclusionDay, allocationInfo);
             }
-            //todo 释放特殊材料日分配量
-        });
+        }
+        //todo 20260211 特殊材料库存分配量(释放)
+        productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, -sumDeductionDay);
     }
 
     /**

@@ -263,8 +263,6 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
-        //更新特殊材料库存
-        productionContext.updateSpecialMaterialInfoMap(addNewGroupPlan, realAllocationDays);
         //更新剩余天数
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
