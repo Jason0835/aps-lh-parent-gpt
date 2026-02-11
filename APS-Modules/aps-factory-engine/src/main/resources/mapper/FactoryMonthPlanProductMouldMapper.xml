@@ -219,7 +219,7 @@
                      AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                      AND mpi.YEAR = #{year,jdbcType=DECIMAL}
                      AND mpi.MONTH = #{month,jdbcType=DECIMAL}
-                     AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                     AND mpi.LAST_MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
                      AND mpi.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
                  ) AS filtered_mpi
                    INNER JOIN t_mdm_sku_mould_rel msm
@@ -258,6 +258,39 @@
               AND `YEAR` = #{year,jdbcType=DECIMAL}
               AND `MONTH` = #{month,jdbcType=DECIMAL}
               AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+              AND PRODUCTION_VERSION =  #{productionVersion,jdbcType=VARCHAR}
+            ) AS filtered_plans
+            ON mdp.FACTORY_CODE = filtered_plans.FACTORY_CODE
+            AND mdp.MATERIAL_DESC = filtered_plans.MATERIAL_DESC
+            WHERE mdp.IS_DELETE = 0
+            AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
+    </select>
+
+    <select id="getEnableFinalMouldDeliveryInfo" resultType="com.zlt.aps.factory.domain.vo.MonthPlanProductMouldInfoVo">
+            SELECT
+                mdp.FACTORY_CODE,
+                mdp.MATERIAL_CODE,
+                mdp.MATERIAL_DESC,
+                mdp.MOULD_CODE,
+                mdp.MAIN_PATTERN,
+                mdp.BOARDING_DATE,
+                mdp.MOULD_CODE AS BASE_MOULD_CODE,
+                '' AS MOULD_TYPE,
+                1 AS MOULD_STATUS,
+                '-99' AS SHELL_STANDARD,
+                1 AS LOGISTICS_STATUS,
+                '02' AS RELATION_TYPE
+            FROM t_mdm_mould_delivery_plan mdp
+            INNER JOIN (
+              SELECT
+                  DISTINCT FACTORY_CODE, MATERIAL_DESC
+              FROM
+                  t_mp_month_plan_prod_final
+              WHERE IS_DELETE = 0
+              AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+              AND `YEAR` = #{year,jdbcType=DECIMAL}
+              AND `MONTH` = #{month,jdbcType=DECIMAL}
+              AND LAST_MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
               AND PRODUCTION_VERSION =  #{productionVersion,jdbcType=VARCHAR}
             ) AS filtered_plans
             ON mdp.FACTORY_CODE = filtered_plans.FACTORY_CODE

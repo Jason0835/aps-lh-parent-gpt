@@ -207,6 +207,7 @@ public class MatchingProductionHandler {
         List<FactoryMonthPlanMouldDayResult> planList = planFinalList.stream().map(plan -> {
             FactoryMonthPlanMouldDayResult newPlan = new FactoryMonthPlanMouldDayResult();
             SpringBeanUtils.copyPropertiesIgnoreNull(plan, newPlan);
+            newPlan.setMonthPlanVersion(plan.getLastMonthPlanVersion()); // 用最新需求计划版本号
             return newPlan;
         }).collect(Collectors.toList());
         
@@ -225,7 +226,7 @@ public class MatchingProductionHandler {
                 cxContinueInfoMap);
 
         // 构建排产结果并保存
-        this.saveMouldProductionResultAdjust(productionContext, planList, detailLogList, newSkuQtyMap);
+        this.saveMouldProductionResultAdjust(productionContext, planList, planFinalList, newSkuQtyMap);
     }
     
     /**
@@ -1190,7 +1191,7 @@ public class MatchingProductionHandler {
     @Transactional
     public void saveMouldProductionResultAdjust(TbrProductionContext productionContext,
                                            List<FactoryMonthPlanMouldDayResult> resultList,
-                                           List<FactoryMonthPlanMouldDayDetail> detailList,
+                                           List<FactoryMonthPlanProductionFinalResult> planFinalList,
                                           Map<String, Integer> newSkuQtyMap) {
         if (CollectionUtils.isEmpty(newSkuQtyMap)) {
             return;
@@ -1207,12 +1208,30 @@ public class MatchingProductionHandler {
         List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(dayResultList, resultList, newSkuQtyMap);
         
         // 未定稿计划转换成定稿计划用于适配搭配算法
-        List<FactoryMonthPlanProductionFinalResult> planFinalList = mouldResultList.stream().map(plan -> {
-            FactoryMonthPlanProductionFinalResult newPlan = new FactoryMonthPlanProductionFinalResult();
-            SpringBeanUtils.copyPropertiesIgnoreNull(plan, newPlan);
-            return newPlan;
-        }).collect(Collectors.toList());
-        baseDao.saveBatch(planFinalList);
+        Map<String, FactoryMonthPlanProductionFinalResult> planMap = planFinalList.stream().collect(Collectors
+                .toMap(FactoryMonthPlanProductionFinalResult::getMaterialDesc, Function.identity(), (p1, p2) -> p1));
+        List<FactoryMonthPlanProductionFinalResult> updateFinalList = new ArrayList<>();
+        for (FactoryMonthPlanMouldDayResult plan: mouldResultList) {
+            FactoryMonthPlanProductionFinalResult updatePlan = planMap.get(plan.getMaterialDesc());
+            if (updatePlan == null) {
+                FactoryMonthPlanProductionFinalResult newPlan = new FactoryMonthPlanProductionFinalResult();
+                SpringBeanUtils.copyPropertiesIgnoreNull(plan, newPlan);
+                newPlan.setLastMonthPlanVersion(plan.getMonthPlanVersion());
+                newPlan.setMonthPlanVersion(CollectionUtils.firstElement(planFinalList).getMonthPlanVersion());
+                updateFinalList.add(newPlan);
+            }
+            updatePlan.setTotalQty(plan.getTotalQty());
+            updatePlan.setMouldCavityQty(plan.getMouldCavityQty());
+            updatePlan.setConventionProductionQty(plan.getConventionProductionQty());
+            updatePlan.setTypeBlockQty(plan.getTypeBlockQty());
+            for (int day = 1; day <=31; day ++) { // 每一天的计划都复制过去
+                Integer productionQty = (Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day);
+                updatePlan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, productionQty);
+            }
+            updateFinalList.add(updatePlan);
+        }
+        
+        baseDao.saveBatch(updateFinalList);
     }
 
     /**
@@ -2085,7 +2104,13 @@ public class MatchingProductionHandler {
             productMouldInfoList = this.getDataService().getEnableProductionMouldInfo(productionContext);
         }
         // 新模具到货计划关系
-        List<MonthPlanProductMouldInfoVo> mouldDeliveryList = this.getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
+        List<MonthPlanProductMouldInfoVo> mouldDeliveryList;
+        if (isAdjuest) {
+            mouldDeliveryList = this.getDataService().getEnableProductionFinalMouldDeliveryInfo(productionContext);
+        } else {
+            mouldDeliveryList = this.getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
+        }
+
         List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList, productionContext);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
