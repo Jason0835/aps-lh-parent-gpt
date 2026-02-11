@@ -141,8 +141,8 @@ public class CxAddSkuProductionHandler {
         Integer startDay = cxLhGroup.getProductionDay();
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = productionPlan.getEndDay();
-        // 根据结构特殊材料情况重算结束日期
-        endDay = specialMaterialScheduleHandler.calculateEndDayBySpecialMaterial(startDay, endDay, productionContext, productionPlanInfo);
+        //todo 不用计算日期-计算量即可 根据结构特殊材料情况重算结束日期
+//        endDay = specialMaterialScheduleHandler.calculateEndDayBySpecialMaterial(startDay, endDay, productionContext, productionPlanInfo);
 
         if (startDay > endDay) {
             //记录日志
