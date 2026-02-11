@@ -67,4 +67,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             )
         </foreach>
     </insert>
+
+    <select id="selectExistYearMonth"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.SalesOrderPoolRecord">
+        SELECT
+            `YEAR`, `MONTH`
+        FROM T_DP_SALES_ORDER_POOL_RECORD
+        WHERE IS_DELETE = 0
+            AND FACTORY_CODE = #{factoryCode}
+        GROUP BY `YEAR`, `MONTH`
+    </select>
 </mapper>

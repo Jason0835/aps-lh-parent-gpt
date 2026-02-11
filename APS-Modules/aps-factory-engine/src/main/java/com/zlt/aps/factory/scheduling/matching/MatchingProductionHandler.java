@@ -1139,16 +1139,18 @@ public class MatchingProductionHandler {
                                                                   String materialDesc, Integer dayVulcanizationQty,
                                                                   int startDay, int endDay) {
         List<MatchingMouldDayUsedHelper> mouldDayUsedList = new ArrayList<>();
-        Map<Integer, List<ProductionMouldInfoVo>> canUseMouldMap = new TreeMap<>();
+//        Map<Integer, List<ProductionMouldInfoVo>> canUseMouldMap = new TreeMap<>();
         Integer dayMoldQty = dayVulcanizationQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        for (int day = startDay; day <= endDay; day++) {
-            // 选择模具
-            canUseMouldMap.put(day, this.selectedAllMouldByDay(productionContext, materialDesc, dayMoldQty, day));
-        }
+//        for (int day = startDay; day <= endDay; day++) {
+//            // 选择模具
+//            canUseMouldMap.put(day, this.selectedAllMouldByDay(productionContext, materialDesc, dayMoldQty, day));
+//        }
         // 遍历每一天的可用模具，与前一天可用模具相同的日期分作一组，然后按组遍历排产
         for (int day = startDay; day <= endDay; day++) {
-          List<ProductionMouldInfoVo> canUseMould = canUseMouldMap.get(day);
-          mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day)); // 记录可用时间段
+          List<ProductionMouldInfoVo> canUseMould = this.selectedAllMouldByDay(productionContext, materialDesc, dayMoldQty, day);
+          if (!CollectionUtils.isEmpty(canUseMould)) {
+              mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day)); // 记录可用时间段
+          }
         }
         return mouldDayUsedList;
     }
@@ -1220,8 +1222,11 @@ public class MatchingProductionHandler {
                 FactoryMonthPlanProductionFinalResult newPlan = new FactoryMonthPlanProductionFinalResult();
                 SpringBeanUtils.copyPropertiesIgnoreNull(plan, newPlan);
                 newPlan.setLastMonthPlanVersion(plan.getMonthPlanVersion());
-                newPlan.setMonthPlanVersion(CollectionUtils.firstElement(planFinalList).getMonthPlanVersion());
+                FactoryMonthPlanProductionFinalResult firstPlan = CollectionUtils.firstElement(planFinalList);
+                newPlan.setMonthPlanVersion(firstPlan.getMonthPlanVersion());
+                newPlan.setProductionNo(firstPlan.getProductionNo());
                 updateFinalList.add(newPlan);
+                continue;
             }
             updatePlan.setTotalQty(plan.getTotalQty());
             updatePlan.setMouldCavityQty(plan.getMouldCavityQty());

@@ -214,13 +214,12 @@
                 END AS MOULD_CODE
             FROM (
                    SELECT DISTINCT mpi.MATERIAL_DESC
-                   FROM t_mp_month_plan_prod_final mpi
+                   FROM t_dp_demand_plan mpi
                    WHERE mpi.IS_DELETE = 0
                      AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                      AND mpi.YEAR = #{year,jdbcType=DECIMAL}
                      AND mpi.MONTH = #{month,jdbcType=DECIMAL}
-                     AND mpi.LAST_MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-                     AND mpi.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                     AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
                  ) AS filtered_mpi
                    INNER JOIN t_mdm_sku_mould_rel msm
                               ON msm.MATERIAL_DESC = filtered_mpi.MATERIAL_DESC
@@ -285,13 +284,12 @@
               SELECT
                   DISTINCT FACTORY_CODE, MATERIAL_DESC
               FROM
-                  t_mp_month_plan_prod_final
+                  t_dp_demand_plan
               WHERE IS_DELETE = 0
               AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
               AND `YEAR` = #{year,jdbcType=DECIMAL}
               AND `MONTH` = #{month,jdbcType=DECIMAL}
-              AND LAST_MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-              AND PRODUCTION_VERSION =  #{productionVersion,jdbcType=VARCHAR}
+              AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
             ) AS filtered_plans
             ON mdp.FACTORY_CODE = filtered_plans.FACTORY_CODE
             AND mdp.MATERIAL_DESC = filtered_plans.MATERIAL_DESC
