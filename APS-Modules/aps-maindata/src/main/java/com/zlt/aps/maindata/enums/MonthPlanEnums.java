@@ -206,9 +206,12 @@ public enum MonthPlanEnums {
     /**
      *  SYS0202006 EUDR开始的年周号
      */
-    EUDR_REQUIRE("SYS0202006","EUDR开始的年周号");
+    EUDR_REQUIRE("SYS0202006","EUDR开始的年周号"),
 
-
+    /**
+     *  SYS0206006 周程滚动调整日
+     */
+    WEEK_ROLL_ADJUST_DATE("SYS0206006","周程滚动调整日");
 
     private final String code;
     private final String name;
