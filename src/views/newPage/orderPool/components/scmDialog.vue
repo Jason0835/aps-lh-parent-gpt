@@ -46,6 +46,24 @@ export default {
   inject: ["parentDict"],
   data() {
     return {
+      monthPickerOptions: {
+        disabledDate: (time) => {
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth();
+
+          // 转换为月份比较
+          const timeYear = time.getFullYear();
+          const timeMonth = time.getMonth();
+
+          // 计算当前月的索引和下个月的索引
+          const currentMonthIndex = currentYear * 12 + currentMonth;
+          const nextMonthIndex = currentYear * 12 + (currentMonth + 1);
+          const timeMonthIndex = timeYear * 12 + timeMonth;
+
+          return timeMonthIndex < currentMonthIndex || timeMonthIndex > nextMonthIndex;
+        }
+      },
       isLock: false,
       loading: false,
       visible: false,
@@ -120,6 +138,7 @@ export default {
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",
+          pickerOptions:this.monthPickerOptions
         },
       ];
     },
