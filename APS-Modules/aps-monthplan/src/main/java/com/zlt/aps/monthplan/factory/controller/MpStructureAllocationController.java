@@ -1,12 +1,16 @@
 package com.zlt.aps.monthplan.factory.controller;
 
+import cn.hutool.core.collection.CollUtil;
 import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -45,6 +50,8 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
 
     private final MpStructureAllocationEntityMapper entityMapper;
 
+    private final IFactoryMonthPlanProductionFinalResultService monthPlanProductionFinalResultService;
+
     /**
      * 查询排产过程_结构排产列表
      *
@@ -57,11 +64,35 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         try {
             startPage();
             List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
+            filterStructureAllocationList(queryCondition, list);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();
         }
     }
+
+
+    private void filterStructureAllocationList(MpStructureAllocation queryCondition, List<MpStructureAllocation> list) {
+        if (StringUtils.isNotEmpty(queryCondition.getProductionVersion())) {
+            return;
+        }
+        // 排产版本为空，默认查询当前年月最新的排产版本
+        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
+        param.setFactoryCode(queryCondition.getFactoryCode());
+        param.setYear(queryCondition.getYear());
+        param.setMonth(queryCondition.getMonth());
+        List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
+        if (PubUtil.isEmpty(monthPlanResultList)) {
+            list.clear();
+            return;
+        }
+        // 排产版本
+        String productionVersion = monthPlanResultList.get(0).getProductionVersion();
+        log.info("排产版本为空，默认查询当前年月最新的排产版本:{}", productionVersion);
+        CollUtil.filter(list, item -> StringUtils.equals(item.getProductionVersion(), productionVersion));
+    }
+
+
 
     @Override
     protected List<MpStructureAllocation> listExportData(MpStructureAllocation condition) {
