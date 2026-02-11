@@ -883,11 +883,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
             return;
         }
-        // 最新需求计划版本
-        String lastMonthPlanVersion = "";
-        if (PubUtil.isNotEmpty(monthPlanProdFinalList)) {
-            lastMonthPlanVersion = monthPlanProdFinalList.get(0).getLastMonthPlanVersion();
-        }
         // 调整结果按照物料编码分组
         Map<String, List<MpAdjustResult>> adjustResultMap = buildMaterialCodeAdjustMap(adjustResultList);
         // 月度生产计划排程结果
@@ -899,23 +894,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 初始化SKU与施工（示方书）关系
         initSkuConstructionRef(contextDTO);
         // 汇总调整明细
-        adjustDetailList = sumByStructureAndMaterial(adjustDetailList, Boolean.TRUE);
+        List<MpAdjustDetailVo> summaryAdjustDetailList = sumByStructureAndMaterial(adjustDetailList, Boolean.TRUE);
+        // 汇总调整结果
+        Map<String, MpAdjustResult> summaryAdjustResult = summaryAdjustResult(adjustResultList, adjustDetailList);
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
-        for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
+        for (MpAdjustDetailVo adjustDetailVo : summaryAdjustDetailList) {
             String isSkuAdd = adjustDetailVo.getIsSkuAdd();
             if (!ApsConstant.TRUE.equals(isSkuAdd)) {
                 continue;
             }
-            String materialCode = adjustDetailVo.getMaterialCode();
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
-            // 汇总调整结果 TODO
-            if (adjustResult == null) {
-                continue;
-            }
+            // 构建分组key
+            String groupKey = buildGroupKey(adjustDetailVo);
+            // 匹配汇总后调整结果
+            MpAdjustResult adjustResult = summaryAdjustResult.getOrDefault(groupKey, new MpAdjustResult());
+
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
-            monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
             monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
             monthPlan.setId(null);
@@ -965,6 +960,109 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
 
     }
+
+
+    /**
+     * 汇总调整结果
+     * @param adjustResultList 调整结果列表
+     * @param adjustDetailList 调整明细列表
+     * @return Map<String, MpAdjustResult>
+     */
+    public Map<String, MpAdjustResult> summaryAdjustResult(List<MpAdjustResult> adjustResultList, List<MpAdjustDetailVo> adjustDetailList) {
+        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(adjustDetailList)) {
+            return Collections.emptyMap();
+        }
+        // 先按物料编码分组，再按主键ID映射
+        Map<String, Map<Long, MpAdjustDetailVo>> detailMap = adjustDetailList.stream()
+                .collect(Collectors.groupingBy(
+                        MpAdjustDetailVo::getMaterialCode,
+                        Collectors.toMap(
+                                MpAdjustDetailVo::getId,
+                                vo -> vo,
+                                (v1, v2) -> v1
+                        )
+                ));
+
+        // 遍历调整结果，匹配明细并分组汇总
+        Map<String, MpAdjustResult> summaryMap = new HashMap<>();
+        for (MpAdjustResult result : adjustResultList) {
+            if (StringUtils.isEmpty(result.getMaterialCode())) {
+                continue;
+            }
+            // 匹配对应的调整明细VO
+            MpAdjustDetailVo detailVo = matchAdjustDetail(result, detailMap);
+            // 无匹配明细，跳过
+            if (detailVo == null) {
+                continue;
+            }
+            // 构建分组key
+            String groupKey = buildGroupKey(detailVo);
+            // 获取或初始化汇总对象
+            MpAdjustResult summaryResult = summaryMap.getOrDefault(groupKey, new MpAdjustResult());
+            if (summaryResult.getMaterialCode() == null) {
+                BeanUtils.copyProperties(result, summaryResult);
+                summaryResult.setMaterialCode(detailVo.getMaterialCode());
+                summaryResult.setAdjustDetailId(null);
+            }
+            // 汇总总计划量（处理null值）
+            summaryResult.setTotalPlanQty(
+                    Optional.ofNullable(summaryResult.getTotalPlanQty()).orElse(0) +
+                            Optional.ofNullable(result.getTotalPlanQty()).orElse(0)
+            );
+            // 循环汇总day1-day31字段值
+            summaryDayFields(summaryResult, result);
+            // 存放汇总Map
+            summaryMap.put(groupKey, summaryResult);
+        }
+        return summaryMap;
+    }
+
+    /**
+     * 匹配当前调整结果对应的明细
+     */
+    private MpAdjustDetailVo matchAdjustDetail(MpAdjustResult result, Map<String, Map<Long, MpAdjustDetailVo>> detailMap) {
+        Map<Long, MpAdjustDetailVo> idToDetailMap = detailMap.get(result.getMaterialCode());
+        if (PubUtil.isEmpty(idToDetailMap)) {
+            return null;
+        }
+        try {
+            Long adjustDetailId = result.getAdjustDetailId() != null
+                    ? Long.parseLong(result.getAdjustDetailId())
+                    : null;
+            if (adjustDetailId != null) {
+                return idToDetailMap.get(adjustDetailId);
+            } else {
+                // 无调整明细ID时，取该物料编码下第一条明细
+                return idToDetailMap.values().iterator().next();
+            }
+        } catch (NumberFormatException e) {
+            // ID格式错误，返回null
+            return null;
+        }
+    }
+
+    /**
+     * 构建分组key
+     */
+    private String buildGroupKey(MpAdjustDetailVo detailVo) {
+        String structureName = Optional.ofNullable(detailVo.getStructureName()).orElse("");
+        String materialCode = Optional.ofNullable(detailVo.getMaterialCode()).orElse("");
+        String constructionStage = Optional.ofNullable(detailVo.getConstructionStage()).orElse("");
+        return String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, structureName, materialCode, constructionStage);
+    }
+
+    /**
+     * 循环汇总day1-day31字段值
+     */
+    private void summaryDayFields(MpAdjustResult summaryResult, MpAdjustResult sourceResult) {
+        // 遍历日期，设置每个dayN字段
+        for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+            Integer sourceValue = Convert.toInt(sourceResult.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day), 0);
+            Integer summaryValue = Convert.toInt(summaryResult.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day), 0);
+            summaryResult.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, sourceValue + summaryValue);
+        }
+    }
+
 
     /**
      * 根据净需求奇偶性计算实际生产需求含损耗

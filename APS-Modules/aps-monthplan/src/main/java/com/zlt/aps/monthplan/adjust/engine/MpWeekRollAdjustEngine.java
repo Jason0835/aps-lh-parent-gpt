@@ -1,5 +1,6 @@
 package com.zlt.aps.monthplan.adjust.engine;
 
+import cn.hutool.core.convert.Convert;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -2284,6 +2285,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         mpFinalVo.setAdjustDetail(new StringBuilder());
+        mpFinalVo.setAdjustDetailId(Convert.toStr(adjustStructInVo.getId(), null));
         return mpFinalVo;
     }
     /**
@@ -2330,6 +2332,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         mpFinalVo.setAdjustDetail(new StringBuilder());
+        mpFinalVo.setAdjustDetailId(Convert.toStr(adjustStructOutVo.getId(), null));
         return mpFinalVo;
     }
 }

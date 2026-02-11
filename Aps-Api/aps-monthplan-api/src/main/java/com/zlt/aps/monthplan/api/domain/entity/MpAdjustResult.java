@@ -408,5 +408,13 @@ public class MpAdjustResult extends BaseEntity {
     @TableField(value = "DIFFERENCE_QTY")
     private Integer differenceQty;
 
+    /**
+     * 调整明细ID
+     */
+    @Excel(name = "ui.data.column.mpAdjustResult.adjustDetailId")
+    @ApiModelProperty(value = "调整明细ID", name = "adjustDetailId")
+    @TableField(value = "ADJUST_DETAIL_ID")
+    private String adjustDetailId;
+
 
 }
