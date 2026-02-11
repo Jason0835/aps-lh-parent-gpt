@@ -109,7 +109,12 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     }
 
     /**
-     * 1、对在机结构进行新增Sku的模具排产
+     * 1、对在机结构进行Sku的模具排产
+     * 1.1、先对在机结构的续作部分进行模拟模具排产
+     * 1.1.1、续作Sku模拟模具排产
+     * 1.1.2、与续作Sku同规格同花纹的其它Sku模拟模具排产
+     * 1.1.3、与续作Sku同生胎共用模具的其它Sku模拟模具排产
+     * 1.2、再对在机结构的新增Sku，按Sku的优先级进行模拟模具排产
      *
      * @param context                排产上下文
      * @param allGroupPlanMap        所有分组排产计划
@@ -126,6 +131,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         productionContinue(ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        //2、在机结构-新增Sku排产
         allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {
                     // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
                     ProductionPlanGroupInfo continueGroup = allGroupPlanMap.get(entry1.getKey());
@@ -146,7 +152,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                         log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
                         return;
                     }
-                    //2、在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
+                    //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
                     groupPlanInfo.setThisRoundCanProduction();
                     //在机结构-新增Sku模拟排产
                     cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
@@ -184,11 +190,13 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         String groupName = addNewGroupPlan.getGroupName();
         //最小分配天数
-        Integer minAllocationDays = baseDataContainer.getParamConfiguration().getMinAllocationDays();
+        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext);
         Integer leftOverDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
         //20260206 小于最短上机天数，则不进行分配
-        if (!addNewGroupPlan.isNextAllocation(minAllocationDays)) {
-            log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
+        if (!addNewGroupPlan.isNextAllocation(leftOverDays, productionContext)) {
+            if (leftOverDays > BigDecimal.ZERO.intValue()) {
+                log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
+            }
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
@@ -251,12 +259,10 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-            return ;
+            return;
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
-        //更新特殊材料库存
-        productionContext.updateSpecialMaterialInfoMap(addNewGroupPlan, realAllocationDays);
         //更新剩余天数
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());

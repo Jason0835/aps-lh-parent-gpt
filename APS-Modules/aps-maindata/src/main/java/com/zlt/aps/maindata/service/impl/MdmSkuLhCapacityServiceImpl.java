@@ -103,12 +103,13 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
          */
         sourceList.stream()
                 .filter(skuCapacity -> {
-                    Integer sum = skuCapacity.getVulcanizationTime();
-                    return sum != null && sum > 0;
+                    Integer vulcanizationTime = Convert.toInt(skuCapacity.getVulcanizationTime(), 0);
+                    Integer mechanicalTime = Convert.toInt(skuCapacity.getMechanicalTime(), 0);
+                    return (vulcanizationTime + mechanicalTime) > 0;
                 })
                 .forEach(skuCapacity -> {
-                    Integer vulcanizationTime = skuCapacity.getVulcanizationTime();
-                    Integer mechanicalTime = skuCapacity.getMechanicalTime();
+                    Integer vulcanizationTime = Convert.toInt(skuCapacity.getVulcanizationTime(), 0);
+                    Integer mechanicalTime = Convert.toInt(skuCapacity.getMechanicalTime(), 0);
                     double divisionResult = (double) ApsConstant.SECOND_PER_DAY / (vulcanizationTime + mechanicalTime);
                     double ceilResult = Math.floor(divisionResult);
                     skuCapacity.setApsCapacity(Convert.toInt(ceilResult) * 2);
@@ -116,8 +117,9 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
         // 设置默认值
         sourceList.stream()
                 .filter(skuCapacity -> {
-                    Integer sum = skuCapacity.getVulcanizationTime();
-                    return sum == null || sum <= 0;
+                    Integer vulcanizationTime = Convert.toInt(skuCapacity.getVulcanizationTime(), 0);
+                    Integer mechanicalTime = Convert.toInt(skuCapacity.getMechanicalTime(), 0);
+                    return (vulcanizationTime + mechanicalTime) == 0;
                 })
                 .forEach(skuCapacity -> skuCapacity.setApsCapacity(0));
     }

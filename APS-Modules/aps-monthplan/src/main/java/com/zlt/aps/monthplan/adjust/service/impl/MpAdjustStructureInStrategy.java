@@ -114,6 +114,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             //1）结构内，按结构分别调整
             contextDTO.setStructureName(entry.getKey());
             oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
+            contextDTO.setSpecStructureTotalQty(0);
             if (YesOrNoEnum.YES.getCode().equals(entry.getValue().get(0).getHasSpecialMaterial())){
                 //若是特殊结构,预存特殊结构的总实际排产量
                 setSpecStructureTotalQty(contextDTO,oneStructMpFinalList);

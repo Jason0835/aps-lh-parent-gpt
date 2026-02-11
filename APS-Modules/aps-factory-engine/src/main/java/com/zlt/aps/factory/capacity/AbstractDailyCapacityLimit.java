@@ -602,12 +602,12 @@ public abstract class AbstractDailyCapacityLimit {
         if (PubUtil.isEmpty(dailyCapacityLimitVoMap)){
             return null;
         }
-        if (startDay >= endDay){
+        if (startDay > endDay){
             return null;
         }
 
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
-        for (int i = startDay; i< endDay; i++){
+        for (int i = startDay; i<= endDay; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null) {
                 continue;

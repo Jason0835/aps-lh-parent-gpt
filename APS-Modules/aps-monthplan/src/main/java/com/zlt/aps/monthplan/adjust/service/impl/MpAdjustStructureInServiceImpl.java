@@ -7,8 +7,13 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.enums.ProductTypeEnum;
 import com.tlt.aps.enums.ProductionProcessesTypeEnum;
+import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.factory.domain.Context;
+import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -26,6 +31,8 @@ import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.common.utils.PubUtil;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper;
 import com.zlt.aps.monthplan.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
+import com.zlt.aps.monthplan.mdm.dto.DataDTO;
+import com.zlt.aps.monthplan.mdm.handler.DataManager;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,11 +41,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.util.StopWatch;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -78,6 +89,12 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Autowired
     private MdmStructureLhRatioEntityMapper mdmStructureLhRatioEntityMapper;
+
+    @Autowired
+    private IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
+
+    @Autowired
+    private DataManager dataManager;
 
 
 
@@ -124,8 +141,94 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpFinalAdjustList){
             mpFinalVo.setAdjustDetail(new StringBuilder());
         }
+        // 设置是否特殊材料
+        setSpecialMaterial(contextDTO.getFactoryCode(), mpFinalAdjustList);
         return mpFinalAdjustList;
     }
+
+
+    /**
+     * 设置是否特殊材料
+     * @param factoryCode
+     * @param mpFinalAdjustList
+     */
+    public void setSpecialMaterial(String factoryCode, List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList) {
+        if (PubUtil.isEmpty(mpFinalAdjustList)) {
+            return;
+        }
+
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+
+        // 查询BOM物料消耗明细
+        CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(
+                () -> queryMaterialConsumeDetailList(factoryCode)
+        );
+        // 查询特殊材料记录
+        CompletableFuture<List<RawSpecialMaterialRecord>> rawSpecialMaterialRecordFuture = CompletableFuture.supplyAsync(
+                () -> querySpecialMaterialRecordList(factoryCode)
+        );
+
+        try {
+            // 等待所有异步任务执行完成
+            CompletableFuture.allOf(
+                    materialConsumeDetailFuture,
+                    rawSpecialMaterialRecordFuture
+            ).join();
+
+            log.info("设置是否特殊材料 ==> 并行查询数据执行完成");
+
+        } catch (CompletionException e) {
+            // 异常处理
+            Throwable throwable = e.getCause();
+            log.error("查询数据失败! 失败原因:{}", throwable.getMessage(), throwable);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
+        } finally {
+            watch.stop();
+        }
+
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
+        List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
+
+        for (FactoryMonthPlanFinalAdjustVo monthPlan : mpFinalAdjustList) {
+            // 设置是否含有特殊材料
+            boolean isHasSpecialMaterial = rawSpecialMaterialRecordService.hasSpecialMaterial(monthPlan.getEmbryoCode(), mdmMaterialConsumeDetailList, specialMaterialList);
+            monthPlan.setHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+        }
+    }
+
+
+
+    /**
+     * 查询特殊材料记录
+     *
+     * @param factoryCode
+     */
+    private List<RawSpecialMaterialRecord> querySpecialMaterialRecordList(String factoryCode) {
+        RawSpecialMaterialRecord queryVO = new RawSpecialMaterialRecord();
+        queryVO.setFactoryCode(factoryCode);
+
+        String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        return dataManager.listSpecialMaterials(dataDTO);
+    }
+
+
+    /**
+     * 查询BOM物料消耗明细
+     *
+     * @param factoryCode
+     */
+    private List<MdmMaterialConsumeDetail> queryMaterialConsumeDetailList(String factoryCode) {
+        MdmMaterialConsumeDetail queryVO = new MdmMaterialConsumeDetail();
+        queryVO.setFactoryCode(factoryCode);
+
+        String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        return dataManager.listMaterialConsumeDetails(dataDTO);
+    }
+
 
     @Override
     public Map<String, Object> getMpWeekAdjustParam(String factoryCode,String productType) {
@@ -146,6 +249,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
+        paramCodeList.add(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
         return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
@@ -233,7 +337,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
                 })));
         return workCalendarMap;
     }
-    
+
     @Override
     public List<MdmStructureLhRatio> getStructureLhRatio(MpRollAdjustContextDTO contextDTO) {
         LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();

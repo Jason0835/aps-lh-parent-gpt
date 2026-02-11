@@ -195,8 +195,8 @@ public class CxCapacityAllocationHandler {
         }
         leftOverDays = confirmNeedAllocationDays;
         //20260206 结构剩余需分配天数小于最短上机天数，则标记分配完成，查找下一个
-        Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
-        if (!allocationGroupPlan.isNextAllocation(minAllocationDays)) {
+        Integer minAllocationDays = allocationGroupPlan.getMinAllocationDays(productionContext);
+        if (!allocationGroupPlan.isNextAllocation(leftOverDays, productionContext)) {
             log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, false, leftOverDays, minAllocationDays));
             allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
@@ -223,15 +223,13 @@ public class CxCapacityAllocationHandler {
         Integer leftOver = remainingDays - needAllocationDays;
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
-        //更新特殊材料库存
-        ((TbrProductionContext) context).updateSpecialMaterialInfoMap(allocationGroupPlan, needAllocationDays);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         //20260109 标记分配完成
         allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         //对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //还有剩余产能，继续挑选下一个分组结构
-        if (leftOver >= minAllocationDays) {
+        if (leftOver > BigDecimal.ZERO.intValue()) {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineFindNextGroupPlanLog(context, cxMachineInfo));
             selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, cxMachineInfo);
         }
@@ -297,14 +295,8 @@ public class CxCapacityAllocationHandler {
         //获取分组及零度零度供料架
         String structureName = addNewGroupPlan.getGroupName();
         String isZeroRack = addNewGroupPlan.getIsZero();
-        //最小分配天数
-        Integer minAllocationDays;
-        //20260209 特殊材料结构，将最小分配天数置为零
-        if (addNewGroupPlan.isSpecialMaterial()) {
-            minAllocationDays = BigDecimal.ZERO.intValue();
-        } else {
-            minAllocationDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
-        }
+        //最小分配天数 20260209 特殊材料结构，将最小分配天数置为1
+        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays((TbrProductionContext) context);
         //挑选机台
         List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
         if (CollectionUtils.isEmpty(enableCxMachineList)) {

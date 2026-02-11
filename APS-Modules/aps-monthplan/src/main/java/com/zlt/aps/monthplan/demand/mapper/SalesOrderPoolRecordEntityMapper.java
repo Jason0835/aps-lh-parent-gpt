@@ -1,12 +1,11 @@
 package com.zlt.aps.monthplan.demand.mapper;
 
-import java.util.List;
-
-import org.apache.ibatis.annotations.Mapper;
-
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPoolRecord;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -23,12 +22,13 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
  */
 @Mapper
 public interface SalesOrderPoolRecordEntityMapper extends CommBaseMapper<SalesOrderPoolRecord> {
-	
+
 	/**
 	 * 批量保存
 	 * @param salesOrderPoolRecordList
 	 * @return
 	 */
 	int batchInsert(List<SalesOrderPoolRecord> salesOrderPoolRecordList);
-	
+
+	List<SalesOrderPoolRecord> selectExistYearMonth(SalesOrderPool salesOrderPool);
 }
