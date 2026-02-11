@@ -690,6 +690,8 @@ public class TbrProductionContext extends Context {
                 break;
             }
         }
+        //偶数
+        minProductQty = minProductQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION * ProductionConstant.DOUBLE_MOULD_QTY;
         return minProductQty;
     }
 

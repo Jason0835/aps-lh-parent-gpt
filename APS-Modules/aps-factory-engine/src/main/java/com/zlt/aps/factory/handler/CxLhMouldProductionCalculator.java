@@ -60,10 +60,13 @@ public class CxLhMouldProductionCalculator {
             Integer openMaxQty = context.getOpenDayMaxQty(productionDay, dayMaxProductionQty);
             Integer theoryProductionQty = productionQty;
             productionQty = Math.min(productionQty, openMaxQty);
-            lossQty = theoryProductionQty - productionDay;
+            lossQty = theoryProductionQty - productionQty;
         }
         //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
-
+        Integer lossQtyDiffValue = productionQty;
+        productionQty = productionContext.getSpecialMaterialProductionQtyBySku(groupPlanInfo, productionQty);
+        lossQtyDiffValue = lossQtyDiffValue - productionQty;
+        lossQty = lossQty - lossQtyDiffValue;
         //更新日产信息
         UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(productionDay, productionQty, isDayFinish, cxMachineCodeInfo, lossQty);
         updateDayProductionInfo(productionContext, groupPlanInfo, doubleMouldList, continueSkuPlanList, updateInfo);
@@ -147,7 +150,7 @@ public class CxLhMouldProductionCalculator {
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
             //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
-
+            realDayProductionQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
             Integer lossQtyDiffValue = dayProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {
@@ -199,6 +202,7 @@ public class CxLhMouldProductionCalculator {
         Set<Integer> openDay = context.getProductionDayAfterStop();
         Set<Integer> replenishmentDay = context.getReplenishmentDay();
         Integer dayLhQty = productionSkuInfo.getMaxDaySingleLhMachineQty();
+        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         Integer firstDay = null;
         //进行排产
         for (int day = startDay; day <= endDay; day++) {
@@ -237,7 +241,7 @@ public class CxLhMouldProductionCalculator {
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
             //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
-
+            realDayProductionQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
             Integer lossQtyDiffValue = dayProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {
@@ -256,7 +260,7 @@ public class CxLhMouldProductionCalculator {
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
             //月底补量
             if (isBoostQtyHandler(replenishmentDay, day, sumProductionQty)) {
-                BoostProductionInfoHelper boostInfo = BoostProductionInfoHelper.builder(productionSkuInfo, doubleMouldList, null, cxMachineInfo, cxLhGroup, cxMachineInfoSet, day, realDayProductionQty, isDayFinish, endDay);
+                BoostProductionInfoHelper boostInfo = BoostProductionInfoHelper.builder(productionSkuInfo, doubleMouldList, productionPlanInfo, cxMachineInfo, cxLhGroup, cxMachineInfoSet, day, realDayProductionQty, isDayFinish, endDay);
                 boostQtyByNextBoostDay(productionContext, boostInfo);
             }
         }
