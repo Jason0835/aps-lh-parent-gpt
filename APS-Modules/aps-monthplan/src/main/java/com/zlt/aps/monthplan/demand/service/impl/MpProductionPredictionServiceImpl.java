@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -95,6 +94,7 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         }
         String key = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
         if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+            log.info("正在生成订单预测需求，请稍候,分厂:{},年:{},月:{}",createCondition.getFactoryCode(),createCondition.getYear(),createCondition.getMonth());
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createMonthPrediction.run"));
         }
         redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);

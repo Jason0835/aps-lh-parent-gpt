@@ -104,6 +104,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       }
       String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
       if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+        log.info("正在进行实单模拟排产，请稍候,分厂:{},年:{},月:{}",createCondition.getFactoryCode(),createCondition.getYear(),createCondition.getMonth());
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
       }
       redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
