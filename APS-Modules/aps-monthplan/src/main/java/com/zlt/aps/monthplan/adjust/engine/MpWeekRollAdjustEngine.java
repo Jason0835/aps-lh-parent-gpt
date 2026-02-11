@@ -1470,6 +1470,8 @@ public class MpWeekRollAdjustEngine {
         int blockQty,cavityQty;
         Integer dayVulcanizationQty;
         boolean bFirstAddMould = true;
+        //量试标识
+        boolean bTrailProductionFlag = ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(mpFinalVo.getConstructionStage());
         while (newPlanQty > 0){
             //已有排产标识，防止中间断开
             boolean bHasProduction = false;
@@ -1483,6 +1485,10 @@ public class MpWeekRollAdjustEngine {
                     return newPlanQty < 0 ? 0:newPlanQty;
                 }
                 if (dailyCapacityLimitVoMap.get(i) == null){
+                    continue;
+                }
+                if (bTrailProductionFlag && getTrialNewOnlineDay(contextDTO,i,i, mpProdFinalList) == null){
+                    //若是量试，但该日不能排，则继续
                     continue;
                 }
                 //检查总产能限制(允许上下波动)
