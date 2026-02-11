@@ -35,6 +35,10 @@ public class SpecialMaterialInfoVo implements Serializable {
      */
     private Long sumProductionQty;
     /**
+     * 已分配到SKU的量
+     */
+    private Long sumSkuAllocateQty;
+    /**
      * 现有库存可生产量
      */
     private Long existingInventoryCapacity;

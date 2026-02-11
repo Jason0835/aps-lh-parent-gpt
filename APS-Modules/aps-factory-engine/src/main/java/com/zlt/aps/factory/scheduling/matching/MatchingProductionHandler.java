@@ -207,6 +207,8 @@ public class MatchingProductionHandler {
         List<FactoryMonthPlanMouldDayResult> planList = planFinalList.stream().map(plan -> {
             FactoryMonthPlanMouldDayResult newPlan = new FactoryMonthPlanMouldDayResult();
             SpringBeanUtils.copyPropertiesIgnoreNull(plan, newPlan);
+            newPlan.setBeginDay(plan.getBeginDay());
+            newPlan.setEndDay(plan.getEndDay());
             newPlan.setMonthPlanVersion(plan.getLastMonthPlanVersion()); // 用最新需求计划版本号
             return newPlan;
         }).collect(Collectors.toList());

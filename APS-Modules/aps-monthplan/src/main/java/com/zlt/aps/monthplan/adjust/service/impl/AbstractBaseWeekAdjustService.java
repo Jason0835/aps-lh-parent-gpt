@@ -947,6 +947,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
             // 设置最新需求计划版本
             monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
+            // 设置月度计划开始日期、结束日期
+            setBeginDayAndEndDay(monthPlan);
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
         // 新增月度生产计划
@@ -958,6 +960,31 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new RuntimeException("新增月度生产计划失败", e);
         }
 
+    }
+
+
+    /**
+     * 设置月度计划开始日期、结束日期
+     * @param monthPlan
+     * @return
+     */
+    private void setBeginDayAndEndDay(FactoryMonthPlanProductionFinalResult monthPlan) {
+        Integer beginDay = null;
+        Integer endDay = null;
+        // 按1~31顺序遍历
+        for (int day = 1; day <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; day++) {
+            // 拼接字段名：day1、day2...day31
+            String dayFieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day;
+            Integer fieldValue = Convert.toInt(monthPlan.getFieldValueByFieldName(dayFieldName), 0);
+            if (fieldValue != 0) {
+                if (beginDay == null) {
+                    beginDay = day;
+                }
+                endDay = day;
+            }
+        }
+        monthPlan.setBeginDay(beginDay);
+        monthPlan.setEndDay(endDay);
     }
 
 
@@ -3006,7 +3033,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 existVo.setCurrentNetQty(existCurrentNetQty + currentNetQty);
                 // 累加实际调整量
                 Integer existActualAdjustQty = Convert.toInt(existVo.getActualAdjustQty(), 0);
-                existVo.setCurrentNetQty(existActualAdjustQty + actualAdjustQty);
+                existVo.setActualAdjustQty(existActualAdjustQty + actualAdjustQty);
                 // 拼接试制计划ID
                 mergeTrialPlanId(existVo, vo.getTrialPlanId());
             } else {
