@@ -73,7 +73,7 @@ import java.util.stream.Collectors;
 public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDocService<FactoryMonthPlanProductionFinalResult> implements IFactoryMonthPlanProductionFinalResultService {
 
     private final static String SHEET_NAME = "%d年%d月排产";
-    
+
     private final BaseDao baseDao;
 
     @Autowired
@@ -519,6 +519,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         eventDto.setYear(param.getYear());
         eventDto.setMonth(param.getMonth());
         eventDto.setMonthPlanVersion(param.getMonthPlanVersion());
+        eventDto.setProductionVersion(param.getProductionVersion());
         eventDto.setMaterialTotalQtyMap(materialTotalQtyMap);
         eventDto.setParam(param);
         eventDto.setFinalList(finalList);

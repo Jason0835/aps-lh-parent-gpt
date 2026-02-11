@@ -38,6 +38,11 @@ public class MonthPlanFinalizedEventDto implements Serializable {
     private String monthPlanVersion;
 
     /**
+     * 排产计划版本
+     */
+    private String productionVersion;
+
+    /**
      * 物料总量Map
      */
     private Map<String, Integer> materialTotalQtyMap;
