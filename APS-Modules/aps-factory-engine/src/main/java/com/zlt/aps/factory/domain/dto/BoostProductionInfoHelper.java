@@ -65,14 +65,16 @@ public class BoostProductionInfoHelper implements Serializable {
     /**
      * 构建对象
      *
-     * @param productionSkuInfo 补量的计划
-     * @param doubleMouldList   使用的模具
-     * @param cxLhGroup         硫化组
-     * @param cxMachineInfoSet  使用的成型机
-     * @param startBoostDay     开始补量日
-     * @param startPlannedQty   开始补量已排产量
-     * @param startFinish       开始补量日是否已排产完毕
-     * @param endBoostDay       补量结束日
+     * @param productionSkuInfo  补量的计划
+     * @param doubleMouldList    使用的模具
+     * @param productionPlanInfo 分组计划
+     * @param cxMachineInfo      成型机台
+     * @param cxLhGroup          硫化组
+     * @param cxMachineInfoSet   使用的成型机
+     * @param startBoostDay      开始补量日
+     * @param startPlannedQty    开始补量已排产量
+     * @param startFinish        开始补量日是否已排产完毕
+     * @param endBoostDay        补量结束日
      * @return
      */
     public static BoostProductionInfoHelper builder(MonthPlanProductionRequirePlanVo productionSkuInfo,
