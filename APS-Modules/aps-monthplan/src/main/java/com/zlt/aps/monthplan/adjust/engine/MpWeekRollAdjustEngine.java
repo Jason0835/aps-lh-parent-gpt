@@ -490,7 +490,11 @@ public class MpWeekRollAdjustEngine {
             }
             //2、从第2天开始查找SKU
             secStartDay = i+1;
-            canMoveFinalList = findCanMoveSkuList(mpProdFinalList, secStartDay);
+            canMoveFinalList = findCanMoveSkuList(mpProdFinalList,secStartDay);
+            if (getTrialNewOnlineDay(contextDTO,i,i, mpProdFinalList) == null){
+                //今天不可以移动量试
+                canMoveFinalList = canMoveFinalList.stream().filter(x->ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(x.getConstructionStage())).collect(Collectors.toList());
+            }
             if (PubUtil.isEmpty(canMoveFinalList)){
                 //若没有可以移动的列表，则退出
                 contextDTO.getLogDetail().append(String.format("结构:%s,【其他SKU向前移动】,排产日:%s,排产次日:%s查找可移动的SKU,未找到退出！",contextDTO.getStructureName(),i,secStartDay)).append(ApsConstant.DIVISION);
