@@ -77,12 +77,12 @@ public class MonthPlanFinalizedChangeEventListeners {
             // 上机日期 = 排产周期的开始日 +  (startDay -1 )
             List<FactoryMonthPlanProductionFinalResult> finalList = eventDto.getFinalList();
             mpMonthPlanMonitorService.insertMonitorByFinalList(eventDto.getParam(), finalList);
-            // 6、传给MES
-            finalResultService.issueMonthPlan(eventDto.getParam());
-            // 7、推送SCM
+            // 6、推送SCM
             if (CollectionUtils.isNotEmpty(finalList)) {
                 iScmItfService.publicFacScheduleVersion(buildOutFacScheduleVersionVoList(eventDto));
             }
+            // 7、传给MES
+            finalResultService.issueMonthPlan(eventDto.getParam());
             log.info("月计划定稿事件执行完成");
         } catch (Exception e) {
             log.error("月计划定稿事件执行失败，事件ID：{}", event.getEventId(), e);
