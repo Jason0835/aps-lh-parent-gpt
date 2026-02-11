@@ -950,11 +950,11 @@ export default {
                 title="调整明细"
                 width="500"
                 trigger="hover"
-                content={row.adjustDetail}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                  row.adjustDetail
-                }</span>
+                <div domPropsInnerHTML={row.adjustDetail}></div>
+                <div slot="reference" style="cursor: pointer;" domPropsInnerHTML={row.adjustDetail}>
+
+                </div>
               </el-popover>
               );
             },
