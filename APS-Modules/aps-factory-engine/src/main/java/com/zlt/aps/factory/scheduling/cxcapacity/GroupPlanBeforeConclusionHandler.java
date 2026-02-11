@@ -38,10 +38,14 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context
-     * @param groupPlanInfo
+     * @param context       排产上下文
+     * @param groupPlanInfo 排产分组计划
      */
     public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+        //20260211 需要拉量的特殊结构，不能进行提前收尾处理
+        if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
+            return;
+        }
         String groupName = groupPlanInfo.getGroupName();
         log.info(addGroupStartBeforeConclusionLog(context, groupName));
         //获取当前模拟排产的数据
@@ -114,10 +118,16 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context
-     * @param groupPlanInfo
+     * @param context       排产上下文
+     * @param groupPlanInfo 排产分组计划
+     * @param cxMachineInfo 排产机台
+     * @param cxLhRatio     对应的硫化配比信息
      */
     public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio) {
+        //20260211 需要拉量的特殊结构，不能进行提前收尾处理
+        if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
+            return;
+        }
         String groupName = groupPlanInfo.getGroupName();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
