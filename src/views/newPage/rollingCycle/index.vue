@@ -161,7 +161,12 @@
             v-if="this.hasPermission('monthplan:mpAdjustResult:list')"
           >
           </el-tab-pane>
-          <el-tab-pane label="调整日志" name="four"  v-if="this.hasPermission('monthplan:mpAdjustMaterialLog:list')"> </el-tab-pane>
+          <el-tab-pane
+            label="调整日志"
+            name="four"
+            v-if="this.hasPermission('monthplan:mpAdjustMaterialLog:list')"
+          >
+          </el-tab-pane>
         </el-tabs>
       </template>
       <template slot="footer" v-if="isShowFoot">
@@ -986,6 +991,21 @@ export default {
             prop: "adjustDetail",
             label: this.$t("调整明细"),
             width: 320,
+            render: ({ row }) => {
+              return (
+                <el-popover
+                placement="bottom"
+                title="调整明细"
+                width="500"
+                trigger="hover"
+                content={row.adjustDetail}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                  row.adjustDetail
+                }</span>
+              </el-popover>
+              );
+            },
           },
         ];
       }
