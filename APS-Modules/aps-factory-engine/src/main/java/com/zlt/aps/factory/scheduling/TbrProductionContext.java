@@ -1,7 +1,6 @@
 package com.zlt.aps.factory.scheduling;
 
 import com.google.common.collect.Lists;
-import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.*;
@@ -19,11 +18,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -557,11 +554,11 @@ public class TbrProductionContext extends Context {
         });
         return mouldInfos.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION ? Collections.emptyList() : mouldInfos;
     }
-    
+
     /**
      * 更新特殊材料库存<br/>
      * 根据结构分组的分配天数变化量，更新涉及特殊材料的已排库存信息
-     * 
+     *
      * @param groupInfo      结构分组信息
      * @param allocationDays 分配天数，可以传负数
      */
@@ -574,28 +571,28 @@ public class TbrProductionContext extends Context {
         if (null == allocationDays || allocationDays == BigDecimal.ZERO.intValue()) {
             return;
         }
-        Integer leftOverNeedAllocationDays = Optional.ofNullable(groupInfo.getLeftOverNeedAllocationDays()).orElse(0);
-        if (leftOverNeedAllocationDays <= allocationDays) {
-            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
-        } else {
-            leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
-        }
-        // 计算变化量
-        Integer diffDays = leftOverNeedAllocationDays - groupInfo.getLeftOverNeedAllocationDays();
-        if (diffDays == BigDecimal.ZERO.intValue()) {
-            // 无变化直接结束
-            return;
-        }
+//        Integer leftOverNeedAllocationDays = Optional.ofNullable(groupInfo.getLeftOverNeedAllocationDays()).orElse(0);
+//        if (leftOverNeedAllocationDays <= allocationDays) {
+//            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
+//        } else {
+//            leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
+//        }
+//        // 计算变化量
+//        Integer diffDays = leftOverNeedAllocationDays - groupInfo.getLeftOverNeedAllocationDays();
+//        if (diffDays == BigDecimal.ZERO.intValue()) {
+//            // 无变化直接结束
+//            return;
+//        }
         // 天数换算成排产量 = 天数 * 日硫化量 * 配比
-        BigDecimal realProductionQty = BigDecimalUtils.multiply(diffDays, groupInfo.getThreshold());
-        allcationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumProductionQty,
+        BigDecimal realProductionQty = BigDecimalUtils.multiply(allocationDays, groupInfo.getThreshold());
+        allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumProductionQty,
                 SpecialMaterialInfoVo::setSumProductionQty);
     }
-    
+
     /**
      * 更新特殊材料库存<br/>
      * 根据结构分组的分配数量量，更新涉及特殊材料的已排库存信息
-     * 
+     *
      * @param groupInfo     结构分组信息
      * @param productionQty 分配生产量，可以传负数
      */
@@ -610,20 +607,42 @@ public class TbrProductionContext extends Context {
         }
         // 天数换算成排产量 = 天数 * 日硫化量 * 配比
         BigDecimal realProductionQty = BigDecimalUtils.valueOf(productionQty);
-        allcationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumSkuAllocateQty,
+        allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumSkuAllocateQty,
                 SpecialMaterialInfoVo::setSumSkuAllocateQty);
     }
 
     /**
+     * 清空特殊原材料的Sku排产消耗量
+     * 在正式排产前，需要清除模拟时的消耗
+     */
+    public void clearSpecialMaterialInfoSkuAllocationQty() {
+        if (CollectionUtils.isEmpty(specialMaterialInfoMap)) {
+            return;
+        }
+        specialMaterialInfoMap.forEach((specialMaterialCode, specialMaterialStockInfo) -> {
+            if (CollectionUtils.isEmpty(specialMaterialStockInfo)) {
+                return;
+            }
+            specialMaterialStockInfo.forEach((standardId, stockInfo) -> {
+                if (null == stockInfo) {
+                    return;
+                }
+                stockInfo.setSumSkuAllocateQty(BigDecimal.ZERO.longValue());
+            });
+        });
+    }
+
+    /**
      * 分配特殊材料库存
-     * @param groupInfo 结构
+     *
+     * @param groupInfo         结构
      * @param realProductionQty 分配
      * @param getter
      * @param setter
      */
-    private void allcationSpecialMaterialStock(ProductionPlanGroupInfo groupInfo, BigDecimal realProductionQty,
-                                               Function<SpecialMaterialInfoVo, Long> getter,
-                                               BiConsumer<SpecialMaterialInfoVo, Long> setter) {
+    private void allocationSpecialMaterialStock(ProductionPlanGroupInfo groupInfo, BigDecimal realProductionQty,
+                                                Function<SpecialMaterialInfoVo, Long> getter,
+                                                BiConsumer<SpecialMaterialInfoVo, Long> setter) {
         Map<String, BigDecimal> embryoSpecialMaterialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
         // 预估本结构的用量
         for (Entry<String, BigDecimal> entry : embryoSpecialMaterialInfoMap.entrySet()) {
