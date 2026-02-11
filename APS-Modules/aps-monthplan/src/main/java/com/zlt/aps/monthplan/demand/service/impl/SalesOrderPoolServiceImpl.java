@@ -1,30 +1,9 @@
 package com.zlt.aps.monthplan.demand.service.impl;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-import com.google.common.collect.Lists;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -45,19 +24,24 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.monthplan.api.domain.entity.DpArea;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPoolRecord;
+import com.zlt.aps.monthplan.api.domain.entity.*;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolRecordEntityMapper;
 import com.zlt.aps.monthplan.demand.service.ISalesOrderPoolService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。 文件名称：SalesOrderPoolServiceImpl.java
@@ -79,7 +63,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	private IFactoryParamService iFactoryParamService;
 	@Autowired
 	private IMesItfService iMesItfService;
-	
+
 	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
@@ -180,6 +164,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	@SuppressWarnings("unchecked")
 	@Override
 	public AjaxResult checkSCMData(SalesOrderPool salesOrderPool) {
+		// 校验只能抓取当前月份和下个月的数据，不允许选择年月比已经同步销售订单年月小
+		this.checkParamYearMonth(salesOrderPool);
 		// 通过接口获取供应链数据
 		AjaxResult result = this.syncItfData(salesOrderPool);
 		if (!AppUtils.checkAjaxSuccess(result)) {
@@ -246,6 +232,41 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		return this.saveItfData(salesOrderPool, syncResultList);
 	}
 
+	/**
+	 * 校验抓取年月是否是当前月份或下个月，且不允许选择年月比已经同步销售订单年月小
+	 * @param salesOrderPool 抓取年月
+	 */
+	private void checkParamYearMonth(SalesOrderPool salesOrderPool) {
+		// 校验抓取年月是否是当前月份或下个月
+		Integer year = salesOrderPool.getYear();
+		Integer month = salesOrderPool.getMonth();
+		int paramYearMonth = Integer.parseInt(String.format("%d%02d", year, month));
+
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		int nowYear = calendar.get(Calendar.YEAR);
+		int nowMonth = calendar.get(Calendar.MONTH) + 1;
+		int nowYearMonth = Integer.parseInt(String.format("%d%02d", nowYear, nowMonth));
+
+		calendar.add(Calendar.MONTH, 1);
+		int nextYear = calendar.get(Calendar.YEAR);
+		int nextMonth = calendar.get(Calendar.MONTH) + 1;
+		int nextYearMonth = Integer.parseInt(String.format("%d%02d", nextYear, nextMonth));
+		if (paramYearMonth < nowYearMonth || paramYearMonth > nextYearMonth) {
+			throw new RuntimeException(I18nUtil.getMessage("ui.data.column.salesOrderPool.checkSCMData.nowYearMonth"));
+		}
+
+		// 不允许选择年月比已经同步销售订单年月小
+		List<SalesOrderPoolRecord> existYearMonthList = salesOrderPoolRecordEntityMapper.selectExistYearMonth(salesOrderPool);
+		Optional<Integer> optional = existYearMonthList.stream().map(item -> Integer.valueOf(String.format("%d%02d", item.getYear(), item.getMonth()))).max(Integer::compareTo);
+		if (optional.isPresent()) {
+			Integer existMaxYearMonth = optional.get();
+			if (paramYearMonth < existMaxYearMonth) {
+				throw new RuntimeException(I18nUtil.getMessage("ui.data.column.salesOrderPool.checkSCMData.existYearMonth"));
+			}
+		}
+	}
+
 	@Override
 	public List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode) {
 		LambdaQueryWrapper<SalesOrderPool> wrapper = Wrappers.lambdaQuery();
@@ -284,13 +305,13 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 				MonthPlanEnums.HIGHT_PRIORITY_ORDER_RATE); // 高优先级订单占比
 		BigDecimal hightPriorityOrderRate = BigDecimalUtils
 				.percentages2Decimals(BigDecimalUtils.valueOf(hightPriorityOrderRateStr)); // 占比参数转换成小数
-		
+
 		// 加载物料明细，关联数据
 		LambdaQueryWrapper<MdmMaterialInfo> materialQueryWrapper = new LambdaQueryWrapper<MdmMaterialInfo>();
 		materialQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
 		Map<String, MdmMaterialInfo> materialMap = mdmMaterialInfoEntityMapper.selectList(materialQueryWrapper).stream()
 				.collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-		
+
 		// 把接口数据转换成aps订单池对象
 		List<SalesOrderPool> newSalesOrderPoolList = syncResultList.stream().filter(s -> {
 			if (StringUtils.isEmpty(scmOrderMatralCodePrefix)) {
@@ -384,14 +405,16 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					BigDecimal totalOrdQty = newSalesOrderPoolList.stream().map(SalesOrderPool::getOrdQty)
 							.filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); // 总订单量合计
 					List<SalesOrderPool> hightPriorityList = newSalesOrderPoolList.stream()
-							.filter(s -> ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getOrderPriority())
-									&& ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getScmPriority()))
+							.filter(s ->
+//									ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getOrderPriority())
+//									&&
+									ApsConstant.SAL_PRIORITY_HIGHT.equals(s.getScmPriority()))
 							.sorted(Comparator.comparing(SalesOrderPool::getBillDate, Comparator.reverseOrder()))
 							.collect(Collectors.toList());
 					BigDecimal hightPriorityOrdQty = hightPriorityList.stream().map(SalesOrderPool::getOrdQty)
 							.filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add); // 高优先级订单量合计
 					for (SalesOrderPool pool : hightPriorityList) {
-						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty, 4)
+						if (BigDecimalUtils.div(hightPriorityOrdQty, totalOrdQty, 4, true, BigDecimal.ROUND_UP)
 								.compareTo(hightPriorityOrderRate) <= 0) { // 高优先级总量/所有总量<= 85%则结束，否则要把高优先级调成中优先级
 							break;
 						}
@@ -447,7 +470,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	/**
 	 * 保存同步记录
-	 * 
+	 *
 	 * @param syncResultList
 	 * @param year
 	 * @param month

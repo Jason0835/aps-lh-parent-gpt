@@ -2,7 +2,10 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
@@ -10,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
@@ -59,4 +64,40 @@ public class RawSpecialMaterialRecordServiceImpl extends AbstractDocService<RawS
     protected List<String> getCheckUniqueFields() {
         return new ArrayList<>(Arrays.asList("factoryCode", "materialCode"));
     }
+
+
+    /**
+     * 判断是否特殊材料
+     * @param targetEmbryoCode 目标胚胎编码
+     * @param mdmMaterialConsumeDetailList BOM物料消耗明细列表
+     * @param specialMaterialList 特殊材料清单列表
+     * @return true-是 false-否
+     */
+    @Override
+    public boolean hasSpecialMaterial(String targetEmbryoCode, List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList,
+                                         List<RawSpecialMaterialRecord> specialMaterialList) {
+
+        if (StringUtils.isEmpty(targetEmbryoCode) || PubUtil.isEmpty(mdmMaterialConsumeDetailList)
+                || PubUtil.isEmpty(specialMaterialList)) {
+            return Boolean.FALSE;
+        }
+
+        // 从BOM物料消耗明细列表中通过胎胚代码筛选出匹配的所有数据
+        Set<String> childMaterialCodes = mdmMaterialConsumeDetailList.stream()
+                .filter(detail -> StringUtils.equals(targetEmbryoCode, detail.getEmbryoCode()))
+                .map(MdmMaterialConsumeDetail::getChildMaterialCode)
+                .collect(Collectors.toSet());
+
+        // 如果没有匹配到直接返回false
+        if (PubUtil.isEmpty(childMaterialCodes)) {
+            return Boolean.FALSE;
+        }
+
+        // 检查特殊材料清单列表中是否存在匹配的数据
+        return specialMaterialList.stream()
+                .map(RawSpecialMaterialRecord::getMaterialCode)
+                .anyMatch(childMaterialCodes::contains);
+    }
+
+
 }

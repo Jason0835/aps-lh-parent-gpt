@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.PageUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
@@ -11,13 +12,13 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.SpringContextSupplierUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -39,8 +40,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
-
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -328,6 +327,15 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         queryWrapper.eq(MdmMaterialConsumeDetail::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
-
-
+    /**
+     * 下发月计划
+     *
+     * @param factoryMonthPlanProdFinal 参数
+     * @return 结果
+     */
+    @ApiOperation("下发月计划 - 年月+分厂+需求计划版本+分厂月计划版本")
+    @PostMapping("/issueMonthPlan")
+    public AjaxResult issueMonthPlan(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
+        return factoryMonthPlanProductionFinalResultService.issueMonthPlan(factoryMonthPlanProdFinal);
+    }
 }

@@ -15,10 +15,12 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalRe
 import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.monthplan.demand.service.impl.OrderAllocationServiceImpl;
 import com.zlt.aps.monthplan.factory.event.MonthPlanFinalizedEvent;
+import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -52,10 +54,13 @@ public class MonthPlanFinalizedChangeEventListeners {
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
+    @Autowired
+    private IFactoryMonthPlanProductionFinalResultService finalResultService;
+
     /**
      * 异步处理月计划定稿事件
      */
-//    @Async
+    @Async
     @EventListener
     public void handleMonthPlanFinalizedEvent(MonthPlanFinalizedEvent event) {
         try {
@@ -76,6 +81,8 @@ public class MonthPlanFinalizedChangeEventListeners {
             if (CollectionUtils.isNotEmpty(finalList)) {
                 iScmItfService.publicFacScheduleVersion(buildOutFacScheduleVersionVoList(eventDto));
             }
+            // 7、传给MES
+            finalResultService.issueMonthPlan(eventDto.getParam());
             log.info("月计划定稿事件执行完成");
         } catch (Exception e) {
             log.error("月计划定稿事件执行失败，事件ID：{}", event.getEventId(), e);
