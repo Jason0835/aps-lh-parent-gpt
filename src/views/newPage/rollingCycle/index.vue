@@ -989,17 +989,18 @@ export default {
             prop: "adjVersion",
             label: this.$t("调整版本"),
             width: 180,
+
+          },
+          {
+            prop: "adjustType",
+            label: this.$t("调整类型"),
+            width: 120,
             formatter: (row, column, value) => {
               return this.selectDictLabel(
                 this.dict.type.week_roll_adjust_type,
                 value
               );
             },
-          },
-          {
-            prop: "beginDay",
-            label: this.$t("调整类型"),
-            width: 120,
           },
 
           {
