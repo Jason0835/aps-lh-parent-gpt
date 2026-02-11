@@ -1657,6 +1657,7 @@ public class MpWeekRollAdjustEngine {
             // 差异数量 = 特殊结构总计划量 - 其他SKU汇总 - 当前SKU的已排汇总值
             int specTotalQty = contextDTO.getSpecStructureTotalQty() == null ? 0: contextDTO.getSpecStructureTotalQty();
             int diffQty = specTotalQty - otherTotalQty - curTotalQty;
+            diffQty = diffQty < 0 ? 0 : diffQty;
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,特殊标识：是,特殊结构原总计划量:%s,其他SKU总计划量:%s,当前SKU已排计划量:%s,允许再排计划量:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),iDay,contextDTO.getSpecStructureTotalQty(),otherTotalQty,curTotalQty,diffQty)).append(ApsConstant.DIVISION);
             return diffQty > dayVulcanizationQty ? dayVulcanizationQty:diffQty;
         }
