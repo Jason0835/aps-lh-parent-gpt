@@ -722,7 +722,7 @@ export default {
               }
               result.push(embryoCount);
               result.push(lhMachines);
-              result.push(changeMould);
+              // result.push(changeMould);
             }
           }
         }
