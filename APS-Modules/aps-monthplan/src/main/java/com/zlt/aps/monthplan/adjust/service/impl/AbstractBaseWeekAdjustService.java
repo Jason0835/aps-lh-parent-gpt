@@ -928,11 +928,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
             // 试制量试关联字段设置
             if (StringUtils.isNotEmpty(adjustDetailVo.getTrialPlanId())) {
+                // 实际生产需求(含损耗)
+                monthPlan.setFactProdReqQty(adjustDetailVo.getCurrentNetQty());
                 // 试制量试计划需求数量
                 monthPlan.setTrialQty(adjustDetailVo.getCurrentNetQty());
-                // 差异量(未排产数量) = 生产实际排产量 - 试制量试计划需求数量
-                differenceQty = Convert.toInt(monthPlan.getTotalQty(), 0) - Convert.toInt(monthPlan.getTrialQty(), 0);
-                monthPlan.setFactProdReqQty(null);
+                // 差异量(未排产数量) = 实际生产需求(含损耗) - 生产实际排产量
+                differenceQty = Convert.toInt(monthPlan.getFactProdReqQty(), 0) - Convert.toInt(monthPlan.getTotalQty(), 0);
             }
             // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
