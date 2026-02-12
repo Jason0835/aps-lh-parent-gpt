@@ -104,14 +104,12 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       if (ApsConstant.TRUE.equals(redisService.getCacheObject(keyForPrediction))) {
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createMonthPrediction.run"));
       }
-      String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
-      if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+      String keyForSimulated =  ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION;
+      if (ApsConstant.TRUE.equals(redisService.getCacheObject(keyForSimulated))) {
         log.info("正在进行实单模拟排产，请稍候,分厂:{},年:{},月:{}",createCondition.getFactoryCode(),createCondition.getYear(),createCondition.getMonth());
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
       }
-      String keyForSimulated =  ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION;
       redisService.setCacheObject(keyForSimulated, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
-      redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
       MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
       RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
       // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月

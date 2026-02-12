@@ -84,7 +84,6 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
     @Override
     public void createMonthPrediction(MpProductionPrediction createCondition){
         YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
-
         // 3、检查是否已有T月月度计划(定稿)
         //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
         List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(tMonth);
@@ -95,14 +94,12 @@ public class MpProductionPredictionServiceImpl extends AbstractDocService<MpProd
         if (ApsConstant.TRUE.equals(redisService.getCacheObject(keyForSimulated))) {
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
         }
-        String key = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
-        if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+        String keyForPrediction = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION;
+        if (ApsConstant.TRUE.equals(redisService.getCacheObject(keyForPrediction))) {
             log.info("正在生成订单预测需求，请稍候,分厂:{},年:{},月:{}",createCondition.getFactoryCode(),createCondition.getYear(),createCondition.getMonth());
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createMonthPrediction.run"));
         }
-        String keyForPrediction = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION;
         redisService.setCacheObject(keyForPrediction, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
-        redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月

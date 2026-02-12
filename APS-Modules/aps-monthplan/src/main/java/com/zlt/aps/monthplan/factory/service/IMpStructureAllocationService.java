@@ -1,9 +1,11 @@
 package com.zlt.aps.monthplan.factory.service;
 
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -41,4 +43,10 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @return
      */
     MpStructureAllocation getPreviousStructure(MpStructureAllocation param);
+    /**
+     *  根据调整参数获取分配结构
+     * @param createCondition 调整参数
+     * @return 分配结构
+     */
+    Set<String> findStructureNames(DpDemandPlan createCondition);
 }
