@@ -119,12 +119,19 @@ public class MpWeekRollAdjustEngine {
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
         contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
         //4、拆出搭配量，用于快速判断是否搭配
+        StringBuilder beginDaySb = new StringBuilder();
         mpProdFinalList.stream().forEach(x->{
+            if (x.getBeginDay() == null){
+                beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notBeginDay"),
+                        x.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            }
             if (x.getConventionProductionQty() >0) {
                 splitMatchQtyByDay(contextDTO,x.getConventionProductionQty(), lockNextDay,x);
             }
         });
-
+        if (!StringUtil.isEmptyWithTrim(beginDaySb.toString())){
+            throw new BusinessException(beginDaySb.toString());
+        }
         //5.在机SKU增量
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
