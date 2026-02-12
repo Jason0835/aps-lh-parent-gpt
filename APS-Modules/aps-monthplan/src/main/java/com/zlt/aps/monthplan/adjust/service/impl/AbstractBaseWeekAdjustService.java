@@ -1404,9 +1404,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 获取最新需求计划版本
         String adjustMonthPlanVersion = contextDTO.getAdjustMonthPlanVersion();
-        // 收集结构名称Set（过滤空值）
+        // 收集结构名称Set（筛选结构名称不为空且有调整）
         Set<String> structureNameSet = adjustResultList.stream()
-                .filter(vo -> StringUtils.isNotEmpty(vo.getStructureName()))
+                .filter(vo -> StringUtils.isNotEmpty(vo.getStructureName())
+                        && ApsConstant.TRUE.equals(vo.getAdjustFlag()))
                 .map(MpAdjustResult::getStructureName)
                 .collect(Collectors.toSet());
         if (PubUtil.isEmpty(structureNameSet)) {
