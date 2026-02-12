@@ -140,7 +140,7 @@ export default {
           disabled: this.isEdit,
         },
         {
-          prop: "cxMachineBrandCode",
+          prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           type: "select",
           dictData: this.parentDict.type.cx_machine_type_code,
