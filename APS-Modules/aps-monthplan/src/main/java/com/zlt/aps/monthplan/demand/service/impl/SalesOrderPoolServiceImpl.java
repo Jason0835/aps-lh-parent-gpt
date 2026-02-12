@@ -114,6 +114,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 	@Override
 	public List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode, Set<String> skus) {
+		if(CollectionUtils.isEmpty(skus)) {
+			return Collections.emptyList();
+		}
 		List<SalesOrderPool> result = Lists.newArrayList();
 		final int batchSize = 1000;
 		List<String> skuList = new ArrayList<>(skus);
@@ -130,10 +133,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		return result;
 	}
 
-	@Override
-	public List<SalesOrderPool> findAdjustSalesOrderPool(DpDemandPlan createCondition) {
-		return salesOrderPoolEntityMapper.findAdjustSalesOrderPool(createCondition);
-	}
+
 
 	/**
 	 * 批量修改同PO号的销售优先级

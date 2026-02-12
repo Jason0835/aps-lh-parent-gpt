@@ -204,9 +204,9 @@ public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
     MdmMaterialInfo getMaterialInfoByMaterialCode(String factoryCode, String materialCode);
     /**
      * 根据结构查找物料信息
-     * @param factoryCode
-     * @param structureNames
-     * @return
+     * @param factoryCode 分厂编码
+     * @param structureNames 结构
+     * @return 物料信息
      */
     List<MdmMaterialInfo> findMaterialInfoByStructureNames(String factoryCode, Set<String> structureNames);
     /**

@@ -198,6 +198,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
         // 将集合中指定字段的null值替换为0
         setNullFieldsToZero(adjustDetailList);
+        // 将集合中指定字段的0值替换为null
+        setZeroFieldsToNull(adjustDetailList);
+    }
+
+
+    /**
+     * 将集合中指定字段的0值替换为null
+     * @param adjustDetailList
+     */
+    protected void setZeroFieldsToNull(List<MpAdjustDetailVo> adjustDetailList) {
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return;
+        }
+        for (MpAdjustDetailVo vo : adjustDetailList) {
+            vo.setActualAdjustQty(Convert.toInt(vo.getActualAdjustQty(), 0) == 0 ? null : vo.getActualAdjustQty());
+        }
     }
 
     /**

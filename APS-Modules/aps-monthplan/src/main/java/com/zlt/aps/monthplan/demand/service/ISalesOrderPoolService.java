@@ -2,7 +2,6 @@ package com.zlt.aps.monthplan.demand.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
@@ -62,10 +61,4 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @return
 	 */
 	List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode, Set<String> eligibleSkus);
-	/**
-	 * 获取调整的销售订单
-	 * @param createCondition 调整参数
-	 * @return 销售订单
-	 */
-  List<SalesOrderPool> findAdjustSalesOrderPool(DpDemandPlan createCondition);
 }

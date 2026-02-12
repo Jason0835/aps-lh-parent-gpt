@@ -129,5 +129,19 @@ public class ProductionCapacityParamConfiguration {
      * 默认为 1台
      */
     private Integer lastNearDeadLineMaxLhMachineCount;
+    /**
+     * 单台成型机的月度生产计划锁定期天数
+     * 默认为3天
+     */
+    private Integer singleCxMachineLockDay;
+    /**
+     * 多台成型机的月度生产计划锁定期天数
+     * 默认为4天
+     */
+    private Integer multiCxMachineLockDays;
+    /**
+     * 周程滚动调整日
+     */
+    private String weekRollAdjustDate;
 
 }

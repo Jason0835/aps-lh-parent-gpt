@@ -242,8 +242,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 
         // 2、bom版本去重，仅留下版本号最高的
         Map<String, MdmBomInfo> childMap = bomList.stream()
-                .filter(bom -> StringUtils.isNotEmpty(bom.getChildMaterialCode()))
-                .collect(Collectors.toMap(MdmBomInfo::getChildMaterialCode, Function.identity(), (b1, b2) -> {
+                .filter(bom -> StringUtils.isNotEmpty(bom.getChildCode()))
+                .collect(Collectors.toMap(MdmBomInfo::getChildCode, Function.identity(), (b1, b2) -> {
                     String version1 = Optional.of(b1.getChildMaterialVersion()).orElse("");
                     String version2 = Optional.of(b2.getChildMaterialVersion()).orElse("");
                     return version1.compareTo(version2) >= 0 ? b1 : b2; // 比较版本号，保留版本号较大的
@@ -251,11 +251,11 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 
         // 3、根据父节汇总
         Map<String, List<MdmBomInfo>> parentMap = childMap.values().stream()
-                .filter(bom -> StringUtils.isNotEmpty(bom.getParentMaterialCode()))
-                .collect(Collectors.groupingBy(MdmBomInfo::getParentMaterialCode));
+                .filter(bom -> StringUtils.isNotEmpty(bom.getParentCode()))
+                .collect(Collectors.groupingBy(MdmBomInfo::getParentCode));
         // 4、构建bom树
         childMap.values().forEach(bom -> {
-            List<MdmBomInfo> children = parentMap.get(bom.getChildMaterialCode());
+            List<MdmBomInfo> children = parentMap.get(bom.getChildCode());
             boolean isLeaf = CollectionUtils.isEmpty(children); // 如果没有子节点，判定为叶子节点
             bom.setIsLeaf(isLeaf);
             if (!isLeaf) { // 非叶子节点，关联父子节点的关系
@@ -281,13 +281,13 @@ public class MesBomItfServiceImpl implements MesBomItfService {
             if (pathList.stream().anyMatch(b -> updateIdSet.contains(b.getId()))) {
                 // 5.2.1、初始化消耗量
                 MdmMaterialConsumeDetail consumeDetail = new MdmMaterialConsumeDetail();
-                consumeDetail.setChildMaterialCode(bom.getChildMaterialCode());
+                consumeDetail.setChildMaterialCode(bom.getChildCode());
                 consumeDetail.setChildMaterialName(bom.getChildMaterialName());
                 consumeDetail.setChildMaterialVersion(bom.getChildMaterialVersion());
                 consumeDetail.setUnit(bom.getUnit());
                 // 5.2.2、取胎胚，必然是路径的最后一个元素
                 MdmBomInfo embryoBom = pathList.getLast();
-                consumeDetail.setEmbryoCode(embryoBom.getChildMaterialCode());
+                consumeDetail.setEmbryoCode(embryoBom.getChildCode());
                 consumeDetail.setEmbryoVersion(embryoBom.getChildMaterialVersion());
                 // 5.2.3、计算用量，用量为每一层bom的用量乘数
                 BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
@@ -307,8 +307,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	 * @return
 	 */
 	private String getMapKey(MdmBomInfo info) {
-		return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getParentMaterialCode(),
-				info.getParentVersion(), info.getChildMaterialCode(), info.getChildMaterialVersion());
+		return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getParentCode(),
+				info.getParentVersion(), info.getChildCode(), info.getChildMaterialVersion());
 	}
 
 }
