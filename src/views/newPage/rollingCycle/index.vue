@@ -942,7 +942,7 @@ export default {
           {
             prop: "adjustDetail",
             label: this.$t("调整明细"),
-            width:620,
+            width:720,
             render: ({ row }) => {
               return (
                 <el-popover
