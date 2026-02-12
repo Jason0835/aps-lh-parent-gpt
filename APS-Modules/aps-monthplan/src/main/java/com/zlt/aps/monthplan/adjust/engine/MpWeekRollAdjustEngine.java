@@ -984,7 +984,7 @@ public class MpWeekRollAdjustEngine {
         int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo,bakMpFinalVo);
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
         //提示：物料编码:%s,新上机日:%s,模拟排产结果:{排产计划量:%s,剩余未排:%s}！
-        addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,remainPlanQty));
+        addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty-remainPlanQty,remainPlanQty));
         if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
             // 若剩余量 > 搭配量，说明实单还有剩余
             // 实单剩余  = 剩余量 - 搭配量
@@ -1968,10 +1968,10 @@ public class MpWeekRollAdjustEngine {
             }
             //2.3、排产正式列表
             if (PubUtil.isNotEmpty(incAdjustFormalList)){
-                Iterator<MpAdjustStructureIn> incAdjustIter = incAdjustFormalList.iterator();
-                while (incAdjustIter.hasNext()){
-                    if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustIter.next(),lockNextDay,newOnLineDay)){
-                        incAdjustIter.remove();
+                incAdjustFormalIter = incAdjustFormalList.iterator();
+                while (incAdjustFormalIter.hasNext()){
+                    if (doStructureInWithNewSkuForOne(contextDTO,mpProdFinalList,incAdjustFormalIter.next(),lockNextDay,newOnLineDay)){
+                        incAdjustFormalIter.remove();
                     }
                 }
             }
@@ -2004,6 +2004,8 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,--增模排产,物料编码:%s,开始！", contextDTO.getStructureName(),constructionStage,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
         int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo,bakMpFinalVo);
         contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】,施工:%s,--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),constructionStage,mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
+        //提示：物料编码:%s,新上机日:%s,模拟排产结果:{排产计划量:%s,剩余未排:%s}！
+        addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.newSku.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty-remainPlanQty,remainPlanQty));
         //2.5、若还有剩余，向前挤占其他SKU的搭配量
         if (remainPlanQty > 0){
             // 若剩余量 > 0，说明实单还有剩余
