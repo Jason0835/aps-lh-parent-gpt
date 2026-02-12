@@ -8,9 +8,12 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.Date;
+
+import static com.alibaba.fastjson.util.TypeUtils.isNumber;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -32,6 +35,8 @@ import java.util.Date;
 public class SalesOrderPool extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
+
+    private static final String ZERO_YEAR_WEEK = "0000";
 
      /** 工厂编码 默认116 */
     @Excel(name = "ui.data.column.SalesOrderPool.factoryCode", dictType = "biz_factory_name")
@@ -190,6 +195,38 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "提报日期结束时间", name = "billDateEndTime")
     @TableField(exist = false)
     private String billDateEndTime;
+
+    // 缓存供应链优先级整数值
+    @TableField(exist = false)
+    private transient Integer cachedScmPriority;
+    // 缓存年周号整数值（已转换格式）
+    @TableField(exist = false)
+    private transient Integer cachedWeekYearInt;
+
+    public Integer getCachedScmPriority() {
+        if (cachedScmPriority == null && StringUtils.isNotBlank(this.scmPriority)) {
+            try {
+                cachedScmPriority = Integer.parseInt(this.scmPriority.trim());
+            } catch (NumberFormatException e) {
+                cachedScmPriority = null;
+            }
+        }
+        return cachedScmPriority;
+    }
+
+    public Integer getCachedWeekYearInt() {
+        if (cachedWeekYearInt == null && StringUtils.isNotBlank(this.weekYear)
+            && !ZERO_YEAR_WEEK.equals(this.weekYear) &&  isNumber(this.weekYear)) {
+            // 原转换逻辑：substring(2) + substring(0,2)
+            String transformed = this.weekYear.substring(2) + this.weekYear.substring(0, 2);
+            try {
+                cachedWeekYearInt = Integer.parseInt(transformed);
+            } catch (NumberFormatException e) {
+                cachedWeekYearInt = null;
+            }
+        }
+        return cachedWeekYearInt;
+    }
 
     /**
      * 以分厂+物料为维度，转换销售订单

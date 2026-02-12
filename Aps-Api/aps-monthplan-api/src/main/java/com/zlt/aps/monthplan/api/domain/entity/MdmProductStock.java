@@ -9,9 +9,12 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
+
+import static com.alibaba.fastjson.util.TypeUtils.isNumber;
 
 
 /**
@@ -224,6 +227,43 @@ public class MdmProductStock extends BaseEntity {
     @ApiModelProperty(value = "规格", name = "specifications")
     @TableField(exist = false)
     private String specifications;
+
+    // 缓存转换后的年周号
+    @TableField(exist = false)
+    private transient Integer cachedWeekYearInt;
+    // 缓存是否为动平衡库存
+    @TableField(exist = false)
+    private transient Boolean cachedDynamicBalance;
+    // 缓存是否为均匀性库存
+    @TableField(exist = false)
+    private transient Boolean cachedUniformity;
+
+    public Integer getCachedWeekYearInt() {
+        if (cachedWeekYearInt == null && StringUtils.isNotBlank(this.weekYear)
+            && isNumber(this.weekYear)) {
+            String transformed = this.weekYear.substring(2) + this.weekYear.substring(0, 2);
+            try {
+                cachedWeekYearInt = Integer.parseInt(transformed);
+            } catch (NumberFormatException e) {
+                cachedWeekYearInt = null;
+            }
+        }
+        return cachedWeekYearInt;
+    }
+
+    public boolean isDynamicBalanceCached() {
+        if (cachedDynamicBalance == null) {
+            cachedDynamicBalance = "1".equals(this.getIsDynamicBalance());
+        }
+        return cachedDynamicBalance;
+    }
+
+    public boolean isUniformityCached() {
+        if (cachedUniformity == null) {
+            cachedUniformity = "1".equals(this.getIsUniformity());
+        }
+        return cachedUniformity;
+    }
 
     /**
      * 以分厂+物料为维度，转换库存
