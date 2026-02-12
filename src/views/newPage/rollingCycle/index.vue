@@ -927,7 +927,7 @@ export default {
       }
       if (this.activeName == "four") {
         return [
-        {
+          {
             prop: "materialCode",
             label: this.$t("物料编码"),
             width: 120,
@@ -946,16 +946,18 @@ export default {
             render: ({ row }) => {
               return (
                 <el-popover
-                placement="right"
-                title="调整明细"
-                width="500"
-                trigger="hover"
-              >
-                <div domPropsInnerHTML={row.adjustDetail}></div>
-                <div slot="reference" style="cursor: pointer;" domPropsInnerHTML={row.adjustDetail}>
-
-                </div>
-              </el-popover>
+                  placement="right"
+                  title="调整明细"
+                  width="500"
+                  trigger="hover"
+                >
+                  <div domPropsInnerHTML={row.adjustDetail}></div>
+                  <div
+                    slot="reference"
+                    style="cursor: pointer;"
+                    domPropsInnerHTML={row.adjustDetail}
+                  ></div>
+                </el-popover>
               );
             },
           },
@@ -989,7 +991,6 @@ export default {
             prop: "adjVersion",
             label: this.$t("调整版本"),
             width: 180,
-
           },
           {
             prop: "adjustType",
@@ -1011,7 +1012,6 @@ export default {
             },
             width: 120,
           },
-
         ];
       }
 
@@ -1319,8 +1319,26 @@ export default {
       try {
         let res = await editOutHistory(row);
         this.$modal.msgSuccess(res.msg);
-        // this.getList();
+        this.getSingleList({
+          factoryCode: row.factoryCode,
+          year: row.year,
+          month: row.month,
+          version: row.version,
+          productionVersion: row.productionVersion,
+        });
       } catch (err) {}
+    },
+
+    //单结构调整编辑后重新获取列表
+    async getSingleList(params) {
+      try {
+        let res = await listOutHistory(params);
+        console.log("res.rows", res.rows);
+        this.data=res.rows
+      } catch (err) {
+      } finally {
+        this.subLoading = false;
+      }
     },
 
     handleYearMonthChange(val) {
@@ -1796,8 +1814,17 @@ export default {
         this.outResultData = res;
         if (res.length != 0) {
           this.getStatisticsResult(res[0]);
+          this.getSingleList({
+          factoryCode:res[0].factoryCode,
+          year:res[0].year,
+          month:res[0].month,
+          version:res[0].version,
+          productionVersion:res[0].productionVersion
+
+        });
         }
         this.showConfirmResult = true;
+
         // this.data = res;
         // // this.data=res.rows
         // this.show = true;
@@ -2028,7 +2055,14 @@ export default {
 
         removeOutHistory({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
-          this.data = this.data.filter((item) => item.id != row.id);
+          // this.data = this.data.filter((item) => item.id != row.id);
+          this.getSingleList({
+            factoryCode: row.factoryCode,
+            year: row.year,
+            month: row.month,
+            version: row.version,
+            productionVersion: row.productionVersion,
+          });
           // this.resizeOutHistoryList();
         });
       });
