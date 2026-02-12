@@ -546,8 +546,8 @@ public abstract class AbstractDailyCapacityLimit {
             //46 46
             //8  46
             //8  46
-            int afterMachines = (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) / dailyLhQty -
-                    dayPlanQty / dailyLhQty;
+            int intPart = dayPlanQty / dailyLhQty;
+            int afterMachines = (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) / dailyLhQty - intPart;
             if (afterMachines <=0){
                 return resultArr;
             }
@@ -555,6 +555,14 @@ public abstract class AbstractDailyCapacityLimit {
             int tmpQty = afterMachines * changeMouldFirstQty;
             if (remainQty < dailyLhQty && remainQty>=tmpQty){
                 resultArr[0] = afterMachines;
+                resultArr[1] = 0;
+                resultArr[2] = 0;
+            }
+
+            //增模数超过日硫化的情况，例子：48 276
+            afterMachines = (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) / dailyLhQty;
+            if ((afterMachines * changeMouldFirstQty) >= dailyLhQty){
+                resultArr[0] = afterMachines - intPart;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
             }
