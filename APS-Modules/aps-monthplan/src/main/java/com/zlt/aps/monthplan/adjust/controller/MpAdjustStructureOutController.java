@@ -163,6 +163,7 @@ public class MpAdjustStructureOutController extends AbstractDocBizController<MpA
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustPriority")), "ADJUST_PRIORITY", queryVO.getFieldValueByFieldName("adjustPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("actualAdjustQty")), "ACTUAL_ADJUST_QTY", queryVO.getFieldValueByFieldName("actualAdjustQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustReason")), "ADJUST_REASON", queryVO.getFieldValueByFieldName("adjustReason"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
     }
 
 
