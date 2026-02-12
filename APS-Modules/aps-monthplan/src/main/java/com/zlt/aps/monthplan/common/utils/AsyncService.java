@@ -83,7 +83,6 @@ public class AsyncService {
   @Async("taskExecutor")
   public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion, MonthCalculator.MonthRangeResult monthRange, RequestAttributes requestAttributes){
         String keyForSimulated =  ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION;
-        String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
         try{
           PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
           Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
@@ -153,7 +152,6 @@ public class AsyncService {
         }catch (Exception e){
           log.info("生成实单模拟排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
         }finally {
-          redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
           redisService.setCacheObject(keyForSimulated, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
 
@@ -162,7 +160,6 @@ public class AsyncService {
   @Async("taskExecutor")
   public void executeAsyncTaskForPredictionProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange,RequestAttributes requestAttributes){
     String keyForPrediction = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION;
-    String key = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
     try{
       YearMonth tMonth = monthRange.getTMonth();
       Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
@@ -211,7 +208,6 @@ public class AsyncService {
     }catch (Exception e){
       log.info("生成预测排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
     }finally {
-      redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
       redisService.setCacheObject(keyForPrediction, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
     }
   }
