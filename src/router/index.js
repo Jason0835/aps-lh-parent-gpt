@@ -87,6 +87,12 @@ export const constantRoutes = [
     hidden: true,
   },
   {
+    path: "/largescreen/sulfur",
+    component: () => import("@/views/largescreen/sulfur"),
+    name: 'largescreenIndex',
+    hidden: true,
+  },
+  {
     path: "",
     component: Layout,
     redirect: "index",

@@ -142,7 +142,7 @@ export default {
           },
         },
         {
-          prop: "cxMachineBrandCode",
+          prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
@@ -212,7 +212,7 @@ export default {
 
         {
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
-          prop: "cxMachineBrandCode",
+          prop: "cxMachineTypeCode",
           type: "select",
           dictData: this.dict.type.cx_machine_type_code, // "JOB_TYPE",
         },

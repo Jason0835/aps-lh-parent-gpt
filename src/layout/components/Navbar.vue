@@ -19,7 +19,8 @@
 
       <template v-if="device !== 'mobile'">
         <lang-select class="set-language" />
-        <!-- <el-button type="text" @click="goMonth">中控台</el-button> -->
+        <!-- <el-button type="text" @click="goMonth">中控台</el-button>
+        <el-button type="text" @click="goVulan">加硫</el-button> -->
         <search id="header-search" class="right-menu-item" />
 
         <RefreshCache class="right-menu-item hover-effect"/>
@@ -98,6 +99,9 @@ export default {
   methods: {
     goMonth(){
       this.$router.push(`/largescreen/monthPlan`);
+    },
+    goVulan(){
+      this.$router.push(`/largescreen/sulfur`);
     },
     toggleSideBar() {
       this.$store.dispatch("app/toggleSideBar");
