@@ -77,8 +77,8 @@ public class MpWeekRollAdjustEngine {
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
-            //1.0 检查日硫化量
-            checkDayLhQty(sbError,adjustStructureIn);
+            //1.0 检查日硫化量及主花纹
+            checkDayLhQtyWithMainPattern(sbError,adjustStructureIn);
 
             if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustStructureIn.getConstructionStage())){
                 if (adjustStructureIn.getConfirmAdjustQty() > 0){
@@ -373,7 +373,7 @@ public class MpWeekRollAdjustEngine {
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureOut adjustStructureOut:mpAdjustStructureOutList){
             //1.0 检查日硫化量
-            checkDayLhQty(sbError,adjustStructureOut);
+            checkDayLhQtyWithMainPattern(sbError,adjustStructureOut);
 
             if (adjustStructureOut.getConfirmAdjustQty() < 0){
                 //1.1 减量
@@ -440,25 +440,33 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
-     * 检查日硫化量是否为空
+     * 检查日硫化量及主花纹是否为空
      * @param sbError
      * @param structureIn
      */
-    private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureIn structureIn){
+    private void checkDayLhQtyWithMainPattern(StringBuffer sbError, MpAdjustStructureIn structureIn){
         if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+                    structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+        }
+        if (StringUtil.isEmptyWithTrim(structureIn.getMainPattern())){
+            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }
 
     /**
-     * 检查日硫化量是否为空
+     * 检查日硫化量及主花纹是否为空
      * @param sbError
      * @param structureOut
      */
-    private void checkDayLhQty(StringBuffer sbError, MpAdjustStructureOut structureOut){
+    private void checkDayLhQtyWithMainPattern(StringBuffer sbError, MpAdjustStructureOut structureOut){
         if (structureOut.getDayVulcanizationQty() == null || structureOut.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+                    structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+        }
+        if (StringUtil.isEmptyWithTrim(structureOut.getMainPattern())){
+            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }
