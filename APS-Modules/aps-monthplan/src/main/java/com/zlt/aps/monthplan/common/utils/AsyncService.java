@@ -74,7 +74,7 @@ public class AsyncService {
     String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(finalVersion.getFactoryCode())).findFirst().get().getDictLabel();
 
     // 2.发送消息
-    messageServiceAdapter.sendNotice(templateCode ,SecurityUtils.getUsername() , factoryName,
+    messageServiceAdapter.sendNoticeByAsync(templateCode ,SecurityUtils.getUsername() ,SecurityUtils.getUsername(), factoryName,
         finalVersion.getYear(),
         finalVersion.getMonth(),
         predictionVersion);
