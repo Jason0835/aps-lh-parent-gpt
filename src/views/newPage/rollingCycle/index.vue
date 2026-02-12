@@ -942,14 +942,14 @@ export default {
           {
             prop: "adjustDetail",
             label: this.$t("调整明细"),
-            width: 420,
+            width:620,
             render: ({ row }) => {
               return (
                 <el-popover
                   placement="right"
                   title="调整明细"
                   width="500"
-                  trigger="hover"
+                  trigger="click"
                 >
                   <div domPropsInnerHTML={row.adjustDetail}></div>
                   <div
@@ -1333,7 +1333,6 @@ export default {
     async getSingleList(params) {
       try {
         let res = await listOutHistory(params);
-        console.log("res.rows", res.rows);
         this.data=res.rows
       } catch (err) {
       } finally {
