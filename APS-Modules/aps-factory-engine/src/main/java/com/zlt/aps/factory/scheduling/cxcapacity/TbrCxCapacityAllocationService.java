@@ -14,6 +14,7 @@ import com.zlt.aps.factory.scheduling.AbstractDataLoaderService;
 import com.zlt.aps.factory.scheduling.BaseDataContainer;
 import com.zlt.aps.factory.scheduling.ProductionContext;
 import com.zlt.aps.factory.scheduling.TbrProductionContext;
+import com.zlt.aps.factory.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.factory.service.DpRequireDataService;
 import com.zlt.aps.factory.service.MonthProductionDataService;
 import com.zlt.aps.factory.service.ProductionMdmDataService;
@@ -68,6 +69,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
     private final InitNoProductionRecordHandler initNoProductionRecordHandler;
+    
+    private final MatchingProductionHandler matchingProductionHandler;
 
     public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
@@ -80,7 +83,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           DayProductionStatisticsHandler dayProductionStatisticsHandler,
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
-                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
+                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
+                                          MatchingProductionHandler matchingProductionHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.formalProductionHandler = formalProductionHandler;
         this.simulateProductionHandler = simulateProductionHandler;
@@ -90,6 +94,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
+        this.matchingProductionHandler = matchingProductionHandler;
     }
 
     /**
@@ -177,12 +182,12 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
         formalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //11、最后搭配排产 TODO 报错，先注释掉
-//        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
-        //12、保存模具排产结果
+        //11、保存模具排产结果
         Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext, estimateGroupCxAllocationMap);
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
+        //12、最后搭配排产
+        matchingProductionHandler.matchingProduction(productionContext.getProductionVersion());
     }
 
     /**
