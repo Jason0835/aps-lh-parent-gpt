@@ -228,14 +228,15 @@ public class MdmProductStock extends BaseEntity {
     @TableField(exist = false)
     private String specifications;
 
+    // 缓存转换后的年周号
     @TableField(exist = false)
-    private transient Integer cachedWeekYearInt;  // 缓存转换后的年周号
-
+    private transient Integer cachedWeekYearInt;
+    // 缓存是否为动平衡库存
     @TableField(exist = false)
-    private transient Boolean cachedDynamicBalance; // 缓存是否为动平衡库存
-
+    private transient Boolean cachedDynamicBalance;
+    // 缓存是否为均匀性库存
     @TableField(exist = false)
-    private transient Boolean cachedUniformity;     // 缓存是否为均匀性库存
+    private transient Boolean cachedUniformity;
 
     public Integer getCachedWeekYearInt() {
         if (cachedWeekYearInt == null && StringUtils.isNotBlank(this.weekYear)
