@@ -969,14 +969,63 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setBeginDayAndEndDay(monthPlan);
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
-        // 新增月度生产计划
         try {
+            // 删除月度生产计划
+            deleteMonthPlanList(contextDTO, factoryMonthPlanProdFinalList);
+            // 新增月度生产计划
             baseDao.insertBatch(factoryMonthPlanProdFinalList);
             log.info("新增月度生产计划成功，共新增:{}条记录", factoryMonthPlanProdFinalList.size());
         } catch (Exception e) {
             log.error("新增月度生产计划批量操作异常", e);
             throw new RuntimeException("新增月度生产计划失败", e);
         }
+
+    }
+
+    /**
+     * 删除月度生产计划
+     * @param contextDTO
+     * @param factoryMonthPlanProdFinalList
+     */
+    private void deleteMonthPlanList(MpRollAdjustContextDTO contextDTO,
+                                     List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList) {
+        if (PubUtil.isEmpty(factoryMonthPlanProdFinalList)) {
+            return;
+        }
+        // 收集物料编码Set
+        Set<String> materialCodeSet = factoryMonthPlanProdFinalList.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
+                .collect(Collectors.toSet());
+        // 构建查询月度生产计划条件
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, contextDTO.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, contextDTO.getMpYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, contextDTO.getMpMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, contextDTO.getProductionVersion())
+                .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodeSet);
+        // 查询月度生产计划
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = factoryMonthPlanProdFinalMapper.selectList(wrapper);
+        if (PubUtil.isEmpty(monthPlanList)) {
+            return;
+        }
+        // 收集结构名称Set
+        Set<String> structureNameSet = factoryMonthPlanProdFinalList.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getStructureName)
+                .collect(Collectors.toSet());
+        // 通过结构名称过滤
+        List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = monthPlanList.stream()
+                .filter(vo -> structureNameSet.contains(vo.getStructureName()))
+                .collect(Collectors.toList());
+        if (PubUtil.isEmpty(monthPlanResultList)) {
+            return;
+        }
+        // 收集月度生产计划id Set
+        List<Long> idList = monthPlanResultList.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getId)
+                .collect(Collectors.toList());
+        // 删除月度生产计划
+        baseDao.deleteByIds(FactoryMonthPlanProductionFinalResult.class, idList);
+        log.info("删除月度生产计划成功，共删除:{}条记录", idList.size());
 
     }
 
