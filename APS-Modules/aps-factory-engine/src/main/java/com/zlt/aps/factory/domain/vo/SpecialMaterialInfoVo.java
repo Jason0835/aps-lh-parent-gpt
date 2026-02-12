@@ -56,6 +56,7 @@ public class SpecialMaterialInfoVo implements Serializable {
         info.setStandardLength(stockInfo.getStandardLength());
         info.setStock(stockInfo.getStock());
         info.setSumProductionQty(BigDecimal.ZERO.longValue());
+        info.setSumSkuAllocateQty(BigDecimal.ZERO.longValue());
         info.setExistingInventoryCapacity(BigDecimal.ZERO.longValue());
         return info;
     }
