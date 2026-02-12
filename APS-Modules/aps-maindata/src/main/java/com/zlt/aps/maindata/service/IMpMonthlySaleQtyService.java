@@ -53,8 +53,7 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
     Map<String, Integer> findCurrentMonthlySaleQty(String factoryCode);
     /**
      * 获取调整月均销量
-     * @param createCondition 调整参数
      * @return 月均销量
      */
-    Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition);
+    Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition, Set<String> eligibleSkus);
 }

@@ -8,6 +8,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -49,8 +50,7 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
   AjaxResult checkOverdue(SupplyOrderPool supplyOrderPool);
   /**
    * 获取调整供应链订单
-   * @param createCondition 调整参数
    * @return 供应链订单
    */
-  List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition);
+  List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition, Set<String> eligibleSkus);
 }

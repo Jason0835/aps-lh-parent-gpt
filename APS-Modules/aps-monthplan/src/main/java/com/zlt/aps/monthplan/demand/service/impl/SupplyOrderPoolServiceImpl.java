@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -13,6 +14,7 @@ import com.tlt.aps.enums.ProductionPlanType;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
 import com.tlt.aps.utils.JsonI18nConvertUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.*;
@@ -269,8 +271,27 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     }
 
     @Override
-    public List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition) {
-        return this.supplyOrderPoolEntityMapper.findAdjustSupplyOrderPool(createCondition);
+    public List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition, Set<String> skus) {
+        if(CollectionUtils.isEmpty(skus)) {
+            return Collections.emptyList();
+        }
+        List<SupplyOrderPool> result = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(skus);
+        for (int i = 0; i < skus.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, skus.size());
+            List<String> batchSkus = skuList.subList(i, end);
+            LambdaQueryWrapper<SupplyOrderPool> wrapper =
+                Wrappers.lambdaQuery(SupplyOrderPool.class)
+                    .eq(SupplyOrderPool::getFactoryCode, createCondition.getFactoryCode())
+                    .eq(SupplyOrderPool::getYear, createCondition.getYear())
+                    .eq(SupplyOrderPool::getMonth, createCondition.getMonth())
+                    .eq(SupplyOrderPool::getSourceType,ProductionPlanType.NORMAL.getPlanType())
+                    .in(SupplyOrderPool::getMaterialCode, batchSkus)
+                    .eq(SupplyOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
+            result.addAll(this.supplyOrderPoolEntityMapper.selectList(wrapper));
+        }
+        return result;
     }
 
     /**

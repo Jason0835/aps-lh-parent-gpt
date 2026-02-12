@@ -299,8 +299,23 @@ public class MpMonthlySaleQtyServiceImpl extends AbstractDocService<MpMonthlySal
     }
 
     @Override
-    public Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition) {
-        List<MpMonthlySaleQty> list = entityMapper.findAdjustMonthlySaleQty(createCondition);
+    public Map<String, Integer> findAdjustMonthlySaleQty(DpDemandPlan createCondition, Set<String> skus) {
+        if(CollectionUtils.isEmpty(skus)) {
+            return Collections.emptyMap();
+        }
+        List<MpMonthlySaleQty> list = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(skus);
+        for (int i = 0; i < skus.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, skus.size());
+            List<String> batchSkus = skuList.subList(i, end);
+            LambdaQueryWrapper<MpMonthlySaleQty> wrapper =
+                Wrappers.lambdaQuery(MpMonthlySaleQty.class)
+                    .eq(MpMonthlySaleQty::getFactoryCode, createCondition.getFactoryCode())
+                    .in(MpMonthlySaleQty::getMaterialCode, batchSkus)
+                    .eq(MpMonthlySaleQty::getIsDelete, ApsConstant.APS_YES_NO_0);
+            list.addAll(this.entityMapper.selectList(wrapper));
+        }
         if(CollectionUtils.isEmpty(list)){
             return Collections.emptyMap();
         }

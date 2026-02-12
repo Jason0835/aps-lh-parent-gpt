@@ -3,6 +3,7 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -39,8 +40,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -121,8 +124,24 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
     }
 
     @Override
-    public List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition) {
-        return mdmCycleSchStruConfEntityMapper.findAdjustCycleSchStruConf(createCondition);
+    public List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition, Set<String> structureNames) {
+        if(CollectionUtils.isEmpty(structureNames)) {
+            return Collections.emptyList();
+        }
+        List<MdmCycleSchStruConf> list = Lists.newArrayList();
+        final int batchSize = 1000;
+        List<String> skuList = new ArrayList<>(structureNames);
+        for (int i = 0; i < structureNames.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, structureNames.size());
+            List<String> batchStructureNames = skuList.subList(i, end);
+            LambdaQueryWrapper<MdmCycleSchStruConf> wrapper =
+                Wrappers.lambdaQuery(MdmCycleSchStruConf.class)
+                    .eq(MdmCycleSchStruConf::getFactoryCode, createCondition.getFactoryCode())
+                    .in(MdmCycleSchStruConf::getStructureName, batchStructureNames)
+                    .eq(MdmCycleSchStruConf::getIsDelete, ApsConstant.APS_YES_NO_0);
+            list.addAll(this.mdmCycleSchStruConfEntityMapper.selectList(wrapper));
+        }
+        return list;
     }
 
     /**

@@ -6,13 +6,13 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Sets;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.tlt.aps.exception.BusinessException;
-import com.tlt.aps.utils.SpringContextSupplierUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -24,8 +24,7 @@ import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
-import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
-import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
 import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
@@ -36,7 +35,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.monthplan.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -45,16 +43,15 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -765,6 +762,25 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             structureAllocation.setAdjustStartDay((Math.min(structureAllocation.getEndDay() + 1, monthTotalDay)));
         }
         return structureAllocation;
+    }
+
+    @Override
+    public Set<String> findStructureNames(DpDemandPlan createCondition) {
+        if(StringUtils.isNotBlank(createCondition.getStructureName())) {
+           return Sets.newHashSet(createCondition.getStructureName());
+        }
+        LambdaQueryWrapper<MpStructureAllocation>  queryWrapper = Wrappers.<MpStructureAllocation>lambdaQuery()
+            .eq(MpStructureAllocation::getFactoryCode, createCondition.getFactoryCode())
+            .eq(MpStructureAllocation::getYear, createCondition.getYear())
+            .eq(MpStructureAllocation::getMonth, createCondition.getMonth())
+            .eq(MpStructureAllocation::getMonthPlanVersion, createCondition.getMonthPlanVersion())
+            .eq(MpStructureAllocation::getProductionVersion, createCondition.getProductionVersion())
+            .eq(MpStructureAllocation::getIsDelete,YesOrNoEnum.NO.getCode());
+        List<MpStructureAllocation> list = this.entityMapper.selectList(queryWrapper);
+        if(CollectionUtils.isEmpty(list)) {
+            return Collections.emptySet();
+        }
+        return  list.stream().map(MpStructureAllocation::getStructureName).collect(Collectors.toSet());
     }
 
 
