@@ -95,21 +95,27 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
     public void createVmMonthPrediction(MpSimulatedResult createCondition) {
       log.info("createVmMonthPrediction: factoryCode={},year={},month={}", createCondition.getFactoryCode(), createCondition.getYear(), createCondition.getMonth());
       YearMonth tMonth = YearMonth.of(createCondition.getYear(), createCondition.getMonth());
-      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
-      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
       //   (1) 若 不存在T月月度计划，则提示"T月月度生产计划还未定稿，请先生成及定稿！"，系统不做任何处理。
       List<MpFactoryProductionVersion> finalVersions =  validateProductionVersionFinalized(tMonth);
       if (CollectionUtils.isEmpty(finalVersions)) {
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.productionPrediction.checkFinal"));
+      }
+      String keyForPrediction = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION;
+      if (ApsConstant.TRUE.equals(redisService.getCacheObject(keyForPrediction))) {
+        throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createMonthPrediction.run"));
       }
       String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + createCondition.getFactoryCode()+createCondition.getYear()+createCondition.getMonth();
       if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
         log.info("正在进行实单模拟排产，请稍候,分厂:{},年:{},月:{}",createCondition.getFactoryCode(),createCondition.getYear(),createCondition.getMonth());
         throw new BusinessException(I18nUtil.getMessage("ui.data.alert.createVmMonthPrediction.run"));
       }
+      String keyForSimulated =  ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION;
+      redisService.setCacheObject(keyForSimulated, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
       redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
       MpFactoryProductionVersion finalVersion =  finalVersions.get(0);
       RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+      // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
+      MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
       asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange,requestAttributes);
     }
 

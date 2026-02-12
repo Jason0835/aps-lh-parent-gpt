@@ -8,6 +8,7 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
@@ -927,11 +928,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             Integer differenceQty = factProdReqQty - Convert.toInt(monthPlan.getTotalQty(), 0);
             // 试制量试关联字段设置
             if (StringUtils.isNotEmpty(adjustDetailVo.getTrialPlanId())) {
+                // 实际生产需求(含损耗)
+                monthPlan.setFactProdReqQty(adjustDetailVo.getCurrentNetQty());
                 // 试制量试计划需求数量
                 monthPlan.setTrialQty(adjustDetailVo.getCurrentNetQty());
-                // 差异量(未排产数量) = 生产实际排产量 - 试制量试计划需求数量
-                differenceQty = Convert.toInt(monthPlan.getTotalQty(), 0) - Convert.toInt(monthPlan.getTrialQty(), 0);
-                monthPlan.setFactProdReqQty(null);
+                // 差异量(未排产数量) = 实际生产需求(含损耗) - 生产实际排产量
+                differenceQty = Convert.toInt(monthPlan.getFactProdReqQty(), 0) - Convert.toInt(monthPlan.getTotalQty(), 0);
             }
             // 差异量(未排产数量)
             monthPlan.setDifferenceQty(differenceQty);
@@ -1300,6 +1302,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 调整明细按照物料编号分组
         Map<String, List<MpAdjustDetailVo>> adjustDetailMap = buildMaterialCodeAdjustDetailMap(adjustDetailList);
 
+        // 最新需求计划版本
+        String lastMonthPlanVersion = null;
+        if (PubUtil.isNotEmpty(adjustDetailList)) {
+            lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
+            contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
+        }
+
         // 遍历生产计划列表匹配调整结果（更新计划量、开始日期、结束日期、调整量)
         for (FactoryMonthPlanFinalAdjustVo monthPlanVo : factoryMonthPlanProdFinalList) {
             String materialCode = monthPlanVo.getMaterialCode();
@@ -1316,6 +1325,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 log.warn("更新月度生产计划：物料编号:{}未查询到对应调整明细，跳过", materialCode);
                 continue;
             }
+
+            // 设置最新需求计划版本
+            monthPlanVo.setLastMonthPlanVersion(lastMonthPlanVersion);
 
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
@@ -1366,19 +1378,53 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 actualAdjustQty = null;
             }
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
-            // 设置最新需求计划版本
-            monthPlanVo.setLastMonthPlanVersion(adjustDetail.getLastMonthPlanVersion());
         }
-        // 更新月度生产计划
+
         try {
+            // 更新月度生产计划
             baseDao.updateBatch(factoryMonthPlanProdFinalList);
             log.info("更新月度生产计划成功，共更新:{}条记录", factoryMonthPlanProdFinalList.size());
+            // 通过结构名称更新月度生产计划
+            updateMonthPlanByStructureName(contextDTO, adjustResultList);
         } catch (Exception e) {
             log.error("更新月度生产计划批量操作异常", e);
             throw new RuntimeException("更新月度生产计划失败", e);
         }
 
     }
+
+
+    /**
+     * 通过结构名称更新月度生产计划
+     * @param contextDTO
+     * @param adjustResultList
+     */
+    private void updateMonthPlanByStructureName(MpRollAdjustContextDTO contextDTO, List<MpAdjustResult> adjustResultList) {
+        if (PubUtil.isEmpty(adjustResultList) || StringUtils.isEmpty(contextDTO.getAdjustMonthPlanVersion())) {
+            return;
+        }
+        // 获取最新需求计划版本
+        String adjustMonthPlanVersion = contextDTO.getAdjustMonthPlanVersion();
+        // 收集结构名称Set（筛选结构名称不为空且有调整）
+        Set<String> structureNameSet = adjustResultList.stream()
+                .filter(vo -> StringUtils.isNotEmpty(vo.getStructureName())
+                        && ApsConstant.TRUE.equals(vo.getAdjustFlag()))
+                .map(MpAdjustResult::getStructureName)
+                .collect(Collectors.toSet());
+        if (PubUtil.isEmpty(structureNameSet)) {
+            return;
+        }
+        // 通过结构名称更新月度生产计划最新需求计划版本
+        LambdaUpdateWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, contextDTO.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, contextDTO.getMpYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, contextDTO.getMpMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, contextDTO.getProductionVersion())
+                .in(FactoryMonthPlanProductionFinalResult::getStructureName, structureNameSet)
+                .set(FactoryMonthPlanProductionFinalResult::getLastMonthPlanVersion, adjustMonthPlanVersion);
+        factoryMonthPlanProdFinalMapper.update(null, wrapper);
+    }
+
 
     /**
      * 根据时间获取周次

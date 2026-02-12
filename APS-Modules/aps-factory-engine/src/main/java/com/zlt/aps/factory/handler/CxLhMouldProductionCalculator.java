@@ -54,6 +54,7 @@ public class CxLhMouldProductionCalculator {
         boolean isDayFinish = productionQty >= dayMaxProductionQty ? true : false;
         Set<String> cxMachineCodeInfo = continueSkuInfo.getOnLineCxMachineSet();
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = continueSkuInfo.getContinueSkuPlanList();
+        String skuMaterialDesc = continueSkuPlanList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         //20260127 开产日-量放一半
         Integer lossQty = BigDecimal.ZERO.intValue();
         if (openDay.contains(productionDay)) {
@@ -64,7 +65,13 @@ public class CxLhMouldProductionCalculator {
         }
         //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
         Integer lossQtyDiffValue = productionQty;
-        productionQty = productionContext.getSpecialMaterialProductionQtyBySku(groupPlanInfo, productionQty);
+        Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(groupPlanInfo, productionQty);
+        if (specialMaterialLimitQty == BigDecimal.ZERO.intValue()) {
+            continueSkuPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+            productionContext.addSkuProductionLimitInfo(skuMaterialDesc, MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT);
+            return;
+        }
+        productionQty = specialMaterialLimitQty;
         lossQtyDiffValue = lossQtyDiffValue - productionQty;
         lossQty = lossQty - lossQtyDiffValue;
         //更新日产信息
@@ -150,7 +157,13 @@ public class CxLhMouldProductionCalculator {
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
             //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
-            realDayProductionQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
+            Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
+            if (specialMaterialLimitQty == BigDecimal.ZERO.intValue()) {
+                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+                productionContext.addSkuProductionLimitInfo(skuMaterialDesc, MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT);
+                break;
+            }
+            realDayProductionQty = specialMaterialLimitQty;
             Integer lossQtyDiffValue = dayProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {
@@ -241,7 +254,13 @@ public class CxLhMouldProductionCalculator {
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
             //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
-            realDayProductionQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
+            Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
+            if (specialMaterialLimitQty == BigDecimal.ZERO.intValue()) {
+                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+                productionContext.addSkuProductionLimitInfo(skuMaterialDesc, MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT);
+                break;
+            }
+            realDayProductionQty = specialMaterialLimitQty;
             Integer lossQtyDiffValue = dayProductionQty - realDayProductionQty;
             lossQty = lossQty - lossQtyDiffValue;
             if (lossQty < BigDecimal.ZERO.intValue()) {

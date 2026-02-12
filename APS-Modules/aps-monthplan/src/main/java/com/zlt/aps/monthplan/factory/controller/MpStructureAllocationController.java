@@ -63,8 +63,8 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     public TableDataInfo list(@RequestBody MpStructureAllocation queryCondition) {
         try {
             startPage();
+            setProductionVersion(queryCondition);
             List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
-            filterStructureAllocationList(queryCondition, list);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();
@@ -72,7 +72,12 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     }
 
 
-    private void filterStructureAllocationList(MpStructureAllocation queryCondition, List<MpStructureAllocation> list) {
+    /**
+     * 设置排产版本
+     * 排产版本为空，默认查询当前年月最新的排产版本
+     * @param queryCondition
+     */
+    private void setProductionVersion(MpStructureAllocation queryCondition) {
         if (StringUtils.isNotEmpty(queryCondition.getProductionVersion())) {
             return;
         }
@@ -83,13 +88,12 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         param.setMonth(queryCondition.getMonth());
         List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
         if (PubUtil.isEmpty(monthPlanResultList)) {
-            list.clear();
             return;
         }
         // 排产版本
         String productionVersion = monthPlanResultList.get(0).getProductionVersion();
         log.info("排产版本为空，默认查询当前年月最新的排产版本:{}", productionVersion);
-        CollUtil.filter(list, item -> StringUtils.equals(item.getProductionVersion(), productionVersion));
+        queryCondition.setProductionVersion(productionVersion);
     }
 
 
