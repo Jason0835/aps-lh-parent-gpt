@@ -173,7 +173,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         if (PubUtil.isEmpty(mpAdjustStructureInList)){
             return;
         }
-        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getSaveMpProdFinalList();
         if (PubUtil.isEmpty(mpFinalAdjustList)){
             return;
         }
