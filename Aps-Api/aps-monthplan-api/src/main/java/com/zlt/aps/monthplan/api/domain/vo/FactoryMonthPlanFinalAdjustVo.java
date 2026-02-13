@@ -78,6 +78,11 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private StringBuilder adjustDetail;
 
     /**
+     * 已经移动的标志
+     */
+    private boolean moveFlag = false;
+
+    /**
      * 调整明细ID
      */
     @TableField(exist = false)
