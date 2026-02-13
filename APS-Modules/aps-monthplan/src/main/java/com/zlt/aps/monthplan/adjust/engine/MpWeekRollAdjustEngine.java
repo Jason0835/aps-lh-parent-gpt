@@ -622,7 +622,13 @@ public class MpWeekRollAdjustEngine {
             //允许扣减量,实单-锁定量
             int allowDeductQty = calcAllowDeductQty(mpFinalVo);
             needDeductQty = allowDeductQty >= reAdjustQty ? reAdjustQty:allowDeductQty;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,getRealBillQty(mpFinalVo),mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
+            int realBillQty = getRealBillQty(mpFinalVo);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,realBillQty,mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
+            if (needDeductQty == 0){
+                //提示：【减量】物料编码:%s，确认调整量:%s，实单量:%s，锁定量:%s，允许扣减量:%s！
+                addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.zeroAdjustDeduct"),deductAdjust.getMaterialCode(),reAdjustQty,realBillQty,mpFinalVo.getLockQty(),allowDeductQty));
+                continue;
+            }
             doNeedDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
@@ -665,7 +671,13 @@ public class MpWeekRollAdjustEngine {
             //允许扣减量,实单-锁定量
             int allowDeductQty = calcAllowDeductQty(mpFinalVo);
             needDeductQty = allowDeductQty >= reAdjustQty ? reAdjustQty:allowDeductQty;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,getRealBillQty(mpFinalVo),mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
+            int realBillQty = getRealBillQty(mpFinalVo);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,物料编码:%s,确认调整量:%s,实单量:%s,锁定量:%s,允许扣减量:%s",contextDTO.getStructureName(),deductAdjust.getMaterialCode(),reAdjustQty,realBillQty,mpFinalVo.getLockQty(),allowDeductQty)).append(ApsConstant.DIVISION);
+            if (needDeductQty == 0){
+                //提示：【减量】物料编码:%s，确认调整量:%s，实单量:%s，锁定量:%s，允许扣减量:%s！
+                addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.zeroAdjustDeduct"),deductAdjust.getMaterialCode(),reAdjustQty,realBillQty,mpFinalVo.getLockQty(),allowDeductQty));
+                continue;
+            }
             doNeedDeductProductionQty(contextDTO,needDeductQty, mpFinalVo);
             //3、遍历31天日排产量，根据实际扣减量依次扣减
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
@@ -1188,7 +1200,7 @@ public class MpWeekRollAdjustEngine {
                     continue;
                 }
                 //3、先排实单->自带的搭配
-                doStructureOutWithOnlineSkuForOne(contextDTO, mpProdFinalList, lockNextDay,adjustStructOutVo ,
+                doStructureOutWithOnlineOneSku(contextDTO, mpProdFinalList, lockNextDay,adjustStructOutVo ,
                         mpFinalVo,newOnLineDay);
                 reLocateProdFinalIter.remove();
             }
@@ -1205,8 +1217,8 @@ public class MpWeekRollAdjustEngine {
      * @param newOnLineDay 新的上机日
      * @return
      */
-    private void doStructureOutWithOnlineSkuForOne(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
-                                                   MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int newOnLineDay) {
+    private void doStructureOutWithOnlineOneSku(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, int lockNextDay,
+                                                MpAdjustStructureOut adjustStructOutVo, FactoryMonthPlanFinalAdjustVo mpFinalVo, int newOnLineDay) {
         if (adjustStructOutVo == null) {
             // 非在机SKU，继续
             return;
@@ -1226,6 +1238,8 @@ public class MpWeekRollAdjustEngine {
         if (mpFinalVo.getBeginDay() >= lockNextDay && newOnLineDay > mpFinalVo.getBeginDay()){
             // 若在机SKU的开始日大于锁定日，且新的上机日比原开始日大，表示会发生延后，则退出,
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,在机SKU开始日在锁定日之后,新上机日:%s,比原开始日大,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
+            //提示：物料编码:%s,在机SKU开始日在锁定日之后,新上机日:%s,比原开始日:%s大
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.skuDelay"),mpFinalVo.getMaterialCode(),newOnLineDay,mpFinalVo.getBeginDay()));
             return;
         }
 
@@ -1243,20 +1257,28 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,开始！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
         int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo,bakMpFinalVo);
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
+        //提示：物料编码:%s,新上机日:%s,模拟排产结果:{排产计划量(含搭配):%s,已排:%s,剩余未排:%s}！
+        addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty-remainPlanQty,remainPlanQty));
         if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
             // 若剩余量 > 搭配量，说明实单还有剩余
-            // 实单剩余  = 剩余量 - 搭配量
-            //remainPlanQty -= mpFinalVo.getConventionProductionQty();
             // 去掉搭配量，将实单量排产
-            remainPlanQty = newPlanQty - mpFinalVo.getConventionProductionQty();
+            int newRemainPlanQty = newPlanQty - mpFinalVo.getConventionProductionQty();
+            int oriConventionProductionQty = mpFinalVo.getConventionProductionQty();
             // 本身搭配被挤掉，置0
             mpFinalVo.setConventionProductionQty(0);
+            //重置开始日\结束日\汇总值
+            resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+            int oriTotalQty = mpFinalVo.getTotalQty();
             // 日期向前，依次扣减其他SKU的搭配量，并模拟挤占
             Integer newEndDay = newOnLineDay == lockNextDay ? lockNextDay:newOnLineDay;
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-开始！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
-            deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,remainPlanQty,mpFinalVo,mpProdFinalList);
+            deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,newRemainPlanQty,mpFinalVo,mpProdFinalList);
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-结束！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
+            //提示：在机的物料编码:%s,排产日:%s,模拟后的剩余未排量:%s,原搭配量:%s,挤搭配前的剩余计划量(扣原搭配量):%s,实际挤占量:%s！
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction"),mpFinalVo.getMaterialCode(),newOnLineDay,remainPlanQty,oriConventionProductionQty,newRemainPlanQty,oriTotalQty - mpFinalVo.getTotalQty()));
         }else {
+            //提示：在机的物料编码:%s,排产日:%s,计划调整量(含搭配):%s,实际调整量:%s,剩余调整量:%s,原搭配量:%s,剩余搭配量:%s！
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction2"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty - remainPlanQty,remainPlanQty,mpFinalVo.getConventionProductionQty(),remainPlanQty));
             if (mpFinalVo.getConventionProductionQty() >= remainPlanQty){
                 mpFinalVo.setConventionProductionQty(remainPlanQty);
             }
@@ -2263,6 +2285,8 @@ public class MpWeekRollAdjustEngine {
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,排序:%s,物料编码:%s,开始！",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             int remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, newOnLineDay, newPlanQty, mpFinalVo,bakMpFinalVo);
             contextDTO.getLogDetail().append(String.format("结构:%s,【新增SKU】--增模排产,排序:%s,物料编码:%s,结束！还有剩余排产计划量:%s",contextDTO.getStructureName(), iOrder,mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
+            //提示：物料编码:%s,新上机日:%s,模拟排产结果:{排产计划量:%s,剩余未排:%s}！
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.newSku.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty-remainPlanQty,remainPlanQty));
             //2.5、若还有剩余，向前挤占其他SKU的搭配量
             if (remainPlanQty > 0){
                 // 若剩余量 > 0，说明实单还有剩余
@@ -2278,12 +2302,16 @@ public class MpWeekRollAdjustEngine {
             if (productionQty <=0){
                 mpProdFinalList.removeIf(item -> item.getMaterialCode().equals(adjustStructOutVo.getMaterialCode()));
                 contextDTO.getFactoryMonthPlanProdFinalList().removeIf(item -> item.getMaterialCode().equals(adjustStructOutVo.getMaterialCode()));
+                //提示：新增的物料编码:%s,施工:%s,排产日:%s,计划调整量:%s,因产能限制,没有排产上！
+                addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.newSku.noProduction"),mpFinalVo.getMaterialCode(),"正式",newOnLineDay,newPlanQty));
             }else{
                 //重置各优先级总排产量
                 productionQty += getProductionQty(lockNextDay, newOnLineDay-1,mpFinalVo);
                 resetTotalProductionQty(adjustStructOutVo,mpFinalVo,productionQty);
                 //重置开始日\结束日\汇总值
                 resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+                //提示：新增的物料编码:%s,施工:%s,排产日:%s,计划调整量:%s,实际调整量:%s！
+                addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.newSku.realProduction"),mpFinalVo.getMaterialCode(),"正式",newOnLineDay,newPlanQty,productionQty));
             }
 
         }
