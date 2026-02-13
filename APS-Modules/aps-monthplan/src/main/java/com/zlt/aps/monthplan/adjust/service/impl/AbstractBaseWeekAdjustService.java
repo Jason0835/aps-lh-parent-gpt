@@ -750,15 +750,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             queryMonthPlanList(contextDTO);
             // 4、更新试制量制计划
             updateTrialPlanList(contextDTO);
-            // 5、汇总调整明细
-//            sumAdjustDetail(contextDTO);
-            // 6、更新调整明细
+            // 5、更新调整明细
             updateAdjustDetailList(contextDTO);
-            // 7、更新月度生产计划
+            // 6、更新月度生产计划
             updateMonthPlanList(contextDTO);
-            // 8、新增月度生产计划
+            // 7、新增月度生产计划
             insertMonthPlanList(contextDTO);
-            // 9、更新结构转产
+            // 8、更新结构转产
             updateStructureAllocationList(contextDTO);
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
@@ -1385,14 +1383,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 log.warn("更新月度生产计划：物料编号:{}未查询到对应调整结果，跳过", materialCode);
                 continue;
             }
+
+            // 设置最新需求计划版本
+            monthPlanVo.setLastMonthPlanVersion(lastMonthPlanVersion);
+
             MpAdjustDetailVo adjustDetail = getFirstAdjustDetail(adjustDetailMap, materialCode);
             if (adjustDetail == null) {
                 log.warn("更新月度生产计划：物料编号:{}未查询到对应调整明细，跳过", materialCode);
                 continue;
             }
-
-            // 设置最新需求计划版本
-            monthPlanVo.setLastMonthPlanVersion(lastMonthPlanVersion);
 
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
