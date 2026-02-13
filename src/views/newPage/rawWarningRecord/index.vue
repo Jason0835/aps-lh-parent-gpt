@@ -302,9 +302,20 @@ export default {
   },
   created() {
     console.log();
+    this.search = {
+      factoryCode: "116",
+    };
+    this.query = {
+      factoryCode: "116",
+    };
   },
   activated() {
     let propData = this.getQueryParams();
+    if (Object.keys(propData).length === 0) {
+      // console.log("propData 是空对象");
+      this.getList();
+      return
+    }
 
     let defaultParams = {
       ...propData,

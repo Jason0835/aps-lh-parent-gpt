@@ -1414,18 +1414,32 @@ export default {
         }
 
         this.versionList = list;
-        console.log("list.length", list.length);
 
         if (list.length > 0) {
-          console.log("this.activeName", this.activeName);
           if (this.activeName == "second") {
             this.$set(this.search, "productionVersion", list[0].value);
             this.$set(this.query, "productionVersion", list[0].value);
           } else if (this.activeName == "four") {
-            console.log("list[0].value", list[0].value);
+            if(this.query.version){
+              let hasVersion = list.some(item=>item.value == this.query.version)
+              if(hasVersion){
+                this.$set(this.search, "adjVersion", this.query.version);
+                this.$set(this.query, "adjVersion", this.query.version);
+                return
+              }
+            }
             this.$set(this.search, "adjVersion", list[0].value);
             this.$set(this.query, "adjVersion", list[0].value);
+
           } else {
+            if(this.query.version){
+              let hasVersion = list.some(item=>item.value == this.query.version)
+              if(hasVersion){
+                this.$set(this.search, "version", this.query.version);
+                this.$set(this.query, "version", this.query.version);
+                return
+              }
+            }
             this.$set(this.search, "version", list[0].value);
             this.$set(this.query, "version", list[0].value);
           }

@@ -1,7 +1,7 @@
 <template>
   <div class="screen">
     <div
-    class="screen-flex"
+      class="screen-flex"
       :style="{
         transform: `scale(${size.scale})`,
         position: 'absolute',
@@ -46,30 +46,38 @@
         </div>
       </div>
       <div class="content">
-        <div class="search-content">
-          <div class="search-item">
-            <div class="search-name">日期：</div>
-            <el-date-picker v-model="value1" type="date" placeholder="选择日期">
-            </el-date-picker>
-          </div>
-          <div class="search-item">
-            <div class="search-name">机台：</div>
-            <el-select v-model="value" placeholder="请选择">
-              <el-option
-                v-for="item in options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              >
-              </el-option>
-            </el-select>
-          </div>
-          <div class="search-item">
-            <div class="search-name" style="width: 150px">研发品号：</div>
-            <el-input v-model="input" placeholder="请输入内容"></el-input>
-          </div>
-        </div>
         <div v-show="focusTap == 0">
+          <div class="search-content">
+            <div class="search-item">
+              <div class="search-name">日期：</div>
+              <el-date-picker
+                v-model="value1"
+                type="date"
+                placeholder="选择日期"
+              >
+              </el-date-picker>
+            </div>
+            <div class="search-item">
+              <div class="search-name">机台：</div>
+              <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </div>
+            <div class="search-item">
+              <div class="search-name" style="width: 150px">研发品号：</div>
+              <el-input v-model="input" placeholder="请输入内容"></el-input>
+            </div>
+            <el-button type="primary" icon="el-icon-search" class="blue-button">搜索</el-button>
+            <el-button type="danger" icon="el-icon-search">订单甘特图</el-button>
+            <el-button type="warning" icon="el-icon-search">机台甘特图</el-button>
+            <el-button type="success" icon="el-icon-search">规格甘特图</el-button>
+          </div>
           <table class="production-table">
             <thead>
               <tr>
@@ -125,6 +133,56 @@
           </div>
         </div>
         <div v-show="focusTap == 1">
+          <div class="search-content">
+            <div class="search-item">
+              <div class="search-name">日期：</div>
+              <el-date-picker
+                v-model="value1"
+                type="date"
+                placeholder="选择日期"
+              >
+              </el-date-picker>
+            </div>
+            <div class="search-item">
+              <div class="search-name">机台编码：</div>
+              <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </div>
+            <div class="search-item">
+              <div class="search-name">胎别：</div>
+              <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </div>
+            <div class="search-item">
+              <div class="search-name">责任单位：</div>
+              <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </div>
+            <el-button type="primary" icon="el-icon-search" class="blue-button">搜索</el-button>
+            <el-button type="danger" icon="el-icon-search">导出</el-button>
+
+          </div>
           <div class="table-content">
             <ScrollTable
               :columns="shutdownColumns"
@@ -134,6 +192,47 @@
           </div>
         </div>
         <div v-show="focusTap == 2">
+          <div class="search-content">
+            <div class="search-item">
+              <div class="search-name">日期：</div>
+              <el-date-picker
+                v-model="value1"
+                type="date"
+                placeholder="选择日期"
+              >
+              </el-date-picker>
+            </div>
+            <div class="search-item">
+              <div class="search-name">责任单位：</div>
+              <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </div>
+            <div class="search-item">
+              <div class="search-name">机台：</div>
+              <el-select v-model="value" placeholder="请选择">
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </div>
+            <div class="search-item">
+              <div class="search-name" style="width: 150px">研发品号：</div>
+              <el-input v-model="input" placeholder="请输入内容"></el-input>
+            </div>
+            <el-button type="primary" icon="el-icon-search" class="blue-button">搜索</el-button>
+            <el-button type="danger" icon="el-icon-search">导出</el-button>
+          </div>
           <div class="table-content">
             <ScrollTable
               :columns="birthColumns"
@@ -144,7 +243,7 @@
         </div>
       </div>
       <div class="pageination-container">
-        <el-pagination background layout="prev, pager, next" :total="1000">
+        <el-pagination background layout="prev, pager, next" class="my-pagination" :total="1000">
         </el-pagination>
       </div>
     </div>
@@ -433,10 +532,15 @@ export default {
   height: 0 !important;
   content: none !important;
 }
-.pageination-container{
+.pageination-container {
   display: flex;
   justify-content: flex-end;
   padding: 0 20px;
 }
-
+.blue-button{
+  background: #009ff4;
+}
+.el-pagination.is-background .el-pager li.active {
+  background-color: #FC813B !important;
+}
 </style>

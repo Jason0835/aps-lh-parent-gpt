@@ -93,6 +93,12 @@ export const constantRoutes = [
     hidden: true,
   },
   {
+    path: "/largescreen/forming",
+    component: () => import("@/views/largescreen/forming"),
+    name: 'largescreenIndex',
+    hidden: true,
+  },
+  {
     path: "",
     component: Layout,
     redirect: "index",
