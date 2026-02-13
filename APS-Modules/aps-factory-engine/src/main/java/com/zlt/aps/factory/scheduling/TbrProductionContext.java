@@ -659,6 +659,57 @@ public class TbrProductionContext extends Context {
         return getSpecialMaterialProductionQty(groupInfo, productionQty, SpecialMaterialInfoVo::getSumSkuAllocateQty,
                 SpecialMaterialInfoVo::getSumProductionQty);
     }
+
+    /**
+     * 获取特殊材料批次剩余量，用于搭配，返回最近一个批次的剩余量
+     * @param groupInfo 结构
+     * @param productionQty 预计生产量
+     * @param boolean 库存不足预计生产量的情况下，是否新开一卷
+     * @return
+     */
+    public Integer getSpecialMaterialBatchRemainQty(ProductionPlanGroupInfo groupInfo, Integer productionQty, boolean isNewRoll) {
+        if (!groupInfo.isSpecialMaterial()) {
+            return 0;
+        }
+        // 检查是否有特殊材料库存不足的情况，需要按剩余库存换算后生产条数最少的生产量为准
+        Integer remainProductQty = productionQty;
+        Map<String, BigDecimal> embryoSpecialMaterialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap(); // 本结构特殊材料清单
+        for (Entry<String, BigDecimal> entry: embryoSpecialMaterialInfoMap.entrySet()) {
+            String materialCode = entry.getKey(); // 特殊材料物料
+            BigDecimal unitConsumeQty = entry.getValue(); // 单胎消耗
+            Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(materialCode);
+            if (specialMaterialInfo == null) {
+                remainProductQty = 0;
+                break;
+            }
+            // 1.1统计剩余库存
+            // 计算标准库存
+            Long remainStock = specialMaterialInfo.values().stream()
+                    .mapToLong(s -> BigDecimalUtils
+                            .ceil(s.getSumSkuAllocateQty(), BigDecimalUtils.valueOf(s.getStandardLength())).longValue()
+                            - s.getSumSkuAllocateQty())
+                    .sum();
+            // 1.2剩余库存换算成条数
+            Integer canProductQty = BigDecimalUtils.div(remainStock, unitConsumeQty, 0).intValue();
+            if (canProductQty < remainProductQty && isNewRoll) { // 如果剩余库存不足够生产出需求量，多加一卷
+                Long standardLength = specialMaterialInfo.keySet().stream().min(Long::compareTo).orElse(0L);
+                Long unAllocationQty = specialMaterialInfo.values().stream().mapToLong(s -> s.getStock() - s.getSumSkuAllocateQty()).sum();
+                if (remainStock + standardLength <= unAllocationQty) {
+                    remainProductQty = BigDecimalUtils.div(remainStock + standardLength, unitConsumeQty, 0).intValue();
+                } else {
+                    remainProductQty = canProductQty;
+                }
+            } else {
+                remainProductQty = canProductQty;
+            }
+            if (remainProductQty <= 0) {
+                break;
+            }
+        }
+        //偶数
+        remainProductQty = remainProductQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION * ProductionConstant.DOUBLE_MOULD_QTY;
+        return remainProductQty;
+    }
     
     /**
      * 获取结构目前对应的特殊材料库存可生产量
@@ -682,9 +733,10 @@ public class TbrProductionContext extends Context {
                 break;
             }
             // 1.1统计剩余库存
+            // 可用库存
             Long stock = specialMaterialInfo.values().stream().mapToLong(s -> stockGetter.apply(s) - sumQtyGetter.apply(s)).sum();
             // 1.2剩余库存换算成条数
-            Integer canProductQty = BigDecimalUtils.multiply(stock, unitConsumeQty).intValue();
+            Integer canProductQty = BigDecimalUtils.div(stock, unitConsumeQty, 0).intValue();
             minProductQty = Math.min(minProductQty, canProductQty);
             if (minProductQty <= 0) {
                 break;
