@@ -123,12 +123,25 @@ public class SpecialMaterialScheduleHandler {
         }
         //计算新的排产天数 = ceil(计划量 / 日硫化量 / 配比)
         BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
-        theoryDays = theoryDays.setScale(0, RoundingMode.UP);
+        Integer resultTheoryDays = theoryDays.setScale(0, RoundingMode.UP).intValue();
+//        // 算天数
+//        Integer mouldCount = productionPlanInfo.getGroupPlanData().stream().map(p -> Optional
+//                .ofNullable(productionContext.getBaseDataContainer().getSkuMouldRelationMap().get(p.getMaterialDesc()))
+//                .map(s -> s.size()).orElse(0)).max(Integer::compareTo).orElse(0);
+//        Integer firstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+//        productionPlanInfo.getSumPlanQty()
+        
+        // 算其他特殊材料有交集的结构已排天数，不到最小排产天数的给加到最小排产天数
+        Integer otherTheoryDays = otherNeedProductionSpecialPlanList.stream().mapToInt(g -> g.getTheoryDays()).sum();
+        Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        if (resultTheoryDays + otherTheoryDays < minAllocationDays) {
+            resultTheoryDays = minAllocationDays;
+        }
         if (isAddQty) {
             //拉量时，不能进行提前收尾处理
             productionPlanInfo.setHasBeforeConclusionHandler(false);
         }
-        return theoryDays.intValue();
+        return resultTheoryDays;
     }
 
     /**

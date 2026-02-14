@@ -585,8 +585,10 @@ public class TbrProductionContext extends Context {
 //        }
         // 天数换算成排产量 = 天数 * 日硫化量 * 配比
         BigDecimal realProductionQty = BigDecimalUtils.multiply(allocationDays, groupInfo.getThreshold());
-        allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumProductionQty,
-                SpecialMaterialInfoVo::setSumProductionQty, SpecialMaterialInfoVo::getStock);
+        this.allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumNoRoundProductionQty,
+                SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
+        
+        this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
     }
 
     /**
@@ -709,6 +711,36 @@ public class TbrProductionContext extends Context {
         //偶数
         remainProductQty = remainProductQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION * ProductionConstant.DOUBLE_MOULD_QTY;
         return remainProductQty;
+    }
+    
+    /**
+     * 对特殊材料已占用库存做标准长度取整处理
+     * @param allGroupPlanMap
+     */
+    private void roundSpecialMaterialPlanQtyStandardLength(ProductionPlanGroupInfo groupInfo) {
+        BigDecimal threshold = BigDecimalUtils.valueOf(groupInfo.getThreshold());
+        groupInfo.getEmbryoSpecialMaterialInfoMap().entrySet().forEach(entry -> {
+            BigDecimal specialMaterialThreshold = entry.getValue().multiply(threshold);
+            Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(entry.getKey());
+            if (specialMaterialInfo == null) {
+                return;
+            }
+            specialMaterialInfo.values().stream()
+                    .forEach(stockInfo -> {
+                        BigDecimal sumProductionQty = BigDecimalUtils.valueOf(stockInfo.getSumNoRoundProductionQty()); // 取出未取整数量
+                        BigDecimal standardLength = BigDecimalUtils.valueOf(stockInfo.getStandardLength());
+                        BigDecimal remainderQty = sumProductionQty.remainder(standardLength); // 排产量余数
+                        BigDecimal finalProductionQty = sumProductionQty;
+                        if (remainderQty.compareTo(BigDecimal.ZERO) != 0) {
+                            // 判断如果余数低于最低硫化量 * 硫化机台数 * 用量，则舍弃掉该值；反之要加量补够标准长度的整倍数
+                            BigDecimal modifyQty = remainderQty.compareTo(specialMaterialThreshold) < 0 ? remainderQty.negate()
+                                    : standardLength.subtract(remainderQty);
+                            finalProductionQty = BigDecimalUtils.add(sumProductionQty, modifyQty);
+                        }
+                        stockInfo.setSumProductionQty(finalProductionQty.longValue()); // 计算结果设置到取整后的
+                    });
+
+        });
     }
     
     /**
