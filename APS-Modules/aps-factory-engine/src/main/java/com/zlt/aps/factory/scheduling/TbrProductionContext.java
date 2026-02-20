@@ -583,8 +583,13 @@ public class TbrProductionContext extends Context {
 //            // 无变化直接结束
 //            return;
 //        }
-        // 天数换算成排产量 = 天数 * 日硫化量 * 配比
-        BigDecimal realProductionQty = BigDecimalUtils.multiply(allocationDays, groupInfo.getThreshold());
+        // 保留一天作为换模日，其余天才满额生产
+        Integer firstQty = this.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountBymould());
+        Integer otherDay = allocationDays - 1;
+        BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
+        BigDecimal otherDayProductionQty = BigDecimalUtils.multiply(otherDay, groupInfo.getThreshold()); // 其余日排产量
+        BigDecimal realProductionQty = BigDecimalUtils.add(firstDayProductionQty, otherDayProductionQty);
         this.allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumNoRoundProductionQty,
                 SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
         
@@ -718,9 +723,9 @@ public class TbrProductionContext extends Context {
      * @param allGroupPlanMap
      */
     private void roundSpecialMaterialPlanQtyStandardLength(ProductionPlanGroupInfo groupInfo) {
-        BigDecimal threshold = BigDecimalUtils.valueOf(groupInfo.getThreshold());
+//        BigDecimal threshold = BigDecimalUtils.valueOf(groupInfo.getThreshold());
         groupInfo.getEmbryoSpecialMaterialInfoMap().entrySet().forEach(entry -> {
-            BigDecimal specialMaterialThreshold = entry.getValue().multiply(threshold);
+//            BigDecimal specialMaterialThreshold = entry.getValue().multiply(threshold);
             Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(entry.getKey());
             if (specialMaterialInfo == null) {
                 return;
@@ -728,14 +733,26 @@ public class TbrProductionContext extends Context {
             specialMaterialInfo.values().stream()
                     .forEach(stockInfo -> {
                         BigDecimal sumProductionQty = BigDecimalUtils.valueOf(stockInfo.getSumNoRoundProductionQty()); // 取出未取整数量
-                        BigDecimal standardLength = BigDecimalUtils.valueOf(stockInfo.getStandardLength());
-                        BigDecimal remainderQty = sumProductionQty.remainder(standardLength); // 排产量余数
+                        BigDecimal stockQty = BigDecimalUtils.valueOf(stockInfo.getStock()); // 库存数
+                        BigDecimal standardLength = BigDecimalUtils.valueOf(stockInfo.getStandardLength()); // 标准长度
                         BigDecimal finalProductionQty = sumProductionQty;
-                        if (remainderQty.compareTo(BigDecimal.ZERO) != 0) {
-                            // 判断如果余数低于最低硫化量 * 硫化机台数 * 用量，则舍弃掉该值；反之要加量补够标准长度的整倍数
-                            BigDecimal modifyQty = remainderQty.compareTo(specialMaterialThreshold) < 0 ? remainderQty.negate()
-                                    : standardLength.subtract(remainderQty);
-                            finalProductionQty = BigDecimalUtils.add(sumProductionQty, modifyQty);
+                        // 如果需求量超过实际库存量，则最多只能处理至低于库存量的最大批次数
+                        if (sumProductionQty.compareTo(stockQty) > 0) {
+                            finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
+                        } else if (sumProductionQty.compareTo(standardLength) < 0) {
+                            finalProductionQty = standardLength;
+                        } else {
+//                            BigDecimal remainderQty = sumProductionQty.remainder(standardLength); // 排产量余数
+//                            if (remainderQty.compareTo(BigDecimal.ZERO) != 0) {
+//                                // 判断如果余数低于最低硫化量 * 硫化机台数 * 用量，则舍弃掉该值；反之要加量补够标准长度的整倍数
+//                                BigDecimal modifyQty = remainderQty.compareTo(specialMaterialThreshold) < 0 ? remainderQty.negate()
+//                                        : standardLength.subtract(remainderQty);
+//                                finalProductionQty = BigDecimalUtils.add(sumProductionQty, modifyQty);
+//                            }
+//                            if (finalProductionQty.compareTo(stockQty) > 0) { // 如果取整后的量超过实际库存量，则最多只能处理至低于库存量的最大批次数
+//                                finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
+//                            }
+                            finalProductionQty = BigDecimalUtils.floor(sumProductionQty, standardLength);
                         }
                         stockInfo.setSumProductionQty(finalProductionQty.longValue()); // 计算结果设置到取整后的
                     });

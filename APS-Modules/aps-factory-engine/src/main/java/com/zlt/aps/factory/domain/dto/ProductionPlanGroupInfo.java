@@ -142,6 +142,10 @@ public class ProductionPlanGroupInfo {
      * 特殊材料的结构进行拉量时，不能进行提前收尾处理
      */
     private boolean hasBeforeConclusionHandler;
+    /**
+     * 根据模具数计算的硫化机台数（用于特殊材料粗算天数）
+     */
+    private Integer minLhMachineCountBymould;
 
     /**
      * 构建初始化分组信息对象
@@ -181,6 +185,27 @@ public class ProductionPlanGroupInfo {
             return groupInfo;
         }
         groupInfo.setEmbryoSpecialMaterialInfoMap(materialMap);
+
+        List<String> materialCodeList = groupPlanData.stream()
+                .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
+        Set<String> mouldCodeSet = new HashSet<>();
+        for (String materialCode: materialCodeList) {
+            List<MonthPlanProductMouldInfoVo> mouldList = productionContext.getBaseDataContainer()
+                    .getSkuMouldRelationMap().get(materialCode);
+            if (CollectionUtils.isEmpty(mouldList)) {
+                continue;
+            }
+
+            Set<String> newMouldCodeSet = mouldList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode)
+                    .filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
+            if (CollectionUtils.isEmpty(newMouldCodeSet)) {
+                continue;
+            }
+            mouldCodeSet.addAll(newMouldCodeSet);
+        }
+        // 模具数换算成硫化机台数
+        groupInfo.minLhMachineCountBymould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        
         return groupInfo;
     }
 
@@ -302,7 +327,7 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public Integer getThreshold() {
-        return minLhMachineCount * getDayCapacityBySingleLh();
+        return Math.min(minLhMachineCount, minLhMachineCountBymould) * getDayCapacityBySingleLh();
     }
 
     /**
