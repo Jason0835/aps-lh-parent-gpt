@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.BiConsumer;
@@ -556,6 +557,32 @@ public class TbrProductionContext extends Context {
     }
 
     /**
+     * 获取结构对应的特殊材料的已分配库存数
+     *
+     * @param productionPlanInfo      结构
+     */
+    public Long getSpecialMaterialSumProductionQty(ProductionPlanGroupInfo productionPlanInfo) {
+        if (!productionPlanInfo.isSpecialMaterial()) {
+            return 0L;
+        }
+
+        Long resultQty = null;
+        for (Entry<String, BigDecimal> entry: productionPlanInfo.getEmbryoSpecialMaterialInfoMap().entrySet()) {
+            Map<Long, SpecialMaterialInfoVo> stockMap = this.specialMaterialInfoMap.get(entry.getKey());
+            if (stockMap == null) {
+                continue;
+            }
+            Long sumProductionQty = stockMap.values().stream().mapToLong(SpecialMaterialInfoVo::getSumProductionQty).sum();
+            if (resultQty == null) {
+                resultQty = sumProductionQty;
+            } else {
+                resultQty = Math.min(resultQty, sumProductionQty);
+            }
+        }
+        return resultQty;
+    }
+
+    /**
      * 更新特殊材料库存<br/>
      * 根据结构分组的分配天数变化量，更新涉及特殊材料的已排库存信息
      *
@@ -737,11 +764,10 @@ public class TbrProductionContext extends Context {
                         BigDecimal standardLength = BigDecimalUtils.valueOf(stockInfo.getStandardLength()); // 标准长度
                         BigDecimal finalProductionQty = sumProductionQty;
                         // 如果需求量超过实际库存量，则最多只能处理至低于库存量的最大批次数
+                        // 需小于最小批次数则不需要处理
                         if (sumProductionQty.compareTo(stockQty) > 0) {
                             finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
-                        } else if (sumProductionQty.compareTo(standardLength) < 0) {
-                            finalProductionQty = standardLength;
-                        } else {
+                        } else if (sumProductionQty.compareTo(standardLength) > 0) {
 //                            BigDecimal remainderQty = sumProductionQty.remainder(standardLength); // 排产量余数
 //                            if (remainderQty.compareTo(BigDecimal.ZERO) != 0) {
 //                                // 判断如果余数低于最低硫化量 * 硫化机台数 * 用量，则舍弃掉该值；反之要加量补够标准长度的整倍数
