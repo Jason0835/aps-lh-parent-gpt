@@ -96,18 +96,18 @@ public class SpecialMaterialScheduleHandler {
         BigDecimal standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().map(BigDecimalUtils::valueOf).get();
         Integer standardQty = standardLength.divide(unitConsumeLength, BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
         // 需求量
-        BigDecimal sumPlanQty = BigDecimalUtils.multiply(productionPlanInfo.getSumPlanQty(), unitConsumeLength);
+        Integer productionQty = Math.min(limitProductionQty, productionPlanInfo.getSumPlanQty()); // 取生产上限与需求量的较小值
+//      Integer productionQty = productionPlanInfo.getRemainingMaxProductionQty();
+        BigDecimal sumPlanQty = BigDecimalUtils.multiply(productionQty, unitConsumeLength);
         sumPlanQty = BigDecimalUtils.add(sumPlanQty, otherAllocationQty); // 加上已排量
         //计算余数
         BigDecimal remainderLength = sumPlanQty.remainder(standardLength); // 长度
-        BigDecimal remainderQty = BigDecimalUtils.div(remainderLength, standardLength, 0); // 条数
+        BigDecimal remainderQty = BigDecimalUtils.div(remainderLength, unitConsumeLength, 0); // 条数
         // 区间阈值 = 硫化量 * 配比*单耗
         Integer floatThreshold = productionPlanInfo.getThreshold();
         // 区间阈值 = 硫化量 * 配比*单耗
         BigDecimal thresholdLength = BigDecimalUtils.multiply(floatThreshold, unitConsumeLength);
         boolean isAddQty = false;
-        Integer productionQty = Math.min(limitProductionQty, productionPlanInfo.getSumPlanQty()); // 取生产上限与需求量的较小值
-//        Integer productionQty = productionPlanInfo.getRemainingMaxProductionQty();
         // 重算实际的量
         Integer realProductionQty = BigDecimal.ZERO.intValue();
         // 超过阈值，尝试补量
@@ -138,17 +138,15 @@ public class SpecialMaterialScheduleHandler {
         } else {
             resultTheoryDays = BigDecimal.ONE.intValue(); // 低于首日的，只排一天
         }
-//        // 算天数
-//        Integer mouldCount = productionPlanInfo.getGroupPlanData().stream().map(p -> Optional
-//                .ofNullable(productionContext.getBaseDataContainer().getSkuMouldRelationMap().get(p.getMaterialDesc()))
-//                .map(s -> s.size()).orElse(0)).max(Integer::compareTo).orElse(0);
-//        Integer firstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
-//        productionPlanInfo.getSumPlanQty()
-        
         // 算其他特殊材料有交集的结构已排天数，不到最小排产天数的给加到最小排产天数
         Integer otherTheoryDays = otherNeedProductionSpecialPlanList.stream().mapToInt(g -> g.getTheoryDays()).sum();
         Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
-        if (resultTheoryDays + otherTheoryDays < minAllocationDays) {
+        // 根据最大浮动余量计算结构排产的最低天数
+        Integer maxFloatThreshold = productionPlanInfo.getMaxThreshold(); // 最大浮动余量
+        BigDecimal minTheoryDays = BigDecimalUtils.div(realProductionQty, maxFloatThreshold, 2, false);
+        if (minTheoryDays.intValue() + otherTheoryDays < minAllocationDays) { // 最低浮动天数低于最小分配天数，直接按低于最小分配天数
+            resultTheoryDays = minAllocationDays;
+        } else if (resultTheoryDays + otherTheoryDays < minAllocationDays) { // 浮动天数低于最小分配天数，直接按低于最小分配天数
             resultTheoryDays = minAllocationDays;
         }
         if (isAddQty) {

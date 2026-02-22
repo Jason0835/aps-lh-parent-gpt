@@ -331,6 +331,16 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取一天的最大浮动余量
+     * = 1 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
+     *
+     * @return
+     */
+    public Integer getMaxThreshold() {
+        return Math.max(minLhMachineCount, minLhMachineCountBymould) * getDayCapacityBySingleLh();
+    }
+
+    /**
      * 获取结构下的英寸信息，随意一条计划的因此即可
      *
      * @return
