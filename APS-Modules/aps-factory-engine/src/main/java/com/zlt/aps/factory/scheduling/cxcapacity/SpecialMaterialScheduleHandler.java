@@ -127,8 +127,17 @@ public class SpecialMaterialScheduleHandler {
             return BigDecimal.ZERO.intValue();
         }
         //计算新的排产天数 = ceil(计划量 / 日硫化量 / 配比)
-        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
-        Integer resultTheoryDays = theoryDays.setScale(0, RoundingMode.UP).intValue();
+        Integer firstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(productionPlanInfo.getMinLhMachineCountBymould());
+        BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
+        Integer resultTheoryDays = 0;
+        if (realProductionQty > firstDayProductionQty.intValue()) { // 需排产量大于首日排产量，则计算除了首日之外的计划所需天数
+            BigDecimal otherDayProductionQty = BigDecimalUtils.sub(realProductionQty, firstDayProductionQty); // 其余日排产量
+            BigDecimal theoryDays = BigDecimalUtils.div(otherDayProductionQty, floatThreshold, 2, false);
+            resultTheoryDays = theoryDays.setScale(0, RoundingMode.UP).intValue() + BigDecimal.ONE.intValue(); // 实际天数=其余排产量所需天数 + 首日天数（1天）
+        } else {
+            resultTheoryDays = BigDecimal.ONE.intValue(); // 低于首日的，只排一天
+        }
 //        // 算天数
 //        Integer mouldCount = productionPlanInfo.getGroupPlanData().stream().map(p -> Optional
 //                .ofNullable(productionContext.getBaseDataContainer().getSkuMouldRelationMap().get(p.getMaterialDesc()))
