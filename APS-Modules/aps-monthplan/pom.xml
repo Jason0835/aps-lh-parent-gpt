@@ -42,11 +42,11 @@
         </dependency>
         <dependency>
             <groupId>com.zlt.aps</groupId>
-            <artifactId>aps-monthplan-api</artifactId>
+            <artifactId>aps-mp-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zlt.aps</groupId>
-            <artifactId>aps-factory-engine</artifactId>
+            <artifactId>aps-engine-mp-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zlt.aps.itf</groupId>

@@ -71,7 +71,7 @@
         </dependency>
         <dependency>
             <groupId>com.zlt.aps</groupId>
-            <artifactId>aps-monthplan-api</artifactId>
+            <artifactId>aps-mp-api</artifactId>
         </dependency>
     </dependencies>
 

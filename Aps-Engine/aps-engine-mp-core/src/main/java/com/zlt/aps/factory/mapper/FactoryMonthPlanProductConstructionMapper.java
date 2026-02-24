@@ -1,7 +1,6 @@
 package com.zlt.aps.factory.mapper;
 
 import com.zlt.aps.factory.domain.vo.MonthPlanProductConstructionInfoVo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

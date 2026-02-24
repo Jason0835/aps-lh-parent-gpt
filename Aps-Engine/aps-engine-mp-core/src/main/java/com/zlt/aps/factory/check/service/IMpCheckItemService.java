@@ -1,7 +1,6 @@
 package com.zlt.aps.factory.check.service;
 
 import com.zlt.aps.factory.domain.Context;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpCheckItemVo;
 
 import java.util.List;
