@@ -248,6 +248,13 @@ public class MatchingProductionHandler {
      */
     public void matchingAdjustProduction(MpRollAdjustContextDTO contextDTO,
                                          List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+        // 结构排产的开始、结束时间
+        Integer startDay = contextDTO.getStartDay();
+        Integer endDay = contextDTO.getEndDay();
+        Integer lockDay = contextDTO.getLockEndDay();
+        if (endDay <= lockDay) { // 结束日在锁定日结束前的结构不搭配
+            return;
+        }
         log.info("周程滚动搭配算法start");
         // 加载需求计划
         LambdaQueryWrapper<DpDemandPlan> demandQueryWrapper = new LambdaQueryWrapper<DpDemandPlan>();
@@ -275,17 +282,14 @@ public class MatchingProductionHandler {
             contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
         }
 
-        // 结构排产的开始、结束时间
-        Integer startDay = contextDTO.getStartDay();
-        Integer endDay = contextDTO.getEndDay();
-        // 计算锁定日期
-        Set<String> tempCxMachineCodeSet = mpProdFinalList.stream().map(FactoryMonthPlanFinalAdjustVo::getCxMachineCode)
-                .filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
-        Set<String> cxMachineCodeSet = new HashSet<>();
-        tempCxMachineCodeSet.forEach(code -> {
-            cxMachineCodeSet.addAll(Arrays.stream(code.split(",")).distinct().collect(Collectors.toSet()));
-        });
-        int lockDay = this.getLockDay(productionContext, cxMachineCodeSet.size());
+//        // 计算锁定日期
+//        Set<String> tempCxMachineCodeSet = mpProdFinalList.stream().map(FactoryMonthPlanFinalAdjustVo::getCxMachineCode)
+//                .filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
+//        Set<String> cxMachineCodeSet = new HashSet<>();
+//        tempCxMachineCodeSet.forEach(code -> {
+//            cxMachineCodeSet.addAll(Arrays.stream(code.split(",")).distinct().collect(Collectors.toSet()));
+//        });
+//        int lockDay = this.getLockDay(productionContext, cxMachineCodeSet.size());
 
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit(); // 产能限制计算器，用于计算每天的产能使用情况
         // 按天统计已排产量
@@ -311,13 +315,13 @@ public class MatchingProductionHandler {
                     .map(MdmSkuLhCapacity::getApsCapacity).orElse(0); // sku日产能
             out: do {
                 int startUnAllocationQty = unAllocationQty;
-                for (int day = startDay; day <= endDay; day++) { // 遍历结构排产日
+                for (int day = Math.max(lockDay + 1, startDay); day <= endDay; day++) { // 遍历结构排产日，如果锁定日超过开始i日期，从锁定日下一天开始
                     if (unAllocationQty <= 0) {
                         break out;
                     }
-                    if (day < lockDay) { // 锁定日不搭配
-                        continue;
-                    }
+//                    if (day < lockDay) { // 锁定日不搭配
+//                        continue;
+//                    }
                     // 为当天分配搭配量
                     int tempUnAllocationQty = this.allcatAdjustProductQty(contextDTO, day, plan, cavity2BlockMap,
                             dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitMap);
@@ -332,6 +336,9 @@ public class MatchingProductionHandler {
                     break;
                 }
             } while (true);
+            if (plan.getBeginDay() == null) { // 没能排上的需要删除掉
+                mpProdFinalList.remove(plan);
+            }
         } while (true);
         log.info("周程滚动搭配算法end");
     }
@@ -375,6 +382,8 @@ public class MatchingProductionHandler {
             plan.setMaterialDesc(firstDemandPlan.getMaterialDesc());
             plan.setMainPattern(firstDemandPlan.getMainPattern());
             plan.setMesMaterialCode(firstDemandPlan.getMesMaterialCode());
+            plan.setBeginDay(null);
+            plan.setEndDay(null);
             for (int day = 1; day < contextDTO.getEndDay(); day++) {
                 plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, null); // 清空每天排产量
             }
@@ -472,11 +481,11 @@ public class MatchingProductionHandler {
         // 判断是否需要换模，昨天没有排相同的结构，则需要换模具
         boolean isChangeMould = CollectionUtils.isEmpty(lastDayProductionList);
         // 判断是否需要换活字块
-        boolean isChangeBlock = true;
-        if (lastDayProductionList != null) {
-            // 昨天没有排相同的规格，则需要换或字块
-            isChangeBlock = lastDayProductionList.stream().noneMatch(p -> materialDesc.equals(p.getMaterialDesc()));
-        }
+        boolean isChangeBlock = false;
+//        if (lastDayProductionList != null) {
+//            // 昨天没有排相同的规格，则需要换或字块
+//            isChangeBlock = lastDayProductionList.stream().noneMatch(p -> materialDesc.equals(p.getMaterialDesc()));
+//        }
 
         if (isChangeMould && mouldCavityQty < lhMouldQty) { // 需要换模，且剩余型腔数不足最低排产模具数，结束
             return unAllocationQty;
@@ -498,8 +507,16 @@ public class MatchingProductionHandler {
         if (allocationQty <= 0) {
             return unAllocationQty;
         }
-        Integer oldProductionQty = (Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay);
+        Integer oldProductionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay)).orElse(0);
         plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay, allocationQty + oldProductionQty);
+        plan.setTotalQty(Optional.ofNullable(plan.getTotalQty()).orElse(0) + allocationQty);
+        plan.setConventionProductionQty(Optional.ofNullable(plan.getConventionProductionQty()).orElse(0) + allocationQty);
+        if (plan.getBeginDay() == null) {
+            plan.setBeginDay(scheduleDay);
+        }
+        if (plan.getEndDay() == null || plan.getEndDay() < scheduleDay) {
+            plan.setEndDay(scheduleDay);
+        }
         CxMouldDayProductionHelper dayProduct = lastDayProductionList.stream()
                 .filter(p -> materialDesc.equals(p.getMaterialDesc())).findAny().orElse(null);
         if (dayProduct == null) {
@@ -527,8 +544,7 @@ public class MatchingProductionHandler {
         for (FactoryMonthPlanFinalAdjustVo plan : mpProdFinalList) {
             String materialDesc = plan.getMaterialDesc();
             for (int day = startDay; day <= endDay; day++) {
-                Integer productionQty = (Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day);
-                productionQty = productionQty == null ? 0:productionQty;
+                Integer productionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)).orElse(0);
                 List<CxMouldDayProductionHelper> dayProductionList = dayProductionMap.get(day);
                 if (dayProductionList == null) {
                     dayProductionList = new ArrayList<>();
@@ -1016,7 +1032,8 @@ public class MatchingProductionHandler {
         Date adjustDate = StringUtils.isEmpty(StringUtils.trim(weekRollAdjustDate)) ? DateUtils.getNowDate()
                 : DateUtils.parseDate(weekRollAdjustDate);
         Integer adjustDay;
-        if (productionContext.getYear() != DateUtils.getMonth(adjustDate)) {
+        if (productionContext.getYear() != DateUtils.getYear(adjustDate)
+                && productionContext.getMonth() != DateUtils.getMonth(adjustDate)) {
             // 若调整月不等于当前月，则将调整日设置1
             adjustDay = FactoryConstant.MONTH_START_DAY;
         } else {
@@ -1051,14 +1068,18 @@ public class MatchingProductionHandler {
         Integer multiCxMachineLockDays = productionContext.getBaseDataContainer().getParamConfiguration().getMultiCxMachineLockDays();
         String weekRollAdjustDate = productionContext.getBaseDataContainer().getParamConfiguration().getWeekRollAdjustDate();
         Date adjustDate = StringUtils.isEmpty(StringUtils.trim(weekRollAdjustDate)) ? DateUtils.getNowDate() : DateUtils.parseDate(weekRollAdjustDate);
-        if (productionContext.getYear() != DateUtils.getMonth(adjustDate)){
-            //若调整月不等于当前月，则将调整日设置1
+        if (productionContext.getYear() != DateUtils.getYear(adjustDate)
+                && productionContext.getMonth() != DateUtils.getMonth(adjustDate)) {
+            // 若调整月不等于当前月，则将调整日设置1
             adjustDay = FactoryConstant.MONTH_START_DAY;
-        }else{
+        } else {
             adjustDay = DateUtils.getDay(adjustDate);
         }
 
         Integer lockDay = cxMachineCount == 1? singleCxMachineLockDay: multiCxMachineLockDays; // 根据机台数选择锁定日期
+        if (lockDay < 0) { // 处理异常数据
+            lockDay = 0;
+        }
         adjustStartDay = adjustDay + lockDay;
         return adjustStartDay;
     }
