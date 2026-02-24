@@ -4,11 +4,10 @@ import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
@@ -22,6 +21,7 @@ import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -311,6 +311,8 @@ public class MesItfServiceImpl implements MesItfService {
         for (List<MdmProductStock> importList : splitList) {
             List<MpOverdueSku> mpOverdueSkuList = new ArrayList<>();
             for (MdmProductStock productStock : importList) {
+                productStock.setCreateTime(DateUtils.getNowDate());
+                productStock.setUpdateTime(DateUtils.getNowDate());
                 String weekYear = productStock.getWeekYear();
                 if (weekYear.length() != 4) {
                     continue;
