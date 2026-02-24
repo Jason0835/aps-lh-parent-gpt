@@ -57,5 +57,7 @@ public class ClearProductionInfoHandler {
         productionContext.clearAllCapsuleChuckUsed();
         //清除日排产限制使用量
         productionContext.clearAllDayLimitUsed();
+        //清除特殊原材料的消耗量
+        productionContext.clearSpecialMaterialInfoSkuAllocationQty();
     }
 }

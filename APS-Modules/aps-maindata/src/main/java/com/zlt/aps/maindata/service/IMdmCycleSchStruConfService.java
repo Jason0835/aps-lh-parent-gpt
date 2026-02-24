@@ -9,6 +9,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -45,8 +46,7 @@ public interface IMdmCycleSchStruConfService extends IDocService<MdmCycleSchStru
     void importDataAsync(List<MdmCycleSchStruConf> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
     /**
      *  获取调整周期结构
-     * @param createCondition 调整参数
      * @return 周期结构
      */
-    List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition);
+    List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition, Set<String> structureNames);
 }

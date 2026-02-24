@@ -56,6 +56,30 @@ public class MessageServiceUtils {
     }
 
     /**
+     * 快速发送通知消息（类型：0-通知消息）
+     *
+     * <p>如果未指定接收人，则自动获取模板关联的用户</p>
+     *
+     * @param templateCode 消息模板代码
+     * @param receiver 接收人用户名（可选，如果为空则获取模板关联用户）
+     * @param sendUser 发送人用户名（可选，如果为空则获取模板关联用户）
+     * @param params 模板参数
+     */
+    public void sendNoticeByAsync(String templateCode, String receiver,String sendUser, Object... params) {
+        String[] receivers = determineReceivers(templateCode, receiver, null);
+        if (receivers.length == 0) {
+            log.warn("未找到消息接收人，消息发送取消 - 模板: {}", templateCode);
+            return;
+        }
+
+        // 直接构建 Context 并发送
+        MessageContext context = new MessageContext(); // 实例化你的上下文对象
+        context.setSendBy(sendUser); // 将传进来的 username 设置为发送人
+        sendMessage(templateCode, MsgTypeEnums.NOTICE.getCode(),
+                MsgChannelEnums.SYSTEM.getCode(), receivers, context, params);
+    }
+
+    /**
      * 快速批量发送通知消息（类型：0-通知消息）
      *
      * @param templateCode 消息模板代码

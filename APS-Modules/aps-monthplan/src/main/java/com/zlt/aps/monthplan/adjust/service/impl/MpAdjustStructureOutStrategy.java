@@ -16,6 +16,7 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.factory.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
@@ -47,6 +48,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Autowired
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
+    
+    @Autowired
+    private MatchingProductionHandler matchingProductionHandler;
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -302,9 +306,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
         //6 执行结构间搭配排产,暂不考虑特殊结构
-        //TODO
         //=========================================================
-
+        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
         //=========================================================
 
         //7.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
@@ -330,7 +333,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         if (PubUtil.isEmpty(mpAdjustStructureOutList)){
             return;
         }
-        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getSaveMpProdFinalList();
         if (PubUtil.isEmpty(mpFinalAdjustList)){
             return;
         }

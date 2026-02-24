@@ -13,6 +13,7 @@ import com.zlt.aps.factory.check.service.IMpCheckItemService;
 import com.zlt.aps.factory.daylimit.CapsuleChuckInfoVo;
 import com.zlt.aps.factory.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.factory.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.factory.daylimit.TireDrumInfoVo;
 import com.zlt.aps.factory.domain.Context;
 import com.zlt.aps.factory.domain.vo.*;
 import com.zlt.aps.factory.scheduling.AbstractDataLoaderService;
@@ -368,7 +369,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
         addCheckResult(hasMoldingMachine, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_MACHINE_BASEDATA_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
 
         // 检查 4: 工装台账数据
-        Map<String, ProductionMouldInfoVo> mouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
+        Map<String, Map<String, TireDrumInfoVo>> mouldInfoMap = productionContext.getBaseDataContainer().getTireDrumInfoMap();
         boolean hasEquipmentLedger = !mouldInfoMap.isEmpty();
         addCheckResult(hasEquipmentLedger, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_INVENTORY_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
 

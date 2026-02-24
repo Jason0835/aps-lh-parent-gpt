@@ -74,7 +74,7 @@ public class AsyncService {
     String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(finalVersion.getFactoryCode())).findFirst().get().getDictLabel();
 
     // 2.发送消息
-    messageServiceAdapter.sendNotice(templateCode ,SecurityUtils.getUsername() , factoryName,
+    messageServiceAdapter.sendNoticeByAsync(templateCode ,SecurityUtils.getUsername() ,SecurityUtils.getUsername(), factoryName,
         finalVersion.getYear(),
         finalVersion.getMonth(),
         predictionVersion);
@@ -82,7 +82,7 @@ public class AsyncService {
 
   @Async("taskExecutor")
   public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion, MonthCalculator.MonthRangeResult monthRange, RequestAttributes requestAttributes){
-        String key = ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
+        String keyForSimulated =  ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION;
         try{
           PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
           Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
@@ -152,14 +152,14 @@ public class AsyncService {
         }catch (Exception e){
           log.info("生成实单模拟排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
         }finally {
-          redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+          redisService.setCacheObject(keyForSimulated, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
 
   }
 
   @Async("taskExecutor")
   public void executeAsyncTaskForPredictionProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange,RequestAttributes requestAttributes){
-    String key = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION + finalVersion.getFactoryCode()+finalVersion.getYear()+finalVersion.getMonth();
+    String keyForPrediction = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION;
     try{
       YearMonth tMonth = monthRange.getTMonth();
       Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
@@ -208,7 +208,7 @@ public class AsyncService {
     }catch (Exception e){
       log.info("生成预测排产失败,year={},month={},message={}",finalVersion.getYear(),finalVersion.getMonth(),e.getMessage());
     }finally {
-      redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+      redisService.setCacheObject(keyForPrediction, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
     }
   }
 
