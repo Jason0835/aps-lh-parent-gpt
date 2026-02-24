@@ -12,7 +12,6 @@
 
     <packaging>pom</packaging>
     <modules>
-        <module>aps-factory-engine</module>
         <module>aps-monthplan</module>
         <module>aps-tm</module>
         <module>aps-cx-lh</module>
