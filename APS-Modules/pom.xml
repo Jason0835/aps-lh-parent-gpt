@@ -12,7 +12,7 @@
 
     <packaging>pom</packaging>
     <modules>
-        <module>aps-monthplan</module>
+        <module>aps-mp</module>
         <module>aps-tm</module>
         <module>aps-cx-lh</module>
         <module>aps-tc</module>

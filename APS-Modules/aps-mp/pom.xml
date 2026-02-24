@@ -9,9 +9,9 @@
     </parent>
 
     <groupId>com.zlt.aps</groupId>
-    <artifactId>aps-monthplan</artifactId>
-    <name>aps-monthplan</name>
-    <description>月度计划模块</description>
+    <artifactId>aps-mp</artifactId>
+    <name>aps-mp</name>
+    <description>工厂月度计划服务模块</description>
 
     <properties>
         <java.version>1.8</java.version>
