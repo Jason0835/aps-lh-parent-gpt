@@ -1,6 +1,6 @@
-package com.zlt.aps.dp.mapper;
+package com.zlt.aps.mdm.mapper;
 
-import com.zlt.aps.dp.api.domain.entity.DpArea;
+import com.zlt.aps.mdm.api.domain.entity.DpArea;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
