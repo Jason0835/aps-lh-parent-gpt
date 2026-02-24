@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductInfoMapper">
+
+    <select id="getProductionMaterialInfo" resultType="com.zlt.aps.mp.engine.domain.vo.ProductBaseInfoVo">
+        SELECT DISTINCT mmi.FACTORY_CODE,
+               mmi.MATERIAL_CODE,
+               mmi.MATERIAL_DESC,
+               mmi.PRO_SIZE,
+               mmi.PRODUCT_TYPE_CODE,
+               mmi.SPECIFICATIONS,
+               mmi.MAIN_PATTERN,
+               mmi.PATTERN,
+               mmi.TIRE_TYPE,
+               mmi.COMMON_TYPE,
+               mmi.STRUCTURE_NAME,
+               mmi.CANT_PRODUCE,
+               mmi.PRODUCT_CATEGORY,
+               mmi.GROSS_RATE_JSON,
+               mmi.FORBID_TAG
+          FROM t_mdm_material_info mmi
+         WHERE IFNULL(mmi.IS_DELETE, 0) = 0
+           AND mmi.MATERIAL_CATEGORY = '01'
+           AND EXISTS (SELECT 1
+                         FROM t_dp_demand_plan prp
+                        WHERE IFNULL(prp.IS_DELETE, 0) = 0
+                          AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND prp.YEAR = #{year,jdbcType=DECIMAL}
+                          AND prp.MONTH = #{month,jdbcType=DECIMAL}
+                          AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                          AND mmi.MATERIAL_DESC = prp.MATERIAL_DESC
+                          AND mmi.FACTORY_CODE = prp.FACTORY_CODE)
+    </select>
+
+</mapper>

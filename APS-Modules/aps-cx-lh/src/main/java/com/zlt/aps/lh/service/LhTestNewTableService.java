@@ -1,9 +1,8 @@
 package com.zlt.aps.lh.service;
 
-import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.lh.api.domain.dto.AutoLhScheduleResultDTO;
 import com.zlt.aps.lh.api.domain.entity.LhTestNewTable;
-import com.zlt.aps.lh.api.domain.entity.LhTestScheduleResult;
 import com.zlt.bill.common.service.IDocService;
 
 /**

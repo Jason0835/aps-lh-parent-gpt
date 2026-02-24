@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.itf.mapper.SaleOrderMapper">
+
+    <select id="getSysConfigByKey" resultType="com.ruoyi.api.gateway.system.domain.SysConfig">
+        SELECT *
+        FROM sys_config
+        where CONFIG_KEY = #{configKey}
+    </select>
+</mapper>

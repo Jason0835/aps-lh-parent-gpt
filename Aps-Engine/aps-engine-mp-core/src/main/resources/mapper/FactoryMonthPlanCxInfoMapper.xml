@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMonthPlanCxInfoMapper">
+
+    <select id="getMachineBaseInfo" resultType="com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo">
+        SELECT mmm.FACTORY_CODE,
+               mmm.CX_MACHINE_CODE,
+               mmm.CX_MACHINE_BRAND_CODE,
+               mmm.CX_MACHINE_TYPE_CODE,
+               mmm.IS_ZERO_RACK,
+               mmm.LH_MACHINE_MAX_QTY,
+               cmf.FIXED_STRUCTURE1,
+               cmf.FIXED_STRUCTURE2,
+               cmf.FIXED_STRUCTURE3,
+               cmf.FIXED_MATERIAL_CODE,
+               cmf.DISABLE_STRUCTURE,
+               cmf.DISABLE_MATERIAL_CODE
+          FROM t_mdm_molding_machine mmm
+          LEFT JOIN t_mdm_cx_machine_fixed cmf
+            ON cmf.FACTORY_CODE = mmm.FACTORY_CODE
+           AND cmf.CX_MACHINE_CODE = mmm.CX_MACHINE_CODE
+           AND IFNULL(cmf.IS_DELETE, 0) = 0
+         WHERE IFNULL(mmm.IS_DELETE, 0) = 0
+           AND mmm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getWorkWearInfo" resultType="com.zlt.aps.mp.engine.daylimit.CxWorkWearInfoVo">
+        SELECT wwi.FACTORY_CODE,
+               wwi.WORK_WEAR_NAME,
+               wwi.SPECIFICATION_MODEL,
+               wwi.WORK_WEAR_TYPE,
+               wwi.QTY,
+               wwi.USED_TYPE
+          FROM t_mdm_work_wear_info wwi
+         WHERE IFNULL(wwi.IS_DELETE, 0) = 0
+           AND wwi.WORK_WEAR_STATUS = '1'
+           AND wwi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getDevicePlanShutInfo" resultType="com.zlt.aps.mp.engine.domain.vo.CxDevicePlanShutInfoVo">
+        SELECT dps.FACTORY_CODE,
+               dps.MACHINE_CODE AS CX_MACHINE_CODE,
+               dps.BEGIN_DATE,
+               dps.END_DATE
+          FROM t_mdm_device_plan_shut dps
+         WHERE IFNULL(dps.IS_DELETE, 0) = 0
+           AND dps.MACHINE_TYPE = '02'
+           AND ((dps.BEGIN_DATE >= #{productionStartDate,jdbcType=DATE} AND dps.BEGIN_DATE &lt;= #{productionEndDate,jdbcType=DATE})
+            OR (dps.END_DATE >= #{productionStartDate,jdbcType=DATE} AND dps.END_DATE &lt;= #{productionEndDate,jdbcType=DATE}))
+           AND dps.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+</mapper>

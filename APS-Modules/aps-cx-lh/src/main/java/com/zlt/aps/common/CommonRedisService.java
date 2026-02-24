@@ -2,21 +2,16 @@ package com.zlt.aps.common;
 
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.constant.FactoryConstant;
-import com.zlt.aps.constants.CxParamCodeConstants;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxParams;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.utils.CxLhEngineUtils;
-import io.swagger.annotations.ApiModelProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.support.atomic.RedisAtomicLong;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**

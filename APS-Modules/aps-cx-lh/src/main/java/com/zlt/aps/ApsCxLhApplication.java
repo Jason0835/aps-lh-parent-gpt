@@ -3,7 +3,6 @@ package com.zlt.aps;
 
 import com.ruoyi.common.core.annotation.EnableRyFeignClients;
 import com.ruoyi.common.security.annotation.EnableCustomConfig;
-import com.ruoyi.common.swagger.annotation.EnableCustomSwagger2;
 import lombok.extern.slf4j.Slf4j;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
@@ -25,7 +24,7 @@ import java.net.InetAddress;
 @SpringBootApplication
 @EnableSwagger2
 @EnableRyFeignClients
-@ComponentScan(value = {"com.ruoyi.*", "com.zlt.*","com.tlt.*"})
+@ComponentScan(value = {"com.ruoyi.*", "com.zlt.*", "com.zlt.*"})
 @MapperScan({"com.ruoyi.**.mapper,com.tlt.**.mapper,com.zlt.**.mapper,com.zlt.aps.**.mapper"})
 public class ApsCxLhApplication {
 

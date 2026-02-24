@@ -12,10 +12,7 @@
 
     <packaging>pom</packaging>
     <modules>
-        <module>aps-base</module>
-        <module>aps-maindata</module>
-        <module>aps-factory-engine</module>
-        <module>aps-monthplan</module>
+        <module>aps-mp</module>
         <module>aps-tm</module>
         <module>aps-cx-lh</module>
         <module>aps-tc</module>
@@ -58,7 +55,7 @@
                 <artifactId>aps-base</artifactId>
                 <version>1.0.3-SNAPSHOT</version>
             </dependency>
-            <!-- APS双钱主数据 -->
+            <!-- APS主数据 -->
             <dependency>
                 <groupId>com.zlt.aps</groupId>
                 <artifactId>aps-maindata</artifactId>
@@ -66,13 +63,13 @@
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps</groupId>
-                <artifactId>aps-factory-engine</artifactId>
+                <artifactId>aps-engine-mp-core</artifactId>
                 <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <!-- APS的API模块 -->
             <dependency>
                 <groupId>com.zlt.aps</groupId>
-                <artifactId>aps-monthplan-api</artifactId>
+                <artifactId>aps-mp-api</artifactId>
                 <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>

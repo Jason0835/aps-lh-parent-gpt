@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductMouldMapper">
+
+    <select id="getProductionMouldInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo">
+        SELECT DISTINCT msm.FACTORY_CODE,
+               msm.MATERIAL_CODE,
+               msm.MATERIAL_DESC,
+               msm.MOULD_CODE,
+               msm.MAIN_PATTERN,
+               mmi.MOULD_CODE AS BASE_MOULD_CODE,
+               mmi.MOULD_TYPE,
+               mmi.MOULD_STATUS,
+               mmi.SHELL_STANDARD,
+               mmi.LOGISTICS_STATUS,
+               '01' AS RELATION_TYPE
+          FROM t_mdm_sku_mould_rel msm
+          LEFT JOIN t_mdm_mould_info mmi
+            ON mmi.FACTORY_CODE = msm.FACTORY_CODE
+           AND mmi.MOULD_CODE = msm.MOULD_CODE
+           AND IFNULL(mmi.IS_DELETE, 0) = 0
+         WHERE IFNULL(msm.IS_DELETE, 0) = 0
+           AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND EXISTS (SELECT 1
+                         FROM t_dp_demand_plan prp
+                        WHERE IFNULL(prp.IS_DELETE, 0) = 0
+                          AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                          AND prp.YEAR = #{year,jdbcType=DECIMAL}
+                          AND prp.MONTH = #{month,jdbcType=DECIMAL}
+                          AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                          AND msm.MATERIAL_DESC = prp.MATERIAL_DESC
+                          AND msm.FACTORY_CODE = prp.FACTORY_CODE)
+    </select>
+
+    <select id="getMouldDeliveryInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo">
+            SELECT
+              mdp.FACTORY_CODE,
+              mdp.MATERIAL_CODE,
+              mdp.MATERIAL_DESC,
+              mdp.MOULD_CODE,
+              mdp.BOARDING_DATE,
+              mdp.MAIN_PATTERN,
+              mdp.MOULD_CODE AS BASE_MOULD_CODE,
+              '' AS MOULD_TYPE,
+              1 AS MOULD_STATUS,
+              '-99' AS SHELL_STANDARD,
+              1 AS LOGISTICS_STATUS,
+              '02' AS RELATION_TYPE
+            FROM t_mdm_mould_delivery_plan mdp
+                   INNER JOIN (
+              SELECT
+                DISTINCT FACTORY_CODE, MATERIAL_DESC
+              FROM
+                t_dp_demand_plan
+              WHERE IS_DELETE = 0
+                AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                AND `YEAR` = #{year,jdbcType=DECIMAL}
+                AND `MONTH` = #{month,jdbcType=DECIMAL}
+                AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+            ) AS filtered_plans
+                              ON mdp.FACTORY_CODE = filtered_plans.FACTORY_CODE
+                                AND mdp.MATERIAL_DESC = filtered_plans.MATERIAL_DESC
+            WHERE mdp.IS_DELETE = 0
+              AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
+    </select>
+
+    <select id="getEnableProductionMouldInfoByNetDemand" resultType="com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">
+        SELECT
+        msm.FACTORY_CODE,
+        msm.MATERIAL_CODE,
+        msm.MATERIAL_DESC,
+        msm.MOULD_CODE,
+        msm.MAIN_PATTERN,
+        NULL AS BOARDING_DATE,
+        mmi.MOULD_CODE AS BASE_MOULD_CODE,
+        mmi.MOULD_TYPE,
+        mmi.MOULD_STATUS,
+        mmi.SHELL_STANDARD,
+        mmi.LOGISTICS_STATUS,
+        '01' AS RELATION_TYPE
+        FROM t_mdm_sku_mould_rel msm
+        INNER JOIN t_mdm_mould_info mmi
+        ON mmi.FACTORY_CODE = msm.FACTORY_CODE
+        AND mmi.MOULD_CODE = msm.MOULD_CODE
+        AND mmi.IS_DELETE = 0
+        WHERE msm.IS_DELETE = 0
+        AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        AND EXISTS (
+        SELECT 1 FROM (
+        SELECT mpi.MATERIAL_DESC, mpi.FACTORY_CODE
+        FROM T_DP_DEMAND_PLAN mpi
+        WHERE mpi.IS_DELETE = 0
+        AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        AND mpi.YEAR = #{year,jdbcType=DECIMAL}
+        AND mpi.MONTH = #{month,jdbcType=DECIMAL}
+        <if test="monthPlanVersion != null and monthPlanVersion != ''">
+            AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        </if>
+        UNION ALL
+        SELECT tpp.MATERIAL_DESC, tpp.FACTORY_CODE
+        FROM t_mp_trial_plan tpp
+        WHERE tpp.IS_DELETE = 0
+        AND tpp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        AND tpp.YEAR = #{year,jdbcType=DECIMAL}
+        AND tpp.MONTH = #{month,jdbcType=DECIMAL}
+        ) combined
+        WHERE combined.MATERIAL_DESC = msm.MATERIAL_DESC
+        AND combined.FACTORY_CODE = msm.FACTORY_CODE
+        )
+    </select>
+
+    <select id="getEnableMouldDeliveryInfoByNetDemand" resultType="com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">
+        SELECT
+        mdp.FACTORY_CODE,
+        mdp.MATERIAL_CODE,
+        mdp.MATERIAL_DESC,
+        mdp.MOULD_CODE,
+        mdp.BOARDING_DATE,
+        mdp.MAIN_PATTERN,
+        mdp.MOULD_CODE AS BASE_MOULD_CODE,
+        '' AS MOULD_TYPE,
+        1 AS MOULD_STATUS,
+        '-99' AS SHELL_STANDARD,
+        1 AS LOGISTICS_STATUS,
+        '02' AS RELATION_TYPE
+        FROM t_mdm_mould_delivery_plan mdp
+        WHERE mdp.IS_DELETE = 0
+        AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
+        AND EXISTS (
+        SELECT 1
+        FROM (
+        -- 使用UNION ALL合并两个子查询的结果
+        SELECT mpi.FACTORY_CODE, mpi.MATERIAL_DESC
+        FROM T_DP_DEMAND_PLAN mpi
+        WHERE mpi.IS_DELETE = 0
+        AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        AND mpi.YEAR = #{year,jdbcType=DECIMAL}
+        AND mpi.MONTH = #{month,jdbcType=DECIMAL}
+        <if test="monthPlanVersion != null and monthPlanVersion != ''">
+            AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+        </if>
+        UNION ALL
+        SELECT tpp.FACTORY_CODE, tpp.MATERIAL_DESC
+        FROM t_mp_trial_plan tpp
+        WHERE tpp.IS_DELETE = 0
+        AND tpp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        AND tpp.YEAR = #{year,jdbcType=DECIMAL}
+        AND tpp.MONTH = #{month,jdbcType=DECIMAL}
+        ) temp
+        WHERE temp.FACTORY_CODE = mdp.FACTORY_CODE
+        AND temp.MATERIAL_DESC = mdp.MATERIAL_DESC
+        )
+    </select>
+
+
+    <select id="getEnableProductionMouldInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo">
+            SELECT
+              msm.FACTORY_CODE,
+              msm.MATERIAL_CODE,
+              msm.MATERIAL_DESC,
+              msm.MAIN_PATTERN,
+              NULL AS BOARDING_DATE,
+              mmi.MOULD_CODE AS BASE_MOULD_CODE,
+              mmi.MOULD_TYPE,
+              mmi.MOULD_STATUS,
+              mmi.SHELL_STANDARD,
+              mmi.LOGISTICS_STATUS,
+              '01' AS RELATION_TYPE,
+              CASE
+                WHEN msm.SHARE_MOULD_CODE IS NOT NULL
+                  AND TRIM(msm.SHARE_MOULD_CODE) != ''
+                  THEN msm.SHARE_MOULD_CODE
+                ELSE msm.MOULD_CODE
+                END AS MOULD_CODE
+            FROM (
+                   SELECT DISTINCT mpi.MATERIAL_DESC
+                   FROM t_mp_proc_month_plan_init mpi
+                   WHERE mpi.IS_DELETE = 0
+                     AND mpi.IS_PRODUCTION = '1'
+                     AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                     AND mpi.YEAR = #{year,jdbcType=DECIMAL}
+                     AND mpi.MONTH = #{month,jdbcType=DECIMAL}
+                     AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                     AND mpi.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+                 ) AS filtered_mpi
+                   INNER JOIN t_mdm_sku_mould_rel msm
+                              ON msm.MATERIAL_DESC = filtered_mpi.MATERIAL_DESC
+                                AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                                AND msm.IS_DELETE = 0
+                   INNER JOIN t_mdm_mould_info mmi
+                              ON mmi.FACTORY_CODE = msm.FACTORY_CODE
+                                AND mmi.MOULD_CODE = msm.MOULD_CODE
+                                AND mmi.IS_DELETE = 0
+    </select>
+    
+    <select id="getEnableProductionFinalMouldInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo">
+            SELECT
+              msm.FACTORY_CODE,
+              msm.MATERIAL_CODE,
+              msm.MATERIAL_DESC,
+              msm.MAIN_PATTERN,
+              NULL AS BOARDING_DATE,
+              mmi.MOULD_CODE AS BASE_MOULD_CODE,
+              mmi.MOULD_TYPE,
+              mmi.MOULD_STATUS,
+              mmi.SHELL_STANDARD,
+              mmi.LOGISTICS_STATUS,
+              '01' AS RELATION_TYPE,
+              CASE
+                WHEN msm.SHARE_MOULD_CODE IS NOT NULL
+                  AND TRIM(msm.SHARE_MOULD_CODE) != ''
+                  THEN msm.SHARE_MOULD_CODE
+                ELSE msm.MOULD_CODE
+                END AS MOULD_CODE
+            FROM (
+                   SELECT DISTINCT mpi.MATERIAL_DESC
+                   FROM t_dp_demand_plan mpi
+                   WHERE mpi.IS_DELETE = 0
+                     AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                     AND mpi.YEAR = #{year,jdbcType=DECIMAL}
+                     AND mpi.MONTH = #{month,jdbcType=DECIMAL}
+                     AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+                 ) AS filtered_mpi
+                   INNER JOIN t_mdm_sku_mould_rel msm
+                              ON msm.MATERIAL_DESC = filtered_mpi.MATERIAL_DESC
+                                AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+                                AND msm.IS_DELETE = 0
+                   INNER JOIN t_mdm_mould_info mmi
+                              ON mmi.FACTORY_CODE = msm.FACTORY_CODE
+                                AND mmi.MOULD_CODE = msm.MOULD_CODE
+                                AND mmi.IS_DELETE = 0
+    </select>
+
+    <select id="getEnableMouldDeliveryInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo">
+            SELECT
+                mdp.FACTORY_CODE,
+                mdp.MATERIAL_CODE,
+                mdp.MATERIAL_DESC,
+                mdp.MOULD_CODE,
+                mdp.MAIN_PATTERN,
+                mdp.BOARDING_DATE,
+                mdp.MOULD_CODE AS BASE_MOULD_CODE,
+                '' AS MOULD_TYPE,
+                1 AS MOULD_STATUS,
+                '-99' AS SHELL_STANDARD,
+                1 AS LOGISTICS_STATUS,
+                '02' AS RELATION_TYPE
+            FROM t_mdm_mould_delivery_plan mdp
+            INNER JOIN (
+              SELECT
+                  DISTINCT FACTORY_CODE, MATERIAL_DESC
+              FROM
+                  t_mp_proc_month_plan_init
+              WHERE IS_DELETE = 0
+              AND IS_PRODUCTION = '1'
+              AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+              AND `YEAR` = #{year,jdbcType=DECIMAL}
+              AND `MONTH` = #{month,jdbcType=DECIMAL}
+              AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+              AND PRODUCTION_VERSION =  #{productionVersion,jdbcType=VARCHAR}
+            ) AS filtered_plans
+            ON mdp.FACTORY_CODE = filtered_plans.FACTORY_CODE
+            AND mdp.MATERIAL_DESC = filtered_plans.MATERIAL_DESC
+            WHERE mdp.IS_DELETE = 0
+            AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
+    </select>
+
+    <select id="getEnableFinalMouldDeliveryInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo">
+            SELECT
+                mdp.FACTORY_CODE,
+                mdp.MATERIAL_CODE,
+                mdp.MATERIAL_DESC,
+                mdp.MOULD_CODE,
+                mdp.MAIN_PATTERN,
+                mdp.BOARDING_DATE,
+                mdp.MOULD_CODE AS BASE_MOULD_CODE,
+                '' AS MOULD_TYPE,
+                1 AS MOULD_STATUS,
+                '-99' AS SHELL_STANDARD,
+                1 AS LOGISTICS_STATUS,
+                '02' AS RELATION_TYPE
+            FROM t_mdm_mould_delivery_plan mdp
+            INNER JOIN (
+              SELECT
+                  DISTINCT FACTORY_CODE, MATERIAL_DESC
+              FROM
+                  t_dp_demand_plan
+              WHERE IS_DELETE = 0
+              AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+              AND `YEAR` = #{year,jdbcType=DECIMAL}
+              AND `MONTH` = #{month,jdbcType=DECIMAL}
+              AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+            ) AS filtered_plans
+            ON mdp.FACTORY_CODE = filtered_plans.FACTORY_CODE
+            AND mdp.MATERIAL_DESC = filtered_plans.MATERIAL_DESC
+            WHERE mdp.IS_DELETE = 0
+            AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
+    </select>
+
+    <select id="getMouldShellInfo" resultType="com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo">
+        SELECT FACTORY_CODE,
+               MOULD_SET_CODE,
+               MACHINE_QTY,
+               ON_HAND_QTY,
+               TOTAL_QTY
+          FROM t_mdm_mould_shell_info
+         WHERE IFNULL(IS_DELETE, 0) = 0
+           AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getMouldAllocationInfo" resultType="com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo">
+        SELECT mma.FACTORY_CODE,
+               mma.MAIN_PATTERN,
+               mma.PATTERN,
+               mma.STRUCTURE_NAME,
+               mma.SPECIFICATIONS,
+               mma.ALLOCATION_QTY
+          FROM t_mdm_mould_allocation mma
+         WHERE IFNULL(mma.IS_DELETE, 0) = 0
+           AND mma.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mma.YEAR = #{year,jdbcType=DECIMAL}
+           AND mma.MONTH = #{month,jdbcType=DECIMAL}
+    </select>
+</mapper>

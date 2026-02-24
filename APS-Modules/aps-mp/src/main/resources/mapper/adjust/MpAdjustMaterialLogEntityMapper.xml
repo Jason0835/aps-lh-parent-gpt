@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.adjust.mapper.MpAdjustMaterialLogEntityMapper">
+
+    <select id="getVersionList" resultType="com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog">
+        SELECT
+        ADJ_VERSION
+        FROM
+        T_MP_ADJUST_MATERIAL_LOG
+        WHERE
+        IS_DELETE = 0 AND ADJ_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="year != null and year != ''">AND YEAR = #{year}</if>
+        <if test="month != null and month != ''">AND MONTH = #{month}</if>
+        <if test="adjustType != null and adjustType != ''">AND ADJUST_TYPE = #{adjustType}</if>
+        GROUP BY ADJ_VERSION
+        ORDER BY ADJ_VERSION DESC
+    </select>
+
+    <delete id="deleteAdjustProcLogByVersion" parameterType="String">
+        DELETE FROM T_MP_ADJUST_MATERIAL_LOG
+        WHERE FACTORY_CODE = #{factoryCode} AND YEAR= #{year} AND MONTH= #{month}
+        AND ADJ_VERSION= #{version}
+    </delete>
+
+</mapper>

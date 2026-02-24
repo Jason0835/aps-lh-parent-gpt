@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProdFinalMapper">
+
+    <insert id="copyDetailByResult">
+        insert into T_MP_MONTH_PLAN_PROD_DETAIL_FINAL(factory_code, year, month, `year_month`, month_plan_version, production_version, PLAN_SEQ, MONTH_PLAN_ID, product_code,
+                                                      product_desc, construction_stage, spec_code_info, location_type, channel, brand, specifications, pattern, hierarchy, pro_size,
+                                                      product_type_code, product_type_name, level_code, level_name, is_important_custom, is_ensure_plan,
+                                                      is_emergency, is_debit_plan, is_stock_up, delivery_date_due, profit_grade, is_import, MOULD_NO,
+                                                      mould_code, spec_code, embryo_code, mould_method, production_sequence, curing_time, prod_req_plan, fact_prod_req_qty, total_qty, difference_qty, reason,
+                                                      begin_date, end_day, pre_day_1, pre_day_2, pre_day_3, pre_day_4, pre_day_5, pre_day_6, pre_day_7, day_1,
+                                                      day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15,
+                                                      day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28,
+                                                      day_29, day_30, day_31, total_vulcanization_minutes, display_seq, remark, is_delete, create_time,
+                                                      update_time, create_by, update_by)
+            select factory_code, year, month, `year_month`, month_plan_version, production_version, PLAN_SEQ, MONTH_PLAN_ID, product_code,
+                   product_desc, construction_stage, spec_code_info, location_type, channel, brand, specifications, pattern, hierarchy, pro_size,
+                   product_type_code, product_type_name, level_code, level_name, is_important_custom, is_ensure_plan,
+                   is_emergency, is_debit_plan, is_stock_up, delivery_date_due, profit_grade, 0, MOULD_NO,
+                   mould_code, spec_code, embryo_code, mould_method, production_sequence, curing_time, prod_req_plan, fact_prod_req_qty, total_qty, difference_qty, reason,
+                   begin_date, end_day, pre_day_1, pre_day_2, pre_day_3, pre_day_4, pre_day_5, pre_day_6, pre_day_7, day_1,
+                   day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15,
+                   day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28,
+                   day_29, day_30, day_31, total_vulcanization_minutes, display_seq, remark, 0, #{createTime},
+                   #{createTime}, #{createBy}, #{createBy}
+        from T_MP_MOULDING_DAY_RESULT_DETAIL
+        where ifnull(IS_DELETE, 0) = 0
+          and YEAR = #{year}
+          and MONTH = #{month}
+          and FACTORY_CODE = #{factoryCode}
+          and MONTH_PLAN_VERSION = #{monthPlanVersion}
+          and PRODUCTION_VERSION = #{productionVersion}
+    </insert>
+
+    <select id="selectParamList"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal">
+        select * from T_MP_MONTH_PLAN_PROD_FINAL
+        where IS_DELETE = 0
+        <!-- 目前能保证五个字段都不能为空，暂不考虑拼接的方式 -->
+        and (YEAR, MONTH, FACTORY_CODE, PRODUCT_CODE, SPEC_CODE) in
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.year}, #{item.month}, #{item.factoryCode}, #{item.productCode}, #{item.specCode})
+        </foreach>
+    </select>
+
+    <select id="selectMpFinalList"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo">
+        select * from T_MP_MONTH_PLAN_PROD_FINAL
+        where YEAR = #{year}
+          and MONTH = #{month}
+          and FACTORY_CODE = #{factoryCode}
+          and IS_DELETE = 0
+    </select>
+
+    <select id="getStatisticsDay" resultType="com.zlt.aps.monthplan.api.domain.vo.DayProductionTotalVo">
+        SELECT 1 AS DAYS,
+               COUNT(DISTINCT PRODUCT_CODE) AS DAY_COUNT,
+               SUM(DAY_1) AS QTY
+          FROM t_mp_month_plan_prod_final
+         WHERE PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+           AND DAY_1 > 0
+        <foreach collection="days" item="day" index="index">
+         UNION ALL
+        SELECT ${day} AS DAYS,
+               COUNT(DISTINCT PRODUCT_CODE) AS DAY_COUNT,
+               SUM(DAY_${day}) AS QTY
+          FROM t_mp_month_plan_prod_final
+         WHERE PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
+           AND DAY_${day} > 0
+        </foreach>
+    </select>
+</mapper>

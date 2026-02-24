@@ -1,7 +1,6 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.zlt.aps.constants.CxEngineConstants;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxMatchingSpecifyMachineList;
 import com.zlt.aps.cx.mapper.entity.CxMatchingSpecifyMachineListMapper;
 import com.zlt.aps.cx.service.CxMatchingSpecifyMachineService;
@@ -13,7 +12,6 @@ import com.zlt.aps.maindata.mapper.MdmMoldingMachineStatusEntityMapper;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineCls;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineClsB;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

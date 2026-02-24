@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductConstructionMapper">
+
+    <select id="getConstructionByRequire" resultType="com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo">
+        SELECT DISTINCT prp.FACTORY_CODE,
+               prp.MATERIAL_CODE,
+               mpc.CONSTRUCTION_CODE,
+               mpc.SPEC_CODE,
+               mpc.EMBRYO_CODE,
+               mpc.MAIN_MATERIAL_DESC,
+               mpc.TRIAL_STATUS as PRODUCT_STATUS,
+               mpc.MOULD_METHOD,
+               mpc.IS_ZERO_RACK,
+               mpc.CURING_TIME,
+               mpc.CURING_TIME2,
+               mpc.MOULD_CAVITY,
+               mpc.MOULD_CLAMPING_PRESSURE,
+               mpc.EMBRYO_NO,
+               mpc.LH_NO,
+               mpc.TEXT_NO
+          FROM t_dp_demand_plan prp
+          LEFT JOIN t_mdm_sku_construction_ref mpc
+            ON mpc.FACTORY_CODE = prp.FACTORY_CODE
+           AND mpc.MATERIAL_CODE = prp.MATERIAL_CODE
+           AND IFNULL(mpc.IS_DELETE, 0) = 0
+         WHERE IFNULL(prp.IS_DELETE, 0) = 0
+           AND mpc.ID IS NOT NULL
+           AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND prp.YEAR = #{year,jdbcType=DECIMAL}
+           AND prp.MONTH = #{month,jdbcType=DECIMAL}
+           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+    </select>
+
+</mapper>

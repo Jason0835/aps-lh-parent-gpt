@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <packaging>pom</packaging>
     <modules>
-        <module>aps-monthplan-api</module>
+        <module>aps-mp-api</module>
         <module>aps-cx-lh-api</module>
         <module>tm-api</module>
         <module>cx-api</module>

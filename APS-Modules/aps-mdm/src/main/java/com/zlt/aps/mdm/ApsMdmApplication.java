@@ -17,7 +17,7 @@ import java.net.InetAddress;
 @SpringBootApplication
 @EnableCustomSwagger2
 @EnableRyFeignClients
-@ComponentScan(value = {"com.zlt.*", "com.tlt.aps.**"})
+@ComponentScan(value = {"com.zlt.*", "com.zlt.aps.**"})
 public class ApsMdmApplication {
     public static void main(String[] args) throws Exception {
         ConfigurableApplicationContext application = SpringApplication.run(ApsMdmApplication.class, args);

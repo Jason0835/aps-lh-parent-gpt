@@ -1,0 +1,3733 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.report.mapper.MonthPlanReportMapper">
+
+    <select id="selectAccountingPeriod" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+        WITH RECURSIVE monthly_ranges AS (SELECT 1                                                      AS month_num,
+                                                 STR_TO_DATE(CONCAT(#{year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
+                                                 STR_TO_DATE(CONCAT(#{year}, '-01-25'), '%Y-%m-%d')     AS end_date
+                                          UNION ALL
+                                          -- 递归部分，生成 2 - 12 月的日期范围
+                                          SELECT month_num + 1,
+                                                 STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num, 2, '0'), '-26'),
+                                                             '%Y-%m-%d') AS start_date,
+                                                 STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num + 1, 2, '0'), '-25'),
+                                                             '%Y-%m-%d') AS end_date
+                                          FROM monthly_ranges
+                                          WHERE month_num <![CDATA[  <  ]]> 12)
+        -- 主查询输出结果
+        SELECT #{year}   AS `YEAR`,
+               month_num AS `MONTH`,
+               start_date,
+               end_date
+        FROM monthly_ranges
+        ORDER BY month_num
+    </select>
+
+    <sql id="salePlanTableName">
+        -- 销售订单需求计划表名
+        T_MP_ORDER_PLAN_ALLOCATION
+    </sql>
+
+    <sql id="saleFinishTableName">
+        -- 销售订单需求完成表名
+        T_MDM_HISTORY_SALE_RECORD
+    </sql>
+
+    <sql id="producePlanTableName">
+        -- 生产计划表名
+        T_MP_MONTH_PLAN_PROD_FINAL
+    </sql>
+
+    <sql id="produceFinishTableName">
+        -- 生产完成表名
+        t_lh_day_finish_qty
+    </sql>
+
+    <sql id="stockTableName">
+        t_mdm_product_stock_month
+    </sql>
+
+    <select id="selectFinalMonthPlanVersion" resultType="String">
+        SELECT MAX(MONTH_PLAN_VERSION) FROM
+        <include refid="producePlanTableName"/>
+        WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode} AND YEAR = #{year} AND MONTH = #{month}
+    </select>
+
+    <select id="listProduceMonthFinishRate4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+        SELECT
+        c.range_key,
+        c.range_label,
+        COUNT(t1.PRODUCT_CODE) AS sku_count,
+        '2' unit
+        FROM rate_range_config c
+        LEFT JOIN (
+        SELECT
+        p.PRODUCT_CODE,
+        CASE
+        WHEN ifnull( PLAN_QTY, 0 ) != 0 THEN
+        round( ifnull( finish_quantity, 0 ) / ifnull( PLAN_QTY, 0 ) * 100, 2 ) ELSE 0
+        END finish_rate,
+        ifnull( finish_quantity, 0 ) finish_quantity,
+        ifnull( PLAN_QTY, 0 ) PLAN_QTY
+        FROM
+        (
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.PRODUCT_CODE,
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        )
+        -- 主查询分组汇总数据
+        SELECT
+        ppd.PRODUCT_CODE,
+        COUNT(DISTINCT ppd.PRODUCT_CODE) AS skuCount,
+        SUM(ppd.day_1_25_sum + ppd.day_26_31_sum) AS PLAN_QTY
+        FROM
+        preprocessed_data ppd
+        GROUP BY
+        ppd.PRODUCT_CODE
+        ) p
+        LEFT JOIN (
+        -- 硫化完成数
+        SELECT
+        f.PRODUCT_CODE,
+        sum( f.DAY_FINISH_QTY ) finish_quantity
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        WHERE
+        f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY
+        f.PRODUCT_CODE
+        ) f ON p.PRODUCT_CODE = f.PRODUCT_CODE
+        ) t1 ON
+        -- 处理特殊区间：0%
+        (c.range_key = 0 AND t1.finish_rate = 0) OR
+        -- 处理普通区间
+        (t1.finish_rate <![CDATA[ > ]]> c.min_value AND
+        t1.finish_rate <![CDATA[ <= ]]> COALESCE(c.max_value, 999999)) OR
+        -- 处理开区间：>160%
+        (c.max_value IS NULL AND t1.finish_rate > c.min_value)
+        GROUP BY c.range_label, c.range_key
+        ORDER BY c.range_key DESC
+    </select>
+
+    <select id="listProduceMonthFinishRate" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+        SELECT
+        c.range_key,
+        c.range_label,
+        COUNT(t1.PRODUCT_CODE) AS sku_count,
+        '2' unit
+        FROM rate_range_config c
+        LEFT JOIN (
+        SELECT
+        p.PRODUCT_CODE,
+        CASE
+        WHEN ifnull( PLAN_QTY, 0 ) != 0 THEN
+        round( ifnull( finish_quantity, 0 ) / ifnull( PLAN_QTY, 0 ) * 100, 2 ) ELSE 0
+        END finish_rate,
+        ifnull( finish_quantity, 0 ) finish_quantity,
+        ifnull( PLAN_QTY, 0 ) PLAN_QTY
+        FROM
+        (
+        SELECT
+        p.PRODUCT_CODE,
+        COUNT(DISTINCT p.PRODUCT_CODE) AS skuCount,
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ) as PLAN_QTY
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        GROUP BY
+        p.PRODUCT_CODE
+        ) p
+        LEFT JOIN (
+        -- 硫化完成数
+        SELECT
+        f.PRODUCT_CODE,
+        sum( f.DAY_FINISH_QTY ) finish_quantity
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        WHERE
+        f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY
+        f.PRODUCT_CODE
+        ) f ON p.PRODUCT_CODE = f.PRODUCT_CODE
+        ) t1 ON
+        -- 处理特殊区间：0%
+        (c.range_key = 0 AND t1.finish_rate = 0) OR
+        -- 处理普通区间
+        (t1.finish_rate <![CDATA[ > ]]> c.min_value AND
+        t1.finish_rate <![CDATA[ <= ]]> COALESCE(c.max_value, 999999)) OR
+        -- 处理开区间：>160%
+        (c.max_value IS NULL AND t1.finish_rate > c.min_value)
+        GROUP BY c.range_label, c.range_key
+        ORDER BY c.range_key DESC
+    </select>
+
+    <select id="listSaleMonthFinishRate" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+        SELECT
+        c.range_key,
+        c.range_label,
+        COUNT(t.PRODUCT_CODE) AS sku_count,
+        '2' unit
+        FROM rate_range_config c
+        LEFT JOIN (
+        SELECT
+        p.PRODUCT_CODE,
+        CASE
+        WHEN ifnull( PLAN_QTY, 0 ) != 0 THEN
+        round( ifnull( finish_quantity, 0 )/ ifnull( PLAN_QTY, 0 ) * 100, 2 ) ELSE 0
+        END finish_rate,
+        ifnull( finish_quantity, 0 ) finish_quantity,
+        ifnull( PLAN_QTY, 0 ) PLAN_QTY
+        FROM
+        (-- 销售订单需求计划数
+        SELECT
+        p.PRODUCT_CODE,
+        sum( p.PLAN_QTY ) PLAN_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        WHERE
+        p.YEAR = #{year}
+        AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND p.IS_DELETE = 0
+        GROUP BY
+        p.PRODUCT_CODE
+        ) p
+        LEFT JOIN (
+        -- 销售订单完成数
+        SELECT
+        f.PRODUCT_CODE,
+        sum( f.SALE_QTY ) finish_quantity
+        FROM
+        <include refid="saleFinishTableName"/>
+        f
+        WHERE
+        f.YEAR = #{year}
+        AND f.MONTH = #{month}
+        AND f.FACTORY_CODE = #{factoryCode}
+        AND f.IS_DELETE = 0
+        GROUP BY
+        f.PRODUCT_CODE
+        ) f ON p.PRODUCT_CODE = f.PRODUCT_CODE
+        ) t ON
+        -- 处理特殊区间：0%
+        (c.range_key = 0 AND t.finish_rate = 0) OR
+        -- 处理普通区间
+        (t.finish_rate <![CDATA[ > ]]> c.min_value AND
+        t.finish_rate <![CDATA[ <= ]]> COALESCE(c.max_value, 999999)) OR
+        -- 处理开区间：>160%
+        (c.max_value IS NULL AND t.finish_rate > c.min_value)
+        GROUP BY c.range_label, c.range_key
+        ORDER BY c.range_key DESC
+    </select>
+
+    <select id="selectTrialProduceMonthFinishRate4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+        SET @queryYear = #{year};
+        SET @queryMonth = #{month};
+        SET @factoryCode = #{factoryCode};
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.PRODUCT_CODE,
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = @queryYear AND p.MONTH = @queryMonth THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (@queryMonth = 1 AND p.YEAR = @queryYear - 1 AND p.MONTH = 12)
+        OR (p.YEAR = @queryYear AND p.MONTH = @queryMonth - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = @queryYear AND p.MONTH IN (@queryMonth, @queryMonth - 1))
+        OR (@queryMonth = 1 AND p.YEAR = @queryYear - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = @factoryCode
+        AND p.IS_DELETE = 0
+        AND p.CONSTRUCTION_STAGE IN(1, 2)
+        )
+        -- 主查询分组汇总数据
+        SELECT
+        '试制或量试' AS rangeLabel,
+        COUNT(DISTINCT ppd.PRODUCT_CODE) AS skuCount,
+        SUM(ppd.day_1_25_sum + ppd.day_26_31_sum) AS PLAN_QTY
+        FROM
+        preprocessed_data ppd
+        GROUP BY
+        ppd.PRODUCT_CODE
+    </select>
+
+    <select id="selectTrialProduceMonthFinishRate"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+        SET @queryYear = #{year};
+        SET @queryMonth = #{month};
+        SET @factoryCode = #{factoryCode};
+        SELECT
+        '试制或量试' AS rangeLabel,
+        COUNT(DISTINCT p.PRODUCT_CODE) AS skuCount,
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ) AS PLAN_QTY
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        p.YEAR = @queryYear AND p.MONTH = @queryMonth
+        AND p.FACTORY_CODE = @factoryCode
+        AND p.IS_DELETE = 0
+        AND p.CONSTRUCTION_STAGE IN(1, 2)
+    </select>
+
+    <select id="selectProduceAndSale" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateVo">
+        SELECT
+        SUM(CASE WHEN dataType = '1' THEN QTY END) AS producePlanQty,
+        SUM(CASE WHEN dataType = '2' THEN QTY END) AS produceFinishPlanQty,
+        SUM(CASE WHEN dataType = '3' THEN QTY END) AS salePlanQty,
+        SUM(CASE WHEN dataType = '4' THEN QTY END) AS saleFinishPlanQty
+        FROM
+        (
+        -- 1-25生产计划数量
+        SELECT SUM(
+        IFNULL(DAY_1,0) + IFNULL(DAY_2,0) + IFNULL(DAY_3,0) + IFNULL(DAY_4,0) + IFNULL(DAY_5,0) +
+        IFNULL(DAY_6,0) + IFNULL(DAY_7,0) + IFNULL(DAY_8,0) + IFNULL(DAY_9,0) + IFNULL(DAY_10,0) +
+        IFNULL(DAY_11,0) + IFNULL(DAY_12,0) + IFNULL(DAY_13,0) + IFNULL(DAY_14,0) + IFNULL(DAY_15,0) +
+        IFNULL(DAY_16,0) + IFNULL(DAY_17,0) + IFNULL(DAY_18,0) + IFNULL(DAY_19,0) + IFNULL(DAY_20,0) +
+        IFNULL(DAY_21,0) + IFNULL(DAY_22,0) + IFNULL(DAY_23,0) + IFNULL(DAY_24,0) + IFNULL(DAY_25,0)
+        ) QTY, '1' dataType FROM
+        <include refid="producePlanTableName"/>
+        WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode} AND `YEAR` = #{year} AND `MONTH` = #{month}
+
+        UNION ALL
+        -- 上月26-31生产计划数量
+        SELECT SUM(IFNULL(DAY_26, 0) + IFNULL(DAY_27, 0) + IFNULL(DAY_28, 0) + IFNULL(DAY_29, 0) + IFNULL(DAY_30, 0) +
+        IFNULL(DAY_31, 0)) QTY, '1' dataType FROM
+        <include refid="producePlanTableName"/>
+        WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode} AND `YEAR` = #{year} AND `MONTH` = #{month} - 1
+
+        UNION ALL
+        -- 模具完成数量
+        SELECT IFNULL(SUM(DAY_FINISH_QTY), 0) QTY, '2' dataType FROM
+        <include refid="produceFinishTableName"/>
+        WHERE IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+
+        UNION ALL
+        -- 销售计划数
+        SELECT sum( p.PLAN_QTY ) QTY, '3' dataType FROM
+        <include refid="salePlanTableName"/>
+        p WHERE p.YEAR = #{year} AND p.MONTH = #{month} AND FACTORY_CODE = #{factoryCode} AND p.IS_DELETE = 0 AND
+        p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        UNION ALL
+        -- 销售完成数
+        SELECT sum( f.SALE_QTY ) QTY, '4' dataType FROM
+        <include refid="saleFinishTableName"/>
+        f WHERE f.YEAR = #{year} AND f.MONTH = #{month} AND f.FACTORY_CODE = #{factoryCode} AND f.IS_DELETE = 0
+        ) t
+    </select>
+
+    <select id="selectProduceAndSale4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateVo">
+        SELECT
+        SUM(CASE WHEN dataType = '1' THEN QTY END) AS producePlanQty,
+        SUM(CASE WHEN dataType = '2' THEN QTY END) AS produceFinishPlanQty,
+        SUM(CASE WHEN dataType = '3' THEN QTY END) AS salePlanQty,
+        SUM(CASE WHEN dataType = '4' THEN QTY END) AS saleFinishPlanQty
+        FROM
+        (
+        -- 1-25生产计划数量
+        SELECT SUM(
+        IFNULL(DAY_1,0) + IFNULL(DAY_2,0) + IFNULL(DAY_3,0) + IFNULL(DAY_4,0) + IFNULL(DAY_5,0) +
+        IFNULL(DAY_6,0) + IFNULL(DAY_7,0) + IFNULL(DAY_8,0) + IFNULL(DAY_9,0) + IFNULL(DAY_10,0) +
+        IFNULL(DAY_11,0) + IFNULL(DAY_12,0) + IFNULL(DAY_13,0) + IFNULL(DAY_14,0) + IFNULL(DAY_15,0) +
+        IFNULL(DAY_16,0) + IFNULL(DAY_17,0) + IFNULL(DAY_18,0) + IFNULL(DAY_19,0) + IFNULL(DAY_20,0) +
+        IFNULL(DAY_21,0) + IFNULL(DAY_22,0) + IFNULL(DAY_23,0) + IFNULL(DAY_24,0) + IFNULL(DAY_25,0) +
+        IFNULL(DAY_26,0) + IFNULL(DAY_27,0) + IFNULL(DAY_28,0) + IFNULL(DAY_29,0) + IFNULL(DAY_30,0) +
+        IFNULL(DAY_31,0)
+        ) QTY, '1' dataType FROM
+        <include refid="producePlanTableName"/>
+        WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode} AND `YEAR` = #{year} AND `MONTH` = #{month}
+
+        UNION ALL
+        -- 模具完成数量
+        SELECT IFNULL(SUM(DAY_FINISH_QTY), 0) QTY, '2' dataType FROM
+        <include refid="produceFinishTableName"/>
+        WHERE IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+
+        UNION ALL
+        -- 销售计划数
+        SELECT sum( p.PLAN_QTY ) QTY, '3' dataType FROM
+        <include refid="salePlanTableName"/>
+        p WHERE p.YEAR = #{year} AND p.MONTH = #{month} AND FACTORY_CODE = #{factoryCode} AND p.IS_DELETE = 0 AND
+        p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        UNION ALL
+        -- 销售完成数
+        SELECT sum( f.SALE_QTY ) QTY, '4' dataType FROM
+        <include refid="saleFinishTableName"/>
+        f WHERE f.YEAR = #{year} AND f.MONTH = #{month} AND f.FACTORY_CODE = #{factoryCode} AND f.IS_DELETE = 0
+        ) t
+    </select>
+
+    <select id="selectMonthPlanFinishBrand4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateBrandVo">
+        SELECT
+        productInfo.BRAND,
+        stock.stockSkuCount,
+        stock.stockQty,
+        salePlan.skuCount as salePlanSkuCount,
+        salePlan.PLAN_QTY as salePlanQty,
+        saleFinish.skuCount as saleFinishSkuCount,
+        saleFinish.finish_quantity as saleFinishPlanQty,
+        proPlan.skuCount as produceSkuCount,
+        proPlan.PLAN_QTY as producePlanQty,
+        proFinish.finish_quantity as produceFinishPlanQty
+        FROM (
+        SELECT BRAND
+        FROM t_mdm_material_info
+        WHERE IS_DELETE = 0
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY BRAND
+        ) productInfo
+
+        LEFT JOIN (
+        -- 销售订单需求计划数
+        SELECT
+        p.BRAND,
+        COUNT(DISTINCT PRODUCT_CODE) skuCount,
+        SUM( p.PLAN_QTY ) PLAN_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        WHERE
+        p.YEAR = #{year}
+        AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND p.IS_DELETE = 0
+        GROUP BY
+        p.BRAND
+        ) salePlan ON salePlan.BRAND = productInfo.BRAND
+
+        LEFT JOIN (
+        -- 销售订单完成数
+        SELECT
+        pro.BRAND,
+        COUNT(DISTINCT f.PRODUCT_CODE) skuCount,
+        sum( f.SALE_QTY ) finish_quantity
+        FROM
+        <include refid="saleFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE
+        f.YEAR = #{year}
+        AND f.MONTH = #{month}
+        AND f.FACTORY_CODE = #{factoryCode}
+        AND f.IS_DELETE = 0
+        GROUP BY
+        pro.BRAND
+        ) saleFinish ON saleFinish.BRAND = productInfo.BRAND
+
+        LEFT JOIN (
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.BRAND,
+        p.PRODUCT_CODE,
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        )
+        -- 主查询根据 BRAND 分组汇总数据
+        SELECT
+        ppd.BRAND,
+        COUNT(DISTINCT ppd.PRODUCT_CODE) AS skuCount,
+        SUM(ppd.day_1_25_sum + ppd.day_26_31_sum) AS PLAN_QTY
+        FROM
+        preprocessed_data ppd
+        GROUP BY
+        ppd.BRAND
+        ) proPlan ON proPlan.BRAND = productInfo.BRAND
+        LEFT JOIN (
+        -- 硫化完成数
+        SELECT
+        pro.BRAND,
+        sum( f.DAY_FINISH_QTY ) finish_quantity
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE
+        f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY
+        pro.BRAND
+        ) proFinish ON proFinish.BRAND = productInfo.BRAND
+
+        LEFT JOIN (
+        -- 期初库存
+        SELECT
+        pro.BRAND,
+        COUNT(DISTINCT proStock.PRODUCT_CODE) as stockSkuCount,
+        sum(proStock.STOCK_QTY) as stockQty
+        FROM
+        <include refid="stockTableName"/>
+        proStock
+        LEFT JOIN T_MDM_MATERIAL_INFO pro ON proStock.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE proStock.IS_DELETE = 0 AND proStock.FACTORY_CODE = #{factoryCode}
+        <if test='month == 1'>AND proStock.YEAR = #{year} - 1 AND proStock.MONTH = 12</if>
+        <if test='month != 1'>AND proStock.YEAR = #{year} AND proStock.MONTH = #{month} - 1</if>
+        GROUP BY pro.BRAND
+        ) stock ON stock.BRAND = productInfo.BRAND
+
+        LEFT JOIN sys_dict_data dict ON dict.DICT_VALUE = proPlan.BRAND AND dict.DICT_TYPE = 'biz_brand_name'
+    </select>
+
+    <select id="selectMonthPlanFinishBrand" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateBrandVo">
+        SELECT
+        productInfo.BRAND,
+        stock.stockSkuCount,
+        stock.stockQty,
+        salePlan.skuCount as salePlanSkuCount,
+        salePlan.PLAN_QTY as salePlanQty,
+        saleFinish.skuCount as saleFinishSkuCount,
+        saleFinish.finish_quantity as saleFinishPlanQty,
+        proPlan.skuCount as produceSkuCount,
+        proPlan.PLAN_QTY as producePlanQty,
+        proFinish.finish_quantity as produceFinishPlanQty
+        FROM (
+        SELECT BRAND
+        FROM t_mdm_material_info
+        WHERE IS_DELETE = 0
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY BRAND
+        ) productInfo
+
+        LEFT JOIN (
+        -- 销售订单需求计划数
+        SELECT
+        p.BRAND,
+        COUNT(DISTINCT PRODUCT_CODE) skuCount,
+        SUM( p.PLAN_QTY ) PLAN_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        WHERE
+        p.YEAR = #{year}
+        AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND p.IS_DELETE = 0
+        GROUP BY
+        p.BRAND
+        ) salePlan ON salePlan.BRAND = productInfo.BRAND
+
+        LEFT JOIN (
+        -- 销售订单完成数
+        SELECT
+        pro.BRAND,
+        COUNT(DISTINCT f.PRODUCT_CODE) skuCount,
+        sum( f.SALE_QTY ) finish_quantity
+        FROM
+        <include refid="saleFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE
+        f.YEAR = #{year}
+        AND f.MONTH = #{month}
+        AND f.FACTORY_CODE = #{factoryCode}
+        AND f.IS_DELETE = 0
+        GROUP BY
+        pro.BRAND
+        ) saleFinish ON saleFinish.BRAND = productInfo.BRAND
+
+        LEFT JOIN (
+        SELECT
+        p.BRAND,
+        COUNT(DISTINCT p.PRODUCT_CODE) AS skuCount,
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ) AS PLAN_QTY
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        GROUP BY
+        p.BRAND
+        ) proPlan ON proPlan.BRAND = productInfo.BRAND
+        LEFT JOIN (
+        -- 硫化完成数
+        SELECT
+        pro.BRAND,
+        sum( f.DAY_FINISH_QTY ) finish_quantity
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE
+        f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY
+        pro.BRAND
+        ) proFinish ON proFinish.BRAND = productInfo.BRAND
+
+        LEFT JOIN (
+        -- 期初库存
+        SELECT
+        pro.BRAND,
+        COUNT(DISTINCT proStock.PRODUCT_CODE) as stockSkuCount,
+        sum(proStock.STOCK_QTY) as stockQty
+        FROM
+        <include refid="stockTableName"/>
+        proStock
+        LEFT JOIN T_MDM_MATERIAL_INFO pro ON proStock.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE proStock.IS_DELETE = 0 AND proStock.FACTORY_CODE = #{factoryCode}
+        <if test='month == 1'>AND proStock.YEAR = #{year} - 1 AND proStock.MONTH = 12</if>
+        <if test='month != 1'>AND proStock.YEAR = #{year} AND proStock.MONTH = #{month} - 1</if>
+        GROUP BY pro.BRAND
+        ) stock ON stock.BRAND = productInfo.BRAND
+
+        LEFT JOIN sys_dict_data dict ON dict.DICT_VALUE = proPlan.BRAND AND dict.DICT_TYPE = 'biz_brand_name'
+    </select>
+
+    <select id="selectMonthPlanFinishBrandSize4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateProSizeVo">
+        SELECT
+        productInfo.BRAND,
+        productInfo.PRO_SIZE,
+        salePlan.PLAN_QTY as salePlanQty,
+        saleFinish.finish_quantity as saleFinishPlanQty,
+        proPlan.PLAN_QTY as producePlanQty,
+        proFinish.finish_quantity as produceFinishPlanQty
+        FROM (
+        SELECT BRAND, PRO_SIZE
+        FROM t_mdm_material_info
+        WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode}
+        GROUP BY BRAND, PRO_SIZE
+        ) productInfo
+
+        LEFT JOIN (
+        -- 销售订单需求计划数
+        SELECT p.BRAND,
+        p.PRO_SIZE,
+        SUM(p.PLAN_QTY) PLAN_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year}
+        AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND p.IS_DELETE = 0
+        GROUP BY p.BRAND, p.PRO_SIZE) salePlan
+        ON salePlan.BRAND = productInfo.BRAND AND productInfo.PRO_SIZE = salePlan.PRO_SIZE
+
+        LEFT JOIN (
+        -- 销售订单完成数
+        SELECT pro.BRAND,
+        pro.PRO_SIZE,
+        sum(f.SALE_QTY) finish_quantity
+        FROM
+        <include refid="saleFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE f.YEAR = #{year}
+        AND f.MONTH = #{month}
+        AND f.FACTORY_CODE = #{factoryCode}
+        AND f.IS_DELETE = 0
+        GROUP BY pro.BRAND,
+        pro.PRO_SIZE) saleFinish
+        ON saleFinish.BRAND = productInfo.BRAND AND productInfo.PRO_SIZE = saleFinish.PRO_SIZE
+
+        LEFT JOIN (
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.BRAND,
+        p.PRO_SIZE,
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        )
+        -- 主查询分组汇总数据
+        SELECT
+        ppd.BRAND,
+        ppd.PRO_SIZE,
+        SUM(ppd.day_1_25_sum + ppd.day_26_31_sum) AS PLAN_QTY
+        FROM
+        preprocessed_data ppd
+        GROUP BY
+        ppd.BRAND,
+        ppd.PRO_SIZE
+        ) proPlan
+        ON proPlan.BRAND = productInfo.BRAND AND productInfo.PRO_SIZE = proPlan.PRO_SIZE
+
+        LEFT JOIN (
+        -- 硫化完成数
+        SELECT pro.BRAND,
+        pro.PRO_SIZE,
+        sum(f.DAY_FINISH_QTY) finish_quantity
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY pro.BRAND,
+        pro.PRO_SIZE) proFinish
+        ON proFinish.BRAND = proPlan.BRAND AND proPlan.PRO_SIZE = proFinish.PRO_SIZE
+        ORDER BY
+        productInfo.BRAND,
+        productInfo.PRO_SIZE
+    </select>
+
+    <select id="selectMonthPlanFinishBrandSize"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateProSizeVo">
+        SELECT
+        productInfo.BRAND,
+        productInfo.PRO_SIZE,
+        salePlan.PLAN_QTY as salePlanQty,
+        saleFinish.finish_quantity as saleFinishPlanQty,
+        proPlan.PLAN_QTY as producePlanQty,
+        proFinish.finish_quantity as produceFinishPlanQty
+        FROM (
+        SELECT BRAND, PRO_SIZE
+        FROM t_mdm_material_info
+        WHERE IS_DELETE = 0 AND FACTORY_CODE = #{factoryCode}
+        GROUP BY BRAND, PRO_SIZE
+        ) productInfo
+
+        LEFT JOIN (
+        -- 销售订单需求计划数
+        SELECT p.BRAND,
+        p.PRO_SIZE,
+        SUM(p.PLAN_QTY) PLAN_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year}
+        AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND p.IS_DELETE = 0
+        GROUP BY p.BRAND, p.PRO_SIZE) salePlan
+        ON salePlan.BRAND = productInfo.BRAND AND productInfo.PRO_SIZE = salePlan.PRO_SIZE
+
+        LEFT JOIN (
+        -- 销售订单完成数
+        SELECT pro.BRAND,
+        pro.PRO_SIZE,
+        sum(f.SALE_QTY) finish_quantity
+        FROM
+        <include refid="saleFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE f.YEAR = #{year}
+        AND f.MONTH = #{month}
+        AND f.FACTORY_CODE = #{factoryCode}
+        AND f.IS_DELETE = 0
+        GROUP BY pro.BRAND,
+        pro.PRO_SIZE) saleFinish
+        ON saleFinish.BRAND = productInfo.BRAND AND productInfo.PRO_SIZE = saleFinish.PRO_SIZE
+
+        LEFT JOIN (
+        SELECT
+        p.BRAND,
+        p.PRO_SIZE,
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ) AS PLAN_QTY
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        GROUP BY
+        p.BRAND,
+        p.PRO_SIZE
+        ) proPlan
+        ON proPlan.BRAND = productInfo.BRAND AND productInfo.PRO_SIZE = proPlan.PRO_SIZE
+
+        LEFT JOIN (
+        -- 硫化完成数
+        SELECT pro.BRAND,
+        pro.PRO_SIZE,
+        sum(f.DAY_FINISH_QTY) finish_quantity
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        left JOIN t_mdm_material_info pro ON f.PRODUCT_CODE = pro.PRODUCT_CODE
+        WHERE f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY pro.BRAND,
+        pro.PRO_SIZE) proFinish
+        ON proFinish.BRAND = proPlan.BRAND AND proPlan.PRO_SIZE = proFinish.PRO_SIZE
+        ORDER BY
+        productInfo.BRAND,
+        productInfo.PRO_SIZE
+    </select>
+
+    <select id="selectStopDay" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+        -- 使用递归 CTE 生成每个月的日期范围
+        WITH RECURSIVE
+            monthly_ranges AS (
+                -- 初始查询，生成 1 月份的日期范围
+                SELECT 1                                                      AS month_num,
+                       STR_TO_DATE(CONCAT(#{year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
+                       STR_TO_DATE(CONCAT(#{year}, '-01-25'), '%Y-%m-%d')     AS end_date
+                UNION ALL
+                -- 递归部分，生成 2 - 12 月的日期范围
+                SELECT month_num + 1,
+                       STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num, 2, '0'), '-26'), '%Y-%m-%d')     AS start_date,
+                       STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num + 1, 2, '0'), '-25'), '%Y-%m-%d') AS end_date
+                FROM monthly_ranges
+                WHERE month_num <![CDATA[  <  ]]> 12),
+            -- 结合日期范围和原始表进行统计
+            monthly_stats AS (SELECT mr.month_num,
+                                     mpc.BEGIN_DATE              mpcStartDate,
+                                     mpc.END_DATE                mpcEndDate,
+                                     mr.start_date               mrStartDate,
+                                     mr.end_date                 mrEndDate,
+                                     CASE
+                                         WHEN mpc.BEGIN_DATE <![CDATA[  <=  ]]> mr.start_date THEN mr.start_date
+                                         ELSE mpc.BEGIN_DATE END actualBeginDate,
+                                     CASE
+                                         WHEN mpc.END_DATE <![CDATA[  >=  ]]> mr.end_date THEN mr.end_date
+                                         ELSE mpc.END_DATE END   actualEndDate,
+                                     IFNULL((DATEDIFF(
+                                                     CASE
+                                                         WHEN mpc.END_DATE <![CDATA[  >=  ]]> mr.end_date THEN mr.end_date
+                                                         ELSE mpc.END_DATE END,
+                                                     CASE
+                                                         WHEN mpc.BEGIN_DATE <![CDATA[  <=  ]]> mr.start_date THEN mr.start_date
+                                                         ELSE mpc.BEGIN_DATE END
+                                             ) + 1), 0)          diff_date_num
+                              FROM monthly_ranges mr
+                                       LEFT JOIN t_mdm_production_calendar mpc
+                                                 ON
+                                                     (mpc.END_DATE <![CDATA[  >=  ]]> mr.start_date AND mpc.END_DATE <![CDATA[  <=  ]]> mr.end_date)
+                                                         OR
+                                                     (mpc.BEGIN_DATE <![CDATA[  <=  ]]> mr.end_date AND mpc.BEGIN_DATE <![CDATA[  >=  ]]> mr.start_date))
+        -- 主查询输出结果
+        SELECT #{year}   AS       `YEAR`,
+               month_num AS       `MONTH`
+                ,
+               SUM(diff_date_num) stopDay
+        FROM monthly_stats
+        GROUP BY month_num
+        ORDER BY month_num
+    </select>
+
+    <select id="selectProduceQtyAndCount" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+        -- 使用 CTE 生成每个月的统计数据
+        WITH RECURSIVE
+            monthly_stats AS (
+                -- 生成 1 - 12 月的月份编号
+                SELECT 1 AS month_num
+                UNION ALL
+                SELECT month_num + 1
+                FROM monthly_stats
+                WHERE month_num <![CDATA[  <  ]]> 12),
+            -- 计算每个月的统计结果
+            final_stats AS (SELECT ms.month_num,
+                                       -- 计算本月 1 - 25 日的数据和
+                                   COALESCE(
+                                           (SELECT SUM(
+                                                           IFNULL(t2.DAY_1, 0) + IFNULL(t2.DAY_2, 0) +
+                                                           IFNULL(t2.DAY_3, 0) + IFNULL(t2.DAY_4, 0) +
+                                                           IFNULL(t2.DAY_5, 0) +
+                                                           IFNULL(t2.DAY_6, 0) + IFNULL(t2.DAY_7, 0) +
+                                                           IFNULL(t2.DAY_8, 0) + IFNULL(t2.DAY_9, 0) +
+                                                           IFNULL(t2.DAY_10, 0) +
+                                                           IFNULL(t2.DAY_11, 0) + IFNULL(t2.DAY_12, 0) +
+                                                           IFNULL(t2.DAY_13, 0) + IFNULL(t2.DAY_14, 0) +
+                                                           IFNULL(t2.DAY_15, 0) +
+                                                           IFNULL(t2.DAY_16, 0) + IFNULL(t2.DAY_17, 0) +
+                                                           IFNULL(t2.DAY_18, 0) + IFNULL(t2.DAY_19, 0) +
+                                                           IFNULL(t2.DAY_20, 0) +
+                                                           IFNULL(t2.DAY_21, 0) + IFNULL(t2.DAY_22, 0) +
+                                                           IFNULL(t2.DAY_23, 0) + IFNULL(t2.DAY_24, 0) +
+        IFNULL(t2.DAY_25, 0) +
+        IFNULL(t2.DAY_26, 0) + IFNULL(t2.DAY_27, 0) +
+        IFNULL(t2.DAY_28, 0) + IFNULL(t2.DAY_29, 0) +
+        IFNULL(t2.DAY_30, 0) + IFNULL(t2.DAY_31, 0)
+                                                   )
+        FROM
+        <include refid="producePlanTableName"/>
+        t2
+                                            WHERE t2.YEAR = #{year}
+                                              AND t2.MONTH = ms.month_num),
+                                           0
+                                   ) AS total_sum,
+                                   -- 统计去重后的 PRODUCT_CODE 数据条数
+                                   COALESCE(
+                                           (SELECT COUNT(DISTINCT t.PRODUCT_CODE)
+        FROM
+        <include refid="producePlanTableName"/>
+        t
+        WHERE t.YEAR = #{year} AND t.MONTH = ms.month_num),
+                                           0
+                                   ) AS distinct_data_count
+                            FROM monthly_stats ms)
+        -- 主查询输出结果
+        SELECT month_num           AS `MONTH`,
+               total_sum           AS produceTotal,
+               distinct_data_count AS produceSkuCount
+        FROM final_stats
+        ORDER BY month_num
+    </select>
+
+    <select id="selectProduceQtyAndCount4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+        -- 使用 CTE 生成每个月的统计数据
+        WITH RECURSIVE
+        monthly_stats AS (
+        -- 生成 1 - 12 月的月份编号
+        SELECT 1 AS month_num
+        UNION ALL
+        SELECT month_num + 1
+        FROM monthly_stats
+        WHERE month_num <![CDATA[  <  ]]> 12),
+        -- 计算每个月的统计结果
+        final_stats AS (SELECT ms.month_num,
+        -- 计算上一个月 26 - 31 日的数据和
+        COALESCE(
+        (SELECT SUM(
+        IFNULL(t1.DAY_26, 0) + IFNULL(t1.DAY_27, 0) +
+        IFNULL(t1.DAY_28, 0) + IFNULL(t1.DAY_29, 0) +
+        IFNULL(t1.DAY_30, 0) + IFNULL(t1.DAY_31, 0)
+        )
+        FROM
+        <include refid="producePlanTableName"/>
+        t1
+        WHERE t1.YEAR = CASE WHEN ms.month_num = 1 THEN #{year} - 1 ELSE #{year} END
+        AND t1.MONTH = CASE WHEN ms.month_num = 1 THEN 12 ELSE ms.month_num - 1 END),
+        0
+        ) +
+        -- 计算本月 1 - 25 日的数据和
+        COALESCE(
+        (SELECT SUM(
+        IFNULL(t2.DAY_1, 0) + IFNULL(t2.DAY_2, 0) +
+        IFNULL(t2.DAY_3, 0) + IFNULL(t2.DAY_4, 0) +
+        IFNULL(t2.DAY_5, 0) +
+        IFNULL(t2.DAY_6, 0) + IFNULL(t2.DAY_7, 0) +
+        IFNULL(t2.DAY_8, 0) + IFNULL(t2.DAY_9, 0) +
+        IFNULL(t2.DAY_10, 0) +
+        IFNULL(t2.DAY_11, 0) + IFNULL(t2.DAY_12, 0) +
+        IFNULL(t2.DAY_13, 0) + IFNULL(t2.DAY_14, 0) +
+        IFNULL(t2.DAY_15, 0) +
+        IFNULL(t2.DAY_16, 0) + IFNULL(t2.DAY_17, 0) +
+        IFNULL(t2.DAY_18, 0) + IFNULL(t2.DAY_19, 0) +
+        IFNULL(t2.DAY_20, 0) +
+        IFNULL(t2.DAY_21, 0) + IFNULL(t2.DAY_22, 0) +
+        IFNULL(t2.DAY_23, 0) + IFNULL(t2.DAY_24, 0) +
+        IFNULL(t2.DAY_25, 0)
+        )
+        FROM
+        <include refid="producePlanTableName"/>
+        t2
+        WHERE t2.YEAR = #{year}
+        AND t2.MONTH = ms.month_num),
+        0
+        ) AS total_sum,
+        -- 统计去重后的 PRODUCT_CODE 数据条数
+        COALESCE(
+        (SELECT COUNT(DISTINCT t.PRODUCT_CODE)
+        FROM
+        <include refid="producePlanTableName"/>
+        t
+        WHERE (t.YEAR = CASE WHEN ms.month_num = 1 THEN #{year} - 1 ELSE #{year} END
+        AND t.MONTH =
+        CASE WHEN ms.month_num = 1 THEN 12 ELSE ms.month_num - 1 END)
+        OR (t.YEAR = #{year} AND t.MONTH = ms.month_num)),
+        0
+        ) AS distinct_data_count
+        FROM monthly_stats ms)
+        -- 主查询输出结果
+        SELECT month_num AS `MONTH`,
+        total_sum AS produceTotal,
+        distinct_data_count AS produceSkuCount
+        FROM final_stats
+        ORDER BY month_num
+    </select>
+
+    <select id="selectFinishQtyAndCount" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+        -- 使用递归 CTE 生成每个月的日期范围
+        WITH RECURSIVE
+            monthly_ranges AS (
+                -- 初始查询，生成 1 月份的日期范围
+                SELECT 1                                                      AS month_num,
+                       STR_TO_DATE(CONCAT(#{year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
+                       STR_TO_DATE(CONCAT(#{year}, '-01-25'), '%Y-%m-%d')     AS end_date
+                UNION ALL
+                -- 递归部分，生成 2 - 12 月的日期范围
+                SELECT month_num + 1,
+                       STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num, 2, '0'), '-26'), '%Y-%m-%d')     AS start_date,
+                       STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num + 1, 2, '0'), '-25'), '%Y-%m-%d') AS end_date
+                FROM monthly_ranges
+                WHERE month_num <![CDATA[  <  ]]> 12),
+            -- 结合日期范围和原始表进行统计
+            monthly_stats AS (SELECT mr.month_num,
+                                     COUNT(DISTINCT t.PRODUCT_CODE)   AS product_count,
+                                     SUM(IFNULL(t.DAY_FINISH_QTY, 0)) AS total_finish_qty,
+                                     COUNT(DISTINCT t.FINISH_DATE)       date_count
+                              FROM monthly_ranges mr
+                                       LEFT JOIN
+        <include refid="produceFinishTableName"/>
+        t ON t.FINISH_DATE BETWEEN mr.start_date AND mr.end_date
+                              WHERE t.IS_DELETE = 0
+                              GROUP BY mr.month_num)
+        -- 主查询输出结果
+        SELECT month_num        AS `MONTH`,
+               total_finish_qty AS finishTotal,
+               product_count    AS finishSkuCount,
+               date_count       AS finishDateCount
+        FROM monthly_stats
+        ORDER BY month_num
+    </select>
+
+    <select id="selectSkuSummaryProduce" resultType="com.zlt.aps.monthplan.api.domain.vo.SkuSummaryProduceVo">
+        SELECT
+        `MONTH`,
+        SUM(CASE WHEN finishDay BETWEEN 1 AND 7 THEN 1 ELSE 0 END) AS day_1_to_7_count,
+        SUM(CASE WHEN finishDay BETWEEN 8 AND 14 THEN 1 ELSE 0 END) AS day_8_to_14_count,
+        SUM(CASE WHEN finishDay BETWEEN 15 AND 21 THEN 1 ELSE 0 END) AS day_15_to_21_count,
+        SUM(CASE WHEN finishDay BETWEEN 22 AND 31 THEN 1 ELSE 0 END) AS day_22_to_31_count,
+        count(1) AS total_count
+        FROM (
+                 -- 使用递归 CTE 生成每个月的日期范围
+                 WITH RECURSIVE
+                     monthly_ranges AS (
+                         -- 初始查询，生成 1 月份的日期范围
+                         SELECT 1                                                      AS month_num,
+                                STR_TO_DATE(CONCAT(#{year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
+                                STR_TO_DATE(CONCAT(#{year}, '-01-25'), '%Y-%m-%d')     AS end_date
+                         UNION ALL
+                         -- 递归部分，生成 2 - 12 月的日期范围
+                         SELECT month_num + 1,
+                                STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num, 2, '0'), '-26'),
+                                            '%Y-%m-%d')                                                           AS start_date,
+                                STR_TO_DATE(CONCAT(#{year}, '-', LPAD(month_num + 1, 2, '0'), '-25'),
+                                            '%Y-%m-%d')                                                           AS end_date
+            FROM monthly_ranges
+                         WHERE month_num <![CDATA[  <  ]]> 12),
+                     -- 结合日期范围和原始表进行统计
+                     monthly_stats AS (SELECT mr.month_num,
+                                              t.PRODUCT_CODE,
+                                              COUNT(1) date_count
+                                       FROM monthly_ranges mr
+                                                LEFT JOIN
+        <include refid="produceFinishTableName"/>
+        t ON t.FINISH_DATE BETWEEN mr.start_date AND mr.end_date
+        LEFT JOIN t_product_construction_info a ON a.sap_code = t.PRODUCT_CODE
+                                       WHERE t.DAY_FINISH_QTY <![CDATA[  >  ]]> 0
+        AND t.IS_DELETE = 0 AND a.production_stage = 0
+                                       GROUP BY mr.month_num, t.PRODUCT_CODE)
+                 -- 主查询输出结果
+                 SELECT month_num  AS `MONTH`,
+                        date_count AS finishDay
+                 FROM monthly_stats
+                 ORDER BY month_num
+        ) t GROUP BY `MONTH`
+        ORDER BY `MONTH`
+    </select>
+
+    <select id="selectSkuSummaryTrial" resultType="com.zlt.aps.monthplan.api.domain.vo.SkuSummaryTrialVo">
+        SELECT
+        `MONTH`,
+        count(1) AS total_count,
+        SUM(finishSum) AS total_sum,
+        <foreach collection="dayList" item="day" separator=",">
+            SUM(CASE WHEN finishDay = #{day} THEN 1 ELSE 0 END) AS dayCount${day},
+            SUM(CASE WHEN finishDay = #{day} THEN finishSum ELSE 0 END) daySum${day}
+        </foreach>
+        FROM (
+        -- 使用递归 CTE 生成每个月的日期范围
+        WITH RECURSIVE monthly_ranges AS (
+        -- 初始查询，生成 1 月份的日期范围
+        SELECT
+        1 AS month_num,
+        STR_TO_DATE(CONCAT(#{queryDto.year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
+        STR_TO_DATE(CONCAT(#{queryDto.year}, '-01-25'), '%Y-%m-%d') AS end_date
+        UNION ALL
+        -- 递归部分，生成 2 - 12 月的日期范围
+        SELECT
+        month_num + 1,
+        STR_TO_DATE(CONCAT(#{queryDto.year}, '-', LPAD(month_num, 2, '0'), '-26'), '%Y-%m-%d') AS start_date,
+        STR_TO_DATE(CONCAT(#{queryDto.year}, '-', LPAD(month_num + 1, 2, '0'), '-25'), '%Y-%m-%d') AS end_date
+        FROM
+        monthly_ranges
+        WHERE
+        month_num <![CDATA[  <  ]]> 12
+        ),
+        -- 结合日期范围和原始表进行统计
+        monthly_stats AS (
+                SELECT
+        mr.month_num,
+        t.PRODUCT_CODE,
+        COUNT(DISTINCT t.FINISH_DATE) date_count,
+        SUM(t.DAY_FINISH_QTY) DAY_FINISH_QTY
+        FROM
+        monthly_ranges mr
+        LEFT JOIN
+        <include refid="produceFinishTableName"/>
+        t ON t.FINISH_DATE BETWEEN mr.start_date AND mr.end_date
+        LEFT JOIN t_product_construction_info cons ON cons.sap_code = t.PRODUCT_CODE AND cons.del_flag = 0
+        WHERE t.IS_DELETE = 0 AND cons.PRODUCTION_STAGE = '1'
+        GROUP BY
+        mr.month_num, t.PRODUCT_CODE
+        )
+        -- 主查询输出结果
+        SELECT
+        month_num AS `MONTH`,
+        SUM(date_count) AS finishDay,
+        SUM(DAY_FINISH_QTY) finishSum
+        FROM
+        monthly_stats
+        GROUP BY
+        month_num
+        ORDER BY
+        month_num
+        ) t GROUP BY `MONTH`
+        ORDER BY `MONTH`
+    </select>
+
+    <select id="selectSkuSummaryTrial4Detail" resultType="com.zlt.aps.monthplan.api.domain.vo.SkuSummaryTrialProductVo">
+        -- 使用递归 CTE 生成每个月的日期范围
+        WITH RECURSIVE monthly_ranges AS (
+        -- 初始查询，生成 1 月份的日期范围
+        SELECT
+        1 AS month_num,
+        STR_TO_DATE(CONCAT(#{queryDto.year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
+        STR_TO_DATE(CONCAT(#{queryDto.year}, '-01-25'), '%Y-%m-%d') AS end_date
+        UNION ALL
+        -- 递归部分，生成 2 - 12 月的日期范围
+        SELECT
+        month_num + 1,
+        STR_TO_DATE(CONCAT(#{queryDto.year}, '-', LPAD(month_num, 2, '0'), '-26'), '%Y-%m-%d') AS start_date,
+        STR_TO_DATE(CONCAT(#{queryDto.year}, '-', LPAD(month_num + 1, 2, '0'), '-25'), '%Y-%m-%d') AS end_date
+        FROM
+        monthly_ranges
+        WHERE
+        month_num <![CDATA[  <  ]]> 12
+        ),
+        -- 结合日期范围和原始表进行统计
+        monthly_stats AS (
+        SELECT
+        mr.month_num,
+        t.PRODUCT_CODE,
+        COUNT(DISTINCT t.FINISH_DATE) date_count,
+        SUM(t.DAY_FINISH_QTY) DAY_FINISH_QTY
+        FROM
+        monthly_ranges mr
+        LEFT JOIN
+        <include refid="produceFinishTableName"/>
+        t ON t.FINISH_DATE BETWEEN mr.start_date AND mr.end_date
+        LEFT JOIN t_product_construction_info cons ON cons.sap_code = t.PRODUCT_CODE AND cons.del_flag = 0
+        WHERE t.IS_DELETE = 0 AND cons.PRODUCTION_STAGE = '1'
+        GROUP BY
+        mr.month_num, t.PRODUCT_CODE
+        )
+        -- 主查询输出结果
+        SELECT
+        month_num AS `MONTH`,
+        PRODUCT_CODE,
+        SUM(date_count) AS finishDay,
+        SUM(DAY_FINISH_QTY) finishSum
+        FROM
+        monthly_stats
+        GROUP BY
+        month_num,
+        PRODUCT_CODE
+        ORDER BY
+        month_num
+    </select>
+
+    <select id="selectBrandProSizeSummary" resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        SELECT
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+        FROM t_mdm_material_info proInfo
+        WHERE proInfo.IS_DELETE = 0
+        GROUP BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+        ORDER BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectStockBrandProSizeSummary" resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        SELECT
+        COUNT(1) AS stockCount,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE,
+        </if>
+        SUM(IFNULL(stock.STOCK_QTY, 0)) stockQty
+        FROM
+        <include refid="stockTableName"/>
+        stock
+        LEFT JOIN t_mdm_material_info proInfo
+        ON proInfo.IS_DELETE = 0 AND proInfo.PRODUCT_CODE = stock.PRODUCT_CODE
+
+        WHERE stock.IS_DELETE = 0
+        <if test='month == 1'>AND stock.`YEAR` = #{year} - 1 AND stock.`MONTH` = 12</if>
+        <if test='month != 1'>AND stock.`YEAR` = #{year} AND stock.`MONTH` = #{month} - 1</if>
+        AND stock.FACTORY_CODE = #{factoryCode}
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            AND proInfo.BRAND IS NOT NULL
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            AND proInfo.PRO_SIZE IS NOT NULL
+        </if>
+        GROUP BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+        ORDER BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectSalePlanBrandProSizeSummary"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        SELECT
+        COUNT(1) AS salePlanCount,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            salePlan.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            salePlan.PRO_SIZE,
+        </if>
+        SUM(IFNULL(salePlan.PLAN_QTY, 0)) salePlanQty
+        FROM
+        <include refid="salePlanTableName"/>
+        salePlan
+        WHERE salePlan.IS_DELETE = 0 AND salePlan.`YEAR` = #{year} AND salePlan.`MONTH` = #{month} AND
+        salePlan.FACTORY_CODE = #{factoryCode} AND salePlan.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            AND salePlan.BRAND IS NOT NULL
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            AND salePlan.PRO_SIZE IS NOT NULL
+        </if>
+        GROUP BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            salePlan.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            salePlan.PRO_SIZE
+        </if>
+        ORDER BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            salePlan.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            salePlan.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectSaleFinishBrandProSizeSummary"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        SELECT
+        COUNT(1) AS saleFinishCount,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE,
+        </if>
+        SUM(IFNULL(saleFinish.SALE_QTY, 0)) saleFinishQty
+        FROM
+        <include refid="saleFinishTableName"/>
+        saleFinish
+        LEFT JOIN t_mdm_material_info proInfo
+        ON proInfo.IS_DELETE = 0 AND saleFinish.PRODUCT_CODE = proInfo.PRODUCT_CODE
+
+        WHERE saleFinish.IS_DELETE = 0
+        AND saleFinish.`YEAR` = #{year}
+        AND saleFinish.`MONTH` = #{month}
+        AND saleFinish.FACTORY_CODE = #{factoryCode}
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            AND proInfo.BRAND IS NOT NULL
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            AND proInfo.PRO_SIZE IS NOT NULL
+        </if>
+        GROUP BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+        ORDER BY
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectProPlanBrandProSizeSummary"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        SELECT
+        p.PRODUCT_CODE,
+        COUNT(1) AS proPlanCount,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            p.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            p.PRO_SIZE,
+        </if>
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        )AS proPlanQty
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            AND p.BRAND IS NOT NULL
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            AND p.PRO_SIZE IS NOT NULL
+        </if>
+        GROUP BY
+        p.PRODUCT_CODE,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            p.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            p.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectProPlanBrandProSizeSummary4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.PRODUCT_CODE,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            p.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            p.PRO_SIZE,
+        </if>
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        )
+        -- 主查询分组汇总数据
+        SELECT
+        ppd.PRODUCT_CODE,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            ppd.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            ppd.PRO_SIZE,
+        </if>
+        SUM(ppd.day_1_25_sum + ppd.day_26_31_sum) AS proPlanQty
+        FROM
+        preprocessed_data ppd
+        GROUP BY
+        ppd.PRODUCT_CODE,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            ppd.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            ppd.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectProFinishBrandProSizeSummary"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+        SELECT proFinish.PRODUCT_CODE,
+        COUNT(1) AS proFinishCount,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND,
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE,
+        </if>
+        SUM(IFNULL(proFinish.DAY_FINISH_QTY, 0)) AS proFinishQty
+        FROM
+        <include refid="produceFinishTableName"/>
+        proFinish
+        LEFT JOIN t_mdm_material_info proInfo
+        ON proInfo.FACTORY_CODE = proFinish.FACTORY_CODE AND proFinish.PRODUCT_CODE = proInfo.PRODUCT_CODE AND
+        proInfo.IS_DELETE = 0
+        WHERE proFinish.IS_DELETE = 0
+        AND proFinish.FACTORY_CODE = #{factoryCode}
+        AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        proFinish.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        proFinish.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            AND proInfo.BRAND IS NOT NULL
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            AND proInfo.PRO_SIZE IS NOT NULL
+        </if>
+        GROUP BY proFinish.PRODUCT_CODE,
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
+            proInfo.BRAND
+        </if>
+        <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "2"'>
+            proInfo.PRO_SIZE
+        </if>
+    </select>
+
+    <select id="selectBaseClassificationList" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+        SELECT proInfo.PRODUCT_CODE,
+        proInfo.BRAND,
+        proInfo.PRO_SIZE,
+        mlc.LOCATION_TYPE,
+        mlc.CHANNEL
+        FROM t_mdm_material_info proInfo
+        LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0
+        AND proInfo.BRAND = mlc.BRAND
+        WHERE proInfo.IS_DELETE = 0
+        <if test="brand != null and brand != ''">AND proInfo.BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND proInfo.PRO_SIZE = #{proSize}</if>
+        <if test="locationType != null and locationType != ''">AND mlc.LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''">AND mlc.CHANNEL = #{channel}</if>
+    </select>
+
+    <select id="selectSalePlanClassification" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+        SELECT PRODUCT_CODE,
+        BRAND,
+        PRO_SIZE,
+        LOCATION_TYPE,
+        CHANNEL,
+        SUM(PLAN_QTY) salePlanQty,
+        count(1) AS saleSkuCount
+        FROM
+        <include refid="salePlanTableName"/>
+        WHERE `YEAR` = #{year}
+        AND `MONTH` = #{month}
+        AND FACTORY_CODE = #{factoryCode}
+        AND MONTH_PLAN_VERSION = #{monthPlanVersion}
+        <if test="brand != null and brand != ''">AND BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND PRO_SIZE = #{proSize}</if>
+        <if test="locationType != null and locationType != ''">AND LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''">AND CHANNEL = #{channel}</if>
+        GROUP BY PRODUCT_CODE,
+        BRAND,
+        PRO_SIZE,
+        LOCATION_TYPE,
+        CHANNEL
+    </select>
+
+    <select id="selectProPlanClassification" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+        SELECT
+        p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL,
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ) AS producePlanQty,
+        COUNT(DISTINCT p.PRODUCT_CODE) AS produceSkuCount
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        <if test="brand != null and brand != ''">AND p.BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND p.PRO_SIZE = #{proSize}</if>
+        <if test="locationType != null and locationType != ''">AND p.LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''">AND p.CHANNEL = #{channel}</if>
+        GROUP BY p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL
+    </select>
+
+    <select id="selectProPlanClassification4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL,
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        <if test="brand != null and brand != ''">AND p.BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND p.PRO_SIZE = #{proSize}</if>
+        <if test="locationType != null and locationType != ''">AND p.LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''">AND p.CHANNEL = #{channel}</if>
+        )
+        -- 主查询分组汇总数据
+        SELECT
+        ppd.PRODUCT_CODE,
+        ppd.BRAND,
+        ppd.PRO_SIZE,
+        ppd.LOCATION_TYPE,
+        ppd.CHANNEL,
+        COUNT(DISTINCT ppd.PRODUCT_CODE) AS produceSkuCount,
+        SUM(ppd.day_1_25_sum + ppd.day_26_31_sum) AS producePlanQty
+        FROM
+        preprocessed_data ppd
+        GROUP BY ppd.PRODUCT_CODE,
+        ppd.BRAND,
+        ppd.PRO_SIZE,
+        ppd.LOCATION_TYPE,
+        ppd.CHANNEL
+    </select>
+
+    <select id="selectStockClassification" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+        SELECT stock.PRODUCT_CODE,
+        proInfo.BRAND,
+        proInfo.PRO_SIZE,
+        stock.LOCATION_TYPE,
+        mlc.CHANNEL,
+        stock.STOCK_QTY stockQty
+        FROM
+        <include refid="stockTableName"/>
+        stock
+        LEFT JOIN t_mdm_material_info proInfo ON proInfo.IS_DELETE = 0
+        AND stock.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0
+        AND stock.LOCATION_TYPE = mlc.LOCATION_TYPE
+        AND proInfo.BRAND = mlc.BRAND
+        WHERE
+        <if test='month == 1'>stock.`YEAR` = #{year} - 1 AND stock.`MONTH` = 12</if>
+        <if test='month != 1'>stock.`YEAR` = #{year} AND stock.`MONTH` = #{month} - 1</if>
+        <if test="brand != null and brand != ''">AND proInfo.BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''">AND proInfo.PRO_SIZE = #{proSize}</if>
+        <if test="locationType != null and locationType != ''">AND stock.LOCATION_TYPE = #{locationType}</if>
+        <if test="channel != null and channel != ''">AND mlc.CHANNEL = #{channel}</if>
+        AND stock.FACTORY_CODE = #{factoryCode}
+    </select>
+
+    <select id="selectBaseTireTypeSatisfyRateList4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+        SELECT proInfo.PRODUCT_CODE,
+               proInfo.PRODUCT_DESC,
+               proInfo.PRO_SIZE,
+               proInfo.BRAND,
+               proInfo.TIRE_TYPE,
+               proInfo.PATTERN,
+               mlc.LOCATION_TYPE,
+               mlc.CHANNEL,
+               CASE WHEN IFNULL(proPlan.qty, 0) = 0 THEN 0 ELSE 1 end       produceSkuCount,
+               proPlan.qty       AS                                         producePlanQty,
+               proPlan.notSatisfiedReason,
+               CASE WHEN IFNULL(salePlan.PLAN_QTY, 0) = 0 THEN 0 ELSE 1 end saleSkuCount,
+               salePlan.PLAN_QTY AS                                         salePlanQty,
+               CASE WHEN IFNULL(stock.STOCK_QTY, 0) = 0 THEN 0 ELSE 1 end   stockSkuCount,
+               stock.STOCK_QTY
+        FROM t_mdm_material_info proInfo
+                 LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0 AND proInfo.BRAND = mlc.BRAND
+                 LEFT JOIN (
+            -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+            WITH preprocessed_data AS (SELECT p.PRODUCT_CODE,
+                                              p.BRAND,
+                                              p.PRO_SIZE,
+                                              p.LOCATION_TYPE,
+                                              p.CHANNEL,
+                                              p.REASON,
+                                              -- 计算 1 - 25 日的总和
+                                              CASE
+                                                  WHEN
+                                                      p.YEAR = #{year} AND p.MONTH = #{month} THEN
+                                                      IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) +
+                                                      IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+                                                      IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) +
+                                                      IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+                                                      IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) +
+                                                      IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+                                                      IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) +
+                                                      IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+                                                      IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) +
+                                                      IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+                                                  ELSE 0
+                                                  END AS day_1_25_sum,
+                                              -- 计算 26 - 31 日的总和
+                                              CASE
+                                                  WHEN
+                                                      (
+                                                          (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+                                                              OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+                                                          ) THEN
+                                                      IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) +
+                                                      IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+                                                      IFNULL(p.DAY_31, 0)
+                                                  ELSE 0
+                                                  END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+                                       WHERE (
+                                           (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+                                               OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+                                           )
+                                         AND p.FACTORY_CODE = #{factoryCode}
+                                         AND p.IS_DELETE = 0)
+            -- 主查询分组汇总数据
+            SELECT ppd.PRODUCT_CODE,
+                   ppd.BRAND,
+                   ppd.PRO_SIZE,
+                   ppd.LOCATION_TYPE,
+                   ppd.CHANNEL,
+                   GROUP_CONCAT(DISTINCT ppd.REASON ORDER BY PRODUCT_CODE) AS notSatisfiedReason,
+                   COUNT(DISTINCT ppd.PRODUCT_CODE)                        AS count,
+                   SUM(ppd.day_1_25_sum + ppd.day_26_31_sum)               AS qty
+
+            FROM preprocessed_data ppd
+            GROUP BY ppd.PRODUCT_CODE,
+                     ppd.BRAND,
+                     ppd.PRO_SIZE,
+                     ppd.LOCATION_TYPE,
+                     ppd.CHANNEL) proPlan ON proPlan.PRODUCT_CODE = proInfo.PRODUCT_CODE
+            AND mlc.LOCATION_TYPE = proPlan.LOCATION_TYPE AND mlc.CHANNEL = proPlan.CHANNEL
+
+        LEFT JOIN
+        <include refid="salePlanTableName"/>
+        salePlan
+                           ON proInfo.PRODUCT_CODE = salePlan.PRODUCT_CODE AND salePlan.IS_DELETE = 0
+                               AND mlc.LOCATION_TYPE = salePlan.LOCATION_TYPE AND mlc.CHANNEL = salePlan.CHANNEL
+                               AND salePlan.`YEAR` = #{year} AND salePlan.`MONTH` = #{month}
+                               AND salePlan.MONTH_PLAN_VERSION = #{monthPlanVersion}
+                 LEFT JOIN (SELECT PRODUCT_CODE, LOCATION_TYPE, SUM(STOCK_QTY) STOCK_QTY
+        FROM
+        <include refid="stockTableName"/>
+                            WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+                              AND FACTORY_CODE = #{factoryCode}
+                            GROUP BY PRODUCT_CODE, LOCATION_TYPE) stock ON stock.PRODUCT_CODE = proInfo.PRODUCT_CODE
+            AND stock.LOCATION_TYPE = mlc.LOCATION_TYPE
+        WHERE proInfo.IS_DELETE = 0
+          AND (proPlan.qty > 0 OR salePlan.PLAN_QTY > 0 OR stock.STOCK_QTY > 0)
+    </select>
+
+    <select id="selectBaseTireTypeSatisfyRateList"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+        SELECT proInfo.PRODUCT_CODE,
+        proInfo.PRODUCT_DESC,
+        proInfo.PRO_SIZE,
+        proInfo.BRAND,
+        proInfo.TIRE_TYPE,
+        proInfo.PATTERN,
+        mlc.LOCATION_TYPE,
+        mlc.CHANNEL,
+        CASE WHEN IFNULL(proPlan.qty, 0) = 0 THEN 0 ELSE 1 end produceSkuCount,
+        proPlan.qty AS producePlanQty,
+        proPlan.notSatisfiedReason,
+        CASE WHEN IFNULL(salePlan.PLAN_QTY, 0) = 0 THEN 0 ELSE 1 end saleSkuCount,
+        salePlan.PLAN_QTY AS salePlanQty,
+        CASE WHEN IFNULL(stock.STOCK_QTY, 0) = 0 THEN 0 ELSE 1 end stockSkuCount,
+        stock.STOCK_QTY
+        FROM t_mdm_material_info proInfo
+        LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0 AND proInfo.BRAND = mlc.BRAND
+        LEFT JOIN (SELECT p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL,
+        p.REASON,
+        SUM(
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) +
+        IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) +
+        IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) +
+        IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) +
+        IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) +
+        IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) +
+        IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ) AS qty,
+        GROUP_CONCAT(DISTINCT p.REASON ORDER BY PRODUCT_CODE) AS notSatisfiedReason,
+        COUNT(DISTINCT p.PRODUCT_CODE) AS count
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        GROUP BY p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL
+        ) proPlan ON proPlan.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        AND mlc.LOCATION_TYPE = proPlan.LOCATION_TYPE AND mlc.CHANNEL = proPlan.CHANNEL
+
+        LEFT JOIN
+        <include refid="salePlanTableName"/>
+        salePlan
+        ON proInfo.PRODUCT_CODE = salePlan.PRODUCT_CODE AND salePlan.IS_DELETE = 0
+        AND mlc.LOCATION_TYPE = salePlan.LOCATION_TYPE AND mlc.CHANNEL = salePlan.CHANNEL
+        AND salePlan.`YEAR` = #{year} AND salePlan.`MONTH` = #{month}
+        AND salePlan.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        LEFT JOIN (SELECT PRODUCT_CODE, LOCATION_TYPE, SUM(STOCK_QTY) STOCK_QTY
+        FROM
+        <include refid="stockTableName"/>
+        WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY PRODUCT_CODE, LOCATION_TYPE) stock ON stock.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        AND stock.LOCATION_TYPE = mlc.LOCATION_TYPE
+        WHERE proInfo.IS_DELETE = 0
+        AND (proPlan.qty > 0 OR salePlan.PLAN_QTY > 0 OR stock.STOCK_QTY > 0)
+    </select>
+
+    <select id="selectProPlan4TireTypeSatisfyRate"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @factoryCode = #{factoryCode};
+
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (SELECT p.PRODUCT_CODE,
+                                          p.PRODUCT_DESC,
+                                          p.BRAND,
+                                          p.PRO_SIZE,
+                                          p.LOCATION_TYPE,
+                                          p.CHANNEL,
+                                          p.PATTERN,
+                                          p.REASON,
+                                          proInfo.TIRE_TYPE,
+                                          -- 计算 1 - 25 日的总和
+                                          CASE
+                                              WHEN
+                                                  p.YEAR = @targetYear AND p.MONTH = @targetMonth THEN
+                                                  IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) +
+                                                  IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+                                                  IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) +
+                                                  IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+                                                  IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) +
+                                                  IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+                                                  IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) +
+                                                  IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+                                                  IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) +
+                                                  IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+                                              ELSE 0
+                                              END AS day_1_25_sum,
+                                          -- 计算 26 - 31 日的总和
+                                          CASE
+                                              WHEN
+                                                  (
+                                                      (@targetMonth = 1 AND p.YEAR = @targetYear - 1 AND p.MONTH = 12)
+                                                          OR (p.YEAR = @targetYear AND p.MONTH = @targetMonth - 1)
+                                                      ) THEN
+                                                  IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) +
+                                                  IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+                                                  IFNULL(p.DAY_31, 0)
+                                              ELSE 0
+                                              END AS day_26_31_sum
+                                   FROM T_MP_MONTH_PLAN_PROD_FINAL p
+                                            LEFT JOIN t_mdm_material_info proInfo
+                                                      ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
+                                                          AND proInfo.FACTORY_CODE = @factoryCode
+                                   WHERE (
+                                       (p.YEAR = @targetYear AND p.MONTH IN (@targetMonth, @targetMonth - 1))
+                                           OR (@targetMonth = 1 AND p.YEAR = @targetYear - 1 AND p.MONTH = 12)
+                                       )
+                                     AND p.FACTORY_CODE = @factoryCode
+                                     AND p.IS_DELETE = 0)
+        -- 主查询分组汇总数据
+        SELECT ppd.PRODUCT_CODE,
+               ppd.PRODUCT_DESC,
+               ppd.BRAND,
+               ppd.PRO_SIZE,
+               ppd.LOCATION_TYPE,
+               ppd.CHANNEL,
+               ppd.PATTERN,
+               ppd.TIRE_TYPE,
+               ppd.REASON                                                                                 AS notSatisfiedReason,
+               CASE
+                   WHEN IFNULL(ppd.day_1_25_sum, 0) + IFNULL(ppd.day_26_31_sum, 0) > 0 THEN 1
+                   ELSE 0 END                                                                             AS produceSkuCount,
+               IFNULL(ppd.day_1_25_sum, 0) + IFNULL(ppd.day_26_31_sum, 0)                                 AS producePlanQty
+
+        FROM preprocessed_data ppd
+    </select>
+
+    <select id="selectSalePlan4TireTypeSatisfyRate"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @factoryCode = #{factoryCode};
+        SET @monthPlanVersion = #{monthPlanVersion};
+
+        SELECT
+        p.PRODUCT_CODE,
+        p.PRODUCT_DESC,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL,
+        p.PATTERN,
+        proInfo.TIRE_TYPE,
+        CASE WHEN IFNULL(p.PLAN_QTY, 0) > 0 THEN 1 ELSE 0 END AS saleSkuCount,
+        IFNULL(p.PLAN_QTY, 0) AS salePlanQty
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        LEFT JOIN t_mdm_material_info proInfo ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        AND proInfo.FACTORY_CODE = @factoryCode
+        WHERE
+        p.YEAR = @targetYear
+        AND p.MONTH = @targetMonth
+        AND p.FACTORY_CODE = @factoryCode
+        AND p.MONTH_PLAN_VERSION = @monthPlanVersion
+        AND p.IS_DELETE = 0
+    </select>
+
+    <select id="selectStock4TireTypeSatisfyRate"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT
+        p.PRODUCT_CODE,
+        p.PRODUCT_DESC,
+        p.LOCATION_TYPE,
+        proInfo.BRAND,
+        proInfo.PRO_SIZE,
+        proInfo.PATTERN,
+        proInfo.TIRE_TYPE,
+        mlc.LOCATION_TYPE,
+        CASE WHEN IFNULL(p.STOCK_QTY, 0) > 0 THEN 1 ELSE 0 END AS stockSkuCount,
+        IFNULL(p.STOCK_QTY, 0) AS stockQty
+        FROM
+        <include refid="stockTableName"/>
+        p
+        LEFT JOIN t_mdm_material_info proInfo ON p.PRODUCT_CODE = proInfo.PRODUCT_CODE
+        AND proInfo.FACTORY_CODE = @factoryCode
+        LEFT JOIN T_MDM_LOCATION_CHANNEL mlc ON mlc.IS_DELETE = 0 AND proInfo.BRAND = mlc.BRAND
+        WHERE p.IS_DELETE = 0
+        <if test='month == 1'>AND p.`YEAR` = @targetYear - 1 AND p.`MONTH` = 12</if>
+        <if test='month != 1'>AND p.`YEAR` = @targetYear AND p.`MONTH` = @targetMonth - 1</if>
+        AND p.FACTORY_CODE = @factoryCode
+    </select>
+
+    <select id="selectSingleMouldProductCodeList" resultType="java.lang.String">
+        SELECT DISTINCT PRODUCT_CODE
+        FROM T_MDM_PRODUCT_MODEL_RELATION
+        GROUP BY PRODUCT_CODE, SPEC_CODE
+        HAVING COUNT(1) = 1
+    </select>
+
+    <select id="selectSingleMouldList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeSingleMouldVo">
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (SELECT p.MOULD_CODE,
+                                          p.PRODUCT_CODE,
+                                          p.REASON,
+                                          p.MONTH_PLAN_ID,
+                                          reqPlan.ORDER_NO,
+                                          -- 计算 1 - 25 日的总和
+                                          CASE
+                                              WHEN
+                                                  p.YEAR = #{year} AND p.MONTH = #{month} THEN
+                                                  IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) +
+                                                  IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+                                                  IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) +
+                                                  IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+                                                  IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) +
+                                                  IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+                                                  IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) +
+                                                  IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+                                                  IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) +
+                                                  IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+                                              ELSE 0
+                                              END AS day_1_25_sum,
+                                          -- 计算 26 - 31 日的总和
+                                          CASE
+                                              WHEN
+                                                  (
+                                                      (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+                                                          OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+                                                      ) THEN
+                                                  IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) +
+                                                  IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+                                                  IFNULL(p.DAY_31, 0)
+                                              ELSE 0
+                                              END AS day_26_31_sum
+                                   FROM t_mp_month_plan_prod_detail_final p
+                                            LEFT JOIN T_MP_PRODUCT_REQUIRE_PLAN reqPlan
+                                                      ON p.MONTH_PLAN_ID = reqPlan.ID
+                                   WHERE (
+                                       (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+                                           OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+                                       )
+                                     AND p.FACTORY_CODE = #{factoryCode}
+                                     AND p.IS_DELETE = 0)
+        -- 主查询分组汇总数据
+        SELECT ppd.MOULD_CODE,
+               ppd.PRODUCT_CODE,
+               GROUP_CONCAT(reason ORDER BY reason SEPARATOR ',')     AS reason,
+               GROUP_CONCAT(ORDER_NO ORDER BY ORDER_NO SEPARATOR ',') AS ORDER_NO,
+               COUNT(1)                                               AS count,
+               SUM(ppd.day_1_25_sum + ppd.day_26_31_sum)              AS qty
+        FROM preprocessed_data ppd
+        GROUP BY ppd.MOULD_CODE,
+                 ppd.PRODUCT_CODE
+        HAVING COUNT(1) = 1
+    </select>
+
+    <select id="selectOrderPlanAllocationByOrderNo"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeSingleMouldVo">
+        SELECT count(1) count,
+        SUM(PLAN_QTY) qty
+        FROM
+        <include refid="salePlanTableName"/>
+        WHERE IS_DELETE = 0
+        AND `YEAR` = #{queryDto.year}
+        AND `MONTH` = #{queryDto.month}
+        AND MONTH_PLAN_VERSION = #{queryDto.monthPlanVersion}
+        <if test="orderNoList != null">
+            AND ORDER_NO IN
+            <foreach collection="orderNoList" item="orderNo" separator=",">
+                #{orderNo}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="selectCxScheduleResultQty" resultType="com.zlt.aps.monthplan.api.domain.vo.CxScheduleResultReportVo">
+        SELECT cxResult.SAP_CODE,
+               cxResult.SPEC_DIMENSION proSize,
+               SUM(
+                       IFNULL(cxResult.CLASS1_PLAN_QTY, 0) +
+                       IFNULL(cxResult.CLASS2_PLAN_QTY, 0) +
+                       IFNULL(cxResult.CLASS3_PLAN_QTY, 0) +
+                       IFNULL(cxResult.CLASS4_PLAN_QTY, 0) +
+                       IFNULL(cxResult.CLASS5_PLAN_QTY, 0) +
+                       IFNULL(cxResult.CLASS6_PLAN_QTY, 0)
+               )                       qty
+        FROM (SELECT PRODUCT_CODE, SPEC_CODE FROM T_MDM_PRODUCT_MODEL_RELATION GROUP BY PRODUCT_CODE, SPEC_CODE) pmr
+                 LEFT JOIN T_MDM_PRODUCT_CONSTRUCTION pc
+                           ON pc.IS_DELETE = 0 AND pmr.PRODUCT_CODE = pc.PRODUCT_CODE AND pmr.SPEC_CODE = pc.SPEC_CODE
+                 LEFT JOIN T_CX_SCHEDULE_RESULT cxResult ON cxResult.IS_DELETE = 0
+            AND cxResult.EMBRYO_CODE = pc.EMBRYO_CODE AND cxResult.BOM_DATA_VERSION = pc.BOM_VERSION
+            AND YEAR(cxResult.SCHEDULE_DATE) = #{year} AND MONTH(cxResult.SCHEDULE_DATE) = #{month}
+        WHERE cxResult.SAP_CODE IS NOT NULL
+
+        GROUP BY cxResult.SAP_CODE, cxResult.SPEC_DIMENSION
+    </select>
+
+    <select id="selectConstructionReal" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeConstructionRealVo">
+        SELECT proModelRel.PRODUCT_CODE,
+               proModelRel.SPEC_CODE,
+               proCon.EMBRYO_CODE,
+               proCon.BOM_VERSION,
+               cons.tread_rubber_category AS treadCode
+        FROM (SELECT PRODUCT_CODE, SPEC_CODE
+              FROM T_MDM_PRODUCT_MODEL_RELATION
+              GROUP BY PRODUCT_CODE, SPEC_CODE) proModelRel
+                 LEFT JOIN t_mdm_product_construction proCon ON proCon.IS_DELETE = 0
+            AND proModelRel.PRODUCT_CODE = proCon.PRODUCT_CODE AND proModelRel.SPEC_CODE = proCon.SPEC_CODE
+                 LEFT JOIN t_product_construction_info cons ON cons.del_flag = 0
+            AND proCon.EMBRYO_CODE = cons.EMBRYO_CODE AND proCon.BOM_VERSION = cons.embryo_version
+        WHERE cons.TREAD_CODE IS NOT NULL
+    </select>
+
+    <select id="selectTireTypeProduceList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationAllVo">
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (SELECT p.PRODUCT_CODE,
+        p.MONTH_PLAN_ID,
+        p.PRODUCTION_VERSION,
+        p.LOCATION_TYPE,
+        p.BRAND,
+        p.CHANNEL,
+        p.IS_IMPORT,
+        p.SPEC_CODE,
+        p.DELIVERY_DATE_DUE,
+        reqPlan.ORDER_NO,
+        stock.STOCK_QTY,
+        -- 计算 1 - 25 日的总和
+        CASE
+        WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) +
+        IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) +
+        IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) +
+        IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) +
+        IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) +
+        IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE
+        WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) +
+        IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM t_mp_month_plan_prod_detail_final p
+        LEFT JOIN T_MP_PRODUCT_REQUIRE_PLAN reqPlan
+        ON p.MONTH_PLAN_ID = reqPlan.ID
+        LEFT JOIN (
+        SELECT PRODUCT_CODE,
+        SUM(STOCK_QTY) STOCK_QTY FROM
+        <include refid="stockTableName"/>
+        WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY PRODUCT_CODE
+        ) stock ON stock.PRODUCT_CODE = p.PRODUCT_CODE
+        WHERE (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        <if test='hasOrder != null and hasOrder == "1"'>AND p.CHANNEL IS NOT NULL</if>
+        <if test='hasOrder != null and hasOrder == "0"'>AND p.CHANNEL IS NULL</if>
+        <if test='channel != null and channel != ""'>AND p.CHANNEL = #{channel}</if>
+        <if test='hasNoProduce != null and hasNoProduce == "2"'>
+            AND NOT EXISTS(
+            SELECT 1 FROM T_MP_PROC_NO_PRODUCTION_PLAN noProduct
+            WHERE noProduct.IS_DELETE = 0 AND p.MONTH_PLAN_ID = noProduct.MONTH_PLAN_ID
+            )
+        </if>
+        <if test='isDebitPlan != null and isDebitPlan != ""'>AND p.IS_DEBIT_PLAN = #{isDebitPlan}</if>
+        <if test='isStockUp != null and isStockUp != ""'>AND p.IS_STOCK_UP = #{isStockUp}</if>
+        )
+        -- 主查询分组汇总数据
+        SELECT ppd.PRODUCT_CODE,
+        ppd.MONTH_PLAN_ID,
+        ppd.PRODUCTION_VERSION,
+        ppd.LOCATION_TYPE,
+        ppd.BRAND,
+        ppd.CHANNEL,
+        ppd.IS_IMPORT,
+        ppd.SPEC_CODE,
+        ppd.DELIVERY_DATE_DUE,
+        ppd.STOCK_QTY,
+        CASE WHEN IFNULL(ppd.STOCK_QTY, 0) > 0 THEN 1 ELSE 0 END stock_sku_count,
+        ORDER_NO AS ORDER_NO,
+        CASE WHEN ppd.day_1_25_sum + ppd.day_26_31_sum > 0 THEN 1 ELSE 0 END AS produceSkuCount,
+        ppd.day_1_25_sum + ppd.day_26_31_sum AS produceQty
+        FROM preprocessed_data ppd
+    </select>
+
+    <select id="selectTireTypeNoProduceList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationVo">
+        SELECT
+        noProduce.PRODUCT_CODE,
+        noProduce.FACT_PROD_REQ_QTY AS totalSalePlanQty,
+        IFNULL(noProduce.FACT_PROD_REQ_QTY, 0) - IFNULL(noProduce.UN_PRODUCTION_QTY, 0) AS produceQty,
+        noProduce.REASON,
+        CASE WHEN FACT_PROD_REQ_QTY > 0 THEN 1 ELSE 0 END AS saleSkuCount,
+        CASE WHEN IFNULL(noProduce.FACT_PROD_REQ_QTY, 0) - IFNULL(noProduce.UN_PRODUCTION_QTY, 0) > 0 THEN 1 ELSE 0 END
+        AS produceSkuCount,
+        stock.STOCK_QTY
+        FROM t_mp_proc_no_production_plan noProduce
+        LEFT JOIN T_MP_PRODUCT_REQUIRE_PLAN reqPlan ON reqPlan.IS_DELETE = 0 AND noProduce.MONTH_PLAN_ID = reqPlan.ID
+        LEFT JOIN (
+        SELECT PRODUCT_CODE,
+        SUM(STOCK_QTY) STOCK_QTY FROM
+        <include refid="stockTableName"/>
+        WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY PRODUCT_CODE
+        ) stock ON stock.PRODUCT_CODE = noProduce.PRODUCT_CODE
+
+        WHERE noProduce.IS_DELETE = 0
+        AND noProduce.`YEAR` = #{year}
+        AND noProduce.`MONTH` = #{month}
+        AND noProduce.FACTORY_CODE = #{factoryCode}
+        AND noProduce.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        <if test='hasOrder != null and hasOrder == "1"'>AND noProduce.CHANNEL IS NOT NULL</if>
+        <if test='hasOrder != null and hasOrder == "0"'>AND noProduce.CHANNEL IS NULL</if>
+        <if test='channel != null and channel != ""'>AND noProduce.CHANNEL = #{channel}</if>
+        <if test='hasNoProduce != null and hasNoProduce == "1"'>AND noProduce.UN_PRODUCTION_QTY =
+            noProduce.FACT_PROD_REQ_QTY
+        </if>
+        <if test='hasNoProduce != null and hasNoProduce == "0"'>AND noProduce.UN_PRODUCTION_QTY !=
+            noProduce.FACT_PROD_REQ_QTY
+        </if>
+        AND (noProduce.UN_PRODUCTION_QTY != 0 OR noProduce.FACT_PROD_REQ_QTY != 0)
+    </select>
+
+    <select id="selectTireTypeStockSatisfiedList"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationVo">
+        SELECT
+        planAllocation.PRODUCT_CODE,
+        planAllocation.PLAN_QTY AS totalSalePlanQty,
+        CASE WHEN IFNULL(PLAN_QTY, 0) > 0 THEN 1 ELSE 0 END AS saleSkuCount,
+        CASE WHEN IFNULL(stock.STOCK_QTY, 0) > 0 THEN 1 ELSE 0 END AS stockSkuCount,
+        stock.STOCK_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        planAllocation
+        LEFT JOIN (
+        SELECT PRODUCT_CODE,
+        SUM(STOCK_QTY) STOCK_QTY FROM
+        <include refid="stockTableName"/>
+        WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY PRODUCT_CODE
+        ) stock ON stock.PRODUCT_CODE = planAllocation.PRODUCT_CODE
+
+        WHERE planAllocation.IS_DELETE = 0
+        AND planAllocation.`YEAR` = #{year}
+        AND planAllocation.`MONTH` = #{month}
+        AND planAllocation.FACTORY_CODE = #{factoryCode}
+        AND planAllocation.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND planAllocation.PRODUCE_QTY_DUE = 0
+        <if test='channel != null and channel != ""'>AND planAllocation.CHANNEL = #{channel}</if>
+    </select>
+
+    <select id="selectTireTypeTrialList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationVo">
+        SELECT
+        proPlanInit.PRODUCT_CODE,
+        proPlanInit.FACT_PROD_REQ_QTY AS totalSalePlanQty,
+        CASE WHEN IFNULL(FACT_PROD_REQ_QTY, 0) > 0 THEN 1 ELSE 0 END AS saleSkuCount,
+        stock.STOCK_QTY
+        FROM T_MP_PROC_MONTH_PLAN_INIT proPlanInit
+        LEFT JOIN (
+        SELECT PRODUCT_CODE,
+        SUM(STOCK_QTY) STOCK_QTY FROM
+        <include refid="stockTableName"/>
+        WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+        AND FACTORY_CODE = #{factoryCode}
+        GROUP BY PRODUCT_CODE
+        ) stock ON stock.PRODUCT_CODE = proPlanInit.PRODUCT_CODE
+
+        WHERE proPlanInit.IS_DELETE = 0
+        AND proPlanInit.`YEAR` = #{year}
+        AND proPlanInit.`MONTH` = #{month}
+        AND proPlanInit.FACTORY_CODE = #{factoryCode}
+        AND proPlanInit.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND proPlanInit.CONSTRUCTION_STAGE IN(0, 1, 2)
+        <if test='channel != null and channel != ""'>AND proPlanInit.CHANNEL = #{channel}</if>
+    </select>
+
+    <select id="selectProPlanProSizeLocationTypeWeight"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.ProduceSalePlanVo">
+        SELECT CHANNEL,
+               PRO_SIZE,
+               SUM(IFNULL(DAY_1, 0))  AS DAY_1,
+               SUM(IFNULL(DAY_2, 0))  AS DAY_2,
+               SUM(IFNULL(DAY_3, 0))  AS DAY_3,
+               SUM(IFNULL(DAY_4, 0))  AS DAY_4,
+               SUM(IFNULL(DAY_5, 0))  AS DAY_5,
+               SUM(IFNULL(DAY_6, 0))  AS DAY_6,
+               SUM(IFNULL(DAY_7, 0))  AS DAY_7,
+               SUM(IFNULL(DAY_8, 0))  AS DAY_8,
+               SUM(IFNULL(DAY_9, 0))  AS DAY_9,
+               SUM(IFNULL(DAY_10, 0)) AS DAY_10,
+               SUM(IFNULL(DAY_11, 0)) AS DAY_11,
+               SUM(IFNULL(DAY_12, 0)) AS DAY_12,
+               SUM(IFNULL(DAY_13, 0)) AS DAY_13,
+               SUM(IFNULL(DAY_14, 0)) AS DAY_14,
+               SUM(IFNULL(DAY_15, 0)) AS DAY_15,
+               SUM(IFNULL(DAY_16, 0)) AS DAY_16,
+               SUM(IFNULL(DAY_17, 0)) AS DAY_17,
+               SUM(IFNULL(DAY_18, 0)) AS DAY_18,
+               SUM(IFNULL(DAY_19, 0)) AS DAY_19,
+               SUM(IFNULL(DAY_20, 0)) AS DAY_20,
+               SUM(IFNULL(DAY_21, 0)) AS DAY_21,
+               SUM(IFNULL(DAY_22, 0)) AS DAY_22,
+               SUM(IFNULL(DAY_23, 0)) AS DAY_23,
+               SUM(IFNULL(DAY_24, 0)) AS DAY_24,
+               SUM(IFNULL(DAY_25, 0)) AS DAY_25,
+               SUM(IFNULL(DAY_26, 0)) AS DAY_26,
+               SUM(IFNULL(DAY_27, 0)) AS DAY_27,
+               SUM(IFNULL(DAY_28, 0)) AS DAY_28,
+               SUM(IFNULL(DAY_29, 0)) AS DAY_29,
+               SUM(IFNULL(DAY_30, 0)) AS DAY_30,
+               SUM(IFNULL(DAY_31, 0)) AS DAY_31
+        FROM
+        <include refid="producePlanTableName"/>
+        WHERE IS_DELETE = 0
+          AND `YEAR` = #{year}
+          AND `MONTH` = #{month}
+          AND FACTORY_CODE = #{factoryCode}
+        GROUP BY CHANNEL,
+                 PRO_SIZE
+    </select>
+
+    <select id="selectSalePlanProSizeLocationTypeWeight"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.ProduceSalePlanResultVo">
+        SELECT proSizeWeight.PRO_SIZE,
+               proSizeWeight.CHANNEL,
+               proSizeWeight.SINGLE_TIRE_WEIGHT,
+               SUM(IFNULL(salePlan.PLAN_QTY, 0))                                               monthSaleQty,
+               SUM(IFNULL(salePlan.PLAN_QTY, 0) * IFNULL(proSizeWeight.SINGLE_TIRE_WEIGHT, 0)) monthSaleWeight
+        FROM t_mdm_pro_size_weight proSizeWeight
+        LEFT JOIN
+        (
+        SELECT PRO_SIZE, CHANNEL, PLAN_QTY
+        FROM
+        <include refid="salePlanTableName"/>
+        WHERE IS_DELETE = 0
+        AND `YEAR` = #{year}
+        AND `MONTH` = #{month}
+        AND FACTORY_CODE = #{factoryCode}
+        AND MONTH_PLAN_VERSION = #{monthPlanVersion}
+        UNION ALL
+        SELECT PRO_SIZE, `CHANNEL`, NEED_QTY
+        FROM t_mp_month_plan_adjust_notice
+        WHERE IS_DELETE = 0
+        AND `STATUS` = 3
+        AND `YEAR` = #{year}
+        AND `MONTH` = #{month}
+        ) salePlan ON salePlan.PRO_SIZE = proSizeWeight.PRO_SIZE AND salePlan.CHANNEL = proSizeWeight.CHANNEL
+        WHERE proSizeWeight.IS_DELETE = 0
+        GROUP BY proSizeWeight.PRO_SIZE,
+                 proSizeWeight.CHANNEL,
+                 proSizeWeight.SINGLE_TIRE_WEIGHT
+        ORDER BY proSizeWeight.CHANNEL,
+                 proSizeWeight.PRO_SIZE
+    </select>
+
+    <select id="selectProductStockMonth" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
+        SELECT *
+        FROM
+        <include refid="stockTableName"/>
+        WHERE IS_DELETE = 0
+        <if test='month == 1'>AND `YEAR` = #{year} - 1 AND `MONTH` = 12</if>
+        <if test='month != 1'>AND `YEAR` = #{year} AND `MONTH` = #{month} - 1</if>
+          AND FACTORY_CODE = #{factoryCode}
+    </select>
+
+    <select id="selectProPlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation">
+        SELECT
+        p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL,
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0) +
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0) AS qty
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE p.YEAR = #{year} AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+    </select>
+
+    <select id="selectProPlanList4AccountingPeriod"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation">
+        -- 使用 CTE 提前计算每个记录的不同日期范围的总和
+        WITH preprocessed_data AS (
+        SELECT
+        p.PRODUCT_CODE,
+        p.BRAND,
+        p.PRO_SIZE,
+        p.LOCATION_TYPE,
+        p.CHANNEL,
+        -- 计算 1 - 25 日的总和
+        CASE WHEN
+        p.YEAR = #{year} AND p.MONTH = #{month} THEN
+        IFNULL(p.DAY_1, 0) + IFNULL(p.DAY_2, 0) + IFNULL(p.DAY_3, 0) + IFNULL(p.DAY_4, 0) + IFNULL(p.DAY_5, 0) +
+        IFNULL(p.DAY_6, 0) + IFNULL(p.DAY_7, 0) + IFNULL(p.DAY_8, 0) + IFNULL(p.DAY_9, 0) + IFNULL(p.DAY_10, 0) +
+        IFNULL(p.DAY_11, 0) + IFNULL(p.DAY_12, 0) + IFNULL(p.DAY_13, 0) + IFNULL(p.DAY_14, 0) + IFNULL(p.DAY_15, 0) +
+        IFNULL(p.DAY_16, 0) + IFNULL(p.DAY_17, 0) + IFNULL(p.DAY_18, 0) + IFNULL(p.DAY_19, 0) + IFNULL(p.DAY_20, 0) +
+        IFNULL(p.DAY_21, 0) + IFNULL(p.DAY_22, 0) + IFNULL(p.DAY_23, 0) + IFNULL(p.DAY_24, 0) + IFNULL(p.DAY_25, 0)
+        ELSE 0
+        END AS day_1_25_sum,
+        -- 计算 26 - 31 日的总和
+        CASE WHEN
+        (
+        (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        OR (p.YEAR = #{year} AND p.MONTH = #{month} - 1)
+        ) THEN
+        IFNULL(p.DAY_26, 0) + IFNULL(p.DAY_27, 0) + IFNULL(p.DAY_28, 0) + IFNULL(p.DAY_29, 0) + IFNULL(p.DAY_30, 0) +
+        IFNULL(p.DAY_31, 0)
+        ELSE 0
+        END AS day_26_31_sum
+        FROM
+        <include refid="producePlanTableName"/>
+        p
+        WHERE
+        (
+        (p.YEAR = #{year} AND p.MONTH IN (#{month}, #{month} - 1))
+        OR (#{month} = 1 AND p.YEAR = #{year} - 1 AND p.MONTH = 12)
+        )
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.IS_DELETE = 0
+        )
+        -- 主查询分组汇总数据
+        SELECT
+        ppd.PRODUCT_CODE,
+        ppd.BRAND,
+        ppd.PRO_SIZE,
+        ppd.LOCATION_TYPE,
+        ppd.CHANNEL,
+        ppd.day_1_25_sum + ppd.day_26_31_sum AS qty
+        FROM
+        preprocessed_data ppd
+    </select>
+
+    <select id="selectProFinishList" resultType="com.zlt.aps.monthplan.api.domain.vo.LhDayFinishQtyVo">
+        SELECT
+        f.PRODUCT_CODE,
+        f.SPEC_CODE,
+        sum( f.DAY_FINISH_QTY ) DAY_FINISH_QTY
+        FROM
+        <include refid="produceFinishTableName"/>
+        f
+        WHERE
+        f.IS_DELETE = 0 AND
+        ((
+        -- 上个月 26 - 31 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-26'), '%Y-%m-%d')
+        AND LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month} - 1, '-01'), '%Y-%m-%d'))
+        )
+        OR
+        (
+        -- 本月 1 - 25 日的数据
+        f.FINISH_DATE BETWEEN STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d') AND
+        STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-25'), '%Y-%m-%d')
+        ))
+        GROUP BY
+        f.PRODUCT_CODE
+        f.SPEC_CODE
+    </select>
+
+    <select id="selectSalePlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation">
+        SELECT
+        *
+        FROM
+        <include refid="salePlanTableName"/>
+        p
+        WHERE
+        p.YEAR = #{year}
+        AND p.MONTH = #{month}
+        AND p.FACTORY_CODE = #{factoryCode}
+        AND p.MONTH_PLAN_VERSION = #{monthPlanVersion}
+        AND p.IS_DELETE = 0
+    </select>
+
+    <select id="selectSaleFinishList" resultType="com.zlt.aps.monthplan.api.domain.vo.SaleFinishVo">
+        SELECT *
+        FROM
+        <include refid="saleFinishTableName"/>
+        WHERE IS_DELETE = 0
+        AND `YEAR` = #{year}
+        AND `MONTH` = #{month}
+        AND FACTORY_CODE = #{factoryCode}
+    </select>
+
+    <select id="selectProductMoldeRealList"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
+        SELECT PRODUCT_CODE, GROUP_CONCAT(DISTINCT SPEC_CODE SEPARATOR ',') AS SPEC_CODE
+        FROM T_MDM_PRODUCT_MODEL_RELATION
+        WHERE FACTORY_CODE = #{factoryCode}
+        GROUP BY FACTORY_CODE, PRODUCT_CODE
+    </select>
+
+    <select id="selectByMonthPlanVersion" resultType="com.zlt.aps.monthplan.api.domain.dto.ProduceVersionDto">
+        SELECT DISTINCT YEAR, MONTH, FACTORY_CODE, MONTH_PLAN_VERSION
+        FROM t_mp_moulding_day_result
+        WHERE IS_DELETE = 0 AND PRODUCTION_VERSION = #{monthPlanVersion}
+    </select>
+
+    <select id="selectStockUpPlanQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               MAX(IS_ENSURE_PLAN) AS isEnsurePlan,
+               MAX(IS_EMERGENCY)   AS isEmergency,
+               MAX(BRAND)          AS BRAND,
+               MAX(PRO_SIZE)       AS PRO_SIZE,
+               MAX(PATTERN)        AS PATTERN,
+        SUM(IF(LOCATION_TYPE = 1, PLAN_QTY, 0)) inStockUpPlanQty,
+        SUM(IF(LOCATION_TYPE = 2, PLAN_QTY, 0)) outStockUpPlanQty,
+        SUM(IF(LOCATION_TYPE = 3, PLAN_QTY, 0)) oeStockUpPlanQty,
+               SUM(PLAN_QTY)                                             sumStockUpPlanQty
+        FROM t_mp_product_require_plan
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth
+          AND FACTORY_CODE = @factoryCode
+          AND MONTH_PLAN_VERSION = @monthPlanVersion
+          AND IS_STOCK_UP = 1
+        <if test="productCode != null and productCode != ''">AND INSTR(PRODUCT_CODE, #{productCode}) > 0</if>
+        <if test="productDesc != null and productDesc != ''">AND INSTR(PRODUCT_DESC, #{productDesc}) > 0</if>
+        <if test="proSize != null and proSize != ''">AND PRO_SIZE = #{proSize}</if>
+        <if test="brand != null and brand != ''">AND BRAND = #{brand}</if>
+        <if test="pattern != null and pattern != ''">AND INSTR(PATTERN, #{pattern}) > 0</if>
+        GROUP BY PRODUCT_CODE
+    </select>
+
+    <select id="selectProductQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               MAX(CONSTRUCTION_STAGE),
+               MAX(MOULD_NO) AS MOULD_NO,
+               COUNT(MOULD_NO)  mouldQty,
+               SUM(IF(LOCATION_TYPE = 1, TOTAL_QTY, 0)) inProductQty,
+               SUM(IF(LOCATION_TYPE = 2, TOTAL_QTY, 0)) outProductQty,
+               SUM(IF(LOCATION_TYPE = 3, TOTAL_QTY, 0)) oeProductQty,
+               SUM(TOTAL_QTY)                                             sumProductQty
+        FROM t_mp_moulding_day_result_detail
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth
+          AND FACTORY_CODE = @factoryCode
+          AND MONTH_PLAN_VERSION = @monthPlanVersion
+          AND IS_STOCK_UP = 0
+        GROUP BY PRODUCT_CODE
+    </select>
+
+    <select id="selectProductQtyList4FinalDetail"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               MAX(CONSTRUCTION_STAGE),
+               MAX(MOULD_NO) AS                         MOULD_NO,
+               COUNT(MOULD_NO)                          mouldQty,
+               SUM(IF(LOCATION_TYPE = 1, TOTAL_QTY, 0)) inProductQty,
+               SUM(IF(LOCATION_TYPE = 2, TOTAL_QTY, 0)) outProductQty,
+               SUM(IF(LOCATION_TYPE = 3, TOTAL_QTY, 0)) oeProductQty,
+               SUM(TOTAL_QTY)                           sumProductQty
+        FROM t_mp_month_plan_prod_detail_final
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth
+          AND FACTORY_CODE = @factoryCode
+          AND MONTH_PLAN_VERSION = @monthPlanVersion
+          AND IS_STOCK_UP = 0
+        GROUP BY PRODUCT_CODE
+    </select>
+
+    <select id="selectDemandQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               CHANNEL,
+               SUM(IF(LOCATION_TYPE = 1, PLAN_QTY, 0)) inDemandQty,
+               SUM(IF(LOCATION_TYPE = 2, PLAN_QTY, 0)) outDemandQty,
+               SUM(IF(LOCATION_TYPE = 3, PLAN_QTY, 0)) oeDemandQty,
+               SUM(PLAN_QTY)                                             sumDemandQty
+        FROM t_mp_order_plan_allocation
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth
+          AND FACTORY_CODE = @factoryCode
+          AND MONTH_PLAN_VERSION = @monthPlanVersion
+        GROUP BY PRODUCT_CODE, CHANNEL
+    </select>
+
+    <select id="selectStockQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               SUM(IF(LOCATION_TYPE = 1, STOCK_QTY, 0)) inStockQty,
+               SUM(IF(LOCATION_TYPE = 2, STOCK_QTY, 0)) outStockQty,
+               SUM(IF(LOCATION_TYPE = 3, STOCK_QTY, 0)) oeStockQty,
+               SUM(STOCK_QTY)                                             sumStockQty
+        FROM T_MDM_PRODUCT_STOCK_MONTH
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth - 1
+          AND FACTORY_CODE = @factoryCode
+        GROUP BY PRODUCT_CODE
+    </select>
+
+    <select id="selectStockUpActQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               SUM(IF(LOCATION_TYPE = 1, TOTAL_QTY, 0)) inStockUpActQty,
+               SUM(IF(LOCATION_TYPE = 2, TOTAL_QTY, 0)) outStockUpActQty,
+               SUM(IF(LOCATION_TYPE = 3, TOTAL_QTY, 0)) oeStockUpActQty,
+               SUM(TOTAL_QTY)                                             sumStockUpActQty
+        FROM t_mp_moulding_day_result_detail
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth
+          AND FACTORY_CODE = @factoryCode
+          AND MONTH_PLAN_VERSION = @monthPlanVersion
+          AND IS_STOCK_UP = 1
+        GROUP BY PRODUCT_CODE
+    </select>
+
+    <select id="selectUnProductQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT PRODUCT_CODE,
+               SUM(IF(LOCATION_TYPE = 1, UN_PRODUCTION_QTY, 0)) inUnProductQty,
+               SUM(IF(LOCATION_TYPE = 2, UN_PRODUCTION_QTY, 0)) outUnProductQty,
+               SUM(IF(LOCATION_TYPE = 3, UN_PRODUCTION_QTY, 0)) oeUnProductQty,
+               SUM(UN_PRODUCTION_QTY)                                             sumUnProductQty
+        FROM t_mp_proc_no_production_plan
+        WHERE IS_DELETE = 0
+          AND `YEAR` = @targetYear
+          AND `MONTH` = @targetMonth
+          AND FACTORY_CODE = @factoryCode
+          AND MONTH_PLAN_VERSION = @monthPlanVersion
+        GROUP BY PRODUCT_CODE
+    </select>
+
+    <select id="selectYearMonthPlanQty" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4PlanVo">
+        SELECT MONTH,
+               SUM(TOTAL_QTY)               as monthTotalPlanQty,
+               COUNT(DISTINCT PRODUCT_CODE) as monthTotalSpecQty
+        FROM T_MP_MONTH_PLAN_PROD_FINAL
+        WHERE IS_DELETE = 0
+          AND `YEAR` = #{year}
+        GROUP BY MONTH
+    </select>
+
+    <select id="selectYearMonthFinishQty" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4PlanVo">
+        SELECT `MONTH`,
+               SUM(DAY_FINISH_QTY)          as monthTotalFinishQty,
+               COUNT(DISTINCT PRODUCT_CODE) as monthTotalSpecFinishQty
+        FROM t_lh_day_finish_qty
+        WHERE IS_DELETE = 0
+          AND `YEAR` = #{year}
+        GROUP BY `MONTH`
+    </select>
+
+    <select id="selectOrderAndStockUpQty" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4OrderVo">
+        SELECT MONTH,
+               SUM(PLAN_ORDER_QTY) AS planOrderQty,
+               SUM(STOCK_QTY)      AS stockUpQty,
+               SUM(ORDER_QTY)      AS ORDER_QTY,
+               SUM(PLAN_QTY)       AS PLAN_QTY
+        FROM (SELECT `MONTH`,
+                     SUM(PLAN_QTY) AS PLAN_ORDER_QTY,
+                     0             AS STOCK_QTY,
+                     0             AS ORDER_QTY,
+                     0             AS PLAN_QTY
+              FROM t_mp_month_sale_plan
+              WHERE IS_DELETE = 0
+                AND `YEAR` = #{year}
+              GROUP BY `MONTH`
+
+              UNION ALL
+
+              SELECT `MONTH`,
+                     SUM(NEED_QTY) AS PLAN_ORDER_QTY,
+                     0             AS STOCK_QTY,
+                     0             AS ORDER_QTY,
+                     0             AS PLAN_QTY
+              FROM t_mp_month_plan_adjust_notice
+              WHERE IS_DELETE = 0
+                AND `YEAR` = #{year}
+              GROUP BY `MONTH`
+
+              UNION ALL
+
+              SELECT `MONTH`,
+                     0              AS PLAN_ORDER_QTY,
+                     SUM(STOCK_QTY) AS STOCK_QTY,
+                     0              AS ORDER_QTY,
+                     0              AS PLAN_QTY
+              FROM t_mdm_stock_up_plan
+              WHERE IS_DELETE = 0
+                AND `YEAR` = #{year}
+              GROUP BY `MONTH`
+
+              UNION ALL
+
+              SELECT `MONTH`,
+                     0              AS PLAN_ORDER_QTY,
+                     0              AS STOCK_QTY,
+                     SUM(SALE_QTY) AS ORDER_QTY,
+                     0              AS PLAN_QTY
+            FROM T_MDM_HISTORY_SALE_RECORD
+              WHERE IS_DELETE = 0
+                AND `YEAR` = #{year}
+              GROUP BY `MONTH`
+
+              UNION ALL
+
+              SELECT `MONTH`,
+                     0              AS PLAN_ORDER_QTY,
+                     0              AS STOCK_QTY,
+                     0              AS ORDER_QTY,
+                     SUM(TOTAL_QTY) AS PLAN_QTY
+              FROM t_mp_month_plan_prod_final
+              WHERE IS_DELETE = 0
+                AND `YEAR` = #{year}
+              GROUP BY `MONTH`) combined
+        GROUP BY MONTH
+        ORDER BY MONTH
+    </select>
+
+    <select id="selectProductionProcesses" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4ProductProcessesVo">
+        SET @scheduleDate = #{scheduleDate};
+
+        SELECT '成型' as productProcessName,
+               'cx'   as productProcess,
+               SCHEDULE_DATE,
+               SUM(IFNULL(CLASS1_PLAN_QTY, 0) + IFNULL(CLASS2_PLAN_QTY, 0) + IFNULL(CLASS3_PLAN_QTY, 0) +
+                   IFNULL(CLASS4_PLAN_QTY, 0) + IFNULL(CLASS5_PLAN_QTY, 0) +
+                   IFNULL(CLASS6_PLAN_QTY, 0))                                                                 as planQty,
+               SUM(IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
+                   IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
+                   IFNULL(CLASS6_FINISH_QTY, 0))                                                               as finishQty
+        FROM `t_cx_schedule_result`
+        WHERE SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '硫化' as productProcessName,
+               'lh'   as productProcess,
+               SCHEDULE_DATE,
+               SUM(IFNULL(CLASS1_PLAN_QTY, 0) + IFNULL(CLASS2_PLAN_QTY, 0) + IFNULL(CLASS3_PLAN_QTY, 0) +
+                   IFNULL(CLASS4_PLAN_QTY, 0) + IFNULL(CLASS5_PLAN_QTY, 0) +
+                   IFNULL(CLASS6_PLAN_QTY, 0))                                                                 as planQty,
+               SUM(IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
+                   IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
+                   IFNULL(CLASS6_FINISH_QTY, 0))                                                               as finishQty
+        FROM `t_lh_schedule_result`
+        WHERE SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '胎面'                                                       as productProcessName,
+               'tm'                                                                             as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_tm_schedule_result` a
+                 LEFT JOIN T_TM_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '胎侧'                                                       as productProcessName,
+               'tc'                                                                             as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_tc_schedule_result` a
+                 LEFT JOIN T_TC_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '内衬'                                                       as productProcessName,
+               'nc'                                                                             as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_nc_schedule_result` a
+                 LEFT JOIN T_NC_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢丝斜裁'                                                     as productProcessName,
+               'cd15'                                                                           as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty1, 0) + IFNULL(night_plan_qty1, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_cd15_schedule_result` a
+                 LEFT JOIN T_CD15_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢丝直裁'                                                   as productProcessName,
+               'cd90'                                                                           as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_cd90_schedule_result` a
+                 LEFT JOIN T_CD90_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '胎圈'                                                       as productProcessName,
+               'tq'                                                                             as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(mid_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.MID_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_tq_schedule_result` a
+                 LEFT JOIN T_TQ_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢丝圈'                                                     as productProcessName,
+               'gsq'                                                                            as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(mid_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.MID_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_gsq_schedule_result` a
+                 LEFT JOIN T_GSQ_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢带压延'                                               as productProcessName,
+               'gdyy'                                                                               as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(class1_plan, 0) + IFNULL(class2_plan, 0))     as planQty,
+               SUM(IFNULL(floor(fq.class1_finish_qty), 0) + IFNULL(floor(fq.class2_finish_qty), 0)) as finishQty
+        FROM `t_gdyy_schedule_result` a
+                 LEFT JOIN T_GDYY_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '纤维压延'                                                   as productProcessName,
+               'xwyy'                                                                           as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_xwyy_schedule_result` a
+                 LEFT JOIN T_XWYY_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        select '密炼'                                                                                               as productProcessName,
+               'mix' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(a.TOTAL_PLAN_QTY)                                                                                as planQty,
+               SUM(ifnull(tgf.mid_finish_qty, 0) + ifnull(tgf.night_finish_qty, 0) +
+                   ifnull(tgf.day_finish_qty, 0))                                                                   as finishQty
+        from t_glue_schedule_result a
+                 left join t_glue_finish tgf on a.order_no = tgf.order_no and tgf.del_flag = 0
+        where a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE = @scheduleDate
+        GROUP BY a.SCHEDULE_DATE
+    </select>
+
+    <select id="selectFactoryMachine" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4MachineVo">
+        SELECT '可用模具数' as typeName, count(1) as machineCount
+        FROM T_MDM_MOULD_INFO
+        where MOULD_STATUS = 1
+        UNION ALL
+        SELECT '硫化机台数' as typeName, count(1) as machineCount
+        FROM t_lh_machine_info
+        where IS_DELETE = 0
+          AND `STATUS` = 1
+        UNION ALL
+        SELECT '成型机台数' as typeName, count(1) as machineCount
+        FROM t_mdm_molding_machine
+        where IS_DELETE = 0
+          AND `MACHINE_STATUS` = 0
+        UNION ALL
+        SELECT '压出机台数' as typeName, SUM(cnt) as machineCount
+        FROM (SELECT COUNT(1) AS cnt
+              FROM t_tm_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0
+              UNION ALL
+              SELECT COUNT(1) AS cnt
+              FROM t_tc_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0) subquery
+        UNION ALL
+        SELECT '裁断机台数' as typeName, SUM(cnt) as machineCount
+        FROM (SELECT COUNT(1) AS cnt
+              FROM t_nc_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0
+              UNION ALL
+              SELECT COUNT(1) AS cnt
+              FROM t_cd15_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0
+              UNION ALL
+              SELECT COUNT(1) AS cnt
+              FROM t_cd90_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0
+              UNION ALL
+              SELECT COUNT(1) AS cnt
+              FROM t_tq_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0
+              UNION ALL
+              SELECT COUNT(1) AS cnt
+              FROM t_gsq_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0) subquery
+        UNION ALL
+        SELECT '压延机台数' as typeName, SUM(cnt) as machineCount
+        FROM (SELECT COUNT(1) AS cnt
+              FROM t_gdyy_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0
+              UNION ALL
+              SELECT COUNT(1) AS cnt
+              FROM t_xwyy_machine_info
+              WHERE del_flag = '0'
+                AND `status` = 0) subquery
+        UNION ALL
+        SELECT '密炼机台数' as typeName, count(1) as machineCount
+        FROM t_mix_machine
+        where DEL_FLAG = '0'
+          AND `status` = 0
+    </select>
+
+    <select id="selectProductionProcessesByDate7"
+            resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4ProductProcessesVo">
+        SET @scheduleDate = #{scheduleDate};
+        SET @scheduleDateBefore7 = #{scheduleDateBefore7};
+
+        SELECT '成型'                            as productProcessName,
+               'cx' as productProcess,
+               SCHEDULE_DATE,
+               SUM(IFNULL(CLASS1_PLAN_QTY, 0) + IFNULL(CLASS2_PLAN_QTY, 0) + IFNULL(CLASS3_PLAN_QTY, 0) +
+                   IFNULL(CLASS4_PLAN_QTY, 0) + IFNULL(CLASS5_PLAN_QTY, 0) +
+                   IFNULL(CLASS6_PLAN_QTY, 0))   as planQty,
+               SUM(IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
+                   IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
+                   IFNULL(CLASS6_FINISH_QTY, 0)) as finishQty
+        FROM `t_cx_schedule_result`
+        WHERE IS_DELETE = 0
+          AND SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '硫化'                            as productProcessName,
+               'lh' as productProcess,
+               SCHEDULE_DATE,
+               SUM(IFNULL(CLASS1_PLAN_QTY, 0) + IFNULL(CLASS2_PLAN_QTY, 0) + IFNULL(CLASS3_PLAN_QTY, 0) +
+                   IFNULL(CLASS4_PLAN_QTY, 0) + IFNULL(CLASS5_PLAN_QTY, 0) +
+                   IFNULL(CLASS6_PLAN_QTY, 0))   as planQty,
+               SUM(IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
+                   IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
+                   IFNULL(CLASS6_FINISH_QTY, 0)) as finishQty
+        FROM `t_lh_schedule_result`
+        WHERE IS_DELETE = 0
+          AND SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '胎面'                                                       as productProcessName,
+               'tm' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_tm_schedule_result` a
+                 LEFT JOIN T_TM_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '胎侧'                                                       as productProcessName,
+               'tc' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_tc_schedule_result` a
+                 LEFT JOIN T_TC_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '内衬'                                                       as productProcessName,
+               'nc' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_nc_schedule_result` a
+                 LEFT JOIN T_NC_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢丝斜裁'                                                     as productProcessName,
+               'cd15' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty1, 0) + IFNULL(night_plan_qty1, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_cd15_schedule_result` a
+                 LEFT JOIN T_CD15_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢丝直裁'                                                   as productProcessName,
+               'cd90' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_cd90_schedule_result` a
+                 LEFT JOIN T_CD90_DAY_FINISH_QTY fq on a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '胎圈'                                                       as productProcessName,
+               'tq' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(mid_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.MID_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_tq_schedule_result` a
+                 LEFT JOIN T_TQ_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢丝圈'                                                     as productProcessName,
+               'gsq' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(mid_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.MID_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_gsq_schedule_result` a
+                 LEFT JOIN T_GSQ_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '钢带压延'                                               as productProcessName,
+               'gdyy' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(class1_plan, 0) + IFNULL(class2_plan, 0))     as planQty,
+               SUM(IFNULL(floor(fq.class1_finish_qty), 0) + IFNULL(floor(fq.class2_finish_qty), 0)) as finishQty
+        FROM `t_gdyy_schedule_result` a
+                 LEFT JOIN T_GDYY_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '纤维压延'                                                   as productProcessName,
+               'xwyy' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(IFNULL(day_plan_qty, 0) + IFNULL(night_plan_qty, 0))     as planQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty
+        FROM `t_xwyy_schedule_result` a
+                 LEFT JOIN T_XWYY_DAY_FINISH_QTY fq ON a.order_no = fq.order_no and fq.del_flag = '0'
+        WHERE a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY SCHEDULE_DATE
+
+        UNION ALL
+
+        SELECT '密炼'                                                                                               as productProcessName,
+               'mix' as productProcess,
+               a.SCHEDULE_DATE,
+               SUM(a.TOTAL_PLAN_QTY)                                                                                as planQty,
+               SUM(ifnull(tgf.mid_finish_qty, 0) + ifnull(tgf.night_finish_qty, 0) +
+                   ifnull(tgf.day_finish_qty, 0))                                                                   as finishQty
+        from t_glue_schedule_result a
+                 left join t_glue_finish tgf on a.order_no = tgf.order_no and tgf.del_flag = 0
+        where a.DEL_FLAG = '0'
+          AND a.SCHEDULE_DATE BETWEEN @scheduleDateBefore7 AND @scheduleDate
+        GROUP BY a.SCHEDULE_DATE
+        ORDER BY productProcessName, SCHEDULE_DATE
+    </select>
+
+    <select id="selectCxLhMachine" resultType="com.zlt.aps.monthplan.api.domain.vo.CxLhMachineVo">
+        SELECT CASE
+                   WHEN MACHINE_TYPE = '0' THEN '成型维修机台总时数'
+                   WHEN MACHINE_TYPE = '1' THEN '硫化维修机台总时数'
+                   WHEN MACHINE_TYPE = '2' THEN '模具维修机台总时数'
+                   WHEN MACHINE_TYPE = '3' THEN '洗模机台总时数'
+                   ELSE '' END                                            AS machineTypeName,
+               MACHINE_TYPE,
+               SUM(TIMESTAMPDIFF(SECOND, a.BEGIN_DATE, a.END_DAY) / 3600) AS qty
+        FROM t_mdm_device_maintenance_plan a
+        WHERE IS_DELETE = 0
+          AND `YEAR` = #{year}
+          AND `MONTH` = #{month}
+        GROUP BY MACHINE_TYPE
+        UNION ALL
+        SELECT '可用成型机台数' AS machineTypeName, '-1' machineType, COUNT(1) AS qty
+        FROM t_mdm_molding_machine
+        WHERE IS_DELETE = 0
+          AND MACHINE_STATUS = 0
+        UNION ALL
+        SELECT '可用硫化机台数' AS machineTypeName, '-2' machineType, COUNT(1) AS qty
+        FROM t_lh_machine_info
+        WHERE IS_DELETE = 0
+          AND `STATUS` = 1
+    </select>
+
+    <select id="selectProductConstructionInfo4RequirePlan"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.CxProductConstructionInfo">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT *
+        FROM t_product_construction_info
+        WHERE del_flag = 0
+          AND EXISTS(SELECT 1
+                     FROM t_mp_product_require_plan
+                     WHERE IS_DELETE = 0
+                       AND `YEAR` = @targetYear
+                       AND `MONTH` = @targetMonth
+                       AND FACTORY_CODE = @factoryCode
+                       AND MONTH_PLAN_VERSION = @monthPlanVersion
+                       AND IS_STOCK_UP = 1
+                       AND PRODUCT_CODE = t_product_construction_info.sap_code
+                     GROUP BY PRODUCT_CODE)
+    </select>
+
+    <select id="selectProductConstruction4RequirePlan"
+            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+        SET @targetYear = #{year};
+        SET @targetMonth = #{month};
+        SET @monthPlanVersion = #{monthPlanVersion};
+        SET @factoryCode = #{factoryCode};
+
+        SELECT *
+        FROM t_mdm_product_construction
+        WHERE IS_DELETE = 0
+          AND EXISTS(SELECT 1
+                     FROM t_mp_product_require_plan
+                     WHERE IS_DELETE = 0
+                       AND `YEAR` = @targetYear
+                       AND `MONTH` = @targetMonth
+                       AND FACTORY_CODE = @factoryCode
+                       AND MONTH_PLAN_VERSION = @monthPlanVersion
+                       AND IS_STOCK_UP = 1
+                       AND PRODUCT_CODE = t_mdm_product_construction.PRODUCT_CODE
+                     GROUP BY PRODUCT_CODE)
+    </select>
+
+    <select id="selectProductVersion" resultType="java.lang.String">
+        SELECT MAX(PRODUCTION_VERSION)
+        FROM t_mp_month_plan_prod_final
+        WHERE `YEAR` = #{year}
+          AND `MONTH` = #{month}
+    </select>
+
+    <select id="selectSystemRunReport" resultType="com.zlt.aps.monthplan.api.domain.vo.SystemRunReportVo">
+        SET @startDate = #{startDate};
+        SET @endDate = #{endDate};
+
+        SELECT '成型'                                                                                             as productProcessName,
+               'cx'                                                                                               as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                                           AS planSkuCount,
+               SUM(IFNULL(a.CLASS1_PLAN_QTY, 0) + IFNULL(a.CLASS2_PLAN_QTY, 0))                                   AS planSkuQty,
+               SUM(IFNULL(a.CLASS2_PLAN_QTY, 0))                                                                  AS nightPlanQty,
+               SUM(IFNULL(floor(a.CLASS1_FINISH_QTY), 0) +
+                   IFNULL(floor(a.CLASS2_FINISH_QTY), 0))                                                         as finishQty,
+               ROUND(SUM(IFNULL(a.TOTAL_STOCK, 0)), 1) AS stockQty,
+               SUM(b.CLASS2_FINISH_QTY)                                                                           AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.CLASS1_PLAN_QTY, 0) + IFNULL(a.CLASS2_PLAN_QTY, 0)) /
+                      IFNULL(floor(a.CLASS1_FINISH_QTY), 0) + IFNULL(floor(a.CLASS2_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1,
+                      0))                                                                                         AS abnormalSkuCount
+        FROM t_cx_schedule_result a
+                 LEFT JOIN t_cx_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) AND
+                              a.EMBRYO_CODE = b.EMBRYO_CODE and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '硫化'                                                                                               as productProcessName,
+               'lh'                                                                                                 as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                                             AS planSkuCount,
+               SUM(IFNULL(a.CLASS1_PLAN_QTY, 0) + IFNULL(a.CLASS2_PLAN_QTY, 0))                                     AS planSkuQty,
+               SUM(IFNULL(a.CLASS2_PLAN_QTY, 0))                                                                    AS nightPlanQty,
+               SUM(IFNULL(floor(a.CLASS1_FINISH_QTY), 0) +
+                   IFNULL(floor(a.CLASS2_FINISH_QTY), 0))                                                           as finishQty,
+               ROUND(SUM(IFNULL(a.EMBRYO_STOCK, 0)), 1) AS stockQty,
+               SUM(b.CLASS2_PLAN_QTY)                                                                               AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.CLASS1_PLAN_QTY, 0) + IFNULL(a.CLASS2_PLAN_QTY, 0)) /
+                      (IFNULL(floor(a.CLASS1_FINISH_QTY), 0) + IFNULL(floor(a.CLASS2_FINISH_QTY), 0)) <![CDATA[  <  ]]> 0.9, 1,
+                      0))                                                                                           AS abnormalSkuCount
+        FROM t_lh_schedule_result a
+                 LEFT JOIN t_lh_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) AND
+                              a.PRODUCT_CODE = b.PRODUCT_CODE AND a.SPEC_CODE = b.SPEC_CODE and b.IS_DELETE = 0
+        WHERE a.IS_DELETE = 0
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '胎面'                                                                           as productProcessName,
+               'tm'                                                                             as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_tm_schedule_result a
+                 LEFT JOIN t_tm_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_tm_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) AND
+                              a.tread_code = b.tread_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '胎侧'                                                                           as productProcessName,
+               'tc'                                                                             as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_tc_schedule_result a
+                 LEFT JOIN t_tc_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_tc_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) AND
+                              a.sidewall_code = b.sidewall_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '内衬'                                                                           as productProcessName,
+               'nc'                                                                             as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_nc_schedule_result a
+                 LEFT JOIN t_nc_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_nc_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) AND
+                              a.lining_code = b.lining_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '钢丝斜裁'                                                                                       as productProcessName,
+               'cd15'                                                                                           as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                                         AS planSkuCount,
+               SUM(IFNULL(a.day_plan_qty1, 0) + IFNULL(a.night_plan_qty1, 0))                                   AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty1, 0))                                                                AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                   IFNULL(floor(fq.NIGHT_FINISH_QTY), 0))                                                       as finishQty,
+               ROUND(SUM(IFNULL(a.stock1_qty1, 0) + IFNULL(a.stock1_qty2, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY1)                                                                           AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.day_plan_qty1, 0) + IFNULL(a.night_plan_qty1, 0)) /
+                      IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1,
+                      0))                                                                                       AS abnormalSkuCount
+        FROM t_cd15_schedule_result a
+                 LEFT JOIN t_cd15_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_cd15_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) AND
+                              a.steel_strip_code1 = b.steel_strip_code1 AND
+                              a.steel_strip_code2 = b.steel_strip_code2 and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '纤维直裁'                                                                       as productProcessName,
+               'cd90'                                                                           as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_cd90_schedule_result a
+                 LEFT JOIN t_cd90_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_cd90_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) and
+                              a.cloth_code = b.cloth_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '胎圈'                                                                           as productProcessName,
+               'tq'                                                                             as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.mid_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.mid_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_tq_schedule_result a
+                 LEFT JOIN t_tq_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_tq_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) and
+                              a.bead_code = b.bead_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '钢丝圈'                                                                         as productProcessName,
+               'gsq'                                                                            as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.mid_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.mid_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_gsq_schedule_result a
+                 LEFT JOIN t_gsq_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_gsq_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) and
+                              a.steel_ring_code = b.steel_ring_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '钢带压延'                                                                           as productProcessName,
+               'gdyy'                                                                               as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                             AS planSkuCount,
+               SUM(IFNULL(a.class1_plan, 0) + IFNULL(a.class2_plan, 0))                             AS planSkuQty,
+               SUM(IFNULL(a.class2_plan, 0))                                                        AS nightPlanQty,
+               SUM(IFNULL(floor(fq.class1_finish_qty), 0) + IFNULL(floor(fq.class2_finish_qty), 0)) as finishQty,
+               ROUND(SUM(IFNULL(a.stock_qty, 0)), 1) AS stockQty,
+               SUM(b.class2_plan)                                                                   AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.class1_plan, 0) + IFNULL(a.class2_plan, 0)) / IFNULL(floor(fq.class1_finish_qty), 0) +
+                      IFNULL(floor(fq.class2_finish_qty), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                          AS abnormalSkuCount
+        FROM t_gdyy_schedule_result a
+                 LEFT JOIN t_gdyy_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_gdyy_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) and
+                              a.big_roll_code = b.big_roll_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '纤维压延'                                                                       as productProcessName,
+               'xwyy'                                                                           as productProcess,
+               a.schedule_date,
+               COUNT(1)                                                                         AS planSkuCount,
+               SUM(IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                     AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                 AS nightPlanQty,
+               SUM(IFNULL(floor(fq.DAY_FINISH_QTY), 0) + IFNULL(floor(fq.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(IFNULL(stock.stock_num, 0) + IFNULL(stock.modify_num, 0) - IFNULL(stock.bad_num, 0)),
+                     1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                            AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.day_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(fq.DAY_FINISH_QTY), 0) +
+                      IFNULL(floor(fq.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                       AS abnormalSkuCount
+        FROM t_xwyy_schedule_result a
+                 LEFT JOIN t_xwyy_day_finish_qty fq on a.order_no = fq.order_no and fq.del_flag = '0'
+                 LEFT JOIN t_xwyy_stock stock ON a.big_roll_code = stock.material_code and
+                                                 a.schedule_date = DATE_ADD(stock.stock_date, INTERVAL 1 DAY) AND
+                                                 stock.del_flag = '0'
+                 LEFT JOIN t_xwyy_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) and
+                              a.big_roll_code = b.big_roll_code and b.del_flag = '0'
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        UNION ALL
+
+        SELECT '密炼'                                                                             as productProcessName,
+               'ml'                                                                               as productProcess,
+               a.SCHEDULE_DATE,
+               COUNT(1)                                                                           AS planSkuCount,
+               SUM(IFNULL(a.mid_plan_qty, 0) + IFNULL(a.night_plan_qty, 0))                       AS planSkuQty,
+               SUM(IFNULL(a.night_plan_qty, 0))                                                   AS nightPlanQty,
+               SUM(IFNULL(floor(tgf.MID_FINISH_QTY), 0) + IFNULL(floor(tgf.NIGHT_FINISH_QTY), 0)) as finishQty,
+               ROUND(SUM(a.stock_qty), 1) AS stockQty,
+               SUM(b.NIGHT_PLAN_QTY)                                                              AS lastDayPlanQty,
+               SUM(IF((IFNULL(a.mid_plan_qty, 0) + IFNULL(a.night_plan_qty, 0)) / IFNULL(floor(tgf.MID_FINISH_QTY), 0) +
+                      IFNULL(floor(tgf.NIGHT_FINISH_QTY), 0) <![CDATA[  <  ]]> 0.9, 1, 0))                        AS abnormalSkuCount
+        from t_glue_schedule_result a
+                 LEFT JOIN t_glue_schedule_result b
+                           ON a.schedule_date = DATE_ADD(b.schedule_date, INTERVAL 1 DAY) and a.glue = b.glue and
+                              a.SAP_CODE = b.SAP_CODE and b.del_flag = '0'
+                 left join t_glue_finish tgf on a.order_no = tgf.order_no and tgf.del_flag = 0
+        WHERE a.del_flag = '0'
+          AND a.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY a.schedule_date
+
+        ORDER BY productProcess, schedule_date
+    </select>
+
+    <select id="selectCxConsume" resultType="com.zlt.aps.monthplan.api.domain.vo.CxConsumeVo">
+        SET @startDate = #{startDate};
+        SET @endDate = #{endDate};
+
+        SELECT DATE_FORMAT(cxr.schedule_date, '%Y-%m-%d') AS                                      scheduleDate,
+               IFNULL(CEILING(sum((IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)) *
+                                  ci.TREAD_SHOULDER_LENGTH / 1000)), 0)                           treadConsumeQty,
+               IFNULL(CEILING(sum((IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)) *
+                                  ci.SIDEWALL_LENGTH / 1000)), 0)                                 sideWallConsumeQty,
+               IFNULL(CEILING(sum((IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)) *
+                                  CI.FIT_DRUM_PERIMETER / 1000)), 0)                              fitConsumeQty,
+               IFNULL(sum(IFNULL(cxr.CLASS3_PLANNED_QTY, 0) + IFNULL(cxr.CLASS2_PLAN_QTY, 0)), 0) cxConsumeQty,
+               IFNULL(CEILING(SUM((IFNULL(cxr.CLASS2_PLAN_QTY, 0) + IFNULL(cxr.CLASS3_PLANNED_QTY, 0)) *
+                                  IFNULL(CI.FIT_DRUM_PERIMETER, 0) *
+                                  (IFNULL(CI.BELT_CRAFT1, 0) + IFNULL(CI.BELT_CRAFT2, 0)) /
+                                  IFNULL(RO.BREADTH, gp.param_value) / 1000 / 1000)), 0)
+                                                                                                  gdyyCxConsumeQty
+        FROM T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
+                 inner join T_PRODUCT_CONSTRUCTION_INFO ci
+                            on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION =
+                                                                    ci.EMBRYO_VERSION
+                 LEFT JOIN T_CD15_BIG_ROLL RO
+                           ON RO.BIG_ROLL_CODE = CI.ARTICLE_CROWN_SPEC
+                               AND RO.DEL_FLAG = '0'
+                 LEFT JOIN t_gdyy_params gp
+                           ON gp.param_code = 'BREADTH' AND gp.del_flag = '0'
+        WHERE cxr.del_flag = '0'
+          AND cxr.schedule_date BETWEEN @startDate AND @endDate
+        GROUP BY cxr.schedule_date
+    </select>
+
+    <select id="getGsqCxConsume" resultType="com.zlt.aps.monthplan.api.domain.vo.ScheduleSummaryVo">
+        SET @startDate = #{startDate};
+        SET @endDate = #{endDate};
+        SET @startDateSubOne = DATE_SUB(@startDate, INTERVAL 1 DAY);
+        SET @endDateSubOne = DATE_SUB(@endDate, INTERVAL 1 DAY);
+
+        SELECT DATE_FORMAT(t.schedule_date, '%Y-%m-%d') AS scheduleDate,
+               SUM(cxConsumeQty)                        as cxConsumeQty
+        FROM (SELECT cxr.schedule_date, IFNULL(sum(cxr.NIGHT_PLAN_QTY), 0) as cxConsumeQty
+              FROM T_TQ_SCHEDULE_RESULT cxr
+              WHERE cxr.schedule_date BETWEEN @startDate AND @endDate
+              GROUP BY cxr.schedule_date
+
+              UNION ALL
+
+              select DATE_ADD(cxr.schedule_date, INTERVAL 1 DAY), IFNULL(sum(cxr.DAY_PLAN_QTY), 0) as cxConsumeQty
+              from T_TQ_SCHEDULE_RESULT cxr
+              where cxr.del_flag = '0'
+                AND cxr.schedule_date BETWEEN @startDateSubOne AND @endDateSubOne
+              GROUP BY cxr.schedule_date) t
+        GROUP BY t.schedule_date
+    </select>
+</mapper>

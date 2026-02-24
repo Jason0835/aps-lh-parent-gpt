@@ -1,0 +1,73 @@
+package com.zlt.aps.maindata.service.impl;
+
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
+import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
+import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.sysdef.domain.SysDocType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.springframework.transaction.annotation.Transactional;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.ruoyi.common.exception.ServiceException;
+
+/**
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MpMonthPlanStatisticsServiceImpl.java
+ * 描    述：MpMonthPlanStatisticsServiceImplS2-0612.最终排产计划统计业务层处理
+ *@author zlt
+ *@date 2026-02-05
+ *@version 1.0
+ *
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
+ */
+@Slf4j
+@Service
+@Transactional(rollbackFor = Exception.class)
+public class MpMonthPlanStatisticsServiceImpl extends AbstractDocService<MpMonthPlanStatistics>  implements IMpMonthPlanStatisticsService {
+
+    @Autowired
+    private MpMonthPlanStatisticsEntityMapper monthPlanStatisticsEntityMapper;
+
+    @Override
+    protected String getDocTypeCode() {
+        return "s2-0612";
+    }
+
+    @Override
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("s2-0612");
+        return sysDocType;
+    }
+
+    @Override
+    public String checkUnique(MpMonthPlanStatistics docEntityVO) {
+        String unique = super.checkUnique(docEntityVO);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpMonthPlanStatistics.notUnique"));
+        }
+        return unique;
+    }
+
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        // 唯一校验字段
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion) {
+        monthPlanStatisticsEntityMapper.deleteMonthPlanStatisticsByCondition(factoryCode,year,month,productionVersion);
+    }
+
+}
