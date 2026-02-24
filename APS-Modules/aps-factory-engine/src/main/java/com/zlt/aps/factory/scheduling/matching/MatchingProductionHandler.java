@@ -528,6 +528,7 @@ public class MatchingProductionHandler {
             String materialDesc = plan.getMaterialDesc();
             for (int day = startDay; day <= endDay; day++) {
                 Integer productionQty = (Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day);
+                productionQty = productionQty == null ? 0:productionQty;
                 List<CxMouldDayProductionHelper> dayProductionList = dayProductionMap.get(day);
                 if (dayProductionList == null) {
                     dayProductionList = new ArrayList<>();
