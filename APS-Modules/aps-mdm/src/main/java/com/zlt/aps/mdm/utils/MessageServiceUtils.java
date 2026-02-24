@@ -2,7 +2,7 @@ package com.zlt.aps.mdm.utils;
 
 import com.ruoyi.common.utils.StringUtils;
 import com.tlt.aps.utils.MessageUtils;
-import com.zlt.aps.maindata.service.impl.MdmMsgTemplateUserRelServiceImpl;
+import com.zlt.aps.mdm.service.impl.MdmMsgTemplateUserRelServiceImpl;
 import com.zlt.msg.message.domain.vo.MessageContext;
 import com.zlt.msg.message.enums.MsgChannelEnums;
 import com.zlt.msg.message.enums.MsgTypeEnums;
