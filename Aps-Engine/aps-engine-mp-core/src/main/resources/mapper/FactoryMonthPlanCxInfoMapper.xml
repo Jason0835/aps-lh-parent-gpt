@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.factory.mapper.FactoryMonthPlanCxInfoMapper">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMonthPlanCxInfoMapper">
 
-    <select id="getMachineBaseInfo" resultType="com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo">
+    <select id="getMachineBaseInfo" resultType="com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo">
         SELECT mmm.FACTORY_CODE,
                mmm.CX_MACHINE_CODE,
                mmm.CX_MACHINE_BRAND_CODE,
@@ -24,7 +24,7 @@
            AND mmm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
     </select>
 
-    <select id="getWorkWearInfo" resultType="com.zlt.aps.factory.daylimit.CxWorkWearInfoVo">
+    <select id="getWorkWearInfo" resultType="com.zlt.aps.mp.engine.daylimit.CxWorkWearInfoVo">
         SELECT wwi.FACTORY_CODE,
                wwi.WORK_WEAR_NAME,
                wwi.SPECIFICATION_MODEL,
@@ -37,7 +37,7 @@
            AND wwi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
     </select>
 
-    <select id="getDevicePlanShutInfo" resultType="com.zlt.aps.factory.domain.vo.CxDevicePlanShutInfoVo">
+    <select id="getDevicePlanShutInfo" resultType="com.zlt.aps.mp.engine.domain.vo.CxDevicePlanShutInfoVo">
         SELECT dps.FACTORY_CODE,
                dps.MACHINE_CODE AS CX_MACHINE_CODE,
                dps.BEGIN_DATE,

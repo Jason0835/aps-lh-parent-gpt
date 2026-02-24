@@ -15,6 +15,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.redissonLock.annotation.RedissonLockAnno;
 import com.zlt.aps.utils.JsonUtils;
 import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
@@ -161,8 +162,8 @@ public class FactoryMonthPlanProdFinalController extends BusiController<FactoryM
         }
         Date productionStartDate = finalVersion.getProductionStartDate();
         Date productionEndDate = finalVersion.getProductionEndDate();
-        Integer startDays = com.zlt.aps.factory.utils.DateUtils.getDaysByMonth(productionStartDate);
-        Integer maxDays = com.zlt.aps.factory.utils.DateUtils.getMaxDaysByMonth(productionStartDate);
+        Integer startDays = DateUtils.getDaysByMonth(productionStartDate);
+        Integer maxDays = DateUtils.getMaxDaysByMonth(productionStartDate);
         Integer addDays = maxDays - startDays;
         List<FactoryMonthPlanProdFinalVo> resultList = new ArrayList<>(dataList.size());
         dataList.forEach(result -> {

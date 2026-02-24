@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.factory.mapper.FactoryMonthPlanContinueProductInfoMapper">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMonthPlanContinueProductInfoMapper">
 
-    <select id="getContinueProductInfo" resultType="com.zlt.aps.factory.domain.dto.ContinueProductInfo">
+    <select id="getContinueProductInfo" resultType="com.zlt.aps.mp.engine.domain.dto.ContinueProductInfo">
         SELECT ppf.MATERIAL_CODE,
                ppf.MATERIAL_DESC,
                ppf.STRUCTURE_NAME AS GROUP_NAME,
@@ -23,7 +23,7 @@
            AND ppf.DAY_${lastDay} > 0
     </select>
     
-    <select id="getContinueGroupInfo" resultType="com.zlt.aps.factory.domain.dto.ContinueGroupInfo">
+    <select id="getContinueGroupInfo" resultType="com.zlt.aps.mp.engine.domain.dto.ContinueGroupInfo">
         SELECT msa.CX_MACHINE_CODE,
                msa.STRUCTURE_NAME AS GROUP_NAME
           FROM t_mp_structure_allocation msa
