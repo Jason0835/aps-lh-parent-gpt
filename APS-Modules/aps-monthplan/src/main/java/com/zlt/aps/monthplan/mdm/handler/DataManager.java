@@ -24,7 +24,6 @@ import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import com.zlt.aps.monthplan.config.CaffeineCacheProperties;
 import com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.monthplan.factory.mapper.MpStructureAllocationEntityMapper;

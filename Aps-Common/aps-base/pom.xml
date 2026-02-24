@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <groupId>com.zlt.aps</groupId>
-        <artifactId>aps-modules</artifactId>
+        <artifactId>aps-common</artifactId>
         <version>1.0.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -63,19 +63,21 @@
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-common-core</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
 
-        <!-- Spring Cache -->
+        <!-- Spring Cache
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
-        <!-- Caffeine -->
+         -->
+        <!-- Caffeine
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
         </dependency>
-
+         -->
     </dependencies>
 
     <repositories>

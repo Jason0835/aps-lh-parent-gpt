@@ -20,7 +20,6 @@ import com.zlt.aps.factory.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
-import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;

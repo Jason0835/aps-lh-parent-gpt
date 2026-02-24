@@ -14,7 +14,12 @@
         <module>aps-engine-common</module>
         <module>mix-common-core</module>
         <module>mix-engine-common</module>
+        <module>aps-base</module>
     </modules>
+
+    <properties>
+        <ruoyi-cloud.version>3.5.2-SNAPSHOT</ruoyi-cloud.version>
+    </properties>
 
     <dependencies>
         <dependency>
