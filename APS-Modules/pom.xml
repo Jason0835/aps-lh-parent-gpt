@@ -63,7 +63,7 @@
             </dependency>
             <dependency>
                 <groupId>com.zlt.aps</groupId>
-                <artifactId>aps-factory-engine</artifactId>
+                <artifactId>aps-engine-mp-core</artifactId>
                 <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <!-- APS的API模块 -->

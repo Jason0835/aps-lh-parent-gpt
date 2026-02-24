@@ -17,7 +17,7 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>aps-factory-engine</module>
+        <module>aps-engine-mp-core</module>
         <module>aps-engine-tm-core</module>
         <module>aps-engine-cd15-core</module>
         <module>aps-engine-cd90-core</module>

@@ -8,9 +8,9 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>aps-factory-engine</artifactId>
-    <name>aps-factory-engine</name>
-    <description>分厂排产引擎模块</description>
+    <artifactId>aps-engine-mp-core</artifactId>
+    <name>aps-engine-mp-core</name>
+    <description>工厂月计划排产引擎模块</description>
 
     <properties>
         <java.version>1.8</java.version>
