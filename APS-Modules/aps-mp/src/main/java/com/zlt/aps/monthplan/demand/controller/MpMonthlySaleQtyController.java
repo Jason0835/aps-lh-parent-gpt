@@ -602,7 +602,7 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     @ApiOperation("查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表")
     @PostMapping("/genMpHistorySaleRecord")
     public AjaxResult genMpHistorySaleRecord(@RequestBody MpHistorySaleRecord historySaleRecord) {
-        return mpMonthlySaleQtyService.genMpHistorySaleRecord(historySaleRecord.getFactoryCode(), DateUtils.getNowDate(), historySaleRecord.getYear(), String.valueOf(historySaleRecord.getMonth()));
+        return mpMonthlySaleQtyService.genMpHistorySaleRecord(historySaleRecord.getFactoryCode(), DateUtils.getNowDate(), historySaleRecord.getYear(), String.format("%02d", historySaleRecord.getMonth()));
     }
 
 }
