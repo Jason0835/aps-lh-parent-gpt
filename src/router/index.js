@@ -671,9 +671,9 @@ constantRoutes.push(
     redirect: "noredirect",
     children: [
       {
-        path: "console/insertOrderDetail/:id",
+        path: "insertOrderDetail/:id",
         component: () => import("@/views/newPage/insertOrderDetail"),
-        name: "insertOrderDetail",
+        name: "InsertOrderDetail",
         meta: { title: "明细" },
       }],
   },

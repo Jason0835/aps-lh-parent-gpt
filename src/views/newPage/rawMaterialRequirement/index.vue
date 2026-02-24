@@ -289,7 +289,11 @@ export default {
   },
   methods: {
     goRawUsage(){
-      this.$router.push("/rawMaterial/rawWeekUsage");
+      {/* this.$router.push("/rawMaterial/rawWeekUsage"); */}
+      this.$router.push({
+        name: "RawWeekUsage",
+
+      });
     },
     async generatePlan() {
 

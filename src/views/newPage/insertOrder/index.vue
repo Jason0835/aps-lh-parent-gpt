@@ -229,7 +229,7 @@ export default {
         },
         {
           prop: "month1",
-          align:'right',
+          align: "right",
           label: "T" + this.$t("ui.data.insertOrder.monthQty"),
           render: ({ row }) => {
             return (
@@ -237,7 +237,7 @@ export default {
                 <div>
                   <text-button
                     onClick={() => {
-                      this.showDetail(row.versionMap[`T`],'T');
+                      this.showDetail(row.versionMap[`T`], "T");
                     }}
                   >
                     {row[`month1`]}
@@ -389,25 +389,28 @@ export default {
     },
   },
   methods: {
-    showDetail(row,isT) {
-      if(!row)return
-      let query={
-        monthPlanVersion:row.monthPlanVersion,
-        sourceType:row.planType,
-        productionVersion:row.productionVersion,
-        year:row.year,
-        month:row.month<10? "0" + row.month : row.month,
-        requireVersion:isT?row.batchNumber:row.monthPlanVersion,
-        viewFlag:1,
-      }
+    showDetail(row, isT) {
+      if (!row) return;
+      let query = {
+        monthPlanVersion: row.monthPlanVersion,
+        sourceType: row.planType,
+        productionVersion: row.productionVersion,
+        year: row.year,
+        month: row.month < 10 ? "0" + row.month : row.month,
+        requireVersion: isT ? row.batchNumber : row.monthPlanVersion,
+        viewFlag: 1,
+      };
+      // this.$router.push({
+      //   path: `./insertOrderDetail/` + row.id,
+      //   query,
+      // });
       this.$router.push({
-        path: `./insertOrderDetail/` + row.id,
+        name: "InsertOrderDetail",
+        params: { id: row.id },
         query,
       });
-
     },
     async createVersion() {
-
       this.handleAdd();
       return;
 
@@ -423,7 +426,10 @@ export default {
     },
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show({'factoryCode':this.query.factoryCode,'yearMonth':this.query.yearMonth});
+        this.$refs.infoRef.show({
+          factoryCode: this.query.factoryCode,
+          yearMonth: this.query.yearMonth,
+        });
       }
     },
     handleEdit(row) {

@@ -169,7 +169,7 @@ export default {
                 <div>
                   <text-button
                     onClick={() => {
-                      this.showDetail(row.versionMap[`T`],'T');
+                      this.showDetail(row.versionMap[`T`], "T");
                     }}
                   >
                     {row[`month1`]}
@@ -219,7 +219,6 @@ export default {
               </div>
             );
           },
-
         },
         {
           prop: "remark",
@@ -285,22 +284,26 @@ export default {
     },
   },
   methods: {
-    showDetail(row,isT) {
-      if(!row)return
-      let query={
-        monthPlanVersion:row.monthPlanVersion,
-        sourceType:row.planType,
-        productionVersion:row.productionVersion,
-        year:row.year,
-        month:row.month<10? "0" + row.month : row.month,
-        requireVersion:isT?row.batchNumber:row.monthPlanVersion,
-        viewFlag:1,
-      }
+    showDetail(row, isT) {
+      if (!row) return;
+      let query = {
+        monthPlanVersion: row.monthPlanVersion,
+        sourceType: row.planType,
+        productionVersion: row.productionVersion,
+        year: row.year,
+        month: row.month < 10 ? "0" + row.month : row.month,
+        requireVersion: isT ? row.batchNumber : row.monthPlanVersion,
+        viewFlag: 1,
+      };
+      // this.$router.push({
+      //   path: `./console/insertOrderDetail/` + row.id,
+      //   query,
+      // });
       this.$router.push({
-        path: `./insertOrderDetail/` + row.id,
+        name: "InsertOrderDetail",
+        params: { id: row.id },
         query,
       });
-
     },
     handleYearMonthChange(val) {
       this.search = {
