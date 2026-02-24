@@ -31,15 +31,13 @@ import org.springframework.util.CollectionUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.utils.SpringBeanUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.factory.daylimit.MouldAllocationDayInfoHelper;
@@ -100,10 +98,14 @@ import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalRe
 import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
 import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.monthplan.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.utils.SpringBeanUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 
 import lombok.extern.slf4j.Slf4j;
@@ -253,11 +255,24 @@ public class MatchingProductionHandler {
         if (endDay <= lockDay) { // 结束日在锁定日结束前的结构不搭配
             return;
         }
+        // 取调整需求计划
+        String monthPlanVersion = null;
+        MpAdjustStructureIn mpAdjustStructureIn = CollectionUtils.firstElement(contextDTO.getMpAdjustStructureInList());
+        MpAdjustStructureOut mpAdjustStructureOut = CollectionUtils.firstElement(contextDTO.getMpAdjustStructureOutList());
+        if (mpAdjustStructureIn != null) {
+            monthPlanVersion = mpAdjustStructureIn.getLastMonthPlanVersion();
+        } else if (mpAdjustStructureOut != null) {
+            monthPlanVersion = mpAdjustStructureOut.getLastMonthPlanVersion();
+        }
+        if (StringUtils.isEmpty(monthPlanVersion)) {
+            return;
+        }
+        
         log.info("周程滚动搭配算法start");
+        
         // 加载需求计划
         LambdaQueryWrapper<DpDemandPlan> demandQueryWrapper = new LambdaQueryWrapper<DpDemandPlan>();
-        demandQueryWrapper.eq(DpDemandPlan::getMonthPlanVersion,
-                CollectionUtils.firstElement(mpProdFinalList).getLastMonthPlanVersion());
+        demandQueryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
         demandQueryWrapper.eq(DpDemandPlan::getStructureName, contextDTO.getStructureName()); // 过滤空结构的数据
         demandQueryWrapper.gt(DpDemandPlan::getConventionReserveQty, 0);
         List<DpDemandPlan> demandPlanList = monthPlanRequireMapper.selectList(demandQueryWrapper);
@@ -279,15 +294,8 @@ public class MatchingProductionHandler {
             mdmSkuLhCapacityMap = this.initSkuLhCapacity(contextDTO);
             contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
         }
-
-//        // 计算锁定日期
-//        Set<String> tempCxMachineCodeSet = mpProdFinalList.stream().map(FactoryMonthPlanFinalAdjustVo::getCxMachineCode)
-//                .filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
-//        Set<String> cxMachineCodeSet = new HashSet<>();
-//        tempCxMachineCodeSet.forEach(code -> {
-//            cxMachineCodeSet.addAll(Arrays.stream(code.split(",")).distinct().collect(Collectors.toSet()));
-//        });
-//        int lockDay = this.getLockDay(productionContext, cxMachineCodeSet.size());
+        Integer matchingBoostDay = productionContext.getBaseDataContainer().getParamConfiguration().getMatchingBoostDay();
+//        Integer noMatchingProductionSaleQtyThreshold = productionContext.getBaseDataContainer().getParamConfiguration().getNoMatchingProductionSaleQtyThreshold();
 
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit(); // 产能限制计算器，用于计算每天的产能使用情况
         // 按天统计已排产量
@@ -317,9 +325,11 @@ public class MatchingProductionHandler {
                     if (unAllocationQty <= 0) {
                         break out;
                     }
-//                    if (day < lockDay) { // 锁定日不搭配
-//                        continue;
+                    // 常规结构在临近收尾3天（可配置），月均销量<500条的，不触发该结构搭配
+//                    if (endDay - day <= matchingBoostDay) {
+//                        break;
 //                    }
+                    
                     // 为当天分配搭配量
                     int tempUnAllocationQty = this.allcatAdjustProductQty(contextDTO, day, plan, cavity2BlockMap,
                             dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitMap);
@@ -505,10 +515,12 @@ public class MatchingProductionHandler {
         if (allocationQty <= 0) {
             return unAllocationQty;
         }
+        allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量
         Integer oldProductionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay)).orElse(0);
         plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay, allocationQty + oldProductionQty);
         plan.setTotalQty(Optional.ofNullable(plan.getTotalQty()).orElse(0) + allocationQty);
         plan.setConventionProductionQty(Optional.ofNullable(plan.getConventionProductionQty()).orElse(0) + allocationQty);
+        plan.setActualAdjustQty(Optional.ofNullable(plan.getActualAdjustQty()).orElse(0) + allocationQty);
         if (plan.getBeginDay() == null) {
             plan.setBeginDay(scheduleDay);
         }
@@ -522,6 +534,7 @@ public class MatchingProductionHandler {
             dayProduct.setMaterialCode(plan.getMaterialCode());
             dayProduct.setMaterialDesc(materialDesc);
             dayProduct.setProductionDate(scheduleDay);
+            dayProduct.setProductionQty(0);
             dayProductionList.add(dayProduct);
         }
         dayProduct.setProductionQty(dayProduct.getProductionQty() + allocationQty);
