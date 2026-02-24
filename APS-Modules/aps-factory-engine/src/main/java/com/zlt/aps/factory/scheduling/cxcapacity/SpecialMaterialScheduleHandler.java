@@ -71,9 +71,10 @@ public class SpecialMaterialScheduleHandler {
          * 2、计划量*单号模除标准长度，如果余数大于等于日硫化量 * 配比*单耗：计划量补标准长度 - 日硫化量 * 配比*单耗
          * 统计已排量 = 日硫化量 * 配比 * 已排天数
          */
-        Integer otherAllocationQty = otherNeedProductionSpecialPlanList.stream().mapToInt(ProductionPlanGroupInfo::getRemainingMaxProductionQty).sum();
+//        Integer otherAllocationQty = otherNeedProductionSpecialPlanList.stream().mapToInt(ProductionPlanGroupInfo::getSumPlanQty).sum();
+        Long otherAllocationQty = productionContext.getSpecialMaterialSumProductionQty(productionPlanInfo);
         // 同特殊材料结构总预计排产量 productionPlanInfo.getSumPlanQty()
-        Integer sumPlanQty = otherAllocationQty + productionPlanInfo.getRemainingMaxProductionQty();
+//        Integer sumPlanQty = otherAllocationQty + productionPlanInfo.getSumPlanQty();
         // 取出各结构的特殊材料清单交集
         Map<String, BigDecimal> specialIntersectionMap = new HashMap<>();
         specialIntersectionMap.putAll(materialMap);
@@ -90,23 +91,27 @@ public class SpecialMaterialScheduleHandler {
         }
         Map.Entry<String, BigDecimal> entry = specialIntersectionMap.entrySet().stream().findFirst().get();
         // 单耗
-        BigDecimal unitConsumeQty = entry.getValue();
+        BigDecimal unitConsumeLength = entry.getValue();
         // 标准长度
-        Long standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().get();
-        Integer standardQty = BigDecimal.valueOf(standardLength).divide(unitConsumeQty, BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
+        BigDecimal standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().map(BigDecimalUtils::valueOf).get();
+        Integer standardQty = standardLength.divide(unitConsumeLength, BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
+        // 需求量
+        Integer productionQty = Math.min(limitProductionQty, productionPlanInfo.getSumPlanQty()); // 取生产上限与需求量的较小值
+//      Integer productionQty = productionPlanInfo.getRemainingMaxProductionQty();
+        BigDecimal sumPlanQty = BigDecimalUtils.multiply(productionQty, unitConsumeLength);
+        sumPlanQty = BigDecimalUtils.add(sumPlanQty, otherAllocationQty); // 加上已排量
         //计算余数
-        BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
+        BigDecimal remainderLength = sumPlanQty.remainder(standardLength); // 长度
+        BigDecimal remainderQty = BigDecimalUtils.div(remainderLength, unitConsumeLength, 0); // 条数
         // 区间阈值 = 硫化量 * 配比*单耗
         Integer floatThreshold = productionPlanInfo.getThreshold();
         // 区间阈值 = 硫化量 * 配比*单耗
-        BigDecimal threshold = BigDecimalUtils.multiply(floatThreshold, unitConsumeQty);
+        BigDecimal thresholdLength = BigDecimalUtils.multiply(floatThreshold, unitConsumeLength);
         boolean isAddQty = false;
-        //productionPlanInfo.getSumPlanQty()
-        Integer productionQty = productionPlanInfo.getRemainingMaxProductionQty();
         // 重算实际的量
         Integer realProductionQty = BigDecimal.ZERO.intValue();
         // 超过阈值，尝试补量
-        if (remainderQty.compareTo(threshold) >= BigDecimal.ZERO.intValue()) {
+        if (remainderLength.compareTo(thresholdLength) >= BigDecimal.ZERO.intValue()) {
             if (limitProductionQty >= productionQty + standardQty - floatThreshold) {
                 //检查补量后不超过可生产上限才进行补量
                 isAddQty = true;
@@ -115,121 +120,42 @@ public class SpecialMaterialScheduleHandler {
         }
         // 不补量，则需要将计划量扣减掉余数部分
         if (!isAddQty) {
-            realProductionQty = productionQty - floatThreshold;
+            realProductionQty = productionQty - remainderQty.intValue();
         }
         // 可生产上限不足，则不能排产
         if (realProductionQty <= BigDecimal.ZERO.intValue()) {
             return BigDecimal.ZERO.intValue();
         }
         //计算新的排产天数 = ceil(计划量 / 日硫化量 / 配比)
-        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
-        theoryDays = theoryDays.setScale(0, RoundingMode.UP);
+        Integer firstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(productionPlanInfo.getMinLhMachineCountBymould());
+        BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
+        Integer resultTheoryDays = 0;
+        if (realProductionQty > firstDayProductionQty.intValue()) { // 需排产量大于首日排产量，则计算除了首日之外的计划所需天数
+            BigDecimal otherDayProductionQty = BigDecimalUtils.sub(realProductionQty, firstDayProductionQty); // 其余日排产量
+            BigDecimal theoryDays = BigDecimalUtils.div(otherDayProductionQty, floatThreshold, 2, false);
+            resultTheoryDays = theoryDays.setScale(0, RoundingMode.UP).intValue() + BigDecimal.ONE.intValue(); // 实际天数=其余排产量所需天数 + 首日天数（1天）
+        } else {
+            resultTheoryDays = BigDecimal.ONE.intValue(); // 低于首日的，只排一天
+        }
+        // 算其他特殊材料有交集的结构已排天数，不到最小排产天数的给加到最小排产天数
+        Integer otherTheoryDays = otherNeedProductionSpecialPlanList.stream().mapToInt(g -> g.getTheoryDays()).sum();
+        Integer minAllocationDays = productionContext.getBaseDataContainer().getParamConfiguration().getMinAllocationDays();
+        // 根据最大浮动余量计算结构排产的最低天数
+        Integer maxFloatThreshold = productionPlanInfo.getMaxThreshold(); // 最大浮动余量
+        BigDecimal minTheoryDays = BigDecimalUtils.div(realProductionQty, maxFloatThreshold, 2, false);
+        if (minTheoryDays.intValue() + otherTheoryDays < minAllocationDays) { // 最低浮动天数低于最小分配天数，直接按低于最小分配天数
+            resultTheoryDays = minAllocationDays;
+        } else if (resultTheoryDays + otherTheoryDays < minAllocationDays) { // 浮动天数低于最小分配天数，直接按低于最小分配天数
+            resultTheoryDays = minAllocationDays;
+        }
         if (isAddQty) {
             //拉量时，不能进行提前收尾处理
             productionPlanInfo.setHasBeforeConclusionHandler(false);
         }
-        return theoryDays.intValue();
+        return resultTheoryDays;
     }
 
-    /**
-     * 根据结构特殊材料情况重算结束日期
-     * Sku排产时的处理
-     *
-     * @param startDay           起始排产日
-     * @param endDay             结束排产日
-     * @param productionContext  排产上下文
-     * @param productionPlanInfo 排产分组计划信息
-     * @return
-     */
-    public Integer calculateEndDayBySpecialMaterial(Integer startDay, Integer endDay, TbrProductionContext productionContext, ProductionPlanGroupInfo productionPlanInfo) {
-        if (startDay > endDay) {
-            return endDay;
-        }
-        //非特殊结构直接跳过
-        if (!productionPlanInfo.isSpecialMaterial()) {
-            return endDay;
-        }
-        //如果自己是本月排产最后一天，直接跳过，不需要拉量或者舍弃
-        if (productionContext.isProductionEndDay(endDay)) {
-            return endDay;
-        }
-        // 取出与本结构使用相同特殊材料的结构排产:过滤使用相同特殊材料的结构
-        List<ProductionPlanGroupInfo> otherNeedProductionSpecialPlanList = getSameSpecialMaterialOtherGroupList(productionContext, productionPlanInfo);
-        // 其他特殊规格有任意一个没有排完，说明还不是最后一个结构，跳过
-        if (!isLastSpecialMaterialGroup(otherNeedProductionSpecialPlanList)) {
-            return endDay;
-        }
-        //打上最后一个规格的标记
-        productionPlanInfo.setIsLatestSpecialMaterial(true);
-        //本结构涉及的特殊材料清单
-        Map<String, BigDecimal> materialMap = productionPlanInfo.getEmbryoSpecialMaterialInfoMap();
-        // 特殊材料库存列表
-        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap();
-        // 特殊材料库存的可生产上限
-        Integer limitProductionQty = calculateLimitProductionQtyByStock(materialMap, specialMaterialInfoMap);
-        // 可生产上限不足，则不能排产
-        if (limitProductionQty <= BigDecimal.ZERO.intValue()) {
-            return startDay - BigDecimal.ONE.intValue();
-        }
-        /**
-         * 判断同特殊材料排排产量落在哪个区间：
-         * 1、计划量*单号模除标准长度，如果余数小于日硫化量 * 配比*单耗：舍弃余数部分
-         * 2、计划量*单号模除标准长度，如果余数大于等于日硫化量 * 配比*单耗：计划量补标准长度 - 日硫化量 * 配比*单耗
-         */
-        // 统计已排量 = 日硫化量 * 配比 * 已排天数
-        Integer allocationQty = otherNeedProductionSpecialPlanList.stream().mapToInt(ProductionPlanGroupInfo::getTheoryMaxProductionQty).sum();
-        // 同特殊材料结构总预计排产量
-        Integer sumPlanQty = allocationQty + productionPlanInfo.getSumPlanQty();
-        // 取出各结构的特殊材料清单交集
-        Map<String, BigDecimal> specialIntersectionMap = new HashMap<>();
-        specialIntersectionMap.putAll(materialMap);
-        for (ProductionPlanGroupInfo plan : otherNeedProductionSpecialPlanList) {
-            plan.getEmbryoSpecialMaterialInfoMap().keySet().stream().forEach(materialCode -> {
-                if (!specialIntersectionMap.containsKey(materialCode)) {
-                    specialIntersectionMap.remove(materialCode);
-                }
-            });
-        }
-        // 都没有交集，直接重置为本结构的物料清单
-        if (CollectionUtils.isEmpty(specialIntersectionMap)) {
-            specialIntersectionMap.putAll(materialMap);
-        }
-        // 单耗
-        Map.Entry<String, BigDecimal> entry = specialIntersectionMap.entrySet().stream().findFirst().get();
-        BigDecimal unitConsumeQty = entry.getValue();
-        // 标准长度及对应的量
-        Long standardLength = specialMaterialInfoMap.get(entry.getKey()).keySet().stream().findFirst().get();
-        Integer standardQty = BigDecimal.valueOf(standardLength).divide(unitConsumeQty).setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
-        // 计算余数
-        BigDecimal remainderQty = BigDecimalUtils.multiply(sumPlanQty, unitConsumeQty).remainder(BigDecimalUtils.valueOf(standardLength));
-        // 区间阈值 = 硫化量 * 配比*单耗
-        Integer floatThreshold = productionPlanInfo.getThreshold();
-        BigDecimal threshold = BigDecimalUtils.multiply(floatThreshold, unitConsumeQty);
-        boolean isAddQty = false;
-        Integer productionQty = productionPlanInfo.getSumPlanQty();
-        // 重算实际的量
-        Integer realProductionQty = BigDecimal.ZERO.intValue();
-        // 超过阈值，尝试补量
-        if (remainderQty.compareTo(threshold) >= BigDecimal.ZERO.intValue()) {
-            if (limitProductionQty >= productionQty + standardQty - floatThreshold) {
-                // 检查补量后不超过可生产上限才进行补量
-                isAddQty = true;
-                realProductionQty = productionQty + standardQty - floatThreshold;
-            }
-        }
-        // 不补量，则需要将计划量扣减掉余数部分
-        if (!isAddQty) {
-            realProductionQty = productionQty - floatThreshold;
-        }
-        // 可生产上限不足，则不能排产
-        if (realProductionQty <= BigDecimal.ZERO.intValue()) {
-            return startDay - BigDecimal.ONE.intValue();
-        }
-        // 计算排产天数 = ceil(计划量 / 日硫化量 / 配比)
-        BigDecimal theoryDays = BigDecimalUtils.div(realProductionQty, floatThreshold, 2, false);
-        theoryDays = theoryDays.setScale(0, RoundingMode.UP);
-        return startDay + theoryDays.intValue();
-    }
 
     /**
      * 是否需要执行查找其它还需排产的特殊材料分组计划
@@ -278,9 +204,9 @@ public class SpecialMaterialScheduleHandler {
             if (null == plan.getMinLhDayCapacityQty() || null == plan.getMinLhMachineCount()) {
                 return false;
             }
-            if (plan.getRemainingNeedAllocationDays() <= BigDecimal.ZERO.intValue()) {
-                return false;
-            }
+//            if (plan.getRemainingNeedAllocationDays() <= BigDecimal.ZERO.intValue()) {
+//                return false;
+//            }
             //涉及的特殊材料清单
             Map<String, BigDecimal> otherMaterialMap = plan.getEmbryoSpecialMaterialInfoMap();
             if (CollectionUtils.isEmpty(otherMaterialMap)) {

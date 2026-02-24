@@ -11,6 +11,7 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.factory.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
@@ -22,6 +23,7 @@ import com.zlt.aps.monthplan.api.domain.entity.MpTrialPlan;
 import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.monthplan.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
+import com.zlt.aps.monthplan.common.utils.StringUtil;
 import com.zlt.common.utils.PubUtil;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -42,6 +44,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
     @Autowired
     private IMpAdjustStructureInService mpAdjustStructureInService;
+
+    @Autowired
+    private MatchingProductionHandler matchingProductionHandler;
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -109,7 +114,14 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList;
         List<MpMonthPlanStatistics> monthPlanStatisticsResultList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        String structureCondi = contextDTO.getStructureName();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
+            if (!StringUtil.isEmptyWithTrim(structureCondi)){
+                //若传进来的结构有称有值，则按此结构调整
+                if (!entry.getKey().equals(structureCondi)){
+                    continue;
+                }
+            }
             //2.1 初始结构上下文
             //1）结构内，按结构分别调整
             contextDTO.setStructureName(entry.getKey());
@@ -135,9 +147,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
             //2.3 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
-            //TODO
             //=========================================================
-
+            matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
             //=========================================================
 
             //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数

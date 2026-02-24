@@ -31,9 +31,13 @@ public class SpecialMaterialInfoVo implements Serializable {
      */
     private Long stock;
     /**
-     * 总的已排产量
+     * 总的已排产量（已批次取整）
      */
     private Long sumProductionQty;
+    /**
+     * 总的已排产量（未批次取整）
+     */
+    private Long sumNoRoundProductionQty;
     /**
      * 已分配到SKU的量
      */
@@ -57,6 +61,7 @@ public class SpecialMaterialInfoVo implements Serializable {
         info.setStock(stockInfo.getStock());
         info.setSumProductionQty(BigDecimal.ZERO.longValue());
         info.setSumSkuAllocateQty(BigDecimal.ZERO.longValue());
+        info.setSumNoRoundProductionQty(BigDecimal.ZERO.longValue());
         info.setExistingInventoryCapacity(BigDecimal.ZERO.longValue());
         return info;
     }

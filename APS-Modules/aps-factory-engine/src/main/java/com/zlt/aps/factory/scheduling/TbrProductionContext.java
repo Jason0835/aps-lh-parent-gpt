@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.BiConsumer;
@@ -556,6 +557,32 @@ public class TbrProductionContext extends Context {
     }
 
     /**
+     * 获取结构对应的特殊材料的已分配库存数
+     *
+     * @param productionPlanInfo      结构
+     */
+    public Long getSpecialMaterialSumProductionQty(ProductionPlanGroupInfo productionPlanInfo) {
+        if (!productionPlanInfo.isSpecialMaterial()) {
+            return 0L;
+        }
+
+        Long resultQty = null;
+        for (Entry<String, BigDecimal> entry: productionPlanInfo.getEmbryoSpecialMaterialInfoMap().entrySet()) {
+            Map<Long, SpecialMaterialInfoVo> stockMap = this.specialMaterialInfoMap.get(entry.getKey());
+            if (stockMap == null) {
+                continue;
+            }
+            Long sumProductionQty = stockMap.values().stream().mapToLong(SpecialMaterialInfoVo::getSumProductionQty).sum();
+            if (resultQty == null) {
+                resultQty = sumProductionQty;
+            } else {
+                resultQty = Math.min(resultQty, sumProductionQty);
+            }
+        }
+        return resultQty;
+    }
+
+    /**
      * 更新特殊材料库存<br/>
      * 根据结构分组的分配天数变化量，更新涉及特殊材料的已排库存信息
      *
@@ -583,10 +610,17 @@ public class TbrProductionContext extends Context {
 //            // 无变化直接结束
 //            return;
 //        }
-        // 天数换算成排产量 = 天数 * 日硫化量 * 配比
-        BigDecimal realProductionQty = BigDecimalUtils.multiply(allocationDays, groupInfo.getThreshold());
-        allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumProductionQty,
-                SpecialMaterialInfoVo::setSumProductionQty, SpecialMaterialInfoVo::getStock);
+        // 保留一天作为换模日，其余天才满额生产
+        Integer firstQty = this.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountBymould());
+        Integer otherDay = allocationDays - 1;
+        BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
+        BigDecimal otherDayProductionQty = BigDecimalUtils.multiply(otherDay, groupInfo.getThreshold()); // 其余日排产量
+        BigDecimal realProductionQty = BigDecimalUtils.add(firstDayProductionQty, otherDayProductionQty);
+        this.allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumNoRoundProductionQty,
+                SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
+        
+        this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
     }
 
     /**
@@ -659,6 +693,98 @@ public class TbrProductionContext extends Context {
         return getSpecialMaterialProductionQty(groupInfo, productionQty, SpecialMaterialInfoVo::getSumSkuAllocateQty,
                 SpecialMaterialInfoVo::getSumProductionQty);
     }
+
+    /**
+     * 获取特殊材料批次剩余量，用于搭配，返回最近一个批次的剩余量
+     * @param groupInfo 结构
+     * @param productionQty 预计生产量
+     * @param boolean 库存不足预计生产量的情况下，是否新开一卷
+     * @return
+     */
+    public Integer getSpecialMaterialBatchRemainQty(ProductionPlanGroupInfo groupInfo, Integer productionQty, boolean isNewRoll) {
+        if (!groupInfo.isSpecialMaterial()) {
+            return 0;
+        }
+        // 检查是否有特殊材料库存不足的情况，需要按剩余库存换算后生产条数最少的生产量为准
+        Integer remainProductQty = productionQty;
+        Map<String, BigDecimal> embryoSpecialMaterialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap(); // 本结构特殊材料清单
+        for (Entry<String, BigDecimal> entry: embryoSpecialMaterialInfoMap.entrySet()) {
+            String materialCode = entry.getKey(); // 特殊材料物料
+            BigDecimal unitConsumeQty = entry.getValue(); // 单胎消耗
+            Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(materialCode);
+            if (specialMaterialInfo == null) {
+                remainProductQty = 0;
+                break;
+            }
+            // 1.1统计剩余库存
+            // 计算标准库存
+            Long remainStock = specialMaterialInfo.values().stream()
+                    .mapToLong(s -> BigDecimalUtils
+                            .ceil(s.getSumSkuAllocateQty(), BigDecimalUtils.valueOf(s.getStandardLength())).longValue()
+                            - s.getSumSkuAllocateQty())
+                    .sum();
+            // 1.2剩余库存换算成条数
+            Integer canProductQty = BigDecimalUtils.div(remainStock, unitConsumeQty, 0).intValue();
+            if (canProductQty < remainProductQty && isNewRoll) { // 如果剩余库存不足够生产出需求量，多加一卷
+                Long standardLength = specialMaterialInfo.keySet().stream().min(Long::compareTo).orElse(0L);
+                Long unAllocationQty = specialMaterialInfo.values().stream().mapToLong(s -> s.getStock() - s.getSumSkuAllocateQty()).sum();
+                if (remainStock + standardLength <= unAllocationQty) {
+                    remainProductQty = BigDecimalUtils.div(remainStock + standardLength, unitConsumeQty, 0).intValue();
+                } else {
+                    remainProductQty = canProductQty;
+                }
+            } else {
+                remainProductQty = canProductQty;
+            }
+            if (remainProductQty <= 0) {
+                break;
+            }
+        }
+        //偶数
+        remainProductQty = remainProductQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION * ProductionConstant.DOUBLE_MOULD_QTY;
+        return remainProductQty;
+    }
+    
+    /**
+     * 对特殊材料已占用库存做标准长度取整处理
+     * @param allGroupPlanMap
+     */
+    private void roundSpecialMaterialPlanQtyStandardLength(ProductionPlanGroupInfo groupInfo) {
+//        BigDecimal threshold = BigDecimalUtils.valueOf(groupInfo.getThreshold());
+        groupInfo.getEmbryoSpecialMaterialInfoMap().entrySet().forEach(entry -> {
+//            BigDecimal specialMaterialThreshold = entry.getValue().multiply(threshold);
+            Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(entry.getKey());
+            if (specialMaterialInfo == null) {
+                return;
+            }
+            specialMaterialInfo.values().stream()
+                    .forEach(stockInfo -> {
+                        BigDecimal sumProductionQty = BigDecimalUtils.valueOf(stockInfo.getSumNoRoundProductionQty()); // 取出未取整数量
+                        BigDecimal stockQty = BigDecimalUtils.valueOf(stockInfo.getStock()); // 库存数
+                        BigDecimal standardLength = BigDecimalUtils.valueOf(stockInfo.getStandardLength()); // 标准长度
+                        BigDecimal finalProductionQty = sumProductionQty;
+                        // 如果需求量超过实际库存量，则最多只能处理至低于库存量的最大批次数
+                        // 需小于最小批次数则不需要处理
+                        if (sumProductionQty.compareTo(stockQty) > 0) {
+                            finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
+                        } else if (sumProductionQty.compareTo(standardLength) > 0) {
+//                            BigDecimal remainderQty = sumProductionQty.remainder(standardLength); // 排产量余数
+//                            if (remainderQty.compareTo(BigDecimal.ZERO) != 0) {
+//                                // 判断如果余数低于最低硫化量 * 硫化机台数 * 用量，则舍弃掉该值；反之要加量补够标准长度的整倍数
+//                                BigDecimal modifyQty = remainderQty.compareTo(specialMaterialThreshold) < 0 ? remainderQty.negate()
+//                                        : standardLength.subtract(remainderQty);
+//                                finalProductionQty = BigDecimalUtils.add(sumProductionQty, modifyQty);
+//                            }
+//                            if (finalProductionQty.compareTo(stockQty) > 0) { // 如果取整后的量超过实际库存量，则最多只能处理至低于库存量的最大批次数
+//                                finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
+//                            }
+                            finalProductionQty = BigDecimalUtils.floor(sumProductionQty, standardLength);
+                        }
+                        stockInfo.setSumProductionQty(finalProductionQty.longValue()); // 计算结果设置到取整后的
+                    });
+
+        });
+    }
     
     /**
      * 获取结构目前对应的特殊材料库存可生产量
@@ -682,9 +808,10 @@ public class TbrProductionContext extends Context {
                 break;
             }
             // 1.1统计剩余库存
+            // 可用库存
             Long stock = specialMaterialInfo.values().stream().mapToLong(s -> stockGetter.apply(s) - sumQtyGetter.apply(s)).sum();
             // 1.2剩余库存换算成条数
-            Integer canProductQty = BigDecimalUtils.multiply(stock, unitConsumeQty).intValue();
+            Integer canProductQty = BigDecimalUtils.div(stock, unitConsumeQty, 0).intValue();
             minProductQty = Math.min(minProductQty, canProductQty);
             if (minProductQty <= 0) {
                 break;

@@ -12,6 +12,7 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -102,6 +103,9 @@ public class MdmStructureLhRatioServiceImpl extends AbstractDocService<MdmStruct
 
     @Override
     protected Boolean serviceCheckAndDataHandle(MdmStructureLhRatio importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (StringUtils.isBlank(importDocEntity.getCxMachineTypeCode())) {
+            importDocEntity.setCxMachineTypeCode(null);
+        }
         Set<String> structureNameSet = (Set<String>) serviceCheckParams.get("structureNameSet");
         if (PubUtil.isEmpty(structureNameSet) || structureNameSet.contains(importDocEntity.getStructureName())) {
             return Boolean.TRUE;
