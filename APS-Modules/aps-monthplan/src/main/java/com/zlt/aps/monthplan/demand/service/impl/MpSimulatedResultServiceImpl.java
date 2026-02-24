@@ -3,6 +3,7 @@ package com.zlt.aps.monthplan.demand.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.tlt.aps.constant.FactoryConstant;
@@ -114,7 +115,7 @@ public class MpSimulatedResultServiceImpl extends AbstractDocService<MpSimulated
       RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
       // 2、得到T月、T+1月、T+2月。T月 = 当前操作日所在年月(当月) +1 ；T+1月 = 在T月的基础上+1个月；T+2月 = 在T月的基础上+2个月
       MonthCalculator.MonthRangeResult monthRange = MonthCalculator.calculateMonthRanges(tMonth);
-      asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange,requestAttributes);
+      asyncService.executeAsyncTaskForSimulatedProduction(finalVersion,monthRange,requestAttributes,SecurityUtils.getUsername());
     }
 
   @Override

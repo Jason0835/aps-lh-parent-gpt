@@ -2,6 +2,7 @@ package com.zlt.aps.monthplan.common.utils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.context.SecurityContextHolder;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.redis.service.RedisService;
@@ -81,9 +82,10 @@ public class AsyncService {
   }
 
   @Async("taskExecutor")
-  public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion, MonthCalculator.MonthRangeResult monthRange, RequestAttributes requestAttributes){
+  public void executeAsyncTaskForSimulatedProduction(MpFactoryProductionVersion finalVersion, MonthCalculator.MonthRangeResult monthRange, RequestAttributes requestAttributes,String userName){
         String keyForSimulated =  ApsConstant.REDIS_CREATE_VM_MONTH_PREDICTION;
         try{
+          SecurityContextHolder.setUserName(userName);
           PredictionContext predictionContext = dpDemandPlanService.buildPredictionContext(finalVersion.getFactoryCode());
           Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
           productionVersions.put(monthRange.getTMonth(),finalVersion);
@@ -142,6 +144,7 @@ public class AsyncService {
               }
             }
           }
+
           Map<String, MdmMaterialInfo> materialInfoMap = predictionContext.getMaterialInfoMap();
           List<MpSimulatedResult> list = buildSimulatedResult(monthRange,productionVersions,tMonthDemands,materialInfoMap);
           if(CollectionUtils.isNotEmpty(list)) {
@@ -158,9 +161,10 @@ public class AsyncService {
   }
 
   @Async("taskExecutor")
-  public void executeAsyncTaskForPredictionProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange,RequestAttributes requestAttributes){
+  public void executeAsyncTaskForPredictionProduction(MpFactoryProductionVersion finalVersion,MonthCalculator.MonthRangeResult monthRange,RequestAttributes requestAttributes,String userName){
     String keyForPrediction = ApsConstant.REDIS_CREATE_PRE_MONTH_PREDICTION;
     try{
+      SecurityContextHolder.setUserName(userName);
       YearMonth tMonth = monthRange.getTMonth();
       Map<YearMonth,MpFactoryProductionVersion> productionVersions = Maps.newHashMap();
       productionVersions.put(tMonth,finalVersion);
