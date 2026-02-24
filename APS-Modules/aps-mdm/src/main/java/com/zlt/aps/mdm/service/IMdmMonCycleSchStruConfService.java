@@ -1,7 +1,8 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf;
-import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.dp.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.mdm.api.domain.entity.MdmMonCycleSchStruConf;
+
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

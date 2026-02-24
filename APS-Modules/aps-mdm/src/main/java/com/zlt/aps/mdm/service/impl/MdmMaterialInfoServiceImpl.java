@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,19 +21,19 @@ import com.tlt.aps.utils.BeanCopyUtils;
 import com.tlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.maindata.enums.SystemBaseEnums;
-import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
-import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMdmProductConstructionService;
-import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
-import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateJsonVo;
-import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateVo;
-import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.dp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mdm.enums.SystemBaseEnums;
+import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmProductConstructionEntityMapper;
+import com.zlt.aps.mdm.service.IMdmMaterialInfoService;
+import com.zlt.aps.mdm.service.IMdmProductConstructionService;
+import com.zlt.aps.mdm.utils.ScmListUtils;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductConstruction;
+import com.zlt.aps.mdm.api.domain.vo.ConfigConstructionVo;
+import com.zlt.aps.mdm.api.domain.vo.MaterialInfoGrossRateJsonVo;
+import com.zlt.aps.mdm.api.domain.vo.MaterialInfoGrossRateVo;
+import com.zlt.aps.mdm.api.domain.vo.TableProductInfoVo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -336,7 +336,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
 
         Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(uniqueKeyList)) {
-            List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(uniqueKeyList, 500);
+            List<List<String>> splitList = com.zlt.aps.mdm.utils.CollectionUtils.splitList(uniqueKeyList, 500);
             for (List<String> subList : splitList) {
                 List<MdmMaterialInfo> productInfos = mdmMaterialInfoEntityMapper.selectByUniqueKeyList(subList);
                 productInfoList.addAll(productInfos);

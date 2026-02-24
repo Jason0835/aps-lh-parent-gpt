@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.alibaba.nacos.client.naming.utils.CollectionUtils;
 import com.github.pagehelper.PageInfo;
@@ -11,12 +11,12 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMdmProductionMoldingService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductionMolding;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductionMoldingPageVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductionMoldingVo;
+import com.zlt.aps.mdm.service.IMdmMaterialInfoService;
+import com.zlt.aps.mdm.service.IMdmProductionMoldingService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductionMolding;
+import com.zlt.aps.mdm.api.domain.vo.MdmProductionMoldingPageVo;
+import com.zlt.aps.mdm.api.domain.vo.MdmProductionMoldingVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;

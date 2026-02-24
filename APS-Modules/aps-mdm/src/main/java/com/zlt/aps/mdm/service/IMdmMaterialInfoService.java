@@ -1,14 +1,14 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.vo.ConfigConstructionVo;
-import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateVo;
-import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.dp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductConstruction;
+import com.zlt.aps.mdm.api.domain.vo.ConfigConstructionVo;
+import com.zlt.aps.mdm.api.domain.vo.MaterialInfoGrossRateVo;
+import com.zlt.aps.mdm.api.domain.vo.TableProductInfoVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

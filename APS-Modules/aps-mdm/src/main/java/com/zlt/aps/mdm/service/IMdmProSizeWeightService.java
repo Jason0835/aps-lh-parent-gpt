@@ -1,6 +1,6 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProSizeWeight;
+import com.zlt.aps.mdm.api.domain.entity.MdmProSizeWeight;
 import com.zlt.bill.common.service.IDocService;
 
 /**

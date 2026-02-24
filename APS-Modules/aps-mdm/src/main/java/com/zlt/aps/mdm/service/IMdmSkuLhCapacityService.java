@@ -1,7 +1,7 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.bill.common.service.IDocService;
 /**
  * Copyright (c) 2022, All rights reserved。

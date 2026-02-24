@@ -1,11 +1,11 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
-import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.aps.mdm.mapper.MdmSkuStructureRefEntityMapper;
+import com.zlt.aps.mdm.service.IMdmSkuStructureRefService;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

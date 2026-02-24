@@ -1,9 +1,9 @@
-package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.mdm.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.dp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.vo.TableProductInfoVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

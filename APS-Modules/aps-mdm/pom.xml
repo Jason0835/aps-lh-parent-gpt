@@ -69,6 +69,22 @@
                 </exclusion>
             </exclusions>
         </dependency>
+      <dependency>
+        <groupId>com.zlt.aps.dp</groupId>
+        <artifactId>aps-dp-api</artifactId>
+        <version>1.0.3-SNAPSHOT</version>
+        <scope>compile</scope>
+      </dependency>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-all</artifactId>
+      </dependency>
+      <dependency>
+        <groupId>com.zlt.aps</groupId>
+        <artifactId>aps-dp</artifactId>
+        <version>1.0.3-SNAPSHOT</version>
+        <scope>compile</scope>
+      </dependency>
     </dependencies>
 
     <build>

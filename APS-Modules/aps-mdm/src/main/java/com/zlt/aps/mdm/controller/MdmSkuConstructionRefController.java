@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -7,9 +7,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.service.IMdmSkuConstructionRefService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mdm.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mdm.service.IMdmSkuConstructionRefService;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -78,7 +78,7 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
      * 删除
      */
     @Log(title = "ui.data.column.mdmSkuConstructionRef.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions( "monthplan:mdmSkuConstructionRef:remove")
+    @RequiresPermissions( "mdm:mdmSkuConstructionRef:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override

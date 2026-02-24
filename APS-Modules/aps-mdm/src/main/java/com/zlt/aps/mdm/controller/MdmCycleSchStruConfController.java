@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -13,10 +13,10 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
-import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
-import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
+import com.zlt.aps.mdm.mapper.MdmCycleSchStruConfEntityMapper;
+import com.zlt.aps.mdm.service.IMdmCycleSchStruConfService;
+import com.zlt.aps.mdm.utils.RemoteImportExcelUtils;
+import com.zlt.aps.mdm.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ImportExcelUtils;

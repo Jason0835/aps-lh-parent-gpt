@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -9,16 +9,16 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
-import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
-import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
+import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmModelInfoEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmProductConstructionEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmProductModelRelationEntityMapper;
+import com.zlt.aps.mdm.service.IMdmProductModelRelationService;
+import com.zlt.aps.mdm.api.domain.dto.ProductMouldConfigurationParam;
+import com.zlt.aps.mdm.api.domain.dto.ProductMouldRelationConfigurationParam;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -71,7 +71,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     /**
      * 查询SKU与模具关系列表
      */
-//    @RequiresPermissions("maindata:relation:list")
+//    @RequiresPermissions("mdm:relation:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override

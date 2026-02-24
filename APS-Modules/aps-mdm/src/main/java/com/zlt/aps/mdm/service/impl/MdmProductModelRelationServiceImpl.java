@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -13,19 +13,20 @@ import com.tlt.aps.constant.FactoryConstant;
 import com.tlt.aps.constant.StringConstant;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
-import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.maindata.domain.dto.MouldMonthUseDto;
-import com.zlt.aps.maindata.enums.SystemBaseEnums;
-import com.zlt.aps.maindata.mapper.*;
-import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
-import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.dto.ProductMouldConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.dto.ProductMouldRelationConfigurationParam;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
-import com.zlt.aps.monthplan.api.domain.vo.ProductMouldConfigurationVo;
-import com.zlt.aps.monthplan.api.domain.vo.ProductMouldInfoVo;
+
+import com.zlt.aps.mdm.api.domain.dto.MouldMonthUseDto;
+import com.zlt.aps.mdm.enums.SystemBaseEnums;
+import com.zlt.aps.mdm.mapper.*;
+import com.zlt.aps.mdm.mes.IMesItfService;
+import com.zlt.aps.mdm.service.IMdmProductModelRelationService;
+import com.zlt.aps.mdm.utils.ScmListUtils;
+import com.zlt.aps.mdm.api.domain.dto.ProductMouldConfigurationParam;
+import com.zlt.aps.mdm.api.domain.dto.ProductMouldRelationConfigurationParam;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.vo.ProductMouldConfigurationVo;
+import com.zlt.aps.mdm.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
@@ -127,7 +128,7 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
         Map<String, MdmMaterialInfo> productInfoMap = new HashMap<>(16);
         List<String> productCodeList = list.stream().map(MdmSkuMouldRel::getMaterialCode).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(productCodeList)) {
-            List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(productCodeList, 100);
+            List<List<String>> splitList = com.zlt.aps.mdm.utils.CollectionUtils.splitList(productCodeList, 100);
             List<MdmMaterialInfo> productInfoList = new ArrayList<>();
             for (List<String> codeList : splitList) {
                 LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()

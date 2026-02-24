@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -9,11 +9,11 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.maindata.mapper.MdmMoldingMachineClsBEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMoldingMachineClsEntityMapper;
-import com.zlt.aps.maindata.service.IMdmMoldingMachineClsService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineCls;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineClsB;
+import com.zlt.aps.mdm.mapper.MdmMoldingMachineClsBEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmMoldingMachineClsEntityMapper;
+import com.zlt.aps.mdm.service.IMdmMoldingMachineClsService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldingMachineCls;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldingMachineClsB;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

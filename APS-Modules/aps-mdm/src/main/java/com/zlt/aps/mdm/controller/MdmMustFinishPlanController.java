@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -7,8 +7,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.service.IMdmMustFinishPlanService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMustFinishPlan;
+import com.zlt.aps.mdm.service.IMdmMustFinishPlanService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMustFinishPlan;
 import com.zlt.common.controller.BusiController;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -46,7 +46,7 @@ public class MdmMustFinishPlanController extends BusiController<MdmMustFinishPla
     /**
      * 查询必须保证的客户月计划列表
      */
-    @RequiresPermissions("maindata:mustFinishPlan:list")
+    @RequiresPermissions("mdm:mustFinishPlan:list")
     @ApiOperation("查询必须保证的客户月计划列表")
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody MdmMustFinishPlan mdmMustFinishPlan) {
@@ -59,7 +59,7 @@ public class MdmMustFinishPlanController extends BusiController<MdmMustFinishPla
     /**
      * 导出必须保证的客户月计划列表
      */
-    @RequiresPermissions("maindata:mustFinishPlan:export")
+    @RequiresPermissions("mdm:mustFinishPlan:export")
     @Log(title = "ui.data.column.mustFinishPlan.modelName", businessType = BusinessType.EXPORT)
     @PostMapping("/exportData/{fileName}")
     public byte[] exportData(@RequestBody MdmMustFinishPlan mdmMustFinishPlan, @PathVariable("fileName") String fileName,
@@ -86,7 +86,7 @@ public class MdmMustFinishPlanController extends BusiController<MdmMustFinishPla
      * 新增必须保证的客户月计划
      */
     @Log(title = "ui.data.column.mustFinishPlan.modelName", businessType = BusinessType.INSERT)
-    @RequiresPermissions("maindata:mustFinishPlan:add")
+    @RequiresPermissions("mdm:mustFinishPlan:add")
     @ApiOperation("新增必须保证的客户月计划")
     @PostMapping("/add")
     public AjaxResult add(@RequestBody MdmMustFinishPlan mdmMustFinishPlan) {
@@ -97,7 +97,7 @@ public class MdmMustFinishPlanController extends BusiController<MdmMustFinishPla
      * 修改必须保证的客户月计划
      */
     @Log(title = "ui.data.column.mustFinishPlan.modelName", businessType = BusinessType.UPDATE)
-    @RequiresPermissions("maindata:mustFinishPlan:edit")
+    @RequiresPermissions("mdm:mustFinishPlan:edit")
     @ApiOperation("修改必须保证的客户月计划")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody MdmMustFinishPlan mdmMustFinishPlan) {
@@ -108,7 +108,7 @@ public class MdmMustFinishPlanController extends BusiController<MdmMustFinishPla
      * 删除必须保证的客户月计划
      */
     @Log(title = "ui.data.column.mustFinishPlan.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("maindata:mustFinishPlan:remove")
+    @RequiresPermissions("mdm:mustFinishPlan:remove")
     @ApiOperation("删除必须保证的客户月计划")
     @DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids) {

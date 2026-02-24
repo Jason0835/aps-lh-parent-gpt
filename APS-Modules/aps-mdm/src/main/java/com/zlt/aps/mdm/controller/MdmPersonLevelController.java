@@ -1,10 +1,10 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.service.IMdmPersonLevelService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel;
+import com.zlt.aps.mdm.service.IMdmPersonLevelService;
+import com.zlt.aps.mdm.api.domain.entity.MdmPersonLevel;
 import lombok.extern.slf4j.Slf4j;
 
 import io.swagger.annotations.Api;
@@ -45,7 +45,7 @@ public class MdmPersonLevelController extends BaseController {
     /**
      * 查询成型机人员档配置列表
      */
-    @RequiresPermissions("monthplan:mdmPersonLevel:list")
+    @RequiresPermissions("mdm:mdmPersonLevel:list")
     @ApiOperation("查询成型机人员档配置列表")
     @PostMapping("/list")
     public TableDataInfo list(@RequestBody MdmPersonLevel mdmPersonLevel) {
@@ -57,7 +57,7 @@ public class MdmPersonLevelController extends BaseController {
     /**
      * 获取成型机人员档配置详细信息
      */
-    @RequiresPermissions("monthplan:mdmPersonLevel:query")
+    @RequiresPermissions("mdm:mdmPersonLevel:query")
     @ApiOperation("获取成型机人员档配置详细信息")
     @GetMapping(value = "/{id}")
     public MdmPersonLevel getInfo(@PathVariable("id") Long id) {
@@ -85,7 +85,7 @@ public class MdmPersonLevelController extends BaseController {
     /**
      * 删除成型机人员档配置
      */
-    @RequiresPermissions("monthplan:mdmPersonLevel:remove")
+    @RequiresPermissions("mdm:mdmPersonLevel:remove")
     @ApiOperation("删除成型机人员档配置")
     @DeleteMapping("/{ids}")
     public AjaxResult remove(@PathVariable Long[] ids) {

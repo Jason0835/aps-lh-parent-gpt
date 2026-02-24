@@ -1,12 +1,8 @@
-package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.mdm.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
 
 /**
  * BOM物料消耗明细Mapper接口

@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
@@ -9,12 +9,12 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMdmProductVulcanizingService;
-import com.zlt.aps.maindata.service.IVulcanizingMachineService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductVulcanizing;
-import com.zlt.aps.monthplan.api.domain.entity.VulcanizingMachine;
+import com.zlt.aps.mdm.service.IMdmMaterialInfoService;
+import com.zlt.aps.mdm.service.IMdmProductVulcanizingService;
+import com.zlt.aps.mdm.service.IVulcanizingMachineService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductVulcanizing;
+import com.zlt.aps.mdm.api.domain.entity.VulcanizingMachine;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.Nullable;
@@ -87,7 +87,9 @@ public class MdmProductVulcanizingController extends BaseController {
     @PostMapping("/add")
     public AjaxResult add(@RequestBody MdmProductVulcanizing docProductVulcanization) {
         AjaxResult error = buildMachineId(docProductVulcanization);
-        if (error != null) return error;
+        if (error != null) {
+          return error;
+        }
         return toAjax(idocProductVulcanizingService.insertDocProductVulcanization(docProductVulcanization));
     }
 
@@ -115,7 +117,9 @@ public class MdmProductVulcanizingController extends BaseController {
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody MdmProductVulcanizing docProductVulcanization) {
         AjaxResult error = buildMachineId(docProductVulcanization);
-        if (error != null) return error;
+        if (error != null) {
+          return error;
+        }
         return toAjax(idocProductVulcanizingService.updateDocProductVulcanization(docProductVulcanization));
     }
 

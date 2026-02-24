@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -9,13 +9,13 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.constant.FactoryConstant;
-import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.service.IMdmMonthSurplusService;
-import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.monthplan.api.service.IRemoteImportErrorLogService;
-import com.zlt.aps.monthplan.api.service.IRemoteImportLogService;
+import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.service.IMdmMonthSurplusService;
+import com.zlt.aps.mdm.utils.RemoteImportExcelUtils;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mdm.api.service.IRemoteImportErrorLogService;
+import com.zlt.aps.mdm.api.service.IRemoteImportLogService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
@@ -116,7 +116,7 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
         Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(16);
         List<String> materialCodeList = list.stream().map(MdmMonthSurplus::getMaterialCode).filter(Objects::nonNull).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(materialCodeList)) {
-            List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(materialCodeList, 100);
+            List<List<String>> splitList = com.zlt.aps.mdm.utils.CollectionUtils.splitList(materialCodeList, 100);
             List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
             for (List<String> codeList : splitList) {
                 LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()

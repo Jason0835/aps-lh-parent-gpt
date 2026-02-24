@@ -1,6 +1,7 @@
-package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.mdm.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
+
+import com.zlt.aps.mdm.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

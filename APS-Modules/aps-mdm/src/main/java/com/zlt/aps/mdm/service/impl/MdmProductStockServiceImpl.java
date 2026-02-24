@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -8,10 +8,11 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
-import com.zlt.aps.maindata.service.IMdmProductStockService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+
+import com.zlt.aps.mdm.mapper.MdmProductStockEntityMapper;
+import com.zlt.aps.mdm.mes.IMesItfService;
+import com.zlt.aps.mdm.service.IMdmProductStockService;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

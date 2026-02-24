@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -6,12 +6,12 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
-import com.zlt.aps.maindata.service.IMdmCxMachineFixedService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCxMachineFixed;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmMoldingMachineEntityMapper;
+import com.zlt.aps.mdm.service.IMdmCxMachineFixedService;
+import com.zlt.aps.mdm.api.domain.entity.MdmCxMachineFixed;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;

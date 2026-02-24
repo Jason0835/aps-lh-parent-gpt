@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -8,10 +8,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.maindata.service.IMdmMouldUseStatusService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus;
-import com.zlt.aps.monthplan.api.domain.vo.MdmMouldUseStatusVo;
-import com.zlt.aps.monthplan.api.domain.vo.PeriodInfo;
+import com.zlt.aps.mdm.service.IMdmMouldUseStatusService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldUseStatus;
+import com.zlt.aps.mdm.api.domain.vo.MdmMouldUseStatusVo;
+import com.zlt.aps.mdm.api.domain.vo.PeriodInfo;
 import com.zlt.common.controller.BusiController;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.collections4.CollectionUtils;

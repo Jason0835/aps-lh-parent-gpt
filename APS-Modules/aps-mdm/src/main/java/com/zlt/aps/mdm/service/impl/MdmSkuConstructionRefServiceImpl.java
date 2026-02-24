@@ -1,12 +1,12 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.service.IMdmSkuConstructionRefService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mdm.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mdm.service.IMdmSkuConstructionRefService;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

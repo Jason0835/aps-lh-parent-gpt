@@ -1,8 +1,9 @@
-package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.mdm.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.maindata.domain.dto.MouldMonthUseDto;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus;
+import com.zlt.aps.mdm.api.domain.dto.MouldMonthUseDto;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldUseStatus;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * @author leo
  * @date 2021-08-27
  */
+@Mapper
 public interface MdmMouldUseStatusEntityMapper extends BaseMapper<MdmMouldUseStatus> {
 
     /**

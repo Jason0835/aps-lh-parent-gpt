@@ -1,12 +1,12 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.constant.UserConstants;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.mapper.MdmPersonLevelMapper;
-import com.zlt.aps.maindata.service.IMdmPersonLevelService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel;
+import com.zlt.aps.mdm.mapper.MdmPersonLevelMapper;
+import com.zlt.aps.mdm.service.IMdmPersonLevelService;
+import com.zlt.aps.mdm.api.domain.entity.MdmPersonLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

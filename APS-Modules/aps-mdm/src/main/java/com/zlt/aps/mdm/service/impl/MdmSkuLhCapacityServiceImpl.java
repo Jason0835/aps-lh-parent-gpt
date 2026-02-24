@@ -1,14 +1,13 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
-import com.zlt.aps.maindata.service.IMdmSkuLhCapacityService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.mdm.mapper.MdmSkuLhCapacityEntityMapper;
+import com.zlt.aps.mdm.service.IMdmSkuLhCapacityService;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.beans.factory.annotation.Autowired;

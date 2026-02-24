@@ -1,12 +1,12 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
-import com.zlt.aps.maindata.service.IMdmWorkWearInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;
+import com.zlt.aps.mdm.mapper.MdmMoldingMachineEntityMapper;
+import com.zlt.aps.mdm.service.IMdmWorkWearInfoService;
+import com.zlt.aps.mdm.api.domain.entity.MdmWorkWearInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.sysdef.domain.SysDocType;

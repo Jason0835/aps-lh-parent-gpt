@@ -1,12 +1,12 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.service.IMdmProductionCalendarService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductionCalendar;
+import com.zlt.aps.mdm.service.IMdmProductionCalendarService;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductionCalendar;
 import com.zlt.common.controller.BusiController;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -41,7 +41,7 @@ public class MdmProductionCalendarController extends BusiController {
     /**
      * 查询生产日历列表
      */
-    // @RequiresPermissions("maindata:productionCalendar:list")
+    // @RequiresPermissions("mdm:productionCalendar:list")
     @RequiresPermissions("lean:productioncalendar:list")
     @ApiOperation("查询生产日历列表")
     @PostMapping("/list")
@@ -55,7 +55,7 @@ public class MdmProductionCalendarController extends BusiController {
     // /**
     //  * 导出生产日历列表
     //  */
-    // @RequiresPermissions("maindata:productionCalendar:export")
+    // @RequiresPermissions("mdm:productionCalendar:export")
     // @Log(title = "生产日历", businessType = BusinessType.EXPORT)
     // @PostMapping("/exportData/{fileName}")
     // public byte[] exportData(@RequestBody MdmProductionCalendar mdmProductionCalendar, @PathVariable("fileName") String fileName,
@@ -82,7 +82,7 @@ public class MdmProductionCalendarController extends BusiController {
      * 新增生产日历
      */
     @Log(title = "ui.data.column.productionCalendar.modelName", businessType = BusinessType.INSERT)
-    // @RequiresPermissions("maindata:productionCalendar:add")
+    // @RequiresPermissions("mdm:productionCalendar:add")
     @RequiresPermissions("lean:productioncalendar:add")
     @ApiOperation("新增生产日历")
     @PostMapping("/add")
@@ -94,7 +94,7 @@ public class MdmProductionCalendarController extends BusiController {
      * 修改生产日历
      */
     @Log(title = "ui.data.column.productionCalendar.modelName", businessType = BusinessType.UPDATE)
-    // @RequiresPermissions("maindata:productionCalendar:edit")
+    // @RequiresPermissions("mdm:productionCalendar:edit")
     @RequiresPermissions("lean:productioncalendar:edit")
     @ApiOperation("修改生产日历")
     @PostMapping("/edit")
@@ -106,7 +106,7 @@ public class MdmProductionCalendarController extends BusiController {
      * 删除生产日历
      */
     @Log(title = "ui.data.column.productionCalendar.modelName", businessType = BusinessType.DELETE)
-    // @RequiresPermissions("maindata:productionCalendar:remove")
+    // @RequiresPermissions("mdm:productionCalendar:remove")
     @RequiresPermissions("lean:productioncalendar:remove")
     @ApiOperation("删除生产日历")
     @DeleteMapping("/{ids}")

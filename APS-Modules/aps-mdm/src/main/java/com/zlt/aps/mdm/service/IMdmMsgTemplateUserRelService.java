@@ -1,10 +1,10 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 import java.util.List;
 import java.util.Map;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel;
+import com.zlt.aps.mdm.api.domain.entity.MdmMsgTemplateUserRel;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 

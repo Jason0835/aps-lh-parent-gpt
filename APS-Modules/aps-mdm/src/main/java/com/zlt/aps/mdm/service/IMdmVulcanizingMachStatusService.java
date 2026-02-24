@@ -1,9 +1,9 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus;
-import com.zlt.aps.monthplan.api.domain.vo.CopyParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmVulcanizingMachStatusVo;
+import com.zlt.aps.mdm.api.domain.entity.MdmVulcanizingMachStatus;
+import com.zlt.aps.mdm.api.domain.vo.CopyParamVo;
+import com.zlt.aps.mdm.api.domain.vo.MdmVulcanizingMachStatusVo;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;

@@ -1,8 +1,8 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmBomInfo;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.springframework.transaction.annotation.Transactional;
-import com.zlt.aps.maindata.service.IMdmBomInfoService;
+import com.zlt.aps.mdm.service.IMdmBomInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
 

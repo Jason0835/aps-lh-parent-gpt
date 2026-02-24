@@ -1,7 +1,7 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMustFinishPlan;
+import com.zlt.aps.mdm.api.domain.entity.MdmMustFinishPlan;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;

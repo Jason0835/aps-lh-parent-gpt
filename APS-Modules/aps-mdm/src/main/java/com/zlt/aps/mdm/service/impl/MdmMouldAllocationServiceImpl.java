@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -9,10 +9,10 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.maindata.mapper.MdmMouldAllocationEntityMapper;
-import com.zlt.aps.maindata.service.IMdmMouldAllocationService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;
-import com.zlt.aps.monthplan.api.domain.vo.PeriodInfo;
+import com.zlt.aps.mdm.mapper.MdmMouldAllocationEntityMapper;
+import com.zlt.aps.mdm.service.IMdmMouldAllocationService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldAllocation;
+import com.zlt.aps.mdm.api.domain.vo.PeriodInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;

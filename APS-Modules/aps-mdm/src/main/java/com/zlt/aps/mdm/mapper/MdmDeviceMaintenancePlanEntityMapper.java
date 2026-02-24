@@ -1,8 +1,8 @@
-package com.zlt.aps.maindata.mapper;
+package com.zlt.aps.mdm.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.maindata.domain.dto.MouldMonthUseDto;
-import com.zlt.aps.monthplan.api.domain.entity.MdmDeviceMaintenancePlan;
+import com.zlt.aps.mdm.api.domain.dto.MouldMonthUseDto;
+import com.zlt.aps.mdm.api.domain.entity.MdmDeviceMaintenancePlan;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -23,7 +23,7 @@ public interface MdmDeviceMaintenancePlanEntityMapper extends BaseMapper<MdmDevi
      * @return
      */
     List<MouldMonthUseDto> getMonthMaintenanceMould(@Param("factoryCode") String factoryCode,
-                                             @Param("year") int year,
-                                             @Param("month") int month,
-                                             @Param("mouldCodeList") List<String> mouldCodeList);
+                                                    @Param("year") int year,
+                                                    @Param("month") int month,
+                                                    @Param("mouldCodeList") List<String> mouldCodeList);
 }

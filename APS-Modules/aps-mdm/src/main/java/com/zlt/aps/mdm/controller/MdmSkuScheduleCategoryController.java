@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -7,9 +7,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.maindata.mapper.MdmSkuScheduleCategoryEntityMapper;
-import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
+import com.zlt.aps.mdm.mapper.MdmSkuScheduleCategoryEntityMapper;
+import com.zlt.aps.mdm.service.IMdmSkuScheduleCategoryService;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -52,7 +52,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
     /**
      * 查询SKU排产分类列表
      */
-    @RequiresPermissions("monthplan:mdmSkuScheduleCategory:list")
+    @RequiresPermissions("mdm:mdmSkuScheduleCategory:list")
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
@@ -69,7 +69,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
      * 保存
      */
     @Log(title = "ui.data.column.mdmSkuScheduleCategory.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @RequiresPermissions("monthplan:mdmSkuScheduleCategory:save")
+    @RequiresPermissions("mdm:mdmSkuScheduleCategory:save")
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -81,7 +81,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
      * 删除
      */
     @Log(title = "ui.data.column.mdmSkuScheduleCategory.modelName", businessType = BusinessType.DELETE)
-    @RequiresPermissions("monthplan:mdmSkuScheduleCategory:remove")
+    @RequiresPermissions("mdm:mdmSkuScheduleCategory:remove")
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -93,7 +93,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
     /**
      * 获取SKU排产分类详细信息
      */
-    @RequiresPermissions("monthplan:mdmSkuScheduleCategory:query")
+    @RequiresPermissions("mdm:mdmSkuScheduleCategory:query")
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
@@ -109,7 +109,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @RequiresPermissions("monthplan:mdmSkuScheduleCategory:import")
+    @RequiresPermissions("mdm:mdmSkuScheduleCategory:import")
     @Log(title = "ui.data.column.mdmSkuScheduleCategory.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -121,7 +121,7 @@ public class MdmSkuScheduleCategoryController extends AbstractDocBizController<M
     /**
      * 导出列表
      */
-    @RequiresPermissions("monthplan:mdmSkuScheduleCategory:export")
+    @RequiresPermissions("mdm:mdmSkuScheduleCategory:export")
     @Log(title = "SKU排产分类", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")

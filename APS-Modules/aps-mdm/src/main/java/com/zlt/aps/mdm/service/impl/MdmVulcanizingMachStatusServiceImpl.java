@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -8,13 +8,13 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.maindata.mapper.MdmVulcanizingMachStatusEntityMapper;
-import com.zlt.aps.maindata.mapper.VulcanizingMachineMapper;
-import com.zlt.aps.maindata.service.IMdmVulcanizingMachStatusService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus;
-import com.zlt.aps.monthplan.api.domain.entity.VulcanizingMachine;
-import com.zlt.aps.monthplan.api.domain.vo.CopyParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmVulcanizingMachStatusVo;
+import com.zlt.aps.mdm.mapper.MdmVulcanizingMachStatusEntityMapper;
+import com.zlt.aps.mdm.mapper.VulcanizingMachineMapper;
+import com.zlt.aps.mdm.service.IMdmVulcanizingMachStatusService;
+import com.zlt.aps.mdm.api.domain.entity.MdmVulcanizingMachStatus;
+import com.zlt.aps.mdm.api.domain.entity.VulcanizingMachine;
+import com.zlt.aps.mdm.api.domain.vo.CopyParamVo;
+import com.zlt.aps.mdm.api.domain.vo.MdmVulcanizingMachStatusVo;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import io.seata.common.util.StringUtils;

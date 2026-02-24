@@ -1,13 +1,14 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
+
+import com.zlt.aps.mdm.api.domain.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.mdm.mes.IMesItfService;
+import com.zlt.aps.mdm.service.IMdmMouldShellInfoService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

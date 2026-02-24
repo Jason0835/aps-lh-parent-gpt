@@ -1,10 +1,10 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.maindata.domain.dto.MdmProductConstructionDto;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionImportVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
+import com.zlt.aps.mdm.api.domain.dto.MdmProductConstructionDto;
+import com.zlt.aps.mdm.api.domain.entity.MdmProductConstruction;
+import com.zlt.aps.mdm.api.domain.vo.MdmProductConstructionImportVo;
+import com.zlt.aps.mdm.api.domain.vo.MdmProductConstructionVO;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 

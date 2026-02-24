@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -7,9 +7,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.tlt.aps.constant.FactoryConstant;
-import com.zlt.aps.maindata.mapper.MdmDevicePlanShutEntityMapper;
-import com.zlt.aps.maindata.service.IMdmDevicePlanShutService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.mapper.MdmDevicePlanShutEntityMapper;
+import com.zlt.aps.mdm.service.IMdmDevicePlanShutService;
+import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

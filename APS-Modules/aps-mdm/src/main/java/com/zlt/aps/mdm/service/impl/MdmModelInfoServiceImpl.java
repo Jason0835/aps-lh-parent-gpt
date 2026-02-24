@@ -1,4 +1,4 @@
-package com.zlt.aps.maindata.service.impl;
+package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -7,12 +7,12 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.enums.OperationBusinessEnums;
-import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
-import com.zlt.aps.maindata.service.IMdmModelInfoService;
-import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.mapper.MdmProductModelRelationEntityMapper;
+import com.zlt.aps.mdm.mes.IMesItfService;
+import com.zlt.aps.mdm.service.IMdmModelInfoService;
+import com.zlt.aps.mdm.utils.ScmListUtils;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

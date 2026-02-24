@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
@@ -9,10 +9,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.PreAuthorize;
 import com.ruoyi.common.text.Convert;
-import com.zlt.aps.maindata.service.IMdmMoldingMachineStatusService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus;
-import com.zlt.aps.monthplan.api.domain.vo.CopyParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmMoldingMachineStatusVo;
+import com.zlt.aps.mdm.service.IMdmMoldingMachineStatusService;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldingMachineStatus;
+import com.zlt.aps.mdm.api.domain.vo.CopyParamVo;
+import com.zlt.aps.mdm.api.domain.vo.MdmMoldingMachineStatusVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

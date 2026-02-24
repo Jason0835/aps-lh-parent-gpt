@@ -1,4 +1,4 @@
-package com.zlt.aps.monthplan.setting.controller;
+package com.zlt.aps.mdm.controller;
 
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -12,9 +12,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.maindata.service.IMdmDeviceMaintenancePlanService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmDeviceMaintenancePlan;
-import com.zlt.aps.monthplan.api.domain.vo.MdmDeviceMaintenancePlanVo;
+import com.zlt.aps.mdm.service.IMdmDeviceMaintenancePlanService;
+import com.zlt.aps.mdm.api.domain.entity.MdmDeviceMaintenancePlan;
+import com.zlt.aps.mdm.api.domain.vo.MdmDeviceMaintenancePlanVo;
 import com.zlt.common.controller.BusiController;
 import com.zlt.common.utils.ImportExcelUtils;
 import io.swagger.annotations.ApiOperation;

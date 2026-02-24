@@ -1,8 +1,8 @@
-package com.zlt.aps.maindata.service;
+package com.zlt.aps.mdm.service;
 
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
