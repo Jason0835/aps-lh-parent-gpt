@@ -17,7 +17,6 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
@@ -25,6 +24,7 @@ import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.monthplan.api.domain.vo.AreaConvertVo;
+import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;
@@ -592,6 +592,17 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
     @PostMapping("/genMonthlySaleQty")
     public AjaxResult genMonthlySaleQty(@RequestBody MpMonthlySaleQty mpMonthlySaleQty) {
         return mpMonthlySaleQtyService.genMonthlySaleQty(mpMonthlySaleQty);
+    }
+
+    /**
+     * 查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表
+     * @param historySaleRecord 参数
+     * @return 结果
+     */
+    @ApiOperation("查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表")
+    @PostMapping("/genMonthlySaleQty")
+    public AjaxResult genMpHistorySaleRecord(@RequestBody MpHistorySaleRecord historySaleRecord) {
+        return mpMonthlySaleQtyService.genMpHistorySaleRecord(historySaleRecord.getFactoryCode(), DateUtils.getNowDate(), historySaleRecord.getYear(), String.valueOf(historySaleRecord.getMonth()));
     }
 
 }

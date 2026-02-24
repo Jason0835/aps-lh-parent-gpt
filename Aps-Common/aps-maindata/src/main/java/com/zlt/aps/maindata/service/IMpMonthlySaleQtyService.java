@@ -7,6 +7,7 @@ import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,17 @@ public interface IMpMonthlySaleQtyService extends IDocService<MpMonthlySaleQty> 
      */
     @Transactional(rollbackFor = Exception.class)
     AjaxResult genMonthlySaleQty(MpMonthlySaleQty mpMonthlySaleQty);
+
+    /**
+     * 查询SCM发货明细，根据SKU+区域汇总发货量，写入历史销售记录表
+     * @param factoryCode 分厂编号
+     * @param nowDate 当前日期
+     * @param lastYear 上个月对应年份
+     * @param lastMonth 上个月
+     * @return 结果
+     */
+    AjaxResult genMpHistorySaleRecord(String factoryCode, Date nowDate, int lastYear, String lastMonth);
+
     /**
      * 查询当前月均销量
      * @return 查询当前月均销量
