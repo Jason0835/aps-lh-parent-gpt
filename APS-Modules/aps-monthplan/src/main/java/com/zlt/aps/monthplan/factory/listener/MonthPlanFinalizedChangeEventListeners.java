@@ -1,6 +1,7 @@
 package com.zlt.aps.monthplan.factory.listener;
 
 import com.alibaba.fastjson.JSONObject;
+import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.tlt.aps.enums.LocationTypeEnum;
 import com.tlt.aps.utils.GenerageMapKeyUtils;
@@ -18,6 +19,7 @@ import com.zlt.aps.monthplan.factory.event.MonthPlanFinalizedEvent;
 import com.zlt.aps.monthplan.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -57,6 +59,9 @@ public class MonthPlanFinalizedChangeEventListeners {
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService finalResultService;
 
+    @Autowired
+    private ISysConfigService sysConfigService;
+
     /**
      * 异步处理月计划定稿事件
      */
@@ -78,11 +83,31 @@ public class MonthPlanFinalizedChangeEventListeners {
             List<FactoryMonthPlanProductionFinalResult> finalList = eventDto.getFinalList();
             mpMonthPlanMonitorService.insertMonitorByFinalList(eventDto.getParam(), finalList);
             // 6、推送SCM
-            if (CollectionUtils.isNotEmpty(finalList)) {
+            boolean isSyncScm = Boolean.TRUE;
+            try {
+                String config = sysConfigService.selectConfigByKey("final.sync.scm");
+                if (StringUtils.isNotBlank(config)) {
+                    isSyncScm = Boolean.parseBoolean(config);
+                }
+            } catch (Exception e) {
+                log.error("获取配置失败", e);
+            }
+            if (CollectionUtils.isNotEmpty(finalList) && isSyncScm) {
                 iScmItfService.publicFacScheduleVersion(buildOutFacScheduleVersionVoList(eventDto));
             }
+            boolean isSyncMes = Boolean.TRUE;
+            try {
+                String config = sysConfigService.selectConfigByKey("final.sync.mes");
+                if (StringUtils.isNotBlank(config)) {
+                    isSyncMes = Boolean.parseBoolean(config);
+                }
+            } catch (Exception e) {
+                log.error("获取配置失败", e);
+            }
             // 7、传给MES
-            finalResultService.issueMonthPlan(eventDto.getParam());
+            if (isSyncMes) {
+                finalResultService.issueMonthPlan(eventDto.getParam());
+            }
             log.info("月计划定稿事件执行完成");
         } catch (Exception e) {
             log.error("月计划定稿事件执行失败，事件ID：{}", event.getEventId(), e);
