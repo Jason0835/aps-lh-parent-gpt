@@ -5,7 +5,7 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.tlt.aps.constant.FactoryConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineClsEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMoldingMachineClsBService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineCls;

@@ -1,6 +1,6 @@
 package com.zlt.aps.monthplan.common.utils;
 
-import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

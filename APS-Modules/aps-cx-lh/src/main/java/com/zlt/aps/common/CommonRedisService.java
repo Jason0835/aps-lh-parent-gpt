@@ -2,7 +2,7 @@ package com.zlt.aps.common;
 
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.constant.FactoryConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.utils.CxLhEngineUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

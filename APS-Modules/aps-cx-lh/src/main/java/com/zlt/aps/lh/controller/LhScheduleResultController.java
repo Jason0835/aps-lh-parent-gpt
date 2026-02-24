@@ -19,7 +19,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.FactoryService;
 import com.zlt.aps.common.SyncDataLogsService;
 import com.zlt.aps.common.core.constant.ApsConstant;

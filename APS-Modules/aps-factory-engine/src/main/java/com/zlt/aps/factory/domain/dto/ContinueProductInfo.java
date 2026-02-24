@@ -1,6 +1,6 @@
 package com.zlt.aps.factory.domain.dto;
 
-import com.tlt.aps.constant.StringConstant;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.factory.domain.vo.CxMachineBaseInfoVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;

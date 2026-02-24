@@ -6,7 +6,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.cx.mapper.entity.CxPersionTrainSettingEntityMapper;
 import com.zlt.aps.cx.service.ICxPersionTrainSettingService;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxPersionTrainSetting;

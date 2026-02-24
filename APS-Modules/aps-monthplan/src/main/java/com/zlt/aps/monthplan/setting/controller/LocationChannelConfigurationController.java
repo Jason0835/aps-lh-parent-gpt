@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.tlt.aps.constant.StringConstant;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.maindata.mapper.LocationChannelConfigurationMapper;
 import com.zlt.aps.maindata.service.ILocationChannelConfigurationService;
 import com.zlt.aps.monthplan.api.domain.entity.LocationChannelConfiguration;

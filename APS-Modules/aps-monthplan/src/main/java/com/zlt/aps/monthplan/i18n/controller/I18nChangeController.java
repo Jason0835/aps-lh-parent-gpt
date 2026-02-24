@@ -7,7 +7,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.redis.client.RedissonLockClient;
-import com.tlt.aps.utils.AppUtils;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.maindata.service.I18nChangeService;
 import com.zlt.aps.monthplan.api.domain.entity.I18nChange;

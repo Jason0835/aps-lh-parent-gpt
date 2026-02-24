@@ -1,7 +1,7 @@
 package com.zlt.aps.factory.domain;
 
 import com.ruoyi.common.core.utils.DateUtils;
-import com.tlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.factory.constant.ProductionConstant;
 import com.zlt.aps.monthplan.api.enums.ProductionProcessStage;
 import lombok.Data;

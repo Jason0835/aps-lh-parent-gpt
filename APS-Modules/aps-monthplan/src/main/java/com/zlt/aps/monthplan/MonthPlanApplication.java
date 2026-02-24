@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @SpringBootApplication
 @EnableCustomSwagger2
 @EnableRyFeignClients
-@ComponentScan(value = {"com.zlt.*", "com.tlt.aps.**"})
+@ComponentScan(value = {"com.zlt.*", "com.zlt.aps.**"})
 public class MonthPlanApplication {
 
     public static void main(String[] args) {

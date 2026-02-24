@@ -1,7 +1,7 @@
 package com.zlt.aps.monthplan.mdm.dto;
 
-import com.tlt.aps.enums.FormingMethodTypeEnum;
-import com.tlt.aps.enums.WorkWearTypeEnum;
+import com.zlt.aps.enums.FormingMethodTypeEnum;
+import com.zlt.aps.enums.WorkWearTypeEnum;
 import com.zlt.aps.monthplan.api.domain.vo.MoldingMachineAllocationInfoVo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;

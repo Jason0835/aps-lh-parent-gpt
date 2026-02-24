@@ -9,7 +9,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.MdmMouldAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldAllocationService;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMouldAllocation;

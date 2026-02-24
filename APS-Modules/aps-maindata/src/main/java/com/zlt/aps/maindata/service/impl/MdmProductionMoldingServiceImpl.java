@@ -8,7 +8,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.datasource.service.BaseService;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineClsEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductionMoldingEntityMapper;
