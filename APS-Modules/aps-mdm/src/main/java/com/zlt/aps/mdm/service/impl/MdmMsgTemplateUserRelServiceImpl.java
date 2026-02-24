@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.ruoyi.common.utils.StringUtils;
-import com.tlt.aps.exception.BusinessException;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.mdm.mapper.MdmMsgTemplateUserRelMapper;
 import com.zlt.aps.mdm.service.IMdmMsgTemplateUserRelService;

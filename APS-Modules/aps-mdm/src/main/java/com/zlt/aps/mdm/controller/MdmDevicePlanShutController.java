@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.tlt.aps.constant.FactoryConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mdm.mapper.MdmDevicePlanShutEntityMapper;
 import com.zlt.aps.mdm.service.IMdmDevicePlanShutService;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;

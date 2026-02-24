@@ -7,7 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.tlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mdm.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.mdm.service.IMdmSkuStructureRefService;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuStructureRef;

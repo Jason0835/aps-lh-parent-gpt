@@ -3,7 +3,7 @@ package com.zlt.aps.mdm.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.tlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.mdm.api.domain.entity.FactoryParam;
 import com.zlt.aps.mdm.api.domain.vo.FactoryParamVo;
 
