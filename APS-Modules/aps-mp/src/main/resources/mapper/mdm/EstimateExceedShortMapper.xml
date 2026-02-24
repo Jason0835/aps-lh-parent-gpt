@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.monthplan.mdm.mapper.EstimateExceedShortMapper">
+<mapper namespace="com.zlt.aps.mp.mdm.mapper.EstimateExceedShortMapper">
 
     <insert id="generateEstimateExceedShort">
         insert into T_MDM_ESTIMATE_EXCEED_SHORT(YEAR, MONTH, FACTORY_CODE,PRODUCT_CODE, LOCATION_TYPE, PRODUCT_NAME, PRO_SIZE,

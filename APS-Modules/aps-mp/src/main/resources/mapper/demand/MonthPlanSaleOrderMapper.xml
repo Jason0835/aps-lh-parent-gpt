@@ -2,9 +2,9 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.monthplan.demand.mapper.MonthPlanSaleOrderMapper">
+<mapper namespace="com.zlt.aps.mp.demand.mapper.MonthPlanSaleOrderMapper">
 
-    <select id="getNeedInsertProductMinConfigurationList" resultType="com.zlt.aps.monthplan.factory.dto.YearSaleMinProdVo">
+    <select id="getNeedInsertProductMinConfigurationList" resultType="com.zlt.aps.mp.factory.dto.YearSaleMinProdVo">
         SELECT a.FACTORY_CODE,
                a.PRODUCT_CODE,
                mpi.PRODUCT_DESC

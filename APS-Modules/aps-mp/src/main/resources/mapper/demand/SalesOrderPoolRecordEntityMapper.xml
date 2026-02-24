@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.monthplan.demand.mapper.SalesOrderPoolRecordEntityMapper">
+<mapper namespace="com.zlt.aps.mp.demand.mapper.SalesOrderPoolRecordEntityMapper">
 	<insert id="batchInsert">
 		INSERT INTO T_DP_SALES_ORDER_POOL_RECORD (
 			FACTORY_CODE,

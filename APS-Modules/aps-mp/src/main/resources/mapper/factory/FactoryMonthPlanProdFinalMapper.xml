@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.monthplan.factory.mapper.FactoryMonthPlanProdFinalMapper">
+<mapper namespace="com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProdFinalMapper">
 
     <insert id="copyDetailByResult">
         insert into T_MP_MONTH_PLAN_PROD_DETAIL_FINAL(factory_code, year, month, `year_month`, month_plan_version, production_version, PLAN_SEQ, MONTH_PLAN_ID, product_code,
