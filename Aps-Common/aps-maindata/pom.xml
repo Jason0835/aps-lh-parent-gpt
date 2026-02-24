@@ -1,20 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.zlt.aps</groupId>
-        <artifactId>aps-modules</artifactId>
+        <artifactId>aps-common</artifactId>
         <version>1.0.3-SNAPSHOT</version>
     </parent>
+    <modelVersion>4.0.0</modelVersion>
 
     <artifactId>aps-maindata</artifactId>
     <name>aps-maindata</name>
     <description>主数据基础模块-jar</description>
-
-    <properties>
-        <java.version>1.8</java.version>
-    </properties>
 
     <dependencies>
         <dependency>
@@ -26,10 +22,12 @@
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-base</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-monthplan-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.ruoyi</groupId>
@@ -53,16 +51,8 @@
         <dependency>
             <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>

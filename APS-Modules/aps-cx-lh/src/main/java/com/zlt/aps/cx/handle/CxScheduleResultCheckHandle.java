@@ -5,10 +5,7 @@ import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.lh.api.domain.bo.ValidateResult;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.maindata.service.IMdmMoldingMachineService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

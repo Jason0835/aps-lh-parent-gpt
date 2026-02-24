@@ -2,25 +2,25 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
+import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
-import java.util.ArrayList;
+
 import java.util.Collections;
 import java.util.List;
 
 import org.springframework.transaction.annotation.Transactional;
-import com.zlt.aps.maindata.service.IMdmBomInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：MdmBomInfoServiceImpl.java
- * 描    述：MdmBomInfoServiceImplBOM示方书业务层处理
+ * 文件名称：MdmConstructionInfoServiceImpl.java
+ * 描    述：MdmConstructionInfoServiceImpl投产胎胚施工信息业务层处理
  *@author zlt
- *@date 2025-12-05
+ *@date 2025-12-10
  *@version 1.0
  *
  *  修改记录：
@@ -31,24 +31,24 @@ import com.ruoyi.common.exception.ServiceException;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class MdmBomInfoServiceImpl extends AbstractDocService<MdmBomInfo>  implements IMdmBomInfoService {
+public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstructionInfo>  implements IMdmConstructionInfoService {
     @Override
     protected String getDocTypeCode() {
-        return "MDM0106";
+        return "MDM0124";
     }
 
     @Override
     protected SysDocType getSysDocType() {
         SysDocType sysDocType = new SysDocType();
-        sysDocType.setDocTypeCode("MDM0106");
+        sysDocType.setDocTypeCode("MDM0124");
         return sysDocType;
     }
 
     @Override
-    public String checkUnique(MdmBomInfo docEntityVO) {
+    public String checkUnique(MdmConstructionInfo docEntityVO) {
         String unique = super.checkUnique(docEntityVO);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmBomInfo.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mdmConstructionInfo.notUnique"));
         }
         return unique;
     }

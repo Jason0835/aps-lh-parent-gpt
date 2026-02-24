@@ -3,7 +3,6 @@ package com.zlt.aps.maindata.service.impl;
 import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineB;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
-import java.util.ArrayList;
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.aps.maindata.service.IMdmMoldingMachineBService;
 import com.zlt.bill.common.service.AbstractDocService;
