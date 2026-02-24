@@ -658,7 +658,7 @@ constantRoutes.push(
     permissions: ["monthplan:productionMonthPlanInit:list"],
     children: [
       {
-        path: "console/productionMonthPlanInit/:id",
+        path: "console/console/productionMonthPlanInit/:id",
         component: () => import("@/views/monthPlanManagement/console/productionMonthPlanInit"),
         name: "ProductionMonthPlanInit",
         meta: { title: "排结构明细" },
@@ -671,7 +671,7 @@ constantRoutes.push(
     redirect: "noredirect",
     children: [
       {
-        path: "insertOrderDetail/:id",
+        path: "console/insertOrderDetail/:id",
         component: () => import("@/views/newPage/insertOrderDetail"),
         name: "insertOrderDetail",
         meta: { title: "明细" },
@@ -685,7 +685,7 @@ constantRoutes.push(
     permissions: ["monthplan:productionMonthPlanInit:list"],
     children: [
       {
-        path: "mouldingDayResult/:id",
+        path: "console/mouldingDayResult/:id",
         component: () => import("@/views/monthPlanManagement/mouldingDayResult"),
         name: "MouldingDayResult",
         meta: { title: "排程明细" },
@@ -699,7 +699,7 @@ constantRoutes.push(
     permissions: ["monthplan:monthPlanNoProductionPlan:list"],
     children: [
       {
-        path: "monthPlanNoProductionPlan/:id",
+        path: "console/monthPlanNoProductionPlan/:id",
         component: () => import("@/views/monthPlanManagement/monthPlanNoProductionPlan"),
         name: "MonthPlanNoProductionPlan",
         meta: { title: "未排产排程明细" },
