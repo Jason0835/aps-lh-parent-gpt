@@ -25,6 +25,7 @@
         <module>mix-setting-api</module>
         <module>aps-itf-api</module>
         <module>aps-all-api</module>
+        <module>aps-mdm-api</module>
     </modules>
 
     <groupId>com.zlt.aps</groupId>
