@@ -90,6 +90,7 @@ import com.zlt.aps.factory.service.ProductionMdmDataService;
 import com.zlt.aps.factory.utils.MouldRelationDeduplicator;
 import com.zlt.aps.factory.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.monthplan.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
@@ -129,6 +130,8 @@ public class MatchingProductionHandler {
     private MonthPlanRequireMapper monthPlanRequireMapper;
     @Autowired
     private MpStructureAllocationMapper mpStructureAllocationMapper;
+    @Autowired
+    private MdmSkuLhCapacityEntityMapper mdmSkuLhCapacityEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
@@ -267,10 +270,22 @@ public class MatchingProductionHandler {
         Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap = contextDTO.getCavity2BlockMap(); // 可用型腔活块数量
         productionContext.setOverSixMonthStockMap(this.overSixMonthStockHandler(productionContext, stockList)); // 超6个成品库存信息
         productionContext.getBaseDataContainer().setParamConfiguration(this.buildParam(contextDTO.getParamMap()));
+        if (mdmSkuLhCapacityMap == null) {
+            mdmSkuLhCapacityMap = this.initSkuLhCapacity(contextDTO);
+            contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
+        }
 
         // 结构排产的开始、结束时间
-        Integer startDay = contextDTO.getStructureStartDay();
-        Integer endDay = contextDTO.getAdjustEndDay();
+        Integer startDay = contextDTO.getStartDay();
+        Integer endDay = contextDTO.getEndDay();
+        // 计算锁定日期
+        Set<String> tempCxMachineCodeSet = mpProdFinalList.stream().map(FactoryMonthPlanFinalAdjustVo::getCxMachineCode)
+                .filter(StringUtils::isNotEmpty).distinct().collect(Collectors.toSet());
+        Set<String> cxMachineCodeSet = new HashSet<>();
+        tempCxMachineCodeSet.forEach(code -> {
+            cxMachineCodeSet.addAll(Arrays.stream(code.split(",")).distinct().collect(Collectors.toSet()));
+        });
+        int lockDay = this.getLockDay(productionContext, cxMachineCodeSet.size());
 
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit(); // 产能限制计算器，用于计算每天的产能使用情况
         // 按天统计已排产量
@@ -292,7 +307,7 @@ public class MatchingProductionHandler {
                     mpProdFinalList, needProductPlanList); // 获取定稿计划
 
             int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 储备量
-            int capacity = Optional.ofNullable(mdmSkuLhCapacityMap.get(materialDesc))
+            int capacity = Optional.ofNullable(mdmSkuLhCapacityMap.get(plan.getMaterialCode()))
                     .map(MdmSkuLhCapacity::getApsCapacity).orElse(0); // sku日产能
             out: do {
                 int startUnAllocationQty = unAllocationQty;
@@ -300,7 +315,7 @@ public class MatchingProductionHandler {
                     if (unAllocationQty <= 0) {
                         break out;
                     }
-                    if (day < contextDTO.getAdjustDay()) { // 锁定日不搭配
+                    if (day < lockDay) { // 锁定日不搭配
                         continue;
                     }
                     // 为当天分配搭配量
@@ -319,6 +334,21 @@ public class MatchingProductionHandler {
             } while (true);
         } while (true);
         log.info("周程滚动搭配算法end");
+    }
+    
+    private Map<String, MdmSkuLhCapacity> initSkuLhCapacity(MpRollAdjustContextDTO contextDTO) {
+        LambdaQueryWrapper<MdmSkuLhCapacity> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmSkuLhCapacity::getFactoryCode, contextDTO.getFactoryCode());
+        queryWrapper.eq(MdmSkuLhCapacity::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MdmSkuLhCapacity> skuLhCapacityList = mdmSkuLhCapacityEntityMapper.selectList(queryWrapper);
+
+        return skuLhCapacityList.stream()
+                .filter(skuLhCapacity -> StringUtils.isNotEmpty(skuLhCapacity.getMaterialCode()))
+                .collect(Collectors.toMap(
+                        MdmSkuLhCapacity::getMaterialCode,
+                        skuLhCapacity -> skuLhCapacity,
+                        (existingVal, newVal) -> newVal
+                ));
     }
 
     /**
@@ -579,7 +609,7 @@ public class MatchingProductionHandler {
                 productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 占用
                 Integer reserveQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
                 Integer remainQty = productionContext.getSpecialMaterialBatchRemainQty(groupInfo, reserveQty, false); // 剩余量
-                if (reserveQty < remainQty) { // 如果储备量少于剩余量，则需要补够剩余量
+                if (reserveQty < remainQty) { // 如果储备量少于剩余量，则需要补够剩余量，优先补到有富余产能，且搭配量最打的规格上
                     Integer unAllocateQty = remainQty - reserveQty;
                     MonthPlanProductionRequirePlanVo plan = productionPlanList.stream().max(Comparator.comparing(MonthPlanProductionRequirePlanVo::getConventionReserveQty)).orElse(null);
                     plan.setConventionReserveQty(unAllocateQty);
@@ -980,6 +1010,40 @@ public class MatchingProductionHandler {
      * @return
      */
     private Integer getLockDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo) {
+        String weekRollAdjustDate = productionContext.getBaseDataContainer().getParamConfiguration()
+                .getWeekRollAdjustDate();
+        Date adjustDate = StringUtils.isEmpty(StringUtils.trim(weekRollAdjustDate)) ? DateUtils.getNowDate()
+                : DateUtils.parseDate(weekRollAdjustDate);
+        Integer adjustDay;
+        if (productionContext.getYear() != DateUtils.getMonth(adjustDate)) {
+            // 若调整月不等于当前月，则将调整日设置1
+            adjustDay = FactoryConstant.MONTH_START_DAY;
+        } else {
+            adjustDay = DateUtils.getDay(adjustDate);
+        }
+        Set<String> cxMachineInfoSet = groupInfo.getAllocationCxMachineCodeSet();
+        Integer cxMachineCount = 0; // 成型机台数量
+        if (cxMachineInfoSet.size() == 1) {
+            cxMachineCount = 1;
+        } else {
+            Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer()
+                    .getCxMachineBaseInfo();
+            cxMachineCount = (int) cxMachineBaseInfo.entrySet().stream()
+                    .filter(entry -> cxMachineInfoSet.contains(entry.getKey())) // 过滤已分配了本结构的机台
+                    .map(Entry<String, CxMachineBaseInfoVo>::getValue)
+                    .filter(machine -> machine.getAllocationDaySet().contains(adjustDay)).count(); // 过滤锁定日当天有排产的机台
+        }
+        return getLockDay(productionContext, cxMachineCount);
+    }
+
+
+    /**
+     * 获取锁定日期
+     * @param productionContext
+     * @param groupInfo
+     * @return
+     */
+    private Integer getLockDay(TbrProductionContext productionContext, Integer cxMachineCount) {
         Integer adjustStartDay = 0;
         Integer adjustDay;
         Integer singleCxMachineLockDay = productionContext.getBaseDataContainer().getParamConfiguration().getSingleCxMachineLockDay();
@@ -993,20 +1057,7 @@ public class MatchingProductionHandler {
             adjustDay = DateUtils.getDay(adjustDate);
         }
 
-        Set<String> cxMachineInfoSet = groupInfo.getAllocationCxMachineCodeSet();
-        Integer lockDay = 0; // 根据机台数选择锁定日期
-        if (cxMachineInfoSet.size() == 1) {
-            lockDay = singleCxMachineLockDay;
-        } else {
-            Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer()
-                    .getCxMachineBaseInfo();
-            if (cxMachineBaseInfo.entrySet().stream().filter(entry -> cxMachineInfoSet.contains(entry.getKey())) // 过滤已分配了本结构的机台
-                    .map(Entry<String, CxMachineBaseInfoVo>::getValue)
-                    .filter(machine -> machine.getAllocationDaySet().contains(adjustDay)) // 过滤锁定日当天有排产的机台
-                    .count() > 1) { 
-                lockDay = multiCxMachineLockDays;
-            }
-        }
+        Integer lockDay = cxMachineCount == 1? singleCxMachineLockDay: multiCxMachineLockDays; // 根据机台数选择锁定日期
         adjustStartDay = adjustDay + lockDay;
         return adjustStartDay;
     }

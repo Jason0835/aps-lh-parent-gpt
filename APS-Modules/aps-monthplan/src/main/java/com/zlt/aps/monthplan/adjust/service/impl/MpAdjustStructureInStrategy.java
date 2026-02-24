@@ -11,6 +11,7 @@ import com.tlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.factory.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.factory.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.monthplan.adjust.engine.MpWeekRollAdjustEngine;
 import com.zlt.aps.monthplan.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
@@ -42,6 +43,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
     @Autowired
     private IMpAdjustStructureInService mpAdjustStructureInService;
+
+    @Autowired
+    private MatchingProductionHandler matchingProductionHandler;
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -135,9 +139,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
             //2.3 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
-            //TODO
             //=========================================================
-
+            matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
             //=========================================================
 
             //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
