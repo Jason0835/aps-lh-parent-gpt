@@ -7,8 +7,8 @@
         <version>1.0.3-SNAPSHOT</version>
     </parent>
 
-    <artifactId>aps-mdm</artifactId>
-    <name>aps-mdm</name>
+    <artifactId>aps-dp</artifactId>
+    <name>aps-dp</name>
 
     <properties>
         <java.version>1.8</java.version>
@@ -40,8 +40,8 @@
         </dependency>
 
         <dependency>
-            <groupId>com.zlt.aps.mdm</groupId>
-            <artifactId>aps-mdm-api</artifactId>
+            <groupId>com.zlt.aps.dp</groupId>
+            <artifactId>aps-dp-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
         	
@@ -68,6 +68,10 @@
                     <artifactId>jul-to-slf4j</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-monthplan-api</artifactId>
         </dependency>
     </dependencies>
 

@@ -32,6 +32,8 @@
         <module>mix-schedule</module>
         <module>mix-setting</module>
         <module>aps-itf</module>
+        <module>aps-mdm</module>
+        <module>aps-dp</module>
     </modules>
     <properties>
         <aps.version>1.0.3-SNAPSHOT</aps.version>

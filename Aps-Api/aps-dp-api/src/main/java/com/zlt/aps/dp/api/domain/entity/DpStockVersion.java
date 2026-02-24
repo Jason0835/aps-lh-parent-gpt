@@ -1,0 +1,202 @@
+package com.zlt.aps.dp.api.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
+
+import java.util.Date;
+
+/**
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MdmFinishStock.java
+ * 描    述：版本库存对象 T_DP_STOCK_VERSION
+ *
+ * @author zlt
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2025-12-08
+ */
+@ApiModel(value = "版本库存对象", description = "版本库存对象")
+@Data
+@TableName(value = "T_DP_STOCK_VERSION")
+public class DpStockVersion extends BaseEntity {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 工厂编号，字典：biz_factory_name
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "工厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
+    /**
+     * 产品品类，字典：biz_product_type
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.productTypeCode", dictType = "biz_product_type")
+    @ApiModelProperty(value = "产品品类，字典：biz_product_type", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
+
+    /**
+     * 年份
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.year", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "年份", name = "year")
+    @TableField(value = "YEAR")
+    private Integer year;
+
+    /**
+     * 月份
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.month", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月份", name = "month")
+    @TableField(value = "MONTH")
+    private Integer month;
+
+    /**
+     * 需求版本号
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.requireVersion")
+    @ApiModelProperty(value = "需求版本号", name = "requireVersion")
+    @TableField(value = "REQUIRE_VERSION")
+    private String requireVersion;
+
+    /**
+     * 品牌(物料信息.品牌)
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.brand", dictType = "biz_brand_type")
+    @ApiModelProperty(value = "品牌(物料信息.品牌)", name = "brand")
+    @TableField(value = "BRAND")
+    private String brand;
+
+    /**
+     * 产品结构(物料信息.结构)
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.structureName")
+    @ApiModelProperty(value = "产品结构(物料信息.结构)", name = "structureName")
+    @TableField(value = "STRUCTURE_NAME")
+    private String structureName;
+
+    /**
+     * 物料编码
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    /**
+     * 物料描述
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
+    /**
+     * 库存数量
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.stockQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "库存数量", name = "stockQty")
+    @TableField(value = "STOCK_QTY")
+    private Integer stockQty;
+    /**
+     * 需求对冲后-余量库存
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.remainingQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "月结库存余量", name = "REMAINING_QTY")
+    @TableField(value = "REMAINING_QTY")
+    private Integer remainingQty;
+    /**
+     * 年周号
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.weekYear")
+    @ApiModelProperty(value = "年周号", name = "weekYear")
+    @TableField(value = "WEEK_YEAR")
+    private String weekYear;
+
+    /**
+     * 动平衡，字典：biz_yes_no，1 是 0 否
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.isDynamicBalance", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "动平衡，字典：biz_yes_no，1 是 0 否", name = "isDynamicBalance")
+    @TableField(value = "IS_DYNAMIC_BALANCE")
+    private String isDynamicBalance;
+
+    /**
+     * 均匀性，字典：biz_yes_no，1 是 0 否
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.isUniformity", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "均匀性，字典：biz_yes_no，1 是 0 否", name = "isUniformity")
+    @TableField(value = "IS_UNIFORMITY")
+    private String isUniformity;
+
+    /**
+     * 是否超3个月胎，字典：biz_yes_no，1 是 0 否
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.isExceedThreeMonth", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否超3个月胎，字典：biz_yes_no，1 是 0 否", name = "isExceedThreeMonth")
+    @TableField(value = "IS_EXCEED_THREE_MONTH")
+    private String isExceedThreeMonth;
+
+    /**
+     * 是否超6个月胎，字典：biz_yes_no，1 是 0 否
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.isExceedSixMonth", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否超6个月胎，字典：biz_yes_no，1 是 0 否", name = "isExceedSixMonth")
+    @TableField(value = "IS_EXCEED_SIX_MONTH")
+    private String isExceedSixMonth;
+
+    /**
+     * 是否超9个月胎，字典：biz_yes_no，1 是 0 否
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.isExceedNineMonth", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否超9个月胎，字典：biz_yes_no，1 是 0 否", name = "isExceedNineMonth")
+    @TableField(value = "IS_EXCEED_NINE_MONTH")
+    private String isExceedNineMonth;
+
+    /**
+     * 是否超12个月胎，字典：biz_yes_no，1 是 0 否
+     */
+    @Excel(name = "ui.data.column.dpStockVersion.isExceedTwelveMonth", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否超12个月胎，字典：biz_yes_no，1 是 0 否", name = "isExceedTwelveMonth")
+    @TableField(value = "IS_EXCEED_TWELVE_MONTH")
+    private String isExceedTwelveMonth;
+
+    /**
+     * 内外销
+     */
+//    @Excel(name = "ui.data.column.dpStockVersion.domesticExportSale")
+    @ApiModelProperty(value = "内外销", name = "domesticExportSale")
+    @TableField(exist = false)
+    private String domesticExportSale;
+
+    @Excel(name = "ui.data.column.demandPlan.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty("更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
+    private Date updateTime;
+
+    /**
+     * 获取分厂销售需求版本计划分组Key
+     *
+     * @return
+     */
+    public String getMonthPlanVersionKey() {
+        String keyFormat = "%d|*|%d|*|%s|*|%s|*|%s|*|%s";
+        return String.format(keyFormat, this.year, this.month, this.factoryCode, this.productTypeCode, this.requireVersion,this.materialDesc);
+    }
+}

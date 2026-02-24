@@ -26,6 +26,7 @@
         <module>aps-itf-api</module>
         <module>aps-all-api</module>
         <module>aps-mdm-api</module>
+        <module>aps-dp-api</module>
     </modules>
 
     <groupId>com.zlt.aps</groupId>
