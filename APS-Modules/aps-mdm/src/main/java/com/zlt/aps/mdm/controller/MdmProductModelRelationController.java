@@ -60,12 +60,6 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     private MdmProductModelRelationEntityMapper entityMapper;
 
     @Autowired
-    private MdmProductConstructionEntityMapper mdmProductConstructionEntityMapper;
-
-    @Autowired
-    private MdmModelInfoEntityMapper mdmModelInfoEntityMapper;
-
-    @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
     /**
