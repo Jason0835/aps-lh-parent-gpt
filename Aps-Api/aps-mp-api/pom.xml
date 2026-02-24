@@ -9,8 +9,8 @@
 	</parent>
 
 	<groupId>com.zlt.aps</groupId>
-    <artifactId>aps-monthplan-api</artifactId>
-    <name>aps-monthplan-api</name>
+    <artifactId>aps-mp-api</artifactId>
+    <name>aps-mp-api</name>
     <description>月度计划-接口</description>
 
     <properties>
