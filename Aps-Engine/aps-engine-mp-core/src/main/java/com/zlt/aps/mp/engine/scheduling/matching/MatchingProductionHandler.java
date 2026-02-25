@@ -294,9 +294,9 @@ public class MatchingProductionHandler {
             return;
         }
         TbrProductionContext productionContext = this.initProductionContext(contextDTO); // 初始化上下文
-        List<MdmProductStock> stockList = contextDTO.getMdmProductStockList();
+        List<MdmProductStock> stockList = contextDTO.getMdmProductStockList(); // 库存
         if (CollectionUtils.isEmpty(stockList)) {
-            stockList = getDataService().getMdmProductStock(productionContext); // 加载库存
+            stockList = getDataService().getMdmProductStock(productionContext); // 如果没有需要加载库存
             contextDTO.setMdmProductStockList(stockList);
         }
         Map<String, Integer> stockMap = stockList.stream()
@@ -345,6 +345,9 @@ public class MatchingProductionHandler {
                     if (unAllocationQty <= 0) {
                         break out;
                     }
+                    if (!this.checkDayCanProduct(contextDTO, day)) { // 检查生产日历，停产日不处理
+                        continue;
+                    }
                     // 校验日产能限制
                     MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
                     if (dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) { // 当天硫化机已经满足条件，则直接跳过
@@ -366,7 +369,6 @@ public class MatchingProductionHandler {
 //                    if (endDay - day <= matchingBoostDay) {
 //                        break;
 //                    }
-                    
                     // 为当天分配搭配量
                     int tempUnAllocationQty = this.allcatAdjustProductQty(contextDTO, day, plan, cavity2BlockMap,
                             dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitVo);
@@ -501,9 +503,6 @@ public class MatchingProductionHandler {
                                            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionMap,
                                            Integer unAllocationQty, Integer capacity,
                                            MpDailyCapacityLimitVo dailyCapacityLimitVo) {
-        if (!this.checkDayCanProduct(contextDTO, scheduleDay)) {
-            return unAllocationQty;
-        }
         Integer lhMouldQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         DailyMouldAvailabilityResult cavity2Block = cavity2BlockMap.get(scheduleDay); // key:结构名称 + 主花纹
         if (cavity2Block == null) {
