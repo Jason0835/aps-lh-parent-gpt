@@ -297,7 +297,7 @@ public class MatchingProductionHandler {
         Integer matchingBoostDay = productionContext.getBaseDataContainer().getParamConfiguration().getMatchingBoostDay();
 //        Integer noMatchingProductionSaleQtyThreshold = productionContext.getBaseDataContainer().getParamConfiguration().getNoMatchingProductionSaleQtyThreshold();
 
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit(); // 产能限制计算器，用于计算每天的产能使用情况
+//        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit(); // 产能限制计算器，用于计算每天的产能使用情况
         // 按天统计已排产量
         Map<Integer, List<CxMouldDayProductionHelper>> dayProductionMap = this.buildDayProductionMap(mpProdFinalList,
                 startDay, endDay);
@@ -322,6 +322,17 @@ public class MatchingProductionHandler {
             out: do {
                 int startUnAllocationQty = unAllocationQty;
                 for (int day = Math.max(lockDay + 1, startDay); day <= endDay; day++) { // 遍历结构排产日，如果锁定日超过开始i日期，从锁定日下一天开始
+                    // 校验日产能限制
+                    MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
+                    if (dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) { // 当天硫化机已经满足条件，则直接跳过
+                        continue;
+                    }
+                    if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
+                        Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
+                        if (!embryoCodes.contains(plan.getEmbryoCode())) {
+                            continue;
+                        }
+                    }
                     if (unAllocationQty <= 0) {
                         break out;
                     }
@@ -332,12 +343,12 @@ public class MatchingProductionHandler {
                     
                     // 为当天分配搭配量
                     int tempUnAllocationQty = this.allcatAdjustProductQty(contextDTO, day, plan, cavity2BlockMap,
-                            dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitMap);
+                            dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitVo);
                     if (tempUnAllocationQty != unAllocationQty) { // 未分配量有发生变化，说明成功搭配排产，需要更新相关数据
                         unAllocationQty = tempUnAllocationQty;
                         // 重算当天的模具、活块使用情况
-                        adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, day,
-                                dailyCapacityLimitMap.get(day), contextDTO.getParamMap(), null);
+//                        adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, day,
+//                                dailyCapacityLimitVo, contextDTO.getParamMap(), null);
                     }
                 }
                 if (startUnAllocationQty == unAllocationQty) { // 如果遍历后没有发生变化，说明已经无法继续排产，则结束本规格的搭配
@@ -390,6 +401,7 @@ public class MatchingProductionHandler {
             plan.setMaterialDesc(firstDemandPlan.getMaterialDesc());
             plan.setMainPattern(firstDemandPlan.getMainPattern());
             plan.setMesMaterialCode(firstDemandPlan.getMesMaterialCode());
+            plan.setTotalQty(0);
             plan.setBeginDay(null);
             plan.setEndDay(null);
             for (int day = 1; day < contextDTO.getEndDay(); day++) {
@@ -459,7 +471,7 @@ public class MatchingProductionHandler {
                                            Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap,
                                            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionMap,
                                            Integer unAllocationQty, Integer capacity,
-                                           Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
+                                           MpDailyCapacityLimitVo dailyCapacityLimitVo) {
         if (!this.checkDayCanProduct(contextDTO, scheduleDay)) {
             return unAllocationQty;
         }
@@ -477,8 +489,7 @@ public class MatchingProductionHandler {
         List<CxMouldDayProductionHelper> dayProductionList = dayProductionMap.get(scheduleDay);
         // 统计当天的已排量
         Integer todayProductQty = dayProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
-        MpDailyCapacityLimitVo dailyCapacity = dailyCapacityLimitMap.get(scheduleDay);
-        Integer maxDayProductionQty = dailyCapacity.getMaxDayProductionQty();
+        Integer maxDayProductionQty = dailyCapacityLimitVo.getMaxDayProductionQty();
         Integer canProductionQty = maxDayProductionQty - todayProductQty;
         if (canProductionQty <= 0) {
             return unAllocationQty;
@@ -487,7 +498,7 @@ public class MatchingProductionHandler {
         // 根据上一天的排产情况判断是否需要换模
         List<CxMouldDayProductionHelper> lastDayProductionList = dayProductionMap.get(scheduleDay - 1);
         // 判断是否需要换模，昨天没有排相同的结构，则需要换模具
-        boolean isChangeMould = CollectionUtils.isEmpty(lastDayProductionList);
+        boolean isChangeMould = lastDayProductionList.stream().noneMatch(p -> materialDesc.equals(p.getMaterialDesc()));
         // 判断是否需要换活字块
         boolean isChangeBlock = false;
 //        if (lastDayProductionList != null) {
@@ -527,6 +538,8 @@ public class MatchingProductionHandler {
         if (plan.getEndDay() == null || plan.getEndDay() < scheduleDay) {
             plan.setEndDay(scheduleDay);
         }
+        cavity2Block.getCavityResults().put(mouldKey, mouldCavityQty - lhMouldQty); // 更新可用型腔数量
+        // 统计新增的排产计划
         CxMouldDayProductionHelper dayProduct = lastDayProductionList.stream()
                 .filter(p -> materialDesc.equals(p.getMaterialDesc())).findAny().orElse(null);
         if (dayProduct == null) {
@@ -538,6 +551,14 @@ public class MatchingProductionHandler {
             dayProductionList.add(dayProduct);
         }
         dayProduct.setProductionQty(dayProduct.getProductionQty() + allocationQty);
+        // 更新日产能限制
+        dailyCapacityLimitVo.setUsedLhMachines(dailyCapacityLimitVo.getUsedLhMachines() + 1); // 更新硫化机使用情况
+        dailyCapacityLimitVo.setPatternUsedLhMachines(dailyCapacityLimitVo.getPatternUsedLhMachines() + 1);
+        Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
+        if (!embryoCodes.contains(plan.getEmbryoCode())) {
+            embryoCodes.add(plan.getEmbryoCode());
+            dailyCapacityLimitVo.setUsedEmbryoTypes(embryoCodes.size());
+        }
         return unAllocationQty - allocationQty;
     }
 
