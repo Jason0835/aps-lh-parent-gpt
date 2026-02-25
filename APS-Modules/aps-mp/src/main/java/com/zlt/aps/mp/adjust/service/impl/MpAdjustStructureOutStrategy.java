@@ -47,7 +47,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Autowired
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
-    
+
     @Autowired
     private MatchingProductionHandler matchingProductionHandler;
 
@@ -343,6 +343,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //更新实际调整量
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
+            // 实际调整默认：0
+            structureOut.setActualAdjustQty(0);
             mpFinalVo = mpFinalAdjustMap.get(structureOut.getMaterialCode());
             if (mpFinalVo != null){
                 structureOut.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));

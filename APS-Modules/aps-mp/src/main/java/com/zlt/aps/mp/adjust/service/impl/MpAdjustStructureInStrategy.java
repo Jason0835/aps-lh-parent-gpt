@@ -195,6 +195,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         //更新实际调整量
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
+            // 实际调整默认：0
+            structureIn.setActualAdjustQty(0);
             mpFinalVo = mpFinalAdjustMap.get(structureIn.getMaterialCode());
             if (mpFinalVo != null){
                 structureIn.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));

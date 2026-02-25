@@ -212,7 +212,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         for (MpAdjustDetailVo vo : adjustDetailList) {
-            vo.setActualAdjustQty(Convert.toInt(vo.getActualAdjustQty(), 0) == 0 ? null : vo.getActualAdjustQty());
+            vo.setActualAdjustQty(Convert.toInt(vo.getActualAdjustQty(), 0).equals(0) ? null : vo.getActualAdjustQty());
         }
     }
 
