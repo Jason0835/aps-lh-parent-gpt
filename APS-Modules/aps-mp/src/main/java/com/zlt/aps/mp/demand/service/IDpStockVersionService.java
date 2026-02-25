@@ -26,9 +26,8 @@ import java.util.Map;
 public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
   /**
    * 将分配时的成品库存记录到库存版本表中(以需求版本号的维度)；
-   * @param createCondition 需求参数
-   * @param monthPlanVersion 需求版本号
+   * @param demandPlan 需求计划
    * @param finishedProductStockMap 成品库存记录
    */
-  void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap);
+  void insertBatchData(DpDemandPlan demandPlan, Map<String, List<MdmProductStock>> finishedProductStockMap);
 }
