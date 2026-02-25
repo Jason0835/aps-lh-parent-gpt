@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.handler;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
+import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
@@ -245,11 +246,21 @@ public class MouldProductionResultHandler {
         int sumMidQty = requireList.stream().filter(item -> null != item.getMidQty()).mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
         int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
         int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
-        if (lossQty != 0) {
-            if (sumCycleReserveQty % 2 != 0) {
-                sumCycleReserveQty = sumCycleReserveQty + lossQty;
-            } else {
-                sumMidQty = sumMidQty + lossQty;
+        if (lossQty > 0) {
+            if(ProductionPlanType.NORMAL.getPlanType().equals(dayResult.getPlanType())) {
+                if (sumCycleReserveQty % 2 != 0) {
+                    sumCycleReserveQty = sumCycleReserveQty + lossQty;
+                } else {
+                    sumMidQty = sumMidQty + lossQty;
+                }
+            }else{
+                if (sumCycleReserveQty % 2 != 0) {
+                    sumCycleReserveQty = sumCycleReserveQty + lossQty;
+                } else if (sumMidQty % 2 != 0) {
+                    sumMidQty = sumMidQty + lossQty;
+                }else{
+                    sumPostponeQty = sumPostponeQty + lossQty;
+                }
             }
         }
         dayResult.setHeightLossQty(totalHeightLossQty);
