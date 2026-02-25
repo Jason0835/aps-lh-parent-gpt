@@ -71,6 +71,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                v.EXPECTED_CLOSE_DATE,
                v.PLAN_CLOSE_DATE,
                v.DIFF_DAY,
+			   v.PRODUCTION_VERSION,
+			   v.FACTORY_CODE,
+			   v.YEAR_MONTH,
 		       r.CX_MACHINE_CODE
     </select>
 </mapper>

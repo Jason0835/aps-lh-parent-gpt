@@ -36,7 +36,7 @@ public class SummaryDemandPlanService {
 
   private final SaveAllocationResultService saveAllocationResultService;
 
-  public void summaryDemandPlan(DpDemandPlan createCondition,PredictionContext data, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
+  public void summaryDemandPlan(PredictionContext data, PredictionContext.OrderAllocationResult allocationResult, List<DpDemandPlan> finalPlans) {
     Map<String,List<DpDemandPlan>> map = finalPlans.stream().collect(Collectors.groupingBy(DpDemandPlan::getGroupFactoryAndMaterialKey));
     Map<String, Map<String, Integer>> stockQtyMap = calculateStockQty(data.getFinishedProductStockMap());
     Map<String, Integer> originalMonthSurplus  =   data.getOriginalMonthSurplusMap();
@@ -66,7 +66,7 @@ public class SummaryDemandPlanService {
     });
     datas.sort(Comparator.comparing(DpDemandPlanSum::getMaterialCode));
     this.batchInsertProcessor.batchInsert(datas);
-    this.saveAllocationResultService.saveAllocationResults(createCondition,createCondition.getMonthPlanVersion(),allocationResult);
+    this.saveAllocationResultService.saveAllocationResults(finalPlans.get(0),allocationResult);
   }
 
   private Map<String, Map<String, Integer>> calculateStockQty(Map<String, List<MdmProductStock>> finishProductStockMap) {

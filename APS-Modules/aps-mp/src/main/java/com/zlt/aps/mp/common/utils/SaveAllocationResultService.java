@@ -22,8 +22,7 @@ public class SaveAllocationResultService {
 
   @Async("batchInsertExecutor")
   public void saveAllocationResults(
-      DpDemandPlan createCondition,
-      String monthPlanVersion,
+      DpDemandPlan demandPlan,
       PredictionContext.OrderAllocationResult allocationResult) {
     // 批量插入分配结果
     if (!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getAllocations())) {
@@ -31,7 +30,7 @@ public class SaveAllocationResultService {
     }
     if(!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getStockMap())) {
       // 批量插入库存版本
-      dpStockVersionService.insertBatchData(createCondition, monthPlanVersion, allocationResult.getStockMap());
+      dpStockVersionService.insertBatchData(demandPlan, allocationResult.getStockMap());
     }
   }
 }

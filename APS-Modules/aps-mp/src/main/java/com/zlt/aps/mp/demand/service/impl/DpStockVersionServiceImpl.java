@@ -76,30 +76,30 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
     }
 
     @Override
-    public void insertBatchData(DpDemandPlan createCondition, String monthPlanVersion, Map<String, List<MdmProductStock>> finishedProductStockMap) {
+    public void insertBatchData(DpDemandPlan demandPlan,  Map<String, List<MdmProductStock>> finishedProductStockMap) {
         if (CollectionUtils.isEmpty(finishedProductStockMap)) {
             return;
         }
         List<DpStockVersion> list = Lists.newArrayList();
         List<MdmProductStock> finishedProductStocks = flattenStockMap(finishedProductStockMap);
         finishedProductStocks.forEach(finishedProductStock -> {
-            DpStockVersion requireStock = this.buildRequireStock(createCondition,monthPlanVersion,finishedProductStock);
+            DpStockVersion requireStock = this.buildRequireStock(demandPlan,finishedProductStock);
             list.add(requireStock);
         });
         list.sort(Comparator.comparing(DpStockVersion::getMaterialCode));
         this.batchInsertProcessor.batchInsert(list);
     }
 
-    private DpStockVersion buildRequireStock(DpDemandPlan createCondition, String monthPlanVersion, MdmProductStock finishedProductStock) {
+    private DpStockVersion buildRequireStock(DpDemandPlan demandPlan,MdmProductStock finishedProductStock) {
         DpStockVersion requireStock = new DpStockVersion();
         BeanUtils.copyProperties(finishedProductStock, requireStock);
         requireStock.setId(null);
-        requireStock.setRequireVersion(monthPlanVersion);
+        requireStock.setRequireVersion(demandPlan.getMonthPlanVersion());
         requireStock.setIsDelete(YesOrNoEnum.NO.getValue());
         requireStock.setRemainingQty(finishedProductStock.getLeftOverQty());
         requireStock.setBaseVale(null);
-        requireStock.setYear(createCondition.getYear());
-        requireStock.setMonth(createCondition.getMonth());
+        requireStock.setYear(demandPlan.getYear());
+        requireStock.setMonth(demandPlan.getMonth());
         return requireStock;
     }
 
