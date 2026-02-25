@@ -5,8 +5,8 @@
 <mapper namespace="com.zlt.aps.maindata.mapper.FactoryParamMapper">
 
 
-    <select id="getFacParamList" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryParam"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryParam">
+    <select id="getFacParamList" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryParam"
+            resultType="com.zlt.aps.mp.api.domain.entity.FactoryParam">
         select * from T_MP_FACTORY_PARAM
         where is_delete = 0 and IS_SHOW = '1'
         <if test="factoryCode != null  and factoryCode != ''">and factory_code = #{factoryCode}</if>

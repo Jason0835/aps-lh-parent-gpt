@@ -2,7 +2,7 @@ package com.zlt.aps.mp.engine.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**

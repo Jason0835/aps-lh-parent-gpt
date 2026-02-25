@@ -2,11 +2,10 @@ package com.zlt.aps.mp.raw.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.RawWarningRecord;
+import com.zlt.aps.mp.api.domain.entity.RawWarningRecord;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
 public interface IRawWarningService extends IService<RawWarningRecord> {
 

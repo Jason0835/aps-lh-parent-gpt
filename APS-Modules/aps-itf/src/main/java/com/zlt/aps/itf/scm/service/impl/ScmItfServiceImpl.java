@@ -25,8 +25,8 @@ import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.util.PostMethodUtils;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
-import com.zlt.aps.monthplan.api.domain.entity.DpArea;
-import com.zlt.aps.monthplan.api.domain.entity.DpNation;
+import com.zlt.aps.mp.api.domain.entity.DpArea;
+import com.zlt.aps.mp.api.domain.entity.DpNation;
 import com.zlt.core.dao.basedao.BaseDao;
 
 import lombok.extern.slf4j.Slf4j;

@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
 import com.alibaba.fastjson.JSON;
-import com.zlt.aps.monthplan.api.domain.vo.MaterialInfoGrossRateJsonVo;
+import com.zlt.aps.mp.api.domain.vo.MaterialInfoGrossRateJsonVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 

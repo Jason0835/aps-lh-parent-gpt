@@ -1,8 +1,8 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus;
-import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail;
-import com.zlt.aps.monthplan.api.domain.vo.LhMonthPlanSurplusDetailVo;
+import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplus;
+import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail;
+import com.zlt.aps.mp.api.domain.vo.LhMonthPlanSurplusDetailVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

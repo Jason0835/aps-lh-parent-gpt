@@ -3,7 +3,7 @@ package com.zlt.aps.mp.report.service.impl;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.monthplan.api.domain.entity.DemoOrderAccept;
+import com.zlt.aps.mp.api.domain.entity.DemoOrderAccept;
 import com.zlt.aps.mp.report.service.IDemoOrderAcceptService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;

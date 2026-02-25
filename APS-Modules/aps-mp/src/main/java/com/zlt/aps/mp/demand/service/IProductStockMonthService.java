@@ -3,8 +3,8 @@ package com.zlt.aps.mp.demand.service;
 
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
+import com.zlt.aps.mp.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.mp.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Date;

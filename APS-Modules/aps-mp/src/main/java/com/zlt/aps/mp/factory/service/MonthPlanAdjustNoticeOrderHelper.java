@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.factory.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import lombok.Data;
 
 import java.util.Map;

@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialRequirePlan;
+import com.zlt.aps.mp.api.domain.entity.RawMaterialRequirePlan;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;

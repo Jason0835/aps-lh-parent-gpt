@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.factory.mapper.FactoryConsoleMapper">
 
-    <select id="getProductionVersionList" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo" resultType="com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto">
+    <select id="getProductionVersionList" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo" resultType="com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto">
         SELECT YEAR,
                MONTH,
                FACTORY_CODE,
@@ -36,7 +36,7 @@
          ORDER BY MONTH_PLAN_VERSION,PRODUCTION_VERSION
     </select>
 
-    <select id="getNoSelectedVersionList" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo" resultType="com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo">
+    <select id="getNoSelectedVersionList" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo" resultType="com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanVersionVo">
             SELECT
               mv.YEAR,
               mv.MONTH,

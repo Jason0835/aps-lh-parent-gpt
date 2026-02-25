@@ -8,10 +8,10 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhGanttVo;
 import com.zlt.aps.lh.api.domain.vo.LhMachineInfoVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultVo;
-import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail;
-import com.zlt.aps.monthplan.api.domain.vo.LhMonthFinishQtyVo;
-import com.zlt.aps.monthplan.api.domain.vo.LhMonthFinishStatisticsDayQtyVo;
-import com.zlt.aps.monthplan.api.domain.vo.SpecCodeAndProductCodeVO;
+import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail;
+import com.zlt.aps.mp.api.domain.vo.LhMonthFinishQtyVo;
+import com.zlt.aps.mp.api.domain.vo.LhMonthFinishStatisticsDayQtyVo;
+import com.zlt.aps.mp.api.domain.vo.SpecCodeAndProductCodeVO;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;

@@ -3,7 +3,7 @@ package com.zlt.aps.mp.engine.mapper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
-import com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
+import com.zlt.aps.mp.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.constant.Constant;
 import com.zlt.aps.constant.SyncResultCodeConstant;
 import com.zlt.aps.maindata.mapper.ItfInterfaceLogEntityMapper;
-import com.zlt.aps.monthplan.api.domain.itf.*;
+import com.zlt.aps.mp.api.domain.itf.*;
 import com.zlt.aps.mp.demand.service.IMonthPlanSaleOrderService;
 import com.zlt.aps.mp.factory.service.IMpHistorySaleQtyService;
 import com.zlt.aps.mp.itf.InSaleOrderApiRequestConfig;

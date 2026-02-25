@@ -7,7 +7,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.RawWeekUsageEntityMapper;
 import com.zlt.aps.maindata.service.IRawWeekUsageService;
-import com.zlt.aps.monthplan.api.domain.entity.RawWeekUsage;
+import com.zlt.aps.mp.api.domain.entity.RawWeekUsage;
 import com.zlt.aps.mp.raw.service.impl.RawWeekUsageGenerateServiceImpl;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;

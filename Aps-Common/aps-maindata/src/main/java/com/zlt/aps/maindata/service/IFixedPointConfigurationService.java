@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.FixedPointConfiguration;
+import com.zlt.aps.mp.api.domain.entity.FixedPointConfiguration;
 
 import java.util.List;
 

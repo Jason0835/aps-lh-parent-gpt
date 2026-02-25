@@ -9,7 +9,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmHolidayEntityMapper;
 import com.zlt.aps.maindata.service.IMdmHolidayService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmHoliday;
+import com.zlt.aps.mp.api.domain.entity.MdmHoliday;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

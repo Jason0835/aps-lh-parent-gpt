@@ -33,7 +33,7 @@
     </insert>
 
     <select id="selectParamList"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal">
+            resultType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProdFinal">
         select * from T_MP_MONTH_PLAN_PROD_FINAL
         where IS_DELETE = 0
         <!-- 目前能保证五个字段都不能为空，暂不考虑拼接的方式 -->
@@ -44,7 +44,7 @@
     </select>
 
     <select id="selectMpFinalList"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo">
         select * from T_MP_MONTH_PLAN_PROD_FINAL
         where YEAR = #{year}
           and MONTH = #{month}
@@ -52,7 +52,7 @@
           and IS_DELETE = 0
     </select>
 
-    <select id="getStatisticsDay" resultType="com.zlt.aps.monthplan.api.domain.vo.DayProductionTotalVo">
+    <select id="getStatisticsDay" resultType="com.zlt.aps.mp.api.domain.vo.DayProductionTotalVo">
         SELECT 1 AS DAYS,
                COUNT(DISTINCT PRODUCT_CODE) AS DAY_COUNT,
                SUM(DAY_1) AS QTY

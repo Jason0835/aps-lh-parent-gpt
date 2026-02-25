@@ -3,7 +3,7 @@ package com.zlt.aps.mp.raw.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.maindata.mapper.RawWarningConfigEntityMapper;
 import com.zlt.aps.maindata.service.IRawWarningConfigService;
-import com.zlt.aps.monthplan.api.domain.entity.RawWarningConfig;
+import com.zlt.aps.mp.api.domain.entity.RawWarningConfig;
 import com.zlt.common.utils.PubUtil;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;

@@ -2,8 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMoldingMachineStatusEntityMapper">
     <select id="selectDocMoldingMachineStatusList"
-            parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MdmMoldingMachineStatusVo">
+            parameterType="com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineStatus"
+            resultType="com.zlt.aps.mp.api.domain.vo.MdmMoldingMachineStatusVo">
         select a.*,
         c.MOLDING_MACHINE_CLASS_NAME,
         c.MOULD_METHOD moldingMethod,
@@ -31,7 +31,7 @@
         ifnull(REGEXP_REPLACE(b.MOLDING_MACHINE_CODE,'[0-9]',''),'0') asc
     </select>
     
-    <delete id="deleteByYearAndMonth" parameterType="com.zlt.aps.monthplan.api.domain.vo.CopyParamVo">
+    <delete id="deleteByYearAndMonth" parameterType="com.zlt.aps.mp.api.domain.vo.CopyParamVo">
         update t_mdm_molding_machine_status
         set IS_DELETE = 1
         where
@@ -53,7 +53,7 @@
         </foreach>
     </update>
 
-    <select id="checkUnique" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus" resultType="int">
+    <select id="checkUnique" parameterType="com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineStatus" resultType="int">
         select count(1)
         from t_mdm_molding_machine_status a
         where a.is_delete = 0
@@ -70,7 +70,7 @@
     </select>
 
     <select id="selectGenerateListByMachine"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineStatus">
         SELECT
         FACTORY_CODE,
         #{generateToYear,jdbcType=DECIMAL} year,

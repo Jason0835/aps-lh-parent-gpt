@@ -20,7 +20,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;

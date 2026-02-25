@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.enums;
 
 import com.zlt.aps.enums.StockHedgingOptionsEnum;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanSaleOrder;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanSaleOrder;
 
 import java.util.Comparator;
 

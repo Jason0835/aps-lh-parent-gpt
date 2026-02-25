@@ -9,7 +9,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.annotation.DataImportCheck;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

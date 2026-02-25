@@ -18,7 +18,7 @@ import java.util.Objects;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRatioService;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRatio;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRatio;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
 

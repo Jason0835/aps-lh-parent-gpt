@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.factory.event;
 
 import com.zlt.aps.maindata.event.BaseEvent;
-import com.zlt.aps.monthplan.api.domain.dto.MonthPlanFinalizedEventDto;
+import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import lombok.Getter;
 
 /**

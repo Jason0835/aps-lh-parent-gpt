@@ -4,8 +4,8 @@ package com.zlt.aps.maindata.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.enums.ProductTypeEnum;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParam;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryParamVo;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
+import com.zlt.aps.mp.api.domain.vo.FactoryParamVo;
 
 import java.math.BigDecimal;
 import java.util.List;

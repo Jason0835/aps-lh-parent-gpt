@@ -232,7 +232,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by lh_machine_code, startDate
     </select>
     <select id="selectLhScheduleResultTotal"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.LhScheduleResultTotalVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.LhScheduleResultTotalVo">
         select SPEC_CODE,
                PRODUCT_CODE,
                REAL_SCHEDULE_DATE,

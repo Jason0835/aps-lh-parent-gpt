@@ -3,7 +3,7 @@ package com.zlt.aps.mp.common.utils;
 import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 

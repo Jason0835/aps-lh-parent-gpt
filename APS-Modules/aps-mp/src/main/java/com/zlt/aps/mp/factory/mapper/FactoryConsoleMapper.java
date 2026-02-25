@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.factory.mapper;
 
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanVersionVo;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanVersionVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto;
 import org.apache.ibatis.annotations.Mapper;
 

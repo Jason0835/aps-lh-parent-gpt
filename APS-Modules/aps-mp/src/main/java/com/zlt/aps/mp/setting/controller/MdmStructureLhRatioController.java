@@ -3,7 +3,7 @@ package com.zlt.aps.mp.setting.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.maindata.service.IMdmStructureLhRatioService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;

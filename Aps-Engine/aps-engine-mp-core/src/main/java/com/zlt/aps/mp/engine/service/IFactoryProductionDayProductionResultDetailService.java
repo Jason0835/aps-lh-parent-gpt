@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayDetail;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 
 /**
  * 工厂月度计划-模具排产结果明细记录数据

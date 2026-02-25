@@ -5,11 +5,9 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.constant.UserConstants;
-import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
-import com.zlt.aps.monthplan.api.service.IMdmSkuLhCapacityRemoteService;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.mp.api.service.IMdmSkuLhCapacityRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -23,7 +21,6 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.util.Arrays;
-import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 

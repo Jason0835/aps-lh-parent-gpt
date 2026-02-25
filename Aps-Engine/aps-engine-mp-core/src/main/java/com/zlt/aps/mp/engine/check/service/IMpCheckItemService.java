@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.check.service;
 
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.monthplan.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
 
 import java.util.List;
 

@@ -7,7 +7,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.service.IMdmInterestRateService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmInterestRate;
+import com.zlt.aps.mp.api.domain.entity.MdmInterestRate;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

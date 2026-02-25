@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel;
+import com.zlt.aps.mp.api.domain.entity.MdmPersonLevel;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

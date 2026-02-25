@@ -12,7 +12,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
-import com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort;
+import com.zlt.aps.mp.api.domain.entity.EstimateExceedShort;
 import com.zlt.aps.mp.mdm.service.IEstimateExceedShortService;
 import com.zlt.common.controller.BusiController;
 import com.zlt.common.utils.ImportExcelUtils;

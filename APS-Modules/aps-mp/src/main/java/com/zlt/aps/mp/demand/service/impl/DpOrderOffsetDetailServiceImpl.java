@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.mp.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.mp.common.utils.BatchInsertProcessor;
 import com.zlt.aps.mp.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpOrderOffsetDetailService;

@@ -2,9 +2,9 @@ package com.zlt.aps.controller.i18n;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.monthplan.api.domain.entity.I18nChange;
-import com.zlt.aps.monthplan.api.domain.vo.I18nJsonVo;
-import com.zlt.aps.monthplan.api.service.I18nChangeRemoteService;
+import com.zlt.aps.mp.api.domain.entity.I18nChange;
+import com.zlt.aps.mp.api.domain.vo.I18nJsonVo;
+import com.zlt.aps.mp.api.service.I18nChangeRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;

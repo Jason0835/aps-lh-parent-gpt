@@ -14,7 +14,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
-import com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth;
+import com.zlt.aps.mp.api.domain.entity.ProductStockMonth;
 import com.zlt.aps.mp.demand.service.IProductStockMonthService;
 import com.zlt.common.controller.BusiController;
 import com.zlt.common.utils.ImportExcelUtils;

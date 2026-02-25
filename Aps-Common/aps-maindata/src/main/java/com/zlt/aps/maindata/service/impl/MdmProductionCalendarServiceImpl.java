@@ -14,7 +14,7 @@ import com.zlt.aps.utils.YearMonthUtils;
 import com.zlt.aps.maindata.mapper.MdmProductionCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductionCalendarService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductionCalendar;
+import com.zlt.aps.mp.api.domain.entity.MdmProductionCalendar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;

@@ -1,8 +1,8 @@
 package com.zlt.aps.mp.report.mapper;
 
-import com.zlt.aps.monthplan.api.domain.dto.*;
-import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.aps.monthplan.api.domain.vo.*;
+import com.zlt.aps.mp.api.domain.dto.*;
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

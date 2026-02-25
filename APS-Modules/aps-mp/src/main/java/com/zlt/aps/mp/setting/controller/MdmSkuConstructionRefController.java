@@ -9,7 +9,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuConstructionRefService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

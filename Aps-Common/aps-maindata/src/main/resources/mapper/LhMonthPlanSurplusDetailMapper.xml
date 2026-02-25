@@ -4,7 +4,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.LhMonthPlanSurplusDetailMapper">
 
-    <select id="selectParamDetailList" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail">
+    <select id="selectParamDetailList" resultType="com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail">
         select * from T_LH_MONTH_PLAN_SURPLUS_DETAIL
         where IS_DELETE = 0
         <!-- 目前能保证六个字段都不能为空，暂不考虑拼接的方式 -->
@@ -14,7 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
     
-    <select id="selectParamList" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail">
+    <select id="selectParamList" resultType="com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail">
         select * from T_LH_MONTH_PLAN_SURPLUS_DETAIL
         where IS_DELETE = 0
         <!-- 目前能保证五个字段都不能为空，暂不考虑拼接的方式 -->
@@ -25,7 +25,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by id desc
     </select>
     
-    <select id="selectDetailList" resultType="com.zlt.aps.monthplan.api.domain.vo.LhMonthPlanSurplusDetailVo">
+    <select id="selectDetailList" resultType="com.zlt.aps.mp.api.domain.vo.LhMonthPlanSurplusDetailVo">
         SELECT
         FACTORY_CODE,
         PRODUCT_CODE,

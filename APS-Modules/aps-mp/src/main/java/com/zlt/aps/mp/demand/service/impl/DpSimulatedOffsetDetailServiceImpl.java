@@ -2,7 +2,7 @@ package com.zlt.aps.mp.demand.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
+import com.zlt.aps.mp.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.aps.mp.demand.service.IDpSimulatedOffsetDetailService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;

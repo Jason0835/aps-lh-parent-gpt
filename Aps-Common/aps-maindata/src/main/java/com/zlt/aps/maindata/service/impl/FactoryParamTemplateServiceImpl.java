@@ -3,7 +3,7 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zlt.aps.maindata.mapper.FactoryParamTemplateMapper;
 import com.zlt.aps.maindata.service.IFactoryParamTemplateService;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParamTemplate;
+import com.zlt.aps.mp.api.domain.entity.FactoryParamTemplate;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;

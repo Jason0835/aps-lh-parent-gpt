@@ -9,7 +9,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmDevicePlanShutEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDevicePlanShutService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

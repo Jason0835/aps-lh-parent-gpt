@@ -2,7 +2,7 @@ package com.zlt.aps.mp.engine.service;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldUsedStatusLog;
+import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 
 /**
  * Copyright (c) 2022, All rights reserved。

@@ -19,7 +19,7 @@ import com.zlt.aps.lh.mapper.LhMoldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhDayFinishQtyService;
 import com.zlt.aps.lh.service.ILhMoldChangePlanService;
 import com.zlt.aps.lh.service.LhScheduleResultService;
-import com.zlt.aps.monthplan.api.domain.vo.SpecCodeAndProductCodeVO;
+import com.zlt.aps.mp.api.domain.vo.SpecCodeAndProductCodeVO;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;

@@ -9,7 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MpHistorySaleRecordEntityMapper;
 import com.zlt.aps.maindata.service.IMpHistorySaleRecordService;
-import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
+import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;

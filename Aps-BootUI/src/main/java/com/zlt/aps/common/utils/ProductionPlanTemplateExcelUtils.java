@@ -1,6 +1,6 @@
 package com.zlt.aps.common.utils;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;

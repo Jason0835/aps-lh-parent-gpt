@@ -12,7 +12,7 @@ import java.util.List;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.aps.maindata.service.IRawMaterialOutboundRecordService;
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
+import com.zlt.aps.mp.api.domain.entity.RawMaterialOutboundRecord;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
 

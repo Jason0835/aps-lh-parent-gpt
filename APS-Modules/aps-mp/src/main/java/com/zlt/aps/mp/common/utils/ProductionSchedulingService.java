@@ -2,7 +2,7 @@ package com.zlt.aps.mp.common.utils;
 
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.service.IMonthPlanProductionSchedulingService;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;

@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.demand.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.MpProductionPrediction;
+import com.zlt.aps.mp.api.domain.entity.MpProductionPrediction;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

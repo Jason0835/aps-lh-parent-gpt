@@ -17,7 +17,7 @@ import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation;
+import com.zlt.aps.mp.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;

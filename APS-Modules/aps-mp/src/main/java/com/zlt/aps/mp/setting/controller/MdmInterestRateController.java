@@ -8,7 +8,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmInterestRateEntityMapper;
 import com.zlt.aps.maindata.service.IMdmInterestRateService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmInterestRate;
+import com.zlt.aps.mp.api.domain.entity.MdmInterestRate;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

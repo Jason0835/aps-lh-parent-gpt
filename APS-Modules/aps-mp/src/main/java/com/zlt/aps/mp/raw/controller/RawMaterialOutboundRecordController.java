@@ -18,7 +18,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord;
+import com.zlt.aps.mp.api.domain.entity.RawMaterialOutboundRecord;
 import com.zlt.aps.maindata.service.IRawMaterialOutboundRecordService;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;

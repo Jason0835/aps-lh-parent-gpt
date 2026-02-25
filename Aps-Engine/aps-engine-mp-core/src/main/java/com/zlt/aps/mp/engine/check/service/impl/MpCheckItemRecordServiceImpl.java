@@ -10,7 +10,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.zlt.aps.mp.engine.check.mapper.MpCheckItemRecordMapper;
 import com.zlt.aps.utils.JsonUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
+import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

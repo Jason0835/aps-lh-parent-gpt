@@ -8,7 +8,7 @@ import com.zlt.aps.cxlh.cx.api.domain.entity.CxOnlineImport;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo;
 import com.zlt.aps.lh.api.domain.bo.ValidateResult;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
+import com.zlt.aps.mp.api.domain.vo.MdmProductConstructionVO;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
 

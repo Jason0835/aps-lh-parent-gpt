@@ -7,14 +7,13 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.monthplan.api.domain.entity.RawWarningConfig;
-import com.zlt.aps.monthplan.api.service.IRawWarningConfigRemoteService;
+import com.zlt.aps.mp.api.domain.entity.RawWarningConfig;
+import com.zlt.aps.mp.api.service.IRawWarningConfigRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -26,7 +25,6 @@ import java.io.IOException;
 import java.io.ByteArrayInputStream;
 
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;

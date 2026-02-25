@@ -12,7 +12,7 @@ import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import com.zlt.aps.monthplan.api.enums.WorkWearTypeEnum;
+import com.zlt.aps.mp.api.enums.WorkWearTypeEnum;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;

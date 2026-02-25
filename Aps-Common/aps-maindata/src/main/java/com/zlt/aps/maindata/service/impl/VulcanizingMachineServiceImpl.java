@@ -8,7 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.maindata.mapper.VulcanizingMachineMapper;
 import com.zlt.aps.maindata.service.IVulcanizingMachineService;
-import com.zlt.aps.monthplan.api.domain.entity.VulcanizingMachine;
+import com.zlt.aps.mp.api.domain.entity.VulcanizingMachine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

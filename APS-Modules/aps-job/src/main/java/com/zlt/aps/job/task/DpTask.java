@@ -1,8 +1,8 @@
 package com.zlt.aps.job.task;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthlySaleQty;
-import com.zlt.aps.monthplan.api.service.IMpMonthlySaleQtyRemoteService;
+import com.zlt.aps.mp.api.domain.entity.MpMonthlySaleQty;
+import com.zlt.aps.mp.api.service.IMpMonthlySaleQtyRemoteService;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -3,7 +3,7 @@ package com.zlt.aps.mp.setting.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.maindata.mapper.MdmCapsuleChuckEntityMapper;
 import com.zlt.aps.maindata.service.IMdmCapsuleChuckService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
+import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;

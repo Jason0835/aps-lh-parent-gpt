@@ -1,9 +1,9 @@
 package com.zlt.aps.job.task;
 
 import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

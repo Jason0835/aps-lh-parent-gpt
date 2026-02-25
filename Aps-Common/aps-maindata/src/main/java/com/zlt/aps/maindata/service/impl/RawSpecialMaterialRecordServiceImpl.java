@@ -2,7 +2,7 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.lang3.StringUtils;
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
 

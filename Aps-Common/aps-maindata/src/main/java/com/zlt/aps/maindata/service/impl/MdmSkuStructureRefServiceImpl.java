@@ -5,7 +5,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

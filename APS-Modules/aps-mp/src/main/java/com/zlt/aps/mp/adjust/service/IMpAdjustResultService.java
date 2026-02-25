@@ -1,12 +1,8 @@
 package com.zlt.aps.mp.adjust.service;
 
 
-import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.bill.common.service.IDocService;
-import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。

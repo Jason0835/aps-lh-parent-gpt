@@ -23,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </update>
 
-    <select id="queryByFactoryAndSpecCodes" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus">
+    <select id="queryByFactoryAndSpecCodes" resultType="com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplus">
         SELECT
         ID,
         MONTH_PLAN_APS_VERSION   AS monthPlanApsVersion,
@@ -49,7 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
 
-    <select id="selectParamList" resultType="com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus">
+    <select id="selectParamList" resultType="com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplus">
         select *
         from T_LH_MONTH_PLAN_SURPLUS
         where IS_DELETE = 0

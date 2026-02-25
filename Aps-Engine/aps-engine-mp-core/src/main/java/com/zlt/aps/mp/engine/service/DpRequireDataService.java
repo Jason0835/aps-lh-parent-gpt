@@ -2,7 +2,7 @@ package com.zlt.aps.mp.engine.service;
 
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.CycleStructureMinLhMachineQtyVo;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 
 import java.util.List;
 

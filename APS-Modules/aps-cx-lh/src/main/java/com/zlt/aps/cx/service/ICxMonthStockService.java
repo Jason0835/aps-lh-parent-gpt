@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.CxMonthStock;
+import com.zlt.aps.mp.api.domain.entity.CxMonthStock;
 import com.zlt.bill.common.service.IDocService;
 
 /**

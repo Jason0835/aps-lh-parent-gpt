@@ -1,9 +1,9 @@
 package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus;
-import com.zlt.aps.monthplan.api.domain.vo.CopyParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmVulcanizingMachStatusVo;
+import com.zlt.aps.mp.api.domain.entity.MdmVulcanizingMachStatus;
+import com.zlt.aps.mp.api.domain.vo.CopyParamVo;
+import com.zlt.aps.mp.api.domain.vo.MdmVulcanizingMachStatusVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

@@ -7,7 +7,7 @@ import com.ruoyi.common.text.Convert;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuLhCapacityService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -7,9 +7,9 @@ import org.apache.ibatis.annotations.Mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 
 /**
  * MES接口Mapper-Bom相关

@@ -4,7 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlanSum;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
 import com.zlt.common.utils.PubUtil;

@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper">
-    <select id="listReport" resultType="com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor">
+    <select id="listReport" resultType="com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor">
         SELECT v.STRUCTURE_NAME,
 		       v.MATERIAL_CODE,
 		       v.MATERIAL_DESC,

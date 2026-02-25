@@ -4,7 +4,7 @@ import com.google.common.collect.Maps;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionPlanUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 

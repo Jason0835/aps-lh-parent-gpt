@@ -10,7 +10,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;

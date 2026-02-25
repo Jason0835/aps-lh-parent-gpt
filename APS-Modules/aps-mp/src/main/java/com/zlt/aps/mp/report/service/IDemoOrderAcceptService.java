@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.report.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.DemoOrderAccept;
+import com.zlt.aps.mp.api.domain.entity.DemoOrderAccept;
 import com.zlt.bill.common.service.IDocService;
 
 /**

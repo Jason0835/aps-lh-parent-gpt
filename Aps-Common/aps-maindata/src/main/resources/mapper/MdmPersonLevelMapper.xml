@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmPersonLevelMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel" id="MdmPersonLevelResult">
+    <resultMap type="com.zlt.aps.mp.api.domain.entity.MdmPersonLevel" id="MdmPersonLevelResult">
         <result property="id" column="ID"/>
         <result property="factoryCode" column="FACTORY_CODE"/>
         <result property="year" column="YEAR"/>
@@ -25,7 +25,7 @@
         SELECT ID, FACTORY_CODE, YEAR, MONTH, LEVEL_CODE, METHOD_TYPE, MACHINE_NUMBER, FACTOR, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME FROM T_MDM_PERSON_LEVEL
     </sql>
 
-    <select id="selectMdmPersonLevelList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel" resultMap="MdmPersonLevelResult">
+    <select id="selectMdmPersonLevelList" parameterType="com.zlt.aps.mp.api.domain.entity.MdmPersonLevel" resultMap="MdmPersonLevelResult">
         <include refid="selectMdmPersonLevelVo"/>
         WHERE IS_DELETE = 0
         <if test="factoryCode != null  and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>

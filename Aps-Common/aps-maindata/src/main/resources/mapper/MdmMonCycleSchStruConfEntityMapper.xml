@@ -5,7 +5,7 @@
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper">
 
     <select id="selectMonthCycleSchStruConf"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMonCycleSchStruConf">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf">
         SET
         @genYear =
         #{year};

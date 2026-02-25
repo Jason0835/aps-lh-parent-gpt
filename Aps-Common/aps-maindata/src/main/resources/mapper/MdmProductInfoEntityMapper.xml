@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper">
-    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo">
         <id property="id" column="ID" jdbcType="DECIMAL"/>
         <result property="materialCode" column="MATERIAL_CODE" jdbcType="VARCHAR"/>
         <result property="proSize" column="PRO_SIZE" jdbcType="DECIMAL"/>
@@ -86,8 +86,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           AND PRODUCT_TYPE_NAME = #{productTypeName})
     </select>
 
-    <select id="getMaterialInfoList" resultType="com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo"
-            parameterType="com.zlt.aps.monthplan.api.domain.vo.TableProductInfoVo">
+    <select id="getMaterialInfoList" resultType="com.zlt.aps.mp.api.domain.vo.TableProductInfoVo"
+            parameterType="com.zlt.aps.mp.api.domain.vo.TableProductInfoVo">
         SELECT tmpi.ID,
                tmpi.FACTORY_CODE,
         tmpi.MATERIAL_CODE,
@@ -225,7 +225,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
               (SELECT replace_group FROM t_product_info WHERE MATERIAL_CODE = #{materialCode,jdbcType=VARCHAR})
     </select>
 
-    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo">
         select *
         from T_MDM_MATERIAL_INFO
         where CONCAT(FACTORY_CODE, "|", MATERIAL_CODE) in
@@ -236,7 +236,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 
     <select id="queryByFactoryCodeAndMaterialCodes"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo">
         SELECT
         *
         FROM T_MDM_MATERIAL_INFO
@@ -249,7 +249,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
 
-  <select id="findAdjustMaterialInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+  <select id="findAdjustMaterialInfo" resultType="com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo">
           SELECT
             mi.FACTORY_CODE,
             mi.MES_MATERIAL_CATEGORY,

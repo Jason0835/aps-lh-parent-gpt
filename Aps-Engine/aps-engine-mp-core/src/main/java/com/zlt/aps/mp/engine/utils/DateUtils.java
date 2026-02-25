@@ -2,7 +2,7 @@ package com.zlt.aps.mp.engine.utils;
 
 import com.zlt.aps.mp.engine.domain.vo.ProductionDayInfoVo;
 import com.zlt.aps.mp.engine.scheduling.ProductionContext;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalVersionInfoVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalVersionInfoVo;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;

@@ -2,7 +2,7 @@ package com.zlt.aps.mp.itf.controller;
 
 import com.ruoyi.api.gateway.system.domain.SysConfig;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.itf.InSaleOrderDto;
+import com.zlt.aps.mp.api.domain.itf.InSaleOrderDto;
 import com.zlt.aps.mp.itf.mapper.SaleOrderMapper;
 import com.zlt.aps.mp.itf.service.IInSaleOrderSyncService;
 import io.swagger.annotations.Api;

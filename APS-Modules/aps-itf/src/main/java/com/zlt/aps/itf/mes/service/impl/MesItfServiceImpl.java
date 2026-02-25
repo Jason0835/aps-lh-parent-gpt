@@ -20,7 +20,7 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;

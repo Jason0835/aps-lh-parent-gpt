@@ -4,7 +4,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustMaterialLogEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustMaterialLogService;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

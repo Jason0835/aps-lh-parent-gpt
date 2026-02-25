@@ -31,7 +31,7 @@ import com.zlt.aps.maindata.mapper.MpMonthlySaleQtyEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.bill.common.service.AbstractDocService;

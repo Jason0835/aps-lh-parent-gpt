@@ -19,7 +19,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRatio;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRatio;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRatioService;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;

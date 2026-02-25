@@ -2,7 +2,7 @@ package com.zlt.aps.dp.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

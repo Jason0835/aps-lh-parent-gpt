@@ -5,7 +5,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper">
 
     <select id="selectMdmProductConstructionList"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SELECT t.*
         FROM t_mdm_product_construction t
                  INNER JOIN (SELECT DISTINCT a.ID
@@ -47,7 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             ${ew.customSqlSegment}
     </select>
 
-    <select id="queryByFactoryCodeAndSpecCodes" resultType="com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO">
+    <select id="queryByFactoryCodeAndSpecCodes" resultType="com.zlt.aps.mp.api.domain.vo.MdmProductConstructionVO">
         SELECT
         TPC.FACTORY_CODE       AS factoryCode,
         TPC.PRODUCT_CODE       AS productCode,
@@ -74,7 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
 
-    <select id="queryByFactoryCodeAndSpecCodes2" resultType="com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO">
+    <select id="queryByFactoryCodeAndSpecCodes2" resultType="com.zlt.aps.mp.api.domain.vo.MdmProductConstructionVO">
         SELECT
         TPC.FACTORY_CODE       AS factoryCode,
         TPC.PRODUCT_CODE       AS productCode,
@@ -102,7 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
 
-    <select id="queryBySpecCodeAndProductCode"  resultType="com.zlt.aps.monthplan.api.domain.vo.SpecCodeAndProductCodeVO">
+    <select id="queryBySpecCodeAndProductCode"  resultType="com.zlt.aps.mp.api.domain.vo.SpecCodeAndProductCodeVO">
 
         select pc.EMBRYO_CODE as embryoCode,
                pc.PRODUCT_CODE as productCode,
@@ -120,7 +120,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 
     <select id="queryByProductCodeAndSpecCodes"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SELECT
         TPC.FACTORY_CODE AS factoryCode,
         TPC.PRODUCT_CODE AS productCode,
@@ -143,7 +143,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
 
-    <select id="selectExistData" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+    <select id="selectExistData" resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SELECT
         TPC.ID AS id,
         TPC.FACTORY_CODE AS factoryCode,
@@ -208,7 +208,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         WHERE t.create_by = 'MES'
     </select>
 
-    <select id="selectByProductCodeAndMethod" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+    <select id="selectByProductCodeAndMethod" resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SELECT
         TPC.*
         FROM <include refid="tableName"/> TPC
@@ -224,7 +224,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         WHERE TPC.IS_DELETE = 0
     </select>
 
-    <select id="selectByEmbryoCode" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+    <select id="selectByEmbryoCode" resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SELECT
         TPC.*
         FROM <include refid="tableName"/> TPC
@@ -239,7 +239,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         AND TPC.CURING_TIME IS NOT NULL
     </select>
 
-    <select id="selectBySpecCode" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+    <select id="selectBySpecCode" resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SELECT
         TPC.*
         FROM <include refid="tableName"/> TPC

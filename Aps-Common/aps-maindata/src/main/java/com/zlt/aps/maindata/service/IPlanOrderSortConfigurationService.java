@@ -2,8 +2,8 @@ package com.zlt.aps.maindata.service;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.PlanOrderSortConfiguration;
-import com.zlt.aps.monthplan.api.domain.vo.PlanOrderSortConfigurationVo;
+import com.zlt.aps.mp.api.domain.entity.PlanOrderSortConfiguration;
+import com.zlt.aps.mp.api.domain.vo.PlanOrderSortConfigurationVo;
 
 import java.util.List;
 import java.util.Map;

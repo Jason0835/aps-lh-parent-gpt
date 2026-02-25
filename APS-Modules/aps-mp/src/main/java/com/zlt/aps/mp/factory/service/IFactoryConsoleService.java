@@ -1,8 +1,8 @@
 package com.zlt.aps.mp.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.vo.*;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.vo.*;
 import com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto;
 
 import java.util.List;

@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**

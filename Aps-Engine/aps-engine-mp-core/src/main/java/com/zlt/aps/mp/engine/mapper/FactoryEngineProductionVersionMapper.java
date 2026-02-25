@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.engine.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

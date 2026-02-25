@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,8 +20,8 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.service.ILhDayFinishQtyService;
-import com.zlt.aps.monthplan.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.monthplan.api.service.IFactoryConsoleRemoteService;
+import com.zlt.aps.mp.api.domain.dto.FactoryFinalVersionQueryDto;
+import com.zlt.aps.mp.api.service.IFactoryConsoleRemoteService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 

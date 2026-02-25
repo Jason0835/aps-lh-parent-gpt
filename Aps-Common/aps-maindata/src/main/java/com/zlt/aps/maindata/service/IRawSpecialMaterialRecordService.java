@@ -1,8 +1,8 @@
 package com.zlt.aps.maindata.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialConsumeDetail;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

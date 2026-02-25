@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.factory.mapper.MpHistorySaleQtyMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleQty" id="MpHistorySaleQtyResult">
+    <resultMap type="com.zlt.aps.mp.api.domain.entity.MpHistorySaleQty" id="MpHistorySaleQtyResult">
         <result property="id" column="ID"/>
         <result property="year" column="YEAR"/>
         <result property="month" column="MONTH"/>
@@ -27,7 +27,7 @@
         FROM T_MDM_HISTORY_SALE_RECORD
     </sql>
 
-    <select id="selectMpHistorySaleQtyList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleQty" resultMap="MpHistorySaleQtyResult">
+    <select id="selectMpHistorySaleQtyList" parameterType="com.zlt.aps.mp.api.domain.entity.MpHistorySaleQty" resultMap="MpHistorySaleQtyResult">
         <include refid="selectMpHistorySaleQtyVo"/>
         WHERE IS_DELETE = 0
         <if test="year != null "> AND YEAR = #{year}</if>
@@ -40,7 +40,7 @@
         <if test="orderQty != null "> AND ORDER_QTY = #{orderQty}</if>
     </select>
 
-    <select id="selectCalcStocking" resultType="com.zlt.aps.monthplan.api.domain.vo.CalcStockingResultVo">
+    <select id="selectCalcStocking" resultType="com.zlt.aps.mp.api.domain.vo.CalcStockingResultVo">
         SELECT
         d.*,
         <!-- 历史销售记录可能有负数， -->

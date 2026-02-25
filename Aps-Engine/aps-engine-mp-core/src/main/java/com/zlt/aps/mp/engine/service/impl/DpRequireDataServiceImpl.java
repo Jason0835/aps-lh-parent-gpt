@@ -7,7 +7,7 @@ import com.zlt.aps.mp.engine.domain.vo.CycleStructureMinLhMachineQtyVo;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.mp.engine.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;

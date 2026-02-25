@@ -1,7 +1,7 @@
 package com.zlt.aps.dp.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.DpSimulatedOffsetDetail;
+import com.zlt.aps.mp.api.domain.entity.DpSimulatedOffsetDetail;
 import com.zlt.bill.common.service.IDocService;
 
 /**

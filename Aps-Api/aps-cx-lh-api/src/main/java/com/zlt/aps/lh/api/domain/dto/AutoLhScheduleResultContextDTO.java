@@ -7,9 +7,9 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhMachineInfoVo;
 import com.zlt.aps.lh.api.domain.vo.LhMoldInfoVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultVo;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmDeviceMaintenancePlan;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanProdFinalVo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmDeviceMaintenancePlan;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProdFinalVo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
@@ -18,7 +18,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * @author xh

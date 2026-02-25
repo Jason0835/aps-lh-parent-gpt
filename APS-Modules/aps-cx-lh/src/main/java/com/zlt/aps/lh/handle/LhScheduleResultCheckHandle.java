@@ -10,8 +10,8 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.lh.service.LhScheduleResultService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

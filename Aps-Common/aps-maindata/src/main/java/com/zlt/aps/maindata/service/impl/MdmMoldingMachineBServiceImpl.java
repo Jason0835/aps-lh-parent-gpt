@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.service.impl;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineB;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineB;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;

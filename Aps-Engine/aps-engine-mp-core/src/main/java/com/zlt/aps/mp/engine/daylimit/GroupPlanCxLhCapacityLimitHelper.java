@@ -7,7 +7,7 @@ import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.monthplan.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;

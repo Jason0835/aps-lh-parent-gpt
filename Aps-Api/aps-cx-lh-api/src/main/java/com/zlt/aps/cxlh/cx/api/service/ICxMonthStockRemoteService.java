@@ -3,7 +3,7 @@ package com.zlt.aps.cxlh.cx.api.service;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.monthplan.api.domain.entity.CxMonthStock;
+import com.zlt.aps.mp.api.domain.entity.CxMonthStock;
 import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;

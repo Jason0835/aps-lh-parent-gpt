@@ -9,7 +9,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.maindata.service.IProductALevelService;
-import com.zlt.aps.monthplan.api.domain.entity.ProductALevel;
+import com.zlt.aps.mp.api.domain.entity.ProductALevel;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;

@@ -1,9 +1,8 @@
 package com.zlt.aps.mp.adjust.service;
 
 
-import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn;
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

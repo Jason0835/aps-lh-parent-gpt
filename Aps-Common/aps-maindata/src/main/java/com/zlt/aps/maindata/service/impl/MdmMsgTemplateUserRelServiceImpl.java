@@ -11,7 +11,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmMsgTemplateUserRelMapper;
 import com.zlt.aps.maindata.service.IMdmMsgTemplateUserRelService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel;
+import com.zlt.aps.mp.api.domain.entity.MdmMsgTemplateUserRel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.apache.commons.collections4.CollectionUtils;
