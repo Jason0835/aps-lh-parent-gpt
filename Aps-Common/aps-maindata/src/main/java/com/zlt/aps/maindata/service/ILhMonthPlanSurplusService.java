@@ -2,9 +2,9 @@ package com.zlt.aps.maindata.service;
 
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplus;
-import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail;
-import com.zlt.aps.monthplan.api.domain.vo.LhMonthPlanSurplusDetailVo;
+import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplus;
+import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail;
+import com.zlt.aps.mp.api.domain.vo.LhMonthPlanSurplusDetailVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

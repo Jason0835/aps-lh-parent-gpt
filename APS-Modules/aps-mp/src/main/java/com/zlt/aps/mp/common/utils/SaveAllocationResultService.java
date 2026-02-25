@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.common.utils;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.aps.mp.demand.service.IDpStockVersionService;
 import lombok.RequiredArgsConstructor;

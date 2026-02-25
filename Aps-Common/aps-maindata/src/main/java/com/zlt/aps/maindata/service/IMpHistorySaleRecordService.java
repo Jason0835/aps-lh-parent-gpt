@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleRecord;
+import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Set;

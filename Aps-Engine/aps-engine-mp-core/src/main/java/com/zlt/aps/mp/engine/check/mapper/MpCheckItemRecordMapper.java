@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.check.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
+import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

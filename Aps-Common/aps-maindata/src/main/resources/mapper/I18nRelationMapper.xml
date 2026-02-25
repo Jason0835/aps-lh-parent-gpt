@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.I18nRelationMapper">
 
-    <select id="selectList" resultType="com.zlt.aps.monthplan.api.domain.entity.I18nRelation">
+    <select id="selectList" resultType="com.zlt.aps.mp.api.domain.entity.I18nRelation">
         select id,MODE_NAME,FILE_NAME,IS_PAGE from T_I18N_RELATION
         <where>
             <if test="isPage != null">

@@ -2,8 +2,8 @@ package com.zlt.aps.cxlh.cx.api.domain.vo;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.monthplan.api.domain.entity.CxEmbryoMonthPlanSurplus;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.CxEmbryoMonthPlanSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;

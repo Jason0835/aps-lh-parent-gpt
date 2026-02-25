@@ -11,7 +11,7 @@ import com.zlt.aps.cx.mapper.entity.CxPersionTrainSettingEntityMapper;
 import com.zlt.aps.cx.service.ICxPersionTrainSettingService;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxPersionTrainSetting;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.service.AbstractDocService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

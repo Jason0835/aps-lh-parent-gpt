@@ -24,7 +24,7 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolRecordEntityMapper;
 import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;

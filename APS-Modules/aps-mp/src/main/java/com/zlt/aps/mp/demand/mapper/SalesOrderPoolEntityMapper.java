@@ -2,10 +2,10 @@ package com.zlt.aps.mp.demand.mapper;
 
 import java.util.List;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import org.apache.ibatis.annotations.Mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 
 /**

@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.monthplan.api.domain.entity.DpStockVersion;
+import com.zlt.aps.mp.api.domain.entity.DpStockVersion;
 import com.zlt.aps.mp.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpStockVersionService;
 import com.zlt.bill.common.controller.AbstractDocBizController;

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper">
 
-    <delete id="deletedMonthPlanRequireVersion" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+    <delete id="deletedMonthPlanRequireVersion" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
        DELETE FROM t_mp_product_require_plan
         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
           AND YEAR = #{year,jdbcType=DECIMAL}
@@ -18,7 +18,7 @@
           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
     </delete>
 
-    <delete id="deletedByProductionVersion" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+    <delete id="deletedByProductionVersion" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         DELETE FROM t_mp_proc_version
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
@@ -70,7 +70,7 @@
     </delete>
 
     <delete id="deletedLastVersionByProductionVersion"
-            parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+            parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         UPDATE t_mp_proc_version
            SET IS_SELECTED_DEMAND      = NULL,
                PRODUCTION_INIT_VERSION = NULL,
@@ -140,7 +140,7 @@
            AND PRODUCTION_VERSION IS NOT NULL
     </select>
 
-    <update id="deletedProductionVersionAndUpdateLastFlag" parameterType="com.zlt.aps.monthplan.api.domain.vo.FactoryProductionParamVo">
+    <update id="deletedProductionVersionAndUpdateLastFlag" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         UPDATE t_mp_proc_version
            SET PRODUCTION_INIT_VERSION = NULL,
                PRODUCTION_VERSION = NULL,

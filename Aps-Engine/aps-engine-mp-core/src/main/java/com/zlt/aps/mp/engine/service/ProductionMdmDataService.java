@@ -4,8 +4,8 @@ import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.MachineCountDto;
-import com.zlt.aps.monthplan.api.domain.entity.*;
-import com.zlt.aps.monthplan.api.domain.vo.ProductALevelVo;
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.ProductALevelVo;
 import com.zlt.aps.mp.engine.domain.vo.*;
 
 import java.util.List;

@@ -7,7 +7,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.service.IFixedPointConfigurationService;
-import com.zlt.aps.monthplan.api.domain.entity.FixedPointConfiguration;
+import com.zlt.aps.mp.api.domain.entity.FixedPointConfiguration;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

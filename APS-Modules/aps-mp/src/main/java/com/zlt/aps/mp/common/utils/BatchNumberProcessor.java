@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.common.utils;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
+import com.zlt.aps.mp.api.domain.entity.MpPredictionDetail;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 

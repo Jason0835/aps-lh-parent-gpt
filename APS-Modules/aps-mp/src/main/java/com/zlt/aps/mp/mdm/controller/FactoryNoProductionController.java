@@ -14,7 +14,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
+import com.zlt.aps.mp.api.domain.entity.FactoryNoProduction;
 import com.zlt.aps.mp.mdm.service.IFactoryNoProductionService;
 import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;

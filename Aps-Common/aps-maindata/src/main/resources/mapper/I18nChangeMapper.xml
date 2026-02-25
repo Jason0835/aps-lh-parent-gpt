@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.I18nChangeMapper">
 
-    <select id="selectRelList" resultType="com.zlt.aps.monthplan.api.domain.entity.I18nChange">
+    <select id="selectRelList" resultType="com.zlt.aps.mp.api.domain.entity.I18nChange">
         select
         TIC.id,
         TIC.REL_ID,
@@ -66,7 +66,7 @@
         where id = #{id}
     </update>
 
-    <select id="selectByUniqueKey" resultType="com.zlt.aps.monthplan.api.domain.entity.I18nChange">
+    <select id="selectByUniqueKey" resultType="com.zlt.aps.mp.api.domain.entity.I18nChange">
         SELECT * FROM T_I18N_CHANGE
         WHERE IS_DELETE = 0
         <if test="list != null and list.size() > 0">

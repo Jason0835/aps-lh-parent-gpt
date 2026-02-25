@@ -1,7 +1,7 @@
 package com.zlt.aps.itf.service;
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.monthplan.api.domain.entity.LhMonthPlanSurplusDetail;
+import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;

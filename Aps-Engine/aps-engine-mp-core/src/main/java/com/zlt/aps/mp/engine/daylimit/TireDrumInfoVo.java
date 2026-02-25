@@ -3,7 +3,7 @@ package com.zlt.aps.mp.engine.daylimit;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmWorkWearInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkWearInfo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;

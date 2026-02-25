@@ -5,7 +5,7 @@ import com.zlt.aps.maindata.mapper.FixedPointMoldingConfigurationMapper;
 import com.zlt.aps.maindata.mapper.FixedPointProductConfigurationMapper;
 import com.zlt.aps.maindata.mapper.FixedPointVulcanizingConfigurationMapper;
 import com.zlt.aps.maindata.service.IFixedPointConfigurationService;
-import com.zlt.aps.monthplan.api.domain.entity.FixedPointConfiguration;
+import com.zlt.aps.mp.api.domain.entity.FixedPointConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

@@ -64,7 +64,7 @@
               AND mdp.BOARDING_DATE &lt;= #{productionEndDate,jdbcType=DATE}
     </select>
 
-    <select id="getEnableProductionMouldInfoByNetDemand" resultType="com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">
+    <select id="getEnableProductionMouldInfoByNetDemand" resultType="com.zlt.aps.mp.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">
         SELECT
         msm.FACTORY_CODE,
         msm.MATERIAL_CODE,
@@ -109,7 +109,7 @@
         )
     </select>
 
-    <select id="getEnableMouldDeliveryInfoByNetDemand" resultType="com.zlt.aps.monthplan.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">
+    <select id="getEnableMouldDeliveryInfoByNetDemand" resultType="com.zlt.aps.mp.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">
         SELECT
         mdp.FACTORY_CODE,
         mdp.MATERIAL_CODE,

@@ -1,8 +1,8 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
 import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
-import com.zlt.aps.monthplan.api.annotation.WeekAdjustType;
-import com.zlt.aps.monthplan.api.enums.WeekAdjustTypeEnum;
+import com.zlt.aps.mp.api.annotation.WeekAdjustType;
+import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;

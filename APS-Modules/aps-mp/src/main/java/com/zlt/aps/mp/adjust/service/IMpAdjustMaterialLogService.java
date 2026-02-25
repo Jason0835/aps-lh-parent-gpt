@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.adjust.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog;
 import com.zlt.bill.common.service.IDocService;
 /**
  * Copyright (c) 2022, All rights reserved。

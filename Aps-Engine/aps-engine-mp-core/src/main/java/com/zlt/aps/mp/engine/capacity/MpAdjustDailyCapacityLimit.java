@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.capacity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 
 /**
  * 周程滚动日产能限制

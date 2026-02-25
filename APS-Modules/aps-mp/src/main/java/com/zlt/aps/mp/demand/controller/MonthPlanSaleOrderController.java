@@ -17,7 +17,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanSaleOrder;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanSaleOrder;
 import com.zlt.aps.mp.demand.service.IMonthPlanSaleOrderService;
 import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.ExcelReadUtils;

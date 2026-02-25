@@ -4,10 +4,10 @@ package com.zlt.aps.mp.factory.service;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProdFinal;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanRequireStock;
-import com.zlt.aps.monthplan.api.domain.vo.*;
+import com.zlt.aps.mp.api.domain.dto.FactoryMonthPlanProdFinalQueryDto;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProdFinal;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanRequireStock;
+import com.zlt.aps.mp.api.domain.vo.*;
 
 import java.util.Date;
 import java.util.List;

@@ -3,7 +3,7 @@ package com.zlt.aps.mp.engine.check.service;
 import java.util.List;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
+import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import org.springframework.transaction.annotation.Transactional;
 
 /**

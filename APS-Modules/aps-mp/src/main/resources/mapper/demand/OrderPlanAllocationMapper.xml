@@ -14,7 +14,7 @@
           and MONTH_PLAN_VERSION is not null
     </select>
 
-    <select id="getSummaryVo" resultType="com.zlt.aps.monthplan.api.domain.vo.OrderPlanAllocationReportVo">
+    <select id="getSummaryVo" resultType="com.zlt.aps.mp.api.domain.vo.OrderPlanAllocationReportVo">
         SELECT COUNT(DISTINCT PRODUCT_CODE) AS skuCount,
                SUM(PLAN_QTY)                AS skuQty,
                SUM(ALLOCATION_QTY)          AS stockHedgingQty,

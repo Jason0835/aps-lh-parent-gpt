@@ -4,7 +4,7 @@ import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.service.IMdmPersonLevelService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel;
+import com.zlt.aps.mp.api.domain.entity.MdmPersonLevel;
 import lombok.extern.slf4j.Slf4j;
 
 import io.swagger.annotations.Api;

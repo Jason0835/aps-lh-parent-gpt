@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.domain.dto;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.vo.ProductSpecInfoVo;
+import com.zlt.aps.mp.api.domain.entity.MdmProductConstruction;
+import com.zlt.aps.mp.api.domain.vo.ProductSpecInfoVo;
 import lombok.Data;
 
 import java.util.List;

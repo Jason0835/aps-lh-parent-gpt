@@ -4,7 +4,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.mdm.mapper.FactoryNoProductionMapper">
 
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction" id="FactoryNoProductionResult">
+    <resultMap type="com.zlt.aps.mp.api.domain.entity.FactoryNoProduction" id="FactoryNoProductionResult">
         <result property="id" column="ID"/>
         <result property="factoryCode" column="FACTORY_CODE"/>
         <result property="year" column="YEAR"/>
@@ -21,7 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
 
-    <select id="selectFactoryNoProductionList" parameterType="com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction" resultMap="FactoryNoProductionResult">
+    <select id="selectFactoryNoProductionList" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryNoProduction" resultMap="FactoryNoProductionResult">
         SELECT
         fnp.ID,
         fnp.FACTORY_CODE,

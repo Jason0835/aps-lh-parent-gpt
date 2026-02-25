@@ -8,7 +8,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.maindata.service.IMdmMustFinishPlanService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMustFinishPlan;
+import com.zlt.aps.mp.api.domain.entity.MdmMustFinishPlan;
 import com.zlt.common.controller.BusiController;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

@@ -15,7 +15,7 @@ import com.zlt.aps.lh.service.ILhSpecifyMachineService;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;

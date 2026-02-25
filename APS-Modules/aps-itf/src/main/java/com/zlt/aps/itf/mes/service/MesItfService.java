@@ -3,7 +3,7 @@ package com.zlt.aps.itf.mes.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.*;
 
 import java.text.ParseException;
 import java.util.List;

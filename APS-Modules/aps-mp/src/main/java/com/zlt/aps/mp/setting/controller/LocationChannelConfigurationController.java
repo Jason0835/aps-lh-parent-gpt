@@ -9,7 +9,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.maindata.mapper.LocationChannelConfigurationMapper;
 import com.zlt.aps.maindata.service.ILocationChannelConfigurationService;
-import com.zlt.aps.monthplan.api.domain.entity.LocationChannelConfiguration;
+import com.zlt.aps.mp.api.domain.entity.LocationChannelConfiguration;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

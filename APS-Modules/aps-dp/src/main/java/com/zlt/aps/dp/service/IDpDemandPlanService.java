@@ -2,7 +2,7 @@ package com.zlt.aps.dp.service;
 
 
 import com.zlt.aps.dp.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.bill.common.service.IDocService;
 import org.antlr.v4.runtime.atn.PredictionContext;
 

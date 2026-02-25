@@ -8,7 +8,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmProSizeWeightEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProSizeWeightService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProSizeWeight;
+import com.zlt.aps.mp.api.domain.entity.MdmProSizeWeight;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

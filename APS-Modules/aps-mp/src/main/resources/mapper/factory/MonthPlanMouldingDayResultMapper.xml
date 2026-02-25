@@ -13,7 +13,7 @@
           and PRODUCTION_VERSION is not null
     </select>
 
-    <select id="getStatisticsDay" resultType="com.zlt.aps.monthplan.api.domain.vo.DayProductionTotalVo">
+    <select id="getStatisticsDay" resultType="com.zlt.aps.mp.api.domain.vo.DayProductionTotalVo">
         SELECT 1 AS DAYS,
                COUNT(DISTINCT PRODUCT_CODE) AS DAY_COUNT,
                SUM(DAY_1) AS QTY
@@ -31,7 +31,7 @@
         </foreach>
     </select>
 
-    <select id="listFacProduct" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanMouldingDayResultVo">
+    <select id="listFacProduct" resultType="com.zlt.aps.mp.api.domain.vo.MonthPlanMouldingDayResultVo">
         SELECT a.FACTORY_CODE,
                a.`YEAR`,
                a.`MONTH`,
@@ -219,7 +219,7 @@
     </select>
 
     <select id="listFacProductStatistics"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanDayResultStatisticsVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthPlanDayResultStatisticsVo">
         SELECT a.FACTORY_CODE,
                a.`YEAR`,
                a.`MONTH`,

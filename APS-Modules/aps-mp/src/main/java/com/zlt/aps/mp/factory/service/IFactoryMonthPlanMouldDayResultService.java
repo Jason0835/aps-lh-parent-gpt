@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.factory.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.bill.common.service.IDocService;
 
 /**

@@ -4,7 +4,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.adjust.mapper.MpAdjustMaterialLogEntityMapper">
 
-    <select id="getVersionList" resultType="com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog">
+    <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog">
         SELECT
         ADJ_VERSION
         FROM

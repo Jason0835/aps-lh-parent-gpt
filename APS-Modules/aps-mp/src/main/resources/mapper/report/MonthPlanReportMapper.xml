@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.report.mapper.MonthPlanReportMapper">
 
-    <select id="selectAccountingPeriod" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+    <select id="selectAccountingPeriod" resultType="com.zlt.aps.mp.api.domain.vo.AccountingPeriodVo">
         WITH RECURSIVE monthly_ranges AS (SELECT 1                                                      AS month_num,
                                                  STR_TO_DATE(CONCAT(#{year} - 1, '-12-26'), '%Y-%m-%d') AS start_date,
                                                  STR_TO_DATE(CONCAT(#{year}, '-01-25'), '%Y-%m-%d')     AS end_date
@@ -57,7 +57,7 @@
     </select>
 
     <select id="listProduceMonthFinishRate4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo">
         SELECT
         c.range_key,
         c.range_label,
@@ -156,7 +156,7 @@
         ORDER BY c.range_key DESC
     </select>
 
-    <select id="listProduceMonthFinishRate" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+    <select id="listProduceMonthFinishRate" resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo">
         SELECT
         c.range_key,
         c.range_label,
@@ -231,7 +231,7 @@
         ORDER BY c.range_key DESC
     </select>
 
-    <select id="listSaleMonthFinishRate" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+    <select id="listSaleMonthFinishRate" resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo">
         SELECT
         c.range_key,
         c.range_label,
@@ -293,7 +293,7 @@
     </select>
 
     <select id="selectTrialProduceMonthFinishRate4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo">
         SET @queryYear = #{year};
         SET @queryMonth = #{month};
         SET @factoryCode = #{factoryCode};
@@ -345,7 +345,7 @@
     </select>
 
     <select id="selectTrialProduceMonthFinishRate"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateRangeVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo">
         SET @queryYear = #{year};
         SET @queryMonth = #{month};
         SET @factoryCode = #{factoryCode};
@@ -371,7 +371,7 @@
         AND p.CONSTRUCTION_STAGE IN(1, 2)
     </select>
 
-    <select id="selectProduceAndSale" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateVo">
+    <select id="selectProduceAndSale" resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateVo">
         SELECT
         SUM(CASE WHEN dataType = '1' THEN QTY END) AS producePlanQty,
         SUM(CASE WHEN dataType = '2' THEN QTY END) AS produceFinishPlanQty,
@@ -429,7 +429,7 @@
     </select>
 
     <select id="selectProduceAndSale4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateVo">
         SELECT
         SUM(CASE WHEN dataType = '1' THEN QTY END) AS producePlanQty,
         SUM(CASE WHEN dataType = '2' THEN QTY END) AS produceFinishPlanQty,
@@ -482,7 +482,7 @@
     </select>
 
     <select id="selectMonthPlanFinishBrand4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateBrandVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateBrandVo">
         SELECT
         productInfo.BRAND,
         stock.stockSkuCount,
@@ -632,7 +632,7 @@
         LEFT JOIN sys_dict_data dict ON dict.DICT_VALUE = proPlan.BRAND AND dict.DICT_TYPE = 'biz_brand_name'
     </select>
 
-    <select id="selectMonthPlanFinishBrand" resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateBrandVo">
+    <select id="selectMonthPlanFinishBrand" resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateBrandVo">
         SELECT
         productInfo.BRAND,
         stock.stockSkuCount,
@@ -758,7 +758,7 @@
     </select>
 
     <select id="selectMonthPlanFinishBrandSize4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateProSizeVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateProSizeVo">
         SELECT
         productInfo.BRAND,
         productInfo.PRO_SIZE,
@@ -886,7 +886,7 @@
     </select>
 
     <select id="selectMonthPlanFinishBrandSize"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MonthFinishRateProSizeVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.MonthFinishRateProSizeVo">
         SELECT
         productInfo.BRAND,
         productInfo.PRO_SIZE,
@@ -988,7 +988,7 @@
         productInfo.PRO_SIZE
     </select>
 
-    <select id="selectStopDay" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+    <select id="selectStopDay" resultType="com.zlt.aps.mp.api.domain.vo.AccountingPeriodVo">
         -- 使用递归 CTE 生成每个月的日期范围
         WITH RECURSIVE
             monthly_ranges AS (
@@ -1039,7 +1039,7 @@
         ORDER BY month_num
     </select>
 
-    <select id="selectProduceQtyAndCount" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+    <select id="selectProduceQtyAndCount" resultType="com.zlt.aps.mp.api.domain.vo.AccountingPeriodVo">
         -- 使用 CTE 生成每个月的统计数据
         WITH RECURSIVE
             monthly_stats AS (
@@ -1099,7 +1099,7 @@
     </select>
 
     <select id="selectProduceQtyAndCount4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.AccountingPeriodVo">
         -- 使用 CTE 生成每个月的统计数据
         WITH RECURSIVE
         monthly_stats AS (
@@ -1172,7 +1172,7 @@
         ORDER BY month_num
     </select>
 
-    <select id="selectFinishQtyAndCount" resultType="com.zlt.aps.monthplan.api.domain.vo.AccountingPeriodVo">
+    <select id="selectFinishQtyAndCount" resultType="com.zlt.aps.mp.api.domain.vo.AccountingPeriodVo">
         -- 使用递归 CTE 生成每个月的日期范围
         WITH RECURSIVE
             monthly_ranges AS (
@@ -1207,7 +1207,7 @@
         ORDER BY month_num
     </select>
 
-    <select id="selectSkuSummaryProduce" resultType="com.zlt.aps.monthplan.api.domain.vo.SkuSummaryProduceVo">
+    <select id="selectSkuSummaryProduce" resultType="com.zlt.aps.mp.api.domain.vo.SkuSummaryProduceVo">
         SELECT
         `MONTH`,
         SUM(CASE WHEN finishDay BETWEEN 1 AND 7 THEN 1 ELSE 0 END) AS day_1_to_7_count,
@@ -1253,7 +1253,7 @@
         ORDER BY `MONTH`
     </select>
 
-    <select id="selectSkuSummaryTrial" resultType="com.zlt.aps.monthplan.api.domain.vo.SkuSummaryTrialVo">
+    <select id="selectSkuSummaryTrial" resultType="com.zlt.aps.mp.api.domain.vo.SkuSummaryTrialVo">
         SELECT
         `MONTH`,
         count(1) AS total_count,
@@ -1313,7 +1313,7 @@
         ORDER BY `MONTH`
     </select>
 
-    <select id="selectSkuSummaryTrial4Detail" resultType="com.zlt.aps.monthplan.api.domain.vo.SkuSummaryTrialProductVo">
+    <select id="selectSkuSummaryTrial4Detail" resultType="com.zlt.aps.mp.api.domain.vo.SkuSummaryTrialProductVo">
         -- 使用递归 CTE 生成每个月的日期范围
         WITH RECURSIVE monthly_ranges AS (
         -- 初始查询，生成 1 月份的日期范围
@@ -1364,7 +1364,7 @@
         month_num
     </select>
 
-    <select id="selectBrandProSizeSummary" resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+    <select id="selectBrandProSizeSummary" resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         SELECT
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
             proInfo.BRAND
@@ -1390,7 +1390,7 @@
         </if>
     </select>
 
-    <select id="selectStockBrandProSizeSummary" resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+    <select id="selectStockBrandProSizeSummary" resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         SELECT
         COUNT(1) AS stockCount,
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
@@ -1433,7 +1433,7 @@
     </select>
 
     <select id="selectSalePlanBrandProSizeSummary"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         SELECT
         COUNT(1) AS salePlanCount,
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
@@ -1471,7 +1471,7 @@
     </select>
 
     <select id="selectSaleFinishBrandProSizeSummary"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         SELECT
         COUNT(1) AS saleFinishCount,
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
@@ -1514,7 +1514,7 @@
     </select>
 
     <select id="selectProPlanBrandProSizeSummary"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         SELECT
         p.PRODUCT_CODE,
         COUNT(1) AS proPlanCount,
@@ -1556,7 +1556,7 @@
     </select>
 
     <select id="selectProPlanBrandProSizeSummary4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         -- 使用 CTE 提前计算每个记录的不同日期范围的总和
         WITH preprocessed_data AS (
         SELECT
@@ -1621,7 +1621,7 @@
     </select>
 
     <select id="selectProFinishBrandProSizeSummary"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.BrandProSizeSummaryVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.BrandProSizeSummaryVo">
         SELECT proFinish.PRODUCT_CODE,
         COUNT(1) AS proFinishCount,
         <if test='brandProSizeSummaryType != "" and brandProSizeSummaryType == "1"'>
@@ -1666,7 +1666,7 @@
         </if>
     </select>
 
-    <select id="selectBaseClassificationList" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+    <select id="selectBaseClassificationList" resultType="com.zlt.aps.mp.api.domain.vo.ClassificationGapVo">
         SELECT proInfo.PRODUCT_CODE,
         proInfo.BRAND,
         proInfo.PRO_SIZE,
@@ -1682,7 +1682,7 @@
         <if test="channel != null and channel != ''">AND mlc.CHANNEL = #{channel}</if>
     </select>
 
-    <select id="selectSalePlanClassification" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+    <select id="selectSalePlanClassification" resultType="com.zlt.aps.mp.api.domain.vo.ClassificationGapVo">
         SELECT PRODUCT_CODE,
         BRAND,
         PRO_SIZE,
@@ -1707,7 +1707,7 @@
         CHANNEL
     </select>
 
-    <select id="selectProPlanClassification" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+    <select id="selectProPlanClassification" resultType="com.zlt.aps.mp.api.domain.vo.ClassificationGapVo">
         SELECT
         p.PRODUCT_CODE,
         p.BRAND,
@@ -1742,7 +1742,7 @@
     </select>
 
     <select id="selectProPlanClassification4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.ClassificationGapVo">
         -- 使用 CTE 提前计算每个记录的不同日期范围的总和
         WITH preprocessed_data AS (
         SELECT
@@ -1804,7 +1804,7 @@
         ppd.CHANNEL
     </select>
 
-    <select id="selectStockClassification" resultType="com.zlt.aps.monthplan.api.domain.vo.ClassificationGapVo">
+    <select id="selectStockClassification" resultType="com.zlt.aps.mp.api.domain.vo.ClassificationGapVo">
         SELECT stock.PRODUCT_CODE,
         proInfo.BRAND,
         proInfo.PRO_SIZE,
@@ -1830,7 +1830,7 @@
     </select>
 
     <select id="selectBaseTireTypeSatisfyRateList4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeReportSatisfyRateVo">
         SELECT proInfo.PRODUCT_CODE,
                proInfo.PRODUCT_DESC,
                proInfo.PRO_SIZE,
@@ -1932,7 +1932,7 @@
     </select>
 
     <select id="selectBaseTireTypeSatisfyRateList"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeReportSatisfyRateVo">
         SELECT proInfo.PRODUCT_CODE,
         proInfo.PRODUCT_DESC,
         proInfo.PRO_SIZE,
@@ -2008,7 +2008,7 @@
     </select>
 
     <select id="selectProPlan4TireTypeSatisfyRate"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeReportSatisfyRateVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @factoryCode = #{factoryCode};
@@ -2080,7 +2080,7 @@
     </select>
 
     <select id="selectSalePlan4TireTypeSatisfyRate"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeReportSatisfyRateVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @factoryCode = #{factoryCode};
@@ -2111,7 +2111,7 @@
     </select>
 
     <select id="selectStock4TireTypeSatisfyRate"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeReportSatisfyRateVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeReportSatisfyRateVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @factoryCode = #{factoryCode};
@@ -2146,7 +2146,7 @@
         HAVING COUNT(1) = 1
     </select>
 
-    <select id="selectSingleMouldList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeSingleMouldVo">
+    <select id="selectSingleMouldList" resultType="com.zlt.aps.mp.api.domain.vo.TireTypeSingleMouldVo">
         -- 使用 CTE 提前计算每个记录的不同日期范围的总和
         WITH preprocessed_data AS (SELECT p.MOULD_CODE,
                                           p.PRODUCT_CODE,
@@ -2204,7 +2204,7 @@
     </select>
 
     <select id="selectOrderPlanAllocationByOrderNo"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeSingleMouldVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeSingleMouldVo">
         SELECT count(1) count,
         SUM(PLAN_QTY) qty
         FROM
@@ -2221,7 +2221,7 @@
         </if>
     </select>
 
-    <select id="selectCxScheduleResultQty" resultType="com.zlt.aps.monthplan.api.domain.vo.CxScheduleResultReportVo">
+    <select id="selectCxScheduleResultQty" resultType="com.zlt.aps.mp.api.domain.vo.CxScheduleResultReportVo">
         SELECT cxResult.SAP_CODE,
                cxResult.SPEC_DIMENSION proSize,
                SUM(
@@ -2243,7 +2243,7 @@
         GROUP BY cxResult.SAP_CODE, cxResult.SPEC_DIMENSION
     </select>
 
-    <select id="selectConstructionReal" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeConstructionRealVo">
+    <select id="selectConstructionReal" resultType="com.zlt.aps.mp.api.domain.vo.TireTypeConstructionRealVo">
         SELECT proModelRel.PRODUCT_CODE,
                proModelRel.SPEC_CODE,
                proCon.EMBRYO_CODE,
@@ -2259,7 +2259,7 @@
         WHERE cons.TREAD_CODE IS NOT NULL
     </select>
 
-    <select id="selectTireTypeProduceList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationAllVo">
+    <select id="selectTireTypeProduceList" resultType="com.zlt.aps.mp.api.domain.vo.TireTypeClassificationAllVo">
         -- 使用 CTE 提前计算每个记录的不同日期范围的总和
         WITH preprocessed_data AS (SELECT p.PRODUCT_CODE,
         p.MONTH_PLAN_ID,
@@ -2349,7 +2349,7 @@
         FROM preprocessed_data ppd
     </select>
 
-    <select id="selectTireTypeNoProduceList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationVo">
+    <select id="selectTireTypeNoProduceList" resultType="com.zlt.aps.mp.api.domain.vo.TireTypeClassificationVo">
         SELECT
         noProduce.PRODUCT_CODE,
         noProduce.FACT_PROD_REQ_QTY AS totalSalePlanQty,
@@ -2390,7 +2390,7 @@
     </select>
 
     <select id="selectTireTypeStockSatisfiedList"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.TireTypeClassificationVo">
         SELECT
         planAllocation.PRODUCT_CODE,
         planAllocation.PLAN_QTY AS totalSalePlanQty,
@@ -2420,7 +2420,7 @@
         <if test='channel != null and channel != ""'>AND planAllocation.CHANNEL = #{channel}</if>
     </select>
 
-    <select id="selectTireTypeTrialList" resultType="com.zlt.aps.monthplan.api.domain.vo.TireTypeClassificationVo">
+    <select id="selectTireTypeTrialList" resultType="com.zlt.aps.mp.api.domain.vo.TireTypeClassificationVo">
         SELECT
         proPlanInit.PRODUCT_CODE,
         proPlanInit.FACT_PROD_REQ_QTY AS totalSalePlanQty,
@@ -2448,7 +2448,7 @@
     </select>
 
     <select id="selectProPlanProSizeLocationTypeWeight"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.ProduceSalePlanVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.ProduceSalePlanVo">
         SELECT CHANNEL,
                PRO_SIZE,
                SUM(IFNULL(DAY_1, 0))  AS DAY_1,
@@ -2493,7 +2493,7 @@
     </select>
 
     <select id="selectSalePlanProSizeLocationTypeWeight"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.ProduceSalePlanResultVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.ProduceSalePlanResultVo">
         SELECT proSizeWeight.PRO_SIZE,
                proSizeWeight.CHANNEL,
                proSizeWeight.SINGLE_TIRE_WEIGHT,
@@ -2526,7 +2526,7 @@
                  proSizeWeight.PRO_SIZE
     </select>
 
-    <select id="selectProductStockMonth" resultType="com.zlt.aps.monthplan.api.domain.entity.ProductStockMonth">
+    <select id="selectProductStockMonth" resultType="com.zlt.aps.mp.api.domain.entity.ProductStockMonth">
         SELECT *
         FROM
         <include refid="stockTableName"/>
@@ -2536,7 +2536,7 @@
           AND FACTORY_CODE = #{factoryCode}
     </select>
 
-    <select id="selectProPlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation">
+    <select id="selectProPlanList" resultType="com.zlt.aps.mp.api.domain.entity.OrderPlanAllocation">
         SELECT
         p.PRODUCT_CODE,
         p.BRAND,
@@ -2559,7 +2559,7 @@
     </select>
 
     <select id="selectProPlanList4AccountingPeriod"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation">
+            resultType="com.zlt.aps.mp.api.domain.entity.OrderPlanAllocation">
         -- 使用 CTE 提前计算每个记录的不同日期范围的总和
         WITH preprocessed_data AS (
         SELECT
@@ -2611,7 +2611,7 @@
         preprocessed_data ppd
     </select>
 
-    <select id="selectProFinishList" resultType="com.zlt.aps.monthplan.api.domain.vo.LhDayFinishQtyVo">
+    <select id="selectProFinishList" resultType="com.zlt.aps.mp.api.domain.vo.LhDayFinishQtyVo">
         SELECT
         f.PRODUCT_CODE,
         f.SPEC_CODE,
@@ -2637,7 +2637,7 @@
         f.SPEC_CODE
     </select>
 
-    <select id="selectSalePlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation">
+    <select id="selectSalePlanList" resultType="com.zlt.aps.mp.api.domain.entity.OrderPlanAllocation">
         SELECT
         *
         FROM
@@ -2651,7 +2651,7 @@
         AND p.IS_DELETE = 0
     </select>
 
-    <select id="selectSaleFinishList" resultType="com.zlt.aps.monthplan.api.domain.vo.SaleFinishVo">
+    <select id="selectSaleFinishList" resultType="com.zlt.aps.mp.api.domain.vo.SaleFinishVo">
         SELECT *
         FROM
         <include refid="saleFinishTableName"/>
@@ -2662,20 +2662,20 @@
     </select>
 
     <select id="selectProductMoldeRealList"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuMouldRel">
         SELECT PRODUCT_CODE, GROUP_CONCAT(DISTINCT SPEC_CODE SEPARATOR ',') AS SPEC_CODE
         FROM T_MDM_PRODUCT_MODEL_RELATION
         WHERE FACTORY_CODE = #{factoryCode}
         GROUP BY FACTORY_CODE, PRODUCT_CODE
     </select>
 
-    <select id="selectByMonthPlanVersion" resultType="com.zlt.aps.monthplan.api.domain.dto.ProduceVersionDto">
+    <select id="selectByMonthPlanVersion" resultType="com.zlt.aps.mp.api.domain.dto.ProduceVersionDto">
         SELECT DISTINCT YEAR, MONTH, FACTORY_CODE, MONTH_PLAN_VERSION
         FROM t_mp_moulding_day_result
         WHERE IS_DELETE = 0 AND PRODUCTION_VERSION = #{monthPlanVersion}
     </select>
 
-    <select id="selectStockUpPlanQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+    <select id="selectStockUpPlanQtyList" resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -2706,7 +2706,7 @@
         GROUP BY PRODUCT_CODE
     </select>
 
-    <select id="selectProductQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+    <select id="selectProductQtyList" resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -2731,7 +2731,7 @@
     </select>
 
     <select id="selectProductQtyList4FinalDetail"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -2755,7 +2755,7 @@
         GROUP BY PRODUCT_CODE
     </select>
 
-    <select id="selectDemandQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+    <select id="selectDemandQtyList" resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -2776,7 +2776,7 @@
         GROUP BY PRODUCT_CODE, CHANNEL
     </select>
 
-    <select id="selectStockQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+    <select id="selectStockQtyList" resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @factoryCode = #{factoryCode};
@@ -2794,7 +2794,7 @@
         GROUP BY PRODUCT_CODE
     </select>
 
-    <select id="selectStockUpActQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+    <select id="selectStockUpActQtyList" resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -2815,7 +2815,7 @@
         GROUP BY PRODUCT_CODE
     </select>
 
-    <select id="selectUnProductQtyList" resultType="com.zlt.aps.monthplan.api.domain.vo.ProductVersionReportVo">
+    <select id="selectUnProductQtyList" resultType="com.zlt.aps.mp.api.domain.vo.ProductVersionReportVo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -2835,7 +2835,7 @@
         GROUP BY PRODUCT_CODE
     </select>
 
-    <select id="selectYearMonthPlanQty" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4PlanVo">
+    <select id="selectYearMonthPlanQty" resultType="com.zlt.aps.mp.api.domain.vo.HomePage4PlanVo">
         SELECT MONTH,
                SUM(TOTAL_QTY)               as monthTotalPlanQty,
                COUNT(DISTINCT PRODUCT_CODE) as monthTotalSpecQty
@@ -2845,7 +2845,7 @@
         GROUP BY MONTH
     </select>
 
-    <select id="selectYearMonthFinishQty" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4PlanVo">
+    <select id="selectYearMonthFinishQty" resultType="com.zlt.aps.mp.api.domain.vo.HomePage4PlanVo">
         SELECT `MONTH`,
                SUM(DAY_FINISH_QTY)          as monthTotalFinishQty,
                COUNT(DISTINCT PRODUCT_CODE) as monthTotalSpecFinishQty
@@ -2855,7 +2855,7 @@
         GROUP BY `MONTH`
     </select>
 
-    <select id="selectOrderAndStockUpQty" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4OrderVo">
+    <select id="selectOrderAndStockUpQty" resultType="com.zlt.aps.mp.api.domain.vo.HomePage4OrderVo">
         SELECT MONTH,
                SUM(PLAN_ORDER_QTY) AS planOrderQty,
                SUM(STOCK_QTY)      AS stockUpQty,
@@ -2922,7 +2922,7 @@
         ORDER BY MONTH
     </select>
 
-    <select id="selectProductionProcesses" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4ProductProcessesVo">
+    <select id="selectProductionProcesses" resultType="com.zlt.aps.mp.api.domain.vo.HomePage4ProductProcessesVo">
         SET @scheduleDate = #{scheduleDate};
 
         SELECT '成型' as productProcessName,
@@ -3085,7 +3085,7 @@
         GROUP BY a.SCHEDULE_DATE
     </select>
 
-    <select id="selectFactoryMachine" resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4MachineVo">
+    <select id="selectFactoryMachine" resultType="com.zlt.aps.mp.api.domain.vo.HomePage4MachineVo">
         SELECT '可用模具数' as typeName, count(1) as machineCount
         FROM T_MDM_MOULD_INFO
         where MOULD_STATUS = 1
@@ -3155,7 +3155,7 @@
     </select>
 
     <select id="selectProductionProcessesByDate7"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.HomePage4ProductProcessesVo">
+            resultType="com.zlt.aps.mp.api.domain.vo.HomePage4ProductProcessesVo">
         SET @scheduleDate = #{scheduleDate};
         SET @scheduleDateBefore7 = #{scheduleDateBefore7};
 
@@ -3322,7 +3322,7 @@
         ORDER BY productProcessName, SCHEDULE_DATE
     </select>
 
-    <select id="selectCxLhMachine" resultType="com.zlt.aps.monthplan.api.domain.vo.CxLhMachineVo">
+    <select id="selectCxLhMachine" resultType="com.zlt.aps.mp.api.domain.vo.CxLhMachineVo">
         SELECT CASE
                    WHEN MACHINE_TYPE = '0' THEN '成型维修机台总时数'
                    WHEN MACHINE_TYPE = '1' THEN '硫化维修机台总时数'
@@ -3349,7 +3349,7 @@
     </select>
 
     <select id="selectProductConstructionInfo4RequirePlan"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.CxProductConstructionInfo">
+            resultType="com.zlt.aps.mp.api.domain.entity.CxProductConstructionInfo">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -3371,7 +3371,7 @@
     </select>
 
     <select id="selectProductConstruction4RequirePlan"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmProductConstruction">
         SET @targetYear = #{year};
         SET @targetMonth = #{month};
         SET @monthPlanVersion = #{monthPlanVersion};
@@ -3399,7 +3399,7 @@
           AND `MONTH` = #{month}
     </select>
 
-    <select id="selectSystemRunReport" resultType="com.zlt.aps.monthplan.api.domain.vo.SystemRunReportVo">
+    <select id="selectSystemRunReport" resultType="com.zlt.aps.mp.api.domain.vo.SystemRunReportVo">
         SET @startDate = #{startDate};
         SET @endDate = #{endDate};
 
@@ -3677,7 +3677,7 @@
         ORDER BY productProcess, schedule_date
     </select>
 
-    <select id="selectCxConsume" resultType="com.zlt.aps.monthplan.api.domain.vo.CxConsumeVo">
+    <select id="selectCxConsume" resultType="com.zlt.aps.mp.api.domain.vo.CxConsumeVo">
         SET @startDate = #{startDate};
         SET @endDate = #{endDate};
 
@@ -3708,7 +3708,7 @@
         GROUP BY cxr.schedule_date
     </select>
 
-    <select id="getGsqCxConsume" resultType="com.zlt.aps.monthplan.api.domain.vo.ScheduleSummaryVo">
+    <select id="getGsqCxConsume" resultType="com.zlt.aps.mp.api.domain.vo.ScheduleSummaryVo">
         SET @startDate = #{startDate};
         SET @endDate = #{endDate};
         SET @startDateSubOne = DATE_SUB(@startDate, INTERVAL 1 DAY);

@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.factory.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
+import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
 
 import java.util.List;
 

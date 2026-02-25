@@ -4,7 +4,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper">
 
-    <select id="getStructureSelectList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef">
+    <select id="getStructureSelectList" resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef">
         SELECT DISTINCT
         STRUCTURE_NAME
         FROM
@@ -21,7 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
 
-    <select id="getMdmSkuStructureRefList" parameterType="com.baomidou.mybatisplus.core.conditions.query.QueryWrapper" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuStructureRef">
+    <select id="getMdmSkuStructureRefList" parameterType="com.baomidou.mybatisplus.core.conditions.query.QueryWrapper" resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef">
         SELECT a.*
         FROM T_MDM_SKU_STRUCTURE_REF a
                  LEFT JOIN T_MDM_MATERIAL_INFO b ON a.MATERIAL_CODE = b.MATERIAL_CODE

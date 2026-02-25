@@ -1,8 +1,8 @@
 package com.zlt.aps.mp.common.utils.poi;
 
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import org.springframework.util.CollectionUtils;
 
 import java.util.HashMap;

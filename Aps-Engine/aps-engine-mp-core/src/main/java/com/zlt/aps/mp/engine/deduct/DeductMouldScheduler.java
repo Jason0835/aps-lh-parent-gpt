@@ -3,9 +3,9 @@ package com.zlt.aps.mp.engine.deduct;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import com.zlt.aps.monthplan.api.domain.deduct.DailyScheduleVo;
-import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldContext;
-import com.zlt.aps.monthplan.api.domain.deduct.DeductMouldVo;
+import com.zlt.aps.mp.api.domain.deduct.DailyScheduleVo;
+import com.zlt.aps.mp.api.domain.deduct.DeductMouldContext;
+import com.zlt.aps.mp.api.domain.deduct.DeductMouldVo;
 import com.zlt.common.utils.PubUtil;
 
 import java.time.LocalDate;

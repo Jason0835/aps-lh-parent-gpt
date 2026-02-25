@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.adjust.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MpAdjustMaterialLog;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

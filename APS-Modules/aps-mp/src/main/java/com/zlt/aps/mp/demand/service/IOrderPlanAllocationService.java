@@ -1,9 +1,9 @@
 package com.zlt.aps.mp.demand.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.OrderPlanAllocation;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanStatisticsVo;
-import com.zlt.aps.monthplan.api.domain.vo.OrderPlanAllocationReportVo;
+import com.zlt.aps.mp.api.domain.entity.OrderPlanAllocation;
+import com.zlt.aps.mp.api.domain.vo.MonthPlanStatisticsVo;
+import com.zlt.aps.mp.api.domain.vo.OrderPlanAllocationReportVo;
 
 import java.util.List;
 

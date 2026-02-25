@@ -75,7 +75,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
            AND MONTH = #{month,jdbcType=DECIMAL}
     </delete>
 
-    <update id="updateImportantCustomFlag" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
+    <update id="updateImportantCustomFlag" parameterType="com.zlt.aps.mp.api.domain.vo.MonthPlanSaleRequirePlanVo">
         UPDATE t_mp_month_sale_plan msp
           LEFT JOIN t_mdm_customer_info mci
             ON msp.FACTORY_CODE = mci.FACTORY_CODE
@@ -87,7 +87,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
            AND msp.MONTH = #{month,jdbcType=DECIMAL}
     </update>
 
-    <update id="updateEnsurePlan" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
+    <update id="updateEnsurePlan" parameterType="com.zlt.aps.mp.api.domain.vo.MonthPlanSaleRequirePlanVo">
         UPDATE t_mp_month_sale_plan msp
            SET msp.IS_ENSURE_PLAN = (SELECT COUNT(1) FROM t_mdm_must_finish_plan mfp
                                       WHERE msp.FACTORY_CODE = mfp.FACTORY_CODE
@@ -102,7 +102,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           AND msp.MONTH = #{month,jdbcType=DECIMAL}
     </update>
 
-    <update id="updateProductInfo" parameterType="com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo">
+    <update id="updateProductInfo" parameterType="com.zlt.aps.mp.api.domain.vo.MonthPlanSaleRequirePlanVo">
         UPDATE t_mp_month_sale_plan msp
             JOIN t_mdm_material_info mpi
             ON msp.FACTORY_CODE = mpi.FACTORY_CODE

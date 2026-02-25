@@ -10,7 +10,7 @@ import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.maindata.mapper.RawWarningRecordEntityMapper;
 import com.zlt.aps.maindata.service.IRawWarningRecordService;
-import com.zlt.aps.monthplan.api.domain.entity.RawWarningRecord;
+import com.zlt.aps.mp.api.domain.entity.RawWarningRecord;
 import com.zlt.aps.mp.raw.service.IRawWarningService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.msg.message.domain.vo.MessageContext;

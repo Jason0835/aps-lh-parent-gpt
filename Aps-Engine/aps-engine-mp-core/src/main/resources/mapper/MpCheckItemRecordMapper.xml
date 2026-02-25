@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.engine.check.mapper.MpCheckItemRecordMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord" id="MpCheckItemRecordResult">
+    <resultMap type="com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord" id="MpCheckItemRecordResult">
         <result property="id" column="ID"/>
         <result property="year" column="YEAR"/>
         <result property="month" column="MONTH"/>
@@ -26,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SELECT ID, YEAR, MONTH, FACTORY_CODE, PRODUCT_TYPE_CODE, MONTH_PLAN_VERSION, CHECK_ITEM, CHECK_CONTENT, MATERIAL_DESC, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK FROM T_MP_CHECK_ITEM_RECORD
     </sql>
 
-    <select id="selectMpCheckItemRecordList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord" resultMap="MpCheckItemRecordResult">
+    <select id="selectMpCheckItemRecordList" parameterType="com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord" resultMap="MpCheckItemRecordResult">
         <include refid="selectMpCheckItemRecordVo"/>
         WHERE IS_DELETE = 0
         <if test="year != null "> AND YEAR = #{year}</if>

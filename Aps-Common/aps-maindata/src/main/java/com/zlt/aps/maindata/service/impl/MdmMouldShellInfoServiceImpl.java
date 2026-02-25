@@ -7,7 +7,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.service.IMdmMouldShellInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMouldShellInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

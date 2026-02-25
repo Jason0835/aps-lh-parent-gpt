@@ -5,7 +5,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.demand.service.impl.DpDemandPlanServiceImpl;
 import com.zlt.aps.redissonLock.annotation.RedissonLockAnno;
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.common.utils.RequirementVersionService;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;

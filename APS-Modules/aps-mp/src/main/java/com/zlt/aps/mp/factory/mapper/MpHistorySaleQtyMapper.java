@@ -1,8 +1,8 @@
 package com.zlt.aps.mp.factory.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.monthplan.api.domain.entity.MpHistorySaleQty;
-import com.zlt.aps.monthplan.api.domain.vo.CalcStockingResultVo;
+import com.zlt.aps.mp.api.domain.entity.MpHistorySaleQty;
+import com.zlt.aps.mp.api.domain.vo.CalcStockingResultVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

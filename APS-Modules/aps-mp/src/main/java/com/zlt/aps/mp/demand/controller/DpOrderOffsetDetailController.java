@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
 import com.zlt.aps.utils.JsonI18nConvertUtils;
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.mp.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.mp.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpOrderOffsetDetailService;
 import com.zlt.common.exception.QueryExprException;

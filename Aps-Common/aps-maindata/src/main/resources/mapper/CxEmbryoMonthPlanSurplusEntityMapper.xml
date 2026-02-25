@@ -5,7 +5,7 @@
 <mapper namespace="com.zlt.aps.maindata.mapper.CxEmbryoMonthPlanSurplusEntityMapper">
 
     <!-- 基础结果映射 -->
-    <resultMap id="BaseResultMap" type="com.zlt.aps.monthplan.api.domain.entity.CxEmbryoMonthPlanSurplus">
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mp.api.domain.entity.CxEmbryoMonthPlanSurplus">
         <id column="ID" property="id" jdbcType="BIGINT"/>
         <result column="YEAR" property="year" jdbcType="VARCHAR"/>
         <result column="MONTH" property="month" jdbcType="VARCHAR"/>

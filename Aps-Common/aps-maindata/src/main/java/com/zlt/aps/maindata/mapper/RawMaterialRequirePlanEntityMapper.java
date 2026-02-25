@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.mapper;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.RawMaterialRequirePlan;
+import com.zlt.aps.mp.api.domain.entity.RawMaterialRequirePlan;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

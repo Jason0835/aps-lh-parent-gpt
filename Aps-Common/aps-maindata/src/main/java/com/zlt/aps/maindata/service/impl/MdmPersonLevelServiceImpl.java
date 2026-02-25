@@ -6,7 +6,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmPersonLevelMapper;
 import com.zlt.aps.maindata.service.IMdmPersonLevelService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmPersonLevel;
+import com.zlt.aps.mp.api.domain.entity.MdmPersonLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

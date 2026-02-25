@@ -3,7 +3,7 @@ package com.zlt.aps.mp.engine.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldUsedStatusLogMapper;
 import com.zlt.aps.mp.engine.service.IFactoryMouldUsedStatusLogService;
-import com.zlt.aps.monthplan.api.domain.entity.MpMouldUsedStatusLog;
+import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

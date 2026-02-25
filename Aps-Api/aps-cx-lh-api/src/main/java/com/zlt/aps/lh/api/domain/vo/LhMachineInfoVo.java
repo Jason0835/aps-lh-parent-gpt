@@ -1,7 +1,7 @@
 package com.zlt.aps.lh.api.domain.vo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 

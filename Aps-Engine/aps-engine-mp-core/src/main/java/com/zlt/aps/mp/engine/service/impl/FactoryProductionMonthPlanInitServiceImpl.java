@@ -3,7 +3,7 @@ package com.zlt.aps.mp.engine.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zlt.aps.mp.engine.mapper.FactoryProductionInitMapper;
 import com.zlt.aps.mp.engine.service.IFactoryProductionMonthPlanInitService;
-import com.zlt.aps.monthplan.api.domain.entity.ProductionMonthPlanInit;
+import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

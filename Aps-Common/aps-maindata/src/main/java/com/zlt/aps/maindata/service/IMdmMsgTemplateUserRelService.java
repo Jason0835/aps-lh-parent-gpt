@@ -4,9 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel;
+import com.zlt.aps.mp.api.domain.entity.MdmMsgTemplateUserRel;
 import org.springframework.transaction.annotation.Transactional;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 
 /**
  * Copyright (c) 2022, All rights reserved。

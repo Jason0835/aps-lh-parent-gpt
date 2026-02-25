@@ -2,7 +2,7 @@ package com.zlt.aps.maindata.service;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryParamTemplate;
+import com.zlt.aps.mp.api.domain.entity.FactoryParamTemplate;
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IFactoryParamTemplateService.java

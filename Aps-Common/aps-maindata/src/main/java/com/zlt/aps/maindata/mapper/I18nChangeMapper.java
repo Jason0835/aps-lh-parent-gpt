@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.I18nChange;
+import com.zlt.aps.mp.api.domain.entity.I18nChange;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

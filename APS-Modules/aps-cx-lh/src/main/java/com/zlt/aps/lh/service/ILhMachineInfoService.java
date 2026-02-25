@@ -2,7 +2,7 @@ package com.zlt.aps.lh.service;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

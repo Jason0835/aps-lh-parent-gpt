@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.MesBomItfMapper">
 	<!-- 查询SKU与施工关系列表 -->
-    <select id="selectLhConstructionInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuConstructionRef">
+    <select id="selectLhConstructionInfo" resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef">
         SELECT
             MATERIAL_CODE,
             MATERIAL_CODE SPEC_CODE,
@@ -38,7 +38,7 @@
     </select>
 
 	<!-- 半部件BOM信息 -->
-    <select id="selectMesConstructionInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo">
+    <select id="selectMesConstructionInfo" resultType="com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo">
         SELECT
             EMBRYO_VERSION CONSTRUCTION_VERSION,
             EMBRYO_CODE MATERIAL_CODE,
@@ -75,7 +75,7 @@
     </select>
 
 	<!-- 成型及半部件BOM施工信息同步 -->
-    <select id="selectMesBomInfo" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmBomInfo">
+    <select id="selectMesBomInfo" resultType="com.zlt.aps.mp.api.domain.entity.MdmBomInfo">
         SELECT
             CHILD_MATERIAL_CODE,
             CHILD_MATERIAL_NAME,

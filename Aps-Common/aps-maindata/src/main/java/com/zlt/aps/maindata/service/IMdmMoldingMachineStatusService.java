@@ -1,9 +1,9 @@
 package com.zlt.aps.maindata.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus;
-import com.zlt.aps.monthplan.api.domain.vo.CopyParamVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmMoldingMachineStatusVo;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineStatus;
+import com.zlt.aps.mp.api.domain.vo.CopyParamVo;
+import com.zlt.aps.mp.api.domain.vo.MdmMoldingMachineStatusVo;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;

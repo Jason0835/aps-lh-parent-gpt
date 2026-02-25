@@ -13,7 +13,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
-import com.zlt.aps.monthplan.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;

@@ -3,7 +3,7 @@ package com.zlt.aps.mp.mdm.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryNoProduction;
+import com.zlt.aps.mp.api.domain.entity.FactoryNoProduction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;

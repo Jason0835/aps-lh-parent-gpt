@@ -4,7 +4,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper">
 
-    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo">
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmModelInfo">
         SELECT * FROM T_MDM_MOULD_INFO WHERE IS_DELETE = 0
         <if test="list != null and list.size() > 0">
             AND (FACTORY_CODE, MOULD_CODE) IN

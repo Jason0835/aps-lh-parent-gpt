@@ -11,7 +11,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

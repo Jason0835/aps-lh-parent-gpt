@@ -5,7 +5,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 
 /**
  * 月度计划-成品库存业务SQL接口定义

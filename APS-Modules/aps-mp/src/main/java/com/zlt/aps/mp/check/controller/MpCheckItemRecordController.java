@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.check.controller;
 
 import com.ruoyi.common.core.web.controller.BaseController;
-import com.zlt.aps.monthplan.api.domain.entity.MpCheckItemRecord;
+import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemRecordService;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;

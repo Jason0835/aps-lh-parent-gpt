@@ -6,7 +6,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.maindata.mapper.ProductMoldingLimitMapper;
 import com.zlt.aps.maindata.service.IProductMoldingLimitService;
-import com.zlt.aps.monthplan.api.domain.entity.ProductMoldingLimit;
+import com.zlt.aps.mp.api.domain.entity.ProductMoldingLimit;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;

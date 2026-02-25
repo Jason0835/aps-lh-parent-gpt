@@ -1,10 +1,10 @@
 package com.zlt.aps.cxlh.cx.api.domain.vo;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachine;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineCls;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineClsB;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMoldingMachineStatus;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineCls;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineClsB;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachineStatus;
 import io.swagger.annotations.ApiModel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

@@ -15,7 +15,7 @@ import com.zlt.aps.itf.vo.CxMonthPlanIssue;
 import com.zlt.aps.itf.vo.MonthPlanIssue;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.monthplan.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;

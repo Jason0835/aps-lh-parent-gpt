@@ -3,7 +3,7 @@ package com.zlt.aps.mp.engine.utils;
 import com.google.common.collect.Lists;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanNoProductionPlan;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;

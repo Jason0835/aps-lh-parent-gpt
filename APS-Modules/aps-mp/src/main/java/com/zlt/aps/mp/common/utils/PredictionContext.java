@@ -1,11 +1,11 @@
 package com.zlt.aps.mp.common.utils;
 
-import com.zlt.aps.monthplan.api.domain.entity.DpOrderOffsetDetail;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCycleSchStruConf;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.SalesOrderPool;
-import com.zlt.aps.monthplan.api.domain.entity.SupplyOrderPool;
+import com.zlt.aps.mp.api.domain.entity.DpOrderOffsetDetail;
+import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.mp.api.domain.entity.SupplyOrderPool;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
 

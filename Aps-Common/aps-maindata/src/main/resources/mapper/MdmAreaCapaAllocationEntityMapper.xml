@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmAreaCapaAllocationEntityMapper">
 
-    <insert id="copy" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmAreaCapaAllocation">
+    <insert id="copy" parameterType="com.zlt.aps.mp.api.domain.entity.MdmAreaCapaAllocation">
         insert into T_DP_AREA_CAPACITY_CONFIG(FACTORY_CODE, PRODUCT_TYPE_CODE, YEAR, MONTH, AREA_CODE,
                                                CAPACITY_ALLOCATION, CREATE_TIME, CREATE_BY, UPDATE_TIME, UPDATE_BY)
         select #{targetFactoryCode},

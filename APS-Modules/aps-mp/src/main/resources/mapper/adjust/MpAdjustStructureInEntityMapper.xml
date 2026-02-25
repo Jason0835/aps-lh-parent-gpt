@@ -5,7 +5,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper">
 
 
-    <select id="getVersionList" resultType="com.zlt.aps.monthplan.api.domain.entity.MpAdjustStructureIn">
+    <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn">
         SELECT DISTINCT
         VERSION
         FROM

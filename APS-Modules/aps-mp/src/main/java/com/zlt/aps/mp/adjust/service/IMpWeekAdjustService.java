@@ -1,9 +1,6 @@
 package com.zlt.aps.mp.adjust.service;
 
-import com.zlt.aps.monthplan.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
-
-import java.util.List;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 
 /**
  * 周程滚动调整接口

@@ -8,8 +8,8 @@
     </sql>
 
     <select id="selectDocVulcanizingMachStatusEntityList"
-            parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus"
-            resultType="com.zlt.aps.monthplan.api.domain.vo.MdmVulcanizingMachStatusVo">
+            parameterType="com.zlt.aps.mp.api.domain.entity.MdmVulcanizingMachStatus"
+            resultType="com.zlt.aps.mp.api.domain.vo.MdmVulcanizingMachStatusVo">
         select a.*,b.PRODUCT_TYPE_CODE,b.VULCANIZING_MACHINE_CODE from T_MDM_VULCANIZING_MACH_STATUS a
         left join t_mdm_vulcanizing_machine b
         on a.vulcanizing_machine_id = b.id
@@ -29,7 +29,7 @@
         ifnull(REGEXP_REPLACE(b.VULCANIZING_MACHINE_CODE,'[0-9]',''),'0') asc
     </select>
 
-    <select id="checkUnique" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus" resultType="int">
+    <select id="checkUnique" parameterType="com.zlt.aps.mp.api.domain.entity.MdmVulcanizingMachStatus" resultType="int">
         select count(1) from T_MDM_VULCANIZING_MACH_STATUS a
         where a.is_delete = '0'
         and a.year = #{year}
@@ -40,7 +40,7 @@
     </select>
 
     <select id="selectGenerateListByMachine"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.MdmVulcanizingMachStatus">
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmVulcanizingMachStatus">
         SELECT
         FACTORY_CODE,
         #{generateToYear,jdbcType=DECIMAL} year,
@@ -70,7 +70,7 @@
         </foreach>
     </update>
 
-    <delete id="deleteByYearAndMonth" parameterType="com.zlt.aps.monthplan.api.domain.vo.CopyParamVo">
+    <delete id="deleteByYearAndMonth" parameterType="com.zlt.aps.mp.api.domain.vo.CopyParamVo">
         update T_MDM_VULCANIZING_MACH_STATUS
         set IS_DELETE = 1
         where

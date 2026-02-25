@@ -11,7 +11,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.mapper.MdmProductStockEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

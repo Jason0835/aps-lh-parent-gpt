@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.check;
 
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.monthplan.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.common.utils.PubUtil;
 
 import java.util.List;

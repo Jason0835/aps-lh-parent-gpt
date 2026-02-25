@@ -4,7 +4,7 @@ import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.monthplan.api.domain.entity.MdmCapsuleChuck;
+import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;

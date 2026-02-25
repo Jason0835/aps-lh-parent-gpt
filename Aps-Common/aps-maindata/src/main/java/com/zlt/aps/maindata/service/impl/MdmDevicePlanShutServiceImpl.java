@@ -9,7 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmDevicePlanShutEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDevicePlanShutService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;

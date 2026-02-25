@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMsgTemplateUserRelMapper">
-    <resultMap type="com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel" id="MdmMsgTemplateUserRelResult">
+    <resultMap type="com.zlt.aps.mp.api.domain.entity.MdmMsgTemplateUserRel" id="MdmMsgTemplateUserRelResult">
             <result property="id" column="ID"/>
             <result property="templateCode" column="TEMPLATE_CODE"/>
             <result property="userName" column="USER_NAME"/>
@@ -20,7 +20,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SELECT ID, TEMPLATE_CODE, USER_NAME, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK FROM T_MDM_MSG_TEMPLATE_USER_REL
     </sql>
 
-    <select id="selectMdmMsgTemplateUserRelList" parameterType="com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel" resultMap="MdmMsgTemplateUserRelResult">
+    <select id="selectMdmMsgTemplateUserRelList" parameterType="com.zlt.aps.mp.api.domain.entity.MdmMsgTemplateUserRel" resultMap="MdmMsgTemplateUserRelResult">
         <include refid="selectMdmMsgTemplateUserRelVo"/>
         WHERE IS_DELETE = 0
         <if test="templateCode != null  and templateCode != ''"> AND TEMPLATE_CODE = #{templateCode}</if>

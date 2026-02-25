@@ -29,7 +29,7 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.service.LhScheduleResultService;
 import com.zlt.aps.maindata.mapper.ProductMoldingLimitMapper;
 import com.zlt.aps.maindata.utils.CxLhEngineUtils;
-import com.zlt.aps.monthplan.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;

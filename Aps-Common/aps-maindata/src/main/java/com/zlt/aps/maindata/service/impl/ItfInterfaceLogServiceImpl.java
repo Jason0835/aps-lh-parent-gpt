@@ -2,7 +2,7 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.zlt.aps.maindata.service.IItfInterfaceLogService;
-import com.zlt.aps.monthplan.api.domain.itf.ItfInterfaceLog;
+import com.zlt.aps.mp.api.domain.itf.ItfInterfaceLog;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;

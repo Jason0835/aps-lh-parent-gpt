@@ -1,9 +1,9 @@
 package com.zlt.aps.mp.demand.service;
 
 
-import com.zlt.aps.monthplan.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.monthplan.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.monthplan.api.domain.entity.MpPredictionDetail;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpPredictionDetail;
 import com.zlt.bill.common.service.IDocService;
 
 import java.time.YearMonth;

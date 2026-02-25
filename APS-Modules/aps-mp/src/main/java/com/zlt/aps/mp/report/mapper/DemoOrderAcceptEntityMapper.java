@@ -1,6 +1,6 @@
 package com.zlt.aps.mp.report.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.DemoOrderAccept;
+import com.zlt.aps.mp.api.domain.entity.DemoOrderAccept;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 

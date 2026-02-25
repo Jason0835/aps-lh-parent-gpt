@@ -1,8 +1,8 @@
 package com.zlt.aps.mp.demand.mapper;
 
-import com.zlt.aps.monthplan.api.domain.entity.MonthPlanSaleOrder;
-import com.zlt.aps.monthplan.api.domain.itf.InSaleOrderDto;
-import com.zlt.aps.monthplan.api.domain.vo.MonthPlanSaleRequirePlanVo;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanSaleOrder;
+import com.zlt.aps.mp.api.domain.itf.InSaleOrderDto;
+import com.zlt.aps.mp.api.domain.vo.MonthPlanSaleRequirePlanVo;
 import com.zlt.aps.mp.factory.dto.YearSaleMinProdVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;

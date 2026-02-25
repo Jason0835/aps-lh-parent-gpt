@@ -2,7 +2,7 @@ package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.maindata.domain.dto.MouldMonthUseDto;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMouldUseStatus;
+import com.zlt.aps.mp.api.domain.entity.MdmMouldUseStatus;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;

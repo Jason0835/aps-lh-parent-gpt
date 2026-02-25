@@ -3,9 +3,9 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.MesBrandDict;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
-import com.zlt.aps.monthplan.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.monthplan.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

@@ -38,7 +38,7 @@
         tb.PRODUCT_CODE = tmpi.PRODUCT_CODE
     </insert>
 
-    <select id="selectMonthPlanList" resultType="com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort">
+    <select id="selectMonthPlanList" resultType="com.zlt.aps.mp.api.domain.entity.EstimateExceedShort">
         select tmmppf.FACTORY_CODE,
         tmmppf.PRODUCT_CODE,
         tmmppf.LOCATION_TYPE,
@@ -59,7 +59,7 @@
     </select>
 
     <select id="selectSurplusPlanList"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.EstimateExceedShort">
+            resultType="com.zlt.aps.mp.api.domain.entity.EstimateExceedShort">
         select tlmps.FACTORY_CODE,
                tlmps.PRODUCT_CODE,
                IFNULL(sum(tlmps.MONTH_FINISH_QTY), 0) as EXCEED_SHORT_QTY

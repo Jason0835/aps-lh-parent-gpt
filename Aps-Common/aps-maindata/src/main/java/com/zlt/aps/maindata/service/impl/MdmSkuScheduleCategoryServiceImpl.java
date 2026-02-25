@@ -8,7 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmSkuScheduleCategoryEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmSkuScheduleCategory;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuScheduleCategory;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;

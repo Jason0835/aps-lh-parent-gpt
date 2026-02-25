@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductionCalendar;
+import com.zlt.aps.mp.api.domain.entity.MdmProductionCalendar;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;

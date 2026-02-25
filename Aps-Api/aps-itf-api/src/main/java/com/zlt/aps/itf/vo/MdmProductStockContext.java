@@ -1,7 +1,7 @@
 package com.zlt.aps.itf.vo;
 
 import com.ruoyi.common.core.utils.DateUtils;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import lombok.Data;
 
 import java.io.Serializable;

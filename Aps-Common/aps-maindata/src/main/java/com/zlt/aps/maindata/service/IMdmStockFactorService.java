@@ -1,6 +1,6 @@
 package com.zlt.aps.maindata.service;
 
-import com.zlt.aps.monthplan.api.domain.entity.MdmStockFactor;
+import com.zlt.aps.mp.api.domain.entity.MdmStockFactor;
 import com.zlt.bill.common.service.IDocService;
 
 /**

@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.MesItfMapper">
 
-    <select id="selectSkuMouldRelList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmSkuMouldRel">
+    <select id="selectSkuMouldRelList" resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuMouldRel">
         SELECT
         FACTORY_CODE,
         MOULD_CODE,
@@ -33,7 +33,7 @@
         <if test="mouldType != null and mouldType != ''">AND MOULD_TYPE = #{mouldType}</if>
     </select>
 
-    <select id="selectModelInfoList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmModelInfo">
+    <select id="selectModelInfoList" resultType="com.zlt.aps.mp.api.domain.entity.MdmModelInfo">
         SELECT
         FACTORY_CODE,
         MOULD_CODE,
@@ -67,7 +67,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectMaterialList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMaterialInfo">
+    <select id="selectMaterialList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo">
         SELECT MATERIAL_CODE,
         MES_MATERIAL_CODE,
         SPEC_DESC AS MATERIAL_DESC,
@@ -95,7 +95,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectMoldShellList" resultType="com.zlt.aps.monthplan.api.domain.entity.MdmMouldShellInfo">
+    <select id="selectMoldShellList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMouldShellInfo">
         SELECT STOCK_DATE,
         MOLD_SLEEVE AS MOULD_SET_CODE,
         TOTAL_NUM AS TOTAL_QTY,
@@ -116,7 +116,7 @@
     </select>
 
     <select id="syncRawMaterialOutboundRecord"
-            resultType="com.zlt.aps.monthplan.api.domain.entity.RawMaterialOutboundRecord">
+            resultType="com.zlt.aps.mp.api.domain.entity.RawMaterialOutboundRecord">
         SELECT STOCK_DATE AS OUTBOUND_DATE,
         MATERIAL_CODE,
         TYPE_CODE AS MATERIAL_TYPE,

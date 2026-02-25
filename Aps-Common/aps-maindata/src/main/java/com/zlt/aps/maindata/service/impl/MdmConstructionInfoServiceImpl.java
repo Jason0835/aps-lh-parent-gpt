@@ -3,7 +3,7 @@ package com.zlt.aps.maindata.service.impl;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.sysdef.domain.SysDocType;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;

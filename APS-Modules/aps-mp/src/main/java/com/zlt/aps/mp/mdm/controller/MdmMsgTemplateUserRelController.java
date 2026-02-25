@@ -2,7 +2,7 @@ package com.zlt.aps.mp.mdm.controller;
 
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.zlt.aps.maindata.service.IMdmMsgTemplateUserRelService;
-import com.zlt.aps.monthplan.api.domain.entity.MdmMsgTemplateUserRel;
+import com.zlt.aps.mp.api.domain.entity.MdmMsgTemplateUserRel;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;

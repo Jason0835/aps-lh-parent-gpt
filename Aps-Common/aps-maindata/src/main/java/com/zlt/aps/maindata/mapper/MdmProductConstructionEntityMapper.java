@@ -2,10 +2,10 @@ package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Constants;
-import com.zlt.aps.monthplan.api.domain.entity.MdmProductConstruction;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionImportVo;
-import com.zlt.aps.monthplan.api.domain.vo.MdmProductConstructionVO;
-import com.zlt.aps.monthplan.api.domain.vo.SpecCodeAndProductCodeVO;
+import com.zlt.aps.mp.api.domain.entity.MdmProductConstruction;
+import com.zlt.aps.mp.api.domain.vo.MdmProductConstructionImportVo;
+import com.zlt.aps.mp.api.domain.vo.MdmProductConstructionVO;
+import com.zlt.aps.mp.api.domain.vo.SpecCodeAndProductCodeVO;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
