@@ -73,10 +73,18 @@
               <div class="search-name" style="width: 150px">研发品号：</div>
               <el-input v-model="input" placeholder="请输入内容"></el-input>
             </div>
-            <el-button type="primary" icon="el-icon-search" class="blue-button">搜索</el-button>
-            <el-button type="danger" icon="el-icon-search">订单甘特图</el-button>
-            <el-button type="warning" icon="el-icon-search">机台甘特图</el-button>
-            <el-button type="success" icon="el-icon-search">规格甘特图</el-button>
+            <el-button type="primary" icon="el-icon-search" class="blue-button"
+              >搜索</el-button
+            >
+            <el-button type="danger" icon="el-icon-search"
+              >订单甘特图</el-button
+            >
+            <el-button type="warning" icon="el-icon-search" @click="goGent"
+              >机台甘特图</el-button
+            >
+            <el-button type="success" icon="el-icon-search"
+              >规格甘特图</el-button
+            >
           </div>
           <table class="production-table">
             <thead>
@@ -179,9 +187,10 @@
                 </el-option>
               </el-select>
             </div>
-            <el-button type="primary" icon="el-icon-search" class="blue-button">搜索</el-button>
+            <el-button type="primary" icon="el-icon-search" class="blue-button"
+              >搜索</el-button
+            >
             <el-button type="danger" icon="el-icon-search">导出</el-button>
-
           </div>
           <div class="table-content">
             <ScrollTable
@@ -230,7 +239,9 @@
               <div class="search-name" style="width: 150px">研发品号：</div>
               <el-input v-model="input" placeholder="请输入内容"></el-input>
             </div>
-            <el-button type="primary" icon="el-icon-search" class="blue-button">搜索</el-button>
+            <el-button type="primary" icon="el-icon-search" class="blue-button"
+              >搜索</el-button
+            >
             <el-button type="danger" icon="el-icon-search">导出</el-button>
           </div>
           <div class="table-content">
@@ -243,7 +254,12 @@
         </div>
       </div>
       <div class="pageination-container">
-        <el-pagination background layout="prev, pager, next" class="my-pagination" :total="1000">
+        <el-pagination
+          background
+          layout="prev, pager, next"
+          class="my-pagination"
+          :total="1000"
+        >
         </el-pagination>
       </div>
     </div>
@@ -329,6 +345,12 @@ export default {
     window.removeEventListener("resize", this.resize);
   },
   methods: {
+    goGent() {
+      this.$router.push({
+        name: "MachineGantChart",
+
+      });
+    },
     // 表头样式
     headerCellStyle({ row, column, rowIndex, columnIndex }) {
       return {
@@ -537,10 +559,10 @@ export default {
   justify-content: flex-end;
   padding: 0 20px;
 }
-.blue-button{
+.blue-button {
   background: #009ff4;
 }
 .el-pagination.is-background .el-pager li.active {
-  background-color: #FC813B !important;
+  background-color: #fc813b !important;
 }
 </style>
