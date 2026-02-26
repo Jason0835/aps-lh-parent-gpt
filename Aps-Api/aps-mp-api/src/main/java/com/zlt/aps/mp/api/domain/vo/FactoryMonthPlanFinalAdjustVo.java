@@ -32,6 +32,13 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private Integer actualAdjustQty;
 
     /**
+     * 锁定日前的计划量汇总值
+     */
+    @TableField(exist = false)
+    @ApiModelProperty(value = "锁定日前的计划量汇总值", name = "sumPlanQtyBeforeLockDay")
+    private Integer sumPlanQtyBeforeLockDay;
+    
+    /**
      * 搭配量
      */
     private Integer matchQtyDay1;

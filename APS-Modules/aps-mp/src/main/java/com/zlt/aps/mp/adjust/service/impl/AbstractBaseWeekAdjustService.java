@@ -212,7 +212,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         for (MpAdjustDetailVo vo : adjustDetailList) {
-            vo.setActualAdjustQty(Convert.toInt(vo.getActualAdjustQty(), 0) == 0 ? null : vo.getActualAdjustQty());
+            vo.setActualAdjustQty(Convert.toInt(vo.getActualAdjustQty(), 0).equals(0) ? null : vo.getActualAdjustQty());
         }
     }
 
@@ -1953,7 +1953,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
 
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
-        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.FALSE);
         List<MdmMaterialConsumeDetail> materialConsumeDetailList = dataManager.listMaterialConsumeDetails(dataDTO);
         contextDTO.setMdmMaterialConsumeDetailList(materialConsumeDetailList);
     }
@@ -1970,7 +1970,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
 
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
-        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.FALSE);
         List<RawSpecialMaterialRecord> specialMaterialList = dataManager.listSpecialMaterials(dataDTO);
         contextDTO.setSpecialMaterialList(specialMaterialList);
     }

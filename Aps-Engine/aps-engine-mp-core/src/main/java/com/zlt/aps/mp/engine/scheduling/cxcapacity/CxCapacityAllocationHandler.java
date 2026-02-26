@@ -626,7 +626,7 @@ public class CxCapacityAllocationHandler {
             return selected;
         }
         //断面宽优先
-        List<CxMachineBaseInfoVo> sectionWidthList = sameSpecificationsList.stream().filter(cxMachineInfo -> YesOrNoEnum.YES.getCode().equals(cxMachineInfo.getSameProSize())).collect(Collectors.toList());
+        List<CxMachineBaseInfoVo> sectionWidthList = sameSpecificationsList.stream().filter(cxMachineInfo -> YesOrNoEnum.YES.getCode().equals(cxMachineInfo.getSectionWidthCondition())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(sectionWidthList)) {
             sectionWidthList = sameProSizeList;
         }

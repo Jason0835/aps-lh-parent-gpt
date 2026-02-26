@@ -3,6 +3,8 @@ package com.zlt.aps.mp.factory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.enums.ProductionProcessesTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmMouldAllocationEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmMouldAllocation;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.engine.domain.vo.ProductionCycleInfo;
@@ -51,6 +53,9 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+
+    @Autowired
+    private MdmMouldAllocationEntityMapper mdmMouldAllocationMapper;
 
 
     /**
@@ -115,6 +120,20 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         List<DailyMouldAvailabilityResult> results = new ArrayList<>();
 
+        // 2. 提前查询当月模具分配表，构建缓存（一次性）
+        Map<String, Integer> allocationCache = new HashMap<>();
+        List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
+                new QueryWrapper<MdmMouldAllocation>()
+                        .eq("FACTORY_CODE", factoryCode)
+                        .eq("YEAR", year)
+                        .eq("MONTH", month)
+                        .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
+        );
+        for (MdmMouldAllocation alloc : allocations) {
+            String key = alloc.getStructureName() + "|" + alloc.getMainPattern();
+            allocationCache.put(key, alloc.getAllocationQty());
+        }
+
         // 遍历整个排产周期的每一天
         for (int day = 1; day <= monthDays; day++) {
             // 创建当天的结果对象
@@ -153,7 +172,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
             // 转换为当天结果
             Map<String, Integer> cavityDayResults = new HashMap<>();
             for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
-                cavityDayResults.put(entry.getKey(), entry.getValue().size());
+                cavityDayResults.put(entry.getKey(), applyLimitWithCache(allocationCache, entry.getKey(), entry.getValue().size()));
+                // 如果是停产日，直接返回空结果
                 if (stopDays.contains(day)) {
                     cavityDayResults.put(entry.getKey(), 0);
                 }
@@ -161,7 +181,12 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
             Map<String, Integer> insertDayResults = new HashMap<>();
             for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
-                insertDayResults.put(entry.getKey(), entry.getValue().size());
+                String structureKey = materialToStructureMap.get(entry.getKey());
+                if (StringUtils.isNotBlank(structureKey)) {
+                    insertDayResults.put(entry.getKey(), applyLimitWithCache(allocationCache, structureKey, entry.getValue().size()));
+                } else {
+                    insertDayResults.put(entry.getKey(), entry.getValue().size());
+                }            // 如果是停产日，直接返回空结果
                 if (stopDays.contains(day)) {
                     insertDayResults.put(entry.getKey(), 0);
                 }
@@ -174,16 +199,6 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         }
 
         return results;
-    }
-
-    /**
-     * 根据开始日期和第几天计算具体日期
-     */
-    private Date calculateDateFromDay(Date startDate, int day) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(startDate);
-        calendar.add(Calendar.DATE, day - 1);
-        return calendar.getTime();
     }
 
     /**
@@ -214,6 +229,19 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         mouldRelationList.add(result);
         result.setDayOfCycle(dayOfCycle);
 
+        // 2. 提前查询当月模具分配表，构建缓存（一次性）
+        Map<String, Integer> allocationCache = new HashMap<>();
+        List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
+                new QueryWrapper<MdmMouldAllocation>()
+                        .eq("FACTORY_CODE", factoryCode)
+                        .eq("YEAR", year)
+                        .eq("MONTH", month)
+                        .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
+        );
+        for (MdmMouldAllocation alloc : allocations) {
+            String key = alloc.getStructureName() + "|" + alloc.getMainPattern();
+            allocationCache.put(key, alloc.getAllocationQty());
+        }
 
         // 计算可用量
         Map<String, Set<String>> cavityTempMap = new HashMap<>();
@@ -235,6 +263,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                     // 计算活块可用量（按物料描述）
                     insertTempMap.computeIfAbsent(materialDesc, k -> new HashSet<>()).add(mouldCode);
 
+
                     // 计算型腔可用量（按结构+主花纹）
                     if (StringUtils.isNotBlank(structureName)) {
                         cavityTempMap.computeIfAbsent(structureName, k -> new HashSet<>()).add(mouldCode);
@@ -243,10 +272,11 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
             }
         }
 
+
         // 转换为最终结果
         Map<String, Integer> cavityResults = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : cavityTempMap.entrySet()) {
-            cavityResults.put(entry.getKey(), entry.getValue().size());
+            cavityResults.put(entry.getKey(), applyLimitWithCache(allocationCache, entry.getKey(), entry.getValue().size()));
             // 如果是停产日，直接返回空结果
             if (stopDays.contains(dayOfCycle)) {
                 cavityResults.put(entry.getKey(), 0);
@@ -255,8 +285,12 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         Map<String, Integer> insertResults = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : insertTempMap.entrySet()) {
-            insertResults.put(entry.getKey(), entry.getValue().size());
-            // 如果是停产日，直接返回空结果
+            String structureKey = materialToStructureMap.get(entry.getKey());
+            if (StringUtils.isNotBlank(structureKey)) {
+                insertResults.put(entry.getKey(), applyLimitWithCache(allocationCache, structureKey, entry.getValue().size()));
+            } else {
+                insertResults.put(entry.getKey(), entry.getValue().size());
+            }            // 如果是停产日，直接返回空结果
             if (stopDays.contains(dayOfCycle)) {
                 insertResults.put(entry.getKey(), 0);
             }
@@ -267,6 +301,22 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         return mouldRelationList;
     }
+
+    /**
+     * 模具分配限制
+     * @param cache 模具分配比例 Map<结构键, 分配数>
+     * @param structureKey 结构键（格式：结构名|主花纹）
+     * @param rawSize 原始数量
+     * @return 限制后的数量
+     */
+    private int applyLimitWithCache(Map<String, Integer> cache, String structureKey, int rawSize) {
+        Integer allocationQty = cache.get(structureKey);
+        if (allocationQty != null && allocationQty >= 0) {
+            return Math.min(rawSize, allocationQty);
+        }
+        return rawSize;
+    }
+
 
     /**
      * 获取生产周期信息
@@ -525,8 +575,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         mouldCodeSet = allMouldRelationInfoList.stream()
                 .collect(Collectors.groupingBy(item -> item.getMouldCode() + item.getFactoryCode()))
                 .keySet()
-                .stream()  // 添加这行：将Set转换为Stream
-                .collect(Collectors.toCollection(HashSet::new));  // 再收集到HashSet中
+                .stream()
+                .collect(Collectors.toCollection(HashSet::new));
 
         for (MoldCavityInsertMaxValueCalculatorVo mouldInfo : mouldDeliveryList) {
             // 如果不存在，则添加
