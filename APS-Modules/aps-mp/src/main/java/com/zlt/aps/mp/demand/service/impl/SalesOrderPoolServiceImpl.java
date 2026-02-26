@@ -305,6 +305,13 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 				MonthPlanEnums.HIGHT_PRIORITY_ORDER_RATE); // 高优先级订单占比
 		BigDecimal hightPriorityOrderRate = BigDecimalUtils
 				.percentages2Decimals(BigDecimalUtils.valueOf(hightPriorityOrderRateStr)); // 占比参数转换成小数
+        String scmOrderMatralQualityState = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
+                MonthPlanEnums.SCM_ORDER_MATRAL_QUALITY_STATE); // 从参数取出质控标记
+
+        String[] prefixArr = StringUtils.split(scmOrderMatralCodePrefix, ",");
+        String[] qualityStateArr = StringUtils.split(scmOrderMatralQualityState, ",");
+        
+		
 
 		// 加载物料明细，关联数据
 		LambdaQueryWrapper<MdmMaterialInfo> materialQueryWrapper = new LambdaQueryWrapper<MdmMaterialInfo>();
@@ -314,12 +321,17 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 		// 把接口数据转换成aps订单池对象
 		List<SalesOrderPool> newSalesOrderPoolList = syncResultList.stream().filter(s -> {
-			if (StringUtils.isEmpty(scmOrderMatralCodePrefix)) {
-				return true;
-			}
-			String[] prefixArr = StringUtils.split(scmOrderMatralCodePrefix, ",");
+	        if (prefixArr == null || prefixArr.length == 0) {
+	            return true;
+	        }
 			return Arrays.stream(prefixArr).anyMatch(p -> StringUtils.startsWith(s.getOriMaterialCode(), p));
 		} // 只要32、33开头的物料
+		).filter(s -> {
+            if (qualityStateArr == null || qualityStateArr.length == 0) {
+                return true;
+            }
+            return Arrays.stream(qualityStateArr).anyMatch(p -> Objects.equals(p, s.getQualityStateCode()));
+		} // 质控状态只要投产的
 		).map(vo -> {
 			String salPriority = vo.getSalPriority(); // 销售优先级
 			String salCodePo = vo.getSalCodePo(); // po号

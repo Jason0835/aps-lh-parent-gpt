@@ -47,7 +47,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Autowired
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
-    
+
     @Autowired
     private MatchingProductionHandler matchingProductionHandler;
 
@@ -304,11 +304,6 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //6 执行结构间搭配排产,暂不考虑特殊结构
-        //=========================================================
-        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
-        //=========================================================
-
         //7.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj);
@@ -316,6 +311,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
             weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
         }
+
+        //6 执行结构间搭配排产,暂不考虑特殊结构
+        //=========================================================
+        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
+        //=========================================================
+        
         //9.构建月计划统计结果
         List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()), contextDTO.getOneStructureAllocationList());
 
@@ -343,6 +344,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //更新实际调整量
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
+            // 实际调整默认：0
+            structureOut.setActualAdjustQty(0);
             mpFinalVo = mpFinalAdjustMap.get(structureOut.getMaterialCode());
             if (mpFinalVo != null){
                 structureOut.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));

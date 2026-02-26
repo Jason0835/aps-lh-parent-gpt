@@ -52,6 +52,10 @@ public enum MonthPlanEnums {
      */
     MONTH_SALE_QTY_MONTH("SYS0102005", "查询近12个月的月均销量大于零的月份数"),
     /**
+     * SYS0102006 从供应链同步的订单物料信息只需要管控质量符合条件的数据
+     */
+    SCM_ORDER_MATRAL_QUALITY_STATE("SYS0102006", "从供应链同步的订单物料信息只需要管控质量符合条件的数据"),
+    /**
      *  SYS0103001 最小投产量
      */
     MIN_PRODUCTION_QTY("SYS0103001", "最小投产量"),
