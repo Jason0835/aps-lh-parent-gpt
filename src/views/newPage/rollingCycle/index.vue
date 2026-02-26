@@ -1376,7 +1376,7 @@ export default {
       this.getVersionList();
     },
     //获取版本列表
-    async getVersionList(isGet = false) {
+    async getVersionList(isGet = false,isNewVersion=false) {
       this.loading = true;
       let res;
       try {
@@ -1432,6 +1432,11 @@ export default {
             this.$set(this.query, "adjVersion", list[0].value);
 
           } else {
+            if(isNewVersion){
+                this.$set(this.search, "version", list[0].value);
+                this.$set(this.query, "version", list[0].value);
+                return
+            }
             if(this.query.version){
               let hasVersion = list.some(item=>item.value == this.query.version)
               if(hasVersion){
@@ -1619,7 +1624,7 @@ export default {
           this.data = res.rows;
         }
         this.getLoading = false;
-        this.getVersionList();
+        this.getVersionList(false,true);
         this.loading = false;
       } catch (err) {
         this.getLoading = false;
