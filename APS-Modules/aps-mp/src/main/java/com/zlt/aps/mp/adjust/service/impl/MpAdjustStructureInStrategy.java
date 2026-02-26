@@ -153,13 +153,16 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 Date endTime = new Date();
                 copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+                //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+                MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+                reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
+
                 //2.3 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
                 //=========================================================
                 matchingProductionHandler.matchingAdjustProduction(copyContextDTO, oneStructMpFinalList);
                 //=========================================================
 
                 //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-                MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
                 reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
                 //2.5.设置模具变化信息
                 for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
