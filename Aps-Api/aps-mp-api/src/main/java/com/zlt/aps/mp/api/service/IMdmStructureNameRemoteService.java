@@ -24,7 +24,7 @@ import java.util.List;
  *     修 改 人：zlt
  *     修改内容：...
  */
-@FeignClient(contextId = "IMdmStructureNameRemoteService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.mdm:/mdm}")
+@FeignClient(contextId = "IMdmStructureNameRemoteService", value =ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
 public interface IMdmStructureNameRemoteService {
 
     /**
