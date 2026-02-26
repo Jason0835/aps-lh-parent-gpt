@@ -130,7 +130,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                         .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
         );
         for (MdmMouldAllocation alloc : allocations) {
-            String key = alloc.getStructureName() + "|" + alloc.getMainPattern();
+            String key = alloc.getStructureName()  + alloc.getMainPattern();
             allocationCache.put(key, alloc.getAllocationQty());
         }
 
@@ -239,7 +239,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
                         .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
         );
         for (MdmMouldAllocation alloc : allocations) {
-            String key = alloc.getStructureName() + "|" + alloc.getMainPattern();
+            String key = alloc.getStructureName() + alloc.getMainPattern();
             allocationCache.put(key, alloc.getAllocationQty());
         }
 
