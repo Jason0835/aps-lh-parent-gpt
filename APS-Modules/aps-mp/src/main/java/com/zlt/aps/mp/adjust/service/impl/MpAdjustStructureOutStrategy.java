@@ -304,27 +304,31 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-        //7.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+        //6.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj);
-        //8.设置模具变化信息
+
+        //7 执行结构间搭配排产,暂不考虑特殊结构
+        //=========================================================
+        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
+        //=========================================================
+
+        //8.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
+        reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList, adjustDailyCapacityLimitObj);
+
+        //9.设置模具变化信息
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
             weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
         }
 
-        //6 执行结构间搭配排产,暂不考虑特殊结构
-        //=========================================================
-        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
-        //=========================================================
-        
-        //9.构建月计划统计结果
+        //10.构建月计划统计结果
         List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()), contextDTO.getOneStructureAllocationList());
 
         contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         contextDTO.setSaveAdjustProcLogList(contextDTO.getAdjustProcLogList());
 
-        //9.保存调整日志
+        //11.保存调整日志
         saveMpAdjustLog(contextDTO);
     }
 
