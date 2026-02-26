@@ -131,6 +131,10 @@ public class SyncPlanedNotShipResultVo {
 	/** 出运单号 */
 	@ApiModelProperty(value = "出运单号", name = "shipNo")
 	private String shipNo;
+    
+    /** 质控状态 */
+    @ApiModelProperty(value = "质控状态", name = "qualityStateCode")
+    private String qualityStateCode;
 
 	/**
 	 * 规格

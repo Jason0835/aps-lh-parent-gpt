@@ -201,7 +201,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				}
 
                 // 构建胎胚原料消耗量
-                List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList);
+                List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList, syncDataLogs.getFactoryCode());
                 if (CollectionUtils.isNotEmpty(detaiList)) {
                     // 保存前先删除本次同步涉及的胎胚原材料明细
                     List<String> embryoCodeList = detaiList.stream().map(MdmMaterialConsumeDetail::getEmbryoCode).distinct().collect(Collectors.toList());
@@ -227,12 +227,14 @@ public class MesBomItfServiceImpl implements MesBomItfService {
     /**
      * 构建胎胚原料消耗量
      *
-     * @param mesDateList    接口同步的bom数据
+     * @param mesDateList 接口同步的bom数据
      * @param apsDataList aps库现有的bom数据
+     * @param factoryCode 厂别
      * @return
      */
     private List<MdmMaterialConsumeDetail> buildConsumeDetailLIst(List<MdmBomInfo> mesDateList,
-                                                                  List<MdmBomInfo> apsDataList) {
+                                                                  List<MdmBomInfo> apsDataList,
+                                                                  String factoryCode) {
         // 1、合并MES和aps的bom记录
         Set<Long> updateIdSet = mesDateList.stream().map(MdmBomInfo::getId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -281,6 +283,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
             if (pathList.stream().anyMatch(b -> updateIdSet.contains(b.getId()))) {
                 // 5.2.1、初始化消耗量
                 MdmMaterialConsumeDetail consumeDetail = new MdmMaterialConsumeDetail();
+                consumeDetail.setFactoryCode(factoryCode);
                 consumeDetail.setChildMaterialCode(bom.getChildCode());
                 consumeDetail.setChildMaterialName(bom.getChildMaterialName());
                 consumeDetail.setChildMaterialVersion(bom.getChildMaterialVersion());
