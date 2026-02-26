@@ -257,8 +257,9 @@ public class CxCapacityAllocationHandler {
         if (CollectionUtils.isEmpty(needProductionGroupList)) {
             return null;
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         // 如果有在机的特殊结构，则优先取出特殊结构
-        if (((TbrProductionContext) context).getBaseDataContainer().getCxMachineBaseInfo().values()
+        if (productionContext.getBaseDataContainer().getCxMachineBaseInfo().values()
                 .stream().anyMatch(machine -> this.hasSpecialStructure(machine))) {
             List<ProductionPlanGroupInfo> specialMaterialList = needProductionGroupList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(specialMaterialList)) {
@@ -276,7 +277,19 @@ public class CxCapacityAllocationHandler {
         if (specialMaterialList.size() == BigDecimal.ONE.intValue()) {
             return specialMaterialList.get(BigDecimal.ZERO.intValue());
         }
-        specialMaterialList.sort(Comparator.comparing(ProductionPlanGroupInfo::getRemainingNeedAllocationDays));
+        specialMaterialList.sort((groupInfo1, groupInfo2) -> {
+            // 判断如果都是特殊材料，同时包含专用与共用特殊材料的结构优先
+            Boolean hasDedicatedSpecialMaterials1 = groupInfo1.hasDedicatedSpecialMaterials(productionContext);
+            Boolean hasDedicatedSpecialMaterials2 = groupInfo2.hasDedicatedSpecialMaterials(productionContext);
+            int result = hasDedicatedSpecialMaterials2.compareTo(hasDedicatedSpecialMaterials1); // 倒序
+            if (result != 0) {
+                return result;
+            }
+            Integer remainingNeedAllocationDays1 = Optional.ofNullable(groupInfo1.getRemainingNeedAllocationDays()).orElse(0);
+            Integer remainingNeedAllocationDays2 = Optional.ofNullable(groupInfo2.getRemainingNeedAllocationDays()).orElse(0);
+            result = remainingNeedAllocationDays1.compareTo(remainingNeedAllocationDays2);
+            return result;
+        });
         return specialMaterialList.get(BigDecimal.ZERO.intValue());
     }
 

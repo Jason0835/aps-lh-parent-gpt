@@ -83,6 +83,11 @@ public class TbrProductionContext extends Context {
      * key=物料描述 ： value=限制原因集合
      */
     private Map<String, List<MouldProductionLimitTypeEnum>> skuProductionLimitInfo;
+    /**
+     * 特殊材料于结构关系
+     * key=物料描述 ： value=结构名称列表
+     */
+    private Map<String, Set<String>> specialMaterialStructureRelationMap;
 
     /**
      * 加入收尾，方向匹配结构集合
@@ -886,6 +891,27 @@ public class TbrProductionContext extends Context {
                     break;
                 }
             }
+        }
+    }
+
+    /**
+     * 根据结构的特殊材料列表刷新上下文的特殊材料结构关系表
+     *
+     * @param groupInfo 物料描述
+     */
+    public void updateSpecialMaterialStructureRelationMap(ProductionPlanGroupInfo groupInfo) {
+        if (!groupInfo.isSpecialMaterial()) {
+            return;
+        }
+        String strucureName = groupInfo.getGroupName();
+        Set<String> specialMaterialCodeSet = groupInfo.getEmbryoSpecialMaterialInfoMap().keySet();
+        for (String specialMaterialCode: specialMaterialCodeSet) {
+            Set<String> strucureSet =  this.specialMaterialStructureRelationMap.get(specialMaterialCode);
+            if (strucureSet == null) {
+                strucureSet = new HashSet<>();
+                this.specialMaterialStructureRelationMap.put(specialMaterialCode, strucureSet);
+            }
+            strucureSet.add(strucureName);
         }
     }
 }
