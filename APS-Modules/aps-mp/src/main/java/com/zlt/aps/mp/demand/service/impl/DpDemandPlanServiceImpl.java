@@ -11,6 +11,7 @@ import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -987,7 +988,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private void setProductionType(DpDemandPlan mergedPlan, Map<String, String> productionTypeMap) {
-        mergedPlan.setProductionType(productionTypeMap.getOrDefault(mergedPlan.getMaterialCode(),StringUtils.EMPTY));
+        mergedPlan.setProductionType(productionTypeMap.getOrDefault(mergedPlan.getMaterialCode(), BizScheduleTypeEnum.ORDINARY_ORDER_PRODUCT.getCode()));
     }
 
     /**
