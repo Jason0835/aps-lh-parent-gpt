@@ -23,20 +23,20 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['maindata:rawSpecialMaterialRecord:edit']"
+          v-hasPermi="['mdm:mdmStructureName:edit']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
           type="warning"
-          v-hasPermi="['maindata:rawSpecialMaterialRecord:edit']"
+          v-hasPermi="['mdm:mdmStructureName:edit']"
           :disabled="selection.length !== 1"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.edit") }}</el-button
         >
         <el-button
           type="danger"
-          v-hasPermi="['maindata:rawSpecialMaterialRecord:remove']"
+          v-hasPermi="['mdm:mdmStructureName:remove']"
            :disabled="selection.length == 0"
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
@@ -167,7 +167,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["maindata:rawSpecialMaterialRecord:edit"]}
+                  v-hasPermi={["mdm:mdmStructureName:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -175,7 +175,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["maindata:rawSpecialMaterialRecord:remove"]}
+                  v-hasPermi={["mdm:mdmStructureName:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
