@@ -142,6 +142,7 @@ export default {
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
           dictData: this.newStructureList,
+          filterable: true,
           // render: (form) => {
           //   return (
           //     <structureSelect
