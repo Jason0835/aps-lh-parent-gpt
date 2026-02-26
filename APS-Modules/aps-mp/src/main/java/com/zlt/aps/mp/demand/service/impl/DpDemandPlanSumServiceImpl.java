@@ -3,26 +3,26 @@ package com.zlt.aps.mp.demand.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
+import com.zlt.aps.mp.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
 import java.util.Collections;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
-import org.springframework.util.CollectionUtils;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -44,6 +44,7 @@ import org.springframework.util.CollectionUtils;
 public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanSum>  implements IDpDemandPlanSumService {
     private final DpDemandPlanEntityMapper demandPlanEntityMapper;
     private final DpDemandPlanSumEntityMapper dpDemandPlanSumEntityMapper;
+    private final DpStockVersionEntityMapper dpStockVersionEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2026012216";
@@ -90,7 +91,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
 
     @Override
     public List<String> findMonthPlanVersion(DpDemandPlanSum queryCondition) {
-        return dpDemandPlanSumEntityMapper.selectDistinctMonthPlanVersion(
+        return dpStockVersionEntityMapper.selectDistinctMonthPlanVersion(
             queryCondition.getFactoryCode(),
             queryCondition.getYear(),
             queryCondition.getMonth(),
