@@ -437,7 +437,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //5、保存月计划统计结果
         saveMonthPlanStatisticsResult(contextDTO);
         //6、发送消息
-        if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
+        if (PubUtil.isNotEmpty(contextDTO.getMsgRemainQtyNoFull())){
             sendMsgRemainQtyNoFull(contextDTO);
         }
     }
@@ -668,7 +668,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void saveMpAdjustProcLog(MpRollAdjustContextDTO contextDTO){
-        List<FactoryMonthPlanFinalAdjustVo> adjustProcLogList = contextDTO.getAdjustProcLogList();
+        List<FactoryMonthPlanFinalAdjustVo> adjustProcLogList = contextDTO.getSaveAdjustProcLogList();
         if (PubUtil.isEmpty(adjustProcLogList)){
             return;
         }
