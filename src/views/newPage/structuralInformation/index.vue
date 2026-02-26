@@ -141,19 +141,17 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-        },
-        {
-          prop: "createBy",
-          label: this.$t("common.api.sysNotice.columnname.createBy"),
-        },
-        {
-          prop: "createTime",
-          label: this.$t("common.createTime"),
+          minWidth: 200,
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
         },
+        {
+          prop: "createTime",
+          label: this.$t("common.createTime"),
+        },
+
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
