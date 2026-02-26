@@ -65,6 +65,12 @@
             <artifactId>aps-common-core</artifactId>
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-api-auth</artifactId>
+            <version>${ruoyi-cloud.version}</version>
+            <scope>compile</scope>
+        </dependency>
 
         <!-- Spring Cache
         <dependency>
