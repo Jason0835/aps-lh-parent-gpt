@@ -38,6 +38,12 @@ import infoForm from "@/views/components/infoForm.vue";
 export default {
   components: { infoForm, materialCodeSelect,structureSelect },
   inject: ["parentDict"],
+  props: {
+    newStructureList: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     return {
       loading: false,
@@ -134,14 +140,16 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          render: (form) => {
-            return (
-              <structureSelect
-                key={form.structureName}
-                v-model={form.structureName}
-              />
-            );
-          },
+          type: "select",
+          dictData: this.newStructureList,
+          // render: (form) => {
+          //   return (
+          //     <structureSelect
+          //       key={form.structureName}
+          //       v-model={form.structureName}
+          //     />
+          //   );
+          // },
 
         },
       ];

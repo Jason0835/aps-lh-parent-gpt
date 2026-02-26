@@ -19,93 +19,79 @@
       :selectArea="false"
     >
       <template slot="header">
+
         <el-button
           type="primary"
           plain
-          v-hasPermi="['monthplan:mdmSkuStructureRef:edit']"
+          v-hasPermi="['maindata:rawSpecialMaterialRecord:edit']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
+          type="warning"
+          v-hasPermi="['maindata:rawSpecialMaterialRecord:edit']"
+          :disabled="selection.length !== 1"
+          @click="handleEdit(selection[0])"
+          >{{ $t("ui.frame.btn.edit") }}</el-button
+        >
+        <el-button
           type="danger"
-          v-hasPermi="['monthplan:mdmSkuStructureRef:remove']"
-          :disabled="selection.length == 0"
+          v-hasPermi="['maindata:rawSpecialMaterialRecord:remove']"
+           :disabled="selection.length == 0"
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <!-- <el-button
-          type="warning"
-          v-hasPermi="['monthplan:ProductMoldingLimit:edit']"
-          @click="handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
-        <el-button
-          v-hasPermi="['monthplan:mdmSkuStructureRef:import']"
+          v-hasPermi="['maindata:rawSpecialMaterialRecord:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:mdmSkuStructureRef:export']"
+          v-hasPermi="['maindata:rawSpecialMaterialRecord:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
-        >
-        <el-button
-          @click="handleUpdate"
-          :loading="updateLoading"
-          type="primary"
-          v-hasPermi="['monthplan:mdmSkuStructureRef:updateStructure']"
-          >{{ $t("ui.data.skuEmbryoRelation.updateMainPattern") }}</el-button
-        >
+        > -->
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <!-- <tlt-upload
       ref="tltUpload"
-      downloadUrl="/monthplan/mdmSkuStructureRef/importTemplate"
-      uploadUrl="/monthplan/mdmSkuStructureRef/importData"
+      downloadUrl="/maindata/rawSpecialMaterialRecord/importTemplate"
+      uploadUrl="/maindata/rawSpecialMaterialRecord/importData"
       @uploadSuccess="getList"
     /> -->
-    <tlt-upload-form
+    <!-- <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/monthplan/mdmSkuStructureRef/importTemplate"
-      uploadUrl="/monthplan/mdmSkuStructureRef/importData"
+      downloadUrl="/maindata/rawSpecialMaterialRecord/importTemplate"
+      uploadUrl="/maindata/rawSpecialMaterialRecord/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
-    ></tlt-upload-form>
-    <infoDialog ref="infoRef" @success="getList" :newStructureList="newStructureList"/>
+    ></tlt-upload-form> -->
+    <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
 //lib
-import { mapState, mapGetters } from "vuex";
+import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
-import {
-  listSkuStructure,
-  removeSkuStructure,
-  updateMaterial,
-} from "@/api/monthplan/skuStructure";
 
-//components
+import {listStructureName,removeStructureName} from "@/api/mdm/mdmStructureName";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
-import {
-  listStructureName,
-  removeStructureName,
-} from "@/api/mdm/mdmStructureName";
 
 export default {
-  name: "SkuEmbryoRelation",
+  name: "StructuralInformation",
   components: {
     tltUpload,
     infoDialog,
-    TltUploadForm,
+    TltUploadForm
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_rawMaterial_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -129,7 +115,6 @@ export default {
           },
         },
       ],
-      updateLoading: false,
       loading: false,
       data: [],
       selection: [],
@@ -143,53 +128,46 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
-      newStructureList: [],
     };
   },
   computed: {
-    ...mapGetters("globalList", ["structureList"]),
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
-        {
-          prop: "factoryCode",
-          label: this.$t("common.factory"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
-          },
-          width: 120,
-        },
-        {
-          prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-        },
-        // {
-        //   prop: "materialCode",
-        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-        //   width:180,
-        // },
-        // {
-        //   prop: "materialDesc",
-        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        // },
+
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width: 350,
+        },
+        {
+          prop: "createBy",
+          label: this.$t("common.api.sysNotice.columnname.createBy"),
+        },
+        {
+          prop: "createTime",
+          label: this.$t("common.createTime"),
+        },
+        {
+          prop: "remark",
+          label: this.$t("common.remark"),
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          with: 180,
         },
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
-          width: 200,
           render: ({ row }) => {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["monthplan:mdmSkuStructureRef:edit"]}
+                  v-hasPermi={["maindata:rawSpecialMaterialRecord:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -197,7 +175,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["monthplan:mdmSkuStructureRef:remove"]}
+                  v-hasPermi={["maindata:rawSpecialMaterialRecord:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -215,51 +193,14 @@ export default {
     searchColumns() {
       return [
         {
-          prop: "factoryCode",
-          label: this.$t("common.factory"),
-          type: "select", //GLUE_TYPE
-          dictData: this.dict.type.biz_factory_name,
-        },
-        {
-          prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-        },
-        // {
-        //   prop: "materialCode",
-        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-        // },
-        // {
-        //   prop: "胚胎",
-        //   label: this.$t("胚胎"),
-        // },
-        // {
-        //   prop: "materialDesc",
-        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        // },
-        {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          type: "select",
-          dictData: this.newStructureList,
-          filterable: true,
         },
+
       ];
     },
   },
   methods: {
-    async handleUpdate() {
-      try {
-        this.updateLoading = true;
-        let res = await updateMaterial();
-        this.$modal.msgSuccess(res.msg);
-        // this.$set(this.page, "current", 1);
-        // this.getList();
-        this.updateLoading = false;
-      } catch (err) {
-        console.log(err);
-        this.updateLoading = false;
-      }
-    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -275,7 +216,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeSkuStructure({ ids }).then((data) => {
+        removeStructureName({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -294,13 +235,14 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeSkuStructure({ ids }).then((data) => {
+        removeStructureName({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
         });
       });
     },
+
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -330,10 +272,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink(
-        "/monthplan/mdmSkuStructureRef/export",
-        this.formatParams(false)
-      );
+      downloadLink("/maindata/rawSpecialMaterialRecord/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
@@ -360,7 +299,7 @@ export default {
       try {
         this.loading = true;
 
-        const data = await listSkuStructure(this.formatParams());
+        const data = await listStructureName(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -369,39 +308,13 @@ export default {
         this.loading = false;
       }
     },
-    async getNewList() {
-      try {
-        const res = await listStructureName({});
-        let list = [];
-        for (let i = 0; i < res.rows.length; i++) {
-          let obj = {
-            label: res.rows[i].structureName,
-            value: res.rows[i].structureName,
-          };
-          list.push(obj);
-        }
-        console.log(list);
-        this.newStructureList = list;
-      } catch (error) {
-        console.error(error);
-      } finally {
-      }
-    },
   },
   created() {
-    let defaultParams = {
-      factoryCode: "116",
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...defaultParams,
-    };
+
     this.getList();
   },
   activated() {
-    this.getNewList();
+
   },
 };
 </script>
