@@ -1,23 +1,33 @@
 package com.zlt.aps.mdm.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.collection.ListUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.mdm.mapper.MdmSkuStructureRefEntityMapper;
-import com.zlt.aps.mdm.service.IMdmSkuStructureRefService;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.aps.mdm.mapper.MdmSkuStructureRefEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmStructureNameEntityMapper;
+import com.zlt.aps.mdm.service.IMdmSkuStructureRefService;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureName;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -39,6 +49,8 @@ import com.ruoyi.common.exception.ServiceException;
 public class MdmSkuStructureRefServiceImpl extends AbstractDocService<MdmSkuStructureRef>  implements IMdmSkuStructureRefService {
 
     private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
+
+    private final MdmStructureNameEntityMapper mdmStructureNameEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -65,6 +77,37 @@ public class MdmSkuStructureRefServiceImpl extends AbstractDocService<MdmSkuStru
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "structureName","mainMaterialDesc"));
+    }
+
+    @Override
+    protected Map<Object, Object> getServiceCheckParams(List<MdmSkuStructureRef> list, List<MdmSkuStructureRef> importList) {
+        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
+        List<String> structureNameList = list.stream().map(MdmSkuStructureRef::getStructureName).filter(StringUtils::isNotBlank).distinct().collect(Collectors.toList());
+        List<List<String>> splitList = ListUtil.split(structureNameList, 500);
+        List<MdmStructureName> mdmStructureNameList = new ArrayList<>();
+        for (List<String> structureList : splitList) {
+            LambdaQueryWrapper<MdmStructureName> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmStructureName::getStructureName, structureList);
+            mdmStructureNameList.addAll(mdmStructureNameEntityMapper.selectList(wrapper));
+        }
+        if (CollUtil.isNotEmpty(mdmStructureNameList)) {
+            serviceCheckParams.put("mdmStructureNameList", mdmStructureNameList.stream().map(MdmStructureName::getStructureName).collect(Collectors.toList()));
+        }
+        return serviceCheckParams;
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MdmSkuStructureRef importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        if (serviceCheckParams.containsKey("mdmStructureNameList")) {
+            List<String> mdmStructureNameList = (List<String>) serviceCheckParams.get("mdmStructureNameList");
+            String structureName = importDocEntity.getStructureName();
+            if (!mdmStructureNameList.contains(structureName)) {
+                String message = I18nUtil.getMessage("ui.data.alert.mdmSkuStructureRef.structureNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), errorRowNum, message, importErrorLogs);
+                return Boolean.FALSE;
+            }
+        }
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 
     /**
