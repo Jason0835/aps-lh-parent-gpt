@@ -185,6 +185,7 @@ public class ProductionPlanGroupInfo {
             return groupInfo;
         }
         groupInfo.setEmbryoSpecialMaterialInfoMap(materialMap);
+        productionContext.updateSpecialMaterialStructureRelationMap(groupInfo); // 刷新上下文的特殊材料结构关系表
 
         List<String> materialCodeList = groupPlanData.stream()
                 .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
@@ -1009,6 +1010,34 @@ public class ProductionPlanGroupInfo {
      */
     public boolean isSpecialMaterial() {
         return !CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap);
+    }
+    
+    /**
+     * 判断结构是否含有专用特殊材料同时也有共用特殊材料（排产优先级最高）
+     * @param productionContext
+     * @return
+     */
+    public Boolean hasDedicatedSpecialMaterials(TbrProductionContext productionContext) {
+        if (!this.isSpecialMaterial()) {
+            return false;
+        }
+        boolean hasDedicatedSpecialMaterials = false; // 是否包含专用特殊材料
+        boolean hasShareSpecialMaterials = false; // 是否包含共用特殊材料
+        for (String specialMaterialCode: this.embryoSpecialMaterialInfoMap.keySet()) {
+            Set<String> structureNameSet = productionContext.getSpecialMaterialStructureRelationMap().get(specialMaterialCode); // 获取使用该特殊材料的结构
+            if (CollectionUtils.isEmpty(structureNameSet)) {
+                continue;
+            }
+            if (!structureNameSet.contains(this.groupName)) {
+                continue;
+            }
+            if (structureNameSet.size() == 1) { // 只有一个结构使用，说明是专用特殊此材料，需要标记上有专用特殊材料
+                hasDedicatedSpecialMaterials = true;
+            } else {
+                hasShareSpecialMaterials = true;
+            }
+        }
+        return hasDedicatedSpecialMaterials && hasShareSpecialMaterials; // 同时包含专用与共用特殊材料
     }
 
     /**
