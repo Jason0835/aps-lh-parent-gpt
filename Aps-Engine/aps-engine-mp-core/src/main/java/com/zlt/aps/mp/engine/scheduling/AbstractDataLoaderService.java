@@ -546,6 +546,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
         //构建特殊原材料库存信息
         specialMaterialStockHandler(productionContext);
+        // 初始化特殊材料结构关系表
+        productionContext.setSpecialMaterialStructureRelationMap(new HashMap<>());
     }
 
     /**

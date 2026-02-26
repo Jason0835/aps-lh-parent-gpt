@@ -139,7 +139,15 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                     Boolean isSpecial1 = null == continueGroup ? false : continueGroup.isSpecialMaterial();
                     Boolean isSpecial2 = null == continueGroup2 ? false : continueGroup2.isSpecialMaterial();
                     // Boolean的true比false大，因此需要倒序，优先处理true的
-                    return isSpecial2.compareTo(isSpecial1);
+                    int result = isSpecial2.compareTo(isSpecial1);
+                    if (result != 0) {
+                        return result;
+                    }
+                    // 判断如果都是特殊材料，同时包含专用与共用特殊材料的结构优先
+                    Boolean hasDedicatedSpecialMaterials1 = continueGroup.hasDedicatedSpecialMaterials(productionContext);
+                    Boolean hasDedicatedSpecialMaterials2 = continueGroup2.hasDedicatedSpecialMaterials(productionContext);
+                    result = hasDedicatedSpecialMaterials2.compareTo(hasDedicatedSpecialMaterials1); // 倒序
+                    return result;
                 })
                 .forEach(entry -> {
                     String structureName = entry.getKey();

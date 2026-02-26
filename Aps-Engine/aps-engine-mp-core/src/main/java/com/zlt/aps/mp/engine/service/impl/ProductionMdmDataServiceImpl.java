@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.enums.ProductionProcessesTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -206,7 +207,13 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         if (isEmptyFactoryAndYearMonth(context)) {
             return Collections.emptyList();
         }
-        return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode(), context.getYear(), context.getMonth());
+
+        // 需要取排产年月上一个月份库存
+        Date yearMonth = DateUtils.parseDate(context.getYear() + "-" + context.getMonth() + "-" + 1);
+        Date lastYearMonth = DateUtils.addMonths(yearMonth, -1);
+        Integer queryYear = DateUtils.getYear(lastYearMonth);
+        Integer queryMonth = DateUtils.getMonth(lastYearMonth);
+        return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode(), queryYear, queryMonth);
     }
 
     /**
