@@ -124,13 +124,13 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     continue;
                 }
             }
+
             Future future = ThreadPoolManager.getInstance().submit(() -> {
-                String structureName = entry.getKey();
                 MpRollAdjustContextDTO copyContextDTO = new MpRollAdjustContextDTO();
                 BeanUtils.copyProperties(contextDTO,copyContextDTO);
-                copyContextDTO.setAdjustProcLogList(new ArrayList<>());
                 //2.1 初始结构上下文
                 //1）结构内，按结构分别调整
+                copyContextDTO.setAdjustProcLogList(new ArrayList<>());
                 copyContextDTO.setStructureName(entry.getKey());
                 List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = mpProdFinalMap.get(copyContextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(copyContextDTO.getStructureName());
                 copyContextDTO.setSpecStructureTotalQty(0);
@@ -182,7 +182,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 if (!StringUtil.isEmptyWithTrim(copyContextDTO.getMsgRemainQtyNoFull().toString())){
                     contextDTO.getMsgRemainQtyNoFull().append(copyContextDTO.getMsgRemainQtyNoFull().toString());
                 }
-                return structureName;
+                return entry.getKey();
             });
             futureList.add(future);
         }
@@ -192,6 +192,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 f.get();
             } catch (Exception e) {
                 log.error("线程执行异常", e);
+                throw new BusinessException(e.getMessage());
             }
         });
         contextDTO.setSaveMpProdFinalList(newMpFinalList);

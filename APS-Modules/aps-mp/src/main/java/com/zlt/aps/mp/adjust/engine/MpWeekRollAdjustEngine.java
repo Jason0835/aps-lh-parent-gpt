@@ -1599,6 +1599,7 @@ public class MpWeekRollAdjustEngine {
                     if (i == newOnLineDay){
                         //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
                         BeanUtils.copyProperties(bakMpFinalVo,mpFinalVo);
+                        startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),i+1,mpFinalVo,dailyCapacityLimitVo);
                     }else{
                         dayValue -= dayVulcanizationQty;
                         mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);

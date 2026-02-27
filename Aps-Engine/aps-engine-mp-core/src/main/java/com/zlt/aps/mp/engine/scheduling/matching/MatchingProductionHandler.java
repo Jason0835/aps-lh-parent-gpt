@@ -469,6 +469,10 @@ public class MatchingProductionHandler {
                                     Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap) {
         int capacity = 0;
         MdmSkuLhCapacity mdmSkuLhCapacity = mdmSkuLhCapacityMap.get(materialDesc);
+        if (mdmSkuLhCapacity == null){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+                    materialDesc));
+        }
         DayVulcanizationModeEnum dayVulcanizationMode = DayVulcanizationModeEnum
                 .getInstance((String) contextDTO.getParamMap().get(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode()));
         if (dayVulcanizationMode == DayVulcanizationModeEnum.MES_CAPACITY) {
