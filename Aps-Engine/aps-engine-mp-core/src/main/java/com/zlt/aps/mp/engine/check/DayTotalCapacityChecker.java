@@ -47,7 +47,9 @@ public class DayTotalCapacityChecker implements IProductionCheck {
         if (PubUtil.isEmpty(mpPlanFinalAdjustList)){
             return true;
         }
-
+        if (dayTotalCapacityLimit == 0){
+            return false;
+        }
         //1.计算检查日的汇总值
         String dayField = FactoryConstant.DAY_FIELD + checkDay;
         List<FactoryMonthPlanFinalAdjustVo> safeList = new ArrayList<>(mpPlanFinalAdjustList);

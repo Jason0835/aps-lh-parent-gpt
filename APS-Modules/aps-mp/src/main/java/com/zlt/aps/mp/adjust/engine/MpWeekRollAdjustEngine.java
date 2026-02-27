@@ -1509,7 +1509,7 @@ public class MpWeekRollAdjustEngine {
      * @param newPlanQty 新的计划量
      * @param mpFinalVo 当前定稿记录
      */
-    private int incMouldProduction(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+    private synchronized int incMouldProduction(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
                                     MpRollAdjustContextDTO contextDTO,
                                     Integer newOnLineDay, Integer newPlanQty, FactoryMonthPlanFinalAdjustVo mpFinalVo,FactoryMonthPlanFinalAdjustVo bakMpFinalVo) {
         String dayField;
