@@ -180,7 +180,14 @@ public class ProductionPlanGroupInfo {
         // 胎胚与特殊材料对应关系清单
         Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
         // 本结构涉及的特殊材料清单
-        Map<String, BigDecimal> materialMap = embryoSpecialMaterialInfoMap.get(CollectionUtils.firstElement(groupPlanData).getEmbryoCode());
+        Map<String, BigDecimal> materialMap = new HashMap<>();
+        for (MonthPlanProductionRequirePlanVo planVo: groupPlanData) { // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
+            Map<String, BigDecimal> skuMaterialMap = embryoSpecialMaterialInfoMap.get(planVo.getEmbryoCode());
+            if (!CollectionUtils.isEmpty(skuMaterialMap)) {
+                materialMap.putAll(skuMaterialMap);
+                break;
+            }
+        }
         if (CollectionUtils.isEmpty(materialMap)) {
             return groupInfo;
         }
