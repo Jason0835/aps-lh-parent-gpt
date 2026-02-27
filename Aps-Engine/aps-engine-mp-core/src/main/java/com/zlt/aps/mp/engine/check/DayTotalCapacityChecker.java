@@ -4,7 +4,9 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.common.utils.PubUtil;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 日总产能限制检查
@@ -45,17 +47,16 @@ public class DayTotalCapacityChecker implements IProductionCheck {
         if (PubUtil.isEmpty(mpPlanFinalAdjustList)){
             return true;
         }
+
         //1.计算检查日的汇总值
         String dayField = FactoryConstant.DAY_FIELD + checkDay;
-        this.totalPlanQty = mpPlanFinalAdjustList.stream().mapToInt(x-> {
-
-            if (x == null || x.getFieldValueByFieldName(dayField) == null){
-                return 0;
-            }else{
-                return (Integer)x.getFieldValueByFieldName(dayField);
-            }
-        }).sum();
-
+        List<FactoryMonthPlanFinalAdjustVo> safeList = new ArrayList<>(mpPlanFinalAdjustList);
+        this.totalPlanQty = safeList.stream()
+                .filter(Objects::nonNull)
+                .mapToInt(x -> {
+                    Object val = x.getFieldValueByFieldName(dayField);
+                    return val instanceof Number ? ((Number) val).intValue() : 0;
+                }).sum();
 
         //2.检查日的汇总值 小于等于 日总产能限制
         return totalPlanQty <= dayTotalCapacityLimit;
