@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -89,6 +90,7 @@ import com.zlt.aps.mp.engine.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
@@ -97,6 +99,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayDetail;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
@@ -141,6 +144,10 @@ public class MatchingProductionHandler {
     private MonthProductionDataService monthProductionDataService;
     @Autowired
     private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
+    @Autowired
+    private ISysConfigService sysConfigService;
     /**
      * 月份天数上限
      */
@@ -253,6 +260,15 @@ public class MatchingProductionHandler {
      */
     public void matchingAdjustProduction(MpRollAdjustContextDTO contextDTO,
                                          List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+        try {
+            String config = sysConfigService.selectConfigByKey("monthAdjust.skip.matching");
+            if (StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+                return; // 跳过搭配开关打开，则直接返回
+            }
+        } catch (Exception e) {
+            log.error("获取配置失败", e);
+        }
+        
         // 结构排产的开始不能早于锁定日的校验
         Integer startDay = contextDTO.getStartDay();
         Integer endDay = contextDTO.getEndDay();
@@ -277,17 +293,10 @@ public class MatchingProductionHandler {
         }
         log.info("周程滚动搭配算法start");
         TbrProductionContext productionContext = this.initProductionContext(contextDTO); // 初始化上下文
-        List<MdmProductStock> stockList = contextDTO.getMdmProductStockList(); // 库存
-        if (CollectionUtils.isEmpty(stockList)) {
-            stockList = getDataService().getMdmProductStock(productionContext); // 如果没有需要加载库存
-            contextDTO.setMdmProductStockList(stockList);
-        }
+        List<MdmProductStock> stockList = this.getMdmProductStock(contextDTO, productionContext);
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
-        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap(); // 日硫化产能表，key:物料描述
-        if (mdmSkuLhCapacityMap == null) {
-            mdmSkuLhCapacityMap = this.initSkuLhCapacity(contextDTO);
-            contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
-        }
+        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = this.getSkuLhCapacity(contextDTO);; // 日硫化产能表，key:物料描述
+        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = this.getMdmSkuConstructionRefMap(contextDTO); // 获取sku与施工关系，key：物料号
         productionContext.setOverSixMonthStockMap(this.overSixMonthStockHandler(productionContext, stockList)); // 超6个成品库存信息
         productionContext.getBaseDataContainer().setParamConfiguration(this.buildParam(contextDTO.getParamMap()));
         // 部分list转换成map，方便取数
@@ -316,7 +325,7 @@ public class MatchingProductionHandler {
                     .filter(p -> materialDesc.equals(p.getMaterialDesc()) && p.getConventionReserveQty() > 0)
                     .collect(Collectors.toList());
             FactoryMonthPlanFinalAdjustVo plan = this.getFinalPlanByMaterialDesc(contextDTO, materialDesc,
-                    mpProdFinalList, needProductPlanList); // 获取定稿计划
+                    mpProdFinalList, needProductPlanList, mdmSkuConstructionRefMap); // 获取定稿计划
             
             int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 储备量
             unAllocationQty = isSpecial? Math.min(unAllocationQty, unAllocatSpecStructureTotalQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
@@ -377,6 +386,38 @@ public class MatchingProductionHandler {
             }
         } while (true);
         log.info("周程滚动搭配算法end");
+    }
+
+    private Map<String, MdmSkuConstructionRef> getMdmSkuConstructionRefMap(MpRollAdjustContextDTO contextDTO) {
+        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = contextDTO.getMdmSkuConstructionRefMap();
+        if (mdmSkuConstructionRefMap == null) {
+            LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, contextDTO.getFactoryCode());
+            queryWrapper.eq(MdmSkuConstructionRef::getIsDelete, YesOrNoEnum.NO.getValue());
+            List<MdmSkuConstructionRef> skuConstructionRefList = mdmSkuConstructionRefEntityMapper
+                    .selectList(queryWrapper);
+            mdmSkuConstructionRefMap = skuConstructionRefList.stream()
+                    .filter(construction -> StringUtils.isNotEmpty(construction.getMaterialCode()))
+                    .collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, construction -> construction,
+                            (existingVal, newVal) -> newVal));
+        }
+        return mdmSkuConstructionRefMap;
+    }
+
+    /**
+     * 获取成品库存
+     * @param contextDTO
+     * @param productionContext
+     * @return
+     */
+    private List<MdmProductStock> getMdmProductStock(MpRollAdjustContextDTO contextDTO,
+                                                     TbrProductionContext productionContext) {
+        List<MdmProductStock> stockList = contextDTO.getMdmProductStockList(); // 库存
+        if (CollectionUtils.isEmpty(stockList)) {
+            stockList = getDataService().getMdmProductStock(productionContext); // 如果没有需要加载库存
+            contextDTO.setMdmProductStockList(stockList);
+        }
+        return stockList;
     }
 
     /**
@@ -466,19 +507,30 @@ public class MatchingProductionHandler {
         return demandPlanList;
     }
     
-    private Map<String, MdmSkuLhCapacity> initSkuLhCapacity(MpRollAdjustContextDTO contextDTO) {
-        LambdaQueryWrapper<MdmSkuLhCapacity> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MdmSkuLhCapacity::getFactoryCode, contextDTO.getFactoryCode());
-        queryWrapper.eq(MdmSkuLhCapacity::getIsDelete, YesOrNoEnum.NO.getValue());
-        List<MdmSkuLhCapacity> skuLhCapacityList = mdmSkuLhCapacityEntityMapper.selectList(queryWrapper);
+    /**
+     * 日硫化产能表
+     * @param contextDTO
+     * @return
+     */
+    private Map<String, MdmSkuLhCapacity> getSkuLhCapacity(MpRollAdjustContextDTO contextDTO) {
+        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap(); // 日硫化产能表，key:物料描述
+        if (mdmSkuLhCapacityMap == null) {
 
-        return skuLhCapacityList.stream()
-                .filter(skuLhCapacity -> StringUtils.isNotEmpty(skuLhCapacity.getMaterialCode()))
-                .collect(Collectors.toMap(
-                        MdmSkuLhCapacity::getMaterialCode,
-                        skuLhCapacity -> skuLhCapacity,
-                        (existingVal, newVal) -> newVal
-                ));
+            LambdaQueryWrapper<MdmSkuLhCapacity> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmSkuLhCapacity::getFactoryCode, contextDTO.getFactoryCode());
+            queryWrapper.eq(MdmSkuLhCapacity::getIsDelete, YesOrNoEnum.NO.getValue());
+            List<MdmSkuLhCapacity> skuLhCapacityList = mdmSkuLhCapacityEntityMapper.selectList(queryWrapper);
+
+            mdmSkuLhCapacityMap = skuLhCapacityList.stream()
+                    .filter(skuLhCapacity -> StringUtils.isNotEmpty(skuLhCapacity.getMaterialCode()))
+                    .collect(Collectors.toMap(
+                            MdmSkuLhCapacity::getMaterialCode,
+                            skuLhCapacity -> skuLhCapacity,
+                            (existingVal, newVal) -> newVal
+                    ));
+            contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
+        }
+        return mdmSkuLhCapacityMap;
     }
 
     /**
@@ -492,7 +544,8 @@ public class MatchingProductionHandler {
     private FactoryMonthPlanFinalAdjustVo getFinalPlanByMaterialDesc(MpRollAdjustContextDTO contextDTO,
                                                                      String materialDesc,
                                                                      List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                                     List<DpDemandPlan> needProductPlanList) {
+                                                                     List<DpDemandPlan> needProductPlanList,
+                                                                     Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap) {
         FactoryMonthPlanFinalAdjustVo plan = mpProdFinalList.stream()
                 .filter(p -> materialDesc.equals(p.getMaterialDesc())).findFirst().orElse(null); // 获取排产结果
         if (plan == null) { // 如果没有，说明是新增规格，需要新增记录
@@ -504,6 +557,10 @@ public class MatchingProductionHandler {
             plan.setMaterialCode(firstDemandPlan.getMaterialCode());
             plan.setMaterialDesc(firstDemandPlan.getMaterialDesc());
             plan.setMainPattern(firstDemandPlan.getMainPattern());
+            MdmSkuConstructionRef skuConstructionRef = mdmSkuConstructionRefMap.get(firstDemandPlan.getMaterialCode());
+            if (skuConstructionRef != null) {
+                plan.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
+            }
             plan.setMesMaterialCode(firstDemandPlan.getMesMaterialCode());
             plan.setTotalQty(0);
             plan.setBeginDay(null);
@@ -705,8 +762,8 @@ public class MatchingProductionHandler {
             dailyCapacityLimitVo.setUsedLhMachines(dailyCapacityLimitVo.getUsedLhMachines() + 1); // 更新硫化机使用情况
             dailyCapacityLimitVo.setPatternUsedLhMachines(dailyCapacityLimitVo.getPatternUsedLhMachines() + 1);
             Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
-            if (!embryoCodes.contains(plan.getEmbryoCode())) {
-                embryoCodes.add(plan.getEmbryoCode());
+            if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
+                embryoCodes.add(plan.getMainMaterialDesc());
                 dailyCapacityLimitVo.setUsedEmbryoTypes(embryoCodes.size());
             }
         }
