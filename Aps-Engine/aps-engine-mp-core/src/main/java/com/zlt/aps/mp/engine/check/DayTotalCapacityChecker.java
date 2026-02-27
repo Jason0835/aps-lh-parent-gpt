@@ -48,7 +48,11 @@ public class DayTotalCapacityChecker implements IProductionCheck {
         //1.计算检查日的汇总值
         String dayField = FactoryConstant.DAY_FIELD + checkDay;
         this.totalPlanQty = mpPlanFinalAdjustList.stream().mapToInt(x-> {
-            return x.getFieldValueByFieldName(dayField) == null ? 0: (Integer)x.getFieldValueByFieldName(dayField);
+            if (x == null || x.getFieldValueByFieldName(dayField) == null){
+                return 0;
+            }else{
+                return (Integer)x.getFieldValueByFieldName(dayField);
+            }
         }).sum();
 
 
