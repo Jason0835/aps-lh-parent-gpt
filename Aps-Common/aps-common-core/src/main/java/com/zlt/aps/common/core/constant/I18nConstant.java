@@ -9,14 +9,6 @@ package com.zlt.aps.common.core.constant;
  */
 public class I18nConstant {
     /**
-     * 国际化语言-中文
-     */
-    public static final String CHINESE = "zh_CN";
-    /**
-     * 国际化语言-英文
-     */
-    public static final String ENGLISH = "en_US";
-    /**
      * 条件不可为空的国际化提示
      */
     public static final String CONDITION_NO_EMPTY = "ui.data.query.param.condition.noEmpty";

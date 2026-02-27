@@ -1,11 +1,11 @@
 package com.zlt.aps.mp.engine.utils;
 
 import com.alibaba.fastjson.JSONObject;
+import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
-import com.zlt.aps.utils.JsonUtils;
-import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
+import com.zlt.aps.utils.JsonUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
@@ -51,7 +51,7 @@ public class NoProductionReasonUtils {
      * @return
      */
     public static String getNoProductionReasonByLimit(MonthPlanNoProductionReasonEnum noProductionReason, List<MouldProductionLimitTypeEnum> limitTypeList) {
-        List<String> languageList = getLanguageList();
+        List<String> languageList = JsonUtils.getLanguageList();
         String noProductionReasonI18nKey = noProductionReason.getI18nKey();
         String errorCode = noProductionReason.getErrorCode();
         JSONObject noProductionReasonInfo = JsonUtils.getLanguageJsonObject(noProductionReasonI18nKey);
@@ -122,15 +122,4 @@ public class NoProductionReasonUtils {
         return fullI18nInfo;
     }
 
-    /**
-     * 获取语言包信息
-     *
-     * @return
-     */
-    private static List<String> getLanguageList() {
-        List<String> languageList = new ArrayList<>();
-        languageList.add(I18nConstant.CHINESE);
-        languageList.add(I18nConstant.ENGLISH);
-        return languageList;
-    }
 }

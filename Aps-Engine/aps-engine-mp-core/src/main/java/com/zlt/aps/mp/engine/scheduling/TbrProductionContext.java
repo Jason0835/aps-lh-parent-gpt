@@ -878,15 +878,16 @@ public class TbrProductionContext extends Context {
                     }).collect(Collectors.toList());
             Long unAllocationQty = materialConsumeQty;
             for (SpecialMaterialInfoVo stockInfo : stockList) { // 顺序分配至每一个定长的库存上，库存不够扣的切换到其他定长
-                Long newallocationQty = sumQtyGetter.apply(stockInfo) + unAllocationQty;
-                Long realAllocationQty;
+                Long oldQty = sumQtyGetter.apply(stockInfo);
+                Long newQty = 0L;
+                Long tempQty = oldQty + unAllocationQty; // 旧值直接加上分配量
                 if (unAllocationQty > 0) { // 扣减库存，则结果（分配量）不能超过库存
-                    realAllocationQty = Math.min(newallocationQty, stockInfo.getStock());
+                    newQty = Math.min(tempQty, stockInfo.getStock());
                 } else { // 回退，则结果（分配量）不能低于0
-                    realAllocationQty = Math.max(newallocationQty, BigDecimal.ZERO.longValue());
+                    newQty = Math.max(tempQty, BigDecimal.ZERO.longValue());
                 }
-                unAllocationQty -= realAllocationQty;
-                sumQtySetter.accept(stockInfo, newallocationQty);
+                unAllocationQty -= (newQty - oldQty);
+                sumQtySetter.accept(stockInfo, newQty);
                 if (unAllocationQty == 0) {
                     break;
                 }

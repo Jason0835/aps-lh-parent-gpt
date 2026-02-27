@@ -321,6 +321,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 		// 把接口数据转换成aps订单池对象
 		List<SalesOrderPool> newSalesOrderPoolList = syncResultList.stream().filter(s -> {
+		    if (s.getId() == null) {
+		        return false; // id为空的异常数据过滤掉
+		    }
 	        if (prefixArr == null || prefixArr.length == 0) {
 	            return true;
 	        }
