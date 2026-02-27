@@ -1523,7 +1523,7 @@ public class MpWeekRollAdjustEngine {
         MpDailyCapacityLimitVo dailyCapacityLimitVo = contextDTO.getDailyCapacityLimitVoMap().get(newOnLineDay);
         int startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),newOnLineDay,mpFinalVo,dailyCapacityLimitVo);
         int dailyQty = getDayVulcanizationQty(mpFinalVo);
-        int blockQty,cavityQty;
+        int blockQty,cavityQty,diffQty;
         Integer dayVulcanizationQty;
         boolean bFirstAddMould = true;
         //量试标识
@@ -1587,8 +1587,13 @@ public class MpWeekRollAdjustEngine {
                 //若是开产日，计划量全部等比例减少
                 dayVulcanizationQty = getPlanQtyForOpenProductionFirstDay(contextDTO,adjustDailyCapacityLimitObj,dailyCapacityLimitVoMap.get(i),dayVulcanizationQty);
                 //若是特殊结构，其调整计划量不能超过原月计划总量
-                dayVulcanizationQty = getPlanQtyForSpecMaterial(contextDTO,mpFinalVo,otherTotalQty,dayVulcanizationQty,i);
-
+                if (YesOrNoEnum.YES.getCode().equals(mpFinalVo.getHasSpecialMaterial())){
+                    diffQty = getDiffQtyForSpecMaterial(contextDTO,mpFinalVo,otherTotalQty,dayVulcanizationQty,i);
+                    if (diffQty == 0){
+                        return newPlanQty < 0 ? 0:newPlanQty;
+                    }
+                    dayVulcanizationQty = diffQty > dayVulcanizationQty ? dayVulcanizationQty:diffQty;
+                }
                 dayValue += dayVulcanizationQty;
                 mpFinalVo.setFieldValueByFieldName(dayField,dayValue);
                 adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
@@ -1718,25 +1723,22 @@ public class MpWeekRollAdjustEngine {
      * @param iDay 当日
      * @return 实际排的计划量
      */
-    private int getPlanQtyForSpecMaterial(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,
-                                         int otherTotalQty,int dayVulcanizationQty,int iDay){
-        if (YesOrNoEnum.YES.getCode().equals(mpFinalVo.getHasSpecialMaterial())){
-            String dayField;
-            int curTotalQty = 0;
-            for (int i=contextDTO.getStartDay();i<=contextDTO.getEndDay();i++){
-                dayField = FactoryConstant.DAY_FIELD + i;
-                if (mpFinalVo.getFieldValueByFieldName(dayField) != null){
-                    curTotalQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
-                }
+    private int getDiffQtyForSpecMaterial(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo mpFinalVo,
+                                          int otherTotalQty, int dayVulcanizationQty, int iDay){
+        String dayField;
+        int curTotalQty = 0;
+        for (int i=contextDTO.getStartDay();i<=contextDTO.getEndDay();i++){
+            dayField = FactoryConstant.DAY_FIELD + i;
+            if (mpFinalVo.getFieldValueByFieldName(dayField) != null){
+                curTotalQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
             }
-            // 差异数量 = 特殊结构总计划量 - 其他SKU汇总 - 当前SKU的已排汇总值
-            int specTotalQty = contextDTO.getSpecStructureTotalQty() == null ? 0: contextDTO.getSpecStructureTotalQty();
-            int diffQty = specTotalQty - otherTotalQty - curTotalQty;
-            diffQty = diffQty < 0 ? 0 : diffQty;
-            contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,特殊标识：是,特殊结构原总计划量:%s,其他SKU总计划量:%s,当前SKU已排计划量:%s,允许再排计划量:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),iDay,contextDTO.getSpecStructureTotalQty(),otherTotalQty,curTotalQty,diffQty)).append(ApsConstant.DIVISION);
-            return diffQty > dayVulcanizationQty ? dayVulcanizationQty:diffQty;
         }
-        return dayVulcanizationQty;
+        // 差异数量 = 特殊结构总计划量 - 其他SKU汇总 - 当前SKU的已排汇总值
+        int specTotalQty = contextDTO.getSpecStructureTotalQty() == null ? 0: contextDTO.getSpecStructureTotalQty();
+        int diffQty = specTotalQty - otherTotalQty - curTotalQty;
+        diffQty = diffQty < 0 ? 0 : diffQty;
+        contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,特殊标识：是,特殊结构原总计划量:%s,其他SKU总计划量:%s,当前SKU已排计划量:%s,允许再排计划量:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),iDay,contextDTO.getSpecStructureTotalQty(),otherTotalQty,curTotalQty,diffQty)).append(ApsConstant.DIVISION);
+        return diffQty;
     }
 
     /**

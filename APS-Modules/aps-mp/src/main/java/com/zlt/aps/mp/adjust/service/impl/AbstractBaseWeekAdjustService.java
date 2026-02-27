@@ -486,7 +486,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
-        for (int i = contextDTO.getStructureStartDay(); i< contextDTO.getStructureDeadLine(); i++){
+        for (int i = contextDTO.getStructureStartDay(); i<= contextDTO.getStructureDeadLine(); i++){
             if (dailyCapacityLimitVoMap.get(i) == null){
                 continue;
             }
