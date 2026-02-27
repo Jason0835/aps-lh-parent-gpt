@@ -90,6 +90,9 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 for (MdmSkuMouldRel skuMouldRel : skuMouldRelList) {
                     skuMouldRel.setBaseVale(null);
+                    if (StringUtils.isBlank(skuMouldRel.getIsSamePatterPanel())) {
+                        skuMouldRel.setIsSamePatterPanel(YesOrNoEnum.NO.getCode());
+                    }
                     String mapKey = GenerageMapKeyUtils.createMapKey(skuMouldRel.getFactoryCode(), skuMouldRel.getMouldCode(), skuMouldRel.getMaterialCode());
                     if (existsMap.containsKey(mapKey)) {
                         MdmSkuMouldRel existsData = existsMap.get(mapKey);
