@@ -71,6 +71,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         String errorMsg = Optional.ofNullable(errorMsgList)
                 .orElse(Collections.emptyList())
                 .stream()
+                .distinct()
                 .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
         Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
             return new BusinessException(errorMsg);
