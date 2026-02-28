@@ -96,12 +96,12 @@ export default {
         {
           prop: "templateCode",
           label: this.$t("ui.data.messageTemplate.templateCode"),
-          maxlength:30
+          maxlength:50
         },
         {
           prop: "templateName",
           label: this.$t("ui.data.messageTemplate.templateName"),
-          maxlength:30
+          maxlength:100
         },
         {
           prop: "title",

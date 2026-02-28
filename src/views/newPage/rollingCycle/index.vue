@@ -209,7 +209,7 @@
         border
         style="width: 100%"
         :row-class-name="tableRowClassName"
-        max-height="250"
+        max-height="450"
       >
         <el-table-column
           v-for="item in outResultColumns"
