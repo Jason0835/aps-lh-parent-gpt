@@ -23,6 +23,7 @@ import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -33,6 +34,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
@@ -90,6 +92,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
     private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
     private final MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
+    private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+
 
     @Override
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
@@ -212,6 +216,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         CompletableFuture<List<MdmSkuConstructionRef>> skuConstructionRefFuture = CompletableFuture.supplyAsync(
                 () -> querySkuConstructionRef(mpStructureAllocation)
         );
+        // 查询工作日历
+        CompletableFuture<List<MdmWorkCalendar>> workCalendarFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmWorkCalendar(mpStructureAllocation)
+        );
+
 
         try {
             // 等待所有异步任务执行完成
@@ -224,7 +233,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     materialConsumeDetailFuture,
                     rawSpecialMaterialRecordFuture,
                     skuStructureRefFuture,
-                    skuConstructionRefFuture
+                    skuConstructionRefFuture,
+                    workCalendarFuture
             ).join();
 
             log.info("并行查询数据执行完成");
@@ -249,6 +259,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
         List<MdmSkuStructureRef> skuStructureRefList = skuStructureRefFuture.join();
         List<MdmSkuConstructionRef> skuConstructionRefList= skuConstructionRefFuture.join();
+        List<MdmWorkCalendar> workCalendarList = workCalendarFuture.join();
+
 
         // 判断时间是否有交叉，若有则抛出异常
         List<String> dateCrossedErrorMsgList = getDateCrossedErrorMsgList(mpStructureAllocation, structureAllocationList);
@@ -298,8 +310,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         mpStructureAllocation.setBaseVale(null);
         // 计划类型
         mpStructureAllocation.setPlanType("01");
-        // 分配天数 TODO 后续再扣除停工的天数
-        mpStructureAllocation.setAllotDays(endDay - beginDay + 1);
+        // 筛选工作日历数据(停产)
+        List<MdmWorkCalendar> workCalendarResultList = filterWorkCalendar(workCalendarList, beginDay, endDay);
+        // 分配天数 = 结束日期减去开始日期加1减去停产的天数
+        mpStructureAllocation.setAllotDays(endDay - beginDay + 1 - workCalendarResultList.size());
         // 排产净需求
         mpStructureAllocation.setNetQty(0);
         // 排产净需求(含损耗)
@@ -321,6 +335,31 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         mpStructureAllocation.setIsHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
         return baseDao.save(mpStructureAllocation);
     }
+
+
+    /**
+     * 筛选工作日历数据(停产)
+     * @param workCalendarList 原始日历列表
+     * @param beginDay 起始天（包含）
+     * @param endDay 结束天（包含）
+     * @return 符合条件的日历列表
+     */
+    public List<MdmWorkCalendar> filterWorkCalendar(List<MdmWorkCalendar> workCalendarList, Integer beginDay, Integer endDay) {
+        if (PubUtil.isEmpty(workCalendarList)) {
+            return Collections.emptyList();
+        }
+        if (beginDay == null || endDay == null || beginDay > endDay) {
+            return Collections.emptyList();
+        }
+        return workCalendarList.stream()
+                .filter(calendar -> {
+                    Integer day = calendar.getDay();
+                    return day != null && day >= beginDay && day <= endDay;
+                })
+                .filter(calendar -> ApsConstant.FALSE.equals(calendar.getDayFlag()))
+                .collect(Collectors.toList());
+    }
+}
 
     /**
      * 查询SKU与施工（示方书）关系
@@ -447,6 +486,23 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
 
     /**
+     * 查询工作日历
+     *
+     * @param mpStructureAllocation
+     */
+    private List<MdmWorkCalendar> queryMdmWorkCalendar(MpStructureAllocation mpStructureAllocation) {
+        MdmWorkCalendar queryVO = new MdmWorkCalendar();
+        queryVO.setFactoryCode(mpStructureAllocation.getFactoryCode());
+        queryVO.setYear(mpStructureAllocation.getYear());
+        queryVO.setMonth(mpStructureAllocation.getMonth());
+
+        LambdaQueryWrapper<MdmWorkCalendar> queryWrapper = new LambdaQueryWrapper<>();
+        buildMdmWorkCalendarCondition(queryWrapper, queryVO);
+        return mdmWorkCalendarEntityMapper.selectList(queryWrapper);
+    }
+
+
+    /**
      * 查询月周期排产结构配置
      *
      * @param mpStructureAllocation
@@ -460,6 +516,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         LambdaQueryWrapper<MdmMonCycleSchStruConf> queryWrapper = new LambdaQueryWrapper<>();
         buildMdmMonCycleSchStruConfCondition(queryWrapper, queryVO);
         return mdmMonCycleSchStruConfEntityMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建工作日历条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void buildMdmWorkCalendarCondition(LambdaQueryWrapper<MdmWorkCalendar> queryWrapper, MdmWorkCalendar queryVO) {
+        queryWrapper.eq(MdmWorkCalendar::getFactoryCode, queryVO.getFactoryCode());
+        queryWrapper.eq(MdmWorkCalendar::getYear, queryVO.getYear());
+        queryWrapper.eq(MdmWorkCalendar::getMonth, queryVO.getMonth());
+        queryWrapper.eq(MdmWorkCalendar::getIsDelete, YesOrNoEnum.NO.getValue());
     }
 
     /**
