@@ -3103,6 +3103,34 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * 检查调整明细列表中的产品结构字段是否为空
+     * @param adjustDetailList 调整明细列表
+     * @return 错误信息列表
+     */
+    protected List<String> checkStructNameEmpty(List<MpAdjustDetailVo> adjustDetailList) {
+        // 错误信息列表
+        List<String> errorMsgList = new ArrayList<>();
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return errorMsgList;
+        }
+        // 遍历调整明细列表
+        for (MpAdjustDetailVo detail : adjustDetailList) {
+            String materialCode = detail.getMaterialCode();
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            // 判断字段值是否为空
+            if (StringUtils.isBlank(detail.getStructureName())) {
+                String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.structNameEmpty"),
+                        materialCode);
+                errorMsgList.add(errorMsg);
+            }
+        }
+        return errorMsgList;
+    }
+
+
+    /**
      * 根据结构名称和物料编码分组汇总订单量
      * @param originalList
      * @param isMergeTrial

@@ -66,6 +66,15 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         resultList.addAll(adjustDetailByTrialList);
         resultList.addAll(adjustDetailList);
         resultList.addAll(adjustDetailByMonthPlanList);
+        // 检查产品结构字段为空
+        List<String> errorMsgList = checkStructNameEmpty(resultList);
+        String errorMsg = Optional.ofNullable(errorMsgList)
+                .orElse(Collections.emptyList())
+                .stream()
+                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+            return new BusinessException(errorMsg);
+        });
         // 5、通过结构过滤调整明细
         filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
