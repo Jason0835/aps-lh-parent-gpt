@@ -345,6 +345,9 @@ public class MatchingProductionHandler {
     
     /**
      * 收尾补量算法
+     * 
+     * @param contextDTO      上下文
+     * @param mpProdFinalList 定稿计划列表
      */
     public void structureAdjuestBoots(MpRollAdjustContextDTO contextDTO,
                               List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
@@ -375,7 +378,7 @@ public class MatchingProductionHandler {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
         Integer startDay = contextDTO.getStartDay();
         Integer endDay = contextDTO.getEndDay();
-        Integer realStartDay = Math.max(startDay, endDay - matchingBoostDay);
+        Integer realStartDay = Math.max(startDay, endDay - (matchingBoostDay - 1)); // 实际开始日期要看补量天数的设置，哪个晚用哪个
         Integer bootsQty =  0; // 总补量
         
         out:
