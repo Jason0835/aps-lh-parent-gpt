@@ -1,5 +1,8 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -27,6 +30,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -57,7 +62,11 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final FormalProductionHandler formalProductionHandler;
 
+    private final ISysDictDataCacheService iSysDictDataCacheService;
+
     private final SimulateProductionHandler simulateProductionHandler;
+
+    private final WarningInformationHandler warningInformationHandler;
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
@@ -70,15 +79,17 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
     private final AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler;
 
     private final InitNoProductionRecordHandler initNoProductionRecordHandler;
-    
+
     private final MatchingProductionHandler matchingProductionHandler;
 
     public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
                                           MonthProductionDataService monthProductionDataService,
                                           FormalProductionHandler formalProductionHandler,
+                                          ISysDictDataCacheService iSysDictDataCacheService,
                                           ProductionHistoryHandler productionHistoryHandler,
                                           SimulateProductionHandler simulateProductionHandler,
+                                          WarningInformationHandler warningInformationHandler,
                                           ClearProductionInfoHandler clearProductionInfoHandler,
                                           InitNoProductionRecordHandler initNoProductionRecordHandler,
                                           DayProductionStatisticsHandler dayProductionStatisticsHandler,
@@ -88,7 +99,9 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           MatchingProductionHandler matchingProductionHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.formalProductionHandler = formalProductionHandler;
+        this.iSysDictDataCacheService = iSysDictDataCacheService;
         this.simulateProductionHandler = simulateProductionHandler;
+        this.warningInformationHandler = warningInformationHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
         this.dayProductionStatisticsHandler = dayProductionStatisticsHandler;
@@ -189,6 +202,11 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         saveNoProductionPlanResult(productionContext, sumProductionMap);
         //12、最后搭配排产
         matchingProductionHandler.matchingProduction(productionContext.getProductionVersion());
+        //13、预警信息发送
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        String userName = SecurityUtils.getUsername();
+        String factoryName = getFactoryName(context);
+        warningInformationHandler.sendWarningInformation(productionContext, requestAttributes, userName, factoryName);
     }
 
     /**
@@ -409,6 +427,27 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         List<MpMonthPlanStatistics> productionStatisticsList = dayProductionStatisticsHandler.buildDayProductionStatisticsResult(productionContext);
         getMonthProductionDataService().saveProductionStatisticsResult(productionStatisticsList);
         return sumProductionMap;
+    }
+
+
+    /**
+     * 获取工厂名称
+     *
+     * @param context
+     * @return
+     */
+    private String getFactoryName(Context context) {
+        //1.获取工厂国际化
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+        if (CollectionUtils.isEmpty(dictDataList)) {
+            return "";
+        }
+        String factoryCode = context.getFactoryCode();
+        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(factoryCode)).findFirst().get().getDictLabel();
+        if (StringUtils.isBlank(factoryName)) {
+            return "";
+        }
+        return factoryName;
     }
 
     /**
