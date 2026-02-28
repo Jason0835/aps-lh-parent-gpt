@@ -63,15 +63,15 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         resultList.addAll(adjustDetailList);
         resultList.addAll(adjustDetailByMonthPlanList);
         // 检查产品结构字段为空
-        List<String> errorMsgList = checkStructNameEmpty(resultList);
-        String errorMsg = Optional.ofNullable(errorMsgList)
-                .orElse(Collections.emptyList())
-                .stream()
-                .distinct()
-                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
-        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
-            return new BusinessException(errorMsg);
-        });
+//        List<String> errorMsgList = checkStructNameEmpty(resultList);
+//        String errorMsg = Optional.ofNullable(errorMsgList)
+//                .orElse(Collections.emptyList())
+//                .stream()
+//                .distinct()
+//                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+//        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+//            return new BusinessException(errorMsg);
+//        });
         // 4、通过排产机台、结构筛选结构外调整明细
         filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
