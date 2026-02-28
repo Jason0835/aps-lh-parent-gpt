@@ -359,7 +359,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 .filter(calendar -> ApsConstant.FALSE.equals(calendar.getDayFlag()))
                 .collect(Collectors.toList());
     }
-}
 
     /**
      * 查询SKU与施工（示方书）关系
