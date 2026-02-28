@@ -282,7 +282,7 @@ public class MatchingProductionHandler {
                 boolean isBegin = false; // 是否已经开始i排产的标记
                 for (int day = Math.max(lockEndDay + 1, startDay); day <= endDay; day++) { // 遍历结构排产日，如果锁定日超过开始i日期，从锁定日下一天开始
                     // 是主销产品，切剩余天数在可搭配补量的天数范围内，需要补量
-                    if (boostProductionTypeSet.contains(plan.getProductionType())) {
+                    if (!isSpecial && boostProductionTypeSet.contains(plan.getProductionType())) { // 特殊结构不考虑
                         if (endDay - day <= matchingBoostDay) {
                             Integer planQty = Optional.ofNullable((Integer)plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)).orElse(0); // 今天的已排量
                             if (planQty > 0) {
@@ -291,7 +291,7 @@ public class MatchingProductionHandler {
                         }
                     }
                     if (unAllocationQty <= 0) {
-                        if (boostProductionTypeSet.contains(plan.getProductionType())) { // 如果是主销产品则继续往后
+                        if (!isSpecial && boostProductionTypeSet.contains(plan.getProductionType())) { // 如果是主销产品则继续往后
                             continue;
                         }
                         break out;
@@ -322,11 +322,12 @@ public class MatchingProductionHandler {
                         }
                     }
                     // 为当天分配搭配量
-                    int tempUnAllocationQty = this.allcatAdjustProductQty(contextDTO, day, plan,
+                    int allocationQty = this.allcatAdjustProductQty(contextDTO, day, plan,
                             dayProductionMap, unAllocationQty, realCapacity, dailyCapacityLimitVo, mouldRemaindCapacity);
-                    if (tempUnAllocationQty != unAllocationQty) { // 未分配量有发生变化，说明成功搭配排产，需要更新相关数据
+                    if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
                         isBegin = true;
-                        unAllocationQty = tempUnAllocationQty; // 如果是补量，当天有排产，则剩余量清0
+                        unAllocatSpecStructureTotalQty -= allocationQty; // 特殊材料可分配量需要扣减掉已排产量
+                        unAllocationQty -= allocationQty;
                     } else if (isBegin) { // 防止中断不连续的问题出现
                         break;
                     }
@@ -644,7 +645,7 @@ public class MatchingProductionHandler {
         Integer lhMouldQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         DailyMouldAvailabilityResult cavity2Block = contextDTO.getCavity2BlockMap().get(scheduleDay); // key:结构名称 + 主花纹
         if (cavity2Block == null) {
-            return unAllocationQty;
+            return 0;
         }
         String materialDesc = plan.getMaterialDesc();
         String mouldKey = contextDTO.getStructureName() + plan.getMainPattern();
@@ -658,7 +659,7 @@ public class MatchingProductionHandler {
         Integer maxDayProductionQty = dailyCapacityLimitVo.getMaxDayProductionQty();
         Integer canProductionQty = maxDayProductionQty - todayProductQty;
         if (canProductionQty <= 0) {
-            return unAllocationQty;
+            return 0;
         }
         
         // 根据上一天的排产情况判断是否需要换模
@@ -679,10 +680,10 @@ public class MatchingProductionHandler {
         boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
 
         if (isChangeMould && mouldCavityQty < lhMouldQty) { // 需要换模，且剩余型腔数不足最低排产模具数，结束
-            return unAllocationQty;
+            return 0;
         }
         if (isChangeBlock && typeBlockQty < lhMouldQty) { // 需要换活块，且剩余活块数不足最低排产模具数，结束
-            return unAllocationQty;
+            return 0;
         }
         
         // 计算排产量
@@ -696,12 +697,13 @@ public class MatchingProductionHandler {
             allocationQty = changeTypeBlockQty; // 每次仅更换一台
         }
         if (allocationQty <= 0) {
-            return unAllocationQty;
+            return 0;
         }
         if (isRemaindCapacity) {
             allocationQty = Math.min(allocationQty, mouldRemaindCapacity); // 如果当天模具有剩余产能的，优先补满
         }
         allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量
+        allocationQty = (allocationQty & 1) == 0? allocationQty: allocationQty + 1; // 处理奇数，遇到奇数直接+1;
         Integer oldProductionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay)).orElse(0);
         plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay, allocationQty + oldProductionQty);
         plan.setTotalQty(Optional.ofNullable(plan.getTotalQty()).orElse(0) + allocationQty);
@@ -737,7 +739,7 @@ public class MatchingProductionHandler {
             }
         }
         contextDTO.getLogDetail().append(String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,allocationQty)).append(ApsConstant.DIVISION); // 记录日志
-        return unAllocationQty - allocationQty;
+        return allocationQty;
     }
 
     /**

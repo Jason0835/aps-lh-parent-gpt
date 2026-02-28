@@ -37,16 +37,4 @@ public class MatchingProductionController extends BaseController {
 		matchingProductionHandler.matchingProduction(productionVersion);
 		return AjaxResult.success();
 	}
-
-    /**
-     * 周程滚动搭配排产测试入口
-     *
-     * @param productionVersion 待搭配生产版本
-     */
-    @ApiOperation("周程滚动搭配排产测试入口")
-    @PostMapping("/matchingProductionAdjust/{productionVersion}")
-    public AjaxResult matchingProductionAdjust(@PathVariable("productionVersion") String productionVersion) {
-        matchingProductionHandler.matchingProductionAdjust(productionVersion);
-        return AjaxResult.success();
-    }
 }
