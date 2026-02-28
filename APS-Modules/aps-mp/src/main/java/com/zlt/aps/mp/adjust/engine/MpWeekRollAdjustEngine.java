@@ -1601,7 +1601,7 @@ public class MpWeekRollAdjustEngine {
                 //检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
                 if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(i))){
                     // 将值还原，并退出，继续加模
-                    if (i == newOnLineDay){
+                    if (i == newOnLineDay && startMould == 2){
                         //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
                         BeanUtils.copyProperties(bakMpFinalVo,mpFinalVo);
                         startMould = getStartMould(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),i+1,mpFinalVo,dailyCapacityLimitVo);
@@ -1620,7 +1620,7 @@ public class MpWeekRollAdjustEngine {
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,cavityQty)).append(ApsConstant.DIVISION);
                 if (!checkMouldSatisfy(dailyCapacityLimitVoMap.get(i),cavityQty)){
                     // 将值还原，并退出 外循环
-                    if (i == newOnLineDay){
+                    if (i == newOnLineDay && startMould == 2){
                         //若是新上机日就不符要求，将整个vo还原；因为在其他SKU移动中，会提前清
                         BeanUtils.copyProperties(bakMpFinalVo,mpFinalVo);
                     }else{

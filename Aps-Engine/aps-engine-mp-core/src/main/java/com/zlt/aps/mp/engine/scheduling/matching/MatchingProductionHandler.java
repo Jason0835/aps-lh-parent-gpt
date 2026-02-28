@@ -707,7 +707,9 @@ public class MatchingProductionHandler {
             FactoryMonthPlanFinalAdjustVo firstPlan = CollectionUtils.firstElement(mpProdFinalList);
             DpDemandPlan firstDemandPlan = CollectionUtils.firstElement(needProductPlanList);
             plan = new FactoryMonthPlanFinalAdjustVo();
-            SpringBeanUtils.copyPropertiesIgnoreNull(firstPlan, plan);
+            if (firstPlan != null){
+                SpringBeanUtils.copyPropertiesIgnoreNull(firstPlan, plan);
+            }
             plan.setId(null);
             plan.setMaterialCode(firstDemandPlan.getMaterialCode());
             plan.setMaterialDesc(firstDemandPlan.getMaterialDesc());
