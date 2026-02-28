@@ -14,6 +14,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.impl.MpWeekAdjustFactory;
 import com.zlt.aps.mp.common.utils.StringUtil;
+import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -70,6 +71,9 @@ public class MpWeekRollAdjustController extends BaseController {
 
     @Autowired
     private ISysDictDataCacheService iSysDictDataCacheService;
+
+    @Autowired
+    private MatchingProductionHandler matchingProductionHandler;
 
 
     /**
@@ -215,6 +219,8 @@ public class MpWeekRollAdjustController extends BaseController {
         List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
         String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode())).findFirst().get().getDictLabel();
         contextDTO.setFactoryName(factoryName);
+        // 加载搭配排产的必要基础数据
+        matchingProductionHandler.initAdjustContextDTO(contextDTO);
         return contextDTO;
     }
 
