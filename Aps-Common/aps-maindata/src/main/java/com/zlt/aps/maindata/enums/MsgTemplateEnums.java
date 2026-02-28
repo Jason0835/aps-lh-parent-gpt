@@ -30,6 +30,14 @@ public enum MsgTemplateEnums {
      */
     MP_CREATE_PRODUCTION_PREDICT("MP_CREATE_PRODUCTION_PREDICT", "产量预测"),
     /**
+     * 特殊原材料库存不足通知 MP_SPECIAL_MATERIAL_STOCK_LIMIT
+     */
+    MP_SPECIAL_MATERIAL_STOCK_LIMIT("MP_SPECIAL_MATERIAL_STOCK_LIMIT","特殊原材料库存不足"),
+    /**
+     * 净需求没有达到特殊原材料的起排量 MP_NO_REACH_SPECIAL_MATERIAL
+     */
+    MP_NO_REACH_MIN_SPECIAL_MATERIAL("MP_NO_REACH_SPECIAL_MATERIAL","净需求没有达到特殊原材料的起排量"),
+    /**
      * 实单模拟排产成功通知
      */
     MP_CREATE_SIMULATED_PRODUCTION("MP_CREATE_SIMULATED_PRODUCTION","实单模拟排产");

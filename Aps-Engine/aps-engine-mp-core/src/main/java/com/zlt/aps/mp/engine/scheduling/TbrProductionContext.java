@@ -88,7 +88,10 @@ public class TbrProductionContext extends Context {
      * key=物料描述 ： value=结构名称列表
      */
     private Map<String, Set<String>> specialMaterialStructureRelationMap;
-
+    /**
+     * 是否达到特殊最小起排量 false表示没有达到需要预警
+     */
+    private Boolean reachMinSpecialMaterialStandard;
     /**
      * 加入收尾，方向匹配结构集合
      *
@@ -322,6 +325,29 @@ public class TbrProductionContext extends Context {
             skuProductionLimitInfo.put(materialDesc, skuLimitInfo);
         }
         skuLimitInfo.add(limitType);
+    }
+
+    /**
+     * 获取有特殊原材料库存限制排产的Sku集合
+     *
+     * @return
+     */
+    public Set<String> getSpecialMaterialStockLimitSkuInfo() {
+        if (CollectionUtils.isEmpty(skuProductionLimitInfo)) {
+            return Collections.emptySet();
+        }
+        Set<String> specialMaterialStockLimitSet = new HashSet<>();
+        skuProductionLimitInfo.forEach((materialDesc, skuLimitInfo) -> {
+            if (CollectionUtils.isEmpty(skuLimitInfo)) {
+                return;
+            }
+            skuLimitInfo.forEach(singleLimitInfo -> {
+                if (MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT == singleLimitInfo) {
+                    specialMaterialStockLimitSet.add(materialDesc);
+                }
+            });
+        });
+        return specialMaterialStockLimitSet;
     }
 
     /**
@@ -563,7 +589,7 @@ public class TbrProductionContext extends Context {
     /**
      * 获取结构对应的特殊材料的已分配库存数
      *
-     * @param productionPlanInfo      结构
+     * @param productionPlanInfo 结构
      */
     public Long getSpecialMaterialSumProductionQty(ProductionPlanGroupInfo productionPlanInfo) {
         if (!productionPlanInfo.isSpecialMaterial()) {
@@ -571,7 +597,7 @@ public class TbrProductionContext extends Context {
         }
 
         Long resultQty = null;
-        for (Entry<String, BigDecimal> entry: productionPlanInfo.getEmbryoSpecialMaterialInfoMap().entrySet()) {
+        for (Entry<String, BigDecimal> entry : productionPlanInfo.getEmbryoSpecialMaterialInfoMap().entrySet()) {
             Map<Long, SpecialMaterialInfoVo> stockMap = this.specialMaterialInfoMap.get(entry.getKey());
             if (stockMap == null) {
                 continue;
@@ -623,7 +649,7 @@ public class TbrProductionContext extends Context {
         BigDecimal realProductionQty = BigDecimalUtils.add(firstDayProductionQty, otherDayProductionQty);
         this.allocationSpecialMaterialStock(groupInfo, realProductionQty, SpecialMaterialInfoVo::getSumNoRoundProductionQty,
                 SpecialMaterialInfoVo::setSumNoRoundProductionQty, SpecialMaterialInfoVo::getStock);
-        
+
         this.roundSpecialMaterialPlanQtyStandardLength(groupInfo);
     }
 
@@ -672,6 +698,7 @@ public class TbrProductionContext extends Context {
 
     /**
      * 获取结构目前对应的特殊材料库存可生产量
+     *
      * @param groupInfo
      * @param productionQty
      * @return
@@ -686,6 +713,7 @@ public class TbrProductionContext extends Context {
 
     /**
      * 获取SKU目前对应的特殊材料
+     *
      * @param groupInfo
      * @param productionQty
      * @return
@@ -700,9 +728,10 @@ public class TbrProductionContext extends Context {
 
     /**
      * 获取特殊材料批次剩余量，用于搭配，返回最近一个批次的剩余量
-     * @param groupInfo 结构
+     *
+     * @param groupInfo     结构
      * @param productionQty 预计生产量
-     * @param boolean 库存不足预计生产量的情况下，是否新开一卷
+     * @param isNewRoll       库存不足预计生产量的情况下，是否新开一卷
      * @return
      */
     public Integer getSpecialMaterialBatchRemainQty(ProductionPlanGroupInfo groupInfo, Integer productionQty, boolean isNewRoll) {
@@ -712,7 +741,7 @@ public class TbrProductionContext extends Context {
         // 检查是否有特殊材料库存不足的情况，需要按剩余库存换算后生产条数最少的生产量为准
         Integer remainProductQty = productionQty;
         Map<String, BigDecimal> embryoSpecialMaterialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap(); // 本结构特殊材料清单
-        for (Entry<String, BigDecimal> entry: embryoSpecialMaterialInfoMap.entrySet()) {
+        for (Entry<String, BigDecimal> entry : embryoSpecialMaterialInfoMap.entrySet()) {
             String materialCode = entry.getKey(); // 特殊材料物料
             BigDecimal unitConsumeQty = entry.getValue(); // 单胎消耗
             Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(materialCode);
@@ -748,10 +777,11 @@ public class TbrProductionContext extends Context {
         remainProductQty = remainProductQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION * ProductionConstant.DOUBLE_MOULD_QTY;
         return remainProductQty;
     }
-    
+
     /**
      * 对特殊材料已占用库存做标准长度取整处理
-     * @param allGroupPlanMap
+     *
+     * @param groupInfo
      */
     private void roundSpecialMaterialPlanQtyStandardLength(ProductionPlanGroupInfo groupInfo) {
 //        BigDecimal threshold = BigDecimalUtils.valueOf(groupInfo.getThreshold());
@@ -789,9 +819,10 @@ public class TbrProductionContext extends Context {
 
         });
     }
-    
+
     /**
      * 获取结构目前对应的特殊材料库存可生产量
+     *
      * @param groupInfo
      * @param productionQty
      * @return
@@ -803,7 +834,7 @@ public class TbrProductionContext extends Context {
 
         // 检查是否有特殊材料库存不足的情况，需要按剩余库存换算后生产条数最少的生产量为准
         Integer minProductQty = productionQty;
-        for (Entry<String, BigDecimal> entry: embryoSpecialMaterialInfoMap.entrySet()) {
+        for (Entry<String, BigDecimal> entry : embryoSpecialMaterialInfoMap.entrySet()) {
             String materialCode = entry.getKey(); // 特殊材料物料
             BigDecimal unitConsumeQty = entry.getValue(); // 单胎消耗
             Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(materialCode);
@@ -833,8 +864,7 @@ public class TbrProductionContext extends Context {
      * @param realProductionQty 分配
      * @param sumQtyGetter      分配量获取方法
      * @param sumQtySetter      分配量更新方法
-     * @param stockGetter    库存量获取方法
-     * 
+     * @param stockGetter       库存量获取方法
      */
     private void allocationSpecialMaterialStock(ProductionPlanGroupInfo groupInfo, BigDecimal realProductionQty,
                                                 Function<SpecialMaterialInfoVo, Long> sumQtyGetter,
@@ -906,8 +936,8 @@ public class TbrProductionContext extends Context {
         }
         String strucureName = groupInfo.getGroupName();
         Set<String> specialMaterialCodeSet = groupInfo.getEmbryoSpecialMaterialInfoMap().keySet();
-        for (String specialMaterialCode: specialMaterialCodeSet) {
-            Set<String> strucureSet =  this.specialMaterialStructureRelationMap.get(specialMaterialCode);
+        for (String specialMaterialCode : specialMaterialCodeSet) {
+            Set<String> strucureSet = this.specialMaterialStructureRelationMap.get(specialMaterialCode);
             if (strucureSet == null) {
                 strucureSet = new HashSet<>();
                 this.specialMaterialStructureRelationMap.put(specialMaterialCode, strucureSet);
