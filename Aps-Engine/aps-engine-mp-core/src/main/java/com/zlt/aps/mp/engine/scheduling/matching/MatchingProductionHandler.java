@@ -304,7 +304,7 @@ public class MatchingProductionHandler {
                     // 根据日产比例限制产能
                     BigDecimal dayProductionRate = BigDecimalUtils.percentages2Decimals(dailyCapacityLimitVo.getDayProductionRate()); // 日产比例
                     int realCapacity = BigDecimalUtils.multiply(capacity, dayProductionRate).setScale(0, RoundingMode.DOWN).intValue();
-                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, dayProductionMap, materialDesc, realCapacity, day); // 获取模具剩余产能
+                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, dayProductionMap, materialDesc, realCapacity, day, endDay); // 获取模具剩余产能
                     if (mouldRemaindCapacity <=0 && dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) { // 如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
                         if (isBegin) { // 防止中断不连续的问题出现
                             break;
@@ -579,17 +579,19 @@ public class MatchingProductionHandler {
      * @param materialDesc
      * @param capacity
      * @param day
+     * @param endDay
      * @return
      */
     private Integer getMouldRemaindCapacity(MpRollAdjustContextDTO contextDTO,
                                             Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap,
-                                            String materialDesc, int capacity, int day) {
+                                            String materialDesc, int capacity, int day, int endDay) {
         Integer remaindCapacity = 0;
-        List<MatchingProductionAdjuestVo> lastDayProductionList = dayProductionMap.get(day);
-        if (CollectionUtils.isEmpty(lastDayProductionList)) {
+        // 检查当天排产情况
+        List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(day);
+        if (CollectionUtils.isEmpty(dayProductionList)) {
             return remaindCapacity;
         }
-        MatchingProductionAdjuestVo dayProduction = lastDayProductionList.stream()
+        MatchingProductionAdjuestVo dayProduction = dayProductionList.stream()
                 .filter(p -> materialDesc.equals(p.getMaterialDesc())).findFirst().orElse(null);
         if (dayProduction == null) {
             return remaindCapacity;
@@ -605,6 +607,26 @@ public class MatchingProductionHandler {
         if (useCapacity > 0) { // 余数大于0，说明最后一个硫化机没有排满，优先补满逞能剩余的量
             remaindCapacity = realCapacity - useCapacity;
         }
+        if (remaindCapacity > 0) { // 有剩余产能，但是如果下一天有排产，则依然不处理
+            Integer nextDay = 0;
+            for (int i = day; i <= endDay; i ++) {
+                if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
+                    nextDay = i;
+                    break;
+                }
+            }
+            List<MatchingProductionAdjuestVo> nextProductionList = dayProductionMap.get(nextDay);
+            if (CollectionUtils.isEmpty(nextProductionList)) {
+                return remaindCapacity;
+            }
+            MatchingProductionAdjuestVo plan = nextProductionList.stream().filter(p -> p.getMaterialDesc().equals(materialDesc)).findFirst().orElse(null);
+            if (plan == null) {
+                return remaindCapacity;
+            }
+            if (plan.getProductionQty() > 0) { // 下一天有排产，不补
+                return 0;
+            }
+        } 
         return remaindCapacity;
     }
 
