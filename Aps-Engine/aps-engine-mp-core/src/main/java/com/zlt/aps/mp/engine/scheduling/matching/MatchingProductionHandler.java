@@ -281,12 +281,12 @@ public class MatchingProductionHandler {
             scheduleMaterialDesc.add(materialDesc); // 选中的规格加入已排产列表（无论是否能排上，下次轮询均不再处理该规格）
             List<DpDemandPlan> needProductPlanList = demandPlanList.stream()
                     .filter(p -> materialDesc.equals(p.getMaterialDesc())).collect(Collectors.toList());
+            int capacity = this.getMdmSkuLhCapacity(contextDTO, CollectionUtils.firstElement(needProductPlanList).getMaterialCode(), mdmSkuLhCapacityMap); // 产能
             FactoryMonthPlanFinalAdjustVo plan = this.getFinalPlanByMaterialDesc(contextDTO, materialDesc,
-                    mpProdFinalList, needProductPlanList, mdmSkuConstructionRefMap); // 获取定稿计划
+                    mpProdFinalList, needProductPlanList, mdmSkuConstructionRefMap, capacity); // 获取定稿计划
             
             int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 储备量
             unAllocationQty = isSpecial? Math.min(unAllocationQty, unAllocatSpecStructureTotalQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
-            int capacity = this.getMdmSkuLhCapacity(contextDTO, plan.getMaterialCode(), mdmSkuLhCapacityMap);
             
             out: do {
                 int startUnAllocationQty = unAllocationQty;
@@ -690,17 +690,21 @@ public class MatchingProductionHandler {
 
     /**
      * 获取指定物料描述的定稿计划
-     * @param contextDTO
-     * @param materialDesc
-     * @param mpProdFinalList
-     * @param needProductPlanList
+     * 
+     * @param contextDTO               上下文
+     * @param materialDesc             物料描述
+     * @param mpProdFinalList          调整计划列表
+     * @param needProductPlanList      需求列表
+     * @param mdmSkuConstructionRefMap sku与施工关系列表
+     * @param capacity                 硫化产能
      * @return
      */
     private FactoryMonthPlanFinalAdjustVo getFinalPlanByMaterialDesc(MpRollAdjustContextDTO contextDTO,
                                                                      String materialDesc,
                                                                      List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
                                                                      List<DpDemandPlan> needProductPlanList,
-                                                                     Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap) {
+                                                                     Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap,
+                                                                     int capacity) {
         FactoryMonthPlanFinalAdjustVo plan = mpProdFinalList.stream()
                 .filter(p -> materialDesc.equals(p.getMaterialDesc())).findFirst().orElse(null); // 获取排产结果
         if (plan == null) { // 如果没有，说明是新增规格，需要新增记录
@@ -718,6 +722,7 @@ public class MatchingProductionHandler {
             if (skuConstructionRef != null) {
                 plan.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
             }
+            plan.setDayVulcanizationQty(capacity / ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 单模产能
             plan.setMesMaterialCode(firstDemandPlan.getMesMaterialCode());
             plan.setProductionType(firstDemandPlan.getProductionType());
             plan.setTotalQty(0);
