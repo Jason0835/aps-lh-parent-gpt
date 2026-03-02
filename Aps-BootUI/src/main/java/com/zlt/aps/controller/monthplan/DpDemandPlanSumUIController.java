@@ -9,35 +9,33 @@ import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.api.service.IDpDemandPlanSumRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
-
-import java.io.IOException;
-import java.io.ByteArrayInputStream;
-
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：DpDemandPlanSumUIController.java
  * 描    述：需求计划汇总 UI控制层类：....
- *@author yelq
- *@date 2026-01-22
- *@version 1.0
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：yelq
- *     修改内容：...
+ * @author yelq
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：yelq
+ * 修改内容：...
+ * @date 2026-01-22
  */
 @Slf4j
 @Api(tags = "需求计划汇总")
@@ -60,12 +58,23 @@ public class DpDemandPlanSumUIController extends BaseUIController<DpDemandPlanSu
     }
 
     /**
+     * 查询统计数据
+     */
+    @ApiOperation("查询统计数据")
+    @PostMapping("/statisticsInfo")
+    @ResponseBody
+    public AjaxResult statisticsInfo(DpDemandPlanSum queryCondition) {
+        return iDpDemandPlanSumService.statisticsInfo(queryCondition);
+    }
+
+    /**
      * 导出模板文件的文件名，派生类重写名称。
      * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
+     *
      * @return
      */
     @Override
-    public String getExportTemplateFileName(){
+    public String getExportTemplateFileName() {
         return I18nUtil.getMessage("ui.data.column.demandPlan.modelName");
     }
 
@@ -98,7 +107,7 @@ public class DpDemandPlanSumUIController extends BaseUIController<DpDemandPlanSu
     @Override
     public void export(HttpServletResponse response, DpDemandPlanSum entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iDpDemandPlanSumService.exportData(entity,fileName);
+        byte[] excelBytes = iDpDemandPlanSumService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());

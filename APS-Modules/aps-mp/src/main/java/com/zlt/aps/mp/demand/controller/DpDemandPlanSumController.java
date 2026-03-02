@@ -3,49 +3,47 @@ package com.zlt.aps.mp.demand.controller;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
-import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
-import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
-import com.zlt.common.utils.PubUtil;
-import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
+import com.zlt.aps.mp.api.domain.vo.DpDemandPlanSumStatisticsVo;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
+import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
-
-
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
-* Copyright (c) 2022, All rights reserved。
-* 文件名称：DpDemandPlanSumController.java
-* 描    述：需求计划汇总 控制层类：....
-*@author yelq
-*@date 2026-01-22
-*@version 1.0
-*
- *  修改记录：
-*     修改时间：...
-*     修 改 人：yelq
-*     修改内容：...
-*/
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：DpDemandPlanSumController.java
+ * 描    述：需求计划汇总 控制层类：....
+ *
+ * @author yelq
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：yelq
+ * 修改内容：...
+ * @date 2026-01-22
+ */
 @Slf4j
 @Api(tags = "需求计划汇总")
 @RestController
@@ -66,6 +64,52 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
     @Override
     public TableDataInfo list(@RequestBody DpDemandPlanSum queryVO) {
         return super.list(queryVO);
+    }
+
+    @ApiOperation("查询统计数据")
+    @PostMapping("/statisticsInfo")
+    public AjaxResult statisticsInfo(@RequestBody DpDemandPlanSum queryCondition) {
+        if (null == queryCondition) {
+            return AjaxResult.success(DpDemandPlanSumStatisticsVo.createEmpty());
+        }
+        String monthPlanVersion = queryCondition.getMonthPlanVersion();
+        if (StringUtils.isBlank(monthPlanVersion)) {
+            return AjaxResult.success(DpDemandPlanSumStatisticsVo.createEmpty());
+        }
+        QueryWrapper<DpDemandPlanSum> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryCondition);
+        List<DpDemandPlanSum> list = entityMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.success(DpDemandPlanSumStatisticsVo.createEmpty());
+        }
+        DpDemandPlanSumStatisticsVo statisticsInfo = DpDemandPlanSumStatisticsVo.createEmpty();
+        list.forEach(singleData -> {
+            //订单量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getOrderQty, DpDemandPlanSumStatisticsVo::setOrderQty, singleData, DpDemandPlanSum::getOrderQty);
+            //库存量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getStockQty, DpDemandPlanSumStatisticsVo::setStockQty, singleData, DpDemandPlanSum::getStockQty);
+            //月底计划余量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getPlannedSurplus, DpDemandPlanSumStatisticsVo::setPlannedSurplus, singleData, DpDemandPlanSum::getPlannedSurplus);
+
+            //净需求量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getNetQty, DpDemandPlanSumStatisticsVo::setNetQty, singleData, DpDemandPlanSum::getNetQty);
+            //净需求量(含暂缓)
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getPostponeNetQty, DpDemandPlanSumStatisticsVo::setPostponeNetQty, singleData, DpDemandPlanSum::getPostponeNetQty);
+            //净需求量(不含暂缓)
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getUnPostponeNetQty, DpDemandPlanSumStatisticsVo::setUnPostponeNetQty, singleData, DpDemandPlanSum::getUnPostponeNetQty);
+
+            //高优先量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getHeightQty, DpDemandPlanSumStatisticsVo::setHeightQty, singleData, DpDemandPlanSum::getHeightQty);
+            //中优先级量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getMidQty, DpDemandPlanSumStatisticsVo::setMidQty, singleData, DpDemandPlanSum::getMidQty);
+            //暂缓量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getPostponeQty, DpDemandPlanSumStatisticsVo::setPostponeQty, singleData, DpDemandPlanSum::getPostponeQty);
+            //周期储备量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getCycleReserveQty, DpDemandPlanSumStatisticsVo::setCycleReserveQty, singleData, DpDemandPlanSum::getCycleReserveQty);
+            //常规储备量
+            statisticsFieldValue(statisticsInfo, DpDemandPlanSumStatisticsVo::getConventionReserveQty, DpDemandPlanSumStatisticsVo::setConventionReserveQty, singleData, DpDemandPlanSum::getConventionReserveQty);
+        });
+        return AjaxResult.success(statisticsInfo);
     }
 
     @Override
@@ -101,19 +145,19 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody DpDemandPlanSum billVO){
+    public AjaxResult save(@RequestBody DpDemandPlanSum billVO) {
         this.dpDemandPlanSumService.batchUpdateForDemand(billVO);
         return AjaxResult.success();
     }
 
     @ApiOperation("查询需求计划版本号")
     @PostMapping("/findMonthPlanVersion")
-    public AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlanSum queryCondition){
+    public AjaxResult findMonthPlanVersion(@RequestBody DpDemandPlanSum queryCondition) {
         return AjaxResult.success(dpDemandPlanSumService.findMonthPlanVersion(queryCondition));
     }
 
     @Override
-    protected IDocService getDocService(){
+    protected IDocService getDocService() {
         return dpDemandPlanSumService;
     }
 
@@ -175,23 +219,48 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliveryDateDue")), "DELIVERY_DATE_DUE", queryVO.getFieldValueByFieldName("deliveryDateDue"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isImport")), "IS_IMPORT", queryVO.getFieldValueByFieldName("isImport"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureType")), "STRUCTURE_TYPE", queryVO.getFieldValueByFieldName("structureType"));
-        if(!YesOrNoEnum.YES.getValue().equals(queryVO.getFieldValueByFieldName("viewFlag"))) {
+        if (!YesOrNoEnum.YES.getValue().equals(queryVO.getFieldValueByFieldName("viewFlag"))) {
             // 库存、净需求（含暂缓订单）、月度余量，都为0，默认隐藏
             queryWrapper.nested(wq -> wq
-                .ne("STOCK_QTY", 0)
-                .or()
-                .ne("ORDER_QTY", 0)
-                .or()
-                .ne("PLANNED_SURPLUS", 0)
+                    .ne("STOCK_QTY", 0)
+                    .or()
+                    .ne("ORDER_QTY", 0)
+                    .or()
+                    .ne("PLANNED_SURPLUS", 0)
             );
         }
     }
 
 
     @Override
-    protected String getTypeCode(){
+    protected String getTypeCode() {
         return "2026012216";
     }
 
+    /**
+     * 更新统计值
+     *
+     * @param statisticsInfo   统计对象
+     * @param statisticsGetter 统计属性获取
+     * @param statisticsSetter 统计属性设置
+     * @param singleData       单个统计数据对象
+     * @param singleGetter     单个统计对象的属性获取
+     */
+    private void statisticsFieldValue(DpDemandPlanSumStatisticsVo statisticsInfo,
+                                      Function<DpDemandPlanSumStatisticsVo, Integer> statisticsGetter,
+                                      BiConsumer<DpDemandPlanSumStatisticsVo, Integer> statisticsSetter,
+                                      DpDemandPlanSum singleData,
+                                      Function<DpDemandPlanSum, Integer> singleGetter) {
+        if (null == statisticsInfo || null == singleData) {
+            return;
+        }
+        if (null == statisticsGetter || null == statisticsSetter || null == singleGetter) {
+            return;
+        }
+        Integer statisticsValue = Optional.ofNullable(statisticsGetter.apply(statisticsInfo)).orElse(BigDecimal.ZERO.intValue());
+        Integer singleValue = Optional.ofNullable(singleGetter.apply(singleData)).orElse(BigDecimal.ZERO.intValue());
+        statisticsValue = statisticsValue + singleValue;
+        statisticsSetter.accept(statisticsInfo, statisticsValue);
+    }
 
 }

@@ -635,7 +635,7 @@ public class MatchingProductionHandler {
     private Integer getNextDay(MpRollAdjustContextDTO contextDTO, int day, int endDay) {
         Integer nextDay = 0;
         for (int i = day + 1; i <= endDay; i ++) {
-            if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
+            if (this.checkDayCanProduct(contextDTO, i)) { // 下一天是排产日返回，否则跳过看下一天
                 nextDay = i;
                 break;
             }
@@ -653,7 +653,7 @@ public class MatchingProductionHandler {
     private Integer getLastDay(MpRollAdjustContextDTO contextDTO, int day, int beginDay) {
         Integer nextDay = 0;
         for (int i = day - 1; i >= beginDay; i --) {
-            if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
+            if (this.checkDayCanProduct(contextDTO, i)) { // 下一天是排产日返回，否则跳过看下一天
                 nextDay = i;
                 break;
             }
@@ -778,9 +778,15 @@ public class MatchingProductionHandler {
             plan.setDayVulcanizationQty(capacity / ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 单模产能
             plan.setMesMaterialCode(firstDemandPlan.getMesMaterialCode());
             plan.setProductionType(firstDemandPlan.getProductionType());
+            plan.setHeightProductionQty(0);
+            plan.setMidProductionQty(0);
+            plan.setCycleProductionQty(0);
+            plan.setPostponeProductionQty(0);
+            plan.setDifferenceQty(0);
             plan.setTotalQty(0);
             plan.setBeginDay(null);
             plan.setEndDay(null);
+            plan.setAdjustDetailId(null);
             for (int day = 1; day <= MAX_MONTH_DAY; day++) {
                 plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, null); // 清空每天排产量
             }

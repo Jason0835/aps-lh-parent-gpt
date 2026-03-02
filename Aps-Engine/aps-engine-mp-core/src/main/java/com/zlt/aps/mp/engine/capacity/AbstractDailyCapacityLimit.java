@@ -557,6 +557,14 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[0] = afterMachines;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
+                //例子：
+                //16 46
+                if (remainQty != changeMouldBlockQty || remainQty != changeMouldXBlockQty){
+                    int mouldCount = remainQty / changeMouldFirstQty;
+                    if (mouldCount > afterMachines){
+                        resultArr[0] = mouldCount;
+                    }
+                }
             }
 
             //增模数超过日硫化的情况，例子：48 276
