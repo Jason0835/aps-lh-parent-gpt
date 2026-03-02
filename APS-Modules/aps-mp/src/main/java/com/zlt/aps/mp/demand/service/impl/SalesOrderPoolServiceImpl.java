@@ -9,13 +9,11 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.enums.ProductTypeEnum;
-import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.utils.AppUtils;
-import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
@@ -28,6 +26,8 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolRecordEntityMapper;
 import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
+import com.zlt.aps.utils.AppUtils;
+import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -110,6 +110,21 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		planedNotShipParamVo.setMonth(salesOrderPool.getMonth());
 		planedNotShipParamVo.setFactory(salesOrderPool.getFactoryCode());
 		return iScmItfService.lockSalesOrderPool(planedNotShipParamVo);
+	}
+
+	/**
+	 * 解锁订单池
+	 *
+	 * @param salesOrderPool 条件
+	 * @return 结果
+	 */
+	@Override
+	public AjaxResult unlockSalesOrderPool(SalesOrderPool salesOrderPool) {
+		SyncPlanedNotShipParamVo planedNotShipParamVo = new SyncPlanedNotShipParamVo();
+		planedNotShipParamVo.setYear(salesOrderPool.getYear());
+		planedNotShipParamVo.setMonth(salesOrderPool.getMonth());
+		planedNotShipParamVo.setFactory(salesOrderPool.getFactoryCode());
+		return iScmItfService.unlockSalesOrderPool(planedNotShipParamVo);
 	}
 
 	@Override
@@ -310,8 +325,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
         String[] prefixArr = StringUtils.split(scmOrderMatralCodePrefix, ",");
         String[] qualityStateArr = StringUtils.split(scmOrderMatralQualityState, ",");
-        
-		
+
+
 
 		// 加载物料明细，关联数据
 		LambdaQueryWrapper<MdmMaterialInfo> materialQueryWrapper = new LambdaQueryWrapper<MdmMaterialInfo>();

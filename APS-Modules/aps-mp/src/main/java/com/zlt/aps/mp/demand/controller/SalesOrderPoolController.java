@@ -1,22 +1,5 @@
 package com.zlt.aps.mp.demand.controller;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import javax.servlet.http.HttpServletResponse;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -26,8 +9,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.redissonLock.annotation.DistributedLock;
-import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.DpArea;
@@ -35,13 +16,22 @@ import com.zlt.aps.mp.api.domain.entity.DpNation;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
+import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -67,7 +57,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
 
     @Autowired
     private SalesOrderPoolEntityMapper entityMapper;
-    
+
 	@Autowired
 	private DpAreaEntityMapper dpAreaEntityMapper;
 	@Autowired
@@ -124,6 +114,18 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @PostMapping("/lockSalesOrderPool")
     public AjaxResult lockSalesOrderPool(@RequestBody SalesOrderPool billVO){
         return salesOrderPoolService.lockSalesOrderPool(billVO);
+    }
+
+	/**
+	 * 解锁订单池
+	 * @return 结果
+	 */
+    @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @RequiresPermissions("monthplan:SalesOrderPool:unlock")
+    @ApiOperation("解锁订单池")
+    @PostMapping("/unlockSalesOrderPool")
+    public AjaxResult unlockSalesOrderPool(@RequestBody SalesOrderPool billVO){
+        return salesOrderPoolService.unlockSalesOrderPool(billVO);
     }
 
     /**
@@ -185,7 +187,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         this.builderCondition(wrapper, obj);
         return translationList(entityMapper.selectList(wrapper));
     }
-    
+
     /**
      * 检查SCM数据
      */
@@ -195,7 +197,7 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     public AjaxResult checkSCMData(@RequestBody SalesOrderPool salesOrderPool){
         return salesOrderPoolService.checkSCMData(salesOrderPool);
     }
-    
+
     /**
      * 抓取SCM数据
      */

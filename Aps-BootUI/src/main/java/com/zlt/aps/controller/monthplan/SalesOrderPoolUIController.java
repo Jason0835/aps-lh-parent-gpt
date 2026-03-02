@@ -1,24 +1,5 @@
 package com.zlt.aps.controller.monthplan;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.Arrays;
-
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.multipart.MultipartFile;
-
 import com.alibaba.cloud.commons.lang.StringUtils;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -31,10 +12,21 @@ import com.zlt.aps.mp.api.domain.dto.SalesOrderPoolDto;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.mp.api.service.ISalesOrderPoolRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -115,7 +107,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     	updateInfo.setScmPriority(salesOrderPool.getScmPriority());
         return iSalesOrderPoolService.save(updateInfo);
     }
-    
+
 
 
     /**
@@ -127,11 +119,11 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @ResponseBody
     public AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool) {
     	if (StringUtils.isEmpty(salesOrderPool.getSalCodePo())) {
-            return AjaxResult.error("请输入PO号！");	
+            return AjaxResult.error("请输入PO号！");
     	}
     	return iSalesOrderPoolService.editBySalCodePo(salesOrderPool);
     }
-    
+
 	/**
 	 * 锁定订单池
 	 * @return
@@ -142,7 +134,22 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @ResponseBody
     public AjaxResult lockSalesOrderPool(SalesOrderPool salesOrderPool){
     	if (salesOrderPool.getYear() == null || salesOrderPool.getMonth() == null) {
-            return AjaxResult.error("请输入正确的年月！");	
+            return AjaxResult.error("请输入正确的年月！");
+    	}
+        return iSalesOrderPoolService.lockSalesOrderPool(salesOrderPool);
+    }
+
+	/**
+	 * 解锁订单池
+	 * @return 结果
+	 */
+    @ApiOperation("解锁订单池")
+    @RequiresPermissions("monthplan:SalesOrderPool:unlock")
+    @PostMapping("/unlockSalesOrderPool")
+    @ResponseBody
+    public AjaxResult unlockSalesOrderPool(SalesOrderPool salesOrderPool){
+    	if (salesOrderPool.getYear() == null || salesOrderPool.getMonth() == null) {
+            return AjaxResult.error("请输入正确的年月！");
     	}
         return iSalesOrderPoolService.lockSalesOrderPool(salesOrderPool);
     }
@@ -169,7 +176,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     public AjaxResult checkSCMData(SalesOrderPool salesOrderPool) {
         return iSalesOrderPoolService.checkSCMData(salesOrderPool);
     }
-    
+
     /**
      * 抓取SCM数据
      */
