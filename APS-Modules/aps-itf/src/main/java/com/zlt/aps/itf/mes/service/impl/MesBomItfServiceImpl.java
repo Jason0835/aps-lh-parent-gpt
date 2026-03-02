@@ -154,7 +154,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	}
 
 	/**
-	 * 获取分组key（SKU与施工关系表）
+	 * 获取分组key（半部件施工表）
 	 *
 	 * @param info
 	 * @return
@@ -242,22 +242,16 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 .collect(Collectors.toList());
         bomList.addAll(mesDateList);
 
-        // 2、bom版本去重，仅留下版本号最高的
+        // 2、按版本 + 物料号汇总bom数据
         Map<String, MdmBomInfo> childMap = bomList.stream()
-                .filter(bom -> StringUtils.isNotEmpty(bom.getChildCode()))
-                .collect(Collectors.toMap(MdmBomInfo::getChildCode, Function.identity(), (b1, b2) -> {
-                    String version1 = Optional.of(b1.getChildMaterialVersion()).orElse("");
-                    String version2 = Optional.of(b2.getChildMaterialVersion()).orElse("");
-                    return version1.compareTo(version2) >= 0 ? b1 : b2; // 比较版本号，保留版本号较大的
-                }));
+                .collect(Collectors.toMap(bom -> this.getBomChildMapKey(bom), Function.identity(), (b1, b2) -> b1));
 
         // 3、根据父节汇总
         Map<String, List<MdmBomInfo>> parentMap = childMap.values().stream()
-                .filter(bom -> StringUtils.isNotEmpty(bom.getParentCode()))
-                .collect(Collectors.groupingBy(MdmBomInfo::getParentCode));
+                .collect(Collectors.groupingBy(bom -> this.getBomParentMapKey(bom)));
         // 4、构建bom树
         childMap.values().forEach(bom -> {
-            List<MdmBomInfo> children = parentMap.get(bom.getChildCode());
+            List<MdmBomInfo> children = parentMap.get(this.getBomChildMapKey(bom));
             boolean isLeaf = CollectionUtils.isEmpty(children); // 如果没有子节点，判定为叶子节点
             bom.setIsLeaf(isLeaf);
             if (!isLeaf) { // 非叶子节点，关联父子节点的关系
@@ -290,8 +284,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 consumeDetail.setUnit(bom.getUnit());
                 // 5.2.2、取胎胚，必然是路径的最后一个元素
                 MdmBomInfo embryoBom = pathList.getLast();
-                consumeDetail.setEmbryoCode(embryoBom.getChildCode());
-                consumeDetail.setEmbryoVersion(embryoBom.getChildMaterialVersion());
+                consumeDetail.setEmbryoCode(embryoBom.getParentCode()); // 20260302，由于胎胚在bom里没有单独的记录，需要关联出最上级的物料后
+                consumeDetail.setEmbryoVersion(embryoBom.getParentVersion());
                 // 5.2.3、计算用量，用量为每一层bom的用量乘数
                 BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
                         .reduce(BigDecimal.ZERO, BigDecimal::multiply);
@@ -299,12 +293,19 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 detaiList.add(consumeDetail);
             }
         });
-
-        return detaiList;
+        if (CollectionUtils.isEmpty(detaiList)) {
+            return detaiList;
+        }
+        
+        // 按胎胚号 + 物料号去重
+        Map<String, MdmMaterialConsumeDetail> distinctDetailList = detaiList.stream()
+                .collect(Collectors.groupingBy(detail -> this.getMapKey(detail),
+                        Collectors.collectingAndThen(Collectors.toList(), list -> list.get(0))));        
+        return new ArrayList<>(distinctDetailList.values());
     }
 
 	/**
-	 * 获取分组key（SKU与施工关系表）
+	 * 获取分组key（BOM表）
 	 *
 	 * @param info
 	 * @return
@@ -314,4 +315,33 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				info.getParentVersion(), info.getChildCode(), info.getChildMaterialVersion());
 	}
 
+    /**
+     * 获取父节点分组key（BOM表）
+     *
+     * @param info
+     * @return
+     */
+    private String getBomParentMapKey(MdmBomInfo info) {
+        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getParentCode(), info.getParentVersion());
+    }
+
+    /**
+     * 获取子节点分组key（BOM表）
+     *
+     * @param info
+     * @return
+     */
+    private String getBomChildMapKey(MdmBomInfo info) {
+        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getChildCode(), info.getChildMaterialVersion());
+    }
+
+    /**
+     * 获取分组key（消耗表）
+     *
+     * @param info
+     * @return
+     */
+    private String getMapKey(MdmMaterialConsumeDetail info) {
+        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(), info.getEmbryoCode(), info.getChildMaterialCode());
+    }
 }
