@@ -5,6 +5,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
+import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
@@ -49,6 +50,9 @@ public class MesItfController {
 
     @Autowired
     private MesItfService mesItfService;
+
+    @Autowired
+    private MesBomItfService mesBomItfService;
 
     /**
      * 同步SKU与模具关系
@@ -285,5 +289,19 @@ public class MesItfController {
     @PostMapping("/selectMesBrandDict")
     public List<MesBrandDict> selectMesBrandDict() {
         return mesItfService.selectMesBrandDict();
+    }
+
+    /**
+     * 同步BOM
+     *
+     * @return 结果
+     */
+    @ApiOperation("同步BOM")
+    @PostMapping("/syncBomInfo")
+    public AjaxResult syncBomInfo(String factoryCode, String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.setDataVersion(dataVersion);
+        return mesBomItfService.syncBomInfo(syncDataLogs);
     }
 }

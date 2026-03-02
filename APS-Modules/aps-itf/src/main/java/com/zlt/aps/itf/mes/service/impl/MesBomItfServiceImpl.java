@@ -3,7 +3,6 @@ package com.zlt.aps.itf.mes.service.impl;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -27,7 +26,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -243,27 +241,30 @@ public class MesBomItfServiceImpl implements MesBomItfService {
         bomList.addAll(mesDateList);
 
         // 2、按版本 + 物料号汇总bom数据
-        Map<String, MdmBomInfo> childMap = bomList.stream()
-                .collect(Collectors.toMap(bom -> this.getBomChildMapKey(bom), Function.identity(), (b1, b2) -> b1));
+//        Map<String, MdmBomInfo> childMap = bomList.stream()
+//                .collect(Collectors.toMap(bom -> this.getMapKey(bom), Function.identity(), (b1, b2) -> b1));
 
         // 3、根据父节汇总
-        Map<String, List<MdmBomInfo>> parentMap = childMap.values().stream()
+        Map<String, List<MdmBomInfo>> parentMap = bomList.stream()
                 .collect(Collectors.groupingBy(bom -> this.getBomParentMapKey(bom)));
         // 4、构建bom树
-        childMap.values().forEach(bom -> {
-            List<MdmBomInfo> children = parentMap.get(this.getBomChildMapKey(bom));
+        for (MdmBomInfo bom: bomList) {
+            String childKey = this.getBomChildMapKey(bom);
+            List<MdmBomInfo> children = parentMap.get(childKey);
             boolean isLeaf = CollectionUtils.isEmpty(children); // 如果没有子节点，判定为叶子节点
             bom.setIsLeaf(isLeaf);
             if (!isLeaf) { // 非叶子节点，关联父子节点的关系
                 bom.setChildren(children);
                 children.forEach(child -> child.setParent(bom));
             }
-        });
+        };
         // 5、构建物料消耗清单
         List<MdmMaterialConsumeDetail> detaiList = new ArrayList<>();
-        childMap.values().stream().filter(bom -> bom.getIsLeaf()).forEach(bom -> {
+        LinkedList<MdmBomInfo> pathList = new LinkedList<>();
+        List<MdmBomInfo> leafList = bomList.stream().filter(bom -> bom.getIsLeaf()).collect(Collectors.toList());
+        for (MdmBomInfo bom: leafList) {
             // 5.1、构建bom树路径，从叶子节点开始向上
-            LinkedList<MdmBomInfo> pathList = new LinkedList<>();
+            pathList.clear();
             MdmBomInfo currentNode = bom; // 当前节点
             do {
                 if (currentNode == null || pathList.contains(currentNode)) { // 编号为空或者死循环了，结束
@@ -288,11 +289,11 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 consumeDetail.setEmbryoVersion(embryoBom.getParentVersion());
                 // 5.2.3、计算用量，用量为每一层bom的用量乘数
                 BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
-                        .reduce(BigDecimal.ZERO, BigDecimal::multiply);
+                        .reduce(BigDecimal.ONE, BigDecimal::multiply);
                 consumeDetail.setDosage(dosage);
                 detaiList.add(consumeDetail);
             }
-        });
+        }
         if (CollectionUtils.isEmpty(detaiList)) {
             return detaiList;
         }
