@@ -53,8 +53,6 @@ public class MonthPlanNoProductionPlanUIController extends BaseUIController<Mont
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MonthPlanNoProductionPlan monthPlanNoProductionPlan) {
-        String orderByInfo = "STRUCTURE_NAME,SPECIFICATIONS,MAIN_PATTERN,PATTERN,MAIN_MATERIAL_DESC,PRO_SIZE,UPDATE_TIME DESC";
-        startPage(orderByInfo);
         return iMonthPlanNoProductionPlanService.list(monthPlanNoProductionPlan);
     }
 
