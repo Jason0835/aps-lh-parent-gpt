@@ -2610,11 +2610,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MdmSkuConstructionRef skuConstructionRef = MapUtils.getObject(mdmSkuConstructionRefMap, materialCode, new MdmSkuConstructionRef());
         // 胎胚号
         adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
-        // SKU与结构关系列表
-        Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = contextDTO.getMdmSkuStructureRefMap();
-        MdmSkuStructureRef skuStructureRef = MapUtils.getObject(mdmSkuStructureRefMap, materialCode, new MdmSkuStructureRef());
+        // 物料信息
+        Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
+        MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
         // 结构名称
-        adjustDetailVo.setStructureName(skuStructureRef.getStructureName());
+        adjustDetailVo.setStructureName(materialInfo.getStructureName());
         // 月计划结构转产
         Map<String, List<MpStructureAllocation>> structureAllocationMap = contextDTO.getStructureAllocationMap();
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
@@ -2626,10 +2626,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (monthPlan == null) {
             // SKU日硫化产能
             Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
-            // 物料信息
-            Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
-            MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
