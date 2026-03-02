@@ -635,7 +635,7 @@ public class MatchingProductionHandler {
     private Integer getNextDay(MpRollAdjustContextDTO contextDTO, int day, int endDay) {
         Integer nextDay = 0;
         for (int i = day + 1; i <= endDay; i ++) {
-            if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
+            if (this.checkDayCanProduct(contextDTO, i)) { // 下一天是排产日返回，否则跳过看下一天
                 nextDay = i;
                 break;
             }
@@ -653,7 +653,7 @@ public class MatchingProductionHandler {
     private Integer getLastDay(MpRollAdjustContextDTO contextDTO, int day, int beginDay) {
         Integer nextDay = 0;
         for (int i = day - 1; i >= beginDay; i --) {
-            if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
+            if (this.checkDayCanProduct(contextDTO, i)) { // 下一天是排产日返回，否则跳过看下一天
                 nextDay = i;
                 break;
             }
