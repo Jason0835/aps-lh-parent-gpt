@@ -778,9 +778,15 @@ public class MatchingProductionHandler {
             plan.setDayVulcanizationQty(capacity / ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 单模产能
             plan.setMesMaterialCode(firstDemandPlan.getMesMaterialCode());
             plan.setProductionType(firstDemandPlan.getProductionType());
+            plan.setHeightProductionQty(0);
+            plan.setMidProductionQty(0);
+            plan.setCycleProductionQty(0);
+            plan.setPostponeProductionQty(0);
+            plan.setDifferenceQty(0);
             plan.setTotalQty(0);
             plan.setBeginDay(null);
             plan.setEndDay(null);
+            plan.setAdjustDetailId(null);
             for (int day = 1; day <= MAX_MONTH_DAY; day++) {
                 plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, null); // 清空每天排产量
             }
