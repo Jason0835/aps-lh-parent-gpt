@@ -284,7 +284,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 // 5.2.1、初始化消耗量
                 MdmMaterialConsumeDetail consumeDetail = new MdmMaterialConsumeDetail();
                 consumeDetail.setFactoryCode(factoryCode);
-                consumeDetail.setChildMaterialCode(bom.getChildCode());
+                consumeDetail.setChildMaterialCode(bom.getChildMaterialCode());
                 consumeDetail.setChildMaterialName(bom.getChildMaterialName());
                 consumeDetail.setChildMaterialVersion(bom.getChildMaterialVersion());
                 consumeDetail.setUnit(bom.getUnit());

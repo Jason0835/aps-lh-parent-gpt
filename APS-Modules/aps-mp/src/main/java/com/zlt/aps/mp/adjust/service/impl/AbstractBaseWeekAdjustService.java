@@ -486,7 +486,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
-        for (int i = contextDTO.getStructureStartDay(); i< contextDTO.getStructureDeadLine(); i++){
+        for (int i = contextDTO.getStructureStartDay(); i<= contextDTO.getStructureDeadLine(); i++){
             if (dailyCapacityLimitVoMap.get(i) == null){
                 continue;
             }
@@ -967,6 +967,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setBeginDayAndEndDay(monthPlan);
             factoryMonthPlanProdFinalList.add(monthPlan);
         }
+
+        // 构建搭配排产新增月度计划
+        List<FactoryMonthPlanProductionFinalResult> matchingProductionMonthPlanList = buildMatchingProductionMonthPlan(adjustDetailList, adjustResultList, contextDTO);
+        factoryMonthPlanProdFinalList.addAll(matchingProductionMonthPlanList);
+
         try {
             // 删除月度生产计划
             deleteMonthPlanList(contextDTO, factoryMonthPlanProdFinalList);
@@ -978,6 +983,184 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new RuntimeException("新增月度生产计划失败", e);
         }
 
+    }
+
+    /**
+     * 构建搭配排产新增月度计划
+     * @param adjustDetailList
+     * @param adjustResultList
+     * @param contextDTO
+     * @return
+     */
+    private List<FactoryMonthPlanProductionFinalResult> buildMatchingProductionMonthPlan(List<MpAdjustDetailVo> adjustDetailList, List<MpAdjustResult> adjustResultList,
+                                                                                         MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isEmpty(adjustResultList)) {
+            log.warn("调整结果列表为空，直接返回");
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
+        // 筛选调整结果列表（不在调整明细及月度生产计划中）
+        List<MpAdjustResult>  filterAdjustResultList = filterAdjustResultList(adjustDetailList, adjustResultList, monthPlanProdFinalList);
+        if (PubUtil.isEmpty(filterAdjustResultList)) {
+            log.warn("过滤后调整结果列表为空，直接返回");
+            return Collections.emptyList();
+        }
+        // 初始化试制量试计划
+        initTrialPlan(contextDTO);
+        // 初始化物料信息
+        initMaterialInfo(contextDTO);
+        // 月度计划结果列表
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = new ArrayList<>();
+        // 批次号前缀
+        String prefixKey = IncrementConstant.MONTH_FINAL + com.ruoyi.common.core.utils.DateUtils.dateTimeNow("yyMMdd");
+        // 批次号
+        String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
+        for (MpAdjustResult adjustResult : filterAdjustResultList) {
+            FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
+            BeanUtils.copyProperties(adjustResult, monthPlan);
+            monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
+            if (adjustResult.getYear() != null && adjustResult.getMonth() != null) {
+                monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
+            }
+            monthPlan.setId(null);
+            monthPlan.setBaseVale(null);
+            String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
+            monthPlan.setProductionNo(productionNo);
+            // 设置物料信息关联字段
+            setMaterialInfoField(contextDTO, monthPlan);
+            // 设置试制量试关联字段
+            setTrialPlanField(contextDTO, monthPlan);
+            // 设置SKU与示方书关联字段
+            setSkuConstructionRefField(contextDTO, monthPlan);
+            monthPlanList.add(monthPlan);
+        }
+        return monthPlanList;
+    }
+
+    /**
+     * 设置物料信息关联字段
+     * @param contextDTO
+     * @param monthPlan
+     */
+    private void setMaterialInfoField(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanProductionFinalResult monthPlan) {
+        // 物料信息Map
+        Map<String, MdmMaterialInfo> materialInfoMap = contextDTO.getMdmMaterialInfoMap();
+        if (PubUtil.isEmpty(materialInfoMap)) {
+            return;
+        }
+        // 物料编码
+        String materialCode = monthPlan.getMaterialCode();
+        // 获取物料信息
+        MdmMaterialInfo materialInfo = materialInfoMap.getOrDefault(materialCode, new MdmMaterialInfo());
+        // MES物料编码
+        monthPlan.setMesMaterialCode(materialInfo.getMesMaterialCode());
+        // 物料描述
+        monthPlan.setMaterialDesc(materialInfo.getMaterialDesc());
+        // 产品品类
+        monthPlan.setProductTypeCode(materialInfo.getProductTypeCode());
+        // 品牌
+        monthPlan.setBrand(materialInfo.getBrand());
+        // 规格
+        monthPlan.setSpecifications(materialInfo.getSpecifications());
+        // 主花纹
+        monthPlan.setMainPattern(materialInfo.getMainPattern());
+        // 花纹
+        monthPlan.setPattern(materialInfo.getPattern());
+        // 产品分类
+        monthPlan.setProductCategory(materialInfo.getProductCategory());
+        // 英寸
+        monthPlan.setProSize(materialInfo.getProSize());
+    }
+
+    /**
+     * 设置试制量试关联字段
+     * @param contextDTO
+     * @param monthPlan
+     */
+    private void setTrialPlanField(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanProductionFinalResult monthPlan) {
+        // 试制量试计划列表
+        List<MpTrialPlan> trialPlanList = contextDTO.getMpTrialPlanList();
+        if (PubUtil.isEmpty(trialPlanList)) {
+            return;
+        }
+        // 物料编码
+        String materialCode = monthPlan.getMaterialCode();
+        // 获取试制量试
+        MpTrialPlan trialPlan = trialPlanList.stream()
+                .filter(vo -> vo.getMaterialCode().equals(materialCode))
+                .findFirst()
+                .orElse(null);
+        // 施工阶段
+        monthPlan.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
+        // 产品状态
+        monthPlan.setProductStatus(ConstructionStageEnum.FORMAL_FLAG);
+        if (trialPlan != null) {
+            // 施工阶段
+            monthPlan.setConstructionStage(trialPlan.getTrialStatus());
+            // 产品状态
+            String productStatus = null;
+            if (ConstructionStageEnum.MEASUREMENT.getStage().equals(trialPlan.getTrialStatus())) {
+                productStatus = ConstructionStageEnum.MEASUREMENT_FLAG;
+            }
+            if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(trialPlan.getTrialStatus())) {
+                productStatus = ConstructionStageEnum.TRIAL_FLAG;
+            }
+            monthPlan.setProductStatus(productStatus);
+        }
+    }
+
+
+    /**
+     * 筛选调整结果列表（不在调整明细及月度生产计划中）
+     * @param adjustDetailList
+     * @param adjustResultList
+     * @param monthPlanProdFinalList
+     * @return
+     */
+    private List<MpAdjustResult> filterAdjustResultList(List<MpAdjustDetailVo> adjustDetailList, List<MpAdjustResult> adjustResultList,
+                                                       List<FactoryMonthPlanFinalAdjustVo> monthPlanProdFinalList) {
+
+        if (PubUtil.isEmpty(adjustResultList)) {
+            return Collections.emptyList();
+        }
+        // 排除列表
+        Set<String> excludeKeySet = new HashSet<>();
+        if (PubUtil.isNotEmpty(adjustDetailList)) {
+            for (MpAdjustDetailVo vo : adjustDetailList) {
+                String key = generateKey(vo.getMaterialCode(), vo.getStructureName());
+                excludeKeySet.add(key);
+            }
+        }
+        if (PubUtil.isNotEmpty(monthPlanProdFinalList)) {
+            for (FactoryMonthPlanFinalAdjustVo vo : monthPlanProdFinalList) {
+                String key = generateKey(vo.getMaterialCode(), vo.getStructureName());
+                excludeKeySet.add(key);
+            }
+        }
+        List<MpAdjustResult> resultList = new ArrayList<>();
+        for (MpAdjustResult result : adjustResultList) {
+            if (StringUtils.isEmpty(result.getMaterialCode()) || StringUtils.isEmpty(result.getStructureName())) {
+                continue;
+            }
+            String currentKey = generateKey(result.getMaterialCode(), result.getStructureName());
+            // 不在排除集合中，加入结果集
+            if (!excludeKeySet.contains(currentKey)) {
+                resultList.add(result);
+            }
+        }
+        return resultList;
+    }
+
+    /**
+     * 生成唯一标识：拼接物料编码和结构名称，空值替换为空字符串
+     * @param materialCode 物料编码
+     * @param structureName 结构名称
+     * @return 拼接后的唯一标识
+     */
+    private String generateKey(String materialCode, String structureName) {
+        String mc = materialCode == null ? "" : materialCode.trim();
+        String sn = structureName == null ? "" : structureName.trim();
+        return mc + ApsConstant.SPLIT_CHAR + sn;
     }
 
     /**
@@ -3101,6 +3284,34 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .filter(monitor -> monitor != null && monitor.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode));
     }
+
+    /**
+     * 检查调整明细列表中的产品结构字段是否为空
+     * @param adjustDetailList 调整明细列表
+     * @return 错误信息列表
+     */
+    protected List<String> checkStructNameEmpty(List<MpAdjustDetailVo> adjustDetailList) {
+        // 错误信息列表
+        List<String> errorMsgList = new ArrayList<>();
+        if (PubUtil.isEmpty(adjustDetailList)) {
+            return errorMsgList;
+        }
+        // 遍历调整明细列表
+        for (MpAdjustDetailVo detail : adjustDetailList) {
+            String materialCode = detail.getMaterialCode();
+            if (StringUtils.isEmpty(materialCode)) {
+                continue;
+            }
+            // 判断字段值是否为空
+            if (StringUtils.isBlank(detail.getStructureName())) {
+                String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.structNameEmpty"),
+                        materialCode);
+                errorMsgList.add(errorMsg);
+            }
+        }
+        return errorMsgList;
+    }
+
 
     /**
      * 根据结构名称和物料编码分组汇总订单量

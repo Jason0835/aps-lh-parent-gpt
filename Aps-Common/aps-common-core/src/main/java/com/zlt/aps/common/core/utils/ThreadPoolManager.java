@@ -20,7 +20,7 @@ public class ThreadPoolManager {
     private ThreadPoolManager() {
         corePoolSize = Runtime.getRuntime().availableProcessors() * 2 + 1;
         maximumPoolSize = corePoolSize;
-        executor = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, new LinkedBlockingQueue<Runnable>(), Executors.defaultThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
+        executor = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, new LinkedBlockingQueue<Runnable>(5), Executors.defaultThreadFactory(), new ThreadPoolExecutor.CallerRunsPolicy());
         executor.allowCoreThreadTimeOut(true);
     }
 
