@@ -9,13 +9,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.I18nConstant;
+import com.zlt.aps.constant.StringConstant;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.math.BigDecimal;
+import java.util.*;
 
 /**
  * 不排产原因等含有国际化信息的解析
@@ -28,6 +28,47 @@ import java.util.Locale;
  */
 @Slf4j
 public class JsonUtils {
+    /**
+     * 语言长度
+     */
+    private static int LANGUAGE_LENGTH = 2;
+
+    /**
+     * 获取语言包信息
+     *
+     * @return
+     */
+    public static Map<String, Locale> getLanguageMap() {
+        List<String> languageList = getLanguageList();
+        if (CollectionUtils.isEmpty(languageList)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Locale> languageMap = new HashMap<>();
+        languageList.forEach(language -> {
+            if (StringUtils.isBlank(language)) {
+                return;
+            }
+            String[] languageArray = language.split(String.valueOf(StringConstant.CHAR_UNDERLINE));
+            if (languageArray.length != LANGUAGE_LENGTH) {
+                return;
+            }
+            languageMap.put(language, new Locale(languageArray[BigDecimal.ZERO.intValue()], languageArray[BigDecimal.ONE.intValue()]));
+        });
+        return languageMap;
+    }
+
+    /**
+     * 获取语言包信息
+     *
+     * @return
+     */
+    public static List<String> getLanguageList() {
+        List<String> languageList = new ArrayList<>();
+        languageList.add(I18nConstant.ZH_CN);
+        languageList.add(I18nConstant.EN_US);
+        languageList.add(I18nConstant.VI_VN);
+        return languageList;
+    }
 
     /**
      * 获取语言Json对象
@@ -36,12 +77,16 @@ public class JsonUtils {
      * @return
      */
     public static JSONObject getLanguageJsonObject(String languageKey) {
-        String i18nOverModCapsCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
-        String i18nOverModCapsUs = I18nUtil.getMessage(languageKey, Locale.US);
+        Map<String, Locale> languageMap = getLanguageMap();
+        if (CollectionUtils.isEmpty(languageMap)) {
+            return new JSONObject();
+        }
         // 构建 JSON 对象
         JSONObject reasonJson = new JSONObject();
-        reasonJson.put(I18nConstant.CHINESE, i18nOverModCapsCn);
-        reasonJson.put(I18nConstant.ENGLISH, i18nOverModCapsUs);
+        languageMap.forEach((language, languageLocale) -> {
+            String languageContent = I18nUtil.getMessage(languageKey, languageLocale);
+            reasonJson.put(language, languageContent);
+        });
         return reasonJson;
     }
 
@@ -54,14 +99,17 @@ public class JsonUtils {
      * @return
      */
     public static JSONObject getLanguageJsonObject(String languageKey, Object format) {
-        String i18nOverModCapsCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
-        String i18nOverModCapsUs = I18nUtil.getMessage(languageKey, Locale.US);
-        String cn = String.format(i18nOverModCapsCn, format);
-        String us = String.format(i18nOverModCapsUs, format);
+        Map<String, Locale> languageMap = getLanguageMap();
+        if (CollectionUtils.isEmpty(languageMap)) {
+            return new JSONObject();
+        }
         // 构建 JSON 对象
         JSONObject reasonJson = new JSONObject();
-        reasonJson.put(I18nConstant.CHINESE, cn);
-        reasonJson.put(I18nConstant.ENGLISH, us);
+        languageMap.forEach((language, languageLocale) -> {
+            String languageFormat = I18nUtil.getMessage(languageKey, languageLocale);
+            String languageContent = String.format(languageFormat, format);
+            reasonJson.put(language, languageContent);
+        });
         return reasonJson;
     }
 
@@ -74,14 +122,17 @@ public class JsonUtils {
      * @return
      */
     public static JSONObject getLanguageJsonObject(String languageKey, Object... params) {
-        String formatCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
-        String formatUs = I18nUtil.getMessage(languageKey, Locale.US);
-        String cn = String.format(formatCn, params);
-        String us = String.format(formatUs, params);
+        Map<String, Locale> languageMap = getLanguageMap();
+        if (CollectionUtils.isEmpty(languageMap)) {
+            return new JSONObject();
+        }
         // 构建 JSON 对象
         JSONObject reasonJson = new JSONObject();
-        reasonJson.put(I18nConstant.CHINESE, cn);
-        reasonJson.put(I18nConstant.ENGLISH, us);
+        languageMap.forEach((language, languageLocale) -> {
+            String languageFormat = I18nUtil.getMessage(languageKey, languageLocale);
+            String languageContent = String.format(languageFormat, params);
+            reasonJson.put(language, languageContent);
+        });
         return reasonJson;
     }
 
@@ -94,79 +145,17 @@ public class JsonUtils {
      * @return
      */
     public static JSONObject getLanguageJsonObject(String languageKey, Object format1, Object format2) {
-        String i18nOverModCapsCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
-        String i18nOverModCapsUs = I18nUtil.getMessage(languageKey, Locale.US);
-        String cn = String.format(i18nOverModCapsCn, format1, format2);
-        String us = String.format(i18nOverModCapsUs, format1, format2);
-        // 构建 JSON 对象
-        JSONObject reasonJson = new JSONObject();
-        reasonJson.put(I18nConstant.CHINESE, cn);
-        reasonJson.put(I18nConstant.ENGLISH, us);
-        return reasonJson;
-    }
-
-    /**
-     * 获取语言Json对象 传入reason
-     *
-     * @param languageKey 语言包key
-     * @param format1     需要转换的参数
-     * @return
-     */
-    public static JSONObject getLanguageJsonObjectByReason(String reason, String languageKey, Object format1) {
-        String i18nOverModCapsCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
-        String i18nOverModCapsUs = I18nUtil.getMessage(languageKey, Locale.US);
-        String cn = "";
-        String us = "";
-        String reasonCn = "";
-        String reasonUs = "";
-        //reason需要判断是否是json对象  如果是还需要转换一下  否则就不转换了 直接拼接
-        if (isJsonObject(reason)) {
-            JSONObject jsonObject = JSON.parseObject(reason);
-            reasonCn = jsonObject.getString(I18nConstant.CHINESE);
-            reasonUs = jsonObject.getString(I18nConstant.ENGLISH);
-            cn = reasonCn + String.format(i18nOverModCapsCn, format1);
-            us = reasonUs + String.format(i18nOverModCapsUs, format1);
-        } else {
-            cn = reason + String.format(i18nOverModCapsCn, format1);
-            us = reason + String.format(i18nOverModCapsUs, format1);
+        Map<String, Locale> languageMap = getLanguageMap();
+        if (CollectionUtils.isEmpty(languageMap)) {
+            return new JSONObject();
         }
         // 构建 JSON 对象
         JSONObject reasonJson = new JSONObject();
-        reasonJson.put(I18nConstant.CHINESE, cn);
-        reasonJson.put(I18nConstant.ENGLISH, us);
-        return reasonJson;
-    }
-
-    /**
-     * 获取语言Json对象 传入reason
-     *
-     * @param languageKey 语言包key
-     * @param format1     需要转换的参数
-     * @param format2     需要转换的参数
-     * @return
-     */
-    public static JSONObject getLanguageJsonObjectByReason(String reason, String languageKey, Object format1, Object format2) {
-        String i18nOverModCapsCn = I18nUtil.getMessage(languageKey, Locale.SIMPLIFIED_CHINESE);
-        String i18nOverModCapsUs = I18nUtil.getMessage(languageKey, Locale.US);
-        String cn = "";
-        String us = "";
-        String reasonCn = "";
-        String reasonUs = "";
-        //reason需要判断是否是json对象  如果是还需要转换一下  否则就不转换了 直接拼接
-        if (isJsonObject(reason)) {
-            JSONObject jsonObject = JSON.parseObject(reason);
-            reasonCn = jsonObject.getString(I18nConstant.CHINESE);
-            reasonUs = jsonObject.getString(I18nConstant.ENGLISH);
-            cn = reasonCn + String.format(i18nOverModCapsCn, format1, format2);
-            us = reasonUs + String.format(i18nOverModCapsUs, format1, format2);
-        } else {
-            cn = reason + String.format(i18nOverModCapsCn, format1, format2);
-            us = reason + String.format(i18nOverModCapsUs, format1, format2);
-        }
-        // 构建 JSON 对象
-        JSONObject reasonJson = new JSONObject();
-        reasonJson.put(I18nConstant.CHINESE, cn);
-        reasonJson.put(I18nConstant.ENGLISH, us);
+        languageMap.forEach((language, languageLocale) -> {
+            String languageFormat = I18nUtil.getMessage(languageKey, languageLocale);
+            String languageContent = String.format(languageFormat, format1, format2);
+            reasonJson.put(language, languageContent);
+        });
         return reasonJson;
     }
 
@@ -268,7 +257,6 @@ public class JsonUtils {
     }
 
 
-
     /**
      * 解析json备注信息，可能存在多种拼接情况
      * 1、[{"en_US":"...","zh_CN":"..."},{"en_US":"...","zh_CN":"..."}]
@@ -348,4 +336,5 @@ public class JsonUtils {
         builder.append(JSON.parseObject(json).get(locale));
         builder.append(",");
     }
+
 }

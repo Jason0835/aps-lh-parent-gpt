@@ -56,6 +56,6 @@ public class MdmStructureNameServiceImpl extends AbstractDocService<MdmStructure
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return new ArrayList<>(Collections.singleton("STRUCTURE_NAME"));
+        return new ArrayList<>(Collections.singleton("structureName"));
     }
 }

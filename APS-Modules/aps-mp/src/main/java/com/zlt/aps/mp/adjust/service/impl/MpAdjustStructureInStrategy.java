@@ -5,7 +5,9 @@ import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.ThreadPoolManager;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -26,6 +28,7 @@ import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.common.utils.PubUtil;
 import java.util.*;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +66,16 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         resultList.addAll(adjustDetailByTrialList);
         resultList.addAll(adjustDetailList);
         resultList.addAll(adjustDetailByMonthPlanList);
+        // 检查产品结构字段为空
+//        List<String> errorMsgList = checkStructNameEmpty(resultList);
+//        String errorMsg = Optional.ofNullable(errorMsgList)
+//                .orElse(Collections.emptyList())
+//                .stream()
+//                .distinct()
+//                .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+//        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
+//            return new BusinessException(errorMsg);
+//        });
         // 5、通过结构过滤调整明细
         filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
@@ -108,11 +121,10 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
-        Date startTime,endTime;
-        List<MpStructureAllocation> structureAllocationList;
-        List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = new ArrayList<>();
-        List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList;
-        List<MpMonthPlanStatistics> monthPlanStatisticsResultList = new ArrayList<>();
+        List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = Collections.synchronizedList(new ArrayList<>());
+        List<FactoryMonthPlanFinalAdjustVo> newMpLogList = Collections.synchronizedList(new ArrayList<>());
+        List<MpMonthPlanStatistics> monthPlanStatisticsResultList = Collections.synchronizedList(new ArrayList<>());
+        List<Future> futureList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         String structureCondi = contextDTO.getStructureName();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
@@ -122,57 +134,94 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     continue;
                 }
             }
-            //2.1 初始结构上下文
-            //1）结构内，按结构分别调整
-            contextDTO.setStructureName(entry.getKey());
-            oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
-            contextDTO.setSpecStructureTotalQty(0);
-            if (YesOrNoEnum.YES.getCode().equals(entry.getValue().get(0).getHasSpecialMaterial())){
-                //若是特殊结构,预存特殊结构的总实际排产量
-                setSpecStructureTotalQty(contextDTO,oneStructMpFinalList);
-            }
-            structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
-            contextDTO.setOneStructureAllocationList(structureAllocationList);
-            //2）初始锁定日
-            contextDTO.setLockEndDay(getLockEndDay(contextDTO));
-            //3）初始结构开始日、收尾日
-            initStructureStartAndEndDay(contextDTO);
-            //4）初始化日志和消息
-            contextDTO.setLogDetail(new StringBuilder());
-            //2.2 执行结构内调整
-            startTime = new Date();
-            contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-            weekRollAdjustEngine.doStructureInForOne(contextDTO,entry.getValue(), oneStructMpFinalList);
-            endTime = new Date();
-            contextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-            //2.4.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-            reCalcAdjustDailyCapacityLimit(contextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
-            
-            //2.3 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
-            //=========================================================
-            matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
-            //=========================================================
-            
-            //2.5.设置模具变化信息
-            for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
-                weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
-            }
+            final String currentStructureName = entry.getKey();
+            final List<MpAdjustStructureIn> currentAdjustList = new ArrayList<>(entry.getValue());
+            Future future = ThreadPoolManager.getInstance().submit(() -> {
+                //2.1 初始结构上下文
+                MpRollAdjustContextDTO copyContextDTO = copyContext(contextDTO,currentStructureName);
+                List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = new ArrayList<>(mpProdFinalMap.get(copyContextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(currentStructureName));
+                if (YesOrNoEnum.YES.getCode().equals(currentAdjustList.get(0).getHasSpecialMaterial())){
+                    //若是特殊结构,预存特殊结构的总实际排产量
+                    setSpecStructureTotalQty(copyContextDTO,oneStructMpFinalList);
+                }
+                //2.2 执行结构内调整
+                Date startTime = new Date();
+                copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
+                weekRollAdjustEngine.doStructureInForOne(copyContextDTO,entry.getValue(), oneStructMpFinalList);
+                Date endTime = new Date();
+                copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
-            newMpFinalList.addAll(oneStructMpFinalList);
+                //2.3.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
+                MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+                reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
 
-            //2.6 构建月计划统计结果
-            List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList, contextDTO.getOneStructureAllocationList());
-            monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
+                //2.4 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
+                //=========================================================
+                matchingProductionHandler.structureAdjuestBoots(copyContextDTO, oneStructMpFinalList); // 补量
+                matchingProductionHandler.matchingAdjustProduction(copyContextDTO, oneStructMpFinalList); // 搭配
+                //=========================================================
 
-            //2.7 保存调整日志
-            saveMpAdjustLog(contextDTO);
+                //2.5.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+                reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
+                //2.6.设置模具变化信息
+                for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
+                    weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,copyContextDTO.getParamMap(),copyContextDTO.getStructureStartDay(),mpFinalVo,copyContextDTO.getDailyCapacityLimitVoMap());
+                }
+
+                newMpFinalList.addAll(oneStructMpFinalList);
+                newMpLogList.addAll(copyContextDTO.getAdjustProcLogList());
+
+                //2.7 构建月计划统计结果
+                List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(copyContextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList, copyContextDTO.getOneStructureAllocationList());
+                monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
+
+                //2.8 保存调整日志
+                saveMpAdjustLog(copyContextDTO);
+
+                if (!StringUtil.isEmptyWithTrim(copyContextDTO.getMsgRemainQtyNoFull().toString())){
+                    contextDTO.getMsgRemainQtyNoFull().append(copyContextDTO.getMsgRemainQtyNoFull().toString());
+                }
+                return currentStructureName;
+            });
+            futureList.add(future);
         }
 
-
+        futureList.forEach(f -> {
+            try {
+                f.get();
+            } catch (Exception e) {
+                log.error("线程执行异常", e);
+                throw new BusinessException(e.getMessage());
+            }
+        });
         contextDTO.setSaveMpProdFinalList(newMpFinalList);
+        contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
+    }
+
+    /**
+     * 复制上下文副本
+     * @param contextDTO
+     * @return
+     */
+    private synchronized MpRollAdjustContextDTO copyContext(MpRollAdjustContextDTO contextDTO,String currentStructureName){
+        MpRollAdjustContextDTO copyContextDTO = new MpRollAdjustContextDTO();
+        BeanUtils.copyProperties(contextDTO,copyContextDTO);
+        //1）结构内，按结构分别调整
+        copyContextDTO.setStructureName(currentStructureName);
+        copyContextDTO.setFactoryMonthPlanProdFinalList(new ArrayList<>(contextDTO.getFactoryMonthPlanProdFinalList()));
+        copyContextDTO.setAdjustProcLogList(new ArrayList<>());
+        copyContextDTO.setSpecStructureTotalQty(0);
+        List<MpStructureAllocation> structureAllocationList = copyContextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(copyContextDTO.getStructureName())).collect(Collectors.toList());
+        copyContextDTO.setOneStructureAllocationList(structureAllocationList);
+        //2）初始锁定日
+        copyContextDTO.setLockEndDay(getLockEndDay(copyContextDTO));
+        //3）初始结构开始日、收尾日
+        initStructureStartAndEndDay(copyContextDTO);
+        //4）初始化日志和消息
+        copyContextDTO.setLogDetail(new StringBuilder());
+        return copyContextDTO;
     }
 
     /**

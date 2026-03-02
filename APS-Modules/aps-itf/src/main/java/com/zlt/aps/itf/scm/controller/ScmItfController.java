@@ -1,20 +1,18 @@
 package com.zlt.aps.itf.scm.controller;
 
-import java.util.List;
-
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.itf.scm.service.ScmItfService;
+import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
+import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.itf.scm.service.ScmItfService;
-import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
-import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
-
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+import java.util.List;
 
 /**
  * SCM接口
@@ -47,6 +45,18 @@ public class ScmItfController {
 		return scmItfService.lockSalesOrderPool(planedNotShipParamVo);
 	}
 
+	/**
+	 * 解锁订单池
+	 *
+	 * @param planedNotShipParamVo 解锁参数
+	 * @return 结果集合
+	 */
+	@ApiOperation("解锁订单池")
+	@PostMapping("/unlockSalesOrderPool")
+	public AjaxResult unlockSalesOrderPool(@RequestBody SyncPlanedNotShipParamVo planedNotShipParamVo) {
+		return scmItfService.unlockSalesOrderPool(planedNotShipParamVo);
+	}
+
 
 	/**
 	 * 发货明细表同步接口
@@ -66,7 +76,7 @@ public class ScmItfController {
 	public AjaxResult publicFacScheduleVersion(@RequestBody List<SyncOutFacScheduleVersionVo> outFacScheduleVersionList) {
 		return scmItfService.publicFacScheduleVersion(outFacScheduleVersionList);
 	}
-	
+
     /**
      * 同步区域/国家数据
      *

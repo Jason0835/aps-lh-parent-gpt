@@ -3,6 +3,10 @@ package com.zlt.aps.mp.demand.mapper;
 import com.zlt.aps.mp.api.domain.entity.DpStockVersion;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -21,5 +25,20 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface DpStockVersionEntityMapper extends CommBaseMapper<DpStockVersion> {
 
+    /**
+     * 直接查询去重后的month_plan_version列表
+     */
+    @Select("SELECT REQUIRE_VERSION " +
+            " FROM T_DP_STOCK_VERSION " +
+            " WHERE FACTORY_CODE = #{factoryCode} " +
+            " AND `YEAR` = #{year} " +
+            " AND `MONTH` = #{month} " +
+            " AND IS_DELETE = #{isDelete} " +
+            " GROUP BY REQUIRE_VERSION " +
+            " ORDER BY MAX(CREATE_TIME) DESC ")
+    List<String> selectDistinctMonthPlanVersion(@Param("factoryCode") String factoryCode,
+                                                @Param("year") Integer year,
+                                                @Param("month") Integer month,
+                                                @Param("isDelete") Integer isDelete);
 }
 

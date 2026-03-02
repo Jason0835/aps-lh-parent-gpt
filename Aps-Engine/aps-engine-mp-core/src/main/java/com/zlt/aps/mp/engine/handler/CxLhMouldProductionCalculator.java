@@ -66,7 +66,7 @@ public class CxLhMouldProductionCalculator {
         //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
         Integer lossQtyDiffValue = productionQty;
         Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(groupPlanInfo, productionQty);
-        if (specialMaterialLimitQty == BigDecimal.ZERO.intValue()) {
+        if (specialMaterialLimitQty <= BigDecimal.ZERO.intValue()) {
             continueSkuPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
             productionContext.addSkuProductionLimitInfo(skuMaterialDesc, MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT);
             return;
@@ -158,7 +158,7 @@ public class CxLhMouldProductionCalculator {
             }
             //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
             Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
-            if (specialMaterialLimitQty == BigDecimal.ZERO.intValue()) {
+            if (specialMaterialLimitQty <= BigDecimal.ZERO.intValue()) {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 productionContext.addSkuProductionLimitInfo(skuMaterialDesc, MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT);
                 break;
@@ -255,7 +255,7 @@ public class CxLhMouldProductionCalculator {
             }
             //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
             Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
-            if (specialMaterialLimitQty == BigDecimal.ZERO.intValue()) {
+            if (specialMaterialLimitQty <= BigDecimal.ZERO.intValue()) {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
                 productionContext.addSkuProductionLimitInfo(skuMaterialDesc, MouldProductionLimitTypeEnum.SPECIAL_MATERIAL_STOCK_LIMIT);
                 break;

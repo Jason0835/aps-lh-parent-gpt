@@ -5,7 +5,11 @@ import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayDetail;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
@@ -14,9 +18,6 @@ import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayDetail;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -131,8 +132,9 @@ public class MouldProductionResultHandler {
             } else {
                 dayResult.setTypeBlockQty(skuMaxUsedList.size());
             }
-            setMouldUsedInfo(dayResult);
-            Set<String> cxMachineCodeSet = allGroupPlanInfo.get(dayResult.getStructureName()).getAllocationCxMachineCodeSet();
+            ProductionPlanGroupInfo groupInfo = allGroupPlanInfo.get(dayResult.getStructureName());
+            setMouldUsedInfo(groupInfo, dayResult);
+            Set<String> cxMachineCodeSet = groupInfo.getAllocationCxMachineCodeSet();
             if (!CollectionUtils.isEmpty(cxMachineCodeSet)) {
                 dayResult.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeSet));
             }
@@ -247,18 +249,18 @@ public class MouldProductionResultHandler {
         int sumConventionQty = requireList.stream().filter(item -> null != item.getConventionReserveQty()).mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
         int sumPostponeQty = requireList.stream().filter(item -> null != item.getPostponeQty()).mapToInt(MonthPlanProductionRequirePlanVo::getPostponeQty).sum();
         if (lossQty > 0) {
-            if(ProductionPlanType.NORMAL.getPlanType().equals(dayResult.getPlanType())) {
+            if (ProductionPlanType.NORMAL.getPlanType().equals(dayResult.getPlanType())) {
                 if (sumCycleReserveQty % 2 != 0) {
                     sumCycleReserveQty = sumCycleReserveQty + lossQty;
                 } else {
                     sumMidQty = sumMidQty + lossQty;
                 }
-            }else{
+            } else {
                 if (sumCycleReserveQty % 2 != 0) {
                     sumCycleReserveQty = sumCycleReserveQty + lossQty;
                 } else if (sumMidQty % 2 != 0) {
                     sumMidQty = sumMidQty + lossQty;
-                }else{
+                } else {
                     sumPostponeQty = sumPostponeQty + lossQty;
                 }
             }
@@ -436,32 +438,13 @@ public class MouldProductionResultHandler {
     /**
      * 根据每日排产量，得到模具使用变化
      *
-     * @param result
+     * @param groupInfo 分组计划信息
+     * @param result    Sku排产结果对象
      */
-    private static void setMouldUsedInfo(FactoryMonthPlanMouldDayResult result) {
-        Map<Integer, Integer> dayProductionQty = DayProductionHandler.getDayQty(result, FactoryConstant.PRODUCTION_CYCLE);
-        if (CollectionUtils.isEmpty(dayProductionQty)) {
-            return;
-        }
-        Integer singleLhMachineCapacity = result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        List<MouldDayUsedNumber> lhMachineCountList = new ArrayList<>();
-        dayProductionQty.forEach((day, productionQty) -> {
-            Integer usedLhMachineNumber = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue();
-            MouldDayUsedNumber used = new MouldDayUsedNumber(day, usedLhMachineNumber);
-            lhMachineCountList.add(used);
-        });
-        //日期从小到大，判断第一天如果小于第二天则舍弃第一天的模具数
-        lhMachineCountList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
-        int size = lhMachineCountList.size();
-        int startIndex = BigDecimal.ZERO.intValue();
-        if (size > BigDecimal.ONE.intValue()) {
-            Integer firstMouldNumber = lhMachineCountList.get(BigDecimal.ZERO.intValue()).getUsedLhMachineCount();
-            Integer secondMouldNumber = lhMachineCountList.get(BigDecimal.ONE.intValue()).getUsedLhMachineCount();
-            if (firstMouldNumber < secondMouldNumber) {
-                startIndex = BigDecimal.ONE.intValue();
-            }
-        }
-        List<MouldDayUsedNumber> resultList = lhMachineCountList.subList(startIndex, size - startIndex);
+    private static void setMouldUsedInfo(ProductionPlanGroupInfo groupInfo, FactoryMonthPlanMouldDayResult result) {
+        String materialDesc = result.getMaterialDesc();
+        //使用排产量进行推算不准，直接换成使用模具数 getSkuProductionMouldNumberInfoByProductionQty(result);
+        List<MouldDayUsedNumber> resultList = getSkuProductionMouldNumberInfoByMould(groupInfo, materialDesc);
         //对排产量，保留第一个排产日，日期从小到大
         Map<Integer, Integer> lhMachineNumberDayMap = new HashMap<>();
         resultList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
@@ -516,6 +499,73 @@ public class MouldProductionResultHandler {
 //        String endWithValue = String.format(",%s", rejectNoProductionReason);
 //        result = result.replaceAll(endWithValue, "");
 //        return result;
+    }
+
+    /**
+     * 从结构排产信息中获取各Sku每日使用的模具信息
+     *
+     * @param groupInfo    结构分组信息
+     * @param materialDesc 排产的Sku信息
+     */
+    private static List<MouldDayUsedNumber> getSkuProductionMouldNumberInfoByMould(ProductionPlanGroupInfo groupInfo, String materialDesc) {
+        //获取硫化机台数
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfo = groupInfo.getDayProductionLimitInfo();
+        if (CollectionUtils.isEmpty(dayProductionInfo)) {
+            return Collections.emptyList();
+        }
+        List<MouldDayUsedNumber> lhMachineCountList = new ArrayList<>();
+        dayProductionInfo.forEach((productionDay, productionInfo) -> {
+            if (null == productionInfo) {
+                return;
+            }
+            Map<String, Set<String>> skuProductionMouldInfo = productionInfo.getSkuProductionMouldMap();
+            if (CollectionUtils.isEmpty(skuProductionMouldInfo)) {
+                return;
+            }
+            Set<String> skuProductionSet = skuProductionMouldInfo.get(materialDesc);
+            if (CollectionUtils.isEmpty(skuProductionSet)) {
+                return;
+            }
+            Integer usedLhMachineNumber = skuProductionSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            MouldDayUsedNumber used = new MouldDayUsedNumber(productionDay, usedLhMachineNumber);
+            lhMachineCountList.add(used);
+        });
+        return lhMachineCountList;
+    }
+
+    /**
+     * 根据排产量来计算使用硫化机台数
+     *
+     * @param result
+     * @return
+     */
+    private static List<MouldDayUsedNumber> getSkuProductionMouldNumberInfoByProductionQty(FactoryMonthPlanMouldDayResult result) {
+        Map<Integer, Integer> dayProductionQty = DayProductionHandler.getDayQty(result, FactoryConstant.PRODUCTION_CYCLE);
+        if (CollectionUtils.isEmpty(dayProductionQty)) {
+            return Collections.emptyList();
+        }
+        //硫化机台产能 = 单模产能 * 2
+        Integer singleLhMachineCapacity = result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        List<MouldDayUsedNumber> lhMachineCountList = new ArrayList<>();
+        dayProductionQty.forEach((day, productionQty) -> {
+            //转化使用硫化机台数
+            Integer usedLhMachineNumber = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue();
+            MouldDayUsedNumber used = new MouldDayUsedNumber(day, usedLhMachineNumber);
+            lhMachineCountList.add(used);
+        });
+        //日期从小到大，判断第一天如果小于第二天则舍弃第一天的模具数
+        lhMachineCountList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
+        int size = lhMachineCountList.size();
+        int startIndex = BigDecimal.ZERO.intValue();
+        if (size > BigDecimal.ONE.intValue()) {
+            Integer firstMouldNumber = lhMachineCountList.get(BigDecimal.ZERO.intValue()).getUsedLhMachineCount();
+            Integer secondMouldNumber = lhMachineCountList.get(BigDecimal.ONE.intValue()).getUsedLhMachineCount();
+            if (firstMouldNumber < secondMouldNumber) {
+                startIndex = BigDecimal.ONE.intValue();
+            }
+        }
+        List<MouldDayUsedNumber> resultList = lhMachineCountList.subList(startIndex, size - startIndex);
+        return resultList;
     }
 }
 
