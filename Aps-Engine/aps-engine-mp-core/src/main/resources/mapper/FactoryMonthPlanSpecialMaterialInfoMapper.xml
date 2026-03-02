@@ -39,12 +39,24 @@
            AND sms.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND sms.YEAR = #{year,jdbcType=DECIMAL}
            AND sms.MONTH = #{month,jdbcType=DECIMAL}
+           AND sms.STANDARD_LENGTH > 0
+           AND sms.STOCK > 0
            AND EXISTS (SELECT 1
                          FROM T_MDM_SPECIAL_MATERIAL_RECORD smr
                         WHERE IFNULL(smr.IS_DELETE, 0) = 0
                           AND smr.MATERIAL_TYPE = '02'
                           AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND smr.MATERIAL_CODE = sms.MATERIAL_CODE)
+           AND NOT EXISTS (
+              SELECT 0 
+                FROM t_mdm_special_material_stock ss
+               WHERE ss.YEAR = sms.YEAR
+                 AND ss.MONTH = sms.MONTH
+                 AND ss.FACTORY_CODE = sms.FACTORY_CODE
+                 AND ss.MATERIAL_CODE = sms.MATERIAL_CODE
+                 AND IFNULL(ss.IS_DELETE, 0) = 0
+                 AND ss.stock_date > sms.stock_date
+           )
     </select>
 
 </mapper>
