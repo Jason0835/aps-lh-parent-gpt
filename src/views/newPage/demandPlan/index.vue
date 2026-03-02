@@ -560,6 +560,12 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
+        {
+          prop: "productionType",
+          label: this.$t("ui.data.DemandPlan.productionType"),
+          type: "select",
+          dictData: this.dict.type.biz_schedule_type,
+        },
       ];
     },
   },

@@ -126,7 +126,7 @@ export default {
           prop: "scmPriority",
           label: this.$t("ui.data.column.monthplan.scmPriority"),
           type: "select",
-          dictData: this.parentDict.type.biz_order_type,
+          dictData: this.parentDict.type.biz_scm_type,
         },
         // {
         //   prop: "area",

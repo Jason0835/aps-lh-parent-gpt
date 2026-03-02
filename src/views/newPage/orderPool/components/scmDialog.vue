@@ -36,10 +36,12 @@ import {
   getSCMData,
   savePoData,
   lockPool,
+  unLockPool
 } from "@/api/newPage/salesOrderPool";
 
 import infoForm from "@/views/components/infoForm.vue";
 import Year from "@/components/Crontab/year.vue";
+import { el } from '@fullcalendar/core/internal-common';
 
 export default {
   components: { infoForm },
@@ -114,6 +116,7 @@ export default {
           },
         ],
       },
+      lockType:'lock',
     };
   },
   computed: {
@@ -154,7 +157,12 @@ export default {
           month: arr[1],
         };
         if (this.isLock) {
-          let res = await lockPool(obj);
+          if(this.lockType=='lock'){
+            let res = await lockPool(obj);
+          }else{
+            let res = await unLockPool(obj);
+          }
+
           this.loading = false;
           this.$modal.msgSuccess(this.$t('common.msg.success.operate'));
           this.$emit("success");
@@ -210,6 +218,7 @@ export default {
     show(data) {
       if (data) {
         this.isLock = true;
+        this.lockType=data
       } else {
         this.isLock = false;
       }

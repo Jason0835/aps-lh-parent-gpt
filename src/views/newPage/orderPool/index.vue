@@ -64,6 +64,13 @@
           @click="lockBtn"
           >{{ $t("ui.data.column.oderPool.lock") }}
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          v-hasPermi="['monthplan:SalesOrderPool:unlock']"
+          @click="unLockBtn"
+          >{{ $t("取消锁定") }}
+        </el-button>
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -424,6 +431,11 @@ export default {
     async lockBtn(){
       if (this.$refs.scmRef) {
         this.$refs.scmRef.show('lock');
+      }
+    },
+    async unLockBtn(){
+      if (this.$refs.scmRef) {
+        this.$refs.scmRef.show('unlock');
       }
     },
     handleAdd() {

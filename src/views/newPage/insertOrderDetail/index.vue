@@ -656,6 +656,11 @@ export default {
             minWidth: 300,
           },
           {
+            label: this.$t("ui.data.column.finishStock.structureName"),
+            width: 180,
+            prop: "structureName",
+          },
+          {
             label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
             prop: "constructionStage",
             minWidth: 100,

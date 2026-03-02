@@ -318,7 +318,7 @@ import {
 } from "@/api/system/dict/type";
 
 export default {
-  name: "/system/dict",
+  name: "Dict",
   dicts: ["sys_normal_disable"],
   data() {
     return {

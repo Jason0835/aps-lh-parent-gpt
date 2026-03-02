@@ -55,3 +55,11 @@ export function lockPool(query) {
 
   })
 }
+export function unLockPool(query) {
+  return request({
+    url: '/monthplan/SalesOrderPool/unlockSalesOrderPool',
+    method: 'post',
+    data: query,
+
+  })
+}
