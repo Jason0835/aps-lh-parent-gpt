@@ -111,7 +111,7 @@ public class MpAdjustStructureOutUIController extends BaseUIController<MpAdjustS
         Integer confirmAdjustQty = mpAdjustStructureOut.getConfirmAdjustQty();
         // 判断确认调整量是否为奇数，若是则返回错误提示
         if (confirmAdjustQty != null && !NumberUtil.isEven(confirmAdjustQty)) {
-            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpAdjustStructureIn.isOddNumber"), mpAdjustStructureOut.getMaterialCode());
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpAdjustStructure.isOddNumber"), mpAdjustStructureOut.getMaterialCode());
             return AjaxResult.error(errorMsg);
         }
         return iMpAdjustStructureOutService.save(mpAdjustStructureOut);
