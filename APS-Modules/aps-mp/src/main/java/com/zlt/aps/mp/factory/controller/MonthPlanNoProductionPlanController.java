@@ -103,7 +103,7 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
 
     @Override
     protected String getOrderBy() {
-        return "STRUCTURE_NAME ASC,SPECIFICATIONS ASC,PATTERN ASC,PRO_SIZE ASC";
+        return "STRUCTURE_NAME,SPECIFICATIONS,MAIN_PATTERN,PATTERN,MAIN_MATERIAL_DESC,PRO_SIZE,UPDATE_TIME DESC";
     }
 
     /**

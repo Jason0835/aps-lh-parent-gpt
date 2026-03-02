@@ -999,7 +999,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return Collections.emptyList();
         }
         List<FactoryMonthPlanFinalAdjustVo> monthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
-        // 筛选调整结果列表（不在调整明细及月度生产计划中）
+        // 筛选调整结果列表（搭配排产新增，不在调整明细及月度生产计划中）
         List<MpAdjustResult>  filterAdjustResultList = filterAdjustResultList(adjustDetailList, adjustResultList, monthPlanProdFinalList);
         if (PubUtil.isEmpty(filterAdjustResultList)) {
             log.warn("过滤后调整结果列表为空，直接返回");
@@ -1015,6 +1015,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String prefixKey = IncrementConstant.MONTH_FINAL + com.ruoyi.common.core.utils.DateUtils.dateTimeNow("yyMMdd");
         // 批次号
         String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
+        // 最新需求计划版本
+        String lastMonthPlanVersion = null;
+        if (PubUtil.isNotEmpty(adjustDetailList)) {
+            lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
+        }
         for (MpAdjustResult adjustResult : filterAdjustResultList) {
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
@@ -1032,6 +1037,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setTrialPlanField(contextDTO, monthPlan);
             // 设置SKU与示方书关联字段
             setSkuConstructionRefField(contextDTO, monthPlan);
+            // 最新需求计划版本
+            monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlanList.add(monthPlan);
         }
         return monthPlanList;
@@ -2603,11 +2610,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MdmSkuConstructionRef skuConstructionRef = MapUtils.getObject(mdmSkuConstructionRefMap, materialCode, new MdmSkuConstructionRef());
         // 胎胚号
         adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
-        // SKU与结构关系列表
-        Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap = contextDTO.getMdmSkuStructureRefMap();
-        MdmSkuStructureRef skuStructureRef = MapUtils.getObject(mdmSkuStructureRefMap, materialCode, new MdmSkuStructureRef());
+        // 物料信息
+        Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
+        MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
         // 结构名称
-        adjustDetailVo.setStructureName(skuStructureRef.getStructureName());
+        adjustDetailVo.setStructureName(materialInfo.getStructureName());
         // 月计划结构转产
         Map<String, List<MpStructureAllocation>> structureAllocationMap = contextDTO.getStructureAllocationMap();
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
@@ -2619,10 +2626,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (monthPlan == null) {
             // SKU日硫化产能
             Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
-            // 物料信息
-            Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
             MdmSkuLhCapacity skuLhCapacity = MapUtils.getObject(mdmSkuLhCapacityMap, materialCode, new MdmSkuLhCapacity());
-            MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
 
             // 无月度生产计划时，返回
             adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
