@@ -634,7 +634,7 @@ public class MatchingProductionHandler {
      */
     private Integer getNextDay(MpRollAdjustContextDTO contextDTO, int day, int endDay) {
         Integer nextDay = 0;
-        for (int i = day; i <= endDay; i ++) {
+        for (int i = day + 1; i <= endDay; i ++) {
             if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
                 nextDay = i;
                 break;
@@ -652,7 +652,7 @@ public class MatchingProductionHandler {
      */
     private Integer getLastDay(MpRollAdjustContextDTO contextDTO, int day, int beginDay) {
         Integer nextDay = 0;
-        for (int i = day; i >= beginDay; i --) {
+        for (int i = day - 1; i >= beginDay; i --) {
             if (this.checkDayCanProduct(contextDTO, day)) { // 下一天是排产日返回，否则跳过看下一天
                 nextDay = i;
                 break;
@@ -1000,7 +1000,9 @@ public class MatchingProductionHandler {
                 dailyCapacityLimitVo.setUsedEmbryoTypes(embryoCodes.size());
             }
         }
-        contextDTO.getLogDetail().append(String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,allocationQty)).append(ApsConstant.DIVISION); // 记录日志
+        String logDetail = String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,allocationQty);
+        log.debug(logDetail);
+        contextDTO.getLogDetail().append(logDetail).append(ApsConstant.DIVISION); // 记录日志
         return allocationQty;
     }
 
