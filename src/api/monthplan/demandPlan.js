@@ -40,3 +40,10 @@ export function getVersionSelect(query) {
     data: query
   })
 }
+export function totalDemandPlan(query) {
+  return request({
+    url: '/monthplan/demandPlanSum/statisticsInfo',
+    method: 'post',
+    data: query
+  })
+}

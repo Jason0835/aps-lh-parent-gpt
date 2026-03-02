@@ -520,9 +520,13 @@ export default {
     },
   },
   created() {
+    // const now = new Date();
+    // const year = now.getFullYear(); // 2024
+    // const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
     const now = new Date();
-    const year = now.getFullYear(); // 2024
-    const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const year = nextMonth.getFullYear();
+      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
     let defaultParams = {
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",

@@ -245,7 +245,7 @@ export default {
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
         },
         {
-          prop: "isSamePatternPanel",
+          prop: "isSamePatterPanel",
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
           width: 80,
           formatter: (row, column, value) => {
@@ -318,7 +318,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
-          prop: "isSamePatternPanel",
+          prop: "isSamePatterPanel",
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },

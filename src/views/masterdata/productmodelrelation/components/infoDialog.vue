@@ -162,7 +162,7 @@ export default {
           disabled:true
         },
         {
-          prop: "isSamePatternPanel",
+          prop: "isSamePatterPanel",
           label: this.$t("ui.data.column.monthplan.samePatternPanel"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,

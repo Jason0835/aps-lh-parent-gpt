@@ -942,7 +942,7 @@ export default {
           {
             prop: "adjustDetail",
             label: this.$t("调整明细"),
-            width:720,
+            width: 720,
             render: ({ row }) => {
               return (
                 <el-popover
@@ -1289,16 +1289,18 @@ export default {
     isPositiveInteger(num) {
       return /^(0|[1-9]\d*)$/.test(num);
     },
+    //判断是否为奇数
+    isEven(number) {
+      return number % 2 === 0;
+    },
+
     async editAdjust(row, type) {
-      // if (!type) {
-      //   if (!this.isNoPositiveInteger(row.confirmAdjustQty)) {
-      //     return this.$modal.msgWarning("不能有小数点");
-      //   }
-      // } else {
-      //   if (!this.isPositiveInteger(row.adjustPriority)) {
-      //     return this.$modal.msgWarning("请输入正整数");
-      //   }
-      // }
+      if (!type) {
+        if(!this.isEven(row.confirmAdjustQty)) {
+          return this.$modal.msgWarning(`物料编码${row.materialCode}--确认调整量不能为奇数`);
+        }
+
+      }
 
       try {
         let res = await saveAdjust(row);
@@ -1316,6 +1318,12 @@ export default {
       //     return this.$modal.msgWarning("请输入正整数");
       //   }
       // }
+      if (!type) {
+        if(!this.isEven(row.confirmAdjustQty)) {
+          return this.$modal.msgWarning(`物料编码${row.materialCode}--确认调整量不能为奇数`);
+        }
+
+      }
       try {
         let res = await editOutHistory(row);
         this.$modal.msgSuccess(res.msg);
@@ -1333,7 +1341,7 @@ export default {
     async getSingleList(params) {
       try {
         let res = await listOutHistory(params);
-        this.data=res.rows
+        this.data = res.rows;
       } catch (err) {
       } finally {
         this.subLoading = false;
@@ -1376,7 +1384,7 @@ export default {
       this.getVersionList();
     },
     //获取版本列表
-    async getVersionList(isGet = false,isNewVersion=false) {
+    async getVersionList(isGet = false, isNewVersion = false) {
       this.loading = true;
       let res;
       try {
@@ -1420,29 +1428,32 @@ export default {
             this.$set(this.search, "productionVersion", list[0].value);
             this.$set(this.query, "productionVersion", list[0].value);
           } else if (this.activeName == "four") {
-            if(this.query.version){
-              let hasVersion = list.some(item=>item.value == this.query.version)
-              if(hasVersion){
+            if (this.query.version) {
+              let hasVersion = list.some(
+                (item) => item.value == this.query.version
+              );
+              if (hasVersion) {
                 this.$set(this.search, "adjVersion", this.query.version);
                 this.$set(this.query, "adjVersion", this.query.version);
-                return
+                return;
               }
             }
             this.$set(this.search, "adjVersion", list[0].value);
             this.$set(this.query, "adjVersion", list[0].value);
-
           } else {
-            if(isNewVersion){
-                this.$set(this.search, "version", list[0].value);
-                this.$set(this.query, "version", list[0].value);
-                return
+            if (isNewVersion) {
+              this.$set(this.search, "version", list[0].value);
+              this.$set(this.query, "version", list[0].value);
+              return;
             }
-            if(this.query.version){
-              let hasVersion = list.some(item=>item.value == this.query.version)
-              if(hasVersion){
+            if (this.query.version) {
+              let hasVersion = list.some(
+                (item) => item.value == this.query.version
+              );
+              if (hasVersion) {
                 this.$set(this.search, "version", this.query.version);
                 this.$set(this.query, "version", this.query.version);
-                return
+                return;
               }
             }
             this.$set(this.search, "version", list[0].value);
@@ -1624,7 +1635,7 @@ export default {
           this.data = res.rows;
         }
         this.getLoading = false;
-        this.getVersionList(false,true);
+        this.getVersionList(false, true);
         this.loading = false;
       } catch (err) {
         this.getLoading = false;
@@ -1833,13 +1844,12 @@ export default {
         if (res.length != 0) {
           this.getStatisticsResult(res[0]);
           this.getSingleList({
-          factoryCode:res[0].factoryCode,
-          year:res[0].year,
-          month:res[0].month,
-          version:res[0].version,
-          productionVersion:res[0].productionVersion
-
-        });
+            factoryCode: res[0].factoryCode,
+            year: res[0].year,
+            month: res[0].month,
+            version: res[0].version,
+            productionVersion: res[0].productionVersion,
+          });
         }
         this.showConfirmResult = true;
 

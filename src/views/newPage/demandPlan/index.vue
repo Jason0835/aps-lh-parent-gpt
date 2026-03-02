@@ -68,6 +68,22 @@
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
       </template>
+      <template slot="headerRight">
+        <span class="stat-info">
+          <span
+            >{{ $t("库存总量") }}:
+            <span class="stat-value"> {{ stat.stockQty }} </span></span
+          >
+          <span
+            >{{ $t("订单总量") }}:
+            <span class="stat-value"> {{ stat.orderQty }} </span></span
+          >
+          <span
+            >{{ $t("排产净需求总量") }}:
+            <span class="stat-value"> {{ stat.netQty }} </span></span
+          >
+        </span>
+      </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
@@ -116,6 +132,7 @@ import {
   saveDemandPlan,
   genenrDemandPlan,
   getVersionSelect,
+  totalDemandPlan
 } from "@/api/monthplan/demandPlan";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoForm from "@/views/components/infoForm.vue";
@@ -190,6 +207,9 @@ export default {
           type: "select",
         },
       ],
+      stat:{
+
+      }
     };
   },
   computed: {
@@ -500,6 +520,7 @@ export default {
           prop: "monthPlanVersion",
           label: this.$t("ui.data.demandPlan.monthPlanVersion"),
           type: "select",
+          clearable: false,
           filterable: true,
           dictData: this.versionList,
         },
@@ -781,10 +802,22 @@ export default {
         const data = await listDemandPlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
+        this.getTotal()
       } catch (error) {
         console.error(error);
       } finally {
         this.loading = false;
+      }
+    },
+    async getTotal(){
+      try {
+
+        const data = await totalDemandPlan(this.formatParams());
+        this.stat=data
+
+      } catch (error) {
+        console.error(error);
+      } finally {this.loading = false;
       }
     },
     async getVersionList(isGet,isSet=true) {
