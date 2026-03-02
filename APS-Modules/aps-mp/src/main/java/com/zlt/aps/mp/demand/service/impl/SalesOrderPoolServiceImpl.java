@@ -423,8 +423,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					if (StringUtils.isEmpty(salCodePo)) {
 						continue;
 					}
-					// 将PO下的所有SKU的供应链优先级 = 找到的最高优先级的值(即供应链优先级值最小的值)；
+					// 将PO下的非暂缓SKU的供应链优先级 = 找到的最高优先级的值(即供应链优先级值最小的值)；
 					newSalesOrderPoolList.stream().filter(s -> salCodePo.equals(s.getSalCodePo()))
+							.filter(item -> !ApsConstant.SAL_PRIORITY_POSTPONE.equals(item.getOrderPriority()))
 							.forEach(s -> s.setScmPriority(scmPriority));
 				}
 
