@@ -151,7 +151,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     	if (salesOrderPool.getYear() == null || salesOrderPool.getMonth() == null) {
             return AjaxResult.error("请输入正确的年月！");
     	}
-        return iSalesOrderPoolService.lockSalesOrderPool(salesOrderPool);
+        return iSalesOrderPoolService.unlockSalesOrderPool(salesOrderPool);
     }
 
     /**
