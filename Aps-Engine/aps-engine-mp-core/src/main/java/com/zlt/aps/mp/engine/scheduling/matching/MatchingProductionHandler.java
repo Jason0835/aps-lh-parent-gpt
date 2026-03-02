@@ -915,6 +915,7 @@ public class MatchingProductionHandler {
         if (canProductionQty <= 0) {
             return 0;
         }
+        boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
         
         // 根据上一天的排产情况判断是否需要换模
         Integer lastDay = this.getLastDay(contextDTO, scheduleDay, beginDay);
@@ -923,6 +924,8 @@ public class MatchingProductionHandler {
         boolean isChangeMould = false;
         if (lastDayProductionList == null) {
             isChangeMould = true;
+        } else if (isRemaindCapacity) {
+            isChangeMould = false; // 补模具产能不需要加模
         } else if (lastDay > 0) {
             if (lastDayProductionList.stream().noneMatch(p -> materialDesc.equals(p.getMaterialDesc()))) {
                 isChangeMould = true; //  昨天没有排产，则需要换模具
@@ -939,7 +942,6 @@ public class MatchingProductionHandler {
 //            // 昨天没有排相同的规格，则需要换或字块
 //            isChangeBlock = lastDayProductionList.stream().noneMatch(p -> materialDesc.equals(p.getMaterialDesc()));
 //        }
-        boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
 
         if (isChangeMould && mouldCavityQty < lhMouldQty) { // 需要换模，且剩余型腔数不足最低排产模具数，结束
             return 0;
