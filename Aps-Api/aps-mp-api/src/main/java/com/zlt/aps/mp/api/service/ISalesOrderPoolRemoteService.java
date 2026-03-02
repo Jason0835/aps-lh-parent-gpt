@@ -1,22 +1,15 @@
 package com.zlt.aps.mp.api.service;
 
-import java.util.List;
-
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
-
 import io.swagger.annotations.ApiOperation;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 
 /**
@@ -63,7 +56,14 @@ public interface ISalesOrderPoolRemoteService {
     @ApiOperation("锁定订单池")
     @PostMapping("/SalesOrderPool/lockSalesOrderPool")
     AjaxResult lockSalesOrderPool(@RequestBody SalesOrderPool salesOrderPool);
-    
+
+    /**
+    * 解锁订单池
+    */
+    @ApiOperation("解锁订单池")
+    @PostMapping("/SalesOrderPool/unlockSalesOrderPool")
+    AjaxResult unlockSalesOrderPool(@RequestBody SalesOrderPool salesOrderPool);
+
     /**
      * 删除
      */

@@ -28,26 +28,33 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @return
 	 */
 	AjaxResult editBySalCodePo(SalesOrderPool salesOrderPool);
-	
+
 	/**
 	 * 校验SCM已计划未发货数据
 	 * @param salesOrderPool
 	 * @return
 	 */
 	AjaxResult checkSCMData(SalesOrderPool salesOrderPool);
-	
+
 	/**
 	 * 抓取SCM已计划未发货数据
 	 * @param salesOrderPool
 	 * @return
 	 */
 	AjaxResult getSCMData(SalesOrderPool salesOrderPool);
-	
+
 	/**
 	 * 锁定订单池
 	 * @return
 	 */
 	AjaxResult lockSalesOrderPool(SalesOrderPool billVO);
+
+	/**
+	 * 解锁订单池
+	 * @return 结果
+	 */
+	AjaxResult unlockSalesOrderPool(SalesOrderPool billVO);
+
 	/**
 	 * 获取销售订单
 	 * @param factoryCode
