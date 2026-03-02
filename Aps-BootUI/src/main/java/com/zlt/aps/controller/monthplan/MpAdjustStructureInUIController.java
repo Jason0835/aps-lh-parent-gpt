@@ -1,5 +1,7 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.util.NumberUtil;
+import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -107,7 +109,13 @@ public class MpAdjustStructureInUIController extends BaseUIController<MpAdjustSt
         if (UserConstants.NOT_UNIQUE.equals(iMpAdjustStructureInService.checkUnique(mpAdjustStructureIn))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpAdjustStructureIn.checkUnique"));
         }
-
+        // 确认调整量
+        Integer confirmAdjustQty = mpAdjustStructureIn.getConfirmAdjustQty();
+        // 判断确认调整量是否为奇数，若是则返回错误提示
+        if (confirmAdjustQty != null && !NumberUtil.isEven(confirmAdjustQty)) {
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpAdjustStructureIn.isOddNumber"), mpAdjustStructureIn.getMaterialCode());
+            return AjaxResult.error(errorMsg);
+        }
         return iMpAdjustStructureInService.save(mpAdjustStructureIn);
     }
 
