@@ -1548,6 +1548,7 @@ public class MpWeekRollAdjustEngine {
                     //若是量试，但该日不能排，则继续
                     continue;
                 }
+                //注：这里不能做预检查，会导致可以拼的SKU被忽略掉
                 //adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
                 //contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,dailyCapacityLimitVoMap.get(i).toString())).append(ApsConstant.DIVISION);
                 //检查：主花纹向下模具数量(/2转成机台数) 符合性
