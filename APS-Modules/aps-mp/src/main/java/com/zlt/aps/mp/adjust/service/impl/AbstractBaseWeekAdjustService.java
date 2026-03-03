@@ -18,6 +18,7 @@ import com.zlt.aps.constant.IncrementConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.utils.IncrementService;
 import com.zlt.aps.utils.ThreadPoolUtil;
@@ -156,8 +157,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     private MessageServiceUtils messageServiceAdapter;
 
     @Autowired
-    private DataManager dataManager;
+    protected DataManager dataManager;
 
+    @Autowired
+    protected DpDemandPlanEntityMapper demandPlanEntityMapper;
 
     @Override
     public void generateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -918,12 +921,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 构建分组key
             String groupKey = buildGroupKey(adjustDetailVo);
             // 匹配汇总后调整结果
-            MpAdjustResult adjustResult = summaryAdjustResult.getOrDefault(groupKey, new MpAdjustResult());
-
+            MpAdjustResult adjustResult = summaryAdjustResult.getOrDefault(groupKey, null);
+            if (adjustResult == null) {
+                log.warn("新增月度生产计划 ==> 物料编码:{} 对应的调整结果为空，跳过不处理", adjustDetailVo.getMaterialCode());
+                continue;
+            }
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
             monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
+            if (adjustDetailVo.getYear() != null && adjustDetailVo.getMonth() != null) {
+                monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustDetailVo.getYear(), adjustDetailVo.getMonth())));
+            }
             if (adjustResult.getYear() != null && adjustResult.getMonth() != null) {
                 monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustResult.getYear(), adjustResult.getMonth())));
             }
@@ -1017,9 +1026,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
         // 最新需求计划版本
         String lastMonthPlanVersion = null;
+        // 需求计划版本
+        String monthPlanVersion = null;
         if (PubUtil.isNotEmpty(adjustDetailList)) {
             lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
+            monthPlanVersion = adjustDetailList.get(0).getMonthPlanVersion();
         }
+        contextDTO.setMonthPlanVersion(monthPlanVersion);
+        // 获取需求计划Map（按照物料编码分组）
+        Map<String, DpDemandPlan> demandPlanMap = getDemandPlanMap(contextDTO);
+        // 循环构建月度计划
         for (MpAdjustResult adjustResult : filterAdjustResultList) {
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
@@ -1031,6 +1047,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
             monthPlan.setProductionNo(productionNo);
+            // 根据物料编码获取需求计划
+            DpDemandPlan demandPlan = demandPlanMap.getOrDefault(adjustResult.getMaterialCode(), new DpDemandPlan());
+            // 排产分类
+            monthPlan.setProductionType(demandPlan.getProductionType());
+            // 施工阶段
+            monthPlan.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
+            // 产品状态
+            monthPlan.setProductStatus(ConstructionStageEnum.FORMAL_FLAG);
             // 设置物料信息关联字段
             setMaterialInfoField(contextDTO, monthPlan);
             // 设置试制量试关联字段
@@ -1043,6 +1067,50 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         return monthPlanList;
     }
+
+
+    /**
+     * 查询需求计划列表
+     * @param queryVo
+     * @return
+     */
+    protected List<DpDemandPlan> queryDemandPlanList(DpDemandPlan queryVo) {
+        LambdaQueryWrapper<DpDemandPlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DpDemandPlan::getFactoryCode, queryVo.getFactoryCode());
+        wrapper.eq(DpDemandPlan::getYear, queryVo.getYear());
+        wrapper.eq(DpDemandPlan::getMonth, queryVo.getMonth());
+        wrapper.eq(DpDemandPlan::getMonthPlanVersion, queryVo.getMonthPlanVersion());
+        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
+        return demandPlanEntityMapper.selectList(wrapper);
+    }
+
+    /**
+     * 获取需求计划Map（按照物料编码分组）
+     * @param contextDTO
+     * @return
+     */
+    protected Map<String, DpDemandPlan> getDemandPlanMap(MpRollAdjustContextDTO contextDTO) {
+        // 构建需求计划查询条件
+        DpDemandPlan queryVo = new DpDemandPlan();
+        queryVo.setFactoryCode(contextDTO.getFactoryCode());
+        queryVo.setYear(contextDTO.getMpYear());
+        queryVo.setMonth(contextDTO.getMpMonth());
+        queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
+        // 查询需求计划列表
+        List<DpDemandPlan> demandPlanList = queryDemandPlanList(queryVo);
+        if (PubUtil.isEmpty(demandPlanList)) {
+            return Collections.emptyMap();
+        }
+        // 按照物料编码分组
+        return demandPlanList.stream()
+                .filter(demandPlan -> StringUtils.isNotEmpty(demandPlan.getMaterialCode()))
+                .collect(Collectors.toMap(
+                        DpDemandPlan::getMaterialCode,
+                        demandPlan -> demandPlan,
+                        (existingVal, newVal) -> newVal
+                ));
+    }
+
 
     /**
      * 设置物料信息关联字段
@@ -1097,10 +1165,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .filter(vo -> vo.getMaterialCode().equals(materialCode))
                 .findFirst()
                 .orElse(null);
-        // 施工阶段
-        monthPlan.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
-        // 产品状态
-        monthPlan.setProductStatus(ConstructionStageEnum.FORMAL_FLAG);
         if (trialPlan != null) {
             // 施工阶段
             monthPlan.setConstructionStage(trialPlan.getTrialStatus());
