@@ -338,6 +338,7 @@ export default {
   },
   data() {
     return {
+      subDayNum:0,
       loadText: "正在加载中...",
       //结构外调整结果列表
       outResultData: [],
@@ -1131,7 +1132,7 @@ export default {
           width: 120,
         },
       ];
-      const days = 31;
+      const days = this.subDayNum || 31;
       for (let i = 0; i < days; i++) {
         list.push({
           label: `${i + 1}号`,
@@ -1296,10 +1297,11 @@ export default {
 
     async editAdjust(row, type) {
       if (!type) {
-        if(!this.isEven(row.confirmAdjustQty)) {
-          return this.$modal.msgWarning(`物料编码${row.materialCode}--确认调整量不能为奇数`);
+        if (!this.isEven(row.confirmAdjustQty)) {
+          return this.$modal.msgWarning(
+            `物料编码${row.materialCode}--确认调整量不能为奇数`
+          );
         }
-
       }
 
       try {
@@ -1319,10 +1321,11 @@ export default {
       //   }
       // }
       if (!type) {
-        if(!this.isEven(row.confirmAdjustQty)) {
-          return this.$modal.msgWarning(`物料编码${row.materialCode}--确认调整量不能为奇数`);
+        if (!this.isEven(row.confirmAdjustQty)) {
+          return this.$modal.msgWarning(
+            `物料编码${row.materialCode}--确认调整量不能为奇数`
+          );
         }
-
       }
       try {
         let res = await editOutHistory(row);
@@ -1642,6 +1645,11 @@ export default {
         this.loading = false;
       }
     },
+    getDaysInMonth(year, month) {
+      // 注意：JavaScript中月份从0开始，所以需要将传入的月份减1
+      // 将日期设置为下个月的第0天，即当前月的最后一天
+      return new Date(year, month, 0).getDate();
+    },
     async getSubList(row) {
       this.subTableData = [];
       try {
@@ -1683,7 +1691,10 @@ export default {
 
         //   this.subTableData = res.rows;
         // } catch (err) {}
+        this.subDayNum=this.getDaysInMonth(row.year, row.month)
         this.getSubList(row);
+
+        console.log();
         this.expands.push(row ? row.id : []);
         console.log("展开");
         // this.getSubList(row.id);
