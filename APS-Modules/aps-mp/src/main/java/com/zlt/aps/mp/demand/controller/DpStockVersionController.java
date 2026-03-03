@@ -169,5 +169,9 @@ public class DpStockVersionController extends AbstractDocBizController<DpStockVe
         return "2025122021";
     }
 
-
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    public AjaxResult findMonthPlanVersion(@RequestBody DpStockVersion queryCondition) {
+        return AjaxResult.success(dpStockVersionService.findMonthPlanVersion(queryCondition));
+    }
 }

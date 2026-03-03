@@ -2,31 +2,26 @@ package com.zlt.aps.mp.demand.service.impl;
 
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpStockVersion;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.aps.mp.common.utils.BatchInsertProcessor;
+import com.zlt.aps.mp.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpStockVersionService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
-
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
 import org.springframework.transaction.annotation.Transactional;
-
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 import org.springframework.util.CollectionUtils;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -48,6 +43,7 @@ import org.springframework.util.CollectionUtils;
 public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion>  implements IDpStockVersionService {
     // 批量插入处理器
     private final BatchInsertProcessor<DpStockVersion> batchInsertProcessor;
+    private final DpStockVersionEntityMapper dpStockVersionEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2025122021";
@@ -113,5 +109,21 @@ public class DpStockVersionServiceImpl extends AbstractDocService<DpStockVersion
             .flatMap(List::stream)
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取需求计划版本号列表
+     *
+     * @param queryCondition 查询条件
+     * @return 需求计划版本号列表
+     */
+    @Override
+    public List<String> findMonthPlanVersion(DpStockVersion queryCondition) {
+        return dpStockVersionEntityMapper.selectDistinctMonthPlanVersion(
+                queryCondition.getFactoryCode(),
+                queryCondition.getYear(),
+                queryCondition.getMonth(),
+                YesOrNoEnum.NO.getValue()
+        );
     }
 }
