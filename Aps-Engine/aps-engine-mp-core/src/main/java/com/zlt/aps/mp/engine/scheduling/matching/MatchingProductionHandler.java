@@ -284,6 +284,7 @@ public class MatchingProductionHandler {
             int capacity = this.getMdmSkuLhCapacity(contextDTO, CollectionUtils.firstElement(needProductPlanList).getMaterialCode(), mdmSkuLhCapacityMap); // 产能
             FactoryMonthPlanFinalAdjustVo plan = this.getFinalPlanByMaterialDesc(contextDTO, materialDesc,
                     mpProdFinalList, needProductPlanList, mdmSkuConstructionRefMap, capacity); // 获取定稿计划
+            boolean isNewPlan = plan.getBeginDay() == null;
             
             int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 储备量
             unAllocationQty = isSpecial? Math.min(unAllocationQty, unAllocatSpecStructureTotalQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
@@ -339,8 +340,8 @@ public class MatchingProductionHandler {
                     break out;
                 }
             } while (true);
-            if (plan.getBeginDay() == null) { // 没能排上的规格需要删除掉
-                mpProdFinalList.remove(plan);
+            if (isNewPlan && plan.getBeginDay() != null) { // 排上的规格添加导列表中
+                mpProdFinalList.add(plan);
             }
         } while (true);
         log.info("周程滚动搭配算法end");
@@ -789,7 +790,6 @@ public class MatchingProductionHandler {
             for (int day = 1; day <= MAX_MONTH_DAY; day++) {
                 plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, null); // 清空每天排产量
             }
-            mpProdFinalList.add(plan);
         }
         return plan;
     }
