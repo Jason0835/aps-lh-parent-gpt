@@ -683,7 +683,7 @@ public class MatchingProductionHandler {
      * 获取上一个排产日
      * @param contextDTO
      * @param day
-     * @param endDay
+     * @param beginDay
      * @return
      */
     private Integer getLastDay(MpRollAdjustContextDTO contextDTO, int day, int beginDay) {
@@ -1178,8 +1178,10 @@ public class MatchingProductionHandler {
             }
             
             productionPlanList.forEach(plan -> {
-                int productionQty = plan.getConventionReserveQty() // 生产量替换成搭配量
-                        .intValue();
+                // 生产量替换成搭配量
+                int productionQty = plan.getConventionReserveQty();
+                //因搭配量只有一条计划，故而可以直接处理奇数，遇到奇数直接+1
+                productionQty = (productionQty & 1) == 0 ? productionQty : productionQty + 1;
                 plan.setProductionQty(productionQty);
                 if (productionQty > 0) {
                     plan.setProductionFlag(YesOrNoEnum.YES.getCode()); // 设置成应生产
@@ -1589,7 +1591,6 @@ public class MatchingProductionHandler {
      * @param groupInfo          排产计划分组
      * @param continueInfo       首日续作规格
      * @param limitMap           排产限制
-     * @param cxMachineInfo      新增sku安排的机台
      */
     private Set<String> matchingScheduleNewSchedule(TbrProductionContext productionContext, String materialDesc,
                                                     SkuNeedProductionInfo needProductionInfo,
@@ -1758,7 +1759,6 @@ public class MatchingProductionHandler {
      * @param productionPlanList
      * @param productionQty
      * @param maxProductionQty
-     * @param lhMouldQty
      * @param beginDate
      * @param endDate
      * @param continueMouldList
@@ -1870,7 +1870,8 @@ public class MatchingProductionHandler {
      * 构建排产结果并保存
      *
      * @param productionContext
-     * @param planList
+     * @param resultList
+     * @param detailList
      * @param newSkuQtyMap
      */
     @Transactional
@@ -2175,7 +2176,7 @@ public class MatchingProductionHandler {
     /**
      * 将周程滚动上下文构建成算法要求的上下文结构
      *
-     * @param result 定稿计划
+     * @param contextDTO 定稿计划
      * @return
      */
     private TbrProductionContext initProductionContext(MpRollAdjustContextDTO contextDTO) {
@@ -2197,7 +2198,7 @@ public class MatchingProductionHandler {
      * 将定稿计划和需求计划构建成算法要求的上下文结构
      *
      * @param planList       定稿计划
-     * @param demandPlanList 需求计划
+     * @param requirePlanList 需求计划
      * @return
      */
     private TbrProductionContext buildProductionContext(TbrProductionContext productionContext,
@@ -2274,8 +2275,8 @@ public class MatchingProductionHandler {
      * 构建模具排产集合
      *
      * @param productionContext
-     * @param planList
-     * @param requirePlanList
+     * @param detailLogList
+     * @param requirePlanMap
      * @return
      */
     private Map<String, ProductionMouldInfoVo> buildMouldInfoMap(TbrProductionContext productionContext,
