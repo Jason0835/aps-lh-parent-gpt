@@ -1,7 +1,6 @@
 package com.zlt.aps.mp.demand.service;
 
 
-
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpStockVersion;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
@@ -30,4 +29,11 @@ public interface IDpStockVersionService  extends IDocService<DpStockVersion>{
    * @param finishedProductStockMap 成品库存记录
    */
   void insertBatchData(DpDemandPlan demandPlan, Map<String, List<MdmProductStock>> finishedProductStockMap);
+
+  /**
+   *  获取需求计划版本号列表
+   * @param queryCondition 查询条件
+   * @return 需求计划版本号列表
+   */
+  List<String> findMonthPlanVersion(DpStockVersion queryCondition);
 }

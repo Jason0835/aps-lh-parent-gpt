@@ -201,4 +201,13 @@ public class DpStockVersionUIController extends BaseUIController<DpStockVersion>
         return ajaxResult;
     }
 
+    /**
+     * 查询需求计划版本号
+     */
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/findMonthPlanVersion")
+    @ResponseBody
+    public AjaxResult findMonthPlanVersion(DpStockVersion queryCondition) {
+        return iMdmFinishStockService.findMonthPlanVersion(queryCondition);
+    }
 }
