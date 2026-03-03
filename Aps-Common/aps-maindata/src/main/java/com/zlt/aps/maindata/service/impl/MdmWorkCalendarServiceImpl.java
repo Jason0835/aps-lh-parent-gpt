@@ -1,14 +1,16 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
@@ -21,10 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -93,6 +92,19 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         // 唯一校验字段
         return new ArrayList<>(Arrays.asList("factoryCode", "procCode", "year", "month", "day"));
     }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MdmWorkCalendar importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        Date productionDate = importDocEntity.getProductionDate();
+        int year = DateUtils.getYear(productionDate);
+        int month = DateUtils.getMonth(productionDate);
+        int day = DateUtils.getDay(productionDate);
+        importDocEntity.setYear(year);
+        importDocEntity.setMonth(month);
+        importDocEntity.setDay(day);
+        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+    }
+
     @Autowired
     private ISysDictDataCacheService iSysDictDataCacheService;
 
