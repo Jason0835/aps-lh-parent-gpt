@@ -242,7 +242,11 @@ public class MesItfServiceImpl implements MesItfService {
                 String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
-                    stock.setStockDate(mdmProductStock.getStockDate());
+                    try {
+                        stock.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
+                    } catch (ParseException e) {
+                        throw new RuntimeException(e);
+                    }
                     stock.setMaterialDesc(materialInfo.getMaterialDesc());
                     stock.setStructureName(materialInfo.getStructureName());
                     stock.setBrand(materialInfo.getBrand());
@@ -494,6 +498,11 @@ public class MesItfServiceImpl implements MesItfService {
         // 查询视图
         List<MdmUnqualifiedStock> unqualifiedStockList = mesViewMapper.selectUnqualifiedStock(mdmUnqualifiedStock);
         for (MdmUnqualifiedStock unqualifiedStock : unqualifiedStockList) {
+            try {
+                unqualifiedStock.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
             Date stockDate = unqualifiedStock.getStockDate();
             unqualifiedStock.setYear(DateUtils.getYear(stockDate));
             unqualifiedStock.setMonth(DateUtils.getMonth(stockDate));
@@ -548,6 +557,11 @@ public class MesItfServiceImpl implements MesItfService {
         // 查询视图
         List<RawSpecialMaterialStock> stockList = mesViewMapper.selectRawSpecialMaterialStock(rawSpecialMaterialStock);
         for (RawSpecialMaterialStock stock : stockList) {
+            try {
+                stock.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
             Date stockDate = stock.getStockDate();
             stock.setYear(DateUtils.getYear(stockDate));
             stock.setMonth(DateUtils.getMonth(stockDate));

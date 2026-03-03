@@ -91,10 +91,10 @@ public class MesItfController {
         if (StringUtils.isBlank(factoryCode)) {
             mdmProductStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        Date stockDate = mdmProductStock.getStockDate();
+        /*Date stockDate = mdmProductStock.getStockDate();
         if (Objects.isNull(stockDate)) {
             mdmProductStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
-        }
+        }*/
         String productTypeCode = mdmProductStock.getProductTypeCode();
         if (StringUtils.isBlank(productTypeCode)) {
             mdmProductStock.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
@@ -138,10 +138,10 @@ public class MesItfController {
         if (StringUtils.isBlank(factoryCode)) {
             mdmProductStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        Date stockDate = mdmProductStock.getStockDate();
+        /*Date stockDate = mdmProductStock.getStockDate();
         if (Objects.isNull(stockDate)) {
             mdmProductStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
-        }
+        }*/
         String productTypeCode = mdmProductStock.getProductTypeCode();
         if (StringUtils.isBlank(productTypeCode)) {
             mdmProductStock.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
@@ -162,10 +162,10 @@ public class MesItfController {
         if (StringUtils.isBlank(factoryCode)) {
             mdmUnqualifiedStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        Date stockDate = mdmUnqualifiedStock.getStockDate();
+        /*Date stockDate = mdmUnqualifiedStock.getStockDate();
         if (Objects.isNull(stockDate)) {
             mdmUnqualifiedStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
-        }
+        }*/
         return mesItfService.syncUnqualifiedStock(mdmUnqualifiedStock);
     }
 
@@ -182,10 +182,10 @@ public class MesItfController {
         if (StringUtils.isBlank(factoryCode)) {
             mdmUnqualifiedStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        Date stockDate = mdmUnqualifiedStock.getStockDate();
+        /*Date stockDate = mdmUnqualifiedStock.getStockDate();
         if (Objects.isNull(stockDate)) {
             mdmUnqualifiedStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
-        }
+        }*/
         return mesItfService.getUnqualifiedStock(mdmUnqualifiedStock);
     }
 
@@ -202,10 +202,10 @@ public class MesItfController {
         if (StringUtils.isBlank(factoryCode)) {
             rawSpecialMaterialStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        Date stockDate = rawSpecialMaterialStock.getStockDate();
+        /*Date stockDate = rawSpecialMaterialStock.getStockDate();
         if (Objects.isNull(stockDate)) {
             rawSpecialMaterialStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
-        }
+        }*/
         return mesItfService.syncRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
@@ -222,10 +222,10 @@ public class MesItfController {
         if (StringUtils.isBlank(factoryCode)) {
             rawSpecialMaterialStock.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        Date stockDate = rawSpecialMaterialStock.getStockDate();
+        /*Date stockDate = rawSpecialMaterialStock.getStockDate();
         if (Objects.isNull(stockDate)) {
             rawSpecialMaterialStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
-        }
+        }*/
         return mesItfService.getRawSpecialMaterialStock(rawSpecialMaterialStock);
     }
 
