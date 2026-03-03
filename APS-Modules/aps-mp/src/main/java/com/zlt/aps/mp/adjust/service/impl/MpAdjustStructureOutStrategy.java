@@ -320,7 +320,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         //7 执行结构间搭配排产,暂不考虑特殊结构
         //=========================================================
-        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList);
+        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList, false);
         //=========================================================
 
         //8.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数

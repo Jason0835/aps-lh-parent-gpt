@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.service.impl;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -266,6 +267,9 @@ public class MesBomItfServiceImpl implements MesBomItfService {
             // 5.1、构建bom树路径，从叶子节点开始向上
             pathList.clear();
             MdmBomInfo currentNode = bom; // 当前节点
+            if (StringUtils.isEmpty(bom.getChildMaterialCode())) {
+                continue;
+            }
             do {
                 if (currentNode == null || pathList.contains(currentNode)) { // 编号为空或者死循环了，结束
                     break;

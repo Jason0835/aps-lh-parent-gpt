@@ -159,7 +159,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 //2.4 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
                 //=========================================================
                 matchingProductionHandler.structureAdjuestBoots(copyContextDTO, oneStructMpFinalList); // 补量
-                matchingProductionHandler.matchingAdjustProduction(copyContextDTO, oneStructMpFinalList); // 搭配
+                matchingProductionHandler.matchingAdjustProduction(copyContextDTO, oneStructMpFinalList, true); // 搭配
                 //=========================================================
 
                 //2.5.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
