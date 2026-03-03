@@ -1018,6 +1018,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         initTrialPlan(contextDTO);
         // 初始化物料信息
         initMaterialInfo(contextDTO);
+        // 初始化SKU日硫化产能
+        initSkuLhCapacity(contextDTO);
         // 月度计划结果列表
         List<FactoryMonthPlanProductionFinalResult> monthPlanList = new ArrayList<>();
         // 批次号前缀
@@ -1032,7 +1034,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
             monthPlanVersion = adjustDetailList.get(0).getMonthPlanVersion();
         }
-        contextDTO.setMonthPlanVersion(monthPlanVersion);
+        contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
         // 获取需求计划Map（按照物料编码分组）
         Map<String, DpDemandPlan> demandPlanMap = getDemandPlanMap(contextDTO);
         // 循环构建月度计划
@@ -1061,6 +1063,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setTrialPlanField(contextDTO, monthPlan);
             // 设置SKU与示方书关联字段
             setSkuConstructionRefField(contextDTO, monthPlan);
+            // 设置SKU日硫化产能关联字段
+            setLhCapacityField(contextDTO, monthPlan);
+            // 设置活块、型腔数量
+            setMoldCavityInsertField(contextDTO, monthPlan);
             // 最新需求计划版本
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
             monthPlanList.add(monthPlan);
@@ -1095,7 +1101,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVo.setFactoryCode(contextDTO.getFactoryCode());
         queryVo.setYear(contextDTO.getMpYear());
         queryVo.setMonth(contextDTO.getMpMonth());
-        queryVo.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
+        queryVo.setMonthPlanVersion(contextDTO.getAdjustMonthPlanVersion());
         // 查询需求计划列表
         List<DpDemandPlan> demandPlanList = queryDemandPlanList(queryVo);
         if (PubUtil.isEmpty(demandPlanList)) {
@@ -1109,6 +1115,28 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                         demandPlan -> demandPlan,
                         (existingVal, newVal) -> newVal
                 ));
+    }
+
+
+    /**
+     * 设置SKU日硫化产能关联字段
+     * @param contextDTO
+     * @param monthPlan
+     */
+    private void setLhCapacityField(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanProductionFinalResult monthPlan) {
+        // SKU日硫化产能Map
+        Map<String, MdmSkuLhCapacity> skuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
+        if (PubUtil.isEmpty(skuLhCapacityMap)) {
+            return;
+        }
+        // 物料编码
+        String materialCode = monthPlan.getMaterialCode();
+        // 通过物料编码获取SKU日硫化产能
+        MdmSkuLhCapacity skuLhCapacity = skuLhCapacityMap.getOrDefault(materialCode, new MdmSkuLhCapacity());
+        // 日硫化量
+        monthPlan.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
+        // 单条硫化时间
+        monthPlan.setCuringTime(skuLhCapacity.getVulcanizationTime());
     }
 
 
@@ -1455,6 +1483,42 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * 设置活块、型腔数量
+     * @param contextDTO
+     * @param monthPlan
+     */
+    private void setMoldCavityInsertField(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanProductionFinalResult monthPlan) {
+        List<DailyMouldAvailabilityResult> moldCavityInsertMap = null;
+        try {
+            // 计算型腔、活块可用量最大值
+            moldCavityInsertMap = calculateMoldCavityInsertMaxValue(contextDTO);
+        } catch (Exception e) {
+            log.error("构建搭配排产新增月度计划 ==> 计算型腔、活块可用量最大值失败! 原因:{}", e.getMessage(), e);
+        }
+        if (PubUtil.isEmpty(moldCavityInsertMap)) {
+            return;
+        }
+        // 型腔可用量（按结构+主花纹分组）
+        Map<String, Integer> cavityResults = moldCavityInsertMap.get(0).getCavityResults();
+        // 活块可用量（按物料描述分组）
+        Map<String, Integer> insertResults = moldCavityInsertMap.get(0).getInsertResults();
+        // 设置型腔数量
+        String mouldCavityKey = monthPlan.getStructureName() + monthPlan.getMainPattern();
+        if (cavityResults != null && cavityResults.containsKey(mouldCavityKey)) {
+            monthPlan.setMouldCavityQty(MapUtils.getInteger(cavityResults, mouldCavityKey, 0));
+        }else {
+            monthPlan.setMouldCavityQty(Integer.valueOf(0));
+        }
+        // 设置活块数量
+        String typeBlockKey = monthPlan.getMaterialDesc();
+        if (insertResults != null && insertResults.containsKey(typeBlockKey)) {
+            monthPlan.setTypeBlockQty(MapUtils.getInteger(insertResults, typeBlockKey, 0));
+        }else {
+            monthPlan.setTypeBlockQty(Integer.valueOf(0));
+        }
+    }
+
+    /**
      * 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
      * @param contextDTO
      * @param monthPlan
@@ -1480,6 +1544,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setTextNo(mdmSkuConstructionRef.getTextNo());
             // 硫化示方书号
             monthPlan.setLhNo(mdmSkuConstructionRef.getLhNo());
+            // 主物料(胎胚号)
+            monthPlan.setMainMaterialDesc(mdmSkuConstructionRef.getMainMaterialDesc());
         }
     }
 
