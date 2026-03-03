@@ -1034,6 +1034,9 @@ public class MatchingProductionHandler {
      */
     private Integer getDayUsedLhMachines(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
                                          Integer day, Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
+        if (day <=0){
+            return 0;
+        }
         MpDailyCapacityLimitVo oldDailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
         MpDailyCapacityLimitVo newDailyCapacityLimitVo = new MpDailyCapacityLimitVo();
         newDailyCapacityLimitVo.setDayOpenCloseFlag(oldDailyCapacityLimitVo.getDayOpenCloseFlag());
