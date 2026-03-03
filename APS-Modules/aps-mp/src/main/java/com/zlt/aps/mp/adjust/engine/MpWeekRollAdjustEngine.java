@@ -1049,8 +1049,11 @@ public class MpWeekRollAdjustEngine {
                         }
                         curMachines = intPart + (remainPart > 0 ? 1:0);
                         if (startMachines < curMachines){
-                            //若还没有达到当前已有机台数，直接退
+                            //若还没有达到当前已有机台数，直接退,让其往上加机台
                             break;
+                        }
+                        if (startMachines == curMachines && remainPart == 0){
+                            continue;
                         }
                         //3.1 计算产能限制
                         adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,m, dailyCapacityLimitVoMap.get(m), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
