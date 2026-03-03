@@ -158,6 +158,14 @@ public class MatchingProductionHandler {
      * @param productionVersion 生产版本
      */
     public void matchingProduction(String productionVersion) {
+        try {
+            String config = sysConfigService.selectConfigByKey("monthPlan.skip.matching");
+            if (StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+                return; // 跳过搭配开关打开，则直接返回
+            }
+        } catch (Exception e) {
+            log.error("获取配置失败", e);
+        }
         // 查询月度计划排产结果
         LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> queryWrapper = new LambdaQueryWrapper<FactoryMonthPlanMouldDayResult>();
         queryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, productionVersion);
