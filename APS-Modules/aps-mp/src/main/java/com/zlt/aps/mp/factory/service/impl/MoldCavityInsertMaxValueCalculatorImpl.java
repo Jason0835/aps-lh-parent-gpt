@@ -64,7 +64,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      * @param year              年份    :  必须传入  -  抛出异常
      * @param month             月份    :  必须传入  -  抛出异常
      * @param factoryCode       工厂代码:  必须传入  -  抛出异常
-     * @param targetDate        指定日期:  必须传入
+     * @param targetDate        指定日期:  可以不传
      * @param monthPlanVersion  净需求计划版本号: 可以不传 -- 注意：不传不考虑净需求计划直接取所有
      * @return 计算结果：DailyMouldAvailabilityResult
      * @throws Exception 抛出异常各自处理
