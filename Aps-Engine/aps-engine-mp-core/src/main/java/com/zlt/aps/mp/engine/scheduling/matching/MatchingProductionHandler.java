@@ -213,12 +213,11 @@ public class MatchingProductionHandler {
      * 周程滚动的结构内搭配算法
      * 
      * @param contextDTO              周程滚动调整上下文
-     * @param mpAdjustStructureInList 结构内调整记录列表
      * @param mpProdFinalList         月计划定稿表列表（只有当前结构的记录）
      * @param isInner                 是否结构内调整
      */
     public void matchingAdjustProduction(MpRollAdjustContextDTO contextDTO,
-                                         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+                                         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, boolean isInner) {
         try {
             String config = sysConfigService.selectConfigByKey("monthAdjust.skip.matching");
             if (StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
@@ -235,8 +234,8 @@ public class MatchingProductionHandler {
         if (endDay <= lockEndDay) { // 结束日在锁定日结束前的结构不搭配
             return;
         }
-        // 特殊材料可搭配量校验
-        boolean isSpecial = Optional.ofNullable(contextDTO.getSpecStructureTotalQty()).orElse(0) > 0;
+        // 特殊材料可搭配量校验（只有结构内需要考虑）
+        boolean isSpecial = isInner && Optional.ofNullable(contextDTO.getSpecStructureTotalQty()).orElse(0) > 0;
         Integer unAllocatSpecStructureTotalQty = 0;
         if (isSpecial) {
             Integer totalQty = mpProdFinalList.stream().filter(p -> p.getTotalQty() != null).mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
