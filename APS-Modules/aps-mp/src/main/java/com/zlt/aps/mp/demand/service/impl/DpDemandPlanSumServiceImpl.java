@@ -10,7 +10,6 @@ import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
-import com.zlt.aps.mp.demand.mapper.DpStockVersionEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -44,7 +43,6 @@ import java.util.List;
 public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanSum>  implements IDpDemandPlanSumService {
     private final DpDemandPlanEntityMapper demandPlanEntityMapper;
     private final DpDemandPlanSumEntityMapper dpDemandPlanSumEntityMapper;
-    private final DpStockVersionEntityMapper dpStockVersionEntityMapper;
     @Override
     protected String getDocTypeCode() {
         return "2026012216";
@@ -91,7 +89,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
 
     @Override
     public List<String> findMonthPlanVersion(DpDemandPlanSum queryCondition) {
-        return dpStockVersionEntityMapper.selectDistinctMonthPlanVersion(
+        return dpDemandPlanSumEntityMapper.selectDistinctMonthPlanVersion(
             queryCondition.getFactoryCode(),
             queryCondition.getYear(),
             queryCondition.getMonth(),

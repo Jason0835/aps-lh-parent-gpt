@@ -294,8 +294,9 @@ public class MatchingProductionHandler {
             boolean isNewPlan = plan.getBeginDay() == null;
             
             int conventionReserveQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 储备量
-            int conventionProductionQty = Optional.ofNullable(plan.getConventionProductionQty()).orElse(0); // 已搭配量
-            int unAllocationQty = conventionReserveQty - conventionProductionQty; // 剩余搭配量 = 储备量 - 已搭配量
+//            int conventionProductionQty = Optional.ofNullable(plan.getConventionProductionQty()).orElse(0); // 已搭配量
+//            int unAllocationQty = conventionReserveQty - conventionProductionQty; // 剩余搭配量 = 储备量 - 已搭配量
+            int unAllocationQty = conventionReserveQty;
             unAllocationQty = isSpecial? Math.min(unAllocationQty, unAllocatSpecStructureTotalQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
             
             out: do {

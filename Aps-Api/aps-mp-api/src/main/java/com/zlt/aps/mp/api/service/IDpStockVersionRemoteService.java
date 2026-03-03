@@ -77,4 +77,11 @@ public interface IDpStockVersionRemoteService {
     @ApiOperation("导入成品库存")
     @PostMapping("/dpStockVersion/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 查询需求计划版本号
+     */
+    @ApiOperation("查询需求计划版本号")
+    @PostMapping("/dpStockVersion/findMonthPlanVersion")
+    AjaxResult findMonthPlanVersion(@RequestBody DpStockVersion queryCondition);
 }
