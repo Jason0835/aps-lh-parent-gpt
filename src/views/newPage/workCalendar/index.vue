@@ -42,6 +42,11 @@
           :loading="loading"
           >{{ $t("ui.data.workCalendar.genAnnualPlan") }}</el-button
         >
+        <el-button
+          v-hasPermi="['monthplan:mdmWorkCalendar:import']"
+          @click="$refs.tltUpload.handleImport()"
+          >{{ $t("ui.frame.btn.import") }}</el-button
+        >
       </div>
     </div>
     <div style="display: flex; flex-direction: row">
@@ -210,6 +215,12 @@
         >
       </template>
     </el-dialog>
+     <tlt-upload
+      ref="tltUpload"
+      downloadUrl="/maindata/mdmWorkCalendar/importTemplate"
+      uploadUrl="/maindata/mdmWorkCalendar/importData"
+      @uploadSuccess="getList"
+    />
   </basic-container>
 </template>
 <script>
