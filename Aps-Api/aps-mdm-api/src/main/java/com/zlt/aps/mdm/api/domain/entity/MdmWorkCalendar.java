@@ -85,7 +85,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 一班开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.oneShiftFlag")
+    @Excel(name = "ui.data.column.mdmWorkCalendar.oneShiftFlag", dictType = "sys_enable_disable")
     @ApiModelProperty(value = "一班开停产标志，0-停,1-开", name = "oneShiftFlag")
     @TableField(value = "ONE_SHIFT_FLAG")
     private String oneShiftFlag;
@@ -93,7 +93,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 二班开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.twoShiftFlag")
+    @Excel(name = "ui.data.column.mdmWorkCalendar.twoShiftFlag", dictType = "sys_enable_disable")
     @ApiModelProperty(value = "二班开停产标志，0-停,1-开", name = "twoShiftFlag")
     @TableField(value = "TWO_SHIFT_FLAG")
     private String twoShiftFlag;
@@ -101,7 +101,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 三班开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.threeShiftFlag")
+    @Excel(name = "ui.data.column.mdmWorkCalendar.threeShiftFlag", dictType = "sys_enable_disable")
     @ApiModelProperty(value = "三班开停产标志，0-停,1-开", name = "threeShiftFlag")
     @TableField(value = "THREE_SHIFT_FLAG")
     private String threeShiftFlag;
@@ -109,7 +109,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 日期开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.dayFlag")
+    @Excel(name = "ui.data.column.mdmWorkCalendar.dayFlag", dictType = "sys_enable_disable")
     @ApiModelProperty(value = "日期开停产标志，0-停,1-开", name = "dayFlag")
     @TableField(value = "DAY_FLAG")
     private String dayFlag;
@@ -117,6 +117,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 比例
      */
+    @ImportExcelValidated(digits = true, min = 0, max = 100)
     @Excel(name = "ui.data.column.mdmWorkCalendar.rate")
     @ApiModelProperty(value = "比例", name = "rate")
     @TableField(value = "RATE")
