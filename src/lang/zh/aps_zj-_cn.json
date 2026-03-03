@@ -385,7 +385,9 @@
 
 
 
-   "ui.data.productionMonthPlanInit.minLhMachineCount":"实单最低硫化机台数"
+   "ui.data.productionMonthPlanInit.minLhMachineCount":"实单最低硫化机台数",
+   "ui.data.fixedMachine.fixedMaterialDesc":"固定物料描述",
+   "ui.data.fixedMachine.disableMaterialDesc":"不可作业物料描述"
 
 
 

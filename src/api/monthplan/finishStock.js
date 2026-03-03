@@ -23,3 +23,12 @@ export function genOverDueSkuByStock(query) {
     data: query
   })
 }
+
+
+export function getVersionSelect(query) {
+  return request({
+    url: '/monthplan/mdmFinishStock/findMonthPlanVersion',
+    method: 'post',
+    data: query
+  })
+}

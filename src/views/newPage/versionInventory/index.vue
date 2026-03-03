@@ -59,11 +59,11 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { getFinishList } from "@/api/monthplan/finishStock";
+import { getFinishList,getVersionSelect } from "@/api/monthplan/finishStock";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-import {
-  getVersionSelect,
-} from "@/api/monthplan/demandPlan";
+// import {
+//   getVersionSelect,
+// } from "@/api/monthplan/demandPlan";
 // import infoDialog from "./components/infoDialog.vue";
 
 export default {

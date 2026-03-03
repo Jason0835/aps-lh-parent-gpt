@@ -156,41 +156,161 @@ export default {
           prop: "fixedStructure1",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure1"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("ui.data.column.workWearInfo.fixedStructure1")}
+                width="500"
+                trigger="click"
+                content={row.fixedStructure1}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.fixedStructure1
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "fixedStructure2",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure2"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("ui.data.column.workWearInfo.fixedStructure2")}
+                width="500"
+                trigger="click"
+                content={row.fixedStructure2}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.fixedStructure2
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "fixedStructure3",
           label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("ui.data.column.workWearInfo.fixedStructure3")}
+                width="500"
+                trigger="click"
+                content={row.fixedStructure3}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.fixedStructure3
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("ui.data.column.workWearInfo.fixedMaterialCode")}
+                width="500"
+                trigger="click"
+                content={row.fixedMaterialCode}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.fixedMaterialCode
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "fixedMaterialDesc",
           label: this.$t("固定物料描述"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("固定物料描述")}
+                width="500"
+                trigger="click"
+                content={row.fixedMaterialDesc}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.fixedMaterialDesc
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "disableStructure",
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("ui.data.column.workWearInfo.disableStructure")}
+                width="500"
+                trigger="click"
+                content={row.disableStructure}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.disableStructure
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "disableMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.disableMaterialCode"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("ui.data.column.workWearInfo.disableMaterialCode")}
+                width="500"
+                trigger="click"
+                content={row.disableMaterialCode}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.disableMaterialCode
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           prop: "disableMaterialDesc",
           label: this.$t("不可作业物料描述"),
           width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="bottom"
+                title={this.$t("不可作业物料描述")}
+                width="500"
+                trigger="click"
+                content={row.disableMaterialDesc}
+              >
+                <span slot="reference" style="cursor: pointer;">{
+                 row.disableMaterialDesc
+                }</span>
+              </el-popover>
+            )
+          }
         },
         {
           align: "center",
