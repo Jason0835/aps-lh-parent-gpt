@@ -1,7 +1,6 @@
-package com.zlt.aps.mp.api.domain.entity;
+package com.zlt.aps.mdm.api.domain.vo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -26,10 +25,9 @@ import java.util.Date;
  * 修改内容：...
  * @date 2025-12-03
  */
-@ApiModel(value = "工作日历对象", description = "工作日历对象 ")
+@ApiModel(value = "工作日历月计划导出对象", description = "工作日历月计划导出对象")
 @Data
-@TableName(value = "T_MDM_WORK_CALENDAR")
-public class MdmWorkCalendar extends BaseEntity {
+public class MpWorkCalendarExportVo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -52,7 +50,6 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 年份
      */
-//    @Excel(name = "ui.data.column.mdmWorkCalendar.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
@@ -60,7 +57,6 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 月份
      */
-//    @Excel(name = "ui.data.column.mdmWorkCalendar.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
@@ -68,7 +64,6 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 日期
      */
-//    @Excel(name = "ui.data.column.mdmWorkCalendar.day")
     @ApiModelProperty(value = "日期", name = "day")
     @TableField(value = "DAY")
     private Integer day;
@@ -86,7 +81,6 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 一班开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.oneShiftFlag")
     @ApiModelProperty(value = "一班开停产标志，0-停,1-开", name = "oneShiftFlag")
     @TableField(value = "ONE_SHIFT_FLAG")
     private String oneShiftFlag;
@@ -94,7 +88,6 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 二班开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.twoShiftFlag")
     @ApiModelProperty(value = "二班开停产标志，0-停,1-开", name = "twoShiftFlag")
     @TableField(value = "TWO_SHIFT_FLAG")
     private String twoShiftFlag;
@@ -102,7 +95,6 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 三班开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.threeShiftFlag")
     @ApiModelProperty(value = "三班开停产标志，0-停,1-开", name = "threeShiftFlag")
     @TableField(value = "THREE_SHIFT_FLAG")
     private String threeShiftFlag;
@@ -110,7 +102,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 日期开停产标志，0-停,1-开
      */
-    @Excel(name = "ui.data.column.mdmWorkCalendar.dayFlag")
+    @Excel(name = "ui.data.column.mdmWorkCalendar.dayFlag", dictType = "sys_enable_disable")
     @ApiModelProperty(value = "日期开停产标志，0-停,1-开", name = "dayFlag")
     @TableField(value = "DAY_FLAG")
     private String dayFlag;
@@ -122,19 +114,4 @@ public class MdmWorkCalendar extends BaseEntity {
     @ApiModelProperty(value = "比例", name = "rate")
     @TableField(value = "RATE")
     private Integer rate;
-
-    /**
-     * 日期
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @ApiModelProperty(value = "日期", name = "calendarTime")
-    @TableField(exist = false)
-    private Date calendarTime;
-
-    /**
-     * 节假日名称
-     */
-    @ApiModelProperty(value = "节假日名称", name = "holidayNames")
-    @TableField(exist = false)
-    private String holidayNames;
 }
