@@ -230,7 +230,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
      */
     @Override
     protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO) {
-        List<MpAdjustStructureIn> mpAdjustStructureInList = contextDTO.getMpAdjustStructureInList();
+        // 重新获取调整记录，避免过程中浅拷贝导致数据被更新
+        List<MpAdjustStructureIn> mpAdjustStructureInList = mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO);
         if (PubUtil.isEmpty(mpAdjustStructureInList)){
             return;
         }
@@ -246,7 +247,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
             // 实际调整默认：0
-            structureIn.setActualAdjustQty(0);
+            if (structureIn.getActualAdjustQty() == null) {
+                structureIn.setActualAdjustQty(0);
+            }
             mpFinalVo = mpFinalAdjustMap.get(structureIn.getMaterialCode());
             if (mpFinalVo != null){
                 structureIn.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));

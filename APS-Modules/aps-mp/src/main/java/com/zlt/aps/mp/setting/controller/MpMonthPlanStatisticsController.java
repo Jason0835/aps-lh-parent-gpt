@@ -1,9 +1,17 @@
 package com.zlt.aps.mp.setting.controller;
 
+import cn.hutool.core.convert.Convert;
+import cn.hutool.json.JSONUtil;
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +33,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -65,8 +75,51 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanStatistics queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        handleZeroToNull(tableDataInfo.getRows());
+        return tableDataInfo;
     }
+
+    /**
+     * 将字段中值为0的字段设为null
+     * @param rows
+     */
+    private void handleZeroToNull(List<?> rows) {
+        if (PubUtil.isEmpty(rows)) {
+            return;
+        }
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = (List<MpMonthPlanStatistics>) rows;
+        for (MpMonthPlanStatistics statistics: monthPlanStatisticsList) {
+            for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+                setDayField(statistics, day);
+            }
+        }
+    }
+
+    /**
+     * 设置时间相关字段
+     * @param statistics
+     * @param day
+     */
+    private void setDayField(MpMonthPlanStatistics statistics, int day) {
+        String dayVale = Convert.toStr(statistics.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day), null);
+        if (dayVale != null) {
+            MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = JSONUtil.toBean(dayVale, MpDayProductionStatisticsDetailVo.class);
+            if (dayProductionStatisticsDetailVo.getLhMachines() == null && dayProductionStatisticsDetailVo.getEmbryoCount() == null
+                    && dayProductionStatisticsDetailVo.getChangeMould() == null) {
+                return;
+            }
+            if (Convert.toInt(dayProductionStatisticsDetailVo.getLhMachines(), 0).equals(0)) {
+                dayProductionStatisticsDetailVo.setLhMachines(null);
+            }
+            if (Convert.toInt(dayProductionStatisticsDetailVo.getEmbryoCount(), 0).equals(0)) {
+                dayProductionStatisticsDetailVo.setEmbryoCount(null);
+            }
+            statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
+        }
+    }
+
+
 
     @Override
     protected String getOrderBy() {

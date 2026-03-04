@@ -558,8 +558,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
-        dayProductionStatisticsDetailVo.setLhMachines(capacityVo.getUsedLhMachines() == 0 ? null: capacityVo.getUsedLhMachines());
-        dayProductionStatisticsDetailVo.setEmbryoCount(capacityVo.getUsedEmbryoTypes() == 0 ? null: capacityVo.getUsedEmbryoTypes());
+        dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
+        dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
         dayProductionStatisticsDetailVo.setChangeMould(null);
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
@@ -900,8 +900,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
             return;
         }
-        // 月度生产计划排程结果
-        List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = new ArrayList<>();
+        // 需要删除月度生产计划列表
+        List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
+        // 需要新增月度生产计划列表
+        List<FactoryMonthPlanProductionFinalResult> insertMonthPlanList = new ArrayList<>();
         // 批次号前缀
         String prefixKey = IncrementConstant.MONTH_FINAL + com.ruoyi.common.core.utils.DateUtils.dateTimeNow("yyMMdd");
         // 批次号
@@ -974,19 +976,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
             setBeginDayAndEndDay(monthPlan);
-            factoryMonthPlanProdFinalList.add(monthPlan);
+            deleteMonthPlanList.add(monthPlan);
+            if (adjustResult.getTotalPlanQty() == null || !adjustResult.getTotalPlanQty().equals(Integer.valueOf(0))) {
+                insertMonthPlanList.add(monthPlan);
+            }
         }
 
         // 构建搭配排产新增月度计划
         List<FactoryMonthPlanProductionFinalResult> matchingProductionMonthPlanList = buildMatchingProductionMonthPlan(adjustDetailList, adjustResultList, contextDTO);
-        factoryMonthPlanProdFinalList.addAll(matchingProductionMonthPlanList);
+        deleteMonthPlanList.addAll(matchingProductionMonthPlanList);
+        insertMonthPlanList.addAll(matchingProductionMonthPlanList);
 
         try {
             // 删除月度生产计划
-            deleteMonthPlanList(contextDTO, factoryMonthPlanProdFinalList);
+            deleteMonthPlanList(contextDTO, deleteMonthPlanList);
             // 新增月度生产计划
-            baseDao.insertBatch(factoryMonthPlanProdFinalList);
-            log.info("新增月度生产计划成功，共新增:{}条记录", factoryMonthPlanProdFinalList.size());
+            baseDao.insertBatch(insertMonthPlanList);
+            log.info("新增月度生产计划成功，共新增:{}条记录", insertMonthPlanList.size());
         } catch (Exception e) {
             log.error("新增月度生产计划批量操作异常", e);
             throw new RuntimeException("新增月度生产计划失败", e);
