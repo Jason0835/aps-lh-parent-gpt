@@ -251,8 +251,8 @@ public class MesItfServiceImpl implements MesItfService {
                     stock.setStructureName(materialInfo.getStructureName());
                     stock.setBrand(materialInfo.getBrand());
                     stock.setProductTypeCode(materialInfo.getProductTypeCode());
-                    saveList.add(stock);
                 }
+                saveList.add(stock);
             }
             if (CollectionUtils.isNotEmpty(saveList)) {
 
@@ -320,7 +320,7 @@ public class MesItfServiceImpl implements MesItfService {
             for (MdmProductStock productStock : importList) {
                 productStock.setCreateTime(DateUtils.getNowDate());
                 productStock.setUpdateTime(DateUtils.getNowDate());
-                String weekYear = productStock.getWeekYear();
+                String weekYear = StringUtils.defaultIfBlank(productStock.getWeekYear(), "");
                 if (weekYear.length() != 4) {
                     continue;
                 }
