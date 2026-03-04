@@ -19,7 +19,6 @@
         '116' AS FACTORY_CODE
         FROM mes_product_stock
         WHERE 1 = 1
-        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
         <if test="params != null">
             <if test="params.materialCodeList != null and params.materialCodeList.size() > 0">
@@ -41,7 +40,6 @@
         '116' AS FACTORY_CODE
         FROM mes_unqualified_stock
         WHERE 1 = 1
-        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
     </select>
 
@@ -58,7 +56,6 @@
         '116' AS FACTORY_CODE
         FROM SPEC_STOCK_SYNC
         WHERE 1 = 1
-        <if test="stockDate != null">AND STOCK_DATE = #{stockDate}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
     </select>
 
