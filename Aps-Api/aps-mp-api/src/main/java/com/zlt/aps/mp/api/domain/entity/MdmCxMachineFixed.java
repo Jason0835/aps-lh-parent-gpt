@@ -126,12 +126,27 @@ public class MdmCxMachineFixed extends BaseEntity {
     @TableField(value = "DISABLE_MATERIAL_DESC", updateStrategy = FieldStrategy.IGNORED)
     private String disableMaterialDesc;
 
+    public List<String> getSplitFixedStructure1() {
+        String fixedStructure1 = StringUtils.defaultIfBlank(this.fixedStructure1, "");
+        return Arrays.stream(fixedStructure1.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitFixedStructure2() {
+        String fixedStructure2 = StringUtils.defaultIfBlank(this.fixedStructure2, "");
+        return Arrays.stream(fixedStructure2.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitFixedStructure3() {
+        String fixedStructure3 = StringUtils.defaultIfBlank(this.fixedStructure3, "");
+        return Arrays.stream(fixedStructure3.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
     public List<String> getSplitFixedMaterialCode() {
         String fixedMaterialCode = StringUtils.defaultIfBlank(this.fixedMaterialCode, "");
         return Arrays.stream(fixedMaterialCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
-    public List<String> getSplitDisableFixedMaterialCode() {
+    public List<String> getSplitDisableMaterialCode() {
         String disableMaterialCode = StringUtils.defaultIfBlank(this.disableMaterialCode, "");
         return Arrays.stream(disableMaterialCode.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
@@ -141,7 +156,12 @@ public class MdmCxMachineFixed extends BaseEntity {
         return Arrays.stream(fixedMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
-    public List<String> getSplitDisableFixedMaterialDesc() {
+    public List<String> getSplitDisableStructure() {
+        String disableStructure = StringUtils.defaultIfBlank(this.disableStructure, "");
+        return Arrays.stream(disableStructure.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitDisableMaterialDesc() {
         String disableMaterialDesc = StringUtils.defaultIfBlank(this.disableMaterialDesc, "");
         return Arrays.stream(disableMaterialDesc.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
