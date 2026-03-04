@@ -380,7 +380,7 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
-     * 增加每日结构切换使用次数
+     * 增加每日换模切换使用次数
      *
      * @param context         排产上下文
      * @param changeMouldDate 换模日
