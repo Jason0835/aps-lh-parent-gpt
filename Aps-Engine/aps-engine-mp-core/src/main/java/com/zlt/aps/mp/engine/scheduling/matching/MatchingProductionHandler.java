@@ -292,13 +292,7 @@ public class MatchingProductionHandler {
             FactoryMonthPlanFinalAdjustVo plan = this.getFinalPlanByMaterialDesc(contextDTO, materialDesc,
                     mpProdFinalList, needProductPlanList, mdmSkuConstructionRefMap, capacity); // 获取定稿计划
             boolean isNewPlan = plan.getBeginDay() == null;
-            
-            // 如果调整量为负数，已搭配量需要扣减
-            int actualAdjustQty = Optional.ofNullable(plan.getActualAdjustQty()).orElse(0); // 实际调整量
-            if (actualAdjustQty < 0) {
-                int conventionProductionQty = Optional.ofNullable(plan.getConventionProductionQty()).orElse(0); // 已搭配量
-                plan.setConventionProductionQty(conventionProductionQty + actualAdjustQty);
-            }
+            this.updateAjuestConventionProductionQty(plan); // 更新搭配量
             
             int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 未搭配量 = 储备池的量
             unAllocationQty = isSpecial? Math.min(unAllocationQty, unAllocatSpecStructureTotalQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
@@ -359,6 +353,30 @@ public class MatchingProductionHandler {
             }
         } while (true);
         log.info("周程滚动搭配算法end");
+    }
+
+    /**
+     * 更新调整计划的已搭配量
+     * 
+     * @param plan 调整计划
+     * @return
+     */
+    private void updateAjuestConventionProductionQty(FactoryMonthPlanFinalAdjustVo plan) {
+        // 如果调整量为负数，已搭配量需要扣减
+        int actualAdjustQty = Optional.ofNullable(plan.getActualAdjustQty()).orElse(0); // 实际调整量
+        if (actualAdjustQty >= 0) {
+            return;
+        }
+        int conventionProductionQty = Optional.ofNullable(plan.getConventionProductionQty()).orElse(0); // 已搭配量
+        int newConventionProductionQty = conventionProductionQty + actualAdjustQty;
+        newConventionProductionQty = newConventionProductionQty > 0 ? newConventionProductionQty : 0;
+        int diffQty = newConventionProductionQty - conventionProductionQty;
+        plan.setConventionProductionQty(newConventionProductionQty);
+        // 搭配量发生变化，totalQty要同时更新
+        int totalQty = Optional.ofNullable(plan.getTotalQty()).orElse(0);
+        int newTotalQty = totalQty + diffQty;
+        newTotalQty = newTotalQty > 0 ? newTotalQty : 0;
+        plan.setTotalQty(newTotalQty);
     }
     
     /**
