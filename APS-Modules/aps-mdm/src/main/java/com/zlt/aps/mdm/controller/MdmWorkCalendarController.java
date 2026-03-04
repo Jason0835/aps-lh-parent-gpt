@@ -7,11 +7,12 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mdm.api.domain.entity.MdmHoliday;
+import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mdm.mapper.MdmHolidayEntityMapper;
 import com.zlt.aps.mdm.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.mdm.service.IMdmWorkCalendarService;
-import com.zlt.aps.mdm.api.domain.entity.MdmHoliday;
-import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -115,6 +116,15 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
             billVO.setYear(instance.get(Calendar.YEAR));
             billVO.setMonth(instance.get(Calendar.MONTH) + 1);
             billVO.setDay(instance.get(Calendar.DAY_OF_MONTH));
+        }
+        // 停产比例改成0
+        if (YesOrNoEnum.NO.getCode().equals(billVO.getDayFlag())) {
+            billVO.setRate(0);
+        }
+        // 比例如果是0，赋值成停产
+        Integer rate = billVO.getRate();
+        if (rate == 0) {
+            billVO.setDayFlag(YesOrNoEnum.NO.getCode());
         }
         return super.save(billVO);
     }

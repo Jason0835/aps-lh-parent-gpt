@@ -118,6 +118,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 比例
      */
+    @ImportExcelValidated(digits = true, min = 0, max = 100)
     @Excel(name = "ui.data.column.mdmWorkCalendar.rate")
     @ApiModelProperty(value = "比例", name = "rate")
     @TableField(value = "RATE")

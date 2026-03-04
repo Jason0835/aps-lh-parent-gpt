@@ -11,6 +11,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
@@ -102,6 +103,15 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         importDocEntity.setYear(year);
         importDocEntity.setMonth(month);
         importDocEntity.setDay(day);
+        // 停产比例改成0
+        if (YesOrNoEnum.NO.getCode().equals(importDocEntity.getDayFlag())) {
+            importDocEntity.setRate(0);
+        }
+        // 比例如果是0，赋值成停产
+        Integer rate = importDocEntity.getRate();
+        if (rate == 0) {
+            importDocEntity.setDayFlag(YesOrNoEnum.NO.getCode());
+        }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
     }
 

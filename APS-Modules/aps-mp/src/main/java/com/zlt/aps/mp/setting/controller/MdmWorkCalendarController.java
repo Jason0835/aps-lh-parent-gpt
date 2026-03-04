@@ -121,6 +121,11 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
         if (YesOrNoEnum.NO.getCode().equals(billVO.getDayFlag())) {
             billVO.setRate(0);
         }
+        // 比例如果是0，赋值成停产
+        Integer rate = billVO.getRate();
+        if (rate == 0) {
+            billVO.setDayFlag(YesOrNoEnum.NO.getCode());
+        }
         return super.save(billVO);
     }
 
