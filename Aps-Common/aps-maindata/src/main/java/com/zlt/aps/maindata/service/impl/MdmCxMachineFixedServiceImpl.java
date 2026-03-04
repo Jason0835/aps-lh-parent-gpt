@@ -5,13 +5,13 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
 import com.zlt.aps.maindata.service.IMdmCxMachineFixedService;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -154,7 +154,7 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             machineCodeList.add(cxMachineCode);
 
             List<String> fixedMaterialDescList = machineFixed.getSplitFixedMaterialDesc();
-            List<String> disableMaterialDescList = machineFixed.getSplitDisableFixedMaterialDesc();
+            List<String> disableMaterialDescList = machineFixed.getSplitDisableMaterialDesc();
 
             materialDescList.addAll(fixedMaterialDescList);
             materialDescList.addAll(disableMaterialDescList);
@@ -189,7 +189,7 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
             Map<String, MdmMaterialInfo> materialInfoMap = (Map<String, MdmMaterialInfo>) serviceCheckParams.get("materialInfoMap");
 
             List<String> splitFixedMaterialDesc = importDocEntity.getSplitFixedMaterialDesc();
-            List<String> splitDisableFixedMaterialDesc = importDocEntity.getSplitDisableFixedMaterialDesc();
+            List<String> splitDisableFixedMaterialDesc = importDocEntity.getSplitDisableMaterialDesc();
 
             List<String> fixedMaterialCodeList = new ArrayList<>();
             for (String materialDesc : splitFixedMaterialDesc) {
