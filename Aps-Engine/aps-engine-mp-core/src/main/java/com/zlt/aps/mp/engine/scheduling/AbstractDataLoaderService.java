@@ -655,7 +655,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         Date productionStartDate = context.getProductionStartDate();
         //开产比例设置
         Map<Integer, Integer> startProductionRatioMap = new HashMap<>(context.getMonthDays());
-        List<ProductionDayInfoVo> startProductionDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.YES.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
+        List<ProductionDayInfoVo> startProductionDays = productionDayInfoList.stream().filter(productionDayInfo -> !productionDayInfo.isStopDay()).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(startProductionDays)) {
             startProductionDays.forEach(startProductionInfo -> {
                 Date startProduction = startProductionInfo.getProductionDate();
@@ -665,7 +665,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         }
         context.setCapacityRatioMap(startProductionRatioMap);
         //停产设置
-        List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
+        List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> productionDayInfo.isStopDay()).collect(Collectors.toList());
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderStopCalendarLog(context, stopDays));
         if (CollectionUtils.isEmpty(stopDays)) {
             context.setStopDays(Collections.emptySet(), maxBoostDays);
