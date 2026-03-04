@@ -240,13 +240,13 @@ public class MesItfServiceImpl implements MesItfService {
             for (MdmProductStock stock : productStockList) {
                 // 默认外销
                 String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
+                try {
+                    stock.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
+                } catch (ParseException e) {
+                    throw new RuntimeException(e);
+                }
                 if (materialInfoMap.containsKey(mapKey)) {
                     MdmMaterialInfo materialInfo = materialInfoMap.get(mapKey);
-                    try {
-                        stock.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
-                    } catch (ParseException e) {
-                        throw new RuntimeException(e);
-                    }
                     stock.setMaterialDesc(materialInfo.getMaterialDesc());
                     stock.setStructureName(materialInfo.getStructureName());
                     stock.setBrand(materialInfo.getBrand());
