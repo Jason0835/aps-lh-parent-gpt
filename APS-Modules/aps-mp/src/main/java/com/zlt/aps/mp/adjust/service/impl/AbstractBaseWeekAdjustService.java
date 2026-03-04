@@ -900,8 +900,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
             return;
         }
-        // 需要删除月度生产计划列表
-        List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
+
         // 需要新增月度生产计划列表
         List<FactoryMonthPlanProductionFinalResult> insertMonthPlanList = new ArrayList<>();
         // 批次号前缀
@@ -976,16 +975,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
             setBeginDayAndEndDay(monthPlan);
-            deleteMonthPlanList.add(monthPlan);
-            if (adjustResult.getTotalPlanQty() == null || !adjustResult.getTotalPlanQty().equals(Integer.valueOf(0))) {
-                insertMonthPlanList.add(monthPlan);
-            }
+            insertMonthPlanList.add(monthPlan);
         }
 
         // 构建搭配排产新增月度计划
         List<FactoryMonthPlanProductionFinalResult> matchingProductionMonthPlanList = buildMatchingProductionMonthPlan(adjustDetailList, adjustResultList, contextDTO);
-        deleteMonthPlanList.addAll(matchingProductionMonthPlanList);
         insertMonthPlanList.addAll(matchingProductionMonthPlanList);
+        // 获取调整结果计划总量为0的月度计划列表
+        List<FactoryMonthPlanProductionFinalResult> adjustResultMonthPlanList = buildAdjustResultMonthPlan(adjustResultList);
+        // 需要删除月度生产计划列表
+        List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
+        deleteMonthPlanList.addAll(insertMonthPlanList);
+        deleteMonthPlanList.addAll(adjustResultMonthPlanList);
 
         try {
             // 删除月度生产计划
@@ -998,6 +999,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new RuntimeException("新增月度生产计划失败", e);
         }
 
+    }
+
+
+    /**
+     * 构建调整结果总计划量为0的月度计划
+     * @param adjustResultList
+     * @return
+     */
+    private List<FactoryMonthPlanProductionFinalResult> buildAdjustResultMonthPlan(List<MpAdjustResult> adjustResultList) {
+        if (PubUtil.isEmpty(adjustResultList)) {
+            log.warn("调整结果列表为空，直接返回");
+            return Collections.emptyList();
+        }
+        List<FactoryMonthPlanProductionFinalResult> monthPLanList = new ArrayList<>();
+        for(MpAdjustResult result : adjustResultList) {
+            if (result.getTotalPlanQty() != null && !result.getTotalPlanQty().equals(Integer.valueOf(0))) {
+                continue;
+            }
+            FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
+            monthPlan.setMaterialCode(result.getMaterialCode());
+            monthPlan.setStructureName(result.getStructureName());
+            monthPLanList.add(monthPlan);
+        }
+        return monthPLanList;
     }
 
     /**
