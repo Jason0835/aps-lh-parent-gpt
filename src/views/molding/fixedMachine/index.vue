@@ -159,7 +159,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("ui.data.column.workWearInfo.fixedStructure1")}
                 width="500"
                 trigger="click"
@@ -179,7 +179,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("ui.data.column.workWearInfo.fixedStructure2")}
                 width="500"
                 trigger="click"
@@ -199,7 +199,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("ui.data.column.workWearInfo.fixedStructure3")}
                 width="500"
                 trigger="click"
@@ -219,7 +219,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("ui.data.column.workWearInfo.fixedMaterialCode")}
                 width="500"
                 trigger="click"
@@ -239,7 +239,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("固定物料描述")}
                 width="500"
                 trigger="click"
@@ -259,7 +259,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("ui.data.column.workWearInfo.disableStructure")}
                 width="500"
                 trigger="click"
@@ -279,7 +279,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("ui.data.column.workWearInfo.disableMaterialCode")}
                 width="500"
                 trigger="click"
@@ -299,7 +299,7 @@ export default {
           render: ({ row }) => {
             return (
               <el-popover
-                placement="bottom"
+                placement="left"
                 title={this.$t("不可作业物料描述")}
                 width="500"
                 trigger="click"

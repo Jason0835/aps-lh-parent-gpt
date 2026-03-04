@@ -150,10 +150,10 @@ export default {
           prop: "childMaterialCode",
           label: this.$t("原材料物料编号"),
         },
-        {
-          prop: "childMaterialVersion",
-          label: this.$t("原材料物料版本"),
-        },
+        // {
+        //   prop: "childMaterialVersion",
+        //   label: this.$t("原材料物料版本"),
+        // },
         {
           prop: "childMaterialName",
           label: this.$t("原材料物料描述"),
