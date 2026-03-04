@@ -1240,6 +1240,7 @@ public class MatchingProductionHandler {
         Set<String> newMouldCodeSet = new HashSet<>(); // 新增模具
         // 循环取结构向下所有符合搭配生产条件的sku进行搭配排产
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
+        out:
         do {
             // 获取优先级最高的Sku信息
             String materialDesc = this.getSelectedAddSku(productionContext, startDay, endDay, productionPlanList,
@@ -1248,6 +1249,27 @@ public class MatchingProductionHandler {
                 break;
             }
             scheduleMaterialDesc.add(materialDesc);
+            
+            for (int day = startDay; day <= endDay; day++) {
+                startDay = day; // 开始时间等于当前校验时间，如果以下校验不通过，则开始日期会推后一天
+                // 检查如果符合二次上机，则从该天开始，否则推后一天继续校验
+                if (!this.checkSecOnline(groupInfo, productionContext, materialDesc, day)) {
+                    if (startDay == endDay) {
+                        continue out; // 最后一天都检验不通过，直接结束本sku排产
+                    }
+                    continue; // 校验不通过，看下一天
+                }
+                // 判断剩余可换模次数
+                DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
+                Set<Integer> hasChangeMouldDaySet = dayCapacityLimit.getHasChangeMouldProductionDay(productionContext);
+                if (CollectionUtils.isEmpty(hasChangeMouldDaySet)) { //达到换模次数限制，不通过
+                    if (startDay == endDay) {
+                        continue out; // 最后一天都检验不通过，直接结束本sku排产
+                    }
+                    continue; // 校验不通过，看下一天
+                }
+                break; // 校验均通过，直接结束
+            }
             // 判断如果是新增sku，则需要检查成型机胎胚总数限制
             CxMachineBaseInfoVo cxMachineInfo = this.getNewSkuCxMachine(productionContext, groupInfo, limitMap,
                     materialDesc);
@@ -1336,7 +1358,6 @@ public class MatchingProductionHandler {
         Map<String, List<MonthPlanProductionRequirePlanVo>> productionPlanMap = groupPlanData.stream()
                 .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
-        out:
         do {
             // 获取优先级最高的Sku信息
             String materialDesc = this.getSelectedAddSku(productionContext, startDay, endDay, groupPlanData,
@@ -1353,26 +1374,6 @@ public class MatchingProductionHandler {
             List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(materialDesc);
             Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty();
             Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
-            for (int day = startDay; day <= endDay; day++) {
-                startDay = day; // 开始时间等于当前校验时间，如果以下校验不通过，则开始日期会推后一天
-                // 检查如果符合二次上机，则从该天开始，否则推后一天继续校验
-                if (!this.checkSecOnline(groupInfo, productionContext, materialDesc, day)) {
-                    if (startDay == endDay) {
-                        continue out; // 最后一天都检验不通过，直接结束本sku排产
-                    }
-                    continue; // 校验不通过，看下一天
-                }
-                // 判断剩余可换模次数
-                DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
-                Set<Integer> hasChangeMouldDaySet = dayCapacityLimit.getHasChangeMouldProductionDay(productionContext);
-                if (CollectionUtils.isEmpty(hasChangeMouldDaySet)) { //达到换模次数限制，不通过
-                    if (startDay == endDay) {
-                        continue out; // 最后一天都检验不通过，直接结束本sku排产
-                    }
-                    continue; // 校验不通过，看下一天
-                }
-                break; // 校验均通过，直接结束
-            }
             List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext,
                     materialDesc, maxProductionQty, startDay, endDay); // 统计每一天所有可用模具
             for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) { // 遍历各模具可用列表
