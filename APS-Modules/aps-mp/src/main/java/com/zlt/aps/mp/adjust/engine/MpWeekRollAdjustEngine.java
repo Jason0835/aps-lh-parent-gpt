@@ -1720,6 +1720,13 @@ public class MpWeekRollAdjustEngine {
                     //若是量试，但该日不能排，则继续
                     continue;
                 }
+                //3.2、检查SKU二次上机
+                resetEndDay(1,structureDeadLine,mpFinalVo);
+                if (!checkSecOnline(mpFinalVo,i, contextDTO.getParamMap()) &&
+                        !hasPlanByDay(mpFinalVo, i -1)){
+                    contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
+                    continue;
+                }
                 //注：这里不能做预检查，会导致可以拼的SKU被忽略掉
                 //adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
                 //contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i,dailyCapacityLimitVoMap.get(i).toString())).append(ApsConstant.DIVISION);
@@ -2382,42 +2389,6 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
-     * 重置开始/结束日期
-     * @param startDay 开始日
-     * @param endDay 开始日
-     * @param mpProdFinalList 定稿Vo列表
-     * @return
-     */
-    /*private void resetBegin2EndDay2TotalQty(int startDay, int endDay, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
-        String dayField;
-        int accTotalQty;
-        for (FactoryMonthPlanFinalAdjustVo mpFinalVo:mpProdFinalList){
-            int realBeginDay = FactoryConstant.MONTH_MAX_DAY+1;
-            int realEndDay = 0;
-            accTotalQty = 0;
-            for (int i = startDay; i <= endDay; i++){
-                dayField = FactoryConstant.DAY_FIELD + i;
-                if (mpFinalVo.getFieldValueByFieldName(dayField) != null &&
-                        (Integer) mpFinalVo.getFieldValueByFieldName(dayField) != 0){
-                    if (realBeginDay > i){
-                        realBeginDay = i;
-                    }
-                    if (realEndDay < i){
-                        realEndDay = i;
-                    }
-                    accTotalQty += (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
-                }
-            }
-            mpFinalVo.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
-            mpFinalVo.setEndDay(realEndDay);
-            mpFinalVo.setTotalQty(accTotalQty);
-            //实际调整量 = 累计排产量 - 原实际排产量
-            int oriTotalQty = mpFinalVo.getOriTotalQty()== null ? 0:mpFinalVo.getOriTotalQty();
-            mpFinalVo.setActualAdjustQty(accTotalQty - oriTotalQty);
-        }
-    }*/
-
-    /**
      * 重置开始/结束日期/计划量
      * @param endDay 结构收尾日
      * @param mpFinalVo 定稿Vo
@@ -2447,6 +2418,27 @@ public class MpWeekRollAdjustEngine {
         //实际调整量 = 累计排产量 - 原实际排产量
         int oriTotalQty = mpFinalVo.getOriTotalQty()== null ? 0:mpFinalVo.getOriTotalQty();
         mpFinalVo.setActualAdjustQty(accTotalQty - oriTotalQty);
+    }
+
+    /**
+     * 重置结束日期
+     * @param endDay 结构收尾日
+     * @param mpFinalVo 定稿Vo
+     * @return
+     */
+    private void resetEndDay(int startDay, int endDay, FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        String dayField;
+        int realEndDay = 0;
+        for (int i = startDay; i <= endDay; i++){
+            dayField = FactoryConstant.DAY_FIELD + i;
+            if (mpFinalVo.getFieldValueByFieldName(dayField) != null &&
+                    (Integer) mpFinalVo.getFieldValueByFieldName(dayField) != 0){
+                if (realEndDay < i){
+                    realEndDay = i;
+                }
+            }
+        }
+        mpFinalVo.setEndDay(realEndDay);
     }
 
     /**
