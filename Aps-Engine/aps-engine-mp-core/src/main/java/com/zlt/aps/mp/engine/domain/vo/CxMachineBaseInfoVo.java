@@ -9,6 +9,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
+import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -265,6 +266,42 @@ public class CxMachineBaseInfoVo implements Serializable {
         return earliestContinuousSet;
     }
 
+    /**
+     * 增加日排产信息
+     * 在模拟排产阶段，且机台选结构，结构反选机台场景使用
+     * 20260304 补充Sku排产信息及排产模具
+     */
+    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo){
+        if(CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo){
+            return ;
+        }
+        Integer productionDay = skuDayProductionInfo.getProductionDay();
+        GroupPlanCxLhCapacityLimitHelper dayLimit = dayProductionLimitInfo.get(productionDay);
+        if (null == dayLimit) {
+            return;
+        }
+        String materialDesc = skuDayProductionInfo.getMaterialDesc();
+        String embryoCode = skuDayProductionInfo.getEmbryoCode();
+        Set<String> currentUsedMouldSet = skuDayProductionInfo.getUsedMouldSet();
+        //更新生胎及模具
+        dayLimit.getProductionEmbryoCodeSet().add(embryoCode);
+        dayLimit.getProductionMouldSet().addAll(currentUsedMouldSet);
+        //Sku排产模具信息
+        Set<String> skuProductionMouldSet = dayLimit.getSkuProductionMouldMap().get(materialDesc);
+        if (null == skuProductionMouldSet) {
+            skuProductionMouldSet = new HashSet<>();
+            dayLimit.getSkuProductionMouldMap().put(materialDesc, currentUsedMouldSet);
+        }
+        skuProductionMouldSet.addAll(currentUsedMouldSet);
+        //更新排产Sku信息
+        SkuDayProductionInfoHelper planned = dayLimit.getProductionSkuQtyInfo().get(materialDesc);
+        if (null == planned) {
+            dayLimit.getProductionSkuQtyInfo().put(materialDesc, skuDayProductionInfo);
+            return;
+        }
+        //更新数量
+        planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+    }
     /**
      * 获取固定信息的优先级
      * 固定SKU的优先级最高，其次是固定结构1,

@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 /**
  * 日排产量计算结果辅助类
@@ -57,5 +58,31 @@ public class DayProductionQtyHelper implements Serializable {
         this.lossQty = lossQty;
         this.nextDayLossQty = nextDayLossQty;
         this.isFinish = isFinish;
+    }
+
+    /**
+     * 排产量偶数处理
+     */
+    public void updateDoubleProductionQty() {
+        int realProductionQty = productionQty;
+        realProductionQty = (realProductionQty & BigDecimal.ONE.intValue()) == BigDecimal.ZERO.intValue() ? realProductionQty : realProductionQty + BigDecimal.ONE.intValue();
+        boolean isHandlerLoss = false;
+        if (realProductionQty != productionQty) {
+            this.productionQty = realProductionQty;
+            isHandlerLoss = true;
+        }
+        if (!isHandlerLoss) {
+            return;
+        }
+        //隔天换模
+        if (isProductionNextDay) {
+            if (this.nextDayLossQty > BigDecimal.ZERO.intValue()) {
+                this.nextDayLossQty = this.nextDayLossQty - BigDecimal.ONE.intValue();
+            }
+            return;
+        }
+        if (this.lossQty > BigDecimal.ZERO.intValue()) {
+            this.lossQty = this.lossQty - BigDecimal.ONE.intValue();
+        }
     }
 }
