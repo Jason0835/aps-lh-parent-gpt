@@ -558,8 +558,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
-        dayProductionStatisticsDetailVo.setLhMachines(capacityVo.getUsedLhMachines() == 0 ? null: capacityVo.getUsedLhMachines());
-        dayProductionStatisticsDetailVo.setEmbryoCount(capacityVo.getUsedEmbryoTypes() == 0 ? null: capacityVo.getUsedEmbryoTypes());
+        dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
+        dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
         dayProductionStatisticsDetailVo.setChangeMould(null);
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
