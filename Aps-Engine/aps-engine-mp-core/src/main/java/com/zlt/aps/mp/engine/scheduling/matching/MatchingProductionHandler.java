@@ -651,15 +651,14 @@ public class MatchingProductionHandler {
         if (useCapacity > 0) { // 余数大于0，说明最后一个硫化机没有排满，优先补满逞能剩余的量
             // 2、先判断后续天数是否满产能排产
             Integer nextDay = this.getNextDay(contextDTO, day, endDay);
-            if (nextDay <= 0) {
-                return remaindCapacity;
-            }
-            MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(nextDay);
-            if (dailyCapacityLimitVo == null) {
-                return remaindCapacity;
-            }
-            if (dailyCapacityLimitVo.getMaxLhMachines() == dailyCapacityLimitVo.getUsedLhMachines()) { // 下一天产能占满，则当天不需要搭配补量
-                return remaindCapacity;
+            if (nextDay > 0) { // 非收尾日，需要判断下一天产能是否占满
+                MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(nextDay);
+                if (dailyCapacityLimitVo == null) {
+                    return remaindCapacity;
+                }
+                if (dailyCapacityLimitVo.getMaxLhMachines() == dailyCapacityLimitVo.getUsedLhMachines()) { // 下一天产能占满，则当天不需要搭配补量
+                    return remaindCapacity;
+                }
             }
             // 3、再判断上一天的模具数是否与当天相同
             Integer lastDay = this.getLastDay(contextDTO, day, beginDay);
