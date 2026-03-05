@@ -848,6 +848,7 @@ public class MatchingProductionHandler {
             plan.setHeightProductionQty(0);
             plan.setMidProductionQty(0);
             plan.setCycleProductionQty(0);
+            plan.setConventionProductionQty(0);
             plan.setPostponeProductionQty(0);
             plan.setDifferenceQty(0);
             plan.setTotalQty(0);
