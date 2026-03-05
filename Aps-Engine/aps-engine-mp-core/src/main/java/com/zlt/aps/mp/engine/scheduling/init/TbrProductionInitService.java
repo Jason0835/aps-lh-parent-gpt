@@ -204,7 +204,8 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
                 return;
             }
             Integer addLossQty = getAddLossQtyUnRatio(planList);
-            log.info(TbrProductionInitLogRecorder.addInitLossQtyLog(context, materialDesc, addLossQty));
+            //加入流程日志，不打印日志文件
+            TbrProductionInitLogRecorder.addInitLossQtyLog(context, materialDesc, addLossQty);
             //单条计划的处理
             if (planList.size() == BigDecimal.ONE.intValue()) {
                 addLossQtyUnRatioBySingle(planList.get(BigDecimal.ZERO.intValue()), addLossQty);

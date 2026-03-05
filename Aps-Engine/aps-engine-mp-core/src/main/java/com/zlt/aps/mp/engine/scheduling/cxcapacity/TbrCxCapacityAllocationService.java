@@ -151,7 +151,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         }
         //设置初始的排产量数据信息
         requirePlanList.forEach(singlePlan -> {
-            log.info(TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan));
+            //加入流程日志，不打印日志文件
+            TbrBeforeProductionGroupLogRecorder.addSetInitPlanInfoLog(context, singlePlan);
             singlePlan.initProductionDataInfo();
             this.initNoProductionRecordHandler.initNoProductionRecord(productionContext, singlePlan);
         });

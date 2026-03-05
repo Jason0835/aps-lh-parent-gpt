@@ -103,9 +103,10 @@ public class CalculateStructureCxMachineNumber {
                 setAllocationZero(groupInfo);
                 return;
             }
-            log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
+            //加入流程日志，不打印日志文件
+            TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
                     productionContext, structureName, groupInfo.getSumPlanQty(), groupInfo.getMinLhMachineCount(),
-                    groupInfo.getMinLhDayCapacityQty(), groupInfo.getTheoryDays(), groupInfo.getNeedCxCapacityMachineCount()));
+                    groupInfo.getMinLhDayCapacityQty(), groupInfo.getTheoryDays(), groupInfo.getNeedCxCapacityMachineCount());
             //分配天数为零，或是小于最小要求天数，则设置不排产
             if (null != minProductionDays && groupInfo.getTheoryDays() < minProductionDays) {
                 groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);

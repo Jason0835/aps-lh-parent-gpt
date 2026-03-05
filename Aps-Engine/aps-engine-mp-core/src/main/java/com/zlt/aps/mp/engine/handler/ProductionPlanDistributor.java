@@ -37,6 +37,7 @@ public class ProductionPlanDistributor {
         List<MonthPlanProductionRequirePlanVo> heightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getHeightProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         realDayProductionQty = deductionHeightProductionQty(heightPlanList, realDeductionMap, realDayProductionQty);
         if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
+            handlerSumDouble(realDeductionMap);
             return realDeductionMap;
         }
         //再其它净需求
@@ -44,6 +45,7 @@ public class ProductionPlanDistributor {
         deductionNoHeightQty(noHeightPlanList, realDeductionMap, realDayProductionQty);
         //重新计算库销比
         continueSkuPlanList.forEach(singlePlan -> singlePlan.calculateInventorySalesRatio(inventorySalesRatioQty));
+        handlerSumDouble(realDeductionMap);
         return realDeductionMap;
     }
 
@@ -127,6 +129,27 @@ public class ProductionPlanDistributor {
             realDayProductionQty = realDayProductionQty - realDeductionQty;
         }
         return realDayProductionQty;
+    }
+
+    /**
+     * 处理排产总数为奇数，向上+1
+     *
+     * @param productionPlanMap 原始的计划分配数据
+     * @return
+     */
+    private void handlerSumDouble(Map<Long, Integer> productionPlanMap) {
+        //20260305 奇数处理
+        if (CollectionUtils.isEmpty(productionPlanMap)) {
+            return;
+        }
+        Integer sumQty = productionPlanMap.values().stream().mapToInt(Integer::intValue).sum();
+        if ((sumQty & BigDecimal.ONE.intValue()) == BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        Long addPlan = productionPlanMap.keySet().stream().sorted().findFirst().get();
+        Integer qty = productionPlanMap.get(addPlan);
+        productionPlanMap.put(addPlan, qty + BigDecimal.ONE.intValue());
+        return;
     }
 
     /**

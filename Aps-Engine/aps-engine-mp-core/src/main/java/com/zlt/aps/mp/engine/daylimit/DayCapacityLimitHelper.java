@@ -168,7 +168,8 @@ public class DayCapacityLimitHelper implements Serializable {
         groupAllocationInfo.add(allocationKey);
         Integer allocationQty = addAllocationPlan.getDayMinAllocationQty();
         cxMachineAllocationQty = cxMachineAllocationQty + allocationQty;
-        log.info(DayLimitLogRecorder.addCxMachineGroupUsedLog(context, productionDay, allocationKey, allocationQty, cxMachineAllocationQty));
+        //加入流程日志，不打印日志文件
+        DayLimitLogRecorder.addCxMachineGroupUsedLog(context, productionDay, allocationKey, allocationQty, cxMachineAllocationQty);
     }
 
     /**
@@ -236,7 +237,8 @@ public class DayCapacityLimitHelper implements Serializable {
         Set<String> doubleMouldCode = doubleMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         String mouldCodeInfo = String.join(StringConstant.COMMA, doubleMouldCode);
         skuInfo.addProductionQty(doubleMouldCode, productionQty, lossQty);
-        log.info(DayLimitLogRecorder.addDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty));
+        //加入流程日志，不打印日志文件
+        DayLimitLogRecorder.addDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty);
     }
 
     /**

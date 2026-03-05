@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.domain.dto;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Set;
 
 /**
@@ -41,6 +42,7 @@ public class LhProductionQtyHelper implements Serializable {
 
     /**
      * 构建对象实例
+     * sumProductionQty会控制为偶数
      *
      * @param productionPlanInfo   分组计划信息对象
      * @param cxMachineInfo        成型机台，可以为空
@@ -53,8 +55,15 @@ public class LhProductionQtyHelper implements Serializable {
         this.productionPlanInfo = productionPlanInfo;
         this.cxMachineInfo = cxMachineInfo;
         this.cxLhGroup = cxLhGroup;
-        this.sumProductionQty = sumProductionQty;
         this.realSumProductionQty = realSumProductionQty;
         this.dayMaxProductionQty = dayMaxProductionQty;
+        if (null == sumProductionQty || sumProductionQty < BigDecimal.ZERO.intValue()) {
+            sumProductionQty = BigDecimal.ZERO.intValue();
+        }
+        //不是偶数的处理
+        if ((sumProductionQty & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+            sumProductionQty = sumProductionQty + BigDecimal.ONE.intValue();
+        }
+        this.sumProductionQty = sumProductionQty;
     }
 }
