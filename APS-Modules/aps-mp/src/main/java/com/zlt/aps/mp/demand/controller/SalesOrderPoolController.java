@@ -9,6 +9,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.DpArea;
@@ -214,6 +215,15 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         return salesOrderPoolService.getSCMData(salesOrderPool);
     }
 
+    /**
+     * 查询最新两个月的版本锁定情况
+     */
+    @ApiOperation("查询最新两个月的版本锁定情况")
+    @PostMapping("/getMonthLock")
+    public AjaxResult getMonthLock(@RequestBody SalesOrderPool salesOrderPool){
+        return salesOrderPoolService.getMonthLock(salesOrderPool);
+    }
+
     @Override
     protected IDocService getDocService(){
         return salesOrderPoolService;
@@ -248,6 +258,12 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliverGoodsType")), "DELIVER_GOODS_TYPE", queryVO.getFieldValueByFieldName("deliverGoodsType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmPriority")), "SCM_PRIORITY", queryVO.getFieldValueByFieldName("scmPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmDetailId")), "SCM_DETAIL_ID", queryVO.getFieldValueByFieldName("scmDetailId"));
+
+        if (YesOrNoEnum.YES.getCode().equals(queryVO.getOrderPriorityNullFlag())) {
+            queryWrapper.isNull(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriorityNullFlag")), "ORDER_PRIORITY");
+        } else {
+            queryWrapper.isNotNull(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriorityNullFlag")), "ORDER_PRIORITY");
+        }
     }
 
 

@@ -78,4 +78,12 @@ public interface IScmItfService {
     @ApiOperation("同步成品库存")
     @PostMapping("/scm/syncArea")
     public AjaxResult syncArea();
+
+    /**
+     * 查询最新两个月的版本锁定情况
+     * @return 结果集合
+     */
+    @ApiOperation("查询最新两个月的版本锁定情况")
+    @PostMapping("/scm/getMonthLock")
+    AjaxResult getMonthLock();
 }

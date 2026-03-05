@@ -19,6 +19,8 @@ import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
+import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
@@ -61,6 +63,12 @@ public class MesItfServiceImpl implements MesItfService {
     private IFactoryParamService iFactoryParamService;
     @Autowired
     private MdmCycleSchStruConfEntityMapper cycleSchStruConfEntityMapper;
+
+    @Autowired
+    private IMdmProductModelRelationService iMdmProductModelRelationService;
+
+    @Autowired
+    private IMdmSkuStructureRefService iMdmSkuStructureRefService;
 
     /**
      * 同步SKU与模具关系
@@ -691,6 +699,10 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 baseDao.saveBatch(saveList);
             }
+            // 更新主花纹到物料信息
+            iMdmProductModelRelationService.updateMainPatternToMaterial(new MdmSkuMouldRel());
+            // 更新结构到物料信息
+            iMdmSkuStructureRefService.updateStructureToMaterial(new MdmSkuStructureRef());
         } finally {
             DynamicDataSourceContextHolder.clear();
             // 切换APS数据源 end

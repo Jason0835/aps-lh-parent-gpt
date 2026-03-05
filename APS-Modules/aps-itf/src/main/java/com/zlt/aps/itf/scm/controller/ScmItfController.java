@@ -87,4 +87,14 @@ public class ScmItfController {
     public AjaxResult syncArea() {
     	return scmItfService.syncArea();
     }
+
+	/**
+	 * 查询最新两个月的版本锁定情况
+	 * @return 结果集合
+	 */
+	@ApiOperation("查询最新两个月的版本锁定情况")
+	@PostMapping("/getMonthLock")
+	public AjaxResult getMonthLock() {
+		return scmItfService.getMonthLock();
+	}
 }

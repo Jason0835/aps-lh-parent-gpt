@@ -270,4 +270,14 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
         AjaxResult ajaxResult = iSalesOrderPoolService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询最新两个月的版本锁定情况
+     */
+    @ApiOperation("查询最新两个月的版本锁定情况")
+    @PostMapping("/getMonthLock")
+    @ResponseBody
+    public AjaxResult getMonthLock(SalesOrderPool salesOrderPool) {
+        return iSalesOrderPoolService.getMonthLock(salesOrderPool);
+    }
 }

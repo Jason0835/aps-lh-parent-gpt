@@ -113,4 +113,11 @@ public interface ISalesOrderPoolRemoteService {
     @ApiOperation("抓取SCM数据")
     @PostMapping("/SalesOrderPool/getSCMData")
     AjaxResult getSCMData(@RequestBody SalesOrderPool salesOrderPool);
+
+    /**
+    * 查询最新两个月的版本锁定情况
+    */
+    @ApiOperation("查询最新两个月的版本锁定情况")
+    @PostMapping("/SalesOrderPool/getMonthLock")
+    AjaxResult getMonthLock(@RequestBody SalesOrderPool salesOrderPool);
 }

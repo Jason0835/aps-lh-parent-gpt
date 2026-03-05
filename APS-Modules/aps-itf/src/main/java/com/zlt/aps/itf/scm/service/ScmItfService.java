@@ -58,4 +58,11 @@ public interface ScmItfService {
 	 * @return
 	 */
 	AjaxResult syncArea();
+
+	/**
+	 * 查询最新两个月的版本锁定情况
+	 *
+	 * @return 结果
+	 */
+	AjaxResult getMonthLock();
 }

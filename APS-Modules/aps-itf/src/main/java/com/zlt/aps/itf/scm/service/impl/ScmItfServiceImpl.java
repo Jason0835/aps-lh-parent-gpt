@@ -55,6 +55,9 @@ public class ScmItfServiceImpl implements ScmItfService {
 	@Value("${itf.scm.publicFacScheduleVersion.url}")
 	private String PUBLIC_FAC_SCHEDULE_VERSION_URL;
 
+	@Value("${itf.scm.getMonthLock.url}")
+	private String SYNC_GET_MONTH_LOCK_URL;
+
 	@Autowired
 	private DpAreaEntityMapper dpAreaEntityMapper;
 	@Autowired
@@ -156,7 +159,7 @@ public class ScmItfServiceImpl implements ScmItfService {
 					JSONObject.toJSONString(planedNotShipParamVo), null);
 			// 校验数据格式是否合法
 			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
-				String errorMsg = "lockSalesOrderPool 返回数据格式校验失败：" + result;
+				String errorMsg = "unlockSalesOrderPool 返回数据格式校验失败：" + result;
 				log.error(errorMsg);
 				ajaxResult = AjaxResult.error(errorMsg);
 				return ajaxResult;
@@ -291,5 +294,31 @@ public class ScmItfServiceImpl implements ScmItfService {
 		}
 		AjaxResult ajaxResult = JSONObject.parseObject(result, AjaxResult.class);
 		return AjaxResultUtils.getList(ajaxResult, clazz);
+	}
+
+	/**
+	 * 查询最新两个月的版本锁定情况
+	 *
+	 * @return 结果
+	 */
+	@Override
+	public AjaxResult getMonthLock() {
+		AjaxResult ajaxResult = null;
+		try {
+			// 调用供应链接口获取数据
+			String result = PostMethodUtils.sendPost(SYNC_GET_MONTH_LOCK_URL,
+					"", null);
+			// 校验数据格式是否合法
+			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
+				String errorMsg = "lockSalesOrderPool 返回数据格式校验失败：" + result;
+				log.error(errorMsg);
+				ajaxResult = AjaxResult.error(errorMsg);
+				return ajaxResult;
+			}
+			ajaxResult = JSONObject.parseObject(result, AjaxResult.class);
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+		}
+		return ajaxResult;
 	}
 }
