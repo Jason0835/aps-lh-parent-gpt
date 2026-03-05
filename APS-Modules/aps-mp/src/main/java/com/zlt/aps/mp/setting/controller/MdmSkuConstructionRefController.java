@@ -159,6 +159,7 @@ public class MdmSkuConstructionRefController extends AbstractDocBizController<Md
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime")), "HYDRAULIC_PRESSURE_CURING_TIME", queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("curingTime2")), "CURING_TIME2", queryVO.getFieldValueByFieldName("curingTime2"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime2")), "HYDRAULIC_PRESSURE_CURING_TIME2", queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime2"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainMaterialDesc")), "MAIN_MATERIAL_DESC", queryVO.getFieldValueByFieldName("mainMaterialDesc"));
     }
 
 
