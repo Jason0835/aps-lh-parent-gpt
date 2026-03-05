@@ -393,7 +393,16 @@
    "ui.data.consumptionDetails.childMaterialCode":"原材料物料编号",
    "ui.data.consumptionDetails.childMaterialVersion":"原材料物料版本",
    "ui.data.consumptionDetails.childMaterialName":"原材料物料描述",
-   "ui.data.consumptionDetails.dosage":"用量"
+   "ui.data.consumptionDetails.dosage":"用量",
+   "ui.data.fgInventory.finalGrade":"品级",
+   "ui.data.orderPool.unLockBtn":"取消锁定",
+   "ui.data.orderPool.orderPriorityNullFlag":"订单优先级为空",
+   "ui.data.total.stockQty":"库存总量",
+   "ui.data.total.orderQty":"订单总量",
+   "ui.data.total.netQty":"排产净需求总量",
+   "ui.data.tooltip.netQty":"排产净需求=实单高优先级+实单中优先级+周期排产储备",
+   "ui.data.tooltip.postponeNetQty":"净需求（含暂缓）=（实单高优先级+实单中优先级）净需求 +暂缓",
+   "ui.data.tooltip.unPostponeNetQty":"净需求（不含暂缓）=（实单高优先级+实单中优先级）净需求"
 
 
 

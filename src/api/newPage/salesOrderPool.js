@@ -63,3 +63,11 @@ export function unLockPool(query) {
 
   })
 }
+export function getMonthLock(query) {
+  return request({
+    url: '/monthplan/SalesOrderPool/getMonthLock',
+    method: 'post',
+    data: query,
+
+  })
+}

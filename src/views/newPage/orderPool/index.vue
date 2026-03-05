@@ -72,6 +72,11 @@
           >{{ $t("取消锁定") }}
         </el-button>
       </template>
+      <template slot="headerRight">
+        <span class="stat-info">
+          <span class="stat-value"> {{lockText}} </span>
+        </span>
+      </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
@@ -92,6 +97,7 @@ import {
   getSCMData,
   saveData,
   getSCMDataCheck,
+  getMonthLock
 } from "@/api/newPage/salesOrderPool";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -112,7 +118,8 @@ export default {
     "biz_deliver_goods_type",
     "biz_scm_type",
     "biz_stor_type",
-    "biz_brand_type"
+    "biz_brand_type",
+    "biz_yes_no"
   ],
   provide() {
     return {
@@ -121,6 +128,7 @@ export default {
   },
   data() {
     return {
+      lockText:'',
       loading: false,
       data: [],
       selection: [],
@@ -383,10 +391,38 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_deliver_goods_type,
         },
+        {
+          prop: "orderPriorityNullFlag",
+          label: this.$t("订单优先级为空"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
       ];
     },
   },
   methods: {
+    async handleGetMothLock(){
+      try{
+        let res=await getMonthLock({});
+        console.log(res);
+        if(res.length!=0){
+          let text=''
+          for (let index = 0; index < res.length; index++) {
+            if(index!=res.length-1){
+              text=text+res[index]+'，'
+            }else{
+              text+=res[index]
+            }
+
+
+          }
+          this.lockText=text
+        }
+
+      }catch(err){
+        console.log(err);
+      }
+    },
     handlePriorityChange(row, val) {
       console.log(row, val);
       // let params = {
@@ -532,6 +568,7 @@ export default {
         // console.log(data);
         this.data = data.rows;
         this.page.total = data.total;
+        this.handleGetMothLock()
       } catch (error) {
         console.error(error);
       } finally {

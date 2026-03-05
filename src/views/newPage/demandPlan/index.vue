@@ -382,6 +382,19 @@ export default {
         {
           prop: "netQty",
           label: this.$t("ui.data.DemandPlan.netQty"),
+          renderColumnHeader: () => {
+            return (
+              <span>
+                {this.$t("ui.data.DemandPlan.netQty")}
+                <el-tooltip
+                  content={this.$t("排产净需求=实单高优先级+实单中优先级+周期排产储备")}
+                  placement="top"
+                >
+                  <i class="el-icon-info"></i>
+                </el-tooltip>
+              </span>
+            );
+          },
         },
         {
           prop: "isProduction",
@@ -443,10 +456,36 @@ export default {
         {
           prop: "postponeNetQty",
           label: this.$t("ui.data.DemandPlan.postponeNetQty"),
+          renderColumnHeader: () => {
+            return (
+              <span>
+                {this.$t("ui.data.DemandPlan.postponeNetQty")}
+                <el-tooltip
+                  content={this.$t("净需求（含暂缓）=（实单高优先级+实单中优先级）净需求 +暂缓")}
+                  placement="top"
+                >
+                  <i class="el-icon-info"></i>
+                </el-tooltip>
+              </span>
+            );
+          },
         },
         {
           prop: "unPostponeNetQty",
           label: this.$t("ui.data.DemandPlan.unPostponeNetQty"),
+          renderColumnHeader: () => {
+            return (
+              <span>
+                {this.$t("ui.data.DemandPlan.unPostponeNetQty")}
+                <el-tooltip
+                  content={this.$t("净需求（不含暂缓）=（实单高优先级+实单中优先级）净需求")}
+                  placement="top"
+                >
+                  <i class="el-icon-info"></i>
+                </el-tooltip>
+              </span>
+            );
+          },
         },
         {
           prop: "heightQty",

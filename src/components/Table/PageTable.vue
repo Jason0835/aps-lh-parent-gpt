@@ -249,7 +249,9 @@ export default {
           selectable,
           reserveSelection,
           children,
+          renderColumnHeader,
           ...other
+
         } = column;
         if (children && children.length != 0) {
           return (
@@ -340,6 +342,7 @@ export default {
             }}
             scopedSlots={{
               default: render ? render : undefined,
+              header: renderColumnHeader ? renderColumnHeader : undefined,
               bulkEdit:
                 typeof bulkEdit == "function"
                   ? bulkEdit

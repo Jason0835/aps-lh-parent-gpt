@@ -132,6 +132,11 @@ export default {
           minWidth:120
         },
         {
+          prop: "finalGrade",
+          label: this.$t("品级"),
+          width:120
+        },
+        {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           width:200
