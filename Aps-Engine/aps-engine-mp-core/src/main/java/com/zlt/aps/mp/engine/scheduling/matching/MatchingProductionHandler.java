@@ -308,7 +308,6 @@ public class MatchingProductionHandler {
                         continue;
                     }
                     // 检查模具是否有剩余产能
-                    this.reCalcAdjustDailyCapacityLimit(contextDTO, plan, day); // 先重算产能限制
                     MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
                     // 根据日产比例限制产能
                     BigDecimal dayProductionRate = BigDecimalUtils.percentages2Decimals(dailyCapacityLimitVo.getDayProductionRate()); // 日产比例
@@ -331,6 +330,7 @@ public class MatchingProductionHandler {
                         }
                     }
                     // 为当天分配搭配量
+                    this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, day); // 先重算产能限制
                     int allocationQty = this.allcatAdjustProductQty(contextDTO, day, realBeginDay, plan,
                             dayProductionMap, unAllocationQty, realCapacity, dailyCapacityLimitVo, dailyCapacityLimitMap, mouldRemaindCapacity);
                     if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
@@ -339,7 +339,7 @@ public class MatchingProductionHandler {
                         }
                         unAllocatSpecStructureTotalQty -= allocationQty; // 特殊材料可分配量需要扣减掉已排产量
                         unAllocationQty -= allocationQty;
-                        this.reCalcAdjustDailyCapacityLimit(contextDTO, plan, day); // 有调整，则也重算产能限制
+                        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, day); // 有搭配，则再次重算产能限制
                     } else if (isBegin) { // 防止中断不连续的问题出现
                         break;
                     }
@@ -553,21 +553,22 @@ public class MatchingProductionHandler {
     private boolean checkMouldSatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo,int cavityQty){
         //型腔台数
         int patternCount = cavityQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        //主花纹向下所有SKU的模具数量 <= 主花纹.型腔数量
-        return dailyCapacityLimitVo.getPatternUsedLhMachines() <= patternCount;
+        //主花纹向下所有SKU的模具数量 < 主花纹.型腔数量
+        return dailyCapacityLimitVo.getPatternUsedLhMachines() < patternCount;
     }
-    
+
     /**
      * 
      * 重算指定天的日产能限制，包括硫化机台数、胎胚种类数
      * 
-     * @param contextDTO  周程滚动上下文
-     * @param mpProdFinal 定稿记录
-     * @param day         排产日
+     * @param contextDTO      周程滚动上下文
+     * @param mpProdFinalList 定稿记录列表
+     * @param mpProdFinal     定稿记录
+     * @param day             排产日
      */
     private void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO,
+                                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
                                                 FactoryMonthPlanFinalAdjustVo mpProdFinal, int day) {
-        List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList = Collections.singletonList(mpProdFinal);
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         MpDailyCapacityLimitVo daylyCapacityLimit = dailyCapacityLimitVoMap.get(day);
