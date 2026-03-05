@@ -179,9 +179,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 //2.8 保存调整日志
                 saveMpAdjustLog(copyContextDTO);
 
-                if (!StringUtil.isEmptyWithTrim(copyContextDTO.getMsgRemainQtyNoFull().toString())){
-                    contextDTO.getMsgRemainQtyNoFull().append(copyContextDTO.getMsgRemainQtyNoFull().toString());
-                }
                 return currentStructureName;
             });
             futureList.add(future);
