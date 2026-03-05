@@ -310,9 +310,7 @@ public class MatchingProductionHandler {
                     // 检查模具是否有剩余产能
                     MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
                     // 根据日产比例限制产能
-                    BigDecimal dayProductionRate = BigDecimalUtils.percentages2Decimals(dailyCapacityLimitVo.getDayProductionRate()); // 日产比例
-                    int realCapacity = BigDecimalUtils.multiply(capacity, dayProductionRate).setScale(0, RoundingMode.DOWN).intValue();
-                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, plan, realCapacity, day, realBeginDay, endDay, dayProductionMap, dailyCapacityLimitMap); // 获取模具剩余产能
+                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, plan, capacity, day, realBeginDay, endDay, dayProductionMap, dailyCapacityLimitMap); // 获取模具剩余产能
                     if (mouldRemaindCapacity <=0 && dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) { // 如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
                         if (isBegin) { // 防止中断不连续的问题出现
                             break;
@@ -332,7 +330,7 @@ public class MatchingProductionHandler {
                     // 为当天分配搭配量
                     this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, day); // 先重算产能限制
                     int allocationQty = this.allcatAdjustProductQty(contextDTO, day, realBeginDay, plan,
-                            dayProductionMap, unAllocationQty, realCapacity, dailyCapacityLimitVo, dailyCapacityLimitMap, mouldRemaindCapacity);
+                            dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitVo, dailyCapacityLimitMap, mouldRemaindCapacity);
                     if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
                         if (mouldRemaindCapacity == 0) {
                             isBegin = true; // 非补模具余量的，才需要标记为开始
@@ -977,12 +975,11 @@ public class MatchingProductionHandler {
         // 判断当天成型硫化比是否已经满足条件
         List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
         // 统计当天的已排量，判断不能超过最大排产量限制
-        Integer todayProductQty = dayProductionList.stream().mapToInt(MatchingProductionAdjuestVo::getProductionQty).sum();
-        Integer maxDayProductionQty = dailyCapacityLimitVo.getMaxDayProductionQty();
-        Integer canProductionQty = maxDayProductionQty - todayProductQty;
-        if (canProductionQty <= 0) {
+        int remainDayTotalCapacity = this.getRemainDayTotalCapacity(contextDTO, dailyCapacityLimitVo, scheduleDay);
+        if (remainDayTotalCapacity <= 0) {
             return 0;
         }
+        
         boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
         
         // 根据上一天的排产情况判断是否需要换模
@@ -1027,7 +1024,7 @@ public class MatchingProductionHandler {
         if (isRemaindCapacity) {
             allocationQty = Math.min(allocationQty, mouldRemaindCapacity); // 如果当天模具有剩余产能的，优先补满
         }
-        allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量
+        allocationQty = Math.min(Math.min(allocationQty, unAllocationQty), remainDayTotalCapacity); // 分配量不能超过未分配量以及剩余产能
         allocationQty = (allocationQty & 1) == 0? allocationQty: allocationQty + 1; // 处理奇数，遇到奇数直接+1;
         Integer oldProductionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay)).orElse(0);
         plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay, allocationQty + oldProductionQty);
@@ -1066,6 +1063,36 @@ public class MatchingProductionHandler {
         log.debug(logDetail);
         contextDTO.getLogDetail().append(logDetail).append(ApsConstant.DIVISION); // 记录日志
         return allocationQty;
+    }
+    
+    /**
+     * 获取每日最大产能扣除已排产量后的剩余产能
+     * 
+     * @param contextDTO           上下文
+     * @param dailyCapacityLimitVo 产能限制对象
+     * @param day                  排产日
+     * @return
+     */
+    private int getRemainDayTotalCapacity(MpRollAdjustContextDTO contextDTO,
+                                               MpDailyCapacityLimitVo dailyCapacityLimitVo, Integer day) {
+        int dayTotalCapacityLimit = Optional.ofNullable(dailyCapacityLimitVo.getMaxDayProductionQty()).orElse(0);
+        List<FactoryMonthPlanFinalAdjustVo> mpPlanFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (CollectionUtils.isEmpty(mpPlanFinalAdjustList)) {
+            return dayTotalCapacityLimit;
+        }
+        // 1.计算检查日的汇总值
+        String dayField = FactoryConstant.DAY_FIELD + day;
+        int totalPlanQty = mpPlanFinalAdjustList.stream().filter(Objects::nonNull).mapToInt(x -> {
+            Object val = x.getFieldValueByFieldName(dayField);
+            return val instanceof Number ? ((Number) val).intValue() : 0;
+        }).sum();
+
+        // 2.检查日的汇总值 小于等于 日总产能限制
+        if (totalPlanQty < dayTotalCapacityLimit) {
+            return dayTotalCapacityLimit - totalPlanQty;
+        } else {
+            return 0;
+        }
     }
 
     /**
