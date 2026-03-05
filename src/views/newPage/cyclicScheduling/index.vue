@@ -279,6 +279,14 @@ export default {
           dictData: this.dict.type.biz_factory_name,
         },
         {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
+        },
+        {
           prop: "productCategory",
           label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
           type: "select",
@@ -427,7 +435,12 @@ export default {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
-
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        params.yearMonth = undefined;
+      }
       if (params.createTime && params.createTime[0]) {
         params.createTimeStart = params.createTime[0];
         params.createTimeEnd = params.createTime[1];
@@ -455,8 +468,13 @@ export default {
     },
   },
   created() {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const year = nextMonth.getFullYear();
+      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
     let defaultParams = {
       factoryCode: "116",
+      yearMonth: `${year}-${month}`,
     };
     this.search = {
       ...defaultParams,
