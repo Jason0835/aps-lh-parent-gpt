@@ -1853,7 +1853,7 @@ public class MpWeekRollAdjustEngine {
             String preDayField = FactoryConstant.DAY_FIELD + (currentDay-1);
             int preDayValue = (Integer) mpFinalVo.getFieldValueByFieldName(preDayField) - beforeProductionQty;
             mpFinalVo.setFieldValueByFieldName(preDayField,preDayValue==0 ? null : preDayValue);
-            contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,单机台已排产天数: %s, 还原值:, 前日还原后的排产量: %s！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),currentDay,usedProductionDays,beforeProductionQty,preDayValue)).append(ApsConstant.DIVISION);
+            contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,单机台已排产天数: %s, 还原值:%s, 前日还原后的排产量: %s！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),currentDay,usedProductionDays,beforeProductionQty,preDayValue)).append(ApsConstant.DIVISION);
             return beforeProductionQty;
         }
         return 0;
