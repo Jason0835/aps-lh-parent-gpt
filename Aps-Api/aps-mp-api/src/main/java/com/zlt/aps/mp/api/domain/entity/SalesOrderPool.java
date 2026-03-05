@@ -67,7 +67,7 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "客户", name = "salCode")
     @TableField(value = "SAL_CODE")
     private String salCode;
-    
+
     /** 内外销 */
     @Excel(name = "ui.data.column.SalesOrderPool.locationType", dictType = "biz_stor_type")
     @ApiModelProperty(value = "内外销", name = "locationType")
@@ -195,6 +195,13 @@ public class SalesOrderPool extends BaseEntity{
     @ApiModelProperty(value = "提报日期结束时间", name = "billDateEndTime")
     @TableField(exist = false)
     private String billDateEndTime;
+
+    /**
+     * 订单优先级是否为空标识，0-否，1-是
+     */
+    @ApiModelProperty(value = "订单优先级是否为空，0-否，1-是", name = "orderPriorityNullFlag")
+    @TableField(exist = false)
+    private String orderPriorityNullFlag;
 
     // 缓存供应链优先级整数值
     @TableField(exist = false)
