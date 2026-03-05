@@ -13,6 +13,7 @@ import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.mapper.MdmBomInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmConstructionInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.utils.ScmListUtils;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +47,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	private MdmConstructionInfoEntityMapper mdmConstructionInfoEntityMapper;
 	@Autowired
 	private MdmBomInfoEntityMapper mdmBomInfoEntityMapper;
+	@Autowired
+	private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 	@Autowired
 	private MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
 	@Autowired
@@ -202,14 +206,14 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 // 构建胎胚原料消耗量
                 List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList, syncDataLogs.getFactoryCode());
                 if (CollectionUtils.isNotEmpty(detaiList)) {
-                    // 保存前先删除本次同步涉及的胎胚原材料明细
-                    List<String> embryoCodeList = detaiList.stream().map(MdmMaterialConsumeDetail::getEmbryoCode).distinct().collect(Collectors.toList());
-                    List<List<String>> splitDeleteList = ScmListUtils.getSplitList(embryoCodeList, 1000);
-                    for (List<String> deleteList : splitDeleteList) { // 分批处理，防止长度超出限制
-                        Map<String, Object> paramMap = new HashMap<>();
-                        paramMap.put("embryoCode", deleteList);
-                        baseDao.deleteByMap(MdmMaterialConsumeDetail.class, paramMap);
-                    }
+//                    // 保存前先删除本次同步涉及的胎胚原材料明细
+//                    List<String> embryoCodeList = detaiList.stream().map(MdmMaterialConsumeDetail::getEmbryoCode).distinct().collect(Collectors.toList());
+//                    List<List<String>> splitDeleteList = ScmListUtils.getSplitList(embryoCodeList, 1000);
+//                    for (List<String> deleteList : splitDeleteList) { // 分批处理，防止长度超出限制
+//                        Map<String, Object> paramMap = new HashMap<>();
+//                        paramMap.put("embryoCode", deleteList);
+//                        baseDao.deleteByMap(MdmMaterialConsumeDetail.class, paramMap);
+//                    }
                     List<List<MdmMaterialConsumeDetail>> splitDetailList = ScmListUtils.getSplitList(detaiList, 1000);
                     for (List<MdmMaterialConsumeDetail> saveList : splitDetailList) { // 分批处理，防止长度超出限制
                         baseDao.saveBatch(saveList);
@@ -241,9 +245,12 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 .collect(Collectors.toList());
         bomList.addAll(mesDateList);
 
-        // 2、按版本 + 物料号汇总bom数据
-//        Map<String, MdmBomInfo> childMap = bomList.stream()
-//                .collect(Collectors.toMap(bom -> this.getMapKey(bom), Function.identity(), (b1, b2) -> b1));
+        // 2、加载已有原料消耗表
+        LambdaQueryWrapper<MdmMaterialConsumeDetail> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmMaterialConsumeDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
+        queryWrapper.eq(MdmMaterialConsumeDetail::getFactoryCode, factoryCode);
+        List<MdmMaterialConsumeDetail> oldDetailList = mdmMaterialConsumeDetailMapper.selectList(queryWrapper);
+        Map<String, MdmMaterialConsumeDetail> oldDetailMap = oldDetailList.stream().collect(Collectors.toMap(detail -> this.getMapKey(detail), Function.identity(), (d1, d2) -> d1));
 
         // 3、根据父节汇总
         Map<String, List<MdmBomInfo>> parentMap = bomList.stream()
@@ -262,7 +269,9 @@ public class MesBomItfServiceImpl implements MesBomItfService {
         // 5、构建物料消耗清单
         List<MdmMaterialConsumeDetail> detaiList = new ArrayList<>();
         LinkedList<MdmBomInfo> pathList = new LinkedList<>();
-        List<MdmBomInfo> leafList = bomList.stream().filter(bom -> bom.getIsLeaf()).collect(Collectors.toList());
+        List<MdmBomInfo> leafList = bomList.stream()
+                .filter(bom -> bom.getIsLeaf() && StringUtils.isNotEmpty(bom.getChildMaterialCode()))
+                .collect(Collectors.toList());
         for (MdmBomInfo bom: leafList) {
             // 5.1、构建bom树路径，从叶子节点开始向上
             pathList.clear();
@@ -277,24 +286,36 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 pathList.addLast(currentNode); // 倒序添加节点
                 currentNode = currentNode.getParent(); // 切换成父节点
             } while (true);
+            
+            if (pathList.size() <= 1) {
+                continue; // 层架不到1层的，说明Bom数据有问题，跳过
+            }
 
             // 5.2、判断如果路径上有任意一个节点是本次更新的bom，则需要新生成一笔消耗明细，
             if (pathList.stream().anyMatch(b -> updateIdSet.contains(b.getId()))) {
-                // 5.2.1、初始化消耗量
+                // 5.2.1、取胎胚，必然是路径的最后一个元素
+                MdmBomInfo embryoBom = pathList.getLast();
+                if (StringUtils.isEmpty(embryoBom.getParentCode())) { // 胎胚号为空说明有问题，跳过
+                    continue;
+                }
+                // 5.2.2、初始化消耗量
                 MdmMaterialConsumeDetail consumeDetail = new MdmMaterialConsumeDetail();
                 consumeDetail.setFactoryCode(factoryCode);
                 consumeDetail.setChildMaterialCode(bom.getChildMaterialCode());
                 consumeDetail.setChildMaterialName(bom.getChildMaterialName());
                 consumeDetail.setChildMaterialVersion(bom.getChildMaterialVersion());
                 consumeDetail.setUnit(bom.getUnit());
-                // 5.2.2、取胎胚，必然是路径的最后一个元素
-                MdmBomInfo embryoBom = pathList.getLast();
                 consumeDetail.setEmbryoCode(embryoBom.getParentCode()); // 20260302，由于胎胚在bom里没有单独的记录，需要关联出最上级的物料后
                 consumeDetail.setEmbryoVersion(embryoBom.getParentVersion());
                 // 5.2.3、计算用量，用量为每一层bom的用量乘数
                 BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
                         .reduce(BigDecimal.ONE, BigDecimal::multiply);
                 consumeDetail.setDosage(dosage);
+                
+                MdmMaterialConsumeDetail oldDetail = oldDetailMap.get(this.getMapKey(consumeDetail));
+                if (oldDetail != null) {
+                    consumeDetail.setId(oldDetail.getId());
+                }
                 detaiList.add(consumeDetail);
             }
         }
