@@ -197,6 +197,14 @@ public class MdmProductStock extends BaseEntity {
     @TableField(value = "IS_EXCEED_TIRE")
     private String isExceedTire;
 
+    /**
+     * 品级
+     */
+    @Excel(name = "ui.data.column.productStock.finalGrade")
+    @ApiModelProperty(value = "品级 ", name = "finalGrade")
+    @TableField(value = "FINAL_GRADE")
+    private String finalGrade;
+
     @Excel(name = "ui.data.column.demandPlan.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty("更新时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
