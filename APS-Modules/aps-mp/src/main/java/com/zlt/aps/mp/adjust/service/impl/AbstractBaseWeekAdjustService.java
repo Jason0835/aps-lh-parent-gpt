@@ -92,6 +92,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 /**
@@ -1621,13 +1622,21 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 生产计划列表按照物料编码进行分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap = monthPlanProdList.stream()
                 .collect(Collectors.groupingBy(FactoryMonthPlanFinalAdjustVo::getMaterialCode));
+
+        // 获取调整结果计划总量为0的月度计划列表
+        List<FactoryMonthPlanProductionFinalResult> adjustResultMonthPlanList = buildAdjustResultMonthPlan(adjustResultList);
+        // 按照物料编码去重进行分组
+        Set<String> adjustResultMonthPlanSet = adjustResultMonthPlanList.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
+                .collect(Collectors.toSet());
+
         // 遍历调整明细列表匹配调整结果(更新实际调整、调整原因)
         for (MpAdjustDetailVo adjustDetailVo : adjustDetailList) {
             String materialCode = adjustDetailVo.getMaterialCode();
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
+            MpAdjustResult adjustResult = CollectionUtils.firstElement(adjustResultMap.get(materialCode));
             if (adjustResult == null) {
                 log.warn("更新调整明细：物料编号:{}未查询到对应调整结果，跳过", materialCode);
                 continue;
@@ -1643,6 +1652,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             // 设置实际调整
             adjustDetailVo.setActualAdjustQty(Convert.toInt(actualAdjustQty, 0));
+            // 如果是关单的情况,实际调整量 = 实际调整量 - 月计划已排产量
+            if (adjustResultMonthPlanSet.contains(materialCode)) {
+                Integer monthScheduledQty = Convert.toInt(adjustDetailVo.getMonthScheduledQty(), 0);
+                adjustDetailVo.setActualAdjustQty(adjustDetailVo.getActualAdjustQty() - monthScheduledQty);
+            }
             // 调整原因 TODO
 //            adjustDetailVo.setAdjustReason("");
         }
@@ -1724,16 +1738,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
 
         // 遍历生产计划列表匹配调整结果（更新计划量、开始日期、结束日期、调整量)
-        for (FactoryMonthPlanFinalAdjustVo monthPlanVo : factoryMonthPlanProdFinalList) {
-            String materialCode = monthPlanVo.getMaterialCode();
+        for (FactoryMonthPlanFinalAdjustVo monthPlan : factoryMonthPlanProdFinalList) {
+            String materialCode = monthPlan.getMaterialCode();
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustResultMap, materialCode);
+            MpAdjustResult adjustResult = CollectionUtils.firstElement(adjustResultMap.get(materialCode));
             if (adjustResult == null) {
                 log.warn("更新月度生产计划：物料编号:{}未查询到对应调整结果，跳过", materialCode);
                 continue;
             }
+
+            FactoryMonthPlanFinalAdjustVo monthPlanVo = new FactoryMonthPlanFinalAdjustVo();
+            BeanUtils.copyProperties(monthPlan, monthPlanVo);
 
             // 设置最新需求计划版本
             monthPlanVo.setLastMonthPlanVersion(lastMonthPlanVersion);
