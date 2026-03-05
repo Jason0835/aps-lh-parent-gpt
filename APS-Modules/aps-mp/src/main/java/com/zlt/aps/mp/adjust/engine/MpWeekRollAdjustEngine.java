@@ -1723,7 +1723,7 @@ public class MpWeekRollAdjustEngine {
                 //3.2、检查SKU二次上机
                 resetEndDay(1,structureDeadLine,mpFinalVo);
                 if (!checkSecOnline(mpFinalVo,i, contextDTO.getParamMap()) &&
-                        !hasPlanByDay(mpFinalVo, i -1)){
+                        !hasPlanByDay(mpFinalVo, getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),i -1))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     continue;
                 }
@@ -1856,6 +1856,24 @@ public class MpWeekRollAdjustEngine {
         return newPlanQty < 0 ? 0:newPlanQty;
     }
 
+    /**
+     * 获取停产前日
+     * @param dailyCapacityLimitVoMap 产能限制Map
+     * @param checkDay 检查日
+     * @return 停产前日
+     */
+    private int getPreDayCloseDay(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap,int checkDay){
+        if (YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(checkDay).getDayOpenCloseFlag())){
+            return checkDay;
+        }
+
+        for (int i = checkDay; i > 0; i--){
+            if (YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                return i;
+            }
+        }
+        return FactoryConstant.MONTH_START_DAY;
+    }
     /**
      * 获取新的活块数量
      * @param contextDTO 周程滚动上下文
