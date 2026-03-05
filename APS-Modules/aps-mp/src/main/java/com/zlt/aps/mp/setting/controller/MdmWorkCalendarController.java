@@ -109,7 +109,7 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MdmWorkCalendar billVO) {
-        Date calendarTime = billVO.getCalendarTime();
+        Date calendarTime = billVO.getProductionDate();
         if (calendarTime != null) {
             Calendar instance = Calendar.getInstance();
             instance.setTime(calendarTime);

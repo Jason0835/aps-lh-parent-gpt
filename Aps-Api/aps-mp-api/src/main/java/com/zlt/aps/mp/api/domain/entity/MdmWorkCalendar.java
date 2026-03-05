@@ -77,7 +77,7 @@ public class MdmWorkCalendar extends BaseEntity {
      * 日期
      */
     @ImportExcelValidated(required = true, date = true)
-    @JsonFormat(pattern = "yyyy-MM")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "ui.data.column.mdmWorkCalendar.productionDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "日期", name = "productionDate")
     @TableField(value = "PRODUCTION_DATE")
