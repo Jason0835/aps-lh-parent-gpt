@@ -238,6 +238,10 @@ public class MesItfServiceImpl implements MesItfService {
             List<String> materialCodeList = productStockList.stream().map(MdmProductStock::getMaterialCode).distinct().collect(Collectors.toList());
             Map<String, MdmMaterialInfo> materialInfoMap = getMaterialInfoMap(materialCodeList);
             for (MdmProductStock stock : productStockList) {
+                // 年周号为空或等于0的数据，跳过
+                if (StringUtils.isBlank(stock.getWeekYear()) || ApsConstant.APS_STRING_0.equals(stock.getWeekYear())) {
+                    continue;
+                }
                 // 默认外销
                 String mapKey = GenerageMapKeyUtils.createMapKey(stock.getFactoryCode(), stock.getMaterialCode());
                 try {
@@ -251,8 +255,8 @@ public class MesItfServiceImpl implements MesItfService {
                     stock.setStructureName(materialInfo.getStructureName());
                     stock.setBrand(materialInfo.getBrand());
                     stock.setProductTypeCode(materialInfo.getProductTypeCode());
+                    saveList.add(stock);
                 }
-                saveList.add(stock);
             }
             if (CollectionUtils.isNotEmpty(saveList)) {
 
