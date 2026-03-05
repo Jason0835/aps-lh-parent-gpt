@@ -696,6 +696,20 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     /**
      * 将日期字段中值为0的字段设为null
+     * @param monthPlan
+     */
+    protected void handleZeroToNull(FactoryMonthPlanProductionFinalResult monthPlan) {
+        // 遍历日期，设置每个dayN字段
+        for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+            String fieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day;
+            if (Convert.toInt(monthPlan.getFieldValueByFieldName(fieldName), 0) == 0) {
+                monthPlan.setFieldValueByFieldName(fieldName, null);
+            }
+        }
+    }
+
+    /**
+     * 将日期字段中值为0的字段设为null
      * @param result
      */
     protected void handleZeroToNull(MpAdjustResult result) {
@@ -976,6 +990,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
             setBeginDayAndEndDay(monthPlan);
+            // 将日期字段中值为0的字段设为null
+            handleZeroToNull(monthPlan);
             insertMonthPlanList.add(monthPlan);
         }
 
@@ -1101,6 +1117,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             setMoldCavityInsertField(contextDTO, monthPlan);
             // 最新需求计划版本
             monthPlan.setLastMonthPlanVersion(lastMonthPlanVersion);
+            // 将日期字段中值为0的字段设为null
+            handleZeroToNull(monthPlan);
             monthPlanList.add(monthPlan);
         }
         return monthPlanList;
