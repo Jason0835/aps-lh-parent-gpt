@@ -1653,7 +1653,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 设置实际调整
             adjustDetailVo.setActualAdjustQty(Convert.toInt(actualAdjustQty, 0));
             // 如果是关单的情况,实际调整量 = 实际调整量 - 月计划已排产量
-            if (adjustResultMonthPlanSet.contains(materialCode)) {
+            if (adjustResultMonthPlanSet.contains(materialCode) && monthPlanMap.containsKey(materialCode)) {
                 Integer monthScheduledQty = Convert.toInt(adjustDetailVo.getMonthScheduledQty(), 0);
                 adjustDetailVo.setActualAdjustQty(adjustDetailVo.getActualAdjustQty() - monthScheduledQty);
             }
