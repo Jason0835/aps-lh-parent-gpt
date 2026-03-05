@@ -33,6 +33,7 @@ import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -150,6 +151,9 @@ public class MatchingProductionHandler {
      * 月份天数上限
      */
     private final static int MAX_MONTH_DAY = 31;
+    
+    @Value("${debug.ignorSkip.matching:false}")
+    private Boolean isIgnorSkip;
 
     /**
      * 搭配排产（已排产结果入口）
@@ -159,7 +163,7 @@ public class MatchingProductionHandler {
     public void matchingProduction(String productionVersion) {
         try {
             String config = sysConfigService.selectConfigByKey("monthPlan.skip.matching");
-            if (StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
                 return; // 跳过搭配开关打开，则直接返回
             }
         } catch (Exception e) {
@@ -227,7 +231,7 @@ public class MatchingProductionHandler {
                                          List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, boolean isInner) {
         try {
             String config = sysConfigService.selectConfigByKey("monthAdjust.skip.matching");
-            if (StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
                 return; // 跳过搭配开关打开，则直接返回
             }
         } catch (Exception e) {
@@ -1002,7 +1006,6 @@ public class MatchingProductionHandler {
             }
         }
         // 判断是否需要换活字块
-        boolean isChangeBlock = false;
 
         if (isChangeMould && !this.checkMouldSatisfy(dailyCapacityLimitVo, mouldCavityQty)) { // 需要换模，且剩余型腔数不足最低排产模具数，结束
             return 0;
@@ -1011,12 +1014,11 @@ public class MatchingProductionHandler {
         // 计算排产量
         int allocationQty = capacity; // 本次排产量，默认是双模*模具产能
         if (isChangeMould) { // 如果是换模具，则只能增加首日排产量
-            Integer changeMouldFirstQty = (Integer) param.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode()); // 换模首日可排产量
-            allocationQty = changeMouldFirstQty; // 每次仅新增一台硫化机
-        }
-        if (isChangeBlock) { // 如果只是换或字块，则按换字块的逻辑处理
-            Integer changeTypeBlockQty = (Integer) param.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode()); // 换活可排产量
-            allocationQty = changeTypeBlockQty; // 每次仅更换一台
+//            Integer changeMouldFirstQty = (Integer) param.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode()); // 换模首日可排产量
+            Integer changeMouldFirstQty = new MpAdjustDailyCapacityLimit().getFirstDayQty(
+                    contextDTO.getFactoryMonthPlanProdFinalList(), scheduleDay, dailyCapacityLimitVo,
+                    contextDTO.getParamMap(), plan.getMainPattern());
+            allocationQty = Optional.ofNullable(changeMouldFirstQty).orElse(0); // 每次仅新增一台硫化机
         }
         if (allocationQty <= 0) {
             return 0;

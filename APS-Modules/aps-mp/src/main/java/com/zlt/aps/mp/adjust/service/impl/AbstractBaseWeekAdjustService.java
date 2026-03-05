@@ -1657,6 +1657,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             MpAdjustResult adjustResult = CollectionUtils.firstElement(adjustResultMap.get(materialCode));
             if (adjustResult == null) {
                 log.warn("更新调整明细：物料编号:{}未查询到对应调整结果，跳过", materialCode);
+                if (!monthPlanMap.containsKey(materialCode)) {
+                    adjustDetailVo.setActualAdjustQty(Integer.valueOf(0));
+                }
                 continue;
             }
             Integer totalPlanQty = Convert.toInt(adjustResult.getTotalPlanQty(), 0);
