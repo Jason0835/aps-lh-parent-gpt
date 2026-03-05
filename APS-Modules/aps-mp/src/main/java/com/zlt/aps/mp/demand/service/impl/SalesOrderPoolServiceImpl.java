@@ -584,4 +584,15 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		}
 		return paramValue;
 	}
+
+	/**
+	 * 查询最新两个月的版本锁定情况
+	 *
+	 * @param salesOrderPool 查询
+	 * @return 结果
+	 */
+	@Override
+	public AjaxResult getMonthLock(SalesOrderPool salesOrderPool) {
+		return iScmItfService.getMonthLock();
+	}
 }

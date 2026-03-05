@@ -215,6 +215,15 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         return salesOrderPoolService.getSCMData(salesOrderPool);
     }
 
+    /**
+     * 查询最新两个月的版本锁定情况
+     */
+    @ApiOperation("查询最新两个月的版本锁定情况")
+    @PostMapping("/getMonthLock")
+    public AjaxResult getMonthLock(@RequestBody SalesOrderPool salesOrderPool){
+        return salesOrderPoolService.getMonthLock(salesOrderPool);
+    }
+
     @Override
     protected IDocService getDocService(){
         return salesOrderPoolService;

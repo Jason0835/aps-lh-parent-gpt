@@ -68,4 +68,11 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @return
 	 */
 	List<SalesOrderPool> findCurrentSalesOrderPool(String factoryCode, Set<String> eligibleSkus);
+
+	/**
+	 * 查询最新两个月的版本锁定情况
+	 * @param salesOrderPool
+	 * @return
+	 */
+	AjaxResult getMonthLock(SalesOrderPool salesOrderPool);
 }
