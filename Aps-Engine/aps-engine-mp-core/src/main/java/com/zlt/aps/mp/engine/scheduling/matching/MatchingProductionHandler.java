@@ -24,7 +24,6 @@ import java.util.stream.Stream;
 
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
-import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanMouldDayDetailMapper;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -259,7 +258,7 @@ public class MatchingProductionHandler {
             return;
         }
         log.info("周程滚动搭配算法start");
-        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList); // 搭配前先重算每日产能
+//        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList); // 搭配前先重算每日产能
         TbrProductionContext productionContext = this.initProductionContext(contextDTO); // 初始化上下文
         List<MdmProductStock> stockList = this.getMdmProductStock(contextDTO, productionContext);
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
@@ -309,6 +308,7 @@ public class MatchingProductionHandler {
                         continue;
                     }
                     // 检查模具是否有剩余产能
+                    this.reCalcAdjustDailyCapacityLimit(contextDTO, plan, day); // 先重算产能限制
                     MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
                     // 根据日产比例限制产能
                     BigDecimal dayProductionRate = BigDecimalUtils.percentages2Decimals(dailyCapacityLimitVo.getDayProductionRate()); // 日产比例
@@ -339,6 +339,7 @@ public class MatchingProductionHandler {
                         }
                         unAllocatSpecStructureTotalQty -= allocationQty; // 特殊材料可分配量需要扣减掉已排产量
                         unAllocationQty -= allocationQty;
+                        this.reCalcAdjustDailyCapacityLimit(contextDTO, plan, day); // 有调整，则也重算产能限制
                     } else if (isBegin) { // 防止中断不连续的问题出现
                         break;
                     }
@@ -382,8 +383,6 @@ public class MatchingProductionHandler {
         if (isSpecial && unAllocatSpecStructureQty <= 0) {
             return;
         }
-        // 补量前先重算每日产能
-        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList); 
         // 加载上下文中的各项必要数据
         Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = this.getSkuLhCapacity(contextDTO);; // 日硫化产能表，key:物料描述
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
@@ -481,23 +480,6 @@ public class MatchingProductionHandler {
         }
         return lhMachineCount;
     }
-//    private Integer getBootsDayLhMachineCount(Map<Integer, Integer> dayProductionQtyMap,
-//                                              Map<Integer, Integer> capacityDayMap,
-//                                              Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
-//        Integer lhMachineCount = 0;
-//        for (Integer day : dayProductionQtyMap.keySet()) {
-//            Integer productionQty = dayProductionQtyMap.getOrDefault(day, 0); // 当天已排产量
-//            Integer capacity = capacityDayMap.getOrDefault(day, 0); // 当天产能
-//            if (capacity == 0) {
-//                continue;
-//            }
-//            // 硫化机数 = 排产量 / 产能，向上取整
-//            Integer newMachineCount = BigDecimalUtils.div(productionQty, capacity).setScale(0, RoundingMode.UP).intValue();
-//            MpDailyCapacityLimitVo dailyCapacityLimit = dailyCapacityLimitMap.get(day);
-//            lhMachineCount = Math.min(dailyCapacityLimit.getMaxLhMachines(), Math.max(lhMachineCount, newMachineCount));
-//        }
-//        return lhMachineCount;
-//    }
 
     /**
      * 统计各天排产量
@@ -574,22 +556,26 @@ public class MatchingProductionHandler {
         //主花纹向下所有SKU的模具数量 <= 主花纹.型腔数量
         return dailyCapacityLimitVo.getPatternUsedLhMachines() <= patternCount;
     }
-
     
     /**
-     * 重算每日产能限制，包括硫化机台数、胎胚种类数
-     * @param contextDTO 周程滚动上下文
-     * @param mpProdFinalList 定稿记录列表
+     * 
+     * 重算指定天的日产能限制，包括硫化机台数、胎胚种类数
+     * 
+     * @param contextDTO  周程滚动上下文
+     * @param mpProdFinal 定稿记录
+     * @param day         排产日
      */
-    protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+    private void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO,
+                                                FactoryMonthPlanFinalAdjustVo mpProdFinal, int day) {
+        List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList = Collections.singletonList(mpProdFinal);
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
-        for (int i = contextDTO.getStructureStartDay(); i<= contextDTO.getStructureDeadLine(); i++){
-            if (dailyCapacityLimitVoMap.get(i) == null){
-                continue;
-            }
-            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null);
+        MpDailyCapacityLimitVo daylyCapacityLimit = dailyCapacityLimitVoMap.get(day);
+        if (daylyCapacityLimit == null) {
+            return;
         }
+        adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, day, daylyCapacityLimit,
+                contextDTO.getParamMap(), mpProdFinal.getMainPattern());
     }
 
     /**
@@ -2061,7 +2047,7 @@ public class MatchingProductionHandler {
         List<String> structureNameList = new ArrayList<>(structureNameMap);
         List<MonthPlanStructureLhRatioVo> structureLhRatioList = getDataService().getLhRatioInfo(context,
                 structureNameList);
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxLhGroupRatioLog(context, structureLhRatioList));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxLhGroupRatioLog(context, structureLhRatioList));
         if (CollectionUtils.isEmpty(structureLhRatioList)) {
             return Collections.emptyList();
         }
@@ -2796,7 +2782,7 @@ public class MatchingProductionHandler {
      */
     private void setMonthProductionDays(Context context) {
         List<ProductionDayInfoVo> productionDayInfoList = this.getDataService().getProductCalendar(context);
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
         Integer maxBoostDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMaxBoostDay();
         if (CollectionUtils.isEmpty(productionDayInfoList)) {
             context.setCapacityRatioMap(Collections.emptyMap());
@@ -2818,7 +2804,7 @@ public class MatchingProductionHandler {
         context.setCapacityRatioMap(startProductionRatioMap);
         // 停产设置
         List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderStopCalendarLog(context, stopDays));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderStopCalendarLog(context, stopDays));
         if (CollectionUtils.isEmpty(stopDays)) {
             context.setStopDays(Collections.emptySet(), maxBoostDays);
             return;
@@ -3067,7 +3053,7 @@ public class MatchingProductionHandler {
                                                           Integer month, Integer lastDay) {
         List<ContinueGroupInfo> continueGroupInfoList = monthProductionDataService.getContinueGroupInfo(factoryCode, year, month,
                 lastDay);
-        log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             return Collections.emptyMap();
         }
@@ -3102,7 +3088,7 @@ public class MatchingProductionHandler {
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet));
+//            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet));
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }
@@ -3117,7 +3103,7 @@ public class MatchingProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService()
                 .getMouldAllocationInfo(productionContext);
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldAllocationLog(context, mouldAllocationInfoList));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldAllocationLog(context, mouldAllocationInfoList));
         if (CollectionUtils.isEmpty(mouldAllocationInfoList)) {
             return Collections.emptyMap();
         }
@@ -3148,7 +3134,7 @@ public class MatchingProductionHandler {
         List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
         Map<String, Map<String, BigDecimal>> embryoSpecialMaterialMap = new HashMap<>();
         Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = new HashMap<>();
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialLog(productionContext, specialMaterialInfoList));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialLog(productionContext, specialMaterialInfoList));
         if (CollectionUtils.isEmpty(specialMaterialInfoList)) {
             productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
             productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
@@ -3189,7 +3175,7 @@ public class MatchingProductionHandler {
     private void specialMaterialStockHandler(TbrProductionContext productionContext) {
         //获取特殊材料库存信息
         List<SpecialMaterialStockVo> specialMaterialStockList = getDataService().getSpecialMaterialStockInfo(productionContext);
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialStockLog(productionContext, specialMaterialStockList));
+//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialStockLog(productionContext, specialMaterialStockList));
         if (CollectionUtils.isEmpty(specialMaterialStockList)) {
             productionContext.setSpecialMaterialInfoMap(new HashMap<>());
             return;
