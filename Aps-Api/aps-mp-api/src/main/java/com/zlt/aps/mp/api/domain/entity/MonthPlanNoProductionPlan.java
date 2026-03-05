@@ -165,7 +165,7 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     /**
      * 主花纹
      */
-    @Excel(name = "ui.data.column.monthPlanNoProductionPlan.mainPattern")
+    @Excel(name = "ui.data.column.mdmMaterialInfo.mainPattern")
     @ApiModelProperty(value = "主花纹", name = "mainPattern")
     @TableField(value = "MAIN_PATTERN")
     private String mainPattern;
