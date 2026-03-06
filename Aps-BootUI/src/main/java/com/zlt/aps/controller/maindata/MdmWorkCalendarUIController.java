@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.service.IMdmWorkCalendarRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -97,6 +98,12 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(MdmWorkCalendar mdmWorkCalendar) {
+        String dayFlag = mdmWorkCalendar.getDayFlag();
+        if (YesOrNoEnum.YES.getCode().equals(dayFlag) && mdmWorkCalendar.getRate() == 0) {
+            mdmWorkCalendar.setRate(100);
+        } else if (YesOrNoEnum.NO.getCode().equals(dayFlag)) {
+            mdmWorkCalendar.setRate(0);
+        }
         if (UserConstants.NOT_UNIQUE.equals(iMdmWorkCalendarService.checkUnique(mdmWorkCalendar))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.checkUnique"));
         }
