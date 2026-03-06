@@ -329,7 +329,10 @@ export default {
           label: this.$t("ui.data.column.skuConstruction.embryoCode"),
           prop: "embryoCode",
         },
-
+        {
+          prop: "mainMaterialDesc",
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+        },
 
       ];
     },
