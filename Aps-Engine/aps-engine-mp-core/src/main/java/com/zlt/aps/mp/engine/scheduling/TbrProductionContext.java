@@ -396,34 +396,6 @@ public class TbrProductionContext extends Context {
     }
 
     /**
-     * 获取materialDesc在startDay~endDay范围内可排产的两副模具
-     * 在多幅的情形下，共用性差的优先，否则编号大的优先
-     *
-     * @param materialDesc 物料描述
-     * @param startDay     排产开始日
-     * @param endDay       排产结束日
-     * @return
-     */
-    public List<ProductionMouldInfoVo> selectedDoubleMouldByRange(String materialDesc, Integer startDay, Integer endDay) {
-        if (StringUtils.isBlank(materialDesc) || null == startDay || null == endDay || startDay > endDay) {
-            return Collections.emptyList();
-        }
-        List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
-        if (CollectionUtils.isEmpty(skuRelationList)) {
-            return Collections.emptyList();
-        }
-        List<ProductionMouldInfoVo> effectiveList = getEffectiveByRange(skuRelationList, startDay, endDay);
-        if (CollectionUtils.isEmpty(effectiveList)) {
-            return Collections.emptyList();
-        }
-        if (effectiveList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
-            return Collections.emptyList();
-        }
-        effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue).thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
-        return effectiveList.subList(BigDecimal.ZERO.intValue(), ProductionConstant.DOUBLE_MOULD_PRODUCTION);
-    }
-
-    /**
      * 根据sku集合，获取在startDay~endDay还有模具产能(符合数量的模具)的sku集合
      *
      * @param mouldNumber     满足模具数量
