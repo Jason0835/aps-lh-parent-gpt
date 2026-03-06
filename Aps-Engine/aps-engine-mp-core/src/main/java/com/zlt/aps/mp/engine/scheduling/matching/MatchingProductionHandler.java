@@ -81,6 +81,7 @@ import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialStockVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.mp.engine.handler.DayProductionStatisticsHandler;
 import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
@@ -94,6 +95,7 @@ import com.zlt.aps.mp.engine.utils.ProductionCycleUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
+import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
@@ -106,6 +108,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -136,11 +139,15 @@ public class MatchingProductionHandler {
     @Autowired
     private MdmSkuLhCapacityEntityMapper mdmSkuLhCapacityEntityMapper;
     @Autowired
+    private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
+    @Autowired
     private BaseDao baseDao;
     @Autowired
     private DpRequireDataService dpRequireDataService;
     @Autowired
     private MonthProductionDataService monthProductionDataService;
+    @Autowired
+    private DayProductionStatisticsHandler dayProductionStatisticsHandler;
     @Autowired
     private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
     @Autowired
@@ -299,6 +306,11 @@ public class MatchingProductionHandler {
             
             int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 未搭配量 = 储备池的量
             unAllocationQty = isSpecial? Math.min(unAllocationQty, unAllocatSpecStructureTotalQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
+            List<FactoryMonthPlanFinalAdjustVo> safeList = new ArrayList<>();
+            safeList.addAll(mpProdFinalList);
+            if (isNewPlan) {
+                safeList.add(plan);
+            }
             
             out: do {
                 int startUnAllocationQty = unAllocationQty;
@@ -332,7 +344,7 @@ public class MatchingProductionHandler {
                         }
                     }
                     // 为当天分配搭配量
-                    this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, day); // 先重算产能限制
+                    this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 先重算产能限制
                     int allocationQty = this.allcatAdjustProductQty(contextDTO, day, realBeginDay, plan,
                             dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitVo, dailyCapacityLimitMap, mouldRemaindCapacity);
                     if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
@@ -341,7 +353,7 @@ public class MatchingProductionHandler {
                         }
                         unAllocatSpecStructureTotalQty -= allocationQty; // 特殊材料可分配量需要扣减掉已排产量
                         unAllocationQty -= allocationQty;
-                        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, day); // 有搭配，则再次重算产能限制
+                        this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 有搭配，则再次重算产能限制
                     } else if (isBegin) { // 防止中断不连续的问题出现
                         break;
                     }
@@ -1940,11 +1952,59 @@ public class MatchingProductionHandler {
         if (CollectionUtils.isEmpty(dayResultList)) {
             return;
         }
-        List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(dayResultList, resultList, newSkuQtyMap);
+        List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(dayResultList, resultList,
+                newSkuQtyMap);
         List<FactoryMonthPlanMouldDayDetail> detailResultList = this.buildDetailResultList(detailLogList, detailList,
                 productionContext, newSkuQtyMap);
+//        List<MpMonthPlanStatistics> productionStatisticsList = this.buildProductionStatisticsList(productionContext,
+//                mouldResultList);
+        
         baseDao.saveBatch(detailResultList);
         baseDao.saveBatch(mouldResultList);
+//        baseDao.saveBatch(productionStatisticsList);
+    }
+
+    /**
+     * 构建排产统计信息
+     * 
+     * @param productionContext 上下文
+     * @param mouldResultList   模具排产结果列表
+     * @return
+     */
+    private List<MpMonthPlanStatistics> buildProductionStatisticsList(TbrProductionContext productionContext,
+                                                                      List<FactoryMonthPlanMouldDayResult> mouldResultList) {
+        // 根据上下文生成新统计信息
+        List<MpMonthPlanStatistics> newProductionStatisticsList = dayProductionStatisticsHandler
+                .buildDayProductionStatisticsResult(productionContext);
+        // 本次搭配涉及的结构
+        List<String> structureNameList = mouldResultList.stream().map(FactoryMonthPlanMouldDayResult::getStructureName)
+                .distinct().collect(Collectors.toList());
+        // 加载本次版本已生成的统计记录
+        LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, productionContext.getFactoryCode());
+        queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, productionContext.getProductionVersion());
+        List<MpMonthPlanStatistics> oldProductionStatisticsList = mpMonthPlanStatisticsEntityMapper
+                .selectList(queryWrapper);
+        Map<String, MpMonthPlanStatistics> oldProductionStatisticsMap = oldProductionStatisticsList.stream()
+                .filter(s -> StringUtils.isNoneEmpty(s.getStructureName())).collect(
+                        Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        // 根据结构取出本次需要保存的统计信息，原有结构的统计记录直接覆盖更新
+        List<MpMonthPlanStatistics> productionStatisticsList = new ArrayList<>();
+        for (MpMonthPlanStatistics newStatistics : newProductionStatisticsList) {
+            String structureName = newStatistics.getStructureName();
+            if (!structureNameList.contains(structureName)) {
+                continue;
+            }
+            MpMonthPlanStatistics oldStatistics = oldProductionStatisticsMap.get(structureName);
+            if (oldStatistics != null) {
+                newStatistics.setId(oldStatistics.getId());
+                newStatistics.setCreateBy(oldStatistics.getCreateBy());
+                newStatistics.setCreateTime(oldStatistics.getCreateTime());
+            }
+            productionStatisticsList.add(newStatistics);
+        }
+        return productionStatisticsList;
     }
 
     /**
@@ -2018,6 +2078,7 @@ public class MatchingProductionHandler {
             if (!newSkuQtyMap.containsKey(plan.getMaterialDesc())) {
                 continue;
             }
+            // 原有记录有同规格的更新（有ID）；没有的说明是新搭配的规格，需要新增（无ID）
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
             if (oldPlan != null) {
                 plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
