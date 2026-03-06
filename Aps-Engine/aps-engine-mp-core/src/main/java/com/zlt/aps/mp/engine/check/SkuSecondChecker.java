@@ -30,7 +30,7 @@ public class SkuSecondChecker implements IProductionCheck {
 
     @Override
     public boolean doCheck() {
-        if (lastCloseDay == null){
+        if (lastCloseDay == null || lastCloseDay == 0){
             return true;
         }
         if (newOnLineDay <=lastCloseDay){
