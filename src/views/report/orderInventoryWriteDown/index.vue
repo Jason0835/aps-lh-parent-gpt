@@ -558,13 +558,19 @@ export default {
   created() {
     this.getAreaList();
     const date = moment();
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const year = nextMonth.getFullYear();
+      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
+
 
     this.search = {
-      yearMonth: date.format("yyyy-MM"),
+      // yearMonth: date.format("yyyy-MM"),
       factoryCode: "116",
+       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
     };
     this.query = {
-      yearMonth: date.format("yyyy-MM"),
+      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",
     };
     // this.getList();
