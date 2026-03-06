@@ -4,6 +4,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -86,4 +87,13 @@ public interface IScmItfService {
     @ApiOperation("查询最新两个月的版本锁定情况")
     @PostMapping("/scm/getMonthLock")
     AjaxResult getMonthLock();
+
+    /**
+     * 查询工厂装箱信息
+     * @param goodsBox 参数
+     * @return 结果
+     */
+    @ApiOperation("查询工厂装箱信息")
+    @PostMapping("/scm/selectGoodsBox")
+    public AjaxResult selectGoodsBox(@RequestBody GoodsBoxVo goodsBox);
 }

@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -96,5 +97,15 @@ public class ScmItfController {
 	@PostMapping("/getMonthLock")
 	public AjaxResult getMonthLock() {
 		return scmItfService.getMonthLock();
+	}
+
+	/**
+	 * 查询工厂装箱信息
+	 * @return 结果
+	 */
+	@ApiOperation("查询工厂装箱信息")
+	@PostMapping("/selectGoodsBox")
+	public AjaxResult selectGoodsBox(@RequestBody GoodsBoxVo goodsBox) {
+		return scmItfService.selectGoodsBox(goodsBox);
 	}
 }

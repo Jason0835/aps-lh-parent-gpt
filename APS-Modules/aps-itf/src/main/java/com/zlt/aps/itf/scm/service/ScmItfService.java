@@ -3,6 +3,7 @@ package com.zlt.aps.itf.scm.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 
 import java.util.List;
 
@@ -65,4 +66,11 @@ public interface ScmItfService {
 	 * @return 结果
 	 */
 	AjaxResult getMonthLock();
+
+	/**
+	 * 查询工厂装箱信息
+	 * @param goodsBox 参数
+	 * @return 结果
+	 */
+	AjaxResult selectGoodsBox(GoodsBoxVo goodsBox);
 }
