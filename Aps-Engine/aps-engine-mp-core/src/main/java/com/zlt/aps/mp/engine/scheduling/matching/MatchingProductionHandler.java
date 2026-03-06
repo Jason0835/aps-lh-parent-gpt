@@ -1561,7 +1561,7 @@ public class MatchingProductionHandler {
                             .anyMatch(p -> Objects.equals(dayPlan.getMaterialDesc(), p.getMaterialDesc()));
                 }
                 BigDecimal unit = BigDecimalUtils.valueOf(isContinue ? dayVulcanizationQty : firtOneMouldQty); // 单模每日最大排产量：续作，直接按最大满产排；非续作只能按新模首日排产
-                Integer newMouldQty = BigDecimalUtils.div(dayPlan.getProductionQty(), unit, 0).intValue(); // 模具数
+                Integer newMouldQty = BigDecimalUtils.div(dayPlan.getProductionQty(), unit).setScale(0, RoundingMode.UP).intValue(); // 模具数
                 maxPlanQty += newMouldQty * unit.intValue();
                 mouldQty += newMouldQty;
             }
@@ -2094,6 +2094,8 @@ public class MatchingProductionHandler {
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
                 plan.setBaseVale(plan.getId());
+                plan.setCreateBy(plan.getCreateBy());
+                plan.setCreateTime(plan.getCreateTime());
             } else {
                 plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
                 plan.setTotalQty(plan.getConventionProductionQty());
