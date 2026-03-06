@@ -1752,10 +1752,18 @@ public class MpWeekRollAdjustEngine {
                     if (isIncMouldFirstDay(mpFinalVo,newOnLineDay-1,dayValue,dailyQty)){
                         //增模首日
                         dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,newOnLineDay, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
+                        if (i == structureDeadLine){
+                            //若是结构收尾日且是增模，因只会增1天，退出
+                            continue;
+                        }
                     }
                 }else{
                     if (bFirstAddMould){
                         dayVulcanizationQty = adjustDailyCapacityLimitObj.getFirstDayQty(mpProdFinalList,i, dailyCapacityLimitVoMap.get(newOnLineDay), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
+                        if (i == structureDeadLine){
+                            //若是结构收尾日且是增模，因只会增1天，退出
+                            continue;
+                        }
                     }
                 }
                 if(dayVulcanizationQty == null){
