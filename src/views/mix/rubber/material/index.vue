@@ -246,6 +246,11 @@ export default {
           },
         },
         {
+          prop: "qualityStateCodeName",
+          width: 120,
+          label: this.$t("质控状态"),
+        },
+        {
           prop: "materialCategory",
           halign: "center",
           align: "center",
