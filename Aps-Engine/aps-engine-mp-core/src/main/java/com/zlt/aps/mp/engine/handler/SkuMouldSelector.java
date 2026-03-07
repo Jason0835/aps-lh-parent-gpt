@@ -366,11 +366,14 @@ public class SkuMouldSelector {
      * @return
      */
     private static List<ProductionMouldInfoVo> getSameProductionQtyMould(List<ProductionMouldInfoVo> mouldList, Integer startDay) {
-        Map<Integer, List<ProductionMouldInfoVo>> startDayGroup = new HashMap<>();
         if (CollectionUtils.isEmpty(mouldList) || null == startDay) {
             return Collections.emptyList();
         }
+        Map<Integer, List<ProductionMouldInfoVo>> startDayGroup = new HashMap<>();
         mouldList.forEach(singleMould -> {
+            if(CollectionUtils.isEmpty(singleMould.getDayProductionInfo())){
+                return ;
+            }
             List<CxMouldDayProductionHelper> dayProductionList = singleMould.getDayProductionInfo().get(startDay);
             if (CollectionUtils.isEmpty(dayProductionList)) {
                 addGroup(startDayGroup, Integer.MAX_VALUE, singleMould);
@@ -379,6 +382,9 @@ public class SkuMouldSelector {
             Integer sumProductionQty = dayProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
             addGroup(startDayGroup, sumProductionQty, singleMould);
         });
+        if(CollectionUtils.isEmpty(startDayGroup)){
+            return Collections.emptyList();
+        }
         Map<Integer, List<ProductionMouldInfoVo>> doubleMouldMap = new HashMap<>();
         startDayGroup.forEach((productionQty, enableMouldList) -> {
             if (CollectionUtils.isEmpty(enableMouldList)) {
