@@ -176,6 +176,9 @@ public class SkuMouldSelector {
         //优先挑选已经排产模具
         List<ProductionMouldInfoVo> hasProductSkuList = new ArrayList<>();
         effectiveList.forEach(singleMould -> {
+            if(CollectionUtils.isEmpty(singleMould.getDayProductionInfo())){
+                return ;
+            }
             List<CxMouldDayProductionHelper> dayProductionList = singleMould.getDayProductionInfo().get(startDay);
             if (CollectionUtils.isEmpty(dayProductionList)) {
                 return;
