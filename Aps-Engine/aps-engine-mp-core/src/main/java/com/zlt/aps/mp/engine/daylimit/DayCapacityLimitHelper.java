@@ -370,7 +370,7 @@ public class DayCapacityLimitHelper implements Serializable {
         }
         changeMouldInfo.add(changeKey);
         usedChangeLhMachineCount = usedChangeLhMachineCount + BigDecimal.ONE.intValue();
-        log.info(DayLimitLogRecorder.addChangeMouldUsedLog(context, productionDay, changeKey, usedChangeLhMachineCount));
+//        log.info(DayLimitLogRecorder.addChangeMouldUsedLog(context, productionDay, changeKey, usedChangeLhMachineCount));
     }
 
     /**
