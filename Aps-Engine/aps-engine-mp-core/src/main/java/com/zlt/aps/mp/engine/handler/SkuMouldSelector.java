@@ -4,15 +4,16 @@ import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.enums.MouldRelationTypeEnum;
-import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -124,14 +125,16 @@ public class SkuMouldSelector {
             return Collections.emptyList();
         }
         List<ProductionMouldInfoVo> effectiveList = getEffectiveByRange(baseDataContainer, skuRelationList, startDay, endDay);
-        if (CollectionUtils.isEmpty(effectiveList)) {
+        if (CollectionUtils.isEmpty(effectiveList) || effectiveList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
-        if (effectiveList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+        //20260306 按起始日排产量分组，优先挑选有排产量的模具
+        List<ProductionMouldInfoVo> enableSelectedList = getDoubleByStartDay(effectiveList, materialDesc, startDay);
+        if (CollectionUtils.isEmpty(enableSelectedList) || enableSelectedList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
-        effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue).thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
-        return effectiveList.subList(BigDecimal.ZERO.intValue(), ProductionConstant.DOUBLE_MOULD_PRODUCTION);
+        enableSelectedList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue).thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
+        return enableSelectedList.subList(BigDecimal.ZERO.intValue(), ProductionConstant.DOUBLE_MOULD_PRODUCTION);
     }
 
     /**
@@ -156,6 +159,41 @@ public class SkuMouldSelector {
             effectiveList.add(mouldInfo);
         });
         return effectiveList;
+    }
+
+    /**
+     * 取得排产量一样的模具类别
+     *
+     * @param effectiveList 有效模具列表
+     * @param materialDesc  排产物料
+     * @param startDay      起始排产日
+     * @return
+     */
+    private static List<ProductionMouldInfoVo> getDoubleByStartDay(List<ProductionMouldInfoVo> effectiveList, String materialDesc, Integer startDay) {
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return Collections.emptyList();
+        }
+        //优先挑选已经排产模具
+        List<ProductionMouldInfoVo> hasProductSkuList = new ArrayList<>();
+        effectiveList.forEach(singleMould -> {
+            List<CxMouldDayProductionHelper> dayProductionList = singleMould.getDayProductionInfo().get(startDay);
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                return;
+            }
+            CxMouldDayProductionHelper lastProductionSku = dayProductionList.get(dayProductionList.size() - BigDecimal.ONE.intValue());
+            if (!materialDesc.equals(lastProductionSku.getMaterialDesc())) {
+                return;
+            }
+            hasProductSkuList.add(singleMould);
+        });
+        List<ProductionMouldInfoVo> selectList = null;
+        if (!CollectionUtils.isEmpty(hasProductSkuList)) {
+            selectList = getSameProductionQtyMould(hasProductSkuList, startDay);
+        }
+        if (!CollectionUtils.isEmpty(selectList)) {
+            return selectList;
+        }
+        return getSameProductionQtyMould(effectiveList, startDay);
     }
 
     /**
@@ -315,5 +353,63 @@ public class SkuMouldSelector {
             log.info(TbrMouldProductionLogRecorder.addContinueSkuNoFindMouldLog(productionContext, productionStage, groupName, materialDesc, MouldProductionLimitTypeEnum.CAPSULE_CHUCK_LIMIT));
         }
         return capsuleChuckLimitQty;
+    }
+
+    /**
+     * 获取在startDay有相同排产量的模具列表
+     *
+     * @param mouldList 模具列表
+     * @param startDay  startDay
+     * @return
+     */
+    private static List<ProductionMouldInfoVo> getSameProductionQtyMould(List<ProductionMouldInfoVo> mouldList, Integer startDay) {
+        Map<Integer, List<ProductionMouldInfoVo>> startDayGroup = new HashMap<>();
+        if (CollectionUtils.isEmpty(mouldList) || null == startDay) {
+            return Collections.emptyList();
+        }
+        mouldList.forEach(singleMould -> {
+            List<CxMouldDayProductionHelper> dayProductionList = singleMould.getDayProductionInfo().get(startDay);
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                addGroup(startDayGroup, Integer.MAX_VALUE, singleMould);
+                return;
+            }
+            Integer sumProductionQty = dayProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+            addGroup(startDayGroup, sumProductionQty, singleMould);
+        });
+        Map<Integer, List<ProductionMouldInfoVo>> doubleMouldMap = new HashMap<>();
+        startDayGroup.forEach((productionQty, enableMouldList) -> {
+            if (CollectionUtils.isEmpty(enableMouldList)) {
+                return;
+            }
+            if (enableMouldList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+                return;
+            }
+            doubleMouldMap.put(productionQty, enableMouldList);
+        });
+        if (CollectionUtils.isEmpty(doubleMouldMap)) {
+            return Collections.emptyList();
+        }
+        List<Integer> keyList = new ArrayList<>(doubleMouldMap.keySet());
+        keyList.sort(Comparator.comparing(Integer::intValue));
+        return doubleMouldMap.get(keyList.get(BigDecimal.ZERO.intValue()));
+    }
+
+    /**
+     * 根据key，从startDayGroup增加排产模具
+     *
+     * @param startDayGroup key的分组信息
+     * @param key           分组key
+     * @param singleMould   单模具信息
+     */
+    private static void addGroup(Map<Integer, List<ProductionMouldInfoVo>> startDayGroup, Integer key, ProductionMouldInfoVo singleMould) {
+        if (null == key || null == singleMould) {
+            return;
+        }
+        List<ProductionMouldInfoVo> enableMouldList = startDayGroup.get(key);
+        if (null == enableMouldList) {
+            enableMouldList = new ArrayList<>();
+            startDayGroup.put(key, enableMouldList);
+        }
+        enableMouldList.add(singleMould);
     }
 }

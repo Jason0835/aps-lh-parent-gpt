@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.setting.controller;
 
+import cn.hutool.core.collection.ListUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -17,9 +18,10 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
+import com.zlt.aps.itf.scm.service.IScmItfService;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
@@ -30,6 +32,8 @@ import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.mp.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.mp.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
@@ -75,6 +79,8 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     private IImportErrorLogService iImportErrorLogService;
     @Autowired
     private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
+    @Autowired
+    private IScmItfService iScmItfService;
 
     /**
      * 查询物料信息表列表
@@ -87,6 +93,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         this.builderCondition(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         this.setSkuConstructionRefField(productInfo, list);
+        this.setQualityStateCodeName(productInfo, list);
         return getDataTable(list);
     }
 
@@ -119,6 +126,39 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
                     materialInfo.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
                     materialInfo.setTextNo(mdmSkuConstructionRef.getTextNo());
                     materialInfo.setLhNo(mdmSkuConstructionRef.getLhNo());
+                }
+            }
+        }
+    }
+
+    /**
+     * 赋值质控状态
+     * @param productInfo 查询条件
+     * @param list 要赋值的列表
+     */
+    private void setQualityStateCodeName(MdmMaterialInfo productInfo, List<MdmMaterialInfo> list) {
+        if (CollectionUtils.isNotEmpty(list)) {
+            // 赋值质控状态
+            GoodsBoxVo goodsBox = new GoodsBoxVo();
+            goodsBox.setFacCode(productInfo.getFactoryCode());
+            if (list.size() < 300) {
+                goodsBox.setGCodeList(list.stream().map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toList()));
+            }
+            AjaxResult ajaxResult = iScmItfService.selectGoodsBox(goodsBox);
+            List<GoodsBoxVo> goodsBoxVoList = AjaxResultUtils.getList(ajaxResult, GoodsBoxVo.class);
+            Map<String, GoodsBoxVo> goodsBoxVoMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(goodsBoxVoList)) {
+                goodsBoxVoMap = goodsBoxVoList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFacCode(), item.getgCode()), Function.identity(), (s1, s2) -> s1));
+            }
+
+            List<List<MdmMaterialInfo>> splitList = ListUtil.split(list, 1000);
+            for (List<MdmMaterialInfo> mdmMaterialInfoList : splitList) {
+                for (MdmMaterialInfo materialInfo : mdmMaterialInfoList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(materialInfo.getFactoryCode(), materialInfo.getMaterialCode());
+                    if (goodsBoxVoMap.containsKey(mapKey)) {
+                        GoodsBoxVo goodsBoxVo = goodsBoxVoMap.get(mapKey);
+                        materialInfo.setQualityStateCodeName(goodsBoxVo.getQualityStateCodeName());
+                    }
                 }
             }
         }

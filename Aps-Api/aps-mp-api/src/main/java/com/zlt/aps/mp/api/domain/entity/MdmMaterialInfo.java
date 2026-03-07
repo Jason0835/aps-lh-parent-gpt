@@ -423,4 +423,10 @@ public class MdmMaterialInfo extends BaseEntity {
     @ApiModelProperty(value = "硫化示方书号", name = "lhNo")
     @TableField(exist = false)
     private String lhNo;
+
+    /** 质控状态 */
+    @Excel(name = "ui.data.column.GoodsBox.qualityStateCode")
+    @ApiModelProperty(value = "质控状态", name = "qualityStateCodeName")
+    @TableField(exist = false)
+    private String qualityStateCodeName;
 }

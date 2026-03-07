@@ -653,29 +653,17 @@ public class CxLhMouldProductionCalculator {
         //模具排产信息-计划分配
         Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = skuProductionPlanList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
         Map<Long, Integer> productionPlanMap = new ProductionPlanDistributor().allocationProductionQty(realDayProductionQty, skuProductionPlanList);
-        Set<String> isSelectedSingle = new HashSet<>();
+        Map<Long, MonthPlanProductionRequirePlanVo> oddNumberMap = new HashMap<>();
         productionPlanMap.forEach((monthPlanId, planProductionQty) -> {
             MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
             doubleMouldList.forEach(productionMould -> productionMould.addProductionInfo(productionDay, groupPlan, isDayFinish, planProductionQty, cxMachineInfo));
-            //奇数补充 出现两条单奇数
-            ProductionMouldInfoVo firstMould = doubleMouldList.get(BigDecimal.ZERO.intValue());
-            ProductionMouldInfoVo secondMould = doubleMouldList.get(BigDecimal.ONE.intValue());
-            ProductionMouldInfoVo singleMould;
-            if (planProductionQty % ProductionConstant.DOUBLE_MOULD_PRODUCTION != BigDecimal.ZERO.intValue()) {
-                if (isSelectedSingle.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
-                    return;
-                }
-                if (isSelectedSingle.contains(firstMould.getMouldCode())) {
-                    singleMould = secondMould;
-                } else {
-                    singleMould = firstMould;
-                }
-                isSelectedSingle.add(singleMould.getMouldCode());
-                if (null != singleMould) {
-                    singleMould.addProductionInfo(productionDay, groupPlan, isDayFinish, ProductionConstant.DOUBLE_MOULD_PRODUCTION, cxMachineInfo);
-                }
+            //出现剩余奇数计划
+            if ((planProductionQty & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+                oddNumberMap.put(monthPlanId, groupPlan);
             }
         });
+        //奇数补充 成对出现
+        handlerLeftOverOddNumberPlan(oddNumberMap, doubleMouldList, productionDay, isDayFinish, cxMachineInfo);
         //模具分配比例控制对象
         MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
         //胶囊卡盘数量控制对象
@@ -692,6 +680,37 @@ public class CxLhMouldProductionCalculator {
         addDayCapacityQtyByMould(productionContext, productionDay, productionPlan, updateInfo, doubleMouldList);
         //todo 20260211 更新特殊材料的库存消耗量
         productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupPlanInfo, realDayProductionQty);
+    }
+
+    /**
+     * 处理成对出现的奇数计划排产
+     *
+     * @param oddNumberMap    奇数计划
+     * @param doubleMouldList 双模
+     * @param productionDay   排产日
+     * @param isDayFinish     是否排产完毕
+     * @param cxMachineInfo   成型机台
+     */
+    private static void handlerLeftOverOddNumberPlan(Map<Long, MonthPlanProductionRequirePlanVo> oddNumberMap, List<ProductionMouldInfoVo> doubleMouldList, Integer productionDay, boolean isDayFinish, Set<String> cxMachineInfo) {
+        if (CollectionUtils.isEmpty(oddNumberMap) || CollectionUtils.isEmpty(doubleMouldList)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> oddNumberPlanList = oddNumberMap.values().stream().collect(Collectors.toList());
+        int planSize = oddNumberPlanList.size();
+        if ((planSize & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        int roundSize = oddNumberPlanList.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        for (int roundIndex = BigDecimal.ZERO.intValue(); roundIndex < roundSize; roundSize++) {
+            int startIndex = roundIndex * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            int endIndex = startIndex + BigDecimal.ONE.intValue();
+            ProductionMouldInfoVo firstMould = doubleMouldList.get(BigDecimal.ZERO.intValue());
+            MonthPlanProductionRequirePlanVo firstPlan = oddNumberPlanList.get(startIndex);
+            firstMould.addProductionInfo(productionDay, firstPlan, isDayFinish, ProductionConstant.DOUBLE_MOULD_PRODUCTION, cxMachineInfo);
+            ProductionMouldInfoVo secondMould = doubleMouldList.get(BigDecimal.ONE.intValue());
+            MonthPlanProductionRequirePlanVo secondPlan = oddNumberPlanList.get(endIndex);
+            secondMould.addProductionInfo(productionDay, secondPlan, isDayFinish, ProductionConstant.DOUBLE_MOULD_PRODUCTION, cxMachineInfo);
+        }
     }
 
     /**

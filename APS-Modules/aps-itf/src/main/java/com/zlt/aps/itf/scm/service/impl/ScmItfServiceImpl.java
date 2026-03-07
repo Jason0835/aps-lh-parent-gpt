@@ -11,6 +11,7 @@ import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.util.PostMethodUtils;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
 import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.DpArea;
@@ -57,6 +58,9 @@ public class ScmItfServiceImpl implements ScmItfService {
 
 	@Value("${itf.scm.getMonthLock.url}")
 	private String SYNC_GET_MONTH_LOCK_URL;
+
+	@Value("${itf.scm.selectGoodsBox.url}")
+	private String SYNC_SELECT_GOODS_BOX_URL;
 
 	@Autowired
 	private DpAreaEntityMapper dpAreaEntityMapper;
@@ -311,6 +315,33 @@ public class ScmItfServiceImpl implements ScmItfService {
 			// 校验数据格式是否合法
 			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
 				String errorMsg = "lockSalesOrderPool 返回数据格式校验失败：" + result;
+				log.error(errorMsg);
+				ajaxResult = AjaxResult.error(errorMsg);
+				return ajaxResult;
+			}
+			ajaxResult = JSONObject.parseObject(result, AjaxResult.class);
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+		}
+		return ajaxResult;
+	}
+
+	/**
+	 * 查询工厂装箱信息
+	 *
+	 * @param goodsBox 参数
+	 * @return 结果
+	 */
+	@Override
+	public AjaxResult selectGoodsBox(GoodsBoxVo goodsBox) {
+		AjaxResult ajaxResult = null;
+		try {
+			// 调用供应链接口获取数据
+			String result = PostMethodUtils.sendPost(SYNC_SELECT_GOODS_BOX_URL,
+					JSONObject.toJSONString(goodsBox), null);
+			// 校验数据格式是否合法
+			if (StringUtils.isEmpty(result) || !JSONValidator.from(result).validate()) {
+				String errorMsg = "unlockSalesOrderPool 返回数据格式校验失败：" + result;
 				log.error(errorMsg);
 				ajaxResult = AjaxResult.error(errorMsg);
 				return ajaxResult;
