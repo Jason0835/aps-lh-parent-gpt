@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -10,6 +11,7 @@ import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.TbrBoostQtyProductionLogRecorder;
+import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.extern.slf4j.Slf4j;
@@ -663,7 +665,7 @@ public class CxLhMouldProductionCalculator {
             }
         });
         //奇数补充 成对出现
-        handlerLeftOverOddNumberPlan(oddNumberMap, doubleMouldList, productionDay, isDayFinish, cxMachineInfo);
+        handlerLeftOverOddNumberPlan(productionContext, oddNumberMap, doubleMouldList, productionDay, isDayFinish, cxMachineInfo);
         //模具分配比例控制对象
         MouldAllocationInfoVo mouldAllocationControlInfo = productionContext.getMouldAllocationInfo(productionPlan);
         //胶囊卡盘数量控制对象
@@ -685,13 +687,14 @@ public class CxLhMouldProductionCalculator {
     /**
      * 处理成对出现的奇数计划排产
      *
-     * @param oddNumberMap    奇数计划
-     * @param doubleMouldList 双模
-     * @param productionDay   排产日
-     * @param isDayFinish     是否排产完毕
-     * @param cxMachineInfo   成型机台
+     * @param productionContext 排产上下文
+     * @param oddNumberMap      奇数计划
+     * @param doubleMouldList   双模
+     * @param productionDay     排产日
+     * @param isDayFinish       是否排产完毕
+     * @param cxMachineInfo     成型机台
      */
-    private static void handlerLeftOverOddNumberPlan(Map<Long, MonthPlanProductionRequirePlanVo> oddNumberMap, List<ProductionMouldInfoVo> doubleMouldList, Integer productionDay, boolean isDayFinish, Set<String> cxMachineInfo) {
+    private static void handlerLeftOverOddNumberPlan(TbrProductionContext productionContext, Map<Long, MonthPlanProductionRequirePlanVo> oddNumberMap, List<ProductionMouldInfoVo> doubleMouldList, Integer productionDay, boolean isDayFinish, Set<String> cxMachineInfo) {
         if (CollectionUtils.isEmpty(oddNumberMap) || CollectionUtils.isEmpty(doubleMouldList)) {
             return;
         }
@@ -700,8 +703,13 @@ public class CxLhMouldProductionCalculator {
         if ((planSize & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
             return;
         }
+        MonthPlanProductionRequirePlanVo plan = oddNumberPlanList.get(BigDecimal.ZERO.intValue());
+        String groupName = plan.getStructureName();
+        String materialDesc = plan.getMaterialDesc();
+        String mouldInfo = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
+        TbrMouldProductionLogRecorder.addMouldProductionLeftOverOddNumberPlan(productionContext, groupName, materialDesc, mouldInfo, productionDay, planSize);
         int roundSize = oddNumberPlanList.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        for (int roundIndex = BigDecimal.ZERO.intValue(); roundIndex < roundSize; roundSize++) {
+        for (int roundIndex = BigDecimal.ZERO.intValue(); roundIndex < roundSize; roundIndex++) {
             int startIndex = roundIndex * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             int endIndex = startIndex + BigDecimal.ONE.intValue();
             ProductionMouldInfoVo firstMould = doubleMouldList.get(BigDecimal.ZERO.intValue());
