@@ -372,7 +372,8 @@ public class SkuMouldSelector {
         Map<Integer, List<ProductionMouldInfoVo>> startDayGroup = new HashMap<>();
         mouldList.forEach(singleMould -> {
             if(CollectionUtils.isEmpty(singleMould.getDayProductionInfo())){
-                return ;
+                addGroup(startDayGroup, Integer.MAX_VALUE, singleMould);
+                return;
             }
             List<CxMouldDayProductionHelper> dayProductionList = singleMould.getDayProductionInfo().get(startDay);
             if (CollectionUtils.isEmpty(dayProductionList)) {
