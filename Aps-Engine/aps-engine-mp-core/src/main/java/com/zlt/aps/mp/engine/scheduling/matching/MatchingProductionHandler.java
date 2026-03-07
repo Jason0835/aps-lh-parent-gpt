@@ -746,6 +746,24 @@ public class MatchingProductionHandler {
     }
 
     /**
+     * 获取上一个排产日
+     * @param contextDTO
+     * @param day
+     * @param beginDay
+     * @return
+     */
+    private Integer getLastDay(TbrProductionContext productionContext, int day, int beginDay) {
+        Integer lastDay = 0;
+        for (int i = day - 1; i >= beginDay; i --) {
+            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
+                lastDay = i;
+                break;
+            }
+        }
+        return lastDay;
+    }
+
+    /**
      * 根据产能模具获取指定sku的硫化产能
      * 
      * @param contextDTO          上下文
@@ -1550,10 +1568,11 @@ public class MatchingProductionHandler {
                 // 判断是否续作
                 List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
                 List<ProductionMouldInfoVo> twoMouldList = new ArrayList<>(); // 一次添加双模
+                Integer lastDay = this.getLastDay(productionContext, usedBeginDate, startDay);
                 for (ProductionMouldInfoVo mouldInfo : limitDoubleMouldList) {
                     // 判断切换计划前上一天的排产计划
                     List<CxMouldDayProductionHelper> lastDayProductionList = mouldInfo.getDayProductionInfo()
-                            .get(usedBeginDate - 1);
+                            .get(lastDay);
                     if (!CollectionUtils.isEmpty(lastDayProductionList)
                             && lastDayProductionList.stream().anyMatch(p -> materialDesc.equals(p.getMaterialDesc()))) { // 上一天有排产，且物料描述一致，说明是续作
                         twoMouldList.add(mouldInfo);
@@ -1640,6 +1659,7 @@ public class MatchingProductionHandler {
             Integer maxPlanQty = 0; // 当前最大可排产量
             Integer mouldQty = 0; // 已排模具数
             Integer dayVulcanizationQty = 0;
+            Integer lastDay = this.getLastDay(productionContext, day, 1);
             for (CxMouldDayProductionHelper dayPlan : planList) {
                 // 取出单模具产能
                 dayVulcanizationQty = allSinglePlanMap.get(dayPlan.getMonthPlanId()).getDayVulcanizationQty();
@@ -1653,7 +1673,7 @@ public class MatchingProductionHandler {
                         isContinue = true;
                     }
                 } else { // 非首日，先看前一天数量
-                    List<CxMouldDayProductionHelper> mouldDayList = dayModPlanMap.get(day - 1);
+                    List<CxMouldDayProductionHelper> mouldDayList = dayModPlanMap.get(lastDay);
                     isContinue = !CollectionUtils.isEmpty(mouldDayList) && mouldDayList.stream()
                             .anyMatch(p -> Objects.equals(dayPlan.getMaterialDesc(), p.getMaterialDesc()));
                 }
@@ -1724,7 +1744,7 @@ public class MatchingProductionHandler {
         for (int day = startDay; day <= endDay; day++) {
             MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
             if (dayLimit == null) { // 如果为空，说明是结构预留的的天数，需要添加
-                List<CxMouldDayProductionHelper> mouldDayList = dayModPlanMap.get(day - 1);
+                List<CxMouldDayProductionHelper> mouldDayList = dayModPlanMap.get(this.getLastDay(productionContext, day, startDay));
                 boolean isContinue = !CollectionUtils.isEmpty(mouldDayList);
                 BigDecimal unit = BigDecimalUtils.valueOf(isContinue ? dayVulcanizationQty : firtOneMouldQty); // 单模每日最大排产量：续作，直接按最大满产排；非续作只能按新模首日排产
                 Integer maxPlanQty = BigDecimalUtils.multiply(maxMouldNum, unit).intValue(); // 最大可排产量 = 最大模具数 * 最大日硫化量
@@ -1832,8 +1852,9 @@ public class MatchingProductionHandler {
                         1, cxMachineInfoSet);
                 cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
                 cxLhGroup.setProductionMouldSet(newMouldCodeSet);
+                Integer lastDay = this.getLastDay(productionContext, usedBeginDate, startDay);
                 for (ProductionMouldInfoVo mould: newDoubleMouldList) {
-                    List<CxMouldDayProductionHelper> latestPlanList = mould.getDayProductionInfo().get(usedBeginDate - 1); // 上一天计划
+                    List<CxMouldDayProductionHelper> latestPlanList = mould.getDayProductionInfo().get(lastDay); // 上一天计划
                     CxMouldDayProductionHelper production = CollectionUtils.firstElement(latestPlanList);
                     if (production != null) {
                         cxLhGroup.setMaterialCode(production.getMaterialCode());
@@ -1882,12 +1903,13 @@ public class MatchingProductionHandler {
      * 
      * @param materialDesc
      * @param usedBeginDate
+     * @param lastDay
      * @param m1
      * @param m2
      * @return
      */
-    private int usedMouldCompare(String materialDesc, Integer usedBeginDate, ProductionMouldInfoVo m1,
-                                 ProductionMouldInfoVo m2) {
+    private int usedMouldCompare(String materialDesc, Integer usedBeginDate, Integer lastDay,
+                                 ProductionMouldInfoVo m1, ProductionMouldInfoVo m2) {
         List<CxMouldDayProductionHelper> dayProduction1 = m1.getDayProductionInfo().get(usedBeginDate);
         List<CxMouldDayProductionHelper> dayProduction2 = m2.getDayProductionInfo().get(usedBeginDate);
         Boolean sameMaterial1 = dayProduction1 != null
@@ -1898,8 +1920,8 @@ public class MatchingProductionHandler {
         if (result != 0) {
             return result;
         }
-        dayProduction1 = m1.getDayProductionInfo().get(usedBeginDate - 1);
-        dayProduction2 = m2.getDayProductionInfo().get(usedBeginDate - 1);
+        dayProduction1 = m1.getDayProductionInfo().get(lastDay);
+        dayProduction2 = m2.getDayProductionInfo().get(lastDay);
         sameMaterial1 = dayProduction1 != null
                 && dayProduction1.stream().anyMatch(s -> Objects.equals(materialDesc, s.getMaterialDesc()));
         sameMaterial2 = dayProduction2 != null
@@ -2008,18 +2030,17 @@ public class MatchingProductionHandler {
                                                                   String materialDesc, Integer dayVulcanizationQty,
                                                                   int startDay, int endDay) {
         List<MatchingMouldDayUsedHelper> mouldDayUsedList = new ArrayList<>();
-//        Map<Integer, List<ProductionMouldInfoVo>> canUseMouldMap = new TreeMap<>();
         Integer dayMoldQty = dayVulcanizationQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-//        for (int day = startDay; day <= endDay; day++) {
-//            // 选择模具
-//            canUseMouldMap.put(day, this.selectedAllMouldByDay(productionContext, materialDesc, dayMoldQty, day));
-//        }
         // 遍历每一天的可用模具，与前一天可用模具相同的日期分作一组，然后按组遍历排产
         for (int day = startDay; day <= endDay; day++) {
-          List<ProductionMouldInfoVo> canUseMould = this.selectedAllMouldByDay(productionContext, materialDesc, dayMoldQty, day);
-          if (!CollectionUtils.isEmpty(canUseMould)) {
-              mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day)); // 记录可用时间段
-          }
+            if (productionContext.getStopDays().contains(day)) { // 跳过停产日
+                continue;
+            }
+            List<ProductionMouldInfoVo> canUseMould = this.selectedAllMouldByDay(productionContext, materialDesc,
+                    dayMoldQty, day);
+            if (!CollectionUtils.isEmpty(canUseMould)) {
+                mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day)); // 记录可用时间段
+            }
         }
         return mouldDayUsedList;
     }
@@ -3155,7 +3176,7 @@ public class MatchingProductionHandler {
                     }
                 }
                 // 如果上一天排满了其他sku，当天不可用
-                List<CxMouldDayProductionHelper> latestProductionList = dayProductionInfo.get(day - 1);
+                List<CxMouldDayProductionHelper> latestProductionList = dayProductionInfo.get(this.getLastDay(productionContext, day, 1));
                 if (!CollectionUtils.isEmpty(latestProductionList)) {
                     Integer productionQty = latestProductionList.stream()
                             .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 合计当天的已排量
@@ -3175,7 +3196,8 @@ public class MatchingProductionHandler {
         if (effectiveList.size() < lhMouldQty) {
             return Collections.emptyList();
         }
-        effectiveList.sort((m1, m2) -> this.usedMouldCompare(materialDesc, day, m1, m2));
+        Integer lastDay = this.getLastDay(productionContext, day, 1);
+        effectiveList.sort((m1, m2) -> this.usedMouldCompare(materialDesc, day, lastDay, m1, m2));
         return effectiveList;
     }
 
