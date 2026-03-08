@@ -210,7 +210,7 @@ public class ProductionCxMachineCalculationHandler {
      */
     private List<CxMachineAllocationPlanHelper> buildAllProductionCxMachineResult(Context context, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         Set<String> productionCxMachineCodeSet = groupContinueInfo.getCxMachineCodeSet();
-        if (CollectionUtils.isEmpty(productionCxMachineCodeSet) || productionCxMachineCodeSet.size() == BigDecimal.ONE.intValue()) {
+        if (CollectionUtils.isEmpty(productionCxMachineCodeSet)) {
             return Collections.emptyList();
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
