@@ -193,4 +193,11 @@ public interface IMdmMaterialInfoRemoteService {
     @ApiOperation("施工配置-新")
     @PostMapping("/productinfo/configConstruction")
     public AjaxResult configConstruction(@RequestBody ConfigConstructionVo configConstructionVo);
+
+    /**
+     * 更新质控状态
+     */
+    @ApiOperation("更新质控状态")
+    @PostMapping("/productinfo/updateQualityStateCodeName")
+    public AjaxResult updateQualityStateCodeName(@RequestBody MdmMaterialInfo materialInfo);
 }

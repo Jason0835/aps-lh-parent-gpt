@@ -215,4 +215,11 @@ public interface IMdmMaterialInfoService extends IDocService<MdmMaterialInfo> {
      * @return 物料信息
      */
     Map<String, MdmMaterialInfo> findAdjustMaterialInfo(DpDemandPlan createCondition);
+
+    /**
+     * 更新质控状态
+     * @param materialInfo 参数
+     * @return 结果
+     */
+    AjaxResult updateQualityStateCodeName(MdmMaterialInfo materialInfo);
 }

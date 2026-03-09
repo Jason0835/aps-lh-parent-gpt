@@ -309,4 +309,15 @@ public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo>
     public AjaxResult configConstruction(ConfigConstructionVo configConstructionVo) {
         return iMaterialInfoService.configConstruction(configConstructionVo);
     }
+
+    /**
+     * 更新质控状态
+     */
+    @RequiresPermissions("lean:productinfo:updateQualityStateCodeName")
+    @ApiOperation("更新质控状态")
+    @PostMapping("/updateQualityStateCodeName")
+    @ResponseBody
+    public AjaxResult updateQualityStateCodeName(TableProductInfoVo entity) {
+        return iMaterialInfoService.updateQualityStateCodeName(entity);
+    }
 }
