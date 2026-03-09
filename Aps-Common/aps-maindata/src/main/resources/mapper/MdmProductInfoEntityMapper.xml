@@ -137,7 +137,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                tmpi.UPDATE_TIME,
                tmpi.CREATE_BY,
                tmpi.UPDATE_BY,
-               tmpi.QUALITY_STATE_CODE_NAME
+               tmpi.QUALITY_STATE_CODE
         FROM t_mdm_material_info tmpi
           LEFT JOIN (SELECT mpmr.FACTORY_CODE,
         mpmr.PRODUCT_CODE AS MATERIAL_CODE,
