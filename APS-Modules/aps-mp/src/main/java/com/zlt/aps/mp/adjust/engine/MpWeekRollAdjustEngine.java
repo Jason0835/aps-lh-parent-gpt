@@ -1723,6 +1723,10 @@ public class MpWeekRollAdjustEngine {
                 if (bTrailProductionFlag && getTrialNewOnlineDay(contextDTO,i,i, mpProdFinalList) == null){
                     //若是量试，但该日不能排，则继续
                     newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,usedProductionDays,beforeProductionQty);
+                    if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        beforeProductionQty = 0;
+                        bFirstAddMould = true;
+                    }
                     continue;
                 }
                 //3.2、检查SKU二次上机
@@ -1731,6 +1735,10 @@ public class MpWeekRollAdjustEngine {
                         !hasPlanByDay(mpFinalVo, getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),i -1))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,usedProductionDays,beforeProductionQty);
+                    if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        beforeProductionQty = 0;
+                        bFirstAddMould = true;
+                    }
                     continue;
                 }
                 //注：这里不能做预检查，会导致可以拼的SKU被忽略掉
@@ -1742,6 +1750,10 @@ public class MpWeekRollAdjustEngine {
                         break;
                     }
                     newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,usedProductionDays,beforeProductionQty);
+                    if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        beforeProductionQty = 0;
+                        bFirstAddMould = true;
+                    }
                     continue;
                 }
                 dayField = FactoryConstant.DAY_FIELD + i;
@@ -1774,6 +1786,10 @@ public class MpWeekRollAdjustEngine {
                         break;
                     }
                     newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,usedProductionDays,beforeProductionQty);
+                    if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        beforeProductionQty = 0;
+                        bFirstAddMould = true;
+                    }
                     continue;
                 }
 
@@ -1811,11 +1827,15 @@ public class MpWeekRollAdjustEngine {
                         mpFinalVo.setFieldValueByFieldName(dayField,dayValue == 0 ? null:dayValue);
                     }
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,每日硫化机台数或每日胎胚种类数不符合产能限制,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
-                    if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                    /*if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
                         newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,usedProductionDays,beforeProductionQty);
                         break;
-                    }
+                    }*/
                     newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,usedProductionDays,beforeProductionQty);
+                    if (beforeProductionQty > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
+                        beforeProductionQty = 0;
+                        bFirstAddMould = true;
+                    }
                     continue;
                 }
                 //检查：主花纹向下模具数量(/2转成机台数) 符合性
@@ -1862,7 +1882,8 @@ public class MpWeekRollAdjustEngine {
     private int revertPreDayQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo, int currentDay, int usedProductionDays, int beforeProductionQty){
         if (usedProductionDays == 1 && beforeProductionQty > 0){
             // 若只有排产1天，则将前日的值还原
-            String preDayField = FactoryConstant.DAY_FIELD + (currentDay-1);
+            int preDay = getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),currentDay -1);
+            String preDayField = FactoryConstant.DAY_FIELD + preDay;
             int preDayValue = (Integer) mpFinalVo.getFieldValueByFieldName(preDayField) - beforeProductionQty;
             mpFinalVo.setFieldValueByFieldName(preDayField,preDayValue==0 ? null : preDayValue);
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,单机台已排产天数: %s, 还原值:%s, 前日还原后的排产量: %s！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),currentDay,usedProductionDays,beforeProductionQty,preDayValue)).append(ApsConstant.DIVISION);
