@@ -137,7 +137,7 @@ export default {
             label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
             type: "number",
             min: 1,
-            max: 5,
+            max: 4,
           },
 
         );
