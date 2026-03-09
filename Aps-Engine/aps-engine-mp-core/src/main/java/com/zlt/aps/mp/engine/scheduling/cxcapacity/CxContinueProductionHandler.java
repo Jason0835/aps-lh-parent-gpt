@@ -57,7 +57,8 @@ public class CxContinueProductionHandler {
         //续作Sku轮询排产
         String groupName = groupPlanInfo.getGroupName();
         continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            log.info(TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc));
+            //log.info();
+            TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc);
             if (!cxContinueSkuInfo.hasProduction()) {
                 log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionQtyLog(context, groupName, materialDesc));
                 return;
@@ -80,7 +81,8 @@ public class CxContinueProductionHandler {
                 return;
             }
             String mouldInfo = selectMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
-            log.info(TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo));
+            //log.info();
+            TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo);
             //2、将排产结果，逐日分配到模具上，按排产日由小到大排序
             resultList.sort(Comparator.comparing(DailyScheduleVo::getScheduleDate));
             resultList.forEach(dailySchedule -> {

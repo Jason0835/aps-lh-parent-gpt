@@ -441,7 +441,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //5、保存月计划统计结果
         saveMonthPlanStatisticsResult(contextDTO);
         //6、发送消息
-        if (PubUtil.isNotEmpty(contextDTO.getMsgRemainQtyNoFull())){
+        if (StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
             sendMsgRemainQtyNoFull(contextDTO);
         }
     }

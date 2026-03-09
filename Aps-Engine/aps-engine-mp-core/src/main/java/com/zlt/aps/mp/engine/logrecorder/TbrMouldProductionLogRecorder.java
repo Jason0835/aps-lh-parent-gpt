@@ -5,9 +5,9 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
-import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -373,6 +373,27 @@ public class TbrMouldProductionLogRecorder {
                 mouldInfo, startDay, endDay);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_SKU_USED_FIND_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加模具排产计划奇数余量处理
+     *
+     * @param context       排产上下文
+     * @param materialDesc  物料描述
+     * @param mouldInfo     模具信息
+     * @param productionDay 排产日
+     * @param size          余数条数
+     * @return
+     */
+    public static String addMouldProductionLeftOverOddNumberPlan(Context context, String groupName, String materialDesc, String mouldInfo, Integer productionDay, Integer size) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 物料：%s 使用模具[%s]在[%s]日排产计划余量奇数 %s条====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc,
+                mouldInfo, productionDay, size);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_PRODUCTION_PLAN, logContent);
         return logContent;
     }
 

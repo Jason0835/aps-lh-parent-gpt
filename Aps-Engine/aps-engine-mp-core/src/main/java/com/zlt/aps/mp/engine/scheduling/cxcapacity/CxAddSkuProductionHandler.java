@@ -14,6 +14,7 @@ import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialInfoVo;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
 import com.zlt.aps.mp.engine.handler.SkuPrioritySelector;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -81,8 +82,8 @@ public class CxAddSkuProductionHandler {
             //todo 记录日志
             return;
         }
-        //选择模具
-        List<ProductionMouldInfoVo> doubleMouldList = productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
+        //选择模具 productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
+        List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addContinueLhGroupSkuNoFindMouldLog(context, groupName, onLineMachineInfo, materialDesc));
@@ -167,8 +168,8 @@ public class CxAddSkuProductionHandler {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoProductionQtyLog(context, groupName, cxMachineCode, materialDesc));
             return;
         }
-        //选择模具
-        List<ProductionMouldInfoVo> doubleMouldList = productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
+        //选择模具 productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
+        List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoFindMouldLog(context, groupName, cxMachineCode, materialDesc));
