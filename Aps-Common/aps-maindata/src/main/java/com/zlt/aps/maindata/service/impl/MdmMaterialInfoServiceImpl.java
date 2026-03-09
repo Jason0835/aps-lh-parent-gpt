@@ -13,14 +13,15 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
+import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.CommonTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.utils.ImportExcelValidatedUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.itf.scm.service.IScmItfService;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
@@ -34,6 +35,9 @@ import com.zlt.aps.mp.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.mp.api.domain.vo.MaterialInfoGrossRateJsonVo;
 import com.zlt.aps.mp.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.mp.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -49,8 +53,8 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.zlt.aps.constant.FactoryConstant.DEFAULT_FACTORY_CODE;
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import static com.zlt.aps.constant.FactoryConstant.DEFAULT_FACTORY_CODE;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -758,6 +762,57 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
                 material -> material,
                 (existing, replacement) -> existing
             ));
+    }
+
+    /**
+     * 更新质控状态
+     *
+     * @param materialInfo 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult updateQualityStateCodeName(MdmMaterialInfo materialInfo) {
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+        List<MdmMaterialInfo> mdmMaterialInfoList = mdmMaterialInfoEntityMapper.selectList(wrapper);
+        setQualityStateCodeName(materialInfo, mdmMaterialInfoList);
+        baseDao.updateBatch(mdmMaterialInfoList);
+        return AjaxResult.success();
+    }
+
+    @Autowired
+    private IScmItfService iScmItfService;
+
+    /**
+     * 赋值质控状态
+     * @param productInfo 查询条件
+     * @param list 要赋值的列表
+     */
+    private void setQualityStateCodeName(MdmMaterialInfo productInfo, List<MdmMaterialInfo> list) {
+        if (CollectionUtils.isNotEmpty(list)) {
+            // 赋值质控状态
+            GoodsBoxVo goodsBox = new GoodsBoxVo();
+            goodsBox.setFacCode(productInfo.getFactoryCode());
+            if (list.size() < 300) {
+                goodsBox.setGCodeList(list.stream().map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toList()));
+            }
+            AjaxResult ajaxResult = iScmItfService.selectGoodsBox(goodsBox);
+            List<GoodsBoxVo> goodsBoxVoList = AjaxResultUtils.getList(ajaxResult, GoodsBoxVo.class);
+            Map<String, GoodsBoxVo> goodsBoxVoMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(goodsBoxVoList)) {
+                goodsBoxVoMap = goodsBoxVoList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFacCode(), item.getgCode()), Function.identity(), (s1, s2) -> s1));
+            }
+
+            List<List<MdmMaterialInfo>> splitList = ScmListUtils.getSplitList(list, 1000);
+            for (List<MdmMaterialInfo> mdmMaterialInfoList : splitList) {
+                for (MdmMaterialInfo materialInfo : mdmMaterialInfoList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(materialInfo.getFactoryCode(), materialInfo.getMaterialCode());
+                    if (goodsBoxVoMap.containsKey(mapKey)) {
+                        GoodsBoxVo goodsBoxVo = goodsBoxVoMap.get(mapKey);
+                        materialInfo.setQualityStateCode(goodsBoxVo.getQualityStateCode());
+                    }
+                }
+            }
+        }
     }
 }
 

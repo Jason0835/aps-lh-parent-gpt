@@ -93,7 +93,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         this.builderCondition(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         this.setSkuConstructionRefField(productInfo, list);
-        this.setQualityStateCodeName(productInfo, list);
+//        this.setQualityStateCodeName(productInfo, list);
         return getDataTable(list);
     }
 
@@ -157,7 +157,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
                     String mapKey = GenerageMapKeyUtils.createMapKey(materialInfo.getFactoryCode(), materialInfo.getMaterialCode());
                     if (goodsBoxVoMap.containsKey(mapKey)) {
                         GoodsBoxVo goodsBoxVo = goodsBoxVoMap.get(mapKey);
-                        materialInfo.setQualityStateCodeName(goodsBoxVo.getQualityStateCodeName());
+                        materialInfo.setQualityStateCode(goodsBoxVo.getQualityStateCode());
                     }
                 }
             }
@@ -489,5 +489,14 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @PostMapping("/configurationConstruction")
     public AjaxResult configurationConstruction(@RequestBody MdmProductConstruction productConstruction) {
         return iproductInfoService.configurationConstruction(productConstruction);
+    }
+
+    /**
+     * 更新质控状态
+     */
+    @ApiOperation("更新质控状态")
+    @PostMapping("/updateQualityStateCodeName")
+    public AjaxResult updateQualityStateCodeName(@RequestBody MdmMaterialInfo materialInfo) {
+        return iproductInfoService.updateQualityStateCodeName(materialInfo);
     }
 }

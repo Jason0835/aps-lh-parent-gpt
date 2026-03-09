@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -13,7 +14,9 @@ import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.GoodsBoxVo;
 import com.zlt.aps.itf.vo.MdmProductStockContext;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -69,6 +72,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private IMdmSkuStructureRefService iMdmSkuStructureRefService;
+
+    @Autowired
+    private ScmItfService scmItfService;
 
     /**
      * 同步SKU与模具关系
@@ -655,6 +661,11 @@ public class MesItfServiceImpl implements MesItfService {
     public AjaxResult syncMaterial(AuxReqSyncDataLogs syncDataLogs) {
         // 查询中间表
         List<MdmMaterialInfo> list = getMaterialInfoList(syncDataLogs);
+        List<GoodsBoxVo> goodsBoxList = getGoodsBoxList(syncDataLogs);
+        Map<String, GoodsBoxVo> goodsBoxVoMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(goodsBoxList)) {
+            goodsBoxVoMap = goodsBoxList.stream().collect(Collectors.toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFacCode(), item.getgCode()), Function.identity(), (s1, s2) -> s1));
+        }
         // 唯一键重复随机取一条
         Map<String, MdmMaterialInfo> groupMap = list.stream().collect(Collectors.toMap(item -> item.getFactoryCode() + "|" + item.getMaterialCode(), Function.identity(), (v1, v2) -> v1));
         list = new ArrayList<>(groupMap.values());
@@ -686,6 +697,11 @@ public class MesItfServiceImpl implements MesItfService {
                     if (convertEnum != null) {
                         entity.setMaterialCategory(convertEnum.getCode());
                     }
+                    String goodBoxMapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getMaterialCode());
+                    if (goodsBoxVoMap.containsKey(goodBoxMapKey)) {
+                        GoodsBoxVo goodsBoxVo = goodsBoxVoMap.get(goodBoxMapKey);
+                        entity.setQualityStateCode(goodsBoxVo.getQualityStateCode());
+                    }
                     entity.setBaseVale(null);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
@@ -708,6 +724,17 @@ public class MesItfServiceImpl implements MesItfService {
             // 切换APS数据源 end
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 获取scm质控状态列表
+     * @return 结果
+     */
+    private List<GoodsBoxVo> getGoodsBoxList(AuxReqSyncDataLogs syncDataLogs) {
+        GoodsBoxVo goodsBox = new GoodsBoxVo();
+        goodsBox.setFacCode(syncDataLogs.getFactoryCode());
+        AjaxResult ajaxResult = scmItfService.selectGoodsBox(goodsBox);
+        return AjaxResultUtils.getList(ajaxResult, GoodsBoxVo.class);
     }
 
     /**
