@@ -43,6 +43,13 @@
           v-hasPermi="['lean:productinfo:export']"
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
+        <el-button
+          @click="handleUpdate"
+           :loading="updateLoading"
+            type="primary"
+          v-hasPermi="['lean:productinfo:updateQualityStateCodeName']"
+          >{{ $t("质控状态更新") }}
+        </el-button>
         <!--<el-button-->
         <!--  v-hasPermi="['setting:material:export']"-->
         <!--  material="warning"-->
@@ -82,6 +89,7 @@ import { downloadLink } from "@/utils/request";
 import {
   tableListProductinfo,
   listProductinfo,
+  updateQualityState,
   editProductinfo,
   removeProductinfo,
   // configurationMould,
@@ -99,7 +107,8 @@ export default {
     "biz_product_type",
     "product_category",
     "mes_material_category",
-    "mes_material_subcategory"
+    "mes_material_subcategory",
+    "quality_state"
   ],
   provide() {
     return {
@@ -141,6 +150,7 @@ export default {
         planDate: tomorrow,
       },
       selection: [],
+      updateLoading:false
     };
   },
   computed: {
@@ -246,9 +256,12 @@ export default {
           },
         },
         {
-          prop: "qualityStateCodeName",
+          prop: "qualityStateCode",
           width: 120,
           label: this.$t("质控状态"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.quality_state, value);
+          },
         },
         {
           prop: "materialCategory",
@@ -425,6 +438,17 @@ export default {
     },
   },
   methods: {
+    async handleUpdate(){
+      this.updateLoading=true
+      try{
+        let res=await updateQualityState({factoryCode:this.search.factoryCode})
+        this.$modal.msgSuccess(res.msg);
+      }catch(err){
+
+      }finally{
+        this.updateLoading=false
+      }
+    },
     handleChangeStatus(status, row) {
       console.log(status);
       let title =

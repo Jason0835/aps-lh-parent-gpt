@@ -32,3 +32,11 @@ export function checkMouldUseStatusUnique(query) {
 export function exportData(query) {
   downloadLink('/lean/productinfo/export', query)
 }
+
+export function updateQualityState(query) {
+  return request({
+    url: '/lean/productinfo/updateQualityStateCodeName',
+    method: 'post',
+    data: query
+  })
+}
