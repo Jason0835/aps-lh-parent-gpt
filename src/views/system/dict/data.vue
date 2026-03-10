@@ -265,7 +265,7 @@
           <el-input
             v-model="form.dictLabel"
             :placeholder="$t('common.api.dictData.placeholder.dataLabel')"
-            maxlength="30"
+            maxlength="40"
           />
         </el-form-item>
         <el-form-item
