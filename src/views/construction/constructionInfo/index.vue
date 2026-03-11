@@ -32,6 +32,11 @@
           v-hasPermi="['monthplan:mdmBomInfo:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="handleGoDetail"
+          v-hasPermi="['mdm:mdmMaterialConsumeDetail:list']"
+          >{{ $t("胎胚原材料清单") }}</el-button
+        >
         <!-- <el-button
           type="primary"
           v-hasPermi="['cx:productConstruction:add']"
@@ -226,11 +231,13 @@ export default {
               <div>
                 {row.status == 1
                   ? this.$t("common.job.column.normal")
-                  : this.$t("financialManagement.exportSalesInvoice.button.repeal")}
+                  : this.$t(
+                      "financialManagement.exportSalesInvoice.button.repeal"
+                    )}
               </div>
             );
           },
-          minWidth:100
+          minWidth: 100,
         },
         // {
         //   prop: "updateTime",
@@ -273,6 +280,11 @@ export default {
     },
   },
   methods: {
+    handleGoDetail() {
+      this.$router.push({
+        name: "ConsumptionDetails",
+      });
+    },
     mesCap() {
       this.loading = true;
       mesCapture()

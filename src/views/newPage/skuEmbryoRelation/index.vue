@@ -160,31 +160,21 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-          width: 120,
         },
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
-        // {
-        //   prop: "materialCode",
-        //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-        //   width:180,
-        // },
-        // {
-        //   prop: "materialDesc",
-        //   label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        // },
+
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width: 350,
+
         },
         {
           align: "center",
           label: this.$t("ui.data.btn.option"),
           fixed: "right",
-          width: 200,
           render: ({ row }) => {
             return (
               <div>
