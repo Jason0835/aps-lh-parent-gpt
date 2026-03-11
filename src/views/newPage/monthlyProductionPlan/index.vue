@@ -489,7 +489,9 @@ export default {
       }
       let date =this.data[0]
       this.$router.push({
-        path: `/monthPlanManagement/console/console/productionMonthPlanInit/${date.productionNo}`,
+        // path: `/monthPlanManagement/console/console/productionMonthPlanInit/${date.productionNo}`,
+        name: 'ProductionMonthPlanInit',
+        params: { id: date.productionNo },
         query: {
           year:date.year ,
           month:date.month,
