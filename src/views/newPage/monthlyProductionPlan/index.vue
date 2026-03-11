@@ -26,6 +26,11 @@
           v-hasPermi="['monthplan:factoryMonthPlanMouldDayResult:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="goProductionMonthPlanInit"
+          v-hasPermi="['monthplan:mpStructureAllocation:list']"
+          >{{ $t("查看结构排产") }}</el-button
+        >
       </template>
       <template slot="headerRight"> </template>
     </page-table>
@@ -478,6 +483,22 @@ export default {
     },
   },
   methods: {
+    goProductionMonthPlanInit(){
+      if(this.data.length==0){
+        return this.$modal.msgWarning('暂无数据');
+      }
+      let date =this.data[0]
+      this.$router.push({
+        path: `/monthPlanManagement/console/console/productionMonthPlanInit/${date.productionNo}`,
+        query: {
+          year:date.year ,
+          month:date.month,
+          factoryCode:date.factoryCode,
+          monthPlanVersion: date.monthPlanVersion,
+          productionVersion: date.productionVersion,
+        },
+      });
+    },
     async generPlan() {
       try {
         this.createLoading = true;
