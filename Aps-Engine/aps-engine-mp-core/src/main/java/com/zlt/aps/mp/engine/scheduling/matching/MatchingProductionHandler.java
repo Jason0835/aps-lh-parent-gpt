@@ -1575,8 +1575,18 @@ public class MatchingProductionHandler {
                     // 判断切换计划前上一天的排产计划
                     List<CxMouldDayProductionHelper> lastDayProductionList = mouldInfo.getDayProductionInfo()
                             .get(lastDay);
+                    inner:
                     if (!CollectionUtils.isEmpty(lastDayProductionList)
                             && lastDayProductionList.stream().anyMatch(p -> materialDesc.equals(p.getMaterialDesc()))) { // 上一天有排产，且物料描述一致，说明是续作
+                        // 判断如果今天的模具已经达到最大模具数，则不能加模具，只能补量
+                        if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty()) {
+                            List<CxMouldDayProductionHelper> dayProduction = mouldInfo.getDayProductionInfo().get(usedBeginDate);
+                            if (dayProduction == null
+                                    || dayProduction.stream().filter(s -> materialDesc.equals(s.getMaterialDesc()))
+                                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() <= 0) { // 当天没有排产的模具跳过
+                                break inner;
+                            }
+                        }
                         twoMouldList.add(mouldInfo);
                     }
                     if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加
@@ -1663,11 +1673,16 @@ public class MatchingProductionHandler {
 
             Integer maxPlanQty = 0; // 当前最大可排产量
             Integer mouldQty = 0; // 已排模具数
-            Integer dayVulcanizationQty = 0;
+            Integer productionQty = 0; // 已排产量
+            Integer maxDayVulcanizationQty = 0;
             Integer lastDay = this.getLastDay(productionContext, day, 1);
+            
+            Set<String> mouldCodeSet = new HashSet<>();
+            Integer firstDayMouldQty = 0; // 加模数量
+            Integer spliceMouldQty = 0; // 可拼机台数量
             for (CxMouldDayProductionHelper dayPlan : planList) {
                 // 取出单模具产能
-                dayVulcanizationQty = allSinglePlanMap.get(dayPlan.getMonthPlanId()).getDayVulcanizationQty();
+                Integer dayVulcanizationQty = allSinglePlanMap.get(dayPlan.getMonthPlanId()).getDayVulcanizationQty();
                 // 如果是新增模具，需要限制产能
                 // 检查有几个新增模具，新增模具只能排限制个数
                 boolean isContinue = false;
@@ -1682,25 +1697,27 @@ public class MatchingProductionHandler {
                     isContinue = !CollectionUtils.isEmpty(mouldDayList) && mouldDayList.stream()
                             .anyMatch(p -> Objects.equals(dayPlan.getMaterialDesc(), p.getMaterialDesc()));
                 }
-                BigDecimal unit = BigDecimalUtils.valueOf(isContinue ? dayVulcanizationQty : firtOneMouldQty); // 单模每日最大排产量：续作，直接按最大满产排；非续作只能按新模首日排产
-                Integer newMouldQty = BigDecimalUtils.div(dayPlan.getProductionQty(), unit).setScale(0, RoundingMode.UP).intValue(); // 模具数
-                maxPlanQty += newMouldQty * unit.intValue();
-                mouldQty += newMouldQty;
+                int mouldPlanQty = Optional.ofNullable(dayPlan.getProductionQty()).orElse(0);
+                if (mouldPlanQty <= 0) { // 当天没有排产量的跳过
+                    continue;
+                }
+                firstDayMouldQty += isContinue? 0: 1; // 记录新增模具数
+                spliceMouldQty += isContinue && dayPlan.getProductionQty() < dayVulcanizationQty - firtOneMouldQty? 1: 0; // 续作模具，且排产量低于产能 - 首日排产量的，记录可拼机台数量
+                productionQty += mouldPlanQty;
+                maxDayVulcanizationQty = Math.max(maxDayVulcanizationQty, dayVulcanizationQty);
+                mouldCodeSet.add(dayPlan.getMouldCode());
             }
-            if (mouldQty < maxMouldNum) { // 如果模具数没达到上限，则把剩余模具按最大产能补到最大排产量上
-                maxPlanQty = maxPlanQty + (maxMouldNum - mouldQty) * dayVulcanizationQty;
-            }
-            MatchingPlanLimitHelper dayLimit = dayPlanMap.get(day);
-            if (dayLimit == null) {
-                dayLimit = new MatchingPlanLimitHelper();
-                dayPlanMap.put(day, dayLimit);
-                dayLimit.setMaxPlanQty(maxPlanQty);
-                dayLimit.setMaxMouldQty(maxMouldNum);
-            }
-            Integer productionQty = planList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
-            Integer planQty = Optional.ofNullable(dayLimit.getPlanQty()).orElse(0) + productionQty;
-            dayLimit.setPlanQty(planQty);
+            // 同一天如果既有可拼硫化机数，也有新增模具，判定为拼机台，可以减掉这部分新增模具
+            int deductMouldQty = Math.min(spliceMouldQty, firstDayMouldQty); // 既有可拼机台模具数，又有新增模具数时，取最小值作为拼机台排产数，这部分模具两模只能算一模，需要扣减掉
+            mouldQty = mouldCodeSet.size() - deductMouldQty;
+            maxPlanQty = maxMouldNum * maxDayVulcanizationQty;
+            // 记录统计值
+            MatchingPlanLimitHelper dayLimit = new MatchingPlanLimitHelper();
+            dayLimit.setMaxPlanQty(maxPlanQty);
+            dayLimit.setMaxMouldQty(maxMouldNum);
+            dayLimit.setPlanQty(productionQty);
             dayLimit.setMouldQty(mouldQty);
+            dayPlanMap.put(day, dayLimit);
         }
         return this.buildProductDayLimitMap(productionContext, groupInfo, allSinglePlanMap, dayModPlanMap, maxMouldNum,
                 firtOneMouldQty, dayPlanMap);
@@ -2250,6 +2267,7 @@ public class MatchingProductionHandler {
             if (!newSkuQtyMap.containsKey(plan.getMaterialDesc())) {
                 continue;
             }
+            FactoryMonthPlanMouldDayResult firstPlan = CollectionUtils.firstElement(resultList);
             // 原有记录有同规格的更新（有ID）；没有的说明是新搭配的规格，需要新增（无ID）
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
             if (oldPlan != null) {
@@ -2265,9 +2283,6 @@ public class MatchingProductionHandler {
                 plan.setFactProdReqQty(oldPlan.getFactProdReqQty());
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
-                plan.setBaseVale(plan.getId());
-                plan.setCreateBy(plan.getCreateBy());
-                plan.setCreateTime(plan.getCreateTime());
             } else {
                 plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
                 plan.setTotalQty(plan.getConventionProductionQty());
@@ -2282,8 +2297,11 @@ public class MatchingProductionHandler {
                 plan.setDifferenceQty(0);
                 plan.setFactProdReqQty(0);
                 plan.setReason(null);
-                plan.setBaseVale(null);
             }
+            plan.setCreateBy(firstPlan.getCreateBy());
+            plan.setCreateTime(firstPlan.getCreateTime());
+            plan.setUpdateBy(firstPlan.getUpdateBy());
+            plan.setUpdateTime(firstPlan.getUpdateTime());
 
             if (null != plan.getInventorySalesRatio()
                     && plan.getInventorySalesRatio().compareTo(BigDecimal.ZERO) < BigDecimal.ZERO.intValue()) {
