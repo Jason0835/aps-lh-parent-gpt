@@ -34,3 +34,17 @@ export function editAnnualPlan(query) {
 
   })
 }
+export function copyWorkCalendar(query) {
+  return request({
+    url: '/maindata/mdmWorkCalendar/copyWorkCalendar',
+    method: 'post',
+    data: query
+  })
+}
+export function copyCheckWorkCalenda(query) {
+  return request({
+    url: '/maindata/mdmWorkCalendar/checkBeforeCopy',
+    method: 'post',
+    data: query
+  })
+}

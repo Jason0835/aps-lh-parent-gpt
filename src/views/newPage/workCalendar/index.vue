@@ -47,12 +47,13 @@
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <!-- <el-button
+        <el-button
           type="primary"
           plain
           @click="handleBuild"
+           v-hasPermi="['maindata:mdmWorkCalendar:copyWorkCalendar']"
           >{{ $t("ui.params.copy") }}
-        </el-button> -->
+        </el-button>
       </div>
     </div>
     <div style="display: flex; flex-direction: row">

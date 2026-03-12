@@ -57,10 +57,9 @@ import moment from "moment";
 import infoForm from "@/views/components/infoForm.vue";
 
 import {
-  saveAreaCapaInfo,
-  copyAreaCapaInfo,
-  copyCheckAreaCapaInfo,
-} from "@/api/monthplan/mdmAreaCapaAllocation";
+  copyWorkCalendar,
+  copyCheckWorkCalenda
+} from "@/api/newPage/workCalendar.js";
 import { selectProcCodeList } from "@/api/newPage/workCalendar.js";
 
 export default {
@@ -187,12 +186,12 @@ export default {
       try {
         this.loading = true;
 
-        const res = await copyCheckAreaCapaInfo(params);
+        const res = await copyCheckWorkCalenda(params);
         console.log("checkCopy res", res);
         this.$confirm(res.msg, {
           type: "warning",
         }).then(() => {
-          copyAreaCapaInfo(params).then((data) => {
+          copyWorkCalendar(params).then((data) => {
             this.$modal.msgSuccess(data.msg);
             this.$emit("success");
             this.hide();
