@@ -11,7 +11,7 @@
   >
     <div class="table-container" v-loading="loading">
       <page-table
-       max-height="400"
+        max-height="400"
         :calcHeight="false"
         ref="tableRef"
         :columns="columns"
@@ -26,6 +26,7 @@
         @pageChange="handlePageChange"
         @selection-change="handleSelectionChange"
         @search="handleSearch"
+        row-key="id"
       >
       </page-table>
     </div>
@@ -33,14 +34,11 @@
 </template>
 
 <script>
-  //结构选择
+//结构选择
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
-import {
-  selectSkuStructure,
-
-} from "@/api/monthplan/skuStructure";
+import { selectSkuStructure } from "@/api/monthplan/skuStructure";
 export default {
   components: { selectDialog },
   inject: ["parentDict"],
@@ -55,7 +53,7 @@ export default {
     factoryCode: String | Number,
     machineType: String | Number,
     label: String,
-    oldList: Array|[],
+    oldList: Array | [],
     multiple: {
       type: Boolean,
       default: false,
@@ -64,7 +62,7 @@ export default {
   data() {
     return {
       searchKey: "",
-      search:{},
+      search: {},
       // searchColumns: [
       //   {
       //     prop: "factoryCode",
@@ -74,11 +72,7 @@ export default {
       //   },
       // ],
       filterKey: "",
-      page: {
-        current: 1,
-        pageSize: 10,
-        total: 0,
-      },
+      page: null,
       query: {},
       showValue: "",
 
@@ -108,18 +102,16 @@ export default {
     },
     columns: function () {
       const list = [
-
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:800
-
+          width: 800,
         },
       ];
       if (this.multiple) {
         list.unshift({
           type: "selection",
-          reserveSelection:true
+          reserveSelection: true,
         });
       }
 
@@ -145,12 +137,40 @@ export default {
   },
 
   methods: {
+    // 排序并选中数据
+    sortAndSelectData(list) {
+      const tableRef = this.$refs.tableRef.getTableRef();
+      // 1. 将数据分为两组：需要置顶的 和 普通的
+      const topItems = [];
+      const normalItems = [];
+
+      list.forEach((item) => {
+        if (this.oldList.includes(item.structureName)) {
+          topItems.push(item);
+        } else {
+          normalItems.push(item);
+        }
+      });
+
+      // 2. 合并数据：置顶的数据在前，普通数据在后
+      //    如果需要按topIdList的顺序置顶，可以进一步排序
+      this.data = [...topItems, ...normalItems];
+
+      // 3. 选中需要置顶的数据
+      this.$nextTick(() => {
+        topItems.forEach((item) => {
+          // 使用toggleRowSelection方法选中行
+          tableRef.toggleRowSelection(item, true);
+        });
+      });
+    },
     async getList() {
       try {
         this.loading = true;
         const data = await selectSkuStructure(this.formatParams());
-        this.data = data.rows;
-        this.page.total = data.total;
+        // this.data = data.rows;
+        this.sortAndSelectData(data.rows)
+        console.log(this.oldList);
         // this.$nextTick(()=>{
         //   if(this.oldList&&this.oldList.length>0){
         //     const tableRef = this.$refs.tableRef.getTableRef();
@@ -175,8 +195,8 @@ export default {
     //
     formatParams() {
       return {
-        pageSize: this.page.pageSize,
-        pageNum: this.page.current,
+        pageSize: 10000,
+        pageNum: 1,
         machineType: this.machineType,
         ...this.query,
         // userName: this.filterKey,
@@ -268,7 +288,6 @@ export default {
         }
         done();
       } else {
-
         if (this.selection) {
           const ids = this.selection
             .map((item) => item[this.valueProp])
@@ -276,12 +295,12 @@ export default {
           this.showValue = this.selection
             .map((item) => item[this.labelProp])
             .join(",");
-            console.log(this.oldList)
+          console.log(this.oldList);
           this.$emit("updateValue", ids);
           this.$emit("change", ids, deepClone(this.selection));
-        }else{
-          this.$modal.msgWarning(this.$t('common.rule.select'));
-          return
+        } else {
+          this.$modal.msgWarning(this.$t("common.rule.select"));
+          return;
         }
         done();
       }
@@ -314,6 +333,5 @@ export default {
 }
 .table-container {
   height: 450px;
-
 }
 </style>

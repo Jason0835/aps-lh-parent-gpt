@@ -50,7 +50,7 @@
       ref="tltUpload"
       :updateSupport="true"
       downloadUrl="/maindata/rawWarningConfig/importTemplate"
-      uploadUrl="​/maindata​/rawWarningConfig​/importData"
+      uploadUrl="/maindata/rawWarningConfig/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"

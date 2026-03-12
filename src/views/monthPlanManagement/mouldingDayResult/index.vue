@@ -99,9 +99,7 @@ import {
   statistics,
 } from "@/api/monthplan/mouldingDayResult";
 import { listProductionPlan } from "@/api/monthplan/monthlyProductionPlan";
-import {
-  statisticsResult,
-} from "@/api/monthplan/adjustStructure";
+import { statisticsResult } from "@/api/monthplan/adjustStructure";
 
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -139,7 +137,7 @@ export default {
         current: 1,
         pageSize: 20,
         total: 0,
-        pageSizes:[10,20,30,40,50,100,200,300]
+        pageSizes: [10, 20, 30, 40, 50, 100, 200, 300],
       },
       sort: {},
       search: {},
@@ -150,6 +148,7 @@ export default {
       dailyVisible: true,
       productionVersion: null,
       stat: {},
+      dayNum: 31,
     };
   },
   computed: {
@@ -369,7 +368,7 @@ export default {
           // const date = moment(this.query.yearMonth);
           // const year = date.year();
           // const month = date.month() + 1;
-          const days = 31;
+          const days = this.dayNum;
 
           for (let i = 0; i < days; i++) {
             columns.push({
@@ -384,14 +383,7 @@ export default {
           }
         }
       }
-      // columns.push({
-      //   label: this.$t("ui.data.column.facMonthPlan.isImport"),
-      //   prop: "isImport",
-      //   align: "center",
-      //   formatter: (row) => {
-      //     return this.selectDictLabel(this.dict.type.biz_yes_no, row.isImport);
-      //   },
-      // });
+
       return columns;
     },
     searchColumns() {
@@ -596,8 +588,8 @@ export default {
         // this.data = data.rows;
         this.page.total = data.total;
         if (data.rows.length != 0) {
-          this.getStatisticsResult(data.rows[0],data.rows);
-        }else{
+          this.getStatisticsResult(data.rows[0], data.rows);
+        } else {
           this.data = [];
         }
       } catch (error) {
@@ -615,8 +607,8 @@ export default {
         this.stat = {};
       }
     },
-        //渲染统计颜色
-        tableRowClassName({ row, rowIndex }) {
+    //渲染统计颜色
+    tableRowClassName({ row, rowIndex }) {
       if (row.showBackground) {
         return row.showBackground;
       }
@@ -627,7 +619,7 @@ export default {
     },
 
     //调整结果统计
-    async getStatisticsResult(data,resultList) {
+    async getStatisticsResult(data, resultList) {
       try {
         let params = {
           factoryCode: data.factoryCode,
@@ -636,8 +628,6 @@ export default {
           productionVersion: data.productionVersion,
         };
         let res = await statisticsResult(params);
-
-
 
         let list = this.insertDataAfterEachName(resultList, res.rows);
         this.data = list;
@@ -663,10 +653,10 @@ export default {
           // 在当前分组后插入两条数据
           for (let i = 0; i < statistList.length; i++) {
             if (statistList[i].structureName == current.structureName) {
-              let changeMould={
+              let changeMould = {
                 structureName: current.structureName,
                 showBackground: "light-yellow",
-              }
+              };
               let embryoCount = {
                 structureName: current.structureName,
                 showBackground: "light-green",
@@ -729,6 +719,17 @@ export default {
         this.verList = [];
       }
     },
+    getDaysInMonth(yearMonth) {
+      // 解析输入，支持 "2026-2" 或 "2026-02" 格式
+      const [year, month] = yearMonth.split("-").map(Number);
+
+      // 创建下个月的第0天（即当月的最后一天）
+      // 注意：month 需要减1，因为 JS 月份从0开始
+      const lastDay = new Date(year, month, 0);
+
+      // 返回当月的天数
+      return lastDay.getDate();
+    },
   },
   created() {
     if (this.$route.query) {
@@ -743,6 +744,7 @@ export default {
         ...defaultParams,
       };
     }
+    this.dayNum=this.getDaysInMonth(this.$route.query.yearMonth)
     this.getList();
   },
   activated() {},

@@ -32,7 +32,7 @@ import infoForm from "@/views/components/infoForm.vue";
 import {
   listMdmProductConstruction,
   generateMdmProductConstruction,
-  removeMdmProductConstruction
+  generateVersion
 } from "@/api/maindata/rawMaterialRequirePlan​";
 import { values } from "lodash";
 export default {
@@ -61,7 +61,13 @@ export default {
             trigger: "change",
           },
         ],
-
+        version: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
       },
       columns: [
         {
@@ -89,6 +95,11 @@ export default {
             label:'T+2',
             value:'1'
           },],
+        },
+        {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
+          clearable: false,
         },
 
       ],
@@ -139,7 +150,17 @@ export default {
       this.form={
         ...defaultParams
       }
+      this.getVersion()
 
+    },
+    async getVersion(){
+      try{
+        let res=await generateVersion({})
+        console.log(res)
+        this.$set(this.form,'version',res.msg)
+      }catch(err){
+
+      }
     },
     hide() {
       this.$refs.form.triggerResetForm();

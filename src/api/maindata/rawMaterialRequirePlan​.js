@@ -31,3 +31,13 @@ export function removeMdmProductConstruction(query) {
     data: query
   })
 }
+export function generateVersion(query) {
+  return request({
+    url: '/maindata/rawMaterialRequirePlan/generateVersion',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}

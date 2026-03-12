@@ -163,14 +163,16 @@ export default {
                 title={this.$t("ui.data.column.workWearInfo.fixedStructure1")}
                 width="500"
                 trigger="click"
-                content={row.fixedStructure1}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.fixedStructure1
-                }</span>
+                <div domPropsInnerHTML={this.renderHtml(row.fixedStructure1)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedStructure1)}
+                ></div>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "fixedStructure2",
@@ -185,12 +187,15 @@ export default {
                 trigger="click"
                 content={row.fixedStructure2}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.fixedStructure2
-                }</span>
+                <div domPropsInnerHTML={this.renderHtml(row.fixedStructure2)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedStructure2)}
+                ></div>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "fixedStructure3",
@@ -205,12 +210,15 @@ export default {
                 trigger="click"
                 content={row.fixedStructure3}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.fixedStructure3
-                }</span>
+                <div domPropsInnerHTML={ this.renderHtml(row.fixedStructure3)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedStructure3)}
+                ></div>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "fixedMaterialCode",
@@ -225,12 +233,12 @@ export default {
                 trigger="click"
                 content={row.fixedMaterialCode}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.fixedMaterialCode
-                }</span>
+                <span slot="reference" style="cursor: pointer;">
+                  {row.fixedMaterialCode}
+                </span>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "fixedMaterialDesc",
@@ -245,12 +253,12 @@ export default {
                 trigger="click"
                 content={row.fixedMaterialDesc}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.fixedMaterialDesc
-                }</span>
+                <span slot="reference" style="cursor: pointer;">
+                  {row.fixedMaterialDesc}
+                </span>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "disableStructure",
@@ -265,12 +273,12 @@ export default {
                 trigger="click"
                 content={row.disableStructure}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.disableStructure
-                }</span>
+                <span slot="reference" style="cursor: pointer;">
+                  {row.disableStructure}
+                </span>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "disableMaterialCode",
@@ -280,17 +288,19 @@ export default {
             return (
               <el-popover
                 placement="left"
-                title={this.$t("ui.data.column.workWearInfo.disableMaterialCode")}
+                title={this.$t(
+                  "ui.data.column.workWearInfo.disableMaterialCode"
+                )}
                 width="500"
                 trigger="click"
                 content={row.disableMaterialCode}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.disableMaterialCode
-                }</span>
+                <span slot="reference" style="cursor: pointer;">
+                  {row.disableMaterialCode}
+                </span>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           prop: "disableMaterialDesc",
@@ -305,12 +315,12 @@ export default {
                 trigger="click"
                 content={row.disableMaterialDesc}
               >
-                <span slot="reference" style="cursor: pointer;">{
-                 row.disableMaterialDesc
-                }</span>
+                <span slot="reference" style="cursor: pointer;">
+                  {row.disableMaterialDesc}
+                </span>
               </el-popover>
-            )
-          }
+            );
+          },
         },
         {
           align: "center",
@@ -473,12 +483,29 @@ export default {
 
       return params;
     },
+    renderHtml(structure) {
+      return structure.replace(/[,，]/g, "<br>");
+    },
     // api
     async getList() {
       try {
         this.loading = true;
 
         const data = await listCxMachineFixed(this.formatParams());
+        // for (let i = 0; i < data.rows.length; i++) {
+        //   data.rows[i].fixedStructure1 = data.rows[i].fixedStructure1.replace(
+        //     /[,，]/g,
+        //     "</br>"
+        //   );
+        //   data.rows[i].fixedStructure2 = data.rows[i].fixedStructure2.replace(
+        //     /[,，]/g,
+        //     "</br>"
+        //   );
+        //   data.rows[i].fixedStructure3 = data.rows[i].fixedStructure3.replace(
+        //     /[,，]/g,
+        //     "</br>"
+        //   );
+        // }
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

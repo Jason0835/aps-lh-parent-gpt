@@ -143,6 +143,10 @@ export default {
           label: this.$t("ui.data.colume.month"),
         },
         {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
+        },
+        {
           prop: "materialType",
           label: this.$t("ui.data.column.trialPlan.trialType"),
           formatter: (row, column, value) => {

@@ -32,7 +32,7 @@
 import { mapState } from "vuex";
 
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
-import structureSelect from "@/views/components/structureSelect.vue";
+import structureSelect from "../components/structureSelect.vue";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
 import { editCxMachineFixed } from "@/api/monthplan/mdmCxMachineFixed";
 
@@ -139,6 +139,7 @@ export default {
                 key={form.fixedStructure1}
                 multiple={true}
                 v-model={form.fixedStructure1}
+                oldList={form.fixedStructure1}
               />
             );
           },
@@ -153,6 +154,7 @@ export default {
                 key={form.fixedStructure2}
                 multiple={true}
                 v-model={form.fixedStructure2}
+                oldList={form.fixedStructure2}
               />
             );
           },
@@ -168,6 +170,7 @@ export default {
                 key={form.fixedStructure3}
                 multiple={true}
                 v-model={form.fixedStructure3}
+                oldList={form.fixedStructure3}
               />
             );
           },
@@ -196,6 +199,7 @@ export default {
                 key={form.disableStructure}
                 multiple={true}
                 v-model={form.disableStructure}
+                oldList={form.disableStructure}
               />
             );
           },

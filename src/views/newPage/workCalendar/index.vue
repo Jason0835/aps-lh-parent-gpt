@@ -47,6 +47,12 @@
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
+        <!-- <el-button
+          type="primary"
+          plain
+          @click="handleBuild"
+          >{{ $t("ui.params.copy") }}
+        </el-button> -->
       </div>
     </div>
     <div style="display: flex; flex-direction: row">
@@ -61,7 +67,9 @@
         <FullCalendar :options="calendarOptions" ref="fullCalendar">
           <template v-slot:eventContent="arg">
             <div style="display: flex; flex-direction: column; width: 100%">
-              <div style="text-align: right;color: #cf1322;font-size: 16px;">{{arg.event.extendedProps.holidayNames}}</div>
+              <div style="text-align: right; color: #cf1322; font-size: 16px">
+                {{ arg.event.extendedProps.holidayNames }}
+              </div>
 
               <div
                 class="cus-event"
@@ -69,6 +77,7 @@
                 @click="changeDayFlag(arg.event.extendedProps)"
                 :style="{
                   background:
+                  isFutureDate(arg.event.extendedProps.calendarTime)? ' #f5f5f5 ':
                     arg.event.extendedProps.dayFlag == 0
                       ? '#ffebee'
                       : '#e3f2fd',
@@ -91,6 +100,7 @@
                   "
                   :style="{
                     background:
+                    isFutureDate(arg.event.extendedProps.calendarTime)? ' #f5f5f5 ':
                       arg.event.extendedProps.oneShiftFlag == 0
                         ? '#ffebee'
                         : '#e3f2fd',
@@ -99,6 +109,7 @@
                   <span
                     :style="{
                       color:
+                      isFutureDate(arg.event.extendedProps.calendarTime)? ' #999 ':
                         arg.event.extendedProps.oneShiftFlag == 0
                           ? '#c62828'
                           : '#1565c0',
@@ -119,6 +130,7 @@
                   "
                   :style="{
                     background:
+                    isFutureDate(arg.event.extendedProps.calendarTime)? ' #f5f5f5 ':
                       arg.event.extendedProps.twoShiftFlag == 0
                         ? '#ffebee'
                         : '#e3f2fd',
@@ -127,6 +139,7 @@
                   <span
                     :style="{
                       color:
+                      isFutureDate(arg.event.extendedProps.calendarTime)? ' #999 ':
                         arg.event.extendedProps.twoShiftFlag == 0
                           ? '#c62828'
                           : '#1565c0',
@@ -152,6 +165,7 @@
                   "
                   :style="{
                     background:
+                    isFutureDate(arg.event.extendedProps.calendarTime)? ' #f5f5f5 ':
                       arg.event.extendedProps.threeShiftFlag == 0
                         ? '#ffebee'
                         : '#e3f2fd',
@@ -160,6 +174,7 @@
                   <span
                     :style="{
                       color:
+                      isFutureDate(arg.event.extendedProps.calendarTime)? ' #999 ':
                         arg.event.extendedProps.threeShiftFlag == 0
                           ? '#c62828'
                           : '#1565c0',
@@ -215,7 +230,8 @@
         >
       </template>
     </el-dialog>
-     <tlt-upload
+    <copyDialog ref="copyRef" @success="getList" />
+    <tlt-upload
       ref="tltUpload"
       downloadUrl="/maindata/mdmWorkCalendar/importTemplate"
       uploadUrl="/maindata/mdmWorkCalendar/importData"
@@ -231,6 +247,8 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 //utils
 import { downloadLink } from "@/utils/request";
+import copyDialog from "./components/copyDialog.vue";
+
 //interface
 import {
   mdmWorkCalendar,
@@ -249,6 +267,7 @@ export default {
     tltUpload,
     infoDialog,
     FullCalendar,
+    copyDialog
   },
   dicts: [
     "biz_factory_name",
@@ -316,6 +335,20 @@ export default {
   },
   computed: {},
   methods: {
+    handleBuild() {
+      if (this.$refs.copyRef) {
+        this.$refs.copyRef.show();
+      }
+    },
+    //比较当前日期
+    isFutureDate(dateStr) {
+      // 获取今天的日期字符串 YYYY-MM-DD
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0]; // 格式：2024-01-15
+
+      // 直接比较字符串（YYYY-MM-DD 格式可以直接比较）
+      return dateStr < todayStr;
+    },
     initYearRange() {
       const currentYear = new Date().getFullYear();
       // for (let i = currentYear - 1; i <= currentYear + 1; i++) {
@@ -348,6 +381,7 @@ export default {
       this.getList();
     },
     changeShiftFlag(info, type) {
+      if(this.isFutureDate(info.calendarTime)) return;
       if (!this.hasPermission("maindata:mdmWorkCalendar:edit")) {
         return; // 直接返回，不执行后续逻辑
       }
@@ -397,6 +431,8 @@ export default {
       this.visible = false;
     },
     changeDayFlag(info) {
+      if(this.isFutureDate(info.calendarTime)) return;
+
       if (!this.hasPermission("maindata:mdmWorkCalendar:edit")) {
         return; // 直接返回，不执行后续逻辑
       }
@@ -420,6 +456,7 @@ export default {
       });
     },
     showModal(info) {
+      if(this.isFutureDate(info.calendarTime)) return;
       if (!this.hasPermission("maindata:mdmWorkCalendar:edit")) {
         return; // 直接返回，不执行后续逻辑
       }
@@ -452,6 +489,19 @@ export default {
       }
     },
     handleDateClick(info) {
+      const clickedDate = info.date; // JS Date 对象
+      const today = new Date();
+
+      // 重置时间部分，只比较日期
+      today.setHours(0, 0, 0, 0);
+      clickedDate.setHours(0, 0, 0, 0);
+
+      if (clickedDate < today) {
+        return false; // 阻止默认行为
+      }
+
+      // 如果是今天或之后，执行你的操作
+      console.log("可以操作：", info.dateStr);
       if (this.search.procCode != 1) {
         return;
       }
@@ -520,7 +570,6 @@ export default {
     async getCodeList() {
       try {
         let res = await selectProcCodeList();
-        console.log(res);
         this.selectList = res;
         this.search.procCode = res[0].dictValue;
         this.getList();

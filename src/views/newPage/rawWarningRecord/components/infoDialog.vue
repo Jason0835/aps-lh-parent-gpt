@@ -108,7 +108,7 @@ export default {
       moldingMachines: (state) => state.molding.machines,
     }),
     title: function () {
-      return this.isType=='week'
+      return this.isType == "week"
         ? this.$t("ui.data.rawWarningRecord.executeUsageWarning")
         : this.$t("ui.data.rawWarningRecord.executeNewMaterialWarning");
     },
@@ -130,17 +130,32 @@ export default {
           clearable: false,
         },
       ];
-      if(this.isType=='week'){
-        columnsDate.push(
-          {
-            prop: "week",
-            label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
-            type: "number",
-            min: 1,
-            max: 4,
-          },
+      let column = [
+        {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
 
-        );
+        {
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
+        },
+        {
+          prop: "week",
+          label: this.$t("ui.data.column.rawMaterial.relatedWeek"),
+          type: "number",
+          min: 1,
+          max: 4,
+        },
+      ];
+      if (this.isType == "week") {
+        return column;
       }
       return columnsDate;
     },
@@ -174,12 +189,21 @@ export default {
     show(data) {
       this.visible = true;
       const now = new Date();
-    const year = now.getFullYear(); // 2024
-    const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
-      this.form = {
+      const year = now.getFullYear(); // 2024
+      const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
+      if(data=='week'){
+        this.form = {
+        factoryCode: "116",
+        yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
+        week:''
+      };
+      }else{
+        this.form = {
         factoryCode: "116",
         yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       };
+      }
+
       this.isType = data;
     },
     hide() {

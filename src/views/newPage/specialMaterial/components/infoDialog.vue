@@ -128,7 +128,7 @@ export default {
         },
         {
           prop: "materialDesc",
-          label: this.$t("common.name"),
+          label: this.$t("物料名称"),
           maxlength:100
         },
         {
