@@ -299,6 +299,8 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
     @Override
     public void workCalendarNotice() {
         // 接收人自行维护
-        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "");
+        int year = DateUtils.getYear(new Date());
+        int month = DateUtils.getMonth(new Date());
+        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "", year, month + 1);
     }
 }

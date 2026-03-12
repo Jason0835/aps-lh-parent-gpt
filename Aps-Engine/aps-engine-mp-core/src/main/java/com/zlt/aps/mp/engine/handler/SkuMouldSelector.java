@@ -138,6 +138,43 @@ public class SkuMouldSelector {
     }
 
     /**
+     * 判断Sku是否还有模具产能，以使用模具数>=双模
+     *
+     * @param context      排产上下文
+     * @param materialDesc Sku
+     * @return
+     */
+    public static boolean hasMouldCapacity(Context context, String materialDesc) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        if (StringUtils.isBlank(materialDesc)) {
+            return false;
+        }
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
+        if (CollectionUtils.isEmpty(skuRelationList)) {
+            return false;
+        }
+        List<ProductionMouldInfoVo> enableMouldList = new ArrayList<>();
+        skuRelationList.forEach(singleMould -> {
+            ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(singleMould.getMouldCode());
+            if (null == mouldInfo) {
+                return;
+            }
+            if (!mouldInfo.hasCapacity()) {
+                return;
+            }
+            enableMouldList.add(mouldInfo);
+        });
+        if (CollectionUtils.isEmpty(enableMouldList)) {
+            return false;
+        }
+        if (enableMouldList.size() >= ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * 根据模具关系，获取在startDay~endDay有效排产的模具信息
      *
      * @param baseDataContainer 基础数据配置容器
@@ -176,8 +213,8 @@ public class SkuMouldSelector {
         //优先挑选已经排产模具
         List<ProductionMouldInfoVo> hasProductSkuList = new ArrayList<>();
         effectiveList.forEach(singleMould -> {
-            if(CollectionUtils.isEmpty(singleMould.getDayProductionInfo())){
-                return ;
+            if (CollectionUtils.isEmpty(singleMould.getDayProductionInfo())) {
+                return;
             }
             List<CxMouldDayProductionHelper> dayProductionList = singleMould.getDayProductionInfo().get(startDay);
             if (CollectionUtils.isEmpty(dayProductionList)) {
@@ -371,7 +408,7 @@ public class SkuMouldSelector {
         }
         Map<Integer, List<ProductionMouldInfoVo>> startDayGroup = new HashMap<>();
         mouldList.forEach(singleMould -> {
-            if(CollectionUtils.isEmpty(singleMould.getDayProductionInfo())){
+            if (CollectionUtils.isEmpty(singleMould.getDayProductionInfo())) {
                 addGroup(startDayGroup, Integer.MAX_VALUE, singleMould);
                 return;
             }
@@ -383,7 +420,7 @@ public class SkuMouldSelector {
             Integer sumProductionQty = dayProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
             addGroup(startDayGroup, sumProductionQty, singleMould);
         });
-        if(CollectionUtils.isEmpty(startDayGroup)){
+        if (CollectionUtils.isEmpty(startDayGroup)) {
             return Collections.emptyList();
         }
         Map<Integer, List<ProductionMouldInfoVo>> doubleMouldMap = new HashMap<>();

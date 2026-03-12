@@ -1,7 +1,6 @@
 package com.zlt.aps.mp.engine.utils;
 
 import com.alibaba.fastjson.JSONObject;
-import com.zlt.aps.common.core.constant.I18nConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
@@ -33,7 +32,7 @@ public class NoProductionReasonUtils {
         String i18nKey = noProductionReason.getI18nKey();
         String errorCode = noProductionReason.getErrorCode();
         List<Object> newParams = new ArrayList<>();
-        newParams.add(errorCode);
+        //去除错误码 newParams.add(errorCode);
         if (null != params) {
             for (Object param : params) {
                 newParams.add(param);
@@ -46,18 +45,19 @@ public class NoProductionReasonUtils {
      * 根据限制类型，组装复杂的不排产原因
      * 因%s不排 或是 因%s部分未排
      *
-     * @param noProductionReason 不排产原因 因%s不排 或是 因%s部分未排
-     * @param limitTypeList      限制类型
+     * @param noProductionReason        不排产原因 因%s不排 或是 因%s部分未排
+     * @param limitTypeList             限制类型
+     * @param defaultNoProductionReason 默认原因
      * @return
      */
-    public static String getNoProductionReasonByLimit(MonthPlanNoProductionReasonEnum noProductionReason, List<MouldProductionLimitTypeEnum> limitTypeList) {
+    public static String getNoProductionReasonByLimit(MonthPlanNoProductionReasonEnum noProductionReason, List<MouldProductionLimitTypeEnum> limitTypeList, MonthPlanNoProductionReasonEnum defaultNoProductionReason) {
         List<String> languageList = JsonUtils.getLanguageList();
         String noProductionReasonI18nKey = noProductionReason.getI18nKey();
         String errorCode = noProductionReason.getErrorCode();
         JSONObject noProductionReasonInfo = JsonUtils.getLanguageJsonObject(noProductionReasonI18nKey);
         if (CollectionUtils.isEmpty(limitTypeList)) {
             //成型或是模具产能不足
-            String i18nKey = MonthPlanNoProductionReasonEnum.NO_ENOUGH_PRODUCTION_CAPACITY.getI18nKey();
+            String i18nKey = defaultNoProductionReason.getI18nKey();
             JSONObject i18nInfo = JsonUtils.getLanguageJsonObject(i18nKey);
             fullText(noProductionReasonInfo, errorCode, i18nInfo, languageList);
             return noProductionReasonInfo.toString();
@@ -94,7 +94,7 @@ public class NoProductionReasonUtils {
             if (null == fullInfoText) {
                 fullInfoText = "";
             }
-            noProductionReasonInfo.put(language, String.format(infoFormat, errorCode, fullInfoText));
+            noProductionReasonInfo.put(language, String.format(infoFormat, fullInfoText));
         });
     }
 

@@ -222,7 +222,7 @@ public class GroupPlanBeforeConclusionHandler {
         if (realAllocationDayBeforeConclusion < minAllocationDays) {
             if (!hasOtherProductionCxMachine(productionContext, groupPlanInfo, cxMachineInfo, allocationInfo)) {
                 //分组计划不排产-单台
-                groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, minAllocationDays);
+                groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, realAllocationDayBeforeConclusion, minAllocationDays);
             }
             //更新提前收尾信息
             updateBeforeConclusionForAllocation(beforeConclusionInfo, cxMachineInfo, allocationInfo);

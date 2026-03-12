@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.autoLogin.loginUtils.annotation.AutoLoginLog;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmHoliday;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -267,8 +268,9 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     /**
      * 发送通知计划员维护日历
      */
+    @AutoLoginLog
     @ApiOperation("发送通知计划员维护日历")
-    @PostMapping("//workCalendarNotice")
+    @PostMapping("/workCalendarNotice")
     public void workCalendarNotice() {
         mdmWorkCalendarService.workCalendarNotice();
     }
