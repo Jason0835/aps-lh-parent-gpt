@@ -246,6 +246,50 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         return AjaxResult.success();
     }
 
+    /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult checkBeforeCopy(MdmWorkCalendar entity) {
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("work_calendar_proc");
+        Map<String, String> dictMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(dictDataList)) {
+            dictMap = dictDataList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        }
+        String sourceFactoryCode = entity.getSourceFactoryCode();
+        Integer sourceYear = entity.getSourceYear();
+        Integer sourceMonth = entity.getSourceMonth();
+        String sourceProcCode = entity.getSourceProcCode();
+        String targetFactoryCode = entity.getTargetFactoryCode();
+        Integer targetYear = entity.getTargetYear();
+        Integer targetMonth = entity.getTargetMonth();
+        String targetProcCode = entity.getTargetProcCode();
+        if (sourceFactoryCode.equals(targetFactoryCode) && sourceYear.equals(targetYear) && sourceMonth.equals(targetMonth) && sourceProcCode.equals(targetProcCode)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.sourceAndTargetEqual"), ApsConstant.APS_YES_NO_0);
+        }
+        List<MdmWorkCalendar> sourceList = selectByFactoryAndYearMonth(sourceFactoryCode, sourceYear, sourceMonth, sourceProcCode);
+        if (CollectionUtils.isEmpty(sourceList)) {
+            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.sourceNotExist"), dictMap.get(sourceProcCode), sourceYear, sourceMonth), ApsConstant.APS_YES_NO_0);
+        }
+        List<MdmWorkCalendar> targetList = selectByFactoryAndYearMonth(targetFactoryCode, targetYear, targetMonth, targetProcCode);
+        if (CollectionUtils.isNotEmpty(targetList)) {
+            return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.targetExists"), dictMap.get(targetProcCode), targetYear, targetMonth), ApsConstant.APS_YES_NO_1);
+        }
+        return AjaxResult.success(ApsConstant.APS_YES_NO_1);
+    }
+
+    private List<MdmWorkCalendar> selectByFactoryAndYearMonth(String factoryCode, Integer year, Integer month, String procCode) {
+        LambdaQueryWrapper<MdmWorkCalendar> sourceWrapper = new LambdaQueryWrapper<>();
+        sourceWrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                .eq(MdmWorkCalendar::getYear, year)
+                .eq(MdmWorkCalendar::getMonth, month)
+                .eq(MdmWorkCalendar::getProcCode, procCode);
+        return entityMapper.selectList(sourceWrapper);
+    }
+
     @Autowired
     private MessageServiceUtils messageService;
 

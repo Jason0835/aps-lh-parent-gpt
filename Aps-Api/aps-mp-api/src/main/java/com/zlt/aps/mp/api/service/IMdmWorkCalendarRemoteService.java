@@ -109,6 +109,16 @@ public interface IMdmWorkCalendarRemoteService {
     AjaxResult copyWorkCalendar(@RequestBody MdmWorkCalendar entity);
 
     /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("复制前校验")
+    @PostMapping({"/mdmWorkCalendar/checkBeforeCopy"})
+    public AjaxResult checkBeforeCopy(@RequestBody MdmWorkCalendar entity);
+
+    /**
      * 发送通知计划员维护日历
      */
     @ApiOperation("发送通知计划员维护日历")

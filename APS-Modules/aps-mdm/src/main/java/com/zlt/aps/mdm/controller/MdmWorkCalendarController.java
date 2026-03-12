@@ -253,6 +253,18 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     }
 
     /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("复制前校验")
+    @PostMapping("/checkBeforeCopy")
+    public AjaxResult checkBeforeCopy(@RequestBody MdmWorkCalendar entity) {
+        return mdmWorkCalendarService.checkBeforeCopy(entity);
+    }
+
+    /**
      * 发送通知计划员维护日历
      */
     @ApiOperation("发送通知计划员维护日历")
