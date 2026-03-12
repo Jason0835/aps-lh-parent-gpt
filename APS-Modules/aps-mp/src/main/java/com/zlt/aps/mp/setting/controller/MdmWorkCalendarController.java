@@ -239,4 +239,37 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     public AjaxResult genAnnualPlan(@RequestBody MdmWorkCalendar entity) {
         return mdmWorkCalendarService.genAnnualPlan(entity);
     }
+
+    /**
+     * 复制工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @ApiOperation("复制工作日历")
+    @PostMapping("/copyWorkCalendar")
+    public AjaxResult copyWorkCalendar(@RequestBody MdmWorkCalendar entity) {
+        return mdmWorkCalendarService.copyWorkCalendar(entity);
+    }
+
+    /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("复制前校验")
+    @PostMapping("/checkBeforeCopy")
+    public AjaxResult checkBeforeCopy(@RequestBody MdmWorkCalendar entity) {
+        return mdmWorkCalendarService.checkBeforeCopy(entity);
+    }
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @ApiOperation("发送通知计划员维护日历")
+    @PostMapping("//workCalendarNotice")
+    public void workCalendarNotice() {
+        mdmWorkCalendarService.workCalendarNotice();
+    }
 }
