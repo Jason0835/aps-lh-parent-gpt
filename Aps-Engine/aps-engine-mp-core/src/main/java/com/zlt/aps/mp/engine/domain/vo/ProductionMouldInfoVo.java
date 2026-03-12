@@ -1,11 +1,7 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
-import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
-import com.zlt.aps.mp.engine.domain.dto.GroupPlanDayProductionInfoHelper;
-import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.enums.MouldRelationTypeEnum;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import lombok.Data;
@@ -15,8 +11,6 @@ import org.springframework.util.CollectionUtils;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 排产模具信息对象
@@ -98,65 +92,25 @@ public class ProductionMouldInfoVo implements Serializable {
     }
 
     /**
-     * 模具增加排产信息
+     * 是否还有产能
      *
-     * @param day                  排产日
-     * @param productionPlanInfo   分组计划信息对象
-     * @param cxLhProductionHelper 硫化分组
-     * @param isFinishDay          天是否排产完毕(包含正常排产完成，因换模或是换活字块导致的完成)
-     * @param realDayProductionQty 双模实际排产量
-     * @param dayLhQty             双模日硫化量(产能)
-     * @param cxMachineCode        成型机台
-     * @param continueSkuPlanList  排产计划集合
+     * @return
      */
-    @Deprecated
-    public void addProductionInfo(Integer day, ProductionPlanGroupInfo productionPlanInfo, CxLhProductionHelper cxLhProductionHelper, boolean isFinishDay, Integer realDayProductionQty, Integer dayLhQty, String cxMachineCode, List<MonthPlanProductionRequirePlanVo> continueSkuPlanList) {
-        //加入已经排产完毕
-        if (isFinishDay) {
-            finishDaySet.add(day);
+    public boolean hasCapacity() {
+        if (CollectionUtils.isEmpty(productionDaySet)) {
+            return false;
         }
-        if (CollectionUtils.isEmpty(continueSkuPlanList)) {
-            return;
+        if (CollectionUtils.isEmpty(finishDaySet)) {
+            return true;
         }
-        List<MonthPlanProductionRequirePlanVo> hasProductionList = continueSkuPlanList.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(hasProductionList)) {
-            return;
-        }
-        //todo 怎么分配
-        Map<Long, MonthPlanProductionRequirePlanVo> needDeductionMap = hasProductionList.stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity()));
-        Map<Long, Integer> realDeductionMap = new HashMap<>();
-        //先高优先级，再其他净需求
-        List<MonthPlanProductionRequirePlanVo> heightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getHeightProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
-        realDayProductionQty = deductionHeightProductionQty(heightPlanList, realDeductionMap, realDayProductionQty);
-        if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
-            //增加模具排产信息
-            realDeductionMap.forEach((monthPlanId, productionQty) -> {
-                MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
-                CxMouldDayProductionHelper mouldProductionHelper = CxMouldDayProductionHelper.createCxMouldDayProductionInfo(groupPlan, cxMachineCode, day, productionQty, cxLhProductionHelper);
-                mouldProductionHelper.setMouldCode(mouldCode);
-                addDayProductionInfo(day, mouldProductionHelper);
-                //日排产信息
-                GroupPlanDayProductionInfoHelper helper = GroupPlanDayProductionInfoHelper.buildDayProductionInfo(groupPlan, cxLhProductionHelper, productionQty, BigDecimal.ZERO.intValue(), null);
-                productionPlanInfo.addDayProductionInfo(helper);
-            });
-            return;
-        }
-        //再其它净需求
-        List<MonthPlanProductionRequirePlanVo> noHeightPlanList = hasProductionList.stream().filter(groupPlan -> groupPlan.getProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
-        deductionNoHeightQty(noHeightPlanList, realDeductionMap, realDayProductionQty);
-        //增加模具排产信息
-        realDeductionMap.forEach((monthPlanId, productionQty) -> {
-            MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
-            CxMouldDayProductionHelper mouldProductionHelper = CxMouldDayProductionHelper.createCxMouldDayProductionInfo(groupPlan, cxMachineCode, day, productionQty, cxLhProductionHelper);
-            mouldProductionHelper.setMouldCode(mouldCode);
-            addDayProductionInfo(day, mouldProductionHelper);
+        Set<Integer> hasLeftOverDaySet = new HashSet<>();
+        productionDaySet.forEach(productionDay -> {
+            if (finishDaySet.contains(productionDay)) {
+                return;
+            }
+            hasLeftOverDaySet.add(productionDay);
         });
-        //增加日排产信息
-        realDeductionMap.forEach((monthPlanId, productionQty) -> {
-            MonthPlanProductionRequirePlanVo groupPlan = needDeductionMap.get(monthPlanId);
-            GroupPlanDayProductionInfoHelper helper = GroupPlanDayProductionInfoHelper.buildDayProductionInfo(groupPlan, cxLhProductionHelper, productionQty, BigDecimal.ZERO.intValue(), null);
-            productionPlanInfo.addDayProductionInfo(helper);
-        });
+        return !CollectionUtils.isEmpty(hasLeftOverDaySet);
     }
 
     /**
@@ -179,45 +133,6 @@ public class ProductionMouldInfoVo implements Serializable {
     }
 
     /**
-     * 扣减高优先级待排产量
-     *
-     * @param heightPlanList
-     * @param realDeductionMap
-     * @param realDayProductionQty
-     * @return
-     */
-    private Integer deductionHeightProductionQty(List<MonthPlanProductionRequirePlanVo> heightPlanList, Map<Long, Integer> realDeductionMap, Integer realDayProductionQty) {
-        if (CollectionUtils.isEmpty(heightPlanList)) {
-            return realDayProductionQty;
-        }
-        //高优先级量降序排序
-        heightPlanList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightProductionQty, Comparator.reverseOrder()));
-        for (MonthPlanProductionRequirePlanVo productionPlan : heightPlanList) {
-            if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
-                break;
-            }
-            Long monthPlanId = productionPlan.getMonthPlanId();
-            Integer heightProductionQty = productionPlan.getHeightProductionQty();
-            if (heightProductionQty <= BigDecimal.ZERO.intValue()) {
-                continue;
-            }
-            Integer realDeductionQty = Math.min(heightProductionQty, realDayProductionQty);
-            if (realDeductionQty > BigDecimal.ZERO.longValue()) {
-                //扣减计划需求量，并汇总计划总扣减量
-                deductionHeightProductionQty(productionPlan, realDeductionQty);
-                Integer sumDeductionQty = realDeductionMap.get(monthPlanId);
-                if (null == sumDeductionQty) {
-                    sumDeductionQty = BigDecimal.ZERO.intValue();
-                }
-                sumDeductionQty = sumDeductionQty + realDeductionQty;
-                realDeductionMap.put(monthPlanId, sumDeductionQty);
-            }
-            realDayProductionQty = realDayProductionQty - realDeductionQty;
-        }
-        return realDayProductionQty;
-    }
-
-    /**
      * 增加模具排产信息
      *
      * @param day                   排产天
@@ -236,83 +151,6 @@ public class ProductionMouldInfoVo implements Serializable {
             dayProductionInfo.put(day, dayProductionList);
         }
         dayProductionList.add(mouldProductionHelper);
-    }
-
-    /**
-     * 扣减非高优先级净需求
-     *
-     * @param noHeightPlanList     非高优先级需求计划
-     * @param realDeductionMap     计划总扣减量
-     * @param realDayProductionQty 需扣减量
-     * @return
-     */
-    private Integer deductionNoHeightQty(List<MonthPlanProductionRequirePlanVo> noHeightPlanList, Map<Long, Integer> realDeductionMap, Integer realDayProductionQty) {
-        if (realDayProductionQty <= BigDecimal.ZERO.longValue()) {
-            return realDayProductionQty;
-        }
-        if (CollectionUtils.isEmpty(noHeightPlanList)) {
-            return realDayProductionQty;
-        }
-        //非高优先级量降序排序
-        noHeightPlanList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getProductionQty, Comparator.reverseOrder()));
-        for (MonthPlanProductionRequirePlanVo productionPlan : noHeightPlanList) {
-            if (realDayProductionQty <= BigDecimal.ZERO.intValue()) {
-                break;
-            }
-            Long monthPlanId = productionPlan.getMonthPlanId();
-            Integer noHeightProductionQty = productionPlan.getProductionQty();
-            if (noHeightProductionQty <= BigDecimal.ZERO.intValue()) {
-                continue;
-            }
-            Integer realDeductionQty = Math.min(noHeightProductionQty, realDayProductionQty);
-            if (realDeductionQty > BigDecimal.ZERO.intValue()) {
-                //扣减计划需求量，并汇总计划总扣减量
-                deductionNoHeightProductionQty(productionPlan, realDeductionQty);
-                Integer sumDeductionQty = realDeductionMap.get(monthPlanId);
-                if (null == sumDeductionQty) {
-                    sumDeductionQty = BigDecimal.ZERO.intValue();
-                }
-                sumDeductionQty = sumDeductionQty + realDeductionQty;
-                realDeductionMap.put(monthPlanId, sumDeductionQty);
-            }
-            realDayProductionQty = realDayProductionQty - realDeductionQty;
-        }
-        return realDayProductionQty;
-    }
-
-    /**
-     * 扣减高优先级量
-     * 扣减高优先级需要同时扣减总需排产量
-     *
-     * @param productionPlan   计划
-     * @param dayProductionQty 真实日排产量
-     */
-    private void deductionHeightProductionQty(MonthPlanProductionRequirePlanVo productionPlan, Integer dayProductionQty) {
-        Integer heightProductionQty = productionPlan.getHeightProductionQty();
-        Integer productionQty = productionPlan.getProductionQty();
-        heightProductionQty = heightProductionQty - dayProductionQty;
-        productionQty = productionQty - dayProductionQty;
-        productionPlan.setHeightProductionQty(heightProductionQty);
-        productionPlan.setProductionQty(productionQty);
-        if (productionQty <= BigDecimal.ZERO.intValue()) {
-            productionPlan.setProductionFlag(YesOrNoEnum.NO.getCode());
-        }
-    }
-
-    /**
-     * 扣减非高优先级净需求量
-     * 只扣减总需求量的值
-     *
-     * @param productionPlan   计划
-     * @param dayProductionQty 真实日排产量
-     */
-    private void deductionNoHeightProductionQty(MonthPlanProductionRequirePlanVo productionPlan, Integer dayProductionQty) {
-        Integer productionQty = productionPlan.getProductionQty();
-        productionQty = productionQty - dayProductionQty;
-        productionPlan.setProductionQty(productionQty);
-        if (productionQty <= BigDecimal.ZERO.intValue()) {
-            productionPlan.setProductionFlag(YesOrNoEnum.NO.getCode());
-        }
     }
 
     /**

@@ -373,10 +373,10 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return;
         }
+        String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, theoryDays, minProductionDays);
         theoryDays = BigDecimal.ZERO.intValue();
         leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
         needCxCapacityMachineCount = BigDecimal.ZERO;
-        String noReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MIN_CX_CAPACITY_WHOLE_STRUCTURE_NAME, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(noReachMinProductionDaysReason));
     }
 
@@ -394,12 +394,15 @@ public class ProductionPlanGroupInfo {
     /**
      * 更新设置整个分组计划不排产
      * 因提前收尾导致不满足最低排产天数
+     * @param minLhMachineCount 最低硫化机台数
+     * @param realAllocationDayBeforeConclusion 高于最低硫化机台数的天数
+     * @param minProductionDays 最低上机天数
      */
-    public void setNoProductionLowMinLhMachineNoReachMinProductionDays(Integer minLhMachineCount, Integer minProductionDays) {
+    public void setNoProductionLowMinLhMachineNoReachMinProductionDays(Integer minLhMachineCount, Integer realAllocationDayBeforeConclusion, Integer minProductionDays) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return;
         }
-        String lowMinLhMachineNoReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME, minLhMachineCount, minProductionDays);
+        String lowMinLhMachineNoReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME, realAllocationDayBeforeConclusion, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(lowMinLhMachineNoReachMinProductionDaysReason));
     }
 
