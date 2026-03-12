@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
@@ -93,6 +94,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             queryCondition.getFactoryCode(),
             queryCondition.getYear(),
             queryCondition.getMonth(),
+            ProductionPlanType.NORMAL.getPlanType(),
             YesOrNoEnum.NO.getValue()
         );
     }
