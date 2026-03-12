@@ -149,7 +149,7 @@ public class MdmWorkCalendar extends BaseEntity {
     /**
      * 目标工序
      */
-    @ApiModelProperty(value = "目标工序", name = "sourceProcCode")
+    @ApiModelProperty(value = "目标工序", name = "targetProcCode")
     @TableField(exist = false)
     private String targetProcCode;
 
