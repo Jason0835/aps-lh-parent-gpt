@@ -64,7 +64,7 @@ public class MdmCxMachineFixedController extends AbstractDocBizController<MdmCxM
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "cx_machine_code asc";
     }
 
     /**

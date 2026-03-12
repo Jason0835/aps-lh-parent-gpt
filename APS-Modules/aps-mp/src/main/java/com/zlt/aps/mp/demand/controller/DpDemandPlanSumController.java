@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.api.domain.vo.DpDemandPlanSumStatisticsVo;
@@ -219,6 +220,13 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliveryDateDue")), "DELIVERY_DATE_DUE", queryVO.getFieldValueByFieldName("deliveryDateDue"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isImport")), "IS_IMPORT", queryVO.getFieldValueByFieldName("isImport"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureType")), "STRUCTURE_TYPE", queryVO.getFieldValueByFieldName("structureType"));
+
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType")), "PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
+        if(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("planType"))) {
+            queryWrapper.eq("PLAN_TYPE", queryVO.getFieldValueByFieldName("planType"));
+        }else{
+            queryWrapper.eq("PLAN_TYPE", ProductionPlanType.NORMAL.getPlanType());
+        }
         if (!YesOrNoEnum.YES.getValue().equals(queryVO.getFieldValueByFieldName("viewFlag"))) {
             // 库存、净需求（含暂缓订单）、月度余量，都为0，默认隐藏
             queryWrapper.nested(wq -> wq
