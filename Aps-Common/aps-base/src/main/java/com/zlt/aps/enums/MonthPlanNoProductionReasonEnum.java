@@ -236,9 +236,13 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     GROUP_MAIN_PATTERN_ERROR("MP3716", "构建结构、主花纹的模具信息失败", "alg.data.before.production.groupMainPatternError"),
     /**
-     * MP3798 成型或是模具产能不足
+     * MP3798-1 成型产能受限
      */
-    NO_ENOUGH_PRODUCTION_CAPACITY("MP3798","成型或是模具产能不足","alg.data.mouldProduction.NoEnoughProductionCapacity"),
+    NO_ENOUGH_CX_MACHINE_CAPACITY("MP3798-1","成型产能受限","alg.data.mouldProduction.noEnoughCxMachineCapacity"),
+    /**
+     * MP3798-2 模具产能受限
+     */
+    NO_ENOUGH_MOULD_CAPACITY("MP3798-2","模具产能受限","alg.data.mouldProduction.noEnoughMouldCapacity"),
     /**
      * MP3799 因%s不排
      */

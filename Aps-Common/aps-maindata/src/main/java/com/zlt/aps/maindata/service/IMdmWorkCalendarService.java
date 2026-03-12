@@ -38,4 +38,25 @@ public interface IMdmWorkCalendarService extends IDocService<MdmWorkCalendar> {
      * @return 结果
      */
     AjaxResult genAnnualPlan(MdmWorkCalendar entity);
+
+    /**
+     * 复制工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    AjaxResult copyWorkCalendar(MdmWorkCalendar entity);
+
+    /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    AjaxResult checkBeforeCopy(MdmWorkCalendar entity);
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    void workCalendarNotice();
 }

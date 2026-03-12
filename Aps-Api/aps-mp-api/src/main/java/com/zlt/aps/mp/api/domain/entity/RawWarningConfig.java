@@ -79,7 +79,7 @@ public class RawWarningConfig extends BaseEntity {
     @Excel(name = "是否启用", dictType = "sys_yes_no")
     @ApiModelProperty(value = "是否启用", name = "enabled")
     @TableField(value = "ENABLED")
-    private Integer enabled;
+    private String enabled;
 
     /**
      * 预警级别：1-低 2-中 3-高

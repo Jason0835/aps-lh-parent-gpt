@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.autoLogin.loginUtils.annotation.AutoLoginLog;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmHoliday;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -250,5 +251,27 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     @PostMapping("/copyWorkCalendar")
     public AjaxResult copyWorkCalendar(@RequestBody MdmWorkCalendar entity) {
         return mdmWorkCalendarService.copyWorkCalendar(entity);
+    }
+
+    /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @ApiOperation("复制前校验")
+    @PostMapping("/checkBeforeCopy")
+    public AjaxResult checkBeforeCopy(@RequestBody MdmWorkCalendar entity) {
+        return mdmWorkCalendarService.checkBeforeCopy(entity);
+    }
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @AutoLoginLog
+    @ApiOperation("发送通知计划员维护日历")
+    @PostMapping("/workCalendarNotice")
+    public void workCalendarNotice() {
+        mdmWorkCalendarService.workCalendarNotice();
     }
 }

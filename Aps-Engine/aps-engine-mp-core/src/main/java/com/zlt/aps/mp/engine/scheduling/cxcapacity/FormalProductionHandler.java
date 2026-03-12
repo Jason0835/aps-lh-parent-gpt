@@ -7,9 +7,10 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.engine.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
+import com.zlt.aps.mp.engine.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
 import lombok.RequiredArgsConstructor;
@@ -87,6 +88,9 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     /**
      * 设置没有分配产能导致整个结构不排的未排原因
+     *
+     * @param productionContext
+     * @param allGroupPlanInfo
      */
     private void setNoConfigurationCapacityReasonByGroup(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
         String noAllocationCxMachineCapacity = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_CX_MACHINE, "");
@@ -137,13 +141,20 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 if (diffValue <= BigDecimal.ZERO.intValue()) {
                     return;
                 }
+                boolean hasMouldCapacity = SkuMouldSelector.hasMouldCapacity(productionContext, singlePlan.getMaterialDesc());
+                MonthPlanNoProductionReasonEnum defaultReason;
+                if (hasMouldCapacity) {
+                    defaultReason = MonthPlanNoProductionReasonEnum.NO_ENOUGH_CX_MACHINE_CAPACITY;
+                } else {
+                    defaultReason = MonthPlanNoProductionReasonEnum.NO_ENOUGH_MOULD_CAPACITY;
+                }
                 List<MouldProductionLimitTypeEnum> limitInfoList = skuProductionLimitInfo.get(singlePlan.getMaterialDesc());
                 //20260208 部分未排及不排判断
                 MonthPlanNoProductionReasonEnum generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_NO_PRODUCTION_REASON;
-                if(realProductionQty > BigDecimal.ZERO.intValue()){
+                if (realProductionQty > BigDecimal.ZERO.intValue()) {
                     generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_PART_NO_PRODUCTION_REASON;
                 }
-                String noProductionReason = NoProductionReasonUtils.getNoProductionReasonByLimit(generalNoProductionReason, limitInfoList);
+                String noProductionReason = NoProductionReasonUtils.getNoProductionReasonByLimit(generalNoProductionReason, limitInfoList, defaultReason);
                 singlePlan.singleAddNoProductionReason(noProductionReason);
             });
         });
