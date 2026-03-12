@@ -374,9 +374,11 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         Long currencyCount = mpOrderPredictionMapper.selectCount(queryWrapper);
 
         if (currencyCount == 0) {
+            //获取当前年月+1的月份
+            LocalDate nextMonth = date.plusMonths(1);
             String message = StringUtils.format(
                     I18nUtil.getMessage("raw.material.require.plan.prediction.plan.not.generated"),
-                    date.getYear(), String.format("%02d", date.getMonthValue())
+                    date.getYear(), String.format("%02d", nextMonth.getMonthValue())
             );
             return AjaxResult.error(message);
         }
