@@ -87,6 +87,8 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         ProductionInitParamConfiguration paramConfiguration = createInitParamConfiguration(productionContext);
         //SKU-损耗处理
         handlerLoss(productionContext, requirePlanList, paramConfiguration.getOpenLevelRatio());
+        //最小投产量的处理
+        handlerMinProductionQty(productionContext, requirePlanList);
         //物料基础信息
         Map<String, ProductBaseInfoVo> productBaseInfoMap = getMaterialInfo(productionContext);
         //施工关系
@@ -95,6 +97,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
         //SKU-日硫化产能
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
+
         //赋值施工信息，模具，日硫化产能
         requirePlanList.forEach(requirePlan -> {
             String materialCode = requirePlan.getMaterialCode();
@@ -235,6 +238,49 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
     }
 
     /**
+     * 最小投产量的处理
+     * 按Sku + 已排产
+     * 1、按优先级，将差量全部加入第一条计划
+     *
+     * @param context         排产上下文
+     * @param requirePlanList 需求计划
+     */
+    private void handlerMinProductionQty(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+        if (CollectionUtils.isEmpty(requirePlanList)) {
+            return;
+        }
+        //按Sku 物料描述分组
+        List<MonthPlanProductionRequirePlanVo> hasProductionQtyList = requirePlanList.stream().filter(singlePlan -> singlePlan.isProductionMinProductionQty()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionQtyList)) {
+            return;
+        }
+        //对物料描述为空进行过滤
+        List<MonthPlanProductionRequirePlanVo> effectiveList = requirePlanList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return;
+        }
+        //按SKU汇总需求
+        Map<String, List<MonthPlanProductionRequirePlanVo>> productGroupMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        productGroupMap.forEach((materialDesc, planList) -> {
+            if (CollectionUtils.isEmpty(planList)) {
+                return;
+            }
+            Integer sumNetQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+            Integer minQty = planList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
+            if (null == minQty) {
+                return;
+            }
+            if (sumNetQty >= minQty) {
+                return;
+            }
+            Integer sumNetLossQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getFactProdReqQty).sum();
+            Integer diffValue = minQty - sumNetLossQty;
+            handMinProductionQtyDiffValue(planList, diffValue);
+        });
+
+    }
+
+    /**
      * 计算非损耗率需要增加的损耗量
      * 偶数+2，奇数+3
      *
@@ -249,6 +295,45 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         //汇总排产净需求量
         Integer sumQty = hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         return getLossQty(sumQty);
+    }
+
+    /**
+     * 处理最小投产量的差量，按优先级，加在第一条有优先级计划量的计划上
+     *
+     * @param planList  单Sku的所有排产计划
+     * @param diffValue 需要补充的差值
+     */
+    private void handMinProductionQtyDiffValue(List<MonthPlanProductionRequirePlanVo> planList, Integer diffValue) {
+        if (CollectionUtils.isEmpty(planList) || null == diffValue || diffValue <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        //高优先级量
+        Integer sumHeightQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum();
+        if (sumHeightQty > BigDecimal.ZERO.intValue()) {
+            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getHeightQty, Comparator.reverseOrder()));
+            MonthPlanProductionRequirePlanVo addQty = planList.get(BigDecimal.ZERO.intValue());
+            Integer heightLossQty = addQty.getHeightLossQty();
+            addQty.setHeightLossQty(heightLossQty + diffValue);
+            Integer netLossQty = addQty.getFactProdReqQty();
+            addQty.setFactProdReqQty(netLossQty + diffValue);
+            return;
+        }
+        Integer sumCycleQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
+        if (sumCycleQty > BigDecimal.ZERO.intValue()) {
+            planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getCycleReserveQty, Comparator.reverseOrder()));
+        } else {
+            Integer sumMidQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getMidQty).sum();
+            if (sumMidQty > BigDecimal.ZERO.intValue()) {
+                planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getMidQty, Comparator.reverseOrder()));
+            } else {
+                planList.sort(Comparator.comparing(MonthPlanProductionRequirePlanVo::getPostponeQty, Comparator.reverseOrder()));
+            }
+        }
+        //加入到排产净需求损耗中
+        MonthPlanProductionRequirePlanVo addQty = planList.get(BigDecimal.ZERO.intValue());
+        Integer netLossQty = addQty.getFactProdReqQty();
+        addQty.setFactProdReqQty(netLossQty + diffValue);
+        return;
     }
 
     /**
