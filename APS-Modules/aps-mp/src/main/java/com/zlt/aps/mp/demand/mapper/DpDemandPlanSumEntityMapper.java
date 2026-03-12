@@ -31,11 +31,13 @@ public interface DpDemandPlanSumEntityMapper extends CommBaseMapper<DpDemandPlan
       " WHERE FACTORY_CODE = #{factoryCode} " +
       " AND `YEAR` = #{year} " +
       " AND `MONTH` = #{month} " +
+      " AND `PLAN_TYPE` = #{planType} " +
       " AND IS_DELETE = #{isDelete} " +
       " GROUP BY MONTH_PLAN_VERSION " +
       " ORDER BY MAX(CREATE_TIME) DESC ")
   List<String> selectDistinctMonthPlanVersion(@Param("factoryCode") String factoryCode,
                                               @Param("year") Integer year,
                                               @Param("month") Integer month,
+                                              @Param("month") String planType,
                                               @Param("isDelete") Integer isDelete);
 }

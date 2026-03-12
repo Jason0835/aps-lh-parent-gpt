@@ -24,4 +24,7 @@ public class IncMouldContext implements Serializable {
 
     @ApiModelProperty(value = "按硫化机维度，记录已排产天数")
     private Integer usedProductionDays = 0;
+
+    @ApiModelProperty(value = "已排产计划量")
+    private Integer hasProductionQty = 0;
 }

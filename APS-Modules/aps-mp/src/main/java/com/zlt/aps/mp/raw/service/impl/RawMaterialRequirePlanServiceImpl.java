@@ -14,6 +14,7 @@ import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IRawMaterialRequirePlanService;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.PredictionVersionInfoVo;
+import com.zlt.aps.mp.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.mp.demand.mapper.DpOrderOffsetDetailEntityMapper;
 import com.zlt.aps.mp.demand.mapper.MpPredictionDetailEntityMapper;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
@@ -102,6 +103,18 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 批量插入条数
      */
     private static final int BATCH_SIZE = 1000;
+
+    /**
+     * 版本号前缀
+     */
+    private static final String VERSION_PREFIX = "RAW";
+
+
+    @Autowired
+    protected DistributedVersionGenerator versionGenerator;
+    @Autowired
+    private DistributedVersionGenerator distributedVersionGenerator;
+
 
     @Override
     protected String getDocTypeCode() {
@@ -306,6 +319,23 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         result.put("year", nextMonth.getYear());
         result.put("month", nextMonth.getMonthValue());
         return result;
+    }
+
+    /**
+     * 生成原材料需求计划版本
+     *
+     * @param billVO
+     */
+    @Override
+    public AjaxResult generateVersion(RawMaterialRequirePlan billVO) {
+        try {
+            String version = versionGenerator.generateVersion(VERSION_PREFIX);
+            billVO.setVersion(version);
+            return AjaxResult.success(version);
+        } catch (Exception e) {
+            log.error("版本号生成失败", e);
+            return AjaxResult.error(I18nUtil.getMessage("raw.material.require.plan.version.generate.error") );
+        }
     }
 
     /**

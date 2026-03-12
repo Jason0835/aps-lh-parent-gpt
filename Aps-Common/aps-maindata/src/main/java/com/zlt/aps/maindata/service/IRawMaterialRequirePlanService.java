@@ -46,4 +46,8 @@ public interface IRawMaterialRequirePlanService  extends IDocService<RawMaterial
      */
     Map<String, Integer> getDefaultYearMonth();
 
+    /**
+     * 生成原材料需求计划版本
+     */
+    AjaxResult generateVersion(RawMaterialRequirePlan billVO);
 }

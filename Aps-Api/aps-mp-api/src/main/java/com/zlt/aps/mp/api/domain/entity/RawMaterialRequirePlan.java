@@ -60,6 +60,12 @@ public class RawMaterialRequirePlan extends BaseEntity {
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
+    /** 版本号 */
+    @Excel(name = "ui.data.column.rawMaterialRequirePlan.version")
+    @ApiModelProperty(value = "版本号", name = "version")
+    @TableField(value = "VERSION")
+    private String version;
+
     /** 材料描述 */
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.materialDesc")
     @ImportExcelValidated(required = true, maxLength = 100)

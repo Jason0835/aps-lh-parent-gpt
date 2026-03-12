@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Sets;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.enums.QualityStateEnum;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.ProductionPlanType;
@@ -612,6 +613,9 @@ public class CycleStockUpService {
     MdmMaterialInfo  materialInfo = materialInfoService.getMaterialInfoByMaterialCode(supplyOrderPool.getFactoryCode(),supplyOrderPool.getMaterialCode());
     if(null == materialInfo){
        throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notFound.materialInfo"));
+    }
+    if(!QualityStateEnum.IN_PRODUCTION.getCode().equals(materialInfo.getQualityStateCode())) {
+      throw new BusinessException(I18nUtil.getMessage("ui.message.supplyOrderPool.notInProduction.materialInfo"));
     }
     if(StringUtils.isBlank(materialInfo.getStructureName())) {
       throw new BusinessException(I18nUtil.getMessage("ui.message.createCycleStockUp.notExist.cycleStockUpMaterial"));
