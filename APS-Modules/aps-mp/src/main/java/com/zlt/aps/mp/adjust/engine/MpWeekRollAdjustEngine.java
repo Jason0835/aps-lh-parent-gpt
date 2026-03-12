@@ -1318,6 +1318,7 @@ public class MpWeekRollAdjustEngine {
     private boolean checkSecOnline(FactoryMonthPlanFinalAdjustVo mpFinalVo,Integer newOnLineDay,Map<String,Object> paramMap){
         Integer skuSecondDays = (Integer) paramMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
         SkuSecondChecker skuSecondChecker = new SkuSecondChecker(newOnLineDay,mpFinalVo.getEndDay(),skuSecondDays);
+
         return skuSecondChecker.doCheck();
     }
 
