@@ -69,6 +69,15 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     }
 
     /**
+     * 生成原材料需求计划版本
+     */
+    @ApiOperation("生成原材料需求计划版本")
+    @PostMapping("/generateVersion")
+    public AjaxResult generateVersion(@RequestBody RawMaterialRequirePlan billVO){
+        return rawMaterialRequirePlanService.generateVersion(billVO);
+    }
+
+    /**
      * 保存
      */
     @Log(title = "ui.data.column.rawMaterialRequirePlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)

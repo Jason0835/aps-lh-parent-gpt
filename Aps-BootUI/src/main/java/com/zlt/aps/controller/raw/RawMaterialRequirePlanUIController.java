@@ -76,6 +76,7 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
         return iRawMaterialRequirePlanService.save(rawMaterialRequirePlan);
     }
 
+
     /**
      * 删除原材料需求计划
      */
@@ -180,5 +181,16 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
                                @RequestParam("month") Integer month,
                                @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth) {
         return iRawMaterialRequirePlanService.generate(factoryCode, year, month, isSpringFestivalMonth);
+    }
+
+
+    /**
+     * 生成原材料需求计划版本
+     */
+    @ApiOperation("生成原材料需求计划版本")
+    @PostMapping("/generateVersion")
+    @ResponseBody
+    public AjaxResult generateVersion(@RequestBody RawMaterialRequirePlan billVO){
+        return iRawMaterialRequirePlanService.generateVersion(billVO);
     }
 }
