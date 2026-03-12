@@ -300,6 +300,6 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         // 接收人自行维护
         int year = DateUtils.getYear(new Date());
         int month = DateUtils.getMonth(new Date());
-        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "", year, month);
+        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "", year, month + 1);
     }
 }
