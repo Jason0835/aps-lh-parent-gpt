@@ -28,9 +28,10 @@ public interface IRawMaterialRequirePlanService  extends IDocService<RawMaterial
      * @param factoryCode
      * @param year        年份
      * @param month       月份
+     * @param version
      * @return 生成结果
      */
-    AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month, boolean isSpringFestivalMonth);
+    AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month, boolean isSpringFestivalMonth, String version);
 
     /**
      * 检查是否正在生成
