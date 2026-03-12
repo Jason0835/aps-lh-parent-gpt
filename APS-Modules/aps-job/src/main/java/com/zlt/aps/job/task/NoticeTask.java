@@ -1,14 +1,15 @@
 package com.zlt.aps.job.task;
 
-import javax.annotation.Resource;
-
+import com.zlt.aps.job.service.INoticeService;
+import com.zlt.aps.mp.api.service.IMdmWorkCalendarRemoteService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.zlt.aps.job.service.INoticeService;
+import javax.annotation.Resource;
 
 /**
  * 发送消息通知
- * 
+ *
  * @author zlt
  */
 @Component("noticeTask")
@@ -21,5 +22,15 @@ public class NoticeTask {
      */
     public void unfinishedSchedule() {
         iNoticeService.unfinishedSchedule();
+    }
+
+    @Autowired
+    private IMdmWorkCalendarRemoteService iMdmWorkCalendarRemoteService;
+
+    /**
+     * 定时通知计划员维护日历
+     */
+    public void workCalendarNotice() {
+        iMdmWorkCalendarRemoteService.workCalendarNotice();
     }
 }

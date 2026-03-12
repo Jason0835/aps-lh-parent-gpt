@@ -17,9 +17,11 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mdm.enums.MsgTemplateEnums;
 import com.zlt.aps.mdm.enums.WorkCalendarPermiEnum;
 import com.zlt.aps.mdm.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.mdm.service.IMdmWorkCalendarService;
+import com.zlt.aps.mdm.utils.MessageServiceUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -242,5 +244,17 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         entity.setBaseVale(null);
         entityMapper.copy(entity);
         return AjaxResult.success();
+    }
+
+    @Autowired
+    private MessageServiceUtils messageService;
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @Override
+    public void workCalendarNotice() {
+        // 接收人自行维护
+        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "");
     }
 }

@@ -107,4 +107,11 @@ public interface IMdmWorkCalendarRemoteService {
     @ApiOperation("复制工作日历")
     @PostMapping("/mdmWorkCalendar/copyWorkCalendar")
     AjaxResult copyWorkCalendar(@RequestBody MdmWorkCalendar entity);
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @ApiOperation("发送通知计划员维护日历")
+    @PostMapping("/mdmWorkCalendar/workCalendarNotice")
+    void workCalendarNotice();
 }

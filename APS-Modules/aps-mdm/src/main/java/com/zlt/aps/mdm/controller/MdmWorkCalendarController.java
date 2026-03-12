@@ -251,4 +251,13 @@ public class MdmWorkCalendarController extends AbstractDocBizController<MdmWorkC
     public AjaxResult copyWorkCalendar(@RequestBody MdmWorkCalendar entity) {
         return mdmWorkCalendarService.copyWorkCalendar(entity);
     }
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @ApiOperation("发送通知计划员维护日历")
+    @PostMapping("//workCalendarNotice")
+    public void workCalendarNotice() {
+        mdmWorkCalendarService.workCalendarNotice();
+    }
 }
