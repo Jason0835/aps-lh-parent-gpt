@@ -1,12 +1,12 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
 import com.zlt.aps.enums.*;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
 import com.zlt.common.utils.PubUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -134,6 +134,21 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         heightProductionQty = originHeightProductionQty;
         productionQty = originProductionQty;
         calculateInventorySalesRatio(BigDecimal.ZERO.intValue());
+    }
+
+    /**
+     * 计划是否可进行最小批量排产
+     * 如果计划不排产则不排
+     * 如果净需求计划为零，则不排
+     *
+     * @return
+     */
+    public boolean isProductionMinProductionQty() {
+        if (!YesOrNoEnum.YES.getCode().equals(getIsProduction())) {
+            return false;
+        }
+        Integer sum = Optional.ofNullable(getNetQty()).orElse(BigDecimal.ZERO.intValue());
+        return sum > BigDecimal.ZERO.intValue();
     }
 
     /**

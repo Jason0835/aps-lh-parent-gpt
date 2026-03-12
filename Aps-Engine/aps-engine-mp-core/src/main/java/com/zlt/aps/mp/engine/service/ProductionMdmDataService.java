@@ -106,6 +106,14 @@ public interface ProductionMdmDataService {
     List<EmbryoSpecialMaterialInfoVo> getEmbryoSpecialMaterialInfo(Context context);
 
     /**
+     * 获取含有特殊材料的生胎配置信息
+     * 基于净需求计划
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<EmbryoSpecialMaterialInfoVo> getEmbryoSpecialMaterialInfoByRequire(Context context);
+    /**
      * 获取特殊材料库存
      *
      * @param context 排产上下文

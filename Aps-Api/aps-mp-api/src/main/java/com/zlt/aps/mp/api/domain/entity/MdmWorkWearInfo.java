@@ -67,11 +67,11 @@ public class MdmWorkWearInfo extends BaseEntity {
     private String workWearName;
 
     /**
-     * 成型机类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆
+     * 成型鼓类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆
      */
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmWorkWearInfo.cxMachineBrandCode", dictType = "biz_machine_brand")
-    @ApiModelProperty(value = "成型机类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆", name = "cxMachineBrandCode")
+    @ApiModelProperty(value = "成型鼓类型 数据字典 biz_machine_brand 01 软控 02 赛象 03 青岛贝帆", name = "cxMachineBrandCode")
     @TableField(value = "CX_MACHINE_BRAND_CODE")
     private String cxMachineBrandCode;
 
