@@ -97,4 +97,14 @@ public interface IMdmWorkCalendarRemoteService {
     @ApiOperation("生成全年工作日历")
     @PostMapping("/mdmWorkCalendar/genAnnualPlan")
     AjaxResult genAnnualPlan(@RequestBody MdmWorkCalendar entity);
+
+    /**
+     * 复制工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @ApiOperation("复制工作日历")
+    @PostMapping("/mdmWorkCalendar/copyWorkCalendar")
+    AjaxResult copyWorkCalendar(@RequestBody MdmWorkCalendar entity);
 }

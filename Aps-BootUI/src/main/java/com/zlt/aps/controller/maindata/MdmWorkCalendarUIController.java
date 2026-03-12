@@ -238,4 +238,17 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
     public AjaxResult genAnnualPlan(MdmWorkCalendar entity) {
         return iMdmWorkCalendarService.genAnnualPlan(entity);
     }
+
+    /**
+     * 复制工作日历
+     * @param entity 参数
+     * @return 结果
+     */
+    @RequiresPermissions("maindata:mdmWorkCalendar:copyWorkCalendar")
+    @ApiOperation("复制工作日历")
+    @PostMapping("/copyWorkCalendar")
+    @ResponseBody
+    public AjaxResult copyWorkCalendar(MdmWorkCalendar entity) {
+        return iMdmWorkCalendarService.copyWorkCalendar(entity);
+    }
 }
