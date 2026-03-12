@@ -219,7 +219,7 @@ export default {
       this.query = query;
       // this.filterKey = this.searchKey;
 
-      this.$set(this.page, "current", 1);
+      // this.$set(this.page, "current", 1);
       this.getList();
     },
     handlePageChange(current, pageSize) {
@@ -251,11 +251,11 @@ export default {
       };
       this.searchKey = "";
       this.filterKey = "";
-      this.page = {
-        current: 1,
-        pageSize: 10,
-        total: 0,
-      };
+      // this.page = {
+      //   current: 1,
+      //   pageSize: 10,
+      //   total: 0,
+      // };
     },
     handleCurrentChange(row) {
       this.currentRow = row;
