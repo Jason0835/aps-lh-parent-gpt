@@ -143,12 +143,18 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         if (SecurityUtils.isAdmin(userId)) {
             return dictDataList;
         }
-        Set<String> menuPermsList = iSysMenuService.selectMenuPermsByUserId(userId);
+        List<String> permList = entityMapper.selectMenuBtPermsByUserId(userId);
+        Set<String> permsSet = new HashSet<>();
+        for (String perm : permList) {
+            if (com.ruoyi.common.utils.StringUtils.isNotEmpty(perm)) {
+                permsSet.addAll(Arrays.asList(perm.trim().split(",")));
+            }
+        }
         List<String> dictValueList = new ArrayList<>();
         WorkCalendarPermiEnum[] values = WorkCalendarPermiEnum.values();
         for (WorkCalendarPermiEnum value : values) {
             String perms = value.getPerms();
-            if (menuPermsList.contains(perms)) {
+            if (permsSet.contains(perms)) {
                 String dictValue = value.getDictValue();
                 dictValueList.add(dictValue);
             }
