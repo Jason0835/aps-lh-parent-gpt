@@ -1,6 +1,7 @@
 package com.zlt.aps.mdm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.api.gateway.system.service.ISysMenuService;
@@ -9,15 +10,18 @@ import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mdm.enums.MsgTemplateEnums;
 import com.zlt.aps.mdm.enums.WorkCalendarPermiEnum;
 import com.zlt.aps.mdm.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.mdm.service.IMdmWorkCalendarService;
+import com.zlt.aps.mdm.utils.MessageServiceUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -141,12 +145,18 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         if (SecurityUtils.isAdmin(userId)) {
             return dictDataList;
         }
-        Set<String> menuPermsList = iSysMenuService.selectMenuPermsByUserId(userId);
+        List<String> permList = entityMapper.selectMenuBtPermsByUserId(userId);
+        Set<String> permsSet = new HashSet<>();
+        for (String perm : permList) {
+            if (com.ruoyi.common.utils.StringUtils.isNotEmpty(perm)) {
+                permsSet.addAll(Arrays.asList(perm.trim().split(",")));
+            }
+        }
         List<String> dictValueList = new ArrayList<>();
         WorkCalendarPermiEnum[] values = WorkCalendarPermiEnum.values();
         for (WorkCalendarPermiEnum value : values) {
             String perms = value.getPerms();
-            if (menuPermsList.contains(perms)) {
+            if (permsSet.contains(perms)) {
                 String dictValue = value.getDictValue();
                 dictValueList.add(dictValue);
             }
@@ -210,5 +220,41 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         }
         this.save(saveList);
         return AjaxResult.success();
+    }
+
+    /**
+     * 复制工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult copyWorkCalendar(MdmWorkCalendar entity) {
+        String targetFactoryCode = entity.getTargetFactoryCode();
+        Integer targetYear = entity.getTargetYear();
+        Integer targetMonth = entity.getTargetMonth();
+        String targetProcCode = entity.getTargetProcCode();
+        LambdaUpdateWrapper<MdmWorkCalendar> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(MdmWorkCalendar::getFactoryCode, targetFactoryCode)
+                .eq(MdmWorkCalendar::getYear, targetYear)
+                .eq(MdmWorkCalendar::getMonth, targetMonth)
+                .eq(MdmWorkCalendar::getProcCode, targetProcCode)
+                .set(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_DEL);
+        entityMapper.update(null, updateWrapper);
+        entity.setBaseVale(null);
+        entityMapper.copy(entity);
+        return AjaxResult.success();
+    }
+
+    @Autowired
+    private MessageServiceUtils messageService;
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @Override
+    public void workCalendarNotice() {
+        // 接收人自行维护
+        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "");
     }
 }

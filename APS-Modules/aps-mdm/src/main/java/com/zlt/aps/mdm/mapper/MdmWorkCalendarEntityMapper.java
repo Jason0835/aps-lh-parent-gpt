@@ -4,6 +4,8 @@ import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmWorkCalendarMapper.java
@@ -21,4 +23,19 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmWorkCalendarEntityMapper extends CommBaseMapper<MdmWorkCalendar> {
 
+    /**
+     * 复制，将源分厂年月、工序复制到目标分厂年月、工序
+     *
+     * @param entity 源参数
+     * @return 源参数
+     */
+    int copy(MdmWorkCalendar entity);
+
+    /**
+     * 根据用户ID查询权限
+     *
+     * @param userId 用户ID
+     * @return 权限列表
+     */
+    public List<String> selectMenuBtPermsByUserId(Long userId);
 }

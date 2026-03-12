@@ -99,7 +99,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
         QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, param);
-        queryWrapper.orderByAsc("STRUCTURE_NAME", "CX_MACHINE_CODE");
+        queryWrapper.orderByAsc("CX_MACHINE_CODE");
         return this.entityMapper.selectList(queryWrapper);
     }
 
