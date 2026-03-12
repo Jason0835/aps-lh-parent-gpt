@@ -251,4 +251,17 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
     public AjaxResult copyWorkCalendar(MdmWorkCalendar entity) {
         return iMdmWorkCalendarService.copyWorkCalendar(entity);
     }
+
+    /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @PostMapping({"/checkBeforeCopy"})
+    @ApiOperation("复制前校验")
+    @ResponseBody
+    public AjaxResult checkBeforeCopy(MdmWorkCalendar entity) {
+        return iMdmWorkCalendarService.checkBeforeCopy(entity);
+    }
 }
