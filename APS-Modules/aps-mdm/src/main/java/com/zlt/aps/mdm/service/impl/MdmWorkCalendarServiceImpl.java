@@ -3,9 +3,11 @@ package com.zlt.aps.mdm.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.api.gateway.system.service.ISysMenuService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -13,6 +15,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mdm.enums.WorkCalendarPermiEnum;
 import com.zlt.aps.mdm.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.mdm.service.IMdmWorkCalendarService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -66,6 +69,9 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
 
     @Autowired
     private MdmWorkCalendarEntityMapper entityMapper;
+
+    @Autowired
+    private ISysMenuService iSysMenuService;
 
     @Override
     protected String getDocTypeCode() {
@@ -131,6 +137,21 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
             return dictDataList;
         }
         // TODO 根据当前用户对应的权限，过滤出可查看的工序列表
+        Long userId = SecurityUtils.getUserId();
+        if (SecurityUtils.isAdmin(userId)) {
+            return dictDataList;
+        }
+        Set<String> menuPermsList = iSysMenuService.selectMenuPermsByUserId(userId);
+        List<String> dictValueList = new ArrayList<>();
+        WorkCalendarPermiEnum[] values = WorkCalendarPermiEnum.values();
+        for (WorkCalendarPermiEnum value : values) {
+            String perms = value.getPerms();
+            if (menuPermsList.contains(perms)) {
+                String dictValue = value.getDictValue();
+                dictValueList.add(dictValue);
+            }
+        }
+        dictDataList = dictDataList.stream().filter(item -> dictValueList.contains(item.getDictValue())).collect(Collectors.toList());
         return dictDataList;
     }
 

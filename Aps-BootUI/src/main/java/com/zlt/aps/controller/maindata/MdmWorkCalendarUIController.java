@@ -1,6 +1,7 @@
 package com.zlt.aps.controller.maindata;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -26,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.Arrays;
 
 /**
@@ -97,7 +99,10 @@ public class MdmWorkCalendarUIController extends BaseUIController<MdmWorkCalenda
     @RequiresPermissions("maindata:mdmWorkCalendar:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(MdmWorkCalendar mdmWorkCalendar) {
+    public AjaxResult save(MdmWorkCalendar mdmWorkCalendar) throws ParseException {
+        if (mdmWorkCalendar.getProductionDate().before(DateUtils.getNowDate("yyyy-MM-dd"))) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.dateBeforeNow"));
+        }
         String dayFlag = mdmWorkCalendar.getDayFlag();
         if (YesOrNoEnum.YES.getCode().equals(dayFlag) && mdmWorkCalendar.getRate() == 0) {
             mdmWorkCalendar.setRate(100);
