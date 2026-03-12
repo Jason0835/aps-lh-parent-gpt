@@ -350,7 +350,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
             }
             return Arrays.stream(qualityStateArr).anyMatch(p -> Objects.equals(p, s.getQualityStateCode()));
 		} // 质控状态只要投产的
-		).map(vo -> {
+		).filter(vo -> materialMap.containsKey(vo.getOriMaterialCode()))
+		.map(vo -> {
 			String salPriority = vo.getSalPriority(); // 销售优先级
 			String salCodePo = vo.getSalCodePo(); // po号
 			String oriMaterialCode = vo.getOriMaterialCode(); // 物料号

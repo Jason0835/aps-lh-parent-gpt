@@ -5,23 +5,23 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.enums.ProductionProcessesTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.engine.constant.ProductionConstant;
-import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
-import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.dto.MachineCountDto;
-import com.zlt.aps.mp.engine.domain.vo.*;
-import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.mapper.*;
-import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
-import com.zlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.mp.engine.domain.dto.CxDevicePlanShutInfoHelper;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IProductALevelService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.ProductALevelVo;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxDevicePlanShutInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.MachineCountDto;
+import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.mapper.*;
+import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
+import com.zlt.aps.utils.BeanCopyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -200,6 +200,25 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         String monthPlanVersion = context.getMonthPlanVersion();
         String productionVersion = context.getProductionVersion();
         return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialEmbryoInfo(factoryCode, year, month, monthPlanVersion, productionVersion);
+    }
+
+    /**
+     * 获取含有特殊材料的生胎配置信息
+     * 基于净需求计划
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    @Override
+    public List<EmbryoSpecialMaterialInfoVo> getEmbryoSpecialMaterialInfoByRequire(Context context) {
+        if (isEmptyFactoryAndRequireVersion(context)) {
+            return Collections.emptyList();
+        }
+        String factoryCode = context.getFactoryCode();
+        Integer year = context.getYear();
+        Integer month = context.getMonth();
+        String monthPlanVersion = context.getMonthPlanVersion();
+        return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialEmbryoInfoByRequire(factoryCode, year, month, monthPlanVersion);
     }
 
     @Override

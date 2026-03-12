@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.Constant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.CheckItemTypeEnums;
@@ -8,7 +9,9 @@ import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
@@ -16,17 +19,14 @@ import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.*;
-import com.zlt.aps.mp.engine.service.DpRequireDataService;
-import com.zlt.aps.mp.engine.utils.DateUtils;
-import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.aps.mp.engine.service.DpRequireDataService;
 import com.zlt.aps.mp.engine.service.MonthProductionDataService;
 import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
+import com.zlt.aps.mp.engine.utils.DateUtils;
+import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -138,12 +138,13 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     /**
      * 排产前基础数据初始化(带异常)
+     *
      * @param productionContext
      * @param requirePlanList
      * @param mpCheckItemVos
      * @param mpCheckItemRecords
      */
-    protected void initProductionBaseDataWithExceptions(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList,List<MpCheckItemVo> mpCheckItemVos,
+    protected void initProductionBaseDataWithExceptions(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList, List<MpCheckItemVo> mpCheckItemVos,
                                                         List<MpCheckItemRecord> mpCheckItemRecords) {
         //1、获取排产参数设定
         try {
@@ -160,9 +161,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
                     mpCheckItemVos, mpCheckItemRecords);
         }
 
-        //2、特殊材料的胎胚配置信息
+        //2、特殊材料的胎胚配置信息--基于净需求计划版本
         try {
-            specialMaterialInfoHandler(productionContext);
+            specialMaterialInfoByRequireHandler(productionContext);
         } catch (Exception e) {
             log.error("特殊材料的胎胚配置信息处理失败", e);
             addCheckResult(false, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA,
@@ -231,7 +232,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
                     NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_TYPE_INFO_ERROR),
                     mpCheckItemVos, mpCheckItemRecords);
         }
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap=new HashMap<>();
+        Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap = new HashMap<>();
         //9、获取SKU模具配置信息
         try {
             mouldRelationMap = getEnableProductionMouldInfo(productionContext);
@@ -352,7 +353,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
         // 先判断该类型的检测是否已经存在结果
         boolean isAlreadyChecked = mpCheckItemVos.stream()
-                .anyMatch(vo -> checkItemType.getCode().equals(vo.getCheckItem()) && !StringUtils.equals(vo.getCheckItem(),CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode()));
+                .anyMatch(vo -> checkItemType.getCode().equals(vo.getCheckItem()) && !StringUtils.equals(vo.getCheckItem(), CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode()));
 
         // 如果已经检测过，直接返回，保留原来的结果（保留第1、2项的成功状态）
         if (isAlreadyChecked) {
@@ -515,39 +516,19 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      */
     private void specialMaterialInfoHandler(TbrProductionContext productionContext) {
         List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
-        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialMap = new HashMap<>();
-        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = new HashMap<>();
-        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialLog(productionContext, specialMaterialInfoList));
-        if (CollectionUtils.isEmpty(specialMaterialInfoList)) {
-            productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
-            productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
-            return;
-        }
-        //转化胎胚号-特殊材料
-        Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
-        allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
-            if (CollectionUtils.isEmpty(rawMaterialList)) {
-                return;
-            }
-            Map<String, BigDecimal> rawMaterialConfigurationMap = embryoSpecialMaterialMap.get(embryoCode);
-            if (null == rawMaterialConfigurationMap) {
-                rawMaterialConfigurationMap = new HashMap<>();
-                embryoSpecialMaterialMap.put(embryoCode, rawMaterialConfigurationMap);
-            }
-            for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
-                String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
-                if (StringUtils.isBlank(specialMaterialCode)) {
-                    continue;
-                }
-                BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();
-                rawMaterialConfigurationMap.put(specialMaterialCode, dosage);
-            }
-        });
-        productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
-        //构建特殊原材料库存信息
-        specialMaterialStockHandler(productionContext);
-        // 初始化特殊材料结构关系表
-        productionContext.setSpecialMaterialStructureRelationMap(new HashMap<>());
+        buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
+    }
+
+    /**
+     * 2.1.2：根据排产信息，获取特殊原材料的配置信息-基于净需求计划 包含：
+     * 1、特殊原材料的胎胚
+     * 2、特殊原材料的库存及可转化的轮胎条数
+     *
+     * @param productionContext 排产单位
+     */
+    private void specialMaterialInfoByRequireHandler(TbrProductionContext productionContext) {
+        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfoByRequire(productionContext);
+        buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
     }
 
     /**
@@ -753,7 +734,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //新模具到货计划关系
         List<MonthPlanProductMouldInfoVo> mouldDeliveryList = getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldDeliveryLog(productionContext, mouldDeliveryList));
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList,productionContext);
+        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList, productionContext);
         if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
             return Collections.emptyMap();
         }
@@ -1019,6 +1000,48 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             standardLengthMap.put(specialMaterialStockInfo.getStandardLength(), SpecialMaterialInfoVo.createInitInfo(specialMaterialStockInfo));
         });
         productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
+    }
+
+    /**
+     * 根据胎胚特殊原材料信息，构建特殊原材料的结构信息
+     *
+     * @param productionContext       排产上下文
+     * @param specialMaterialInfoList 所有特殊原材料信息
+     */
+    private void buildSpecialMaterialInfo(TbrProductionContext productionContext, List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList) {
+        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialLog(productionContext, specialMaterialInfoList));
+        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialMap = new HashMap<>();
+        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = new HashMap<>();
+        if (CollectionUtils.isEmpty(specialMaterialInfoList)) {
+            productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
+            productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
+            return;
+        }
+        //转化胎胚号-特殊材料
+        Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
+        allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
+            if (CollectionUtils.isEmpty(rawMaterialList)) {
+                return;
+            }
+            Map<String, BigDecimal> rawMaterialConfigurationMap = embryoSpecialMaterialMap.get(embryoCode);
+            if (null == rawMaterialConfigurationMap) {
+                rawMaterialConfigurationMap = new HashMap<>();
+                embryoSpecialMaterialMap.put(embryoCode, rawMaterialConfigurationMap);
+            }
+            for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
+                String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
+                if (StringUtils.isBlank(specialMaterialCode)) {
+                    continue;
+                }
+                BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();
+                rawMaterialConfigurationMap.put(specialMaterialCode, dosage);
+            }
+        });
+        productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
+        //构建特殊原材料库存信息
+        specialMaterialStockHandler(productionContext);
+        // 初始化特殊材料结构关系表
+        productionContext.setSpecialMaterialStructureRelationMap(new HashMap<>());
     }
 
 }

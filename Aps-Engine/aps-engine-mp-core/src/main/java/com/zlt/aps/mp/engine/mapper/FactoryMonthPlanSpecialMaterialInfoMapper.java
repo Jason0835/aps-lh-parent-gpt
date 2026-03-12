@@ -28,6 +28,18 @@ public interface FactoryMonthPlanSpecialMaterialInfoMapper {
     List<EmbryoSpecialMaterialInfoVo> getSpecialMaterialEmbryoInfo(@Param("factoryCode") String factoryCode, @Param("year") Integer year, @Param("month") Integer month, @Param("monthPlanVersion") String monthPlanVersion, @Param("productionVersion") String productionVersion);
 
     /**
+     * 获取工厂下排产版本：含有特殊原材料的胎胚特殊材料bom信息
+     * 基于净需求计划版本，不再基于排产版本
+     *
+     * @param factoryCode      工厂编码
+     * @param year             年份
+     * @param month            月份
+     * @param monthPlanVersion 需求计划版本
+     * @return
+     */
+    List<EmbryoSpecialMaterialInfoVo> getSpecialMaterialEmbryoInfoByRequire(@Param("factoryCode") String factoryCode, @Param("year") Integer year, @Param("month") Integer month, @Param("monthPlanVersion") String monthPlanVersion);
+
+    /**
      * 获取工厂下排产版本：特殊原材料的库存信息
      *
      * @param factoryCode 工厂编码

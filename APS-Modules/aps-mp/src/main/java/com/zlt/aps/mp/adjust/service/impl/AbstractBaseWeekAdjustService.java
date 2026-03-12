@@ -2951,6 +2951,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (adjustQty != 0 && week > 0) {
             previousNetQty = adjustQty;
         }
+        if (adjustQty == 0 && week > 0) {
+            previousNetQty = null;
+        }
         adjustDetailVo.setPreviousNetQty(previousNetQty);
     }
 
