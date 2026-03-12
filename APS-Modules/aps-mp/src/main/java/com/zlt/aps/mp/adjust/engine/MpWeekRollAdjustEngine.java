@@ -1905,6 +1905,9 @@ public class MpWeekRollAdjustEngine {
      * @return 停产前日
      */
     private int getPreDayCloseDay(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap,int checkDay){
+        if (dailyCapacityLimitVoMap.get(checkDay) == null){
+            return checkDay;
+        }
         if (YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(checkDay).getDayOpenCloseFlag())){
             return checkDay;
         }
