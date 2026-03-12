@@ -167,7 +167,7 @@ public class RawWeekUsage extends BaseEntity {
      * @return 是否需要预警
      */
     public boolean checkWarning(RawWarningConfig config) {
-        if (config == null || config.getEnabled() != 1) {
+        if (config == null || "1".equals(config.getEnabled())) {
             return false;
         }
 
