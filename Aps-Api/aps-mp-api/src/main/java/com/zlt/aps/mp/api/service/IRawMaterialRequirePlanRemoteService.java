@@ -43,8 +43,15 @@ public interface IRawMaterialRequirePlanRemoteService {
 
 
     /**
-     * 删除
+     * 保存
      */
+    @ApiOperation("生成原材料需求计划版本")
+    @PostMapping("/rawMaterialRequirePlan/generateVersion")
+     AjaxResult generateVersion(@RequestBody RawMaterialRequirePlan billVO);
+
+        /**
+         * 删除
+         */
     @ApiOperation("删除")
     @DeleteMapping("/rawMaterialRequirePlan/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
