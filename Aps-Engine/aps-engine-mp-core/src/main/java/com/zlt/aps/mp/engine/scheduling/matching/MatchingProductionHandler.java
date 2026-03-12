@@ -2027,8 +2027,6 @@ public class MatchingProductionHandler {
                 BigDecimalUtils.percentages2Decimals(rate));
         tempDayVulcanizationQty = tempDayVulcanizationQty.setScale(0, RoundingMode.DOWN); // 小数部分向下取整，但是至少一台
         Integer realDayVulcanizationQty = tempDayVulcanizationQty.intValue();
-        realDayVulcanizationQty = (realDayVulcanizationQty & 1) == 0 ? realDayVulcanizationQty
-                : realDayVulcanizationQty + 1; // 处理奇数，遇到奇数直接+1;
         if (realDayVulcanizationQty <= 0) {
             realDayVulcanizationQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         }
