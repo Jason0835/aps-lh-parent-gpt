@@ -33,6 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         INSERT INTO T_RAW_MATERIAL_REQUIRE_PLAN (
         year,
         month,
+        version,
         material_code,
         material_desc,
         material_type,
@@ -53,6 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             (
             #{item.year},
             #{item.month},
+            #{item.version},
             #{item.materialCode},
             #{item.materialDesc},
             #{item.materialType},
