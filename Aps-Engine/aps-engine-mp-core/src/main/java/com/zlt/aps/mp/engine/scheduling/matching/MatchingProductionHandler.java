@@ -748,6 +748,24 @@ public class MatchingProductionHandler {
     }
 
     /**
+     * 获取下一个排产日
+     * @param contextDTO
+     * @param day
+     * @param beginDay
+     * @return
+     */
+    private Integer getNextDay(TbrProductionContext productionContext, int day, int endDay) {
+        Integer lastDay = 0;
+        for (int i = day + 1; i <= endDay; i ++) {
+            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
+                lastDay = i;
+                break;
+            }
+        }
+        return lastDay;
+    }
+
+    /**
      * 获取上一个排产日
      * @param contextDTO
      * @param day
@@ -1564,28 +1582,23 @@ public class MatchingProductionHandler {
                     continue; // 当天已经无法添加排产，跳过
                 }
                 List<ProductionMouldInfoVo> doubleMouldList = mouldDayUsed.getMouldInfoList();
-                List<ProductionMouldInfoVo> limitDoubleMouldList = doubleMouldList.stream()
-                        .collect(Collectors.toList());
 
                 // 判断是否续作
                 List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
                 List<ProductionMouldInfoVo> twoMouldList = new ArrayList<>(); // 一次添加双模
-                Integer lastDay = this.getLastDay(productionContext, usedBeginDate, startDay);
-                for (ProductionMouldInfoVo mouldInfo : limitDoubleMouldList) {
-                    // 判断切换计划前上一天的排产计划
-                    List<CxMouldDayProductionHelper> lastDayProductionList = mouldInfo.getDayProductionInfo()
-                            .get(lastDay);
-                    inner:
-                    if (!CollectionUtils.isEmpty(lastDayProductionList)
-                            && lastDayProductionList.stream().anyMatch(p -> materialDesc.equals(p.getMaterialDesc()))) { // 上一天有排产，且物料描述一致，说明是续作
-                        // 判断如果今天的模具已经达到最大模具数，则不能加模具，只能补量
-                        if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty()) {
-                            List<CxMouldDayProductionHelper> dayProduction = mouldInfo.getDayProductionInfo().get(usedBeginDate);
-                            if (dayProduction == null
-                                    || dayProduction.stream().filter(s -> materialDesc.equals(s.getMaterialDesc()))
-                                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() <= 0) { // 当天没有排产的模具跳过
-                                break inner;
-                            }
+                Integer lastDay = this.getLastDay(productionContext, usedBeginDate, startDay); // 上一个排产日
+                for (ProductionMouldInfoVo mouldInfo : doubleMouldList) {
+                    inner: 
+                    // 判断上一天有排产，当天没排产
+                    if (this.checkMouldHasProuct(mouldInfo, lastDay, materialDesc)) { // 上一天有排产该物料，说明是续作
+                        boolean hasProduct = this.checkMouldHasProuct(mouldInfo, usedBeginDate, materialDesc);
+                        // 判断如果今天的模具已经达到最大模具数，则不能加模具，只能补量，则当天没有排产本规格的模具跳过
+                        if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty() && !hasProduct) {
+                            break inner;
+                        }
+                        // 模具今天明天没有排产，如果从n+2 至 n+二次上机天数之间有任意一天有排产，则不允许搭配，防止造成二次排产
+                        if (this.checkIsSecOnline(productionContext, mouldInfo, usedBeginDate, endDay)) {
+                            break inner;
                         }
                         twoMouldList.add(mouldInfo);
                     }
@@ -1597,11 +1610,7 @@ public class MatchingProductionHandler {
                 // 执行非首日续作排程算法
                 if (!CollectionUtils.isEmpty(continueMouldList)) {
                     continueMouldList.stream().forEach(mould -> {
-                        List<CxMouldDayProductionHelper> dayProduction = mould.getDayProductionInfo()
-                                .get(usedBeginDate);
-                        if (dayProduction == null
-                                || dayProduction.stream().filter(s -> materialDesc.equals(s.getMaterialDesc()))
-                                        .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() <= 0) { // 当天没有排产
+                        if (this.checkMouldHasProuct(mould, usedBeginDate, materialDesc)) { // 当天没有排产该规格，则当天的排产模具数+1
                             limitHelper.setMouldQty(limitHelper.getMouldQty() + 1);
                         }
                     });
@@ -1633,6 +1642,86 @@ public class MatchingProductionHandler {
             }
             
         } while (true);
+    }
+
+    /**
+     * 判断当天如果上机是否会导致二次上机
+     * 
+     * @param productionContext 上下文
+     * @param mouldInfo         模具
+     * @param day               待排产日期
+     * @param endDay            收尾日
+     * @return
+     */
+    private boolean checkIsSecOnline(TbrProductionContext productionContext, ProductionMouldInfoVo mouldInfo,
+                                     Integer day, Integer endDay) {
+        // 获取二次上机校验天数
+        int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration()
+                .getSkuSecondProduction();
+        if (skuSecondProductionDays <= 0) {
+            return false;
+        }
+        Integer nextDay = this.getNextDay(productionContext, day, endDay); // 下一个排产日
+        if (nextDay <= 0) {
+            return false;
+        }
+        Integer afterDay = this.getNextDay(productionContext, nextDay, endDay); // n+2个排产日
+        if (afterDay > 0) {
+            return false;
+        }
+        boolean isTodayProduct = this.checkMouldHasProuct(mouldInfo, day);
+        boolean isNextdayProduct = this.checkMouldHasProuct(mouldInfo, nextDay);
+        if (isTodayProduct || isNextdayProduct) { // 今天活明天模具有排产，则今天排产不会导致二次上机
+            return false;
+        }
+        // 模具在n+2天后有任意一天有排产，都会导致二次上机
+        Integer skuSecondProductEndDay = 0;
+        int countDays = 2; // 天数计数器，由于逻辑走到这里则今天明天都没有排产，因此从2开始
+        for (int i = day + 1; i <= endDay; i++) {
+            if (countDays >= skuSecondProductionDays) { // 计数器达到二次上机控制天数则结束
+                break;
+            }
+            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
+                skuSecondProductEndDay = i;
+                countDays++;
+                break;
+            }
+        }
+        if (skuSecondProductEndDay <= 0) {
+            return false;
+        }
+        int realEndDay = skuSecondProductEndDay;
+        return mouldInfo.getDayProductionInfo().keySet().stream()
+                .anyMatch(d -> d >= afterDay && d <= realEndDay && this.checkMouldHasProuct(mouldInfo, d));
+    }
+
+    /**
+     * 检查模具某天是否有排产
+     * 
+     * @param mouldInfo    待检查模具
+     * @param day          待检查排产日
+     * @return
+     */
+    private boolean checkMouldHasProuct(ProductionMouldInfoVo mouldInfo, Integer day) {
+        return this.checkMouldHasProuct(mouldInfo, day, null);
+    }
+
+    /**
+     * 检查模具某天是否有排产指定规格
+     * 
+     * @param mouldInfo    待检查模具
+     * @param day          待检查排产日
+     * @param materialDesc 指定规格，如果传空值，则有任意一个规格有排产都符合条件
+     * @return
+     */
+    private boolean checkMouldHasProuct(ProductionMouldInfoVo mouldInfo, Integer day, String materialDesc) {
+        List<CxMouldDayProductionHelper> dayProduction = mouldInfo.getDayProductionInfo().get(day);
+        if (dayProduction == null) {
+            return false;
+        }
+        return dayProduction.stream()
+                .filter(s -> StringUtils.isEmpty(materialDesc) || materialDesc.equals(s.getMaterialDesc()))
+                .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() > 0;
     }
 
     /**
@@ -2896,22 +2985,22 @@ public class MatchingProductionHandler {
      * @param productionPlanInfo 排产计划信息
      * @param productionContext  排产上下文
      * @param materialDesc     规格描述
-     * @param realStartDay       上机日
+     * @param startDay       上机日
      * @return true-允许二次上机，false-不允许二次上机
      */
     private boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo, TbrProductionContext productionContext,
-                                          String materialDesc, Integer realStartDay) {
+                                          String materialDesc, Integer startDay) {
         List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(materialDesc);
         if (CollectionUtils.isEmpty(dayList)) {
             return true;
         }
-        if (dayList.contains(realStartDay)) {
+        if (dayList.contains(startDay)) {
             return true;
         }
         // 取最大的天数
         Integer lastCloseDay = dayList.stream().max(Integer::compareTo).get();
         int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
-        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay, lastCloseDay, skuSecondProductionDays);
+        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(startDay, lastCloseDay, skuSecondProductionDays);
         return skuSecondChecker.doCheck();
     }
 
