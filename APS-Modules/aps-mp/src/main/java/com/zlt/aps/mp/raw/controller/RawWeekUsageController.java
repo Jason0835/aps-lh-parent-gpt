@@ -96,8 +96,9 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
     @ApiOperation("按照月份生成周维度原材料用量记录")
     public AjaxResult generateByMonth(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
+                                      @RequestParam("version") String version,
                                       @RequestParam("month") Integer month) {
-        return rawWeekUsageGenerateService.generateWeekUsage(factoryCode, year, month);
+        return rawWeekUsageGenerateService.generateWeekUsage(factoryCode, year, month, version);
     }
 
     @PostMapping("/generate-by-week")
@@ -105,8 +106,9 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
     public AjaxResult generateByWeek(@RequestParam("factoryCode") String factoryCode,
                                      @RequestParam("year") Integer year,
                                      @RequestParam("month") Integer month,
+                                     @RequestParam("version") String version,
                                      @RequestParam("week") Integer week) {
-        return rawWeekUsageGenerateService.recalculateWeekUsage(factoryCode, year, month, week);
+        return rawWeekUsageGenerateService.recalculateWeekUsage(factoryCode, year, month, week, version);
     }
 
     @GetMapping("/statistics")

@@ -160,6 +160,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     protected List<FactoryMonthPlanMouldDayResult> listExportData(FactoryMonthPlanMouldDayResult obj) {
         QueryWrapper<FactoryMonthPlanMouldDayResult> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.orderByAsc("STRUCTURE_NAME", "MAIN_PATTERN","MAIN_MATERIAL_DESC");
         List<FactoryMonthPlanMouldDayResult> list = entityMapper.selectList(wrapper);
         calculateDayVulcanizationQty(list);
         this.translationList(list);

@@ -51,6 +51,14 @@ public class RawWeekUsage extends BaseEntity {
     private Integer month;
 
     /**
+     * 版本
+     */
+    @Excel(name = "版本")
+    @ApiModelProperty(value = "版本", name = "version")
+    @TableField(value = "VERSION")
+    private String version;
+
+    /**
      * 周次
      */
     @Excel(name = "周次")
