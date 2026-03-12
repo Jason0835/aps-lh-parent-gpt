@@ -263,7 +263,10 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         Integer targetYear = entity.getTargetYear();
         Integer targetMonth = entity.getTargetMonth();
         String targetProcCode = entity.getTargetProcCode();
-        if (sourceFactoryCode.equals(targetFactoryCode) && sourceYear.equals(targetYear) && sourceMonth.equals(targetMonth) && sourceProcCode.equals(targetProcCode)) {
+        if (!sourceYear.equals(targetYear) || !sourceMonth.equals(targetMonth)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.yearMontNotSame"));
+        }
+        if (sourceFactoryCode.equals(targetFactoryCode) && sourceProcCode.equals(targetProcCode)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.sourceAndTargetEqual"), ApsConstant.APS_YES_NO_0);
         }
         List<MdmWorkCalendar> sourceList = selectByFactoryAndYearMonth(sourceFactoryCode, sourceYear, sourceMonth, sourceProcCode);
