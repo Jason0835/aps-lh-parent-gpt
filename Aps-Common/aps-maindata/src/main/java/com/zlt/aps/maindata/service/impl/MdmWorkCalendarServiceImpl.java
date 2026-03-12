@@ -1,19 +1,25 @@
 package com.zlt.aps.maindata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.enums.MsgTemplateEnums;
+import com.zlt.aps.maindata.enums.WorkCalendarPermiEnum;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
+import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -131,6 +137,27 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
             return dictDataList;
         }
         // TODO 根据当前用户对应的权限，过滤出可查看的工序列表
+        Long userId = SecurityUtils.getUserId();
+        if (SecurityUtils.isAdmin(userId)) {
+            return dictDataList;
+        }
+        List<String> permList = entityMapper.selectMenuBtPermsByUserId(userId);
+        Set<String> permsSet = new HashSet<>();
+        for (String perm : permList) {
+            if (com.ruoyi.common.utils.StringUtils.isNotEmpty(perm)) {
+                permsSet.addAll(Arrays.asList(perm.trim().split(",")));
+            }
+        }
+        List<String> dictValueList = new ArrayList<>();
+        WorkCalendarPermiEnum[] values = WorkCalendarPermiEnum.values();
+        for (WorkCalendarPermiEnum value : values) {
+            String perms = value.getPerms();
+            if (permsSet.contains(perms)) {
+                String dictValue = value.getDictValue();
+                dictValueList.add(dictValue);
+            }
+        }
+        dictDataList = dictDataList.stream().filter(item -> dictValueList.contains(item.getDictValue())).collect(Collectors.toList());
         return dictDataList;
     }
 
@@ -189,5 +216,85 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         }
         this.save(saveList);
         return AjaxResult.success();
+    }
+
+    /**
+     * 复制工作日历
+     *
+     * @param entity 条件
+     * @return 结果
+     */
+    @Override
+    public AjaxResult copyWorkCalendar(MdmWorkCalendar entity) {
+        String targetFactoryCode = entity.getTargetFactoryCode();
+        Integer targetYear = entity.getTargetYear();
+        Integer targetMonth = entity.getTargetMonth();
+        String targetProcCode = entity.getTargetProcCode();
+        LambdaUpdateWrapper<MdmWorkCalendar> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(MdmWorkCalendar::getFactoryCode, targetFactoryCode)
+                .eq(MdmWorkCalendar::getYear, targetYear)
+                .eq(MdmWorkCalendar::getMonth, targetMonth)
+                .eq(MdmWorkCalendar::getProcCode, targetProcCode)
+                .set(BaseEntity::getIsDelete, ApsConstant.DEL_FLAG_DEL);
+        entityMapper.update(null, updateWrapper);
+        entity.setBaseVale(null);
+        entityMapper.copy(entity);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 复制前校验
+     *
+     * @param entity 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult checkBeforeCopy(MdmWorkCalendar entity) {
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("work_calendar_proc");
+        Map<String, String> dictMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(dictDataList)) {
+            dictMap = dictDataList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        }
+        String sourceFactoryCode = entity.getSourceFactoryCode();
+        Integer sourceYear = entity.getSourceYear();
+        Integer sourceMonth = entity.getSourceMonth();
+        String sourceProcCode = entity.getSourceProcCode();
+        String targetFactoryCode = entity.getTargetFactoryCode();
+        Integer targetYear = entity.getTargetYear();
+        Integer targetMonth = entity.getTargetMonth();
+        String targetProcCode = entity.getTargetProcCode();
+        if (sourceFactoryCode.equals(targetFactoryCode) && sourceYear.equals(targetYear) && sourceMonth.equals(targetMonth) && sourceProcCode.equals(targetProcCode)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.sourceAndTargetEqual"), ApsConstant.APS_YES_NO_0);
+        }
+        List<MdmWorkCalendar> sourceList = selectByFactoryAndYearMonth(sourceFactoryCode, sourceYear, sourceMonth, sourceProcCode);
+        if (CollectionUtils.isEmpty(sourceList)) {
+            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.sourceNotExist"), dictMap.get(sourceProcCode), sourceYear, sourceMonth), ApsConstant.APS_YES_NO_0);
+        }
+        List<MdmWorkCalendar> targetList = selectByFactoryAndYearMonth(targetFactoryCode, targetYear, targetMonth, targetProcCode);
+        if (CollectionUtils.isNotEmpty(targetList)) {
+            return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.mdmWorkCalendar.targetExists"), dictMap.get(targetProcCode), targetYear, targetMonth), ApsConstant.APS_YES_NO_1);
+        }
+        return AjaxResult.success(ApsConstant.APS_YES_NO_1);
+    }
+
+    private List<MdmWorkCalendar> selectByFactoryAndYearMonth(String factoryCode, Integer year, Integer month, String procCode) {
+        LambdaQueryWrapper<MdmWorkCalendar> sourceWrapper = new LambdaQueryWrapper<>();
+        sourceWrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                .eq(MdmWorkCalendar::getYear, year)
+                .eq(MdmWorkCalendar::getMonth, month)
+                .eq(MdmWorkCalendar::getProcCode, procCode);
+        return entityMapper.selectList(sourceWrapper);
+    }
+
+    @Autowired
+    private MessageServiceUtils messageService;
+
+    /**
+     * 发送通知计划员维护日历
+     */
+    @Override
+    public void workCalendarNotice() {
+        // 接收人自行维护
+        messageService.sendNotice(MsgTemplateEnums.WORK_CALENDAR_NOTICE.getCode(), "");
     }
 }

@@ -40,7 +40,13 @@ public enum MsgTemplateEnums {
     /**
      * 实单模拟排产成功通知
      */
-    MP_CREATE_SIMULATED_PRODUCTION("MP_CREATE_SIMULATED_PRODUCTION","实单模拟排产");
+    MP_CREATE_SIMULATED_PRODUCTION("MP_CREATE_SIMULATED_PRODUCTION","实单模拟排产"),
+
+    /**
+     * 工作日历提醒通知
+     */
+    WORK_CALENDAR_NOTICE("WORK_CALENDAR_NOTICE", "工作日历提醒通知"),
+    ;
 
     private final String code;
     private final String name;
