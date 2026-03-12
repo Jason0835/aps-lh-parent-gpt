@@ -21,4 +21,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MdmWorkCalendarEntityMapper extends CommBaseMapper<MdmWorkCalendar> {
 
+    /**
+     * 复制，将源分厂年月、工序复制到目标分厂年月、工序
+     *
+     * @param entity 源参数
+     * @return 源参数
+     */
+    int copy(MdmWorkCalendar entity);
 }

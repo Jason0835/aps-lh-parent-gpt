@@ -140,4 +140,60 @@ public class MdmWorkCalendar extends BaseEntity {
     @ApiModelProperty(value = "节假日名称", name = "holidayNames")
     @TableField(exist = false)
     private String holidayNames;
+
+    /**
+     * 源工序
+     */
+    @ApiModelProperty(value = "源工序", name = "sourceProcCode")
+    @TableField(exist = false)
+    private String sourceProcCode;
+
+    /**
+     * 目标工序
+     */
+    @ApiModelProperty(value = "目标工序", name = "sourceProcCode")
+    @TableField(exist = false)
+    private String targetProcCode;
+
+    /**
+     * 源年份
+     */
+    @ApiModelProperty(value = "源年份", name = "sourceYear")
+    @TableField(exist = false)
+    private Integer sourceYear;
+
+    /**
+     * 源月份
+     */
+    @ApiModelProperty(value = "源月份", name = "sourceMonth")
+    @TableField(exist = false)
+    private Integer sourceMonth;
+
+    /**
+     * 目标年份
+     */
+    @ApiModelProperty(value = "目标年份", name = "targetYear")
+    @TableField(exist = false)
+    private Integer targetYear;
+
+    /**
+     * 目标月份
+     */
+    @ApiModelProperty(value = "目标月份", name = "targetMonth")
+    @TableField(exist = false)
+    private Integer targetMonth;
+
+    /**
+     * 复制时源工厂编号，字典：biz_factory_name
+     */
+    @ApiModelProperty(value = "复制时源工厂编号，字典：biz_factory_name", name = "sourceFactoryCode")
+    @TableField(exist = false)
+    private String sourceFactoryCode;
+
+    /**
+     * 复制时目标工厂编号，字典：biz_factory_name
+     */
+    @ApiModelProperty(value = "复制时目标工厂编号，字典：biz_factory_name", name = "targetFactoryCode")
+    @TableField(exist = false)
+    private String targetFactoryCode;
 }
