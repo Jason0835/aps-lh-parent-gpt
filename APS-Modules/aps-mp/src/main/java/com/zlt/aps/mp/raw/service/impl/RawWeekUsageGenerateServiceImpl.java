@@ -399,14 +399,16 @@ public class RawWeekUsageGenerateServiceImpl {
 
     /**
      * 重新计算并更新周用量记录（当生产计划变更时调用）
+     *
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
-     * @param week 周次
+     * @param year        年份
+     * @param month       月份
+     * @param week        周次
+     * @param version
      * @return 更新结果
      */
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult recalculateWeekUsage(String factoryCode, Integer year, Integer month, Integer week) {
+    public AjaxResult recalculateWeekUsage(String factoryCode, Integer year, Integer month, Integer week, String version) {
         try {
             log.info("重新计算周用量记录，工厂：{}，年份：{}，月份：{}，周次：{}",
                     factoryCode, year, month, week);

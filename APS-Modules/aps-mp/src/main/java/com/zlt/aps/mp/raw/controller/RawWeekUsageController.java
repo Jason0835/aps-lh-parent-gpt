@@ -106,8 +106,9 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
     public AjaxResult generateByWeek(@RequestParam("factoryCode") String factoryCode,
                                      @RequestParam("year") Integer year,
                                      @RequestParam("month") Integer month,
+                                     @RequestParam("version") String version,
                                      @RequestParam("week") Integer week) {
-        return rawWeekUsageGenerateService.recalculateWeekUsage(factoryCode, year, month, week);
+        return rawWeekUsageGenerateService.recalculateWeekUsage(factoryCode, year, month, week, version);
     }
 
     @GetMapping("/statistics")
