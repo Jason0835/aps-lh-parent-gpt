@@ -191,9 +191,10 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     @ApiOperation("生成原材料需求计划")
     public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("year") Integer year,
+                               @RequestParam("version") String version,
                                @RequestParam("month") Integer month,
                                @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth) {
-        return rawMaterialRequirePlanService.generateRawMaterialRequirePlan(factoryCode, year, month, isSpringFestivalMonth);
+        return rawMaterialRequirePlanService.generateRawMaterialRequirePlan(factoryCode, year, month, isSpringFestivalMonth, version);
     }
 
     @GetMapping("/check-status")

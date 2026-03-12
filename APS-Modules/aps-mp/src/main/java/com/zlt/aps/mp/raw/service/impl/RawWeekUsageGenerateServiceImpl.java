@@ -40,13 +40,15 @@ public class RawWeekUsageGenerateServiceImpl {
 
     /**
      * 生成周维度原材料用量记录
+     *
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
+     * @param year        年份
+     * @param month       月份
+     * @param version
      * @return 生成结果
      */
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult generateWeekUsage(String factoryCode, Integer year, Integer month) {
+    public AjaxResult generateWeekUsage(String factoryCode, Integer year, Integer month, String version) {
         try {
             log.info("开始生成周维度原材料用量记录，工厂：{}，年份：{}，月份：{}", factoryCode, year, month);
 
@@ -70,7 +72,7 @@ public class RawWeekUsageGenerateServiceImpl {
             Map<Integer, List<FactoryMonthPlanProdFinal>> plansByWeek = groupPlansByWeek(monthPlans, year, month);
 
             // 3. 删除旧的周用量记录
-            deleteExistingWeekUsage(factoryCode, year, month);
+            // deleteExistingWeekUsage(factoryCode, year, month);
 
             // 4. 计算并保存每周的原材料用量
             int totalRecords = 0;
@@ -82,7 +84,7 @@ public class RawWeekUsageGenerateServiceImpl {
                 Map<String, BigDecimal> weekMaterialUsage = calculateWeekMaterialUsage(weekPlans);
 
                 // 保存到数据库
-                int records = saveWeekUsage(factoryCode, year, month, week, weekMaterialUsage);
+                int records = saveWeekUsage(factoryCode, year, month, week, weekMaterialUsage, version);
                 totalRecords += records;
             }
 
@@ -114,9 +116,6 @@ public class RawWeekUsageGenerateServiceImpl {
         for (FactoryMonthPlanProdFinal plan : monthPlans) {
             // 遍历该计划的每一天
             for (int day = 1; day <= daysInMonth; day++) {
-                if(plan.getEmbryoCode().equals("215101337")){
-                    log.info("215101337");
-                }
                 int dailyQty = getDailyProductionQty(plan, day);
                 if (dailyQty > 0) {
                     // 计算这一天属于第几周
@@ -290,7 +289,7 @@ public class RawWeekUsageGenerateServiceImpl {
      * 保存周用量记录
      */
     private int saveWeekUsage(String factoryCode, Integer year, Integer month,
-                              Integer week, Map<String, BigDecimal> materialUsage) {
+                              Integer week, Map<String, BigDecimal> materialUsage, String version) {
         int records = 0;
 
         // 获取周的开始和结束日期
@@ -314,6 +313,7 @@ public class RawWeekUsageGenerateServiceImpl {
             weekUsage.setFactoryCode(factoryCode);
             weekUsage.setYear(year);
             weekUsage.setMonth(month);
+            weekUsage.setVersion(version);
             weekUsage.setWeek(week);
             weekUsage.setMaterialCode(materialCode);
             weekUsage.setMaterialDesc(materialName);
@@ -385,14 +385,16 @@ public class RawWeekUsageGenerateServiceImpl {
 
     /**
      * 批量生成周维度用量记录（用于月度计划生成时自动调用）
+     *
      * @param factoryCode 工厂编码
-     * @param year 年份
-     * @param month 月份
+     * @param year        年份
+     * @param month       月份
+     * @param version
      * @return 生成结果
      */
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult generateWeekUsageForMonth(String factoryCode, Integer year, Integer month) {
-        return generateWeekUsage(factoryCode, year, month);
+    public AjaxResult generateWeekUsageForMonth(String factoryCode, Integer year, Integer month, String version) {
+        return generateWeekUsage(factoryCode, year, month, version);
     }
 
     /**
@@ -434,7 +436,7 @@ public class RawWeekUsageGenerateServiceImpl {
             rawWeekUsageEntityMapper.delete(deleteWrapper);
 
             // 5. 保存新的用量记录
-            int records = saveWeekUsage(factoryCode, year, month, week, weekMaterialUsage);
+            int records = saveWeekUsage(factoryCode, year, month, week, weekMaterialUsage, version);
 
             log.info("周用量记录重新计算完成，工厂：{}，年份：{}，月份：{}，周次：{}，更新记录数：{}",
                     factoryCode, year, month, week, records);

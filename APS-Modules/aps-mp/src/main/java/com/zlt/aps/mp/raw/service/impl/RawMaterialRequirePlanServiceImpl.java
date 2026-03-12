@@ -145,7 +145,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month, boolean isSpringFestivalMonth) {
+    public AjaxResult generateRawMaterialRequirePlan(String factoryCode, Integer year, Integer month, boolean isSpringFestivalMonth, String version) {
         try {
             // 1. 检查生成状态
             AjaxResult checkResult = checkGeneratingStatus(year, month);
@@ -206,13 +206,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
                 // 9. 汇总并保存需求计划
                 saveRawMaterialRequirePlan(year, month, currentMonthRequirements,
-                        t1Requirements, t2Requirements, factoryCode);
+                        t1Requirements, t2Requirements, factoryCode,  version);
 
                 // 10. 生成差异数据
-                generateDifferenceData(year, month, factoryCode);
+                generateDifferenceData(year, month, factoryCode, version);
 
                 // 11. 生成周维度原材料用量记录
-                generateWeekUsageRecords(factoryCode, year, month);
+                generateWeekUsageRecords(factoryCode, year, month, version);
 
                 String message = StringUtils.format(
                         I18nUtil.getMessage("raw.material.require.plan.generate.success"),
@@ -264,10 +264,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 生成周维度原材料用量记录
      */
-    private void generateWeekUsageRecords(String factoryCode, Integer year, Integer month) {
+    private void generateWeekUsageRecords(String factoryCode, Integer year, Integer month, String version) {
         try {
             AjaxResult result = rawWeekUsageGenerateService
-                    .generateWeekUsageForMonth(factoryCode, year, month);
+                    .generateWeekUsageForMonth(factoryCode, year, month, version);
 
             if (isSuccess(result)) {
                 String message = StringUtils.format(
@@ -968,10 +968,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                                             Map<String, RawMaterialRequirePlan> currentMonthRequirements,
                                             Map<String, RawMaterialRequirePlan> t1Requirements,
                                             Map<String, RawMaterialRequirePlan> t2Requirements,
-                                            String factoryCode) {
+                                            String factoryCode, String version) {
 
         // 删除旧的计划
-        deleteOldRequirements(year, month);
+        // deleteOldRequirements(year, month);
 
         // 合并所有需求
         Map<String, RawMaterialRequirePlan> allRequirements = mergeAllRequirements(
@@ -983,7 +983,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         }
 
         // 批量保存新的计划
-        batchSaveRequirements(year, month, allRequirements, factoryCode);
+        batchSaveRequirements(year, month, allRequirements, factoryCode, version);
     }
 
     /**
@@ -1034,7 +1034,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private void batchSaveRequirements(Integer year, Integer month,
                                        Map<String, RawMaterialRequirePlan> requirements,
-                                       String factoryCode) {
+                                       String factoryCode, String version) {
 
         String username = SecurityUtils.getUsername();
         if (username == null) {
@@ -1044,7 +1044,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         // 将Map转换为实体列表
         List<RawMaterialRequirePlan> planList = requirements.values().stream()
-                .map(req -> convertToEntity(year, month, req, factoryCode, finalUsername))
+                .map(req -> convertToEntity(year, month, req, factoryCode, finalUsername, version))
                 .collect(Collectors.toList());
 
         // 分批保存
@@ -1088,10 +1088,11 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      */
     private RawMaterialRequirePlan convertToEntity(Integer year, Integer month,
                                                    RawMaterialRequirePlan requirement,
-                                                   String factoryCode, String username) {
+                                                   String factoryCode, String username, String version) {
         RawMaterialRequirePlan plan = new RawMaterialRequirePlan();
         plan.setYear(year);
         plan.setMonth(month);
+        plan.setVersion(version);
         plan.setMaterialCode(requirement.getMaterialCode());
         plan.setMaterialDesc(requirement.getMaterialDesc());
         plan.setMaterialType(requirement.getMaterialType());
@@ -1281,17 +1282,17 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     /**
      * 生成差异数据（优化版）
      */
-    private void generateDifferenceData(Integer year, Integer month, String factoryCode) {
+    private void generateDifferenceData(Integer year, Integer month, String factoryCode, String version) {
         // 获取当前月和上个月的需求
         Map<String, RawMaterialRequirePlan> currentRequirements = getRequirementsByMonth(year, month);
         Map<String, RawMaterialRequirePlan> previousRequirements = getPreviousMonthRequirements(year, month);
 
         // 删除旧的差异数据
-        deleteOldDifferenceData(year, month, factoryCode);
+        //deleteOldDifferenceData(year, month, factoryCode);
 
         // 计算差异并批量保存
         List<RawMaterialMonthDiff> diffRecords = calculateDifferences(
-                year, month, currentRequirements, previousRequirements, factoryCode);
+                year, month, currentRequirements, previousRequirements, factoryCode, version);
 
         if (!diffRecords.isEmpty()) {
             batchSaveDifferenceData(diffRecords);
@@ -1315,7 +1316,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     private List<RawMaterialMonthDiff> calculateDifferences(Integer year, Integer month,
                                                             Map<String, RawMaterialRequirePlan> current,
                                                             Map<String, RawMaterialRequirePlan> previous,
-                                                            String factoryCode) {
+                                                            String factoryCode, String version) {
 
         List<RawMaterialMonthDiff> diffRecords = new ArrayList<>();
         String username = SecurityUtils.getUsername();
@@ -1341,13 +1342,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
             if (prevReq == null) {
                 // 新增的原材料
-                diffRecords.add(createDiffRecord(year, month, materialCode, diffTypeNew,
+                diffRecords.add(createDiffRecord(year, month, materialCode, diffTypeNew, version,
                         BigDecimal.ZERO, curQty, factoryCode, currentReq.getMaterialDesc(), finalUsername));
             } else if (diffValue.compareTo(BigDecimal.ZERO) != 0) {
                 // 数量有变化
                 String diffType = diffValue.compareTo(BigDecimal.ZERO) > 0 ? diffTypeIncrease : diffTypeDecrease;
                 diffRecords.add(createDiffRecord(year, month, materialCode, diffType,
-                        prevQty, curQty, factoryCode, currentReq.getMaterialDesc(), finalUsername));
+                        version, prevQty, curQty, factoryCode, currentReq.getMaterialDesc(), finalUsername));
             }
         });
 
@@ -1357,7 +1358,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 BigDecimal prevQty = prevReq.getCurMonthQty() != null ? prevReq.getCurMonthQty() : BigDecimal.ZERO;
                 // 减少的原材料
                 diffRecords.add(createDiffRecord(year, month, materialCode, diffTypeDecrease,
-                        prevQty, BigDecimal.ZERO, factoryCode, prevReq.getMaterialDesc(), finalUsername));
+                        version, prevQty, BigDecimal.ZERO, factoryCode, prevReq.getMaterialDesc(), finalUsername));
             }
         });
 
@@ -1368,13 +1369,14 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
      * 创建差异记录
      */
     private RawMaterialMonthDiff createDiffRecord(Integer year, Integer month, String materialCode,
-                                                  String diffType, BigDecimal prevQty, BigDecimal curQty,
+                                                  String diffType, String version, BigDecimal prevQty, BigDecimal curQty,
                                                   String factoryCode, String materialDesc, String username) {
 
         RawMaterialMonthDiff diffRecord = new RawMaterialMonthDiff();
         diffRecord.setFactoryCode(factoryCode);
         diffRecord.setYear(year);
         diffRecord.setMonth(month);
+        diffRecord.setVersion(version);
         diffRecord.setMaterialCode(materialCode);
         diffRecord.setMaterialDesc(materialDesc);
         diffRecord.setDiffType(diffType);
