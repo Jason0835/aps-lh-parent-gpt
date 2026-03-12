@@ -14,6 +14,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.enums.QualityStateEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.constant.StringConstant;
@@ -704,6 +705,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
             LambdaQueryWrapper<MdmMaterialInfo> wrapper =
                 Wrappers.lambdaQuery(MdmMaterialInfo.class)
                     .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
+                    .eq(MdmMaterialInfo::getQualityStateCode, QualityStateEnum.IN_PRODUCTION.getCode())
                     .in(MdmMaterialInfo::getMaterialCode, batchSkus)
                     .eq(MdmMaterialInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
             result.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
@@ -715,6 +717,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
     public List<MdmMaterialInfo> findMaterialInfo(String factoryCode) {
         LambdaQueryWrapper<MdmMaterialInfo> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
+        wrapper.eq(MdmMaterialInfo::getQualityStateCode, QualityStateEnum.IN_PRODUCTION.getCode());
         wrapper.eq(MdmMaterialInfo::getIsDelete, YesOrNoEnum.NO.getValue());
         return mdmMaterialInfoEntityMapper.selectList(wrapper);
     }
@@ -742,6 +745,7 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
             LambdaQueryWrapper<MdmMaterialInfo> wrapper =
                 Wrappers.lambdaQuery(MdmMaterialInfo.class)
                     .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
+                    .eq(MdmMaterialInfo::getQualityStateCode, QualityStateEnum.IN_PRODUCTION.getCode())
                     .in(MdmMaterialInfo::getStructureName, batchStructureNames)
                     .eq(MdmMaterialInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
             result.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
