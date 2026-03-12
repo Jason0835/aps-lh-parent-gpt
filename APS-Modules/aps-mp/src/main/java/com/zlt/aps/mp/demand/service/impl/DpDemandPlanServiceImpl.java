@@ -688,6 +688,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             data.getCycleSchStruConfs(),
             data.getOrderQtyMap());
         if (!CollectionUtils.isEmpty(mergedPlans)) {
+            String productCode =   mergedPlans.stream().filter(item -> StringUtils.isBlank(item.getMainPattern())).findFirst().map(DpDemandPlan::getMaterialCode).orElse(null);
+            if(StringUtils.isNotBlank(productCode)){
+                String errorMsg = String.format(I18nUtil.getMessage("ui.data.alert.demandPlan.notHasMainPattern"), productCode);
+                throw new BusinessException(errorMsg);
+            }
+            productCode =   mergedPlans.stream().filter(item -> StringUtils.isBlank(item.getStructureName())).findFirst().map(DpDemandPlan::getMaterialCode).orElse(null);
+            if(StringUtils.isNotBlank(productCode)){
+                String errorMsg = String.format(I18nUtil.getMessage("ui.data.alert.demandPlan.notHasStructureName"), productCode);
+                throw new BusinessException(errorMsg);
+            }
             mergedPlans.sort(Comparator.comparing(DpDemandPlan::getMaterialCode));
             this.batchInsertProcessor.batchInsert(mergedPlans);
         }
