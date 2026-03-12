@@ -90,5 +90,6 @@ public interface IRawMaterialRequirePlanRemoteService {
     public AjaxResult generate(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("year") Integer year,
                                @RequestParam("month") Integer month,
+                               @RequestParam("version") String version,
                                @RequestParam("isSpringFestivalMonth") boolean isSpringFestivalMonth);
 }
