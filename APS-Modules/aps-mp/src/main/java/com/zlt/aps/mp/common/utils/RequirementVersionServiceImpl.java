@@ -41,7 +41,7 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
         // 记录每日生成计数
         sequenceService.incrementDailyCounter();
       }else{
-        sequence = getCurrentSequence();
+        sequence = getCurrentSequence() + 1;
       }
       return formatVersion(prefix,dateStr, sequence);
     } finally {
