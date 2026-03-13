@@ -243,9 +243,9 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
      */
     @Override
     public List<MdmProductStock> getMdmProductStock(Context context) {
-        LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
-        return mdmProductStockEntityMapper.selectList(queryWrapper);
+        MdmProductStock mdmProductStock = new MdmProductStock();
+        mdmProductStock.setFactoryCode(context.getFactoryCode());
+        return mdmProductStockEntityMapper.getLatestStock(mdmProductStock);
     }
 
     @Override
