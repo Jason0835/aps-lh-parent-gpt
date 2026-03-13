@@ -23,3 +23,10 @@ export function removeMdmCapsuleChuck(query) {
   })
 }
 
+export function getTotal(query) {
+  return request({
+    url: '/monthplan/mdmCapsuleChuck/getSum',
+    method: 'post',
+    data: query
+  })
+}

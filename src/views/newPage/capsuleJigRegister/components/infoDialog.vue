@@ -172,7 +172,7 @@ export default {
 
         {
           prop: "newChuckQty",
-          label: this.$t("ui.data.column.capsuleChuck.newChuckQty"),
+          label: this.$t("新卡盘"),
           type: "number",
           listeners: {
             change: this.handleChangeGetMachines,

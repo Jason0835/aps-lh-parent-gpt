@@ -68,6 +68,14 @@
           >{{ $t("ui.data.productmodelrelation.updateMainPattern") }}</el-button
         >
       </template>
+      <template slot="headerRight">
+        <span class="stat-info">
+          <span
+            >{{ $t("总合计") }}:
+            <span class="stat-value"> {{ stat }} </span></span
+          >
+        </span>
+      </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <!-- <tlt-upload
@@ -99,6 +107,7 @@ import {
   removeRelation,
   mesCapture,
   updateMaterial,
+  getTotal
 } from "@/api/maindata/relation";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -120,6 +129,7 @@ export default {
   },
   data() {
     return {
+      stat:0,
       importColumns: [
         {
           label: "",
@@ -326,6 +336,14 @@ export default {
     },
   },
   methods: {
+    async getTotalSun(){
+      try{
+        const res = await getTotal(this.formatParams());
+        this.stat=res
+      }catch(err){
+
+      }
+    },
     async handleUpdate() {
       try {
         this.updateLoading=true
@@ -483,6 +501,7 @@ export default {
         console.log(data);
         this.data = data.rows;
         this.page.total = data.total;
+        this.getTotalSun()
       } catch (error) {
         console.error(error);
       } finally {

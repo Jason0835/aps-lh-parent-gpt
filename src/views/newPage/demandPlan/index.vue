@@ -29,6 +29,7 @@
         </el-button>
         <el-button
           type="primary"
+         :loading="btnLoading"
           plain
            v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
           @click="handleSubmit"
@@ -37,6 +38,7 @@
         <el-button
           type="primary"
           plain
+          :loading="btnLoading"
            v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
           @click="handleRevoke"
           >{{ $t("撤销提交") }}
@@ -170,6 +172,7 @@ export default {
   },
   data() {
     return {
+      btnLoading:false,
       title: "优先级调整",
       versionList: [],
       createLoading: false,
@@ -640,6 +643,7 @@ export default {
   methods: {
     async handleSubmit(){
       try {
+        this.btnLoading=true
         const params = {
           ...this.query,
           ...this.search,
@@ -661,12 +665,15 @@ export default {
       } catch (error) {
         console.log(error);
         this.loading = false;
+      }finally{
+        this.btnLoading=false
       }
     },
     async handleRevoke(){
-      this.$confirm(this.$t("common.confirm.delete"), {
+      this.$confirm(this.$t("该需求版本已做月计划，确认撤销？"), {
         type: "warning",
       }).then(() => {
+        this.btnLoading=true
         const params = {
           ...this.query,
           ...this.search,
@@ -684,7 +691,9 @@ export default {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
-        });
+        }).finally(()=>{
+          this.btnLoading=false
+        })
       });
     },
     refreshSearch(){

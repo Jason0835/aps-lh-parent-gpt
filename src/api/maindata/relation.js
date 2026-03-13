@@ -51,3 +51,10 @@ export function updateMaterial(query) {
     data: query
   })
 }
+export function getTotal(query) {
+  return request({
+    url: '/maindata/relation/selectMouldNumSum',
+    method: 'post',
+    data: query
+  })
+}

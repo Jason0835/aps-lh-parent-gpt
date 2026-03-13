@@ -44,6 +44,14 @@
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
+      <template slot="headerRight">
+        <span class="stat-info">
+          <span
+            >{{ $t("总合计") }}:
+            <span class="stat-value"> {{ stat }} </span></span
+          >
+        </span>
+      </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <!-- <tlt-upload
@@ -73,6 +81,7 @@ import { downloadLink } from "@/utils/request";
 import {
   listMdmCapsuleChuck,
   removeMdmCapsuleChuck,
+  getTotal
 } from "@/api/monthplan/mdmCapsuleChuck";
 
 //components
@@ -95,6 +104,7 @@ export default {
   },
   data() {
     return {
+      stat:0,
       importColumns: [
         {
           label: "",
@@ -154,7 +164,7 @@ export default {
         },
         {
           prop: "newChuckQty",
-          label: this.$t("ui.data.column.capsuleChuck.newChuckQty"),
+          label: this.$t("新卡盘"),
         },
         {
           prop: "totalQty",
@@ -220,6 +230,14 @@ export default {
     },
   },
   methods: {
+    async getTotalSun(){
+      try{
+        const res = await getTotal(this.formatParams());
+        this.stat=res
+      }catch(err){
+
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -320,6 +338,7 @@ export default {
         const data = await listMdmCapsuleChuck(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
+        this.getTotalSun()
       } catch (error) {
         console.error(error);
       } finally {
