@@ -103,6 +103,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     public List<FactoryMonthPlanProductionFinalResult> getDataList(FactoryMonthPlanProductionFinalResult condition) {
         QueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, condition);
+        queryWrapper.orderByAsc("STRUCTURE_NAME", "MAIN_PATTERN","MAIN_MATERIAL_DESC");
         List<FactoryMonthPlanProductionFinalResult> dataList = this.finalMapper.selectList(queryWrapper);
         dealList(dataList);
         return dataList;

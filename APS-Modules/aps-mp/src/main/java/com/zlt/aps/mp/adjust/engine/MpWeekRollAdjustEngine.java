@@ -945,8 +945,8 @@ public class MpWeekRollAdjustEngine {
                     continue;
                 }
                 //3.2、检查SKU二次上机
-                if (!checkSecOnline(mpFinalVo,newOnLineDay, contextDTO.getParamMap()) &&
-                        !hasPlanByDay(mpFinalVo, newOnLineDay -1)){
+                if (!checkSecOnline(mpFinalVo,lockNextDay, newOnLineDay, contextDTO.getParamMap()) &&
+                        !hasPlanByDay(mpFinalVo, getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),newOnLineDay -1))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新的上机日期:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
                     //提示：物料编码:%s,新的上机日期:%s,不符二次上机条件！
                     addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.noSecondOnline"),mpFinalVo.getMaterialCode(),newOnLineDay));
@@ -1311,13 +1311,14 @@ public class MpWeekRollAdjustEngine {
     /**
      * 检查二次上机
      * @param mpFinalVo 定稿对象vo
-     * @param newOnLineDay 新的上机日
+     * @param startDay 新的上机日
      * @param paramMap 参数Map
      * @return true-允许二次上机，false-不允许二次上机
      */
-    private boolean checkSecOnline(FactoryMonthPlanFinalAdjustVo mpFinalVo,Integer newOnLineDay,Map<String,Object> paramMap){
+    private boolean checkSecOnline(FactoryMonthPlanFinalAdjustVo mpFinalVo,Integer startDay,Integer checkDay,Map<String,Object> paramMap){
+        int nearEndDay = getNearEndDay(startDay,checkDay,mpFinalVo);
         Integer skuSecondDays = (Integer) paramMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
-        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(newOnLineDay,mpFinalVo.getEndDay(),skuSecondDays);
+        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(checkDay,nearEndDay,skuSecondDays);
         return skuSecondChecker.doCheck();
     }
 
@@ -1370,8 +1371,8 @@ public class MpWeekRollAdjustEngine {
                     continue;
                 }
                 //2.2、检查SKU二次上机
-                if (!checkSecOnline(mpFinalVo,newOnLineDay, contextDTO.getParamMap()) &&
-                        !hasPlanByDay(mpFinalVo, newOnLineDay -1)){
+                if (!checkSecOnline(mpFinalVo,lockNextDay,newOnLineDay, contextDTO.getParamMap()) &&
+                        !hasPlanByDay(mpFinalVo, getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),newOnLineDay -1))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新的上机日期:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),newOnLineDay)).append(ApsConstant.DIVISION);
                     //提示：物料编码:%s,新的上机日期:%s,不符二次上机条件！
                     addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.noSecondOnline"),mpFinalVo.getMaterialCode(),newOnLineDay));
@@ -1729,8 +1730,7 @@ public class MpWeekRollAdjustEngine {
                     continue;
                 }
                 //3.2、检查SKU二次上机
-                resetEndDay(1,structureDeadLine,mpFinalVo);
-                if (!checkSecOnline(mpFinalVo,i, contextDTO.getParamMap()) &&
+                if (!checkSecOnline(mpFinalVo,newOnLineDay, i, contextDTO.getParamMap()) &&
                         !hasPlanByDay(mpFinalVo, getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),i -1))){
                     contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,不符二次上机条件,退出！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),i)).append(ApsConstant.DIVISION);
                     newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
@@ -2489,19 +2489,21 @@ public class MpWeekRollAdjustEngine {
      * @param mpFinalVo 定稿Vo
      * @return
      */
-    private void resetEndDay(int startDay, int endDay, FactoryMonthPlanFinalAdjustVo mpFinalVo){
+    private int getNearEndDay(int startDay, int endDay, FactoryMonthPlanFinalAdjustVo mpFinalVo){
         String dayField;
-        int realEndDay = 0;
+        int newEndDay = 0;
         for (int i = startDay; i <= endDay; i++){
             dayField = FactoryConstant.DAY_FIELD + i;
             if (mpFinalVo.getFieldValueByFieldName(dayField) != null &&
                     (Integer) mpFinalVo.getFieldValueByFieldName(dayField) != 0){
-                if (realEndDay < i){
-                    realEndDay = i;
-                }
+                newEndDay = i;
+            }
+            if (newEndDay > 0 && (mpFinalVo.getFieldValueByFieldName(dayField) == null ||
+                    (Integer) mpFinalVo.getFieldValueByFieldName(dayField) == 0)){
+                break;
             }
         }
-        mpFinalVo.setEndDay(realEndDay);
+        return newEndDay;
     }
 
     /**
