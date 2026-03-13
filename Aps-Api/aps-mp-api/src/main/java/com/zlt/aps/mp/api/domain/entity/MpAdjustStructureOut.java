@@ -166,7 +166,7 @@ public class MpAdjustStructureOut extends BaseEntity {
     /**
      * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
      */
-    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.constructionStage")
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.schedulingType")
     @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
