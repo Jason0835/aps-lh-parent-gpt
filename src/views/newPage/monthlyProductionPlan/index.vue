@@ -193,7 +193,7 @@ export default {
         },
         {
           prop: "constructionStage",
-          label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
+          label: this.$t("排产类型"),
           width: 120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_construction_stage, value);

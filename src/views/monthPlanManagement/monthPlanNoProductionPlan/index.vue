@@ -149,7 +149,7 @@ export default {
           minWidth: 300,
         },
         {
-          label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
+          label: this.$t("排产类型"),
           prop: "constructionStage",
           minWidth: 100,
           formatter: (row, column, value) => {

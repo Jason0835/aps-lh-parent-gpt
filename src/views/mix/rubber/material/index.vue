@@ -206,6 +206,33 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
         },
+        {
+          prop: "embryoCode",
+          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+        },
+        {
+          prop: "embryoDesc",
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+        },
+        {
+          prop: "qualityStateCode",
+          type: "select", //GLUE_TYPE
+          label: this.$t("质控状态"),
+          dictData: this.dict.type.quality_state,
+
+        },
+        {
+          prop: "cantProduce",
+          type: "select", //GLUE_TYPE
+          label: this.$t("ui.data.column.scheduleAdjust.cantProduce"),
+          dictData: this.dict.type.biz_yes_no,
+
+        },
+        {
+          prop: "mainPattern",
+
+          label: this.$t("ui.data.column.moldLedger.mainPattern"),
+        },
       ];
     },
     columns() {

@@ -230,7 +230,7 @@ export default {
           width: 120,
         },
         {
-          label: this.$t("ui.data.monthlyProductionPlan.constructionStage"),
+          label: this.$t("排产类型"),
           prop: "constructionStage",
           formatter: (row, column, value) => {
             return this.selectDictLabel(

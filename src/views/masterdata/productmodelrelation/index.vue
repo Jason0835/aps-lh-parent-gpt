@@ -72,7 +72,7 @@
         <span class="stat-info">
           <span
             >{{ $t("总合计") }}:
-            <span class="stat-value"> {{ stat }} </span></span
+            <span class="stat-value"> {{ stat.totalNum }} </span></span
           >
         </span>
       </template>
@@ -129,7 +129,9 @@ export default {
   },
   data() {
     return {
-      stat:0,
+      stat:{
+        totalNum:0
+      },
       importColumns: [
         {
           label: "",

@@ -2,7 +2,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="cxFixedMachineMainTable"
+      tableRef="FactoryParamMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -19,84 +19,74 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
+
+        <!-- <el-button
           type="primary"
           plain
-          v-hasPermi="['monthplan:mdmCapsuleChuck:edit']"
+          v-hasPermi="['monthplan:factoryParam:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <el-button
+        > -->
+        <!-- <el-button
+          type="primary"
+          plain
+          v-hasPermi="['monthplan:factoryParam:edit']"
+          @click="handleEdit(selection[0])"
+          >{{ $t("ui.frame.btn.modify") }}</el-button
+        > -->
+        <!-- <el-button
           type="danger"
-          v-hasPermi="['monthplan:mdmCapsuleChuck:remove']"
-          :disabled="selection.length == 0"
-          @click="handleDeleteAll"
+          plain
+          v-hasPermi="['monthplan:factoryParam:remove']"
+          :disabled="selection.length === 0"
+          @click="handleDelete(selection)"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['monthplan:mdmCapsuleChuck:import']"
+        > -->
+        <!-- <el-button
+          v-hasPermi="['monthplan:factoryParam:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
-        >
-        <el-button
+        > -->
+        <!-- <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:mdmCapsuleChuck:export']"
+          v-hasPermi="['monthplan:factoryParam:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
-        >
-      </template>
-      <template slot="headerRight">
-        <span class="stat-info">
-          <span
-            >{{ $t("总合计") }}:
-            <span class="stat-value"> {{ stat.totalNum }} </span></span
-          >
-        </span>
+        > -->
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <!-- <tlt-upload
       ref="tltUpload"
-      downloadUrl="/monthplan/mdmCapsuleChuck/importTemplate"
-      uploadUrl="/monthplan/mdmCapsuleChuck/importData"
+      downloadUrl="/monthplan/factoryParam/importTemplate"
+      uploadUrl="/monthplan/factoryParam/importData"
       @uploadSuccess="getList"
     /> -->
-    <tlt-upload-form
-      ref="tltUpload"
-      :updateSupport="true"
-      downloadUrl="/monthplan/mdmCapsuleChuck/importTemplate"
-      uploadUrl="/monthplan/mdmCapsuleChuck/importData"
-      @uploadSuccess="getList"
-      labelWidth="0"
-      :columns="importColumns"
-    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import moment from "moment";
 //utils
 import { downloadLink } from "@/utils/request";
-
+//interface
 import {
-  listMdmCapsuleChuck,
-  removeMdmCapsuleChuck,
-  getTotal
-} from "@/api/monthplan/mdmCapsuleChuck";
-
+  listFactoryParam,
+  editFactoryParam,
+  removeFactoryParam,
+} from "@/api/monthplan/productionSchedulingParam";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-import TltUploadForm from "@/views/components/tltUploadForm.vue";
+
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "CapsuleJigRegister",
+  name: "ProductionSchedulingParam",
   components: {
     tltUpload,
     infoDialog,
-    TltUploadForm
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name"],
+  dicts: ["biz_factory_name", "molding_method", "biz_personnel_type",'biz_product_type'],
   provide() {
     return {
       parentDict: this.dict,
@@ -104,25 +94,6 @@ export default {
   },
   data() {
     return {
-      stat:{
-        totalNum:0
-      },
-      importColumns: [
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -132,83 +103,81 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        mainPlanMonth: "",
+      },
+      query: {
+        mainPlanMonth: "",
+      },
       importDefaultValue: {},
       importRules: {},
     };
   },
   computed: {
-    ...mapState({
-      moldingMachines: (state) => state.molding.machines,
-    }),
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          formatter: (row, column, value) => {
+          formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          prop: "specifications",
-          label: this.$t("ui.data.column.capsuleChuck.specifications"),
+          prop: "productTypeCode",
+          label: this.$t("ui.data.column.monthplan.productType"),
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          },
         },
         {
-          prop: "proSize",
-          label: this.$t("ui.data.column.capsuleChuck.proSize"),
+          prop: "paramCode",
+          label: this.$t("ui.data.factoryParam.paramCode"),
+          width: 200,
         },
         {
-          prop: "internalQty",
-          label: this.$t("ui.data.column.capsuleChuck.internalQty"),
+          prop: "paramName",
+          label: this.$t("common.api.config.columnname.name"),
+          width: 300,
         },
         {
-          prop: "newChuckQty",
-          label: this.$t("新卡盘"),
+          prop: "paramValue",
+          label: this.$t("ui.data.factoryParam.paramValue"),
         },
         {
-          prop: "totalQty",
-          label: this.$t("common.sum"),
-          render: ({ row }) => {
-            return Number(row.internalQty) + Number(row.newChuckQty);
-          }
+          prop: "defauleValue",
+          label: this.$t("ui.data.factoryParam.defauleValue"),
         },
         {
           prop: "remark",
           label: this.$t("common.remark"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateBy",
+          label: this.$t("common.updateByName"),
         },
         {
           prop: "updateTime",
+          label: this.$t("common.updateTime"),
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
         },
-
         {
           align: "center",
-          label: this.$t("ui.data.btn.option"),
+          halign: "center",
           fixed: "right",
+          label: this.$t("ui.data.btn.option"),
           render: ({ row }) => {
             return (
-              <div>
-                <el-button
-                  v-hasPermi={["monthplan:mdmCapsuleChuck:edit"]}
-                  class="minus"
-                  type="success"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t("ui.frame.btn.update")}
-                </el-button>
-                <el-button
-                  v-hasPermi={["monthplan:mdmCapsuleChuck:remove"]}
-                  class="minus"
-                  type="danger"
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t("ui.frame.btn.delete")}
-                </el-button>
-              </div>
+              <el-button
+                v-hasPermi={["dp:factoryParam:edit"]}
+                class="minus"
+                type="success"
+                onClick={() => this.handleEdit(row)}
+              >
+                {this.$t("ui.frame.btn.update")}
+              </el-button>
             );
           },
         },
@@ -219,27 +188,23 @@ export default {
     searchColumns() {
       return [
         {
-          prop: "factoryCode",
           label: this.$t("common.factory"),
+          prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "specifications",
-          label: this.$t("ui.data.column.capsuleChuck.specifications"),
+          prop: "paramName",
+          label: this.$t("common.api.config.columnname.name"),
+        },
+        {
+          prop: "paramCode",
+          label: this.$t("ui.data.factoryParam.paramCode"),
         },
       ];
     },
   },
   methods: {
-    async getTotalSun(){
-      try{
-        const res = await getTotal(this.formatParams());
-        this.stat=res
-      }catch(err){
-
-      }
-    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -250,35 +215,39 @@ export default {
         this.$refs.infoRef.show(row);
       }
     },
-    handleDelete(row) {
+    handleDelete(rows) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = row.id;
-        removeMdmCapsuleChuck({ ids }).then((data) => {
+        const ids = rows.map((row) => row.id).join(",");
+        removeFactoryParam({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
         });
       });
     },
-    handleDeleteAll() {
-      let ids = "";
-      for (let i = 0; i < this.selection.length; i++) {
-        if (i == this.selection.length - 1) {
-          ids = ids + this.selection[i].id;
-        } else {
-          ids = ids + this.selection[i].id + ",";
-        }
-      }
-      this.$confirm(this.$t("common.confirm.delete"), {
+    handleChangeStatus(status, row) {
+      console.log(status);
+      let label =
+        status === "0"
+          ? this.$t("ui.biz.alter.isOpen")
+          : this.$t("ui.biz.alter.isStop");
+
+      this.$confirm(label, {
         type: "warning",
-      }).then(() => {
-        removeMdmCapsuleChuck({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
-          this.$set(this.page, "current", 1);
+      }).then(async () => {
+        try {
+          this.loading = true;
+          const res = await editFactoryParam({
+            ...row,
+            status,
+          });
+          this.$modal.msgSuccess(res.msg);
           this.getList();
-        });
+        } catch (error) {
+          this.loading = false;
+        }
       });
     },
     handleSearch(data) {
@@ -306,13 +275,22 @@ export default {
       }
       this.getList();
     },
+    handleAutoPlan() {
+      console.log("handleAutoPlan");
+      if (this.$refs.autoPlanRef) {
+        this.$refs.autoPlanRef.show("", "1");
+      }
+    },
+
+    handleExport() {
+      downloadLink("/monthplan/factoryParam/export", this.formatParams(false));
+    },
+
     handleSelectionChange(rows) {
       this.selection = rows;
     },
-    handleExport() {
-      downloadLink("/monthplan/mdmCapsuleChuck/export", this.formatParams(false));
-    },
 
+    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -336,15 +314,36 @@ export default {
     async getList() {
       try {
         this.loading = true;
-
-        const data = await listMdmCapsuleChuck(this.formatParams());
+        const data = await listFactoryParam(this.formatParams());
+        console.log(data);
         this.data = data.rows;
         this.page.total = data.total;
-        this.getTotalSun()
       } catch (error) {
         console.error(error);
       } finally {
         this.loading = false;
+      }
+    },
+
+    async publishSchedule() {
+      try {
+        this.loading = true;
+        const valid = await publishValidate();
+        if (valid.msg == "0") {
+          this.$confirm(
+            this.$t("ui.data.column.scheduleResult.hasNullLhMachineCode")
+          ).then(async () => {
+            const result = await publishScheduleResult();
+            this.$emit("success");
+            this.hide();
+          });
+        } else {
+          const result = await publishScheduleResult();
+          this.$emit("success");
+          this.hide();
+        }
+      } catch (error) {
+        console.error(error);
       }
     },
   },
@@ -360,9 +359,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-    // this.getList();
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>
