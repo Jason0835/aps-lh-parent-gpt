@@ -1,33 +1,29 @@
 package com.zlt.aps.mp.setting.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.maindata.service.IMdmSkuLhCapacityService;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.core.queryformulas.QueryFormulaUtil;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.log.annotation.Log;
-import com.ruoyi.common.log.enums.BusinessType;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -91,6 +87,7 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MdmSkuLhCapacity billVO){
+        mdmSkuLhCapacityService.setClassCapacity(billVO);
         return super.save(billVO);
     }
 
