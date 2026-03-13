@@ -9,6 +9,7 @@ import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
+import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
@@ -97,6 +98,21 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             ProductionPlanType.NORMAL.getPlanType(),
             YesOrNoEnum.NO.getValue()
         );
+    }
+
+    @Override
+    public String getPlanType(FactoryProductionPlanVo selectedRequireVersion) {
+        LambdaQueryWrapper<DpDemandPlanSum> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(DpDemandPlanSum::getFactoryCode, selectedRequireVersion.getFactoryCode());
+        wrapper.eq(DpDemandPlanSum::getYear, selectedRequireVersion.getYear());
+        wrapper.eq(DpDemandPlanSum::getMonth, selectedRequireVersion.getMonth());
+        wrapper.eq(DpDemandPlanSum::getMonthPlanVersion, selectedRequireVersion.getMonthPlanVersion());
+        wrapper.eq(DpDemandPlanSum::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<DpDemandPlanSum>  list = dpDemandPlanSumEntityMapper.selectList(wrapper);
+        if(CollectionUtils.isEmpty(list)) {
+            return null;
+        }
+        return list.get(0).getPlanType();
     }
 
     private void updateDpDemandPlanSum(DpDemandPlanSum billVO) {
