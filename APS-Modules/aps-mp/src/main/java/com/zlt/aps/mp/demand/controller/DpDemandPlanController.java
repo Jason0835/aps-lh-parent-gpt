@@ -238,7 +238,7 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
     @ApiOperation("生成需求计划版本")
     @PostMapping("/createMonthRequireVersion")
     public AjaxResult createMonthRequireVersion(){
-        return AjaxResult.success( requirementVersionService.generateVersion(DpDemandPlanServiceImpl.PREFIX));
+        return AjaxResult.success( requirementVersionService.generateVersion(DpDemandPlanServiceImpl.PREFIX,false));
     }
 
 }
