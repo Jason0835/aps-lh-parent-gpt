@@ -338,7 +338,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         if (null != singleLhMachineQty) {
             setDayVulcanizationQty(singleLhMachineQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION);
         }
-        setCuringTime(lhCapacity.getVulcanizationTime());
+        BigDecimal curingTime = Optional.ofNullable(lhCapacity.getVulcanizationTime()).orElse(BigDecimal.ZERO);
+        setCuringTime(curingTime);
     }
 
     /**

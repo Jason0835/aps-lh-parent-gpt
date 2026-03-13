@@ -95,7 +95,7 @@ public class CxContinueInfoHelper implements Serializable {
             //按硫化配比最大优先->机台编号大优先
             cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.reverseOrder())
                     .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.reverseOrder()));
-            leftOver = cxCapacityInfoList.subList(deductionCount, cxCapacityInfoList.size() - BigDecimal.ONE.intValue());
+            leftOver = cxCapacityInfoList.subList(deductionCount, cxCapacityInfoList.size());
         }
         //最大胎胚种类数
         if (CxMachineLimitTypeEnum.MAX_EMBRYO_SIZE == type) {

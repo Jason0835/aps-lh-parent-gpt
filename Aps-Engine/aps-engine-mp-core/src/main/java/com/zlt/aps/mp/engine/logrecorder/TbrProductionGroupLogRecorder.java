@@ -287,6 +287,23 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加在机结构模拟排产后收尾机台信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构模拟排产完毕后，收尾机台：%s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addInProductionMachinesInfoLog(Context context, String reverseCxMachineInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在机结构模拟排产完毕后，收尾机台：%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                reverseCxMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.REVERSE_MACHINE_PRODUCTION_INFO, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加收尾机台没有分配结构日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，收尾机台：%s 没有分配排产计划====
      *
