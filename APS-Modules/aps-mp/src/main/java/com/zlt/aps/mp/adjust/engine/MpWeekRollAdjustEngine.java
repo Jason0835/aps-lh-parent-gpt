@@ -1882,7 +1882,8 @@ public class MpWeekRollAdjustEngine {
      * @param incMouldContext 增模排产上下文
      */
     private int revertPreDayQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo, int currentDay, IncMouldContext incMouldContext){
-        if (incMouldContext.getUsedProductionDays() == 1 && incMouldContext.getBeforeProductionQty() > 0){
+        if (incMouldContext.getUsedProductionDays() == 1 && incMouldContext.getBeforeProductionQty() > 0 &&
+                YesOrNoEnum.YES.getCode().equals(contextDTO.getDailyCapacityLimitVoMap().get(currentDay).getDayOpenCloseFlag())){
             // 若只有排产1天，则将前日的值还原
             int beforeProductionQty = incMouldContext.getBeforeProductionQty();
             int preDay = getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),currentDay -1);
@@ -1890,10 +1891,8 @@ public class MpWeekRollAdjustEngine {
             int preDayValue = (Integer) mpFinalVo.getFieldValueByFieldName(preDayField) - incMouldContext.getBeforeProductionQty();
             mpFinalVo.setFieldValueByFieldName(preDayField,preDayValue==0 ? null : preDayValue);
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,单机台已排产天数: %s, 还原值:%s, 前日还原后的排产量: %s！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),currentDay,incMouldContext.getUsedProductionDays(),beforeProductionQty,preDayValue)).append(ApsConstant.DIVISION);
-            if (YesOrNoEnum.YES.getCode().equals(contextDTO.getDailyCapacityLimitVoMap().get(currentDay).getDayOpenCloseFlag())){
-                incMouldContext.setBeforeProductionQty(0);
-                incMouldContext.setBFirstAddMould(true);
-            }
+            incMouldContext.setBeforeProductionQty(0);
+            incMouldContext.setBFirstAddMould(true);
             return beforeProductionQty;
         }
         return 0;
