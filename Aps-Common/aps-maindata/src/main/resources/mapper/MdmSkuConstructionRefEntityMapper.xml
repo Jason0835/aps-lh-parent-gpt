@@ -13,7 +13,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             GROUP BY t.FACTORY_CODE, t.MATERIAL_CODE
             ) t2
         ON t1.FACTORY_CODE = t2.FACTORY_CODE AND t1.MATERIAL_CODE = t2.MATERIAL_CODE
-            SET t1.EMBRYO_DESC = t2.MAIN_MATERIAL_DESC
+            SET t1.EMBRYO_DESC = t2.MAIN_MATERIAL_DESC,
                 t1.EMBRYO_CODE = t2.EMBRYO_CODE,
                 t1.UPDATE_BY = #{updateBy},
                 t1.UPDATE_TIME = #{updateTime}
