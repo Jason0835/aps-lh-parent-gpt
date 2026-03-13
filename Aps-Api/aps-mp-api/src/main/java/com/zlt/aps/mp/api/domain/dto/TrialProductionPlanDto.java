@@ -53,7 +53,7 @@ public class TrialProductionPlanDto extends BaseEntity {
     /**
      * 施工阶段
      */
-    @Excel(name = "ui.data.column.monthPlanProductionFinalResult.constructionStage", dictType = "biz_construction_stage", sort = 6)
+    @Excel(name = "ui.data.column.monthPlanProductionFinalResult.schedulingType", dictType = "biz_construction_stage", sort = 6)
     @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "施工阶段", name = "constructionStage")
     private Integer constructionStage;

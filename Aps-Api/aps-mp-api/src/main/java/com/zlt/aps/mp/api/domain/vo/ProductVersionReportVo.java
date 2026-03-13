@@ -28,7 +28,7 @@ public class ProductVersionReportVo extends BaseEntity {
     /**
      * 施工阶段
      */
-    @Excel(name = "ui.data.column.report.constructionStage", dictType = "biz_construction_stage")
+    @Excel(name = "ui.data.column.report.schedulingType", dictType = "biz_construction_stage")
     @ApiModelProperty(value = "施工阶段", name = "constructionStage")
     private String constructionStage;
 
