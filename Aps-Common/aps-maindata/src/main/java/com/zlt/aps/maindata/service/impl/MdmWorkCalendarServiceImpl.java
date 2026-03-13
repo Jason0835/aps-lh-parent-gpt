@@ -130,7 +130,7 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
                 return Boolean.FALSE;
             }
         }
-        if (isValidDate(DateUtils.parseDateToStr("yyyy-MM-dd", productionDate))) {
+        if (!isValidDate(DateUtils.parseDateToStr("yyyy-MM-dd", productionDate))) {
             String message = I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.dateError");
             ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                     errorRowNum, message, importErrorLogs);
