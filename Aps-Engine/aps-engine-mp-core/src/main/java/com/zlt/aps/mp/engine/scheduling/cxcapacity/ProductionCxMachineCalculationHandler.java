@@ -278,7 +278,7 @@ public class ProductionCxMachineCalculationHandler {
         Integer releaseCount = initReleaseInfo.getReleaseMachineCount();
         List<ProductGroupCxCapacityInfo> effectiveList;
         if (null != releaseCount && releaseCount > BigDecimal.ZERO.intValue() && releaseCount < productionCount) {
-            int endIndex = cxCapacityInfoList.size() - releaseCount - BigDecimal.ONE.intValue();
+            int endIndex = cxCapacityInfoList.size() - releaseCount;
             effectiveList = cxCapacityInfoList.subList(BigDecimal.ZERO.intValue(), endIndex);
         } else {
             effectiveList = cxCapacityInfoList;
@@ -295,7 +295,8 @@ public class ProductionCxMachineCalculationHandler {
                 CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
                 Integer remainingDays = cxMachineInfo.getRemainingDays();
                 Integer allocationDay = Math.min(sumDays, remainingDays);
-                productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay); // 更新特殊材料库存
+                // 更新特殊材料库存
+                productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
                 groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
                 CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
                 cxMachineInfo.addAllocationPlanInfo(context, helper);
@@ -312,7 +313,8 @@ public class ProductionCxMachineCalculationHandler {
             Integer remainingDays = cxMachineInfo.getRemainingDays() - minAllocationDays;
             Integer leftOverAllocationDay = Math.min(leftOverSplitDays, remainingDays);
             Integer allocationDay = leftOverAllocationDay + minAllocationDays;
-            productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay); // 更新特殊材料库存
+            // 更新特殊材料库存
+            productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
             CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
             cxMachineInfo.addAllocationPlanInfo(context, helper);
@@ -387,10 +389,12 @@ public class ProductionCxMachineCalculationHandler {
         //不能减，则再加回，看最先收尾时间点
         if (null == deductionDay) {
             deductionMachineCount = deductionMachineCount - BigDecimal.ONE.intValue();
+            if(deductionMachineCount < BigDecimal.ZERO.intValue()){
+                deductionMachineCount = BigDecimal.ZERO.intValue();
+            }
             deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
         }
-        //没有一台可释放，表示续作都有排产
-        release.setReleaseMachineCount(BigDecimal.ZERO.intValue());
+        release.setReleaseMachineCount(deductionMachineCount);
         release.setEarliestConclusionDay(deductionDay);
         return;
     }
