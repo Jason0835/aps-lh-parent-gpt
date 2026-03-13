@@ -32,7 +32,9 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -264,6 +266,8 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
         this.builderCondition(wrapper, queryVO);
         List<MdmSkuMouldRel> list = entityMapper.selectList(wrapper);
         long count = list.stream().map(MdmSkuMouldRel::getMouldCode).filter(StringUtils::isNotBlank).distinct().count();
-        return AjaxResult.success(count);
+        Map<String, Long> map = new HashMap<>();
+        map.put("totalNum", count);
+        return AjaxResult.success(map);
     }
 }

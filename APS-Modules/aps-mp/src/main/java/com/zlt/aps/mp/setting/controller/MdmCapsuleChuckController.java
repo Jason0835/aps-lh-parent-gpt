@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -167,7 +169,9 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
         List<MdmCapsuleChuck> list = entityMapper.selectList(queryWrapper);
         long internalCount = list.stream().filter(item -> !Objects.isNull(item.getInternalQty())).mapToInt(MdmCapsuleChuck::getInternalQty).sum();
         long newChuckCount = list.stream().filter(item -> !Objects.isNull(item.getNewChuckQty())).mapToInt(MdmCapsuleChuck::getNewChuckQty).sum();
-        return AjaxResult.success(internalCount + newChuckCount);
+        Map<String, Long> map = new HashMap<>();
+        map.put("totalNum", internalCount + newChuckCount);
+        return AjaxResult.success(map);
     }
 
 }
