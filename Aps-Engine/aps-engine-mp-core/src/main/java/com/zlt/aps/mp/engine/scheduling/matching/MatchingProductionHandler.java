@@ -825,7 +825,7 @@ public class MatchingProductionHandler {
      */
     private int getMdmSkuLhCapacity(MpRollAdjustContextDTO contextDTO, String materialDesc,
                                     Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap) {
-        int capacity = 0;
+        Integer capacity = 0;
         MdmSkuLhCapacity mdmSkuLhCapacity = mdmSkuLhCapacityMap.get(materialDesc);
         if (mdmSkuLhCapacity == null){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
@@ -839,6 +839,10 @@ public class MatchingProductionHandler {
             capacity = mdmSkuLhCapacity.getStandardCapacity();
         } else if (dayVulcanizationMode == DayVulcanizationModeEnum.APS_CAPACITY) {
             capacity = mdmSkuLhCapacity.getApsCapacity();
+        }
+        if (capacity == null){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+                    materialDesc));
         }
         return capacity;
     }
