@@ -255,7 +255,8 @@ export default {
           };
           list.push(obj)
         }
-        this.selectList = list;
+        const filteredData = list.filter(item => item.value !== '01');
+        this.selectList = filteredData;
       } catch (err) {}
     },
   },

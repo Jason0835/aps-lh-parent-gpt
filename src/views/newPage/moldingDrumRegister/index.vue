@@ -166,7 +166,7 @@ export default {
         },
         {
           prop: "cxMachineBrandCode",
-          label: this.$t("成型鼓类型"),
+          label: this.$t("成型鼓厂家"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_machine_brand, value);

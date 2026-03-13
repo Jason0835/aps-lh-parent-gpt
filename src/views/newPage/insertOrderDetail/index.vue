@@ -920,6 +920,7 @@ export default {
         params.monthPlanVersion=params.requireVersion
 
       }
+      params.planType=params.sourceType
       return params;
     },
     // api

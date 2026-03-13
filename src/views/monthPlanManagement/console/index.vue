@@ -22,13 +22,13 @@
       @select-all="handleSelectAll"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           type="primary"
           plain
           v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
           @click="handleAdd"
           >{{ $t("ui.data.console.noVersionList") }}</el-button
-        >
+        > -->
         <!-- <el-button
           type="primary"
           plain
@@ -197,13 +197,13 @@ export default {
                   >
                     {this.$t("plan.planProduction.detail")}
                   </text-button>
-                  <text-button
+                  {/* <text-button
                     onClick={() => {
                       this.handleDelete(row);
                     }}
                   >
                     {this.$t("common.button.delete")}
-                  </text-button>
+                  </text-button> */}
                   <text-button
                     onClick={() => {
                       downloadLink("/monthplan/demandPlanSum/export", {

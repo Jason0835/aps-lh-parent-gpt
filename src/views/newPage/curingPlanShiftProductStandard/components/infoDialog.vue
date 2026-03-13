@@ -231,7 +231,7 @@ export default {
         },
         {
           prop: "standardCapacity",
-          label: this.$t("ui.data.column.curingPlan.standardCapacity"),
+          label: this.$t("日标准产量"),
           span: 12,
           type: "number",
           required: true,

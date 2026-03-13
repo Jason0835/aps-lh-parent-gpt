@@ -180,7 +180,7 @@ export default {
         },
         {
           prop: "boardingDate",
-          label: this.$t("ui.data.column.monthplan.boardingDate"),
+          label: this.$t("模具可用日期"),
         },
         {
           prop: "remark",

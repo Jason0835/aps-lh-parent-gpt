@@ -215,7 +215,7 @@ export default {
         },
         {
           prop: "cxMachineBrandCode",
-          label: this.$t("成型鼓类型"),
+          label: this.$t("成型鼓厂家"),
           type:'select',
           dictData: this.parentDict.type.biz_machine_brand,
         },

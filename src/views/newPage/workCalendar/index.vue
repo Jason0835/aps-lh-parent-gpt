@@ -572,8 +572,11 @@ export default {
       try {
         let res = await selectProcCodeList();
         this.selectList = res;
-        this.search.procCode = res[0].dictValue;
-        this.getList();
+        if(res.length>0){
+          this.search.procCode = res[0].dictValue;
+          this.getList();
+        }
+
       } catch (err) {}
     },
     async genYearlPlan() {

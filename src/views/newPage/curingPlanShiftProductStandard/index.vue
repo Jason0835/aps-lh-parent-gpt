@@ -164,7 +164,7 @@ export default {
         },
         {
           prop: "standardCapacity",
-          label: this.$t("ui.data.column.curingPlan.standardCapacity"),
+          label: this.$t("日标准产量"),
         },
         // {
         //   prop: "MES日硫化量",

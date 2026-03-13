@@ -27,13 +27,20 @@
           v-hasPermi="['monthplan:demandPlan:createMonthRequire']"
           >{{ $t("ui.data.DemandPlan.createMonthRequire") }}
         </el-button>
-        <!-- <el-button
+        <el-button
           type="primary"
           plain
-          v-hasPermi="['monthplan:productionMouldConfiguration:add']"
-          @click="handleAdd"
-          >{{ $t("生成周度需求计划") }}
-        </el-button> -->
+           v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
+          @click="handleSubmit"
+          >{{ $t("提交确认") }}
+        </el-button>
+        <el-button
+          type="primary"
+          plain
+           v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
+          @click="handleRevoke"
+          >{{ $t("撤销提交") }}
+        </el-button>
         <!-- <el-button
           type="success"
           plain
@@ -127,6 +134,7 @@
 <script>
 import { mapState, mapGetters } from "vuex";
 import { downloadLink } from "@/utils/request";
+import {  versionConfirm,deleteMonthPlanRequire } from "@/api/factory/console";
 import {
   listDemandPlan,
   saveDemandPlan,
@@ -630,6 +638,55 @@ export default {
     },
   },
   methods: {
+    async handleSubmit(){
+      try {
+        const params = {
+          ...this.query,
+          ...this.search,
+        };
+        let obj={
+          factoryCode:params.factoryCode,
+          monthPlanVersion:params.monthPlanVersion
+        }
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          obj.year = arr[0];
+          obj.month = arr[1];
+        }
+
+        const res = await versionConfirm(obj);
+        this.$modal.msgSuccess(res.msg);
+        this.$set(this.page, "current", 1);
+        this.getList();
+      } catch (error) {
+        console.log(error);
+        this.loading = false;
+      }
+    },
+    async handleRevoke(){
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const params = {
+          ...this.query,
+          ...this.search,
+        };
+        let obj={
+          factoryCode:params.factoryCode,
+          monthPlanVersion:params.monthPlanVersion
+        }
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          obj.year = arr[0];
+          obj.month = arr[1];
+        }
+        deleteMonthPlanRequire(obj).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     refreshSearch(){
       this.search={
         factoryCode:this.search.factoryCode,

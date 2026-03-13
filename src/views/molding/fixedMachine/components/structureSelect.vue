@@ -139,6 +139,7 @@ export default {
   methods: {
     // 排序并选中数据
     sortAndSelectData(list) {
+
       const tableRef = this.$refs.tableRef.getTableRef();
       // 1. 将数据分为两组：需要置顶的 和 普通的
       const topItems = [];
@@ -168,8 +169,13 @@ export default {
       try {
         this.loading = true;
         const data = await selectSkuStructure(this.formatParams());
+        if(!this.oldList){
+          this.data = data.rows;
+        }else{
+          this.sortAndSelectData(data.rows)
+        }
         // this.data = data.rows;
-        this.sortAndSelectData(data.rows)
+
         console.log(this.oldList);
         // this.$nextTick(()=>{
         //   if(this.oldList&&this.oldList.length>0){
