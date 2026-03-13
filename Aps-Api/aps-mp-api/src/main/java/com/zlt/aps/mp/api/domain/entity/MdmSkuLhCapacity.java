@@ -1,13 +1,13 @@
 package com.zlt.aps.mp.api.domain.entity;
 
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -70,10 +70,10 @@ public class MdmSkuLhCapacity extends BaseEntity {
     @TableField(value = "MES_CAPACITY")
     private Integer mesCapacity;
 
-    /** 标准产能 */
+    /** 日标准产量 */
     @ImportExcelValidated(digits = true, min = 0, max = 999999)
     @Excel(name = "ui.data.column.mdmSkuLhCapacity.standardCapacity")
-    @ApiModelProperty(value = "标准产能", name = "standardCapacity")
+    @ApiModelProperty(value = "日标准产量", name = "standardCapacity")
     @TableField(value = "STANDARD_CAPACITY")
     private Integer standardCapacity;
 

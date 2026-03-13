@@ -18,4 +18,9 @@ import com.zlt.bill.common.service.IDocService;
  */
 public interface IMdmSkuLhCapacityService  extends IDocService<MdmSkuLhCapacity>{
 
+    /**
+     * 计算日标准产量
+     * @param billVO 要计算的对象
+     */
+    void setClassCapacity(MdmSkuLhCapacity billVO);
 }

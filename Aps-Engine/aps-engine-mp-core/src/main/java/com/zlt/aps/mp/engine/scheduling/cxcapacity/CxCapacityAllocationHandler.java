@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
@@ -125,6 +126,8 @@ public class CxCapacityAllocationHandler {
             //todo 记录日志
             return;
         }
+        String reverseAllCxMachineInfo = endingCxMachineList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.joining(StringConstant.COMMA));
+        TbrProductionGroupLogRecorder.addInProductionMachinesInfoLog(productionContext, reverseAllCxMachineInfo);
         // 对机台排序
         endingCxMachineList.sort((machine1, machine2) -> {
             // 最先给有特殊结构在机的机台挑选

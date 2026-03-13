@@ -2,24 +2,32 @@ package com.zlt.aps.maindata.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
+import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmSkuLhCapacityService;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -41,6 +49,9 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
 
     @Autowired
     private MdmSkuLhCapacityEntityMapper mapper;
+
+    @Autowired
+    private IFactoryParamService factoryParamService;
 
     @Override
     protected String getDocTypeCode() {
@@ -96,6 +107,8 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
             return;
         }
 
+        int paramValue = getParamValue();
+
         /**
          * 模具产能：向下取整（ 24 * 60 * 60 /（ 硫化总时间（s）+ 机械动作时间（s）))
          * APS日硫化产能计算：模具产能 * 2
@@ -112,6 +125,8 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
                     double divisionResult = (double) ApsConstant.SECOND_PER_DAY / (vulcanizationTime + mechanicalTime);
                     double ceilResult = Math.floor(divisionResult);
                     skuCapacity.setApsCapacity(Convert.toInt(ceilResult) * 2);
+
+                    this.setClassCapacity(skuCapacity);
                 });
         // 设置默认值
         sourceList.stream()
@@ -123,4 +138,33 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
                 .forEach(skuCapacity -> skuCapacity.setApsCapacity(0));
     }
 
+    /**
+     * 计算日标准产量
+     * @param billVO 要计算的对象
+     */
+    @Override
+    public void setClassCapacity(MdmSkuLhCapacity billVO) {
+        int paramValue = this.getParamValue();
+        Integer standardCapacity = billVO.getStandardCapacity();
+        if (standardCapacity != null && paramValue != 0) {
+            BigDecimal result = new BigDecimal(standardCapacity).divide(new BigDecimal(paramValue), RoundingMode.UP);
+            billVO.setClassCapacity(result.intValue());
+        }
+    }
+
+    private int getParamValue() {
+        // 取参数
+        FactoryParam factoryParam = new FactoryParam();
+        factoryParam.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        factoryParam.setParamCode(MonthPlanEnums.APS_GENERAL_SHIFT.getCode());
+        factoryParam.setProductTypeCode(ProductTypeEnum.WHOLE_STEEL.getValue());
+        FactoryParam param = factoryParamService.getFacParamSingle(factoryParam);
+        int paramValue;
+        if (param == null) {
+            paramValue = BigDecimal.ZERO.intValue();
+        } else {
+            paramValue = Integer.parseInt(StringUtils.isNotEmpty(param.getParamValue()) ? param.getParamValue() : param.getDefauleValue());
+        }
+        return paramValue;
+    }
 }

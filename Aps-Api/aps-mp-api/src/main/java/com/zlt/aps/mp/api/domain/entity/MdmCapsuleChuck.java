@@ -1,13 +1,13 @@
 package com.zlt.aps.mp.api.domain.entity;
 
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -58,10 +58,10 @@ public class MdmCapsuleChuck extends BaseEntity {
     @TableField(value = "INTERNAL_QTY")
     private Integer internalQty;
 
-    /** JINYU新卡盘 */
+    /** 新卡盘 */
     @ImportExcelValidated(required = true,digits = true,min = 0,max = 9999999)
     @Excel(name = "ui.data.column.mdmCapsuleChuck.newChuckQty", sort = 5)
-    @ApiModelProperty(value = "JINYU新卡盘", name = "newChuckQty")
+    @ApiModelProperty(value = "新卡盘", name = "newChuckQty")
     @TableField(value = "NEW_CHUCK_QTY")
     private Integer newChuckQty;
 

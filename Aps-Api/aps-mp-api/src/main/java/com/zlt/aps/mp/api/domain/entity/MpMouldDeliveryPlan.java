@@ -98,12 +98,12 @@ public class MpMouldDeliveryPlan extends BaseEntity {
     private Date shipmentDate;
 
     /**
-     * 计划上机日期
+     * 模具可用日期
      */
 //    @ImportExcelValidated(required = true, date = true)
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "ui.data.column.mpMouldDeliveryPlan.boardingDate", width = 30, dateFormat = "yyyy-MM-dd", type = Excel.Type.EXPORT)
-    @ApiModelProperty(value = "计划上机日期", name = "boardingDate")
+    @ApiModelProperty(value = "模具可用日期", name = "boardingDate")
     @TableField(value = "BOARDING_DATE")
     private Date boardingDate;
 

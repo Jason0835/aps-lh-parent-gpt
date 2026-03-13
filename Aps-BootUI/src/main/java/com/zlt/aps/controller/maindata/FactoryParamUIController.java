@@ -55,6 +55,7 @@ public class FactoryParamUIController extends BaseUIController<FactoryParam> {
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(FactoryParam factoryParam) {
+        factoryParam.setBusinessGroup("02");
         return iFactoryParamService.list(factoryParam);
     }
 
@@ -97,5 +98,34 @@ public class FactoryParamUIController extends BaseUIController<FactoryParam> {
     @PostMapping("/selectMesBrandDict")
     public List<MesBrandDict> selectMesBrandDict() {
         return iMesItfService.selectMesBrandDict();
+    }
+
+    /**
+     * 根据条件查询主表数据
+     */
+    @ApiOperation("根据条件查询主表数据")
+    @RequiresPermissions("dp:factoryParam:list")
+    @PostMapping("/dpList")
+    @ResponseBody
+    public TableDataInfo dpList(FactoryParam factoryParam) {
+        factoryParam.setBusinessGroup("01");
+        return iFactoryParamService.list(factoryParam);
+    }
+
+    /**
+     * 修改或新增分厂排产设定
+     */
+    @ApiOperation("修改或新增分厂排产设定")
+    @RequiresPermissions("dp:factoryParam:edit")
+    @PostMapping("/dpEdit")
+    @ResponseBody
+    public AjaxResult dpEdit(FactoryParam factoryParam) {
+        AjaxResult ajaxResult = null;
+        if (factoryParam.getId() != null) {
+            ajaxResult = iFactoryParamService.edit(factoryParam);
+        } else {
+            return AjaxResult.error();
+        }
+        return ajaxResult;
     }
 }

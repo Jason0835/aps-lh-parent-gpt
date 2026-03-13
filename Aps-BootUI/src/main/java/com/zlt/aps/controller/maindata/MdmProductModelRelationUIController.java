@@ -242,4 +242,17 @@ public class MdmProductModelRelationUIController extends BaseUIController<MdmSku
     public AjaxResult updateMainPatternToMaterial(MdmSkuMouldRel queryVO) {
         return iMdmProductModelRelationService.updateMainPatternToMaterial(queryVO);
     }
+
+    /**
+     * 查询模具数量
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("查询模具数量")
+    @PostMapping("/selectMouldNumSum")
+    @ResponseBody
+    public AjaxResult selectMouldNumSum(MdmSkuMouldRel queryVO) {
+        return iMdmProductModelRelationService.selectMouldNumSum(queryVO);
+    }
 }

@@ -206,14 +206,6 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 // 构建胎胚原料消耗量
                 List<MdmMaterialConsumeDetail> detaiList = this.buildConsumeDetailLIst(syncList, apsDataList, syncDataLogs.getFactoryCode());
                 if (CollectionUtils.isNotEmpty(detaiList)) {
-//                    // 保存前先删除本次同步涉及的胎胚原材料明细
-//                    List<String> embryoCodeList = detaiList.stream().map(MdmMaterialConsumeDetail::getEmbryoCode).distinct().collect(Collectors.toList());
-//                    List<List<String>> splitDeleteList = ScmListUtils.getSplitList(embryoCodeList, 1000);
-//                    for (List<String> deleteList : splitDeleteList) { // 分批处理，防止长度超出限制
-//                        Map<String, Object> paramMap = new HashMap<>();
-//                        paramMap.put("embryoCode", deleteList);
-//                        baseDao.deleteByMap(MdmMaterialConsumeDetail.class, paramMap);
-//                    }
                     List<List<MdmMaterialConsumeDetail>> splitDetailList = ScmListUtils.getSplitList(detaiList, 1000);
                     for (List<MdmMaterialConsumeDetail> saveList : splitDetailList) { // 分批处理，防止长度超出限制
                         baseDao.saveBatch(saveList);
@@ -308,8 +300,9 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 consumeDetail.setEmbryoCode(embryoBom.getParentCode()); // 20260302，由于胎胚在bom里没有单独的记录，需要关联出最上级的物料后
                 consumeDetail.setEmbryoVersion(embryoBom.getParentVersion());
                 // 5.2.3、计算用量，用量为每一层bom的用量乘数
-                BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
-                        .reduce(BigDecimal.ONE, BigDecimal::multiply);
+//                BigDecimal dosage = pathList.stream().map(node -> BigDecimalUtils.valueOf(node.getDosage()))
+//                        .reduce(BigDecimal.ONE, BigDecimal::multiply);
+                BigDecimal dosage = bom.getDosage(); // 暂时替换成原材料的原始用量，直接乘按现有的数据不正确
                 consumeDetail.setDosage(dosage);
                 
                 MdmMaterialConsumeDetail oldDetail = oldDetailMap.get(this.getMapKey(consumeDetail));

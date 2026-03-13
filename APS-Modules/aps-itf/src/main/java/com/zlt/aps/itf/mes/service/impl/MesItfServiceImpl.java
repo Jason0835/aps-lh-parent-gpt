@@ -549,8 +549,8 @@ public class MesItfServiceImpl implements MesItfService {
                 }
                 Map<String, Object> map = new HashMap<>();
                 map.put("FACTORY_CODE", rawSpecialMaterialStock.getFactoryCode());
-                map.put("YEAR", rawSpecialMaterialStock.getYear());
-                map.put("MONTH", rawSpecialMaterialStock.getMonth());
+                map.put("YEAR", saveList.get(0).getYear());
+                map.put("MONTH", saveList.get(0).getMonth());
                 baseDao.deleteByMap(RawSpecialMaterialStock.class, map);
                 List<List<RawSpecialMaterialStock>> splitList = ScmListUtils.getSplitList(saveList, 1000);
                 for (List<RawSpecialMaterialStock> importList : splitList) {

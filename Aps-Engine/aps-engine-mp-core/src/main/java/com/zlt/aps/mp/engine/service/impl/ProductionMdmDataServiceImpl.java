@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.enums.ProductionProcessesTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -25,6 +26,7 @@ import com.zlt.aps.utils.BeanCopyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
@@ -71,6 +73,8 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
     private final IFactoryParamService factoryParamService;
 
     private final IProductALevelService productALevelService;
+    @Autowired
+    private ISysConfigService sysConfigService;
 
     @Override
     public Integer getProductionCycleConfiguration(Context context) {
@@ -103,6 +107,7 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         queryWrapper.eq("PROC_CODE", ProductionProcessesTypeEnum.MONTH_PLAN.getProcCode());
         queryWrapper.ge("PRODUCTION_DATE", productionStartDate);
         queryWrapper.le("PRODUCTION_DATE", productionEndDate);
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         List<MdmWorkCalendar> configurationList = mdmWorkCalendarEntityMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(configurationList)) {
             return Collections.emptyList();
@@ -232,7 +237,16 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         Date lastYearMonth = DateUtils.addMonths(yearMonth, -1);
         Integer queryYear = DateUtils.getYear(lastYearMonth);
         Integer queryMonth = DateUtils.getMonth(lastYearMonth);
-        return factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode(), queryYear, queryMonth);
+        List<SpecialMaterialStockVo> stockVoList = factoryMonthPlanSpecialMaterialInfoMapper.getSpecialMaterialStockInfo(context.getFactoryCode(), queryYear, queryMonth);
+        try {
+            String config = sysConfigService.selectConfigByKey("monthPlan.skip.specialStock");
+            if (StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+                stockVoList.stream().forEach(stockVo -> stockVo.setStock(99999999L)); // 开关打开时，库存直接给满
+            }
+        } catch (Exception e) {
+            log.error("获取配置失败", e);
+        }
+        return stockVoList;
     }
 
     /**
@@ -243,9 +257,9 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
      */
     @Override
     public List<MdmProductStock> getMdmProductStock(Context context) {
-        LambdaQueryWrapper<MdmProductStock> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MdmProductStock::getFactoryCode, context.getFactoryCode());
-        return mdmProductStockEntityMapper.selectList(queryWrapper);
+        MdmProductStock mdmProductStock = new MdmProductStock();
+        mdmProductStock.setFactoryCode(context.getFactoryCode());
+        return mdmProductStockEntityMapper.getLatestStock(mdmProductStock);
     }
 
     @Override

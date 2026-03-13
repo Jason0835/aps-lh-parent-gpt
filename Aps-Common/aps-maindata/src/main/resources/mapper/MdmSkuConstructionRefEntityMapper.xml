@@ -7,13 +7,47 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateMainMaterialDescToMaterialInfo">
         UPDATE T_MDM_MATERIAL_INFO t1
             JOIN (
-            SELECT t.FACTORY_CODE, t.MATERIAL_CODE, MAX(t.MAIN_MATERIAL_DESC) AS MAIN_MATERIAL_DESC
-            FROM T_MDM_SKU_CONSTRUCTION_REF t
-            WHERE t.IS_DELETE = 0
-            GROUP BY t.FACTORY_CODE, t.MATERIAL_CODE
+            SELECT
+                r.FACTORY_CODE,
+                r.MATERIAL_CODE,
+                r.MAIN_MATERIAL_DESC,
+                r.EMBRYO_CODE
+            FROM (
+                    SELECT
+                        t.*,
+                        -- 分组变量：判断是否为同一组，重置行号
+                        @rn := IF(@statusGroup = CONCAT(t.FACTORY_CODE, '_', t.MATERIAL_CODE),
+                        @rn + 1,
+                        1) AS rn,
+                        @statusGroup := CONCAT(t.FACTORY_CODE, '_', t.MATERIAL_CODE) AS group_flag
+                    FROM (
+                        -- 先按优先级排序（S>T>X），保证同组内优先级高的排在前
+                        SELECT
+                            FACTORY_CODE,
+                            MATERIAL_CODE,
+                            MAIN_MATERIAL_DESC,
+                            EMBRYO_CODE
+                        FROM T_MDM_SKU_CONSTRUCTION_REF
+                        WHERE IS_DELETE = 0
+                        ORDER BY
+                        FACTORY_CODE,
+                        MATERIAL_CODE,
+                        CASE TRIAL_STATUS
+                        WHEN 'S' THEN 1
+                        WHEN 'T' THEN 2
+                        WHEN 'X' THEN 3
+                        ELSE 4
+                        END ASC
+                    ) t,
+                    (SELECT @rn := 0, @statusGroup := '') AS temp
+                ) r
+                WHERE r.rn = 1
             ) t2
         ON t1.FACTORY_CODE = t2.FACTORY_CODE AND t1.MATERIAL_CODE = t2.MATERIAL_CODE
-            SET t1.EMBRYO_DESC = t2.MAIN_MATERIAL_DESC, t1.UPDATE_BY = #{updateBy}, t1.UPDATE_TIME = #{updateTime}
+            SET t1.EMBRYO_DESC = t2.MAIN_MATERIAL_DESC,
+                t1.EMBRYO_CODE = t2.EMBRYO_CODE,
+                t1.UPDATE_BY = #{updateBy},
+                t1.UPDATE_TIME = #{updateTime}
         WHERE t1.IS_DELETE = 0
     </update>
 </mapper>

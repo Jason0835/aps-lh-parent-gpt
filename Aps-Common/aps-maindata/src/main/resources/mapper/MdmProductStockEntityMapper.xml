@@ -38,4 +38,46 @@
             </if>
         </if>
     </select>
+    
+    <!-- 获取最新库存 -->
+    <select id="getLatestStock" resultType="com.zlt.aps.mp.api.domain.entity.MdmProductStock">
+        SELECT
+		        ID,
+				FACTORY_CODE,
+				STOCK_DATE,
+				PRODUCT_TYPE_CODE,
+				BRAND,
+				STRUCTURE_NAME,
+				LOCATION_TYPE,
+				MES_MATERIAL_CODE,
+				MATERIAL_CODE,
+				MATERIAL_DESC,
+				STOCK_QTY,
+				WEEK_YEAR,
+				IS_DYNAMIC_BALANCE,
+				IS_UNIFORMITY,
+				IS_EXCEED_THREE_MONTH,
+				IS_EXCEED_SIX_MONTH,
+				IS_EXCEED_NINE_MONTH,
+				IS_EXCEED_TWELVE_MONTH,
+				IS_EXCEED_TIRE,
+				REMARK,
+				IS_DELETE,
+				CREATE_TIME,
+				UPDATE_TIME,
+				CREATE_BY,
+				UPDATE_BY,
+				INBOUND_QTY,
+				OUTBOUND_QTY,
+				FINAL_GRADE
+          FROM T_MDM_PRODUCT_STOCK
+         WHERE FACTORY_CODE = #{factoryCode}
+           AND IS_DELETE = 0
+           AND stock_date = (
+            SELECT max(stock_date)
+              FROM T_MDM_PRODUCT_STOCK
+             WHERE factory_code = #{factoryCode}
+               AND IS_DELETE = 0
+           )
+    </select>
 </mapper>

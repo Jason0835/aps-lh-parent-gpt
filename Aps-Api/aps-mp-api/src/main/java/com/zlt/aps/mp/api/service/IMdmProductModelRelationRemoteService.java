@@ -119,4 +119,15 @@ public interface IMdmProductModelRelationRemoteService {
     @ApiOperation("更新主花纹到物料表")
     @PostMapping("/relation/updateMainPatternToMaterial")
     public AjaxResult updateMainPatternToMaterial(@RequestBody MdmSkuMouldRel queryVO);
+
+    /**
+     * 查询模具数量
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("查询模具数量")
+    @PostMapping("/relation/selectMouldNumSum")
+    public AjaxResult selectMouldNumSum(@RequestBody MdmSkuMouldRel queryVO);
+
 }

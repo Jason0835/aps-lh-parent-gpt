@@ -212,7 +212,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
      */
-    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.constructionStage", dictType = "biz_construction_stage")
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.schedulingType", dictType = "biz_construction_stage")
     @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
