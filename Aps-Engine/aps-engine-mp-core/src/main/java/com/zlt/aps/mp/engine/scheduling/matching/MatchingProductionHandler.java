@@ -449,15 +449,28 @@ public class MatchingProductionHandler {
                 continue;
             }
             // 统计在产硫化机数
-            Integer lhMachineCount = this.getBootsDayLhMachineCount(contextDTO, plan, realStartDay, endDay,
-                    dailyCapacityLimitMap);
+            Map<Integer, Integer> bootsDayLhMachineMap = this.getBootsDayLhMachineMap(contextDTO, plan, realStartDay,
+                    endDay, dailyCapacityLimitMap); // 每日已使用硫化机数
+            // 统计最大补量机台数，以包括补量天以及前一天的最大硫化机为准
+            Integer maxLhMachineCount = bootsDayLhMachineMap.values().stream().max(Integer::compareTo).orElse(0);
+            if (maxLhMachineCount <= 0) {
+                continue;
+            }
             
             // 遍历补量开始日到收尾日之间的生产量，并尝试开始补量
             for (int day = realStartDay; day <= endDay; day++) {// 根据日产比例限制产能
                 // 如果当天有排产，在不加模的前提下检查是否已经占满
+                MpDailyCapacityLimitVo dailyCapacityLimit = dailyCapacityLimitMap.get(day);
+                if (dailyCapacityLimit == null) {
+                    continue;
+                }
+                Integer useMachineCount = bootsDayLhMachineMap.getOrDefault(day, 0);
+                Integer remainMachineCount = dailyCapacityLimit.getMaxLhMachines() - dailyCapacityLimit.getUsedLhMachines(); // 当天剩余可用机台，超了就是负数（异常情况）
+                Integer bootsMachineCount = remainMachineCount + useMachineCount; // 补量相关机台数 = 剩余机台 + 可用机台
+                bootsMachineCount = bootsMachineCount > 0? bootsMachineCount: 0;
                 Integer productionQty = dayProductionQtyMap.getOrDefault(day, 0); // 当天已排产量
-                int capacity = plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 产能
-                Integer allocationQty = capacity * lhMachineCount - productionQty; // 计算分配量 = 产能 *机台 - 已排量
+                int capacity = plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 单机产能
+                Integer allocationQty = capacity * Math.min(maxLhMachineCount, bootsMachineCount) - productionQty; // 计算分配量 = 产能 *机台 - 已排量
                 Integer realAllocationQty = isSpecial? Math.min(unAllocatSpecStructureQty, allocationQty): allocationQty; // 如果是特殊材料需要控制不能超过总量
                 if (realAllocationQty <= 0) {
                     continue;
@@ -501,23 +514,23 @@ public class MatchingProductionHandler {
     }
 
     /**
-     * 统计在产硫化机数，以包括补量天以及前一天的最大硫化机为准
-     * @param contextDTO
-     * @param plan
-     * @param startDay
-     * @param endDay
-     * @param dailyCapacityLimitMap
+     * 统计补量日期区间的在产硫化机数
+     * 
+     * @param contextDTO            上下文
+     * @param plan                  排产记录
+     * @param startDay              补量区间开始日
+     * @param endDay                补量区间结束日
+     * @param dailyCapacityLimitMap 每日产能限制
      * @return
      */
-    private Integer getBootsDayLhMachineCount(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
+    private Map<Integer, Integer> getBootsDayLhMachineMap(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
                                               Integer startDay, Integer endDay,
                                               Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
-        Integer lhMachineCount = 0;
+        Map<Integer, Integer> bootsDayLhMachineMap = new HashMap<>();
         for (int day = startDay; day <= endDay; day ++) {
-            int dayLhMachineCount = this.getDayUsedLhMachines(contextDTO, plan, day, dailyCapacityLimitMap);
-            lhMachineCount = Math.max(lhMachineCount, dayLhMachineCount);
+            bootsDayLhMachineMap.put(day, this.getDayUsedLhMachines(contextDTO, plan, day, dailyCapacityLimitMap));
         }
-        return lhMachineCount;
+        return bootsDayLhMachineMap;
     }
 
     /**
