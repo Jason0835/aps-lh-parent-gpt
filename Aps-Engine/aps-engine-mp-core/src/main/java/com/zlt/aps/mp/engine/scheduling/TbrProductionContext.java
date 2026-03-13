@@ -371,17 +371,7 @@ public class TbrProductionContext extends Context {
         if (CollectionUtils.isEmpty(hasDayCapacitySet)) {
             return Collections.emptySet();
         }
-        if (hasDayCapacitySet.size() == BigDecimal.ONE.intValue()) {
-            List<Integer> dayList = new ArrayList<>(hasDayCapacitySet);
-            Integer productionDay = dayList.get(BigDecimal.ZERO.intValue());
-            if (productionDay.equals(getProductionEndDay())) {
-                return hasDayCapacitySet;
-            }
-            return Collections.emptySet();
-        }
-        //取得一段连续的时间范围
-        Set<Integer> continueRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(hasDayCapacitySet, getStopDays());
-        return continueRangeSet;
+        return hasDayCapacitySet;
     }
 
     /**
