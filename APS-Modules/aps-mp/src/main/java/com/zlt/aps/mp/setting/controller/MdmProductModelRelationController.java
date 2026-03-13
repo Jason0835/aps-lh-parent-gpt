@@ -249,4 +249,20 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     public AjaxResult updateMainPatternToMaterial(@RequestBody MdmSkuMouldRel queryVO) {
         return mdmProductModelRelationService.updateMainPatternToMaterial(queryVO);
     }
+
+    /**
+     * 查询模具数量
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("查询模具数量")
+    @PostMapping("/selectMouldNumSum")
+    public AjaxResult selectMouldNumSum(@RequestBody MdmSkuMouldRel queryVO) {
+        QueryWrapper<MdmSkuMouldRel> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryVO);
+        List<MdmSkuMouldRel> list = entityMapper.selectList(wrapper);
+        long count = list.stream().map(MdmSkuMouldRel::getMouldCode).distinct().count();
+        return AjaxResult.success(count);
+    }
 }

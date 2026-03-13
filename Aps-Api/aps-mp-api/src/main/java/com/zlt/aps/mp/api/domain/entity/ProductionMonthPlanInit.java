@@ -171,7 +171,7 @@ public class ProductionMonthPlanInit extends BaseEntity {
     /**
      * 施工阶段
      */
-    @Excel(name = "ui.data.column.productionMonthPlanInit.constructionStage", dictType = "biz_construction_stage")
+    @Excel(name = "ui.data.column.productionMonthPlanInit.schedulingType", dictType = "biz_construction_stage")
     @ApiModelProperty(value = "施工阶段", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
