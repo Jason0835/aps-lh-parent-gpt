@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -164,8 +165,8 @@ public class MdmCapsuleChuckController extends AbstractDocBizController<MdmCapsu
         QueryWrapper<MdmCapsuleChuck> queryWrapper = new QueryWrapper<>();
         this.builderCondition(queryWrapper, queryVO);
         List<MdmCapsuleChuck> list = entityMapper.selectList(queryWrapper);
-        long internalCount = list.stream().map(MdmCapsuleChuck::getInternalQty).count();
-        long newChuckCount = list.stream().map(MdmCapsuleChuck::getNewChuckQty).count();
+        long internalCount = list.stream().filter(item -> !Objects.isNull(item.getInternalQty())).mapToInt(MdmCapsuleChuck::getInternalQty).sum();
+        long newChuckCount = list.stream().filter(item -> !Objects.isNull(item.getNewChuckQty())).mapToInt(MdmCapsuleChuck::getNewChuckQty).sum();
         return AjaxResult.success(internalCount + newChuckCount);
     }
 

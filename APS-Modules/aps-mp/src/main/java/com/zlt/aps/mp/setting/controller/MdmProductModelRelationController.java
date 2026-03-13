@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.setting.controller;
 
+import com.alibaba.cloud.commons.lang.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -262,7 +263,7 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
         QueryWrapper<MdmSkuMouldRel> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
         List<MdmSkuMouldRel> list = entityMapper.selectList(wrapper);
-        long count = list.stream().map(MdmSkuMouldRel::getMouldCode).distinct().count();
+        long count = list.stream().map(MdmSkuMouldRel::getMouldCode).filter(StringUtils::isNotBlank).distinct().count();
         return AjaxResult.success(count);
     }
 }
