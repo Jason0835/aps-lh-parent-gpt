@@ -19,6 +19,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -72,6 +73,7 @@ public class FactoryConsoleUIController extends BaseController {
      * @return
      */
     @ResponseBody
+    @RequiresPermissions("monthplan:demandPlan:confirmSubmit")
     @PostMapping("/confirmProductionRequireVersion")
     @ApiOperation("按工厂 + 年月 + 需求计划版本确认工厂需求排产的需求版本")
     public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam) {
@@ -188,7 +190,7 @@ public class FactoryConsoleUIController extends BaseController {
      * @param factoryProductionParam
      * @return
      */
-//    @RequiresPermissions("monthplan:console:deleteMonthPlanRequire")
+    @RequiresPermissions("monthplan:demandPlan:cancelSubmit")
     @ResponseBody
     @PostMapping("/deleteMonthPlanRequire")
     @ApiOperation("按工厂 + 年月 + 需求版本的方式删除需求版本对应的排产版本")
