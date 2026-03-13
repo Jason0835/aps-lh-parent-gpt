@@ -831,7 +831,7 @@ export default {
       // };
       saveDemandPlan(params)
         .then((res) => {
-          this.$modal.msgSuccess(res.msg);
+          // this.$modal.msgSuccess(res.msg);
           this.getList();
         })
         .catch((err) => {

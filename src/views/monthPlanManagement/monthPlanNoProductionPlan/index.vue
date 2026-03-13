@@ -276,7 +276,11 @@ export default {
           minWidth: 120,
         },
 
-
+        {
+          label: this.$t("实际排产"),
+          prop: "factProdReqQty",
+          minWidth: 120,
+        },
         {
           label: this.$t("common.remark"),
           prop: "remark",
