@@ -42,6 +42,37 @@ public class NoProductionReasonUtils {
     }
 
     /**
+     * 组装施工校验的信息
+     *
+     * @param noProductionReasonList
+     * @return
+     */
+    public static String getConstructionConfigurationAllInfo(List<MonthPlanNoProductionReasonEnum> noProductionReasonList) {
+        if (CollectionUtils.isEmpty(noProductionReasonList)) {
+            return "";
+        }
+        String constructionAllInfo = MonthPlanNoProductionReasonEnum.NO_CONSTRUCTION_ALL_INFO.getI18nKey();
+        JSONObject noProductionReasonInfo = JsonUtils.getLanguageJsonObject(constructionAllInfo);
+        List<String> languageList = JsonUtils.getLanguageList();
+        JSONObject fullI18nInfo = null;
+        for (MonthPlanNoProductionReasonEnum noProductionReason : noProductionReasonList) {
+            JSONObject nextFullI18nInfo = JsonUtils.getLanguageJsonObject(noProductionReason.getI18nKey());
+            if (null == fullI18nInfo) {
+                fullI18nInfo = nextFullI18nInfo;
+                continue;
+            }
+            for (String language : languageList) {
+                List<String> languageInfo = new ArrayList<>();
+                languageInfo.add(fullI18nInfo.getString(language));
+                languageInfo.add(nextFullI18nInfo.getString(language));
+                fullI18nInfo.put(language, String.join(StringConstant.COMMA, languageInfo));
+            }
+        }
+        fullText(noProductionReasonInfo, "", fullI18nInfo, languageList);
+        return noProductionReasonInfo.toString();
+    }
+
+    /**
      * 根据限制类型，组装复杂的不排产原因
      * 因%s不排 或是 因%s部分未排
      *
