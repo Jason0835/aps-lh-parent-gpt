@@ -243,8 +243,8 @@ public class ProductionCxMachineCalculationHandler {
         //20260131 分配天数，成型机剩余天数与分配天数取最小
         Integer remainingDays = cxMachineInfo.getRemainingDays();
         allocationDays = Math.min(remainingDays, allocationDays);
-        //更新分组剩余分配量
-        productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDays); // 更新特殊材料库存
+        //更新分组剩余分配量-更新特殊材料库存
+        productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDays);
         groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDays);
         ProductGroupCxCapacityInfo capacityInfo = groupCxCapacityInfoMap.get(cxMachineCode);
         CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, capacityInfo, groupPlanInfo, groupContinueInfo.getContinueSkuMouldNumberMap(), allocationDays, BigDecimal.ONE.intValue(), monthDays);

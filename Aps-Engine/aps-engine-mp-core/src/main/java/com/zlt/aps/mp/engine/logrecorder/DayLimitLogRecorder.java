@@ -169,6 +169,30 @@ public class DayLimitLogRecorder {
     }
 
     /**
+     * 增加可排产天数日志日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产日:[%s]====
+     *
+     * @param context       排程上下文
+     * @param cxMachineInfo 机台信息
+     * @param groupName     分组名
+     * @param proSize       英寸
+     * @param daysInfo     限制类型
+     * @return
+     */
+    public static String addCanProductionDayInfoLog(Context context, CxMachineBaseInfoVo cxMachineInfo, String groupName, String proSize, String daysInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产日:[%s]====";
+        String cxMachineCode = "";
+        if (null != cxMachineInfo) {
+            cxMachineCode = cxMachineInfo.getCxMachineCode();
+        }
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, groupName, proSize, daysInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+    /**
      * 增加日控制限制日志信息记录
      * 1、日产能上限
      * 2、成型工装数量上限

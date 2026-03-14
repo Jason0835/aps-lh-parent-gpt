@@ -5,8 +5,8 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.GroupCxMachineSelectedTypeEnum;
-import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
+import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -354,6 +354,27 @@ public class TbrProductionGroupLogRecorder {
                 cxMachineInfo.getCxMachineCode());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.REVERSE_MACHINE_CAPACITY_NO_COVER_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加收尾机台计划产能匹配的分组计划日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，收尾机台：%s 产能 %s 天 分组计划 %s 需 %s 天 ====
+     *
+     * @param context           排程上下文
+     * @param cxMachineInfo     机台信息
+     * @param realRemainingDays 机台剩余天数
+     * @param groupName         分组计划
+     * @param needDays          计划需要天数
+     * @return
+     */
+    public static String addReverseCxMachineMatchCapacityLog(Context context, CxMachineBaseInfoVo cxMachineInfo, Integer realRemainingDays, String groupName, Integer needDays) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，收尾机台：%s 产能 %s 天 分组计划 %s 需 %s 天 ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineInfo.getCxMachineCode(), realRemainingDays, groupName, needDays);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.REVERSE_MACHINE_SELECTED_GROUP_PLAN, logContent);
         return logContent;
     }
 
