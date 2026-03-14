@@ -3,8 +3,12 @@ package com.zlt.aps.mp.factory.service.impl;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
+import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.sysdef.domain.SysDocType;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,6 +36,9 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocService<FactoryMonthPlanMouldDayResult>  implements IFactoryMonthPlanMouldDayResultService {
+    @Autowired
+    private FactoryMonthPlanMouldDayResultEntityMapper factoryMonthPlanMouldDayResultEntityMapper;
+    
     @Override
     protected String getDocTypeCode() {
         return "11";
@@ -57,5 +64,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    /**
+     * 获取导出数据
+     */
+    @Override
+    public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
+        return factoryMonthPlanMouldDayResultEntityMapper.getExportList(factoryMonthPlanMouldDayResult);
     }
 }
