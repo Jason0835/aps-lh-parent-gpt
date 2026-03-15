@@ -453,7 +453,7 @@ public class MatchingProductionHandler {
                         }
                     }
                     // 检查当天如果搭配是否会导致二次上机
-                    if (isNewPlan && !this.checkSecOnlineAdjuest(contextDTO, plan, day)) { // 非新增SKU需要检查二次上机
+                    if (!isNewPlan && !this.checkSecOnlineAdjuest(contextDTO, plan, day)) { // 非新增SKU需要检查二次上机
                         continue;
                     }
                     
@@ -506,7 +506,7 @@ public class MatchingProductionHandler {
                                           int checkDay) {
         boolean isSecOnLine = true;
         // 1、检查当天排产情况
-        Integer dayProductQty = Optional.of((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + checkDay)).orElse(0);
+        Integer dayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + checkDay)).orElse(0);
         if (dayProductQty > 0) { // 如果当天没有排产才需要继续检查是否引起二次上机
             return isSecOnLine;
         }
@@ -515,7 +515,7 @@ public class MatchingProductionHandler {
         Integer skuEndDay = plan.getEndDay();
         // 2、向前看是否有超出二次上机限制
         for (Integer i = checkDay - 1; i >= skuBeginDay; i--) {
-            Integer checkDayProductQty = Optional.of((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
+            Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
                 isSecOnLine = checkDay - checkDayProductQty - 1 <= skuSecondProduction;
                 break;
@@ -527,7 +527,7 @@ public class MatchingProductionHandler {
 
         // 3、先向后看是否有超出二次上机限制
         for (Integer i = checkDay + 1; i <= skuEndDay; i++) {
-            Integer checkDayProductQty = Optional.of((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
+            Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
                 isSecOnLine = checkDayProductQty - checkDay - 1 <= skuSecondProduction;
                 break;
