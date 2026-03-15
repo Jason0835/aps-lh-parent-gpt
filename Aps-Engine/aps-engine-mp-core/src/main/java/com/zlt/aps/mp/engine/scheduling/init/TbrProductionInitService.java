@@ -444,7 +444,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         }
         //没有高优先级
         Integer addNoHeightLossQty = getLossQty(sumNetQty);
-        sumNetQty = sumNetQty + addHeightLossQty;
+        sumNetQty = sumNetQty + addNoHeightLossQty;
         plan.setFactProdReqQty(sumNetQty);
         return addLossQty - addNoHeightLossQty;
     }

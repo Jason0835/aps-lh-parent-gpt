@@ -1,18 +1,18 @@
 package com.zlt.aps.mp.engine.scheduling;
 
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.mp.api.enums.WorkWearTypeEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
+import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import com.zlt.aps.mp.api.enums.WorkWearTypeEnum;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -197,17 +197,19 @@ public class BaseDataContainer implements Serializable {
      * 获取proSize的剩余机台数数量-在机结构
      * 需要根据成型鼓、胎体鼓、带束层鼓中剩余量最小的
      *
-     * @param proSize
+     * @param proSize       英寸
+     * @param cxMachineCode 成型机台
      * @return
      */
-    public Integer getLeftOverQtyByProSizeAndContinueGroupPlan(String proSize) {
-        if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(tireDrumInfoMap)) {
+    public Integer getLeftOverQtyByProSizeAndContinueGroupPlan(String proSize, String cxMachineCode) {
+        if (StringUtils.isBlank(proSize) || StringUtils.isBlank(cxMachineCode) || CollectionUtils.isEmpty(tireDrumInfoMap)) {
             return BigDecimal.ZERO.intValue();
         }
         //获取匹配的工装类型各自信息
         Map<String, Integer> workWeakTypeLimitQtyMap = new HashMap<>();
+        TireDrumMatchVo tireDrumMatch = getTireDrumMatchInfo(cxMachineCode, proSize);
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
-            List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
+            List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch)).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(limitGroupList)) {
                 workWeakTypeLimitQtyMap.put(workWeakType, BigDecimal.ZERO.intValue());
                 return;
@@ -224,15 +226,38 @@ public class BaseDataContainer implements Serializable {
     }
 
     /**
+     * 构建成型工装匹配条件对象
+     *
+     * @param cxMachineCode 成型机台编号
+     * @param proSize       英寸
+     * @return
+     */
+    public TireDrumMatchVo getTireDrumMatchInfo(String cxMachineCode, String proSize) {
+        if (StringUtils.isBlank(cxMachineCode) || StringUtils.isBlank(proSize)) {
+            return TireDrumMatchVo.createEmpty();
+        }
+        if (CollectionUtils.isEmpty(cxMachineBaseInfo)) {
+            return TireDrumMatchVo.createEmpty();
+        }
+        CxMachineBaseInfoVo cxMachineInfo = cxMachineBaseInfo.get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return TireDrumMatchVo.createEmpty();
+        }
+        return new TireDrumMatchVo(cxMachineCode, cxMachineInfo.getCxMachineTypeCode(), proSize);
+    }
+
+    /**
      * 根据分组计划信息，获取符合条件的可排产日集合
      * 1、日产能还有可分配量
      * 2、成型工装数量
      *
-     * @param selectedGroupInfo 选中的分组计划
+     * @param context               排产上下文
+     * @param selectedGroupInfo     选中的分组计划
+     * @param selectedCxMachineInfo 匹配到的成型机
      * @return
      */
     public GroupCapacityProductionLimitHelper getLeftOverProductionDayInfo(Context context, ProductionPlanGroupInfo selectedGroupInfo, CxMachineBaseInfoVo selectedCxMachineInfo) {
-        if (null == selectedGroupInfo) {
+        if (null == selectedGroupInfo || null == selectedCxMachineInfo) {
             return GroupCapacityProductionLimitHelper.createNoLimitEmptyProductionSet();
         }
         String proSize = selectedGroupInfo.getProSizeInfo();
@@ -246,15 +271,17 @@ public class BaseDataContainer implements Serializable {
             return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
         }
         String dayInfo = dayCapacitySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
-        log.info(DayLimitLogRecorder.addLeftOverDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_LIMIT, dayInfo));
-        Set<Integer> workWeakProductionSet = getLeftOverProductionDayInfo(proSize);
+        DayLimitLogRecorder.addLeftOverDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_LIMIT, dayInfo);
+        //成型工装产能天集合
+        TireDrumMatchVo drumMatch = new TireDrumMatchVo(selectedCxMachineInfo.getCxMachineCode(), selectedCxMachineInfo.getCxMachineTypeCode(), proSize);
+        Set<Integer> workWeakProductionSet = getLeftOverProductionDayInfo(drumMatch);
         if (CollectionUtils.isEmpty(workWeakProductionSet)) {
             limitType = GroupAllocationCapacityLimitTypeEnum.TIRE_DRUM_LIMIT;
             log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
             return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
         }
         dayInfo = workWeakProductionSet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
-        log.info(DayLimitLogRecorder.addLeftOverDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, GroupAllocationCapacityLimitTypeEnum.TIRE_DRUM_LIMIT, dayInfo));
+        DayLimitLogRecorder.addLeftOverDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, GroupAllocationCapacityLimitTypeEnum.TIRE_DRUM_LIMIT, dayInfo);
         Set<Integer> intersectionSet = dayCapacitySet.stream().filter(workWeakProductionSet::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
             limitType = GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_TIRE_DRUM_LIMIT;
@@ -266,20 +293,20 @@ public class BaseDataContainer implements Serializable {
     }
 
     /**
-     * 获取符合proSize的成型工装量排产日集合
+     * 获取符合tireDrumMatch的成型工装量排产日集合
      * 需要3鼓都有剩余量1
      *
-     * @param proSize
+     * @param tireDrumMatch
      * @return
      */
-    public Set<Integer> getLeftOverProductionDayInfo(String proSize) {
-        if (StringUtils.isBlank(proSize) || CollectionUtils.isEmpty(tireDrumInfoMap)) {
+    public Set<Integer> getLeftOverProductionDayInfo(TireDrumMatchVo tireDrumMatch) {
+        if (null == tireDrumMatch || tireDrumMatch.isEmptyValue() || CollectionUtils.isEmpty(tireDrumInfoMap)) {
             return Collections.emptySet();
         }
         //1、汇总可匹配proSize各成型工装的每日排产信息：01 成型鼓 02 胎体鼓 03 带束层鼓
         Map<String, List<WorkWeakTireDrumDayInfoHelper>> workWeakInfoMap = new HashMap<>();
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
-            List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
+            List<TireDrumInfoVo> limitGroupList = limitGroupMap.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch)).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(limitGroupList)) {
                 return;
             }
@@ -331,15 +358,16 @@ public class BaseDataContainer implements Serializable {
      * 因当前TBR都是三股机台，故而工装类型全部+1
      *
      * @param productionDay 排产日
-     * @param groupName     当前为英寸
+     * @param proSize       当前为英寸
      * @param cxMachineCode 成型机台
      */
-    public void addUsedCount(Integer productionDay, String groupName, String cxMachineCode) {
-        if (isCheckEmpty(productionDay, groupName)) {
+    public void addUsedCount(Integer productionDay, String proSize, String cxMachineCode) {
+        if (isCheckEmpty(productionDay, proSize, cxMachineCode)) {
             return;
         }
+        TireDrumMatchVo tireDrumMatch = getTireDrumMatchInfo(cxMachineCode, proSize);
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
-            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, groupName, productionDay);
+            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, tireDrumMatch, productionDay);
             if (null == dayLimitInfo) {
                 return;
             }
@@ -352,15 +380,16 @@ public class BaseDataContainer implements Serializable {
      * 因当前TBR都是三股机台，故而工装类型全部 - 1
      *
      * @param productionDay 排产日
-     * @param groupName     当前为英寸
+     * @param proSize       当前为英寸
      * @param cxMachineCode 成型机台
      */
-    public void releaseUsedCount(Integer productionDay, String groupName, String cxMachineCode) {
-        if (isCheckEmpty(productionDay, groupName)) {
+    public void releaseUsedCount(Integer productionDay, String proSize, String cxMachineCode) {
+        if (isCheckEmpty(productionDay, proSize, cxMachineCode)) {
             return;
         }
+        TireDrumMatchVo tireDrumMatch = getTireDrumMatchInfo(cxMachineCode, proSize);
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
-            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, groupName, productionDay);
+            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, tireDrumMatch, productionDay);
             if (null == dayLimitInfo) {
                 return;
             }
@@ -369,21 +398,21 @@ public class BaseDataContainer implements Serializable {
     }
 
     /**
-     * 根据成型工装类型限制信息，获取匹配proSize，在productionDay
+     * 根据成型工装类型限制信息，获取匹配tireDrumMatch，在productionDay
      * 的日排产限制对象
      *
      * @param workWeakTypeLimitInfo 某种成型工装类型限制对象
-     * @param proSize               英寸
+     * @param tireDrumMatch         工装匹配对象
      * @param productionDay         排产日
      * @return
      */
-    private TireDrumDayInfoHelper getDayLimitInfo(Map<String, TireDrumInfoVo> workWeakTypeLimitInfo, String proSize, Integer productionDay) {
-        if (CollectionUtils.isEmpty(workWeakTypeLimitInfo) || StringUtils.isBlank(proSize) || null == productionDay) {
+    private TireDrumDayInfoHelper getDayLimitInfo(Map<String, TireDrumInfoVo> workWeakTypeLimitInfo, TireDrumMatchVo tireDrumMatch, Integer productionDay) {
+        if (CollectionUtils.isEmpty(workWeakTypeLimitInfo) || null == tireDrumMatch || tireDrumMatch.isEmptyValue() || null == productionDay) {
             return null;
         }
-        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(proSize)).collect(Collectors.toList());
+        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(limitGroupList)) {
-            //没有找到与proSize匹配的成型工装限制信息
+            //没有找到与tireDrumMatch匹配的成型工装限制信息
             return null;
         }
         //随意一条
@@ -401,11 +430,12 @@ public class BaseDataContainer implements Serializable {
      * 校验空参数
      *
      * @param productionDay 排产日
-     * @param groupName     分组信息
+     * @param proSize       分组信息
+     * @param cxMachineCode 成型机台
      * @return
      */
-    private boolean isCheckEmpty(Integer productionDay, String groupName) {
-        if (StringUtils.isBlank(groupName) || null == productionDay) {
+    private boolean isCheckEmpty(Integer productionDay, String proSize, String cxMachineCode) {
+        if (StringUtils.isBlank(proSize) || StringUtils.isBlank(cxMachineCode) || null == productionDay) {
             return true;
         }
         return CollectionUtils.isEmpty(tireDrumInfoMap);

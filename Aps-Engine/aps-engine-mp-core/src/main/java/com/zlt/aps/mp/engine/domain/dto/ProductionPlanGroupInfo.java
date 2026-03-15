@@ -695,7 +695,8 @@ public class ProductionPlanGroupInfo {
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays());
+        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays(), isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
@@ -708,21 +709,13 @@ public class ProductionPlanGroupInfo {
         Integer newClosingDay = sortList.get(BigDecimal.ZERO.intValue());
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
-        //20260122 换模次数控制
-        if (!preSelected.isChangeMould(addSkuInfo)) {
+        //20260122 换模判断
+        if (!isChangeMould) {
             return;
         }
-        //需要换模
+        //需要换模-换模次数处理
         DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        changeMouldLimitHandler.confirmStartDayByChangeMouldLimit(productionContext, preSelected, selectedMould);
         Integer changeMouldDay = preSelected.getClosingDay();
-        if (null == changeMouldDay || null == preSelected.getEndDay()) {
-            //记录日志
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
-            productionContext.addSkuProductionLimitInfo(addSkuInfo.getMaterialDesc(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
-            return;
-        }
-        //换模次数处理
         Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }

@@ -195,7 +195,6 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         String groupName = addNewGroupPlan.getGroupName();
         //最小分配天数
         Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext);
@@ -209,25 +208,25 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
         }
-        /**
-         * 20260120 判断成型鼓是否符合条件
-         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
-         */
-        GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
-        //获取成型工装的排产日集合
-        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
-        if (!isReachMinAllocationDays(addNewGroupPlan, productionDayInfo, minAllocationDays)) {
-            if (productionDayInfo.size() > BigDecimal.ZERO.intValue()) {
-                log.info(TbrProductionGroupLogRecorder.addGroupNoReachMinAllocationDayLog(context, groupName, productionDayInfo.size(), minAllocationDays));
-            }
-            //20260120 标记分配完成--没有成型工装,没有日产能，说明后面也找不到
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-            return;
-        }
+//        /**
+//         * 20260120 判断成型鼓是否符合条件
+//         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
+//         */
+//        GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
+//        //获取成型工装的排产日集合
+//        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
+//        if (!isReachMinAllocationDays(addNewGroupPlan, productionDayInfo, minAllocationDays)) {
+//            if (productionDayInfo.size() > BigDecimal.ZERO.intValue()) {
+//                log.info(TbrProductionGroupLogRecorder.addGroupNoReachMinAllocationDayLog(context, groupName, productionDayInfo.size(), minAllocationDays));
+//            }
+//            //20260120 标记分配完成--没有成型工装,没有日产能，说明后面也找不到
+//            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+//            //下一新增结构
+//            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+//            return;
+//        }
         //对挑选出的结构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, productionDayInfo);
+        CxMachineBaseInfoVo selectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan);
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, groupName));
