@@ -1,17 +1,16 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -131,7 +130,7 @@ public class LhGroupProductionRangeCalculator {
         }
         //7、20260313 换模能力
         MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, materialDesc, intersectionSet);
-        if(MouldProductionLimitTypeEnum.NO_LIMIT != handlerMould.getLimitType()){
+        if (MouldProductionLimitTypeEnum.NO_LIMIT != handlerMould.getLimitType()) {
             return handlerMould;
         }
         intersectionSet = handlerMould.getProductionDaySet();
@@ -189,7 +188,26 @@ public class LhGroupProductionRangeCalculator {
             productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT);
         }
-        intersectionSet = intersectionSet.stream().filter(hasChangeMouldDaySet::contains).collect(Collectors.toSet());
+        //换模能力天数
+        String dayInfo = hasChangeMouldDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        DayLimitLogRecorder.addEnableChangeMouldDayLog(productionContext, dayInfo);
+        //取得最早有换模能力的天数
+        List<Integer> canProductionDayList = new ArrayList<>(intersectionSet);
+        canProductionDayList.sort(Comparator.comparing(Integer::intValue));
+        Integer earliestDay = null;
+        for (Integer canProductionDay : canProductionDayList) {
+            if (hasChangeMouldDaySet.contains(canProductionDay)) {
+                earliestDay = canProductionDay;
+                break;
+            }
+        }
+        //没有换模能力
+        if (null == earliestDay) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
+        }
+        Integer selectedDay = earliestDay;
+        intersectionSet = canProductionDayList.stream().filter(canProductionDay -> canProductionDay >= selectedDay).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
             productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT);

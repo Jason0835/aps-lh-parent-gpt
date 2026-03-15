@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.alibaba.fastjson.JSON;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitHelper;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
@@ -8,10 +10,9 @@ import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
-import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +55,16 @@ public class DayProductionStatisticsHandler {
         }
         //提取每日，分组对应的换模次数
         Map<Integer, Map<String, Integer>> dayChangeMouldInfo = getChangeMouldCountInfo(productionContext);
+        Map<Integer, Integer> dayAllChangeMould = new HashMap<>();
+        dayChangeMouldInfo.forEach((day, changeMouldInfo) -> {
+            Integer sumCount = BigDecimal.ZERO.intValue();
+            if (!CollectionUtils.isEmpty(changeMouldInfo)) {
+                sumCount = changeMouldInfo.values().stream().mapToInt(Integer::intValue).sum();
+            }
+            dayAllChangeMould.put(day, sumCount);
+        });
+        String dayChangeMouldContent = JSON.toJSONString(dayAllChangeMould);
+        DayLimitLogRecorder.addDayStatisticsInfo(productionContext, dayChangeMouldContent);
         statisticsResultInfo.forEach((groupName, singleStatisticsResultInfo) -> {
             singleStatisticsResultInfo.setFactoryCode(productionContext.getFactoryCode());
             singleStatisticsResultInfo.setYear(productionContext.getYear());
