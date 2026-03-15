@@ -1,34 +1,33 @@
-package com.zlt.aps.mp.adjust.engine;
+package com.zlt.aps.mp.engine.adjust;
 
-import cn.hutool.core.convert.Convert;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.UrgencyTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.constant.BusiConstant;
-import com.zlt.aps.mp.api.domain.dto.IncMouldContext;
-import com.zlt.aps.mp.common.utils.PubUtil;
-import com.zlt.aps.mp.common.utils.StringUtil;
-import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
-import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
-import com.zlt.aps.mp.engine.check.SkuSecondChecker;
-import com.zlt.aps.mp.engine.deduct.DeductMouldScheduler;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.deduct.DailyScheduleVo;
 import com.zlt.aps.mp.api.domain.deduct.DeductMouldVo;
+import com.zlt.aps.mp.api.domain.dto.IncMouldContext;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
+import com.zlt.aps.mp.engine.check.SkuSecondChecker;
+import com.zlt.aps.mp.engine.deduct.DeductMouldScheduler;
+import com.zlt.common.utils.PubUtil;
+import com.zlt.common.utils.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
@@ -2649,7 +2648,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         mpFinalVo.setAdjustDetail(new StringBuilder());
-        mpFinalVo.setAdjustDetailId(Convert.toStr(adjustStructInVo.getId(), null));
+        mpFinalVo.setAdjustDetailId(adjustStructInVo.getId()==null?null:String.valueOf(adjustStructInVo.getId()));
         return mpFinalVo;
     }
     /**
@@ -2697,7 +2696,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setTotalQty(0);
         mpFinalVo.setOriTotalQty(0);
         mpFinalVo.setAdjustDetail(new StringBuilder());
-        mpFinalVo.setAdjustDetailId(Convert.toStr(adjustStructOutVo.getId(), null));
+        mpFinalVo.setAdjustDetailId(adjustStructOutVo.getId() == null ? null:String.valueOf(adjustStructOutVo.getId()));
         return mpFinalVo;
     }
 }
