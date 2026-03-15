@@ -521,7 +521,7 @@ public class MatchingProductionHandler {
                 break;
             }
         }
-        if (isSecOnLine) {
+        if (!isSecOnLine) { // 校验不通过，则直接结束
             return isSecOnLine;
         }
 
