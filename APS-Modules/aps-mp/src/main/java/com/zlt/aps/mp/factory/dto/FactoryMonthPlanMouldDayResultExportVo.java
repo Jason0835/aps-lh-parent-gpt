@@ -1,9 +1,6 @@
 package com.zlt.aps.mp.factory.dto;
 
-import java.math.BigDecimal;
-
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
-
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -30,4 +27,5 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "周期储备需求", name = "cycleReserveQty")
     private Integer cycleReserveQty;
+
 }
