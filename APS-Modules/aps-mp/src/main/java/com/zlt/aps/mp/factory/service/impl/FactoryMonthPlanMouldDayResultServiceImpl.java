@@ -145,10 +145,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 2.1.1、把明细记录添加到总表
             List<FactoryMonthPlanMouldDayResultExportVo> structureList = entry.getValue();
             totalRecordList.addAll(structureList);
-            // 2.1.2、添加胎胚总类汇总行
-            FactoryMonthPlanMouldDayResultExportVo statisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
-            statisticsRecord.setStructureName(structureName);
-            statisticsRecord.setDataType(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getCode());
+            // 2.1.2、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
+            FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
+            embryoCountStatisticsRecord.setStructureName(structureName);
+            embryoCountStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getCode());
+            FactoryMonthPlanMouldDayResultExportVo lhMachinesStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
+            lhMachinesStatisticsRecord.setStructureName(structureName);
+            lhMachinesStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.LH_MACHINES.getCode());
             MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
             if (statistics != null) {
                 for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
@@ -156,11 +159,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     String dayStatisticsStr = (String)statistics.getFieldValueByFieldName(dayFieldName);
                     if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
                         MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr, MpDayProductionStatisticsDetailVo.class);
-                        statisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getEmbryoCount());
+                        embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getEmbryoCount());
+                        lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getLhMachines());
                     }
                 }
             }
-            totalRecordList.add(statisticsRecord);
+            totalRecordList.add(embryoCountStatisticsRecord);
+            totalRecordList.add(lhMachinesStatisticsRecord);
             // 2.1.3、构建小计行
             FactoryMonthPlanMouldDayResultExportVo subtotalRecord = this.buildSubtotalRecord(structureName,
                     structureList, structureAllocationMap, MonthPlanExportDataTypeEnum.SUBTOTAL);

@@ -13,8 +13,9 @@ import lombok.Getter;
 public enum MonthPlanExportDataTypeEnum {
     RECORD("1","明细记录"),
     EMBRYO_TYPE_COUNT("2","胎胚种类数"),
-    SUBTOTAL("3","小计"),
-    TOTAL("4","总计");
+    LH_MACHINES("3","硫化机台数"),
+    SUBTOTAL("4","小计"),
+    TOTAL("5","总计");
     final String code;
     final String desc;
 }
