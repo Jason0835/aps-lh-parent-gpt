@@ -1,7 +1,10 @@
 package com.zlt.aps.mp.factory.service;
 
 
+import java.util.List;
+
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.bill.common.service.IDocService;
 
 /**
@@ -18,5 +21,17 @@ import com.zlt.bill.common.service.IDocService;
  *     修改内容：...
  */
 public interface IFactoryMonthPlanMouldDayResultService extends IDocService<FactoryMonthPlanMouldDayResult>{
+    /**
+     * 查询导出列表
+     * @param factoryMonthPlanMouldDayResult
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult);
 
+    /**
+     * 导出数据
+     * @param list
+     * @return
+     */
+    byte[] getFactoryMonthPlanMouldDayResultExportByte(List<FactoryMonthPlanMouldDayResultExportVo> list);
 }

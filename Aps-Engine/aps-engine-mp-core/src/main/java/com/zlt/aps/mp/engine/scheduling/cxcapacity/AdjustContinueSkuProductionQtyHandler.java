@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.constant.Constant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
@@ -175,12 +176,14 @@ public class AdjustContinueSkuProductionQtyHandler {
     // 前置条件检查
     if (!validateAdjustmentConditions(materialDesc, requirePlans, productionContext)) {
       log.info("前置条件检查不通过，无需调整: materialDesc={}", materialDesc);
+      requirePlans.forEach(item -> item.setIsProductionBySum(YesOrNoEnum.YES.getValue()));
       return;
     }
     // 计算调整相关的高优先级产量
     int adjustHeightProductionQty = calculateAdjustHeightProductionQty(materialDesc, plansByMaterial, productionContext);
     if (adjustHeightProductionQty == 0) {
       log.info("计算调整相关的高优先级产量=0，无需调整: materialDesc={}, adjustHeightProductionQty={}", materialDesc, adjustHeightProductionQty);
+      requirePlans.forEach(item -> item.setIsProductionBySum(YesOrNoEnum.YES.getValue()));
       return;
     }
 
@@ -195,6 +198,7 @@ public class AdjustContinueSkuProductionQtyHandler {
     // 判断是否需要调整
     if (totalMouldCapacity >= totalProductionQty) {
       log.info("模具产能足够，无需调整: materialDesc={}, totalMouldCapacity={}, totalProductionQty={}", materialDesc, totalMouldCapacity, totalProductionQty);
+      requirePlans.forEach(item -> item.setIsProductionBySum(YesOrNoEnum.YES.getValue()));
       return;
     }
     int lossHeightProductionQty = calculateHeightLossProductionQty(materialDesc, plansByMaterial,productionContext);

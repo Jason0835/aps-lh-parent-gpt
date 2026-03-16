@@ -143,7 +143,9 @@ public class CxLhMouldProductionCalculator {
                 doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
                 //记录已排产量及损耗量
                 productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
+                Integer beforeDay = day;
                 day = getNextHasProductionDay(day, stopDay);
+                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
                 if (day > endDay) {
                     break;
                 }
@@ -241,7 +243,9 @@ public class CxLhMouldProductionCalculator {
                 doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
                 //记录已排产量及损耗量
                 productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
+                Integer beforeDay = day;
                 day = getNextHasProductionDay(day, stopDay);
+                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
                 if (day > endDay) {
                     break;
                 }
@@ -628,6 +632,36 @@ public class CxLhMouldProductionCalculator {
         //隔天换模，则隔天损耗量 = 日硫化量 - 首日排产量
         Integer nextDayLossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
         return new DayProductionQtyHelper(productionDay, true, firstQty, lossQty, nextDayLossQty, true);
+    }
+
+    /**
+     * 前提是都有换模能力：隔天换模的处理
+     *
+     * @param productionContext 排产上下文
+     * @param beforeDay         前一天换模
+     * @param realChangeDay     真实换模日
+     * @param endDay            结束日
+     * @param materialDesc      物料信息
+     * @param doubleMouldList   模具信息
+     */
+    private static void handlerNextDayChangeMould(TbrProductionContext productionContext, Integer beforeDay, Integer realChangeDay, Integer endDay, String materialDesc, List<ProductionMouldInfoVo> doubleMouldList) {
+        if (null == beforeDay || null == realChangeDay || null == endDay) {
+            return;
+        }
+        if (StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(doubleMouldList)) {
+            return;
+        }
+        String mouldCode = doubleMouldList.get(BigDecimal.ZERO.intValue()).getMouldCode();
+        //前天换模次数-1
+        Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        if (realChangeDay > endDay) {
+            return;
+        }
+        //前天-1
+        changeMouldLimitHandler.deductionChangeMouldUsedQty(productionContext, beforeDay, materialDesc, mouldCode);
+        //隔天+1
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, realChangeDay, materialDesc, mouldCodeSet);
     }
 
     /**

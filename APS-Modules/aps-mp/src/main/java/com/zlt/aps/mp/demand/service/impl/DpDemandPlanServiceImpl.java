@@ -198,15 +198,19 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if (StringUtils.isNotBlank(createCondition.getMonthPlanVersion())) {
             // 19409 净需求计划----->点击生成需求计划需要弹框获取需求计划版本号，然后允许用户修改需求计划版本号
             monthPlanVersion = createCondition.getMonthPlanVersion();
+            if(requirementVersionService.validateVersionFormat(createCondition.getMonthPlanVersion())){
+                requirementVersionService.incrementAndGet();
+                requirementVersionService.incrementDailyCounter();
+            }
         }else{
-            monthPlanVersion = requirementVersionService.generateVersion(PREFIX);
+            monthPlanVersion = requirementVersionService.generateVersion(PREFIX,true);
         }
         createCondition.setMonthPlanVersion(monthPlanVersion);
         // 3. 并行获取数据
         PredictionContext data = fetchRequiredDataInParallel(createCondition);
         // 4. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
-            monthPlanVersion, data.getAllocationOrders(), data.getFinishedProductStockMap(),
+            monthPlanVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
             data.getMonthSurplusMap(),data.getMaterialInfoMap());
 
         AlternateMaterialSelector.setAlternateMaterialFlag(allocationResult.getNetDemands(),data.getFinishedProductStockMap());
@@ -296,7 +300,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         PredictionContext data = fetchRequiredDataInParallelByAdjust(createCondition);
         data.setPostponeOrders(null);
         // 2. 生成版本号不能重复
-        String monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST);
+        String monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST,true);
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(monthPlanVersion);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());
@@ -394,7 +398,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if(CollectionUtils.isEmpty(materialInfos)) {
             return Collections.emptySet();
         }
-        return materialInfos.stream().map(MdmMaterialInfo::getMaterialCode).filter(materialCode -> StringUtils.isNotBlank(materialCode)).collect(Collectors.toSet());
+        return materialInfos.stream().map(MdmMaterialInfo::getMaterialCode).filter(StringUtils::isNotBlank).collect(Collectors.toSet());
     }
 
     @Override
@@ -416,7 +420,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setMonth(currentMonth.getMonthValue());
         createCondition.setIncludePostpone(true);
         // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
-        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
+        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix(),true);
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
         List<MpMonthPlanMonitor>  mpMonthPlanMonitors = this.monthPlanMonitorService.findCompleteQty(finalVersion);
@@ -561,7 +565,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setYear(tMonth.getYear());
         createCondition.setMonth(tMonth.getMonthValue());
         // 1、生成预测版本号(PRE+yyyymmdd+3位流水号)
-        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix());
+        String predictionVersion = requirementVersionService.generateVersion(createCondition.getPrefix(),true);
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(predictionVersion);
         Map<String, Integer> initialData = this.factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(predictionVersion,predictionContext.getFinishedProductStocks(),predictionContext.getMaterialInfoMap());

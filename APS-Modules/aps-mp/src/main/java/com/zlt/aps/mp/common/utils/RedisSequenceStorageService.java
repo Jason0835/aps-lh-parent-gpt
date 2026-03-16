@@ -20,7 +20,8 @@ public class RedisSequenceStorageService {
 
   private static final String SEQUENCE_KEY_PREFIX = "req:seq:";
   private static final String DAILY_COUNTER_KEY_PREFIX = "req:daily:counter:";
-  private static final int SEQUENCE_EXPIRE_SECONDS = 48 * 60 * 60; // 48小时
+  // 24小时
+  private static final int SEQUENCE_EXPIRE_SECONDS = 24 * 60 * 60;
 
   @Autowired
   private StringRedisTemplate redisTemplate;
@@ -83,7 +84,8 @@ public class RedisSequenceStorageService {
     String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
     String counterKey = DAILY_COUNTER_KEY_PREFIX + dateStr;
     redisTemplate.opsForValue().increment(counterKey);
-    redisTemplate.expire(counterKey, 7, TimeUnit.DAYS); // 保留7天
+    // 保留1天
+    redisTemplate.expire(counterKey, 1, TimeUnit.DAYS);
   }
 
   /**

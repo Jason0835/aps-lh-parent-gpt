@@ -440,6 +440,14 @@ public class ExcelUtils {
             throw e;
         } catch (Exception e) {
             throw new ExcelException("生成Excel失败！", e);
+        }finally {
+            if (is!=null){
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 

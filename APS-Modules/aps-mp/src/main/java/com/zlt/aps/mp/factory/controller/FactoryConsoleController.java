@@ -11,7 +11,6 @@ import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultServ
 import com.zlt.aps.mp.factory.service.IFactoryProductionVersionService;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.redissonLock.annotation.RedissonLockAnno;
-import com.zlt.aps.mp.engine.check.service.IMpCheckItemService;
 import com.zlt.aps.mp.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -45,8 +44,6 @@ public class FactoryConsoleController extends BaseController {
     private final IFactoryConsoleService factoryConsoleService;
 
     private final IFactoryProductionVersionService factoryProductionVersionService;
-
-    private final IMpCheckItemService mpCheckItemService;
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService iFactoryMonthPlanProductionFinalResultService;
@@ -130,6 +127,12 @@ public class FactoryConsoleController extends BaseController {
      * @return 结果信息
      */
     @ApiOperation("确认对工厂 + 年月 + 需求计划版本进行工厂排产")
+    @RedissonLockAnno(uniqueMark = "redissonLock:demandPlan:confirmSubmit:",
+        expressions = {"#confirmParam.factoryCode", "#confirmParam.year", "#confirmParam.month"},
+        msgKey = "ui.data.alert.confirmSubmit.run",
+        waitTime = 5,
+        leaseTime = 300
+    )
     @PostMapping("/confirmProductionRequireVersion")
     public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam) {
         AjaxResult checkParamResult = checkEmptyMonthPlanVersion(confirmParam);
@@ -285,6 +288,12 @@ public class FactoryConsoleController extends BaseController {
      */
     @ResponseBody
     @ApiOperation("按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本")
+    @RedissonLockAnno(uniqueMark = "redissonLock:demandPlan:cancelSubmit:",
+        expressions = {"#factoryProductionParam.factoryCode", "#factoryProductionParam.year", "#factoryProductionParam.month"},
+        msgKey = "ui.data.alert.cancelSubmit.run",
+        waitTime = 5,
+        leaseTime = 300
+    )
     @PostMapping("/deleteMonthPlanRequire")
     public AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam) {
         if (null == factoryProductionParam) {

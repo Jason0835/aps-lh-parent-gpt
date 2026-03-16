@@ -1,9 +1,8 @@
 package com.zlt.aps.mp.engine.daylimit;
 
 import com.zlt.aps.constant.StringConstant;
-import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkWearInfo;
+import com.zlt.aps.mp.engine.domain.Context;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -41,6 +40,10 @@ public class TireDrumInfoVo implements Serializable {
      */
     private Set<String> proSizeSet;
     /**
+     * 成型机型类型 赛象三鼓/软控三鼓
+     */
+    private Set<String> cxMachineTypeCodeSet;
+    /**
      * 最大数量
      */
     private Integer maxLimitQty;
@@ -67,11 +70,11 @@ public class TireDrumInfoVo implements Serializable {
         info.setFactoryCode(workWearInfo.getFactoryCode());
         info.setWorkWearType(workWearInfo.getWorkWearType());
         String proSizeInfo = workWearInfo.getSpecifications();
-        Set<String> proSizeSet = Collections.emptySet();
-        if (StringUtils.isNotBlank(proSizeInfo)) {
-            proSizeSet = Stream.of(proSizeInfo.split(StringConstant.COMMA)).collect(Collectors.toSet());
-        }
+        Set<String> proSizeSet = handlerMultipleValue(proSizeInfo);
         info.setProSizeSet(proSizeSet);
+        String cxMachineTypeCode = workWearInfo.getUsedType();
+        Set<String> cxMachineTypeCodeSet = handlerMultipleValue(cxMachineTypeCode);
+        info.setCxMachineTypeCodeSet(cxMachineTypeCodeSet);
         Integer totalQty = BigDecimal.ZERO.intValue();
         if (null != workWearInfo.getQty()) {
             totalQty = totalQty + workWearInfo.getQty();
@@ -93,36 +96,19 @@ public class TireDrumInfoVo implements Serializable {
     }
 
     /**
-     * 排产计划，是否匹配到鼓
-     * 英寸进行匹配
-     *
-     * @param productionPlan 同物料描述任意一条排产计划
-     * @return
-     */
-    public boolean isMatch(MonthPlanProductionRequirePlanVo productionPlan) {
-        if (null == productionPlan) {
-            return false;
-        }
-        String proSize = productionPlan.getProSize();
-        if (StringUtils.isBlank(proSize)) {
-            return false;
-        }
-        return proSizeSet.contains(proSize);
-    }
-
-    /**
      * 根据英寸，匹配到鼓
      *
-     * @param groupPlanProSize
+     * @param matchParam 匹配对象
      * @return
      */
-    public boolean isMatch(String groupPlanProSize) {
-        if (StringUtils.isBlank(groupPlanProSize)) {
+    public boolean isMatch(TireDrumMatchVo matchParam) {
+        if (null == matchParam || matchParam.isEmptyValue()) {
             return false;
         }
-        return proSizeSet.contains(groupPlanProSize);
+        String groupPlanProSize = matchParam.getProSize();
+        String cxMachineTypeCode = matchParam.getCxMachineTypeCode();
+        return proSizeSet.contains(groupPlanProSize) && cxMachineTypeCodeSet.contains(cxMachineTypeCode);
     }
-
 
     /**
      * 获取剩余使用量的鼓数量
@@ -140,5 +126,18 @@ public class TireDrumInfoVo implements Serializable {
             return BigDecimal.ZERO.intValue();
         }
         return dayLimit.getLeftOverUsedQty();
+    }
+
+    /**
+     * 转化处理，以,进行分隔，转化成Set
+     *
+     * @param info 信息
+     * @return
+     */
+    private static Set<String> handlerMultipleValue(String info) {
+        if (StringUtils.isBlank(info)) {
+            return Collections.emptySet();
+        }
+        return Stream.of(info.split(StringConstant.COMMA)).collect(Collectors.toSet());
     }
 }

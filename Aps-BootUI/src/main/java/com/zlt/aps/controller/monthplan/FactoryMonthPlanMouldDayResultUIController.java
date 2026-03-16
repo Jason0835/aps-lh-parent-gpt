@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -21,6 +22,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -178,7 +180,7 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
         byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
