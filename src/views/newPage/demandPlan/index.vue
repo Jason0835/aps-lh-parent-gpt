@@ -31,7 +31,7 @@
           type="primary"
          :loading="btnLoading"
           plain
-           v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
+           v-hasPermi="['monthplan:demandPlan:confirmSubmit']"
           @click="handleSubmit"
           >{{ $t("提交确认") }}
         </el-button>
@@ -39,7 +39,7 @@
           type="primary"
           plain
           :loading="btnLoading"
-           v-hasPermi="['monthplan:monthSaleOrderPlan:createSaleRequirePlan']"
+           v-hasPermi="['monthplan:demandPlan:cancelSubmit']"
           @click="handleRevoke"
           >{{ $t("撤销提交") }}
         </el-button>
@@ -645,9 +645,10 @@ export default {
       try {
         this.btnLoading=true
         const params = {
-          ...this.query,
           ...this.search,
+          ...this.query,
         };
+
         let obj={
           factoryCode:params.factoryCode,
           monthPlanVersion:params.monthPlanVersion
@@ -675,8 +676,8 @@ export default {
       }).then(() => {
         this.btnLoading=true
         const params = {
-          ...this.query,
           ...this.search,
+          ...this.query,
         };
         let obj={
           factoryCode:params.factoryCode,

@@ -338,7 +338,7 @@ export default {
   },
   data() {
     return {
-      subDayNum:0,
+      subDayNum: 0,
       loadText: "正在加载中...",
       //结构外调整结果列表
       outResultData: [],
@@ -1064,6 +1064,9 @@ export default {
           clearable: this.activeName == "first" ? false : true,
           filterable: true,
           dictData: this.versionList,
+          listeners: {
+            change: this.handleVersionChange,
+          },
         },
         {
           prop: "materialCode",
@@ -1350,6 +1353,36 @@ export default {
         this.subLoading = false;
       }
     },
+    handleVersionChange(val) {
+      if (this.activeName == "second") {
+        this.search = {
+          ...this.search,
+          productionVersion: val,
+        };
+        this.query = {
+          ...this.search,
+          productionVersion: val,
+        };
+      } else if (this.activeName == "four") {
+        this.search = {
+          ...this.search,
+          adjVersion: val,
+        };
+        this.query = {
+          ...this.search,
+          adjVersion: val,
+        };
+      } else {
+        this.search = {
+          ...this.search,
+          version: val,
+        };
+        this.query = {
+          ...this.search,
+          version: val,
+        };
+      }
+    },
 
     handleYearMonthChange(val) {
       this.search = {
@@ -1364,7 +1397,6 @@ export default {
       this.getVersionList();
     },
     handleMaterialCodeChange(val) {
-      console.log(val);
       this.search = {
         ...this.search,
         materialCode: val,
@@ -1373,6 +1405,8 @@ export default {
         ...this.search,
         materialCode: val,
       };
+      // this.$set(this.search,'materialCode',val)
+      // this.$set(this.query,'materialCode',val)
     },
     handleFactoryChange(val) {
       this.search = {
@@ -1691,7 +1725,7 @@ export default {
 
         //   this.subTableData = res.rows;
         // } catch (err) {}
-        this.subDayNum=this.getDaysInMonth(row.year, row.month)
+        this.subDayNum = this.getDaysInMonth(row.year, row.month);
         this.getSubList(row);
 
         console.log();
