@@ -386,6 +386,48 @@ public class CxMachineBaseInfoVo implements Serializable {
         return false;
     }
 
+
+    /**
+     * 判断机台排产的最后一个结构
+     * 是否为特殊结构
+     *
+     * @return
+     */
+    public boolean lastProductionSpecialStructure() {
+        CxMachineAllocationPlanHelper lastAllocationGroup = getLastAllocationInfo();
+        if (null == lastAllocationGroup) {
+            return false;
+        }
+        return lastAllocationGroup.getProductionPlanInfo().isSpecialMaterial();
+    }
+
+    /**
+     * 将机台最后个分配的分组计划直接拉到月底最后
+     */
+    public void addLastAllocationToFull(Context context) {
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(theoryProductionDaySet)) {
+            return;
+        }
+        CxMachineAllocationPlanHelper lastAllocationInfo = allocationList.get(BigDecimal.ZERO.intValue());
+        if (null == lastAllocationInfo) {
+            return;
+        }
+        List<Integer> theoryProductionDayList = new ArrayList<>(theoryProductionDaySet);
+        theoryProductionDayList.sort(Comparator.comparing(Integer::intValue, Comparator.reverseOrder()));
+        Integer maxDay = theoryProductionDayList.get(BigDecimal.ZERO.intValue());
+        Integer endDay = lastAllocationInfo.getEndDay();
+        Integer startDay = endDay + BigDecimal.ONE.intValue();
+        Integer addDays = BigDecimal.ZERO.intValue();
+        for (; startDay <= maxDay; startDay++) {
+            addDays = addDays + BigDecimal.ONE.intValue();
+        }
+        Integer newEndDay = context.getMonthDays();
+        lastAllocationInfo.addAllocationDayToFull(newEndDay, addDays);
+    }
+
     /**
      * 获取成型机台在startDay~周期结束日可排产的集合信息
      * 需要剔除自身的停产日

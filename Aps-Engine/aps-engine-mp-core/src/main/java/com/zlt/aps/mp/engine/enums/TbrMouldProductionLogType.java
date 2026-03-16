@@ -287,6 +287,10 @@ public enum TbrMouldProductionLogType {
      */
     CX_MACHINE_SELECTED_GROUP("20-16-02", "机台找分组计划"),
     /**
+     * 20-90 成型补量分配
+     */
+    SUPPLEMENT_CX_MACHINE_DISTRIBUTION("20-90","成型补量分配"),
+    /**
      * 30-01-00 开始分组计划模具排产
      */
     START_CX_MACHINE_GROUP_MOULD_PRODUCTION("30-01-00", "开始分组计划模具排产"),
