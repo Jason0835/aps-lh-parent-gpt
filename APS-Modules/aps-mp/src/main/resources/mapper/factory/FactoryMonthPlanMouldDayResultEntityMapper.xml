@@ -196,7 +196,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.TOTAL_VULCANIZATION_MINUTES,
 		    r.DISPLAY_SEQ 
 		ORDER BY
-		    r.STRUCTURE_NAME,
-		    r.MATERIAL_DESC
+		    r.PRO_SIZE,
+		    r.STRUCTURE_NAME
     </select>
 </mapper>

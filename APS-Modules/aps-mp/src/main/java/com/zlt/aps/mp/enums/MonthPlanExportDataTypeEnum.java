@@ -11,11 +11,11 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum MonthPlanExportDataTypeEnum {
-    RECORD("1","明细记录"),
-    EMBRYO_TYPE_COUNT("2","胎胚种类数"),
-    LH_MACHINES("3","硫化机台数"),
-    SUBTOTAL("4","小计"),
-    TOTAL("5","总计");
+    RECORD("1","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.record"), // 明细记录
+    EMBRYO_TYPE_COUNT("2","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.embryoTypeCount"), // 胎胚种类数
+    LH_MACHINES("3","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.lhMachines"), // 硫化机台数
+    SUBTOTAL("4","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.subtotal"), // 小计
+    TOTAL("5","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.total"); // 合计
     final String code;
-    final String desc;
+    final String name;
 }

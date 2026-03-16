@@ -18,6 +18,7 @@ import com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo;
 import com.zlt.aps.mp.api.domain.vo.MonthFinishRateVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
@@ -144,14 +145,22 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             String structureName = entry.getKey();
             // 2.1.1、把明细记录添加到总表
             List<FactoryMonthPlanMouldDayResultExportVo> structureList = entry.getValue();
+            for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
+                if (result.getDayVulcanizationQty() != null) {
+                    result.setDayVulcanizationQty(result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 日硫化量调整为双模
+                }
+            }
+            
             totalRecordList.addAll(structureList);
             // 2.1.2、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
             FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
             embryoCountStatisticsRecord.setStructureName(structureName);
             embryoCountStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getCode());
+            embryoCountStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getName()));
             FactoryMonthPlanMouldDayResultExportVo lhMachinesStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
             lhMachinesStatisticsRecord.setStructureName(structureName);
             lhMachinesStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.LH_MACHINES.getCode());
+            lhMachinesStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.LH_MACHINES.getName()));
             MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
             if (statistics != null) {
                 for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
@@ -215,7 +224,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 品牌类型字典
         List<SysDictData> brandDatas = sysDictDataCacheService.getType("biz_brand_type");
         Map<String, String> brandMap = brandDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
-
+        // 结构类型字典
+        List<SysDictData> structureTypeDatas = sysDictDataCacheService.getType("structure_type");
+        Map<String, String> structureTypeMap = structureTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        
         // 表头信息
         Map<String, Object> tableMap = new HashMap<>(16);
         // 列表数据
@@ -223,30 +235,27 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         List<CellStyle> cellStyleList = new ArrayList<>();
         // 查询数据
         if (PubUtil.isNotEmpty(list)) {
-            String factoryName = factoryMap.getOrDefault(list.get(0).getFactoryCode(), "");
-            tableMap.put("factoryName",factoryName);
-            tableMap.put("productTypeCode",productTypeMap.getOrDefault(list.get(0).getProductTypeCode(), list.get(0).getProductTypeCode()));
-            tableMap.put("monthPlanVersion", list.get(0).getMonthPlanVersion());
-            tableMap.put("productionVersion", list.get(0).getProductionVersion());
+            FactoryMonthPlanMouldDayResultExportVo firstItem = list.get(0);
+            String factoryName = factoryMap.getOrDefault(firstItem.getFactoryCode(), "");
+            String productTypeName = productTypeMap.getOrDefault(firstItem.getProductTypeCode(), firstItem.getProductTypeCode());
+            String titleFormat = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
+            tableMap.put("factoryName",String.format(titleFormat, factoryName, firstItem.getYear(), firstItem.getMonth(), productTypeName));
+            tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
+            tableMap.put("productionVersion", firstItem.getProductionVersion());
             List<Map<String, Object>> listData = new ArrayList<>();
             int beginIndex = 2;
 
             for (int i = 0; i < list.size(); i++) {
                 Map<String, Object> listDataMap = new HashMap<>(16);
                 FactoryMonthPlanMouldDayResultExportVo exportVo = list.get(i);
-                listDataMap.put("factoryCode", factoryMap.getOrDefault(exportVo.getFactoryCode(), exportVo.getFactoryCode()));
-                listDataMap.put("year", exportVo.getYear());
-                listDataMap.put("month", exportVo.getMonth());
-                listDataMap.put("monthPlanVersion", exportVo.getMonthPlanVersion());
-                listDataMap.put("productionVersion", exportVo.getProductionVersion());
                 listDataMap.put("planType", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
-                listDataMap.put("productTypeCode", productTypeMap.getOrDefault(exportVo.getProductTypeCode(), exportVo.getProductTypeCode()));
                 listDataMap.put("materialCode", exportVo.getMaterialCode());
                 listDataMap.put("mesMaterialCode", exportVo.getMesMaterialCode());
                 listDataMap.put("materialDesc", exportVo.getMaterialDesc());
                 listDataMap.put("structureName", exportVo.getStructureName());
                 listDataMap.put("productStatus", productStatusMap.getOrDefault(exportVo.getProductStatus(), exportVo.getProductStatus()));
                 listDataMap.put("embryoCode", exportVo.getEmbryoCode());
+                listDataMap.put("structureType", structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
                 listDataMap.put("mainMaterialDesc", exportVo.getMainMaterialDesc());
                 listDataMap.put("constructionStage", constructionStageMap.getOrDefault(exportVo.getConstructionStage(), exportVo.getConstructionStage()));
                 listDataMap.put("brand", brandMap.getOrDefault(exportVo.getBrand(), exportVo.getBrand()));
@@ -304,7 +313,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 listDataMap.put("day29", exportVo.getDay29());
                 listDataMap.put("day30", exportVo.getDay30());
                 listDataMap.put("day31", exportVo.getDay31());
-                listDataMap.put("remark", exportVo.getRemark());
 
                 // 计算day1到day31的数量合计
                 Integer totolAll = 0;
@@ -345,7 +353,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     String color = "#DAEEF3";
                     // Excel行号从2开始（第1行是表头）
                     int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 74, color, true));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 67, color, true));
                 }else {
                     listDataMap.put("totalAll", totolAll);
                 }
@@ -379,6 +387,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 统计行
         FactoryMonthPlanMouldDayResultExportVo subtotal = new FactoryMonthPlanMouldDayResultExportVo();
         subtotal.setStructureName(structureName);
+        subtotal.setPlanType(I18nUtil.getMessage(dataType.getName()));
         subtotal.setDataType(dataType.getCode());
         // 结构上机时间
         if (structureAllocationMap != null) {
