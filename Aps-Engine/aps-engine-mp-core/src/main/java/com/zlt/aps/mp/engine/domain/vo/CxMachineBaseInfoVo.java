@@ -11,6 +11,7 @@ import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
@@ -223,6 +224,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(productionDayInfo)) {
             return Collections.emptySet();
         }
+        String daysInfo = productionDayInfo.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        DayLimitLogRecorder.addCanProductionDayInfoLog(productionContext, this, selectedGroup.getGroupName(), selectedGroup.getProSizeInfo(), daysInfo);
         //最后下一个分配日
         Integer startDay = getNextStartDay();
         //成型机本身的排产日集合
@@ -232,6 +235,11 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         //取得交集
         Set<Integer> intersectionSet = localProductionInfo.stream().filter(productionDayInfo::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            return Collections.emptySet();
+        }
+        daysInfo = intersectionSet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        DayLimitLogRecorder.addCanProductionDayInfoLog(productionContext, this, selectedGroup.getGroupName(), selectedGroup.getProSizeInfo(), daysInfo);
         //取得最早的一段连续时间
         Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRangeResultExcludeStop(intersectionSet, stopDayInfo);
         if (CollectionUtils.isEmpty(earliestContinuousSet)) {
@@ -271,9 +279,9 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 在模拟排产阶段，且机台选结构，结构反选机台场景使用
      * 20260304 补充Sku排产信息及排产模具
      */
-    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo){
-        if(CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo){
-            return ;
+    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo) {
+            return;
         }
         Integer productionDay = skuDayProductionInfo.getProductionDay();
         GroupPlanCxLhCapacityLimitHelper dayLimit = dayProductionLimitInfo.get(productionDay);
@@ -302,6 +310,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         //更新数量
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
     }
+
     /**
      * 获取固定信息的优先级
      * 固定SKU的优先级最高，其次是固定结构1,
@@ -584,6 +593,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         String proSize = productionPlanInfo.getProSizeInfo();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        baseDataContainer.getCxMachineBaseInfo().get(cxMachineCode);
         DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
         for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
             if (stopDayInfo.contains(productionDay)) {
@@ -727,7 +737,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         Integer preClosingDay = selectedLhGroup.getProductionDay();
         Integer preEndDay = endDay;
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo);
+        boolean isChangeMould = selectedLhGroup.isChangeMould(addSkuInfo);
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, addSkuInfo.getStructureName(), cxMachineCode, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
@@ -740,21 +751,13 @@ public class CxMachineBaseInfoVo implements Serializable {
         Collections.sort(sortList);
         int size = sortList.size();
         newLhGroup.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
-        //20260122 换模次数控制
-        if (!selectedLhGroup.isChangeMould(addSkuInfo)) {
+        //20260122 换模判断
+        if (!isChangeMould) {
             return newLhGroup;
         }
-        String groupName = addSkuInfo.getStructureName();
-        //需要换模
+        //需要换模-换模次数处理
         DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        changeMouldLimitHandler.confirmStartDayByChangeMouldLimit(productionContext, newLhGroup, selectedMould);
         Integer changeMouldDay = newLhGroup.getProductionDay();
-        if (null == changeMouldDay || null == newLhGroup.getEndDay()) {
-            //记录日志
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, cxMachineCode, addSkuInfo, mouldSetCode, MouldProductionLimitTypeEnum.CHANGE_MOULD_LIMIT));
-            return null;
-        }
-        //换模次数处理
         Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
         return newLhGroup;

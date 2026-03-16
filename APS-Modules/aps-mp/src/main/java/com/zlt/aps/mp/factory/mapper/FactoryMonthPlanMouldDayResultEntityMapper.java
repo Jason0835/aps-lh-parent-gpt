@@ -1,7 +1,11 @@
 package com.zlt.aps.mp.factory.mapper;
 
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
+
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -19,5 +23,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface FactoryMonthPlanMouldDayResultEntityMapper extends CommBaseMapper<FactoryMonthPlanMouldDayResult> {
-
+    /**
+     * 查询导出列表
+     * @param factoryMonthPlanMouldDayResult
+     * @return
+     */
+    List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult);
 }

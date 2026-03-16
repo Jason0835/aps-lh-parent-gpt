@@ -40,6 +40,41 @@ public class DayLimitLogRecorder {
     }
 
     /**
+     * 增加 换模能力日志信息
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，有换模能力日:[%s]====
+     *
+     * @param context  排产上下文
+     * @param daysInfo 有换模能力日
+     * @return
+     */
+    public static String addEnableChangeMouldDayLog(Context context, String daysInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，有换模能力日:[%s]====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                daysInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
+     * 每日换模次数，结构切换次数统计
+     *
+     * @param context        排产上下文
+     * @param statisticsInfo 统计信息
+     * @return
+     */
+    public static String addDayStatisticsInfo(Context context, String statisticsInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，换模次数及切换结构次数：%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                statisticsInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加日换模次数使用减量日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，在[%s]日 %s 换模次数 - 1 后总换模次数 %s ====
      *
@@ -163,6 +198,31 @@ public class DayLimitLogRecorder {
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 cxMachineCode, groupName, proSize, limitType.getLimitDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加可排产天数日志日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产日:[%s]====
+     *
+     * @param context       排程上下文
+     * @param cxMachineInfo 机台信息
+     * @param groupName     分组名
+     * @param proSize       英寸
+     * @param daysInfo      限制类型
+     * @return
+     */
+    public static String addCanProductionDayInfoLog(Context context, CxMachineBaseInfoVo cxMachineInfo, String groupName, String proSize, String daysInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：%s 结构：%s 英寸：%s 可排产日:[%s]====";
+        String cxMachineCode = "";
+        if (null != cxMachineInfo) {
+            cxMachineCode = cxMachineInfo.getCxMachineCode();
+        }
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, groupName, proSize, daysInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
         return logContent;

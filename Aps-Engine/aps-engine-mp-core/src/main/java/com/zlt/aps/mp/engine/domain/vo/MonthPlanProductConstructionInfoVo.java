@@ -109,4 +109,8 @@ public class MonthPlanProductConstructionInfoVo implements Serializable {
      */
     @ApiModelProperty(value = "合模压力", name = "mouldClampingPressure")
     private BigDecimal mouldClampingPressure;
+    /**
+     * 排序值
+     */
+    private Integer sortValue;
 }

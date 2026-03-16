@@ -4,6 +4,7 @@ import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
+import com.zlt.aps.mp.engine.daylimit.GroupCapacityProductionLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -15,6 +16,7 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.enums.GroupCxMachineSelectedTypeEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanCxMachineSelector;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -298,49 +300,29 @@ public class CxCapacityAllocationHandler {
 
     /**
      * 对分组(结构)计划，挑选合适成型机台
+     * 需要考虑成型工装的匹配
      *
-     * @param context                排产上下文
-     * @param addNewGroupPlan        排产分组计划
-     * @param workWeakProductionInfo 可排产日集合
+     * @param context         排产上下文
+     * @param addNewGroupPlan 排产分组计划
      * @return
      */
-    public CxMachineBaseInfoVo selectedCxMachineForGroupPlan(Context context, ProductionPlanGroupInfo addNewGroupPlan, Set<Integer> workWeakProductionInfo) {
+    public CxMachineBaseInfoVo selectedCxMachineForGroupPlan(Context context, ProductionPlanGroupInfo addNewGroupPlan) {
         if (null == addNewGroupPlan) {
             return null;
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         //获取分组及零度零度供料架
         String structureName = addNewGroupPlan.getGroupName();
         String isZeroRack = addNewGroupPlan.getIsZero();
-        //最小分配天数 20260209 特殊材料结构，将最小分配天数置为1
-        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays((TbrProductionContext) context);
         //挑选机台
         List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
             return null;
         }
-        Integer needDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
         //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
-        List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> {
-            Set<Integer> hasProductionDaySet = singleMachine.confirmProductionRange(context, workWeakProductionInfo);
-            if (CollectionUtils.isEmpty(hasProductionDaySet)) {
-                return false;
-            }
-            Integer capacityDays = hasProductionDaySet.size();
-            if (capacityDays < minAllocationDays) {
-                return false;
-            }
-            //设置历史信息
-            singleMachine.setLastBoardingDate(BigDecimal.ZERO.intValue());
-            singleMachine.setProductionCount(BigDecimal.ZERO.intValue());
-            productionHistoryHandler.setCxMachineProductionGroupPlanHistory(context, addNewGroupPlan, singleMachine);
-            //设置产能
-            singleMachine.setSelectedProductionDaySet(hasProductionDaySet);
-            singleMachine.setSelectedProductionDys(capacityDays);
-            Integer diffValue = capacityDays - needDays;
-            singleMachine.setCapacityDiffValue(diffValue);
-            return true;
-        }).collect(Collectors.toList());
+        List<CxMachineBaseInfoVo> hasProductionDayList = enableCxMachineList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, addNewGroupPlan, singleMachine)
+        ).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionDayList)) {
             return null;
         }
@@ -422,47 +404,7 @@ public class CxCapacityAllocationHandler {
         }
         //成型机剩余产能能覆盖剩余排产净需求
         Map<String, ProductionPlanGroupInfo> capacityCoverageMap = new HashMap<>(estimateGroupCxAllocationMap.size());
-        estimateGroupCxAllocationMap.forEach((structureName, groupPlan) -> {
-            Integer minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
-            if (null == minLhDayCapacityQty || minLhDayCapacityQty <= BigDecimal.ZERO.longValue()) {
-                //todo 记录日志
-                return;
-            }
-            Map<String, MonthPlanStructureLhRatioVo> lhRatioMap = groupPlan.getCxMachineLhRationMap();
-            if (CollectionUtils.isEmpty(lhRatioMap)) {
-                //todo 记录日志
-                return;
-            }
-            MonthPlanStructureLhRatioVo lhRatio = groupPlan.getLhRatio(cxMachineInfo);
-            if (null == lhRatio) {
-                //todo 记录日志
-                return;
-            }
-            Integer ratio = lhRatio.getLhMachineMaxQty();
-            if (null == ratio || ratio <= BigDecimal.ZERO.intValue()) {
-                //todo 记录日志
-                return;
-            }
-            //记录配比-需要传递
-            cxMachineInfo.setRatio(ratio);
-            //20260109--先采用天数来判断，因剩余未排产量存在模具受限的干扰 groupPlan.getRemainingProductionQty
-            Integer remainingNeedDays = groupPlan.getRemainingNeedAllocationDays();
-            if (remainingNeedDays <= BigDecimal.ZERO.intValue()) {
-                //todo 记录日志
-                return;
-            }
-            //20260120 真实可排产日，成型工装-成型鼓 日产能上限控制
-            Set<Integer> hasProductionSet = cxMachineInfo.confirmProductionRange(context, groupPlan);
-            if (CollectionUtils.isEmpty(hasProductionSet)) {
-                return;
-            }
-            //成型剩余产能
-            Integer realRemainingDays = hasProductionSet.size();
-            if (realRemainingDays < remainingNeedDays) {
-                return;
-            }
-            capacityCoverageMap.put(structureName, groupPlan);
-        });
+        estimateGroupCxAllocationMap.forEach((structureName, groupPlan) -> addCapacityCoverageMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo));
         return capacityCoverageMap;
     }
 
@@ -677,6 +619,127 @@ public class CxCapacityAllocationHandler {
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
         fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(addNewGroupPlan, diffValue));
+    }
+
+    /**
+     * 获取符合条件的成型机台，且设置对应的信息
+     * 匹配结构+机台类型的成型工装、日产能限制
+     * 1、历史生产信息
+     * 2、产能
+     *
+     * @param productionContext 排产上下文
+     * @param addNewGroupPlan   结构
+     * @param singleMachine     预选机台
+     * @return
+     */
+    private boolean selectEnableMachineAndSetInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo addNewGroupPlan, CxMachineBaseInfoVo singleMachine) {
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        //最小分配天数 20260209 特殊材料结构，将最小分配天数置为1
+        Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext);
+        Integer needDays = addNewGroupPlan.getLeftOverNeedAllocationDays();
+        String groupName = addNewGroupPlan.getGroupName();
+        /**
+         * 20260120 判断成型鼓是否符合条件
+         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
+         */
+        GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(productionContext, addNewGroupPlan, singleMachine);
+        //获取成型工装的排产日集合
+        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
+        if (!isReachMinAllocationDays(addNewGroupPlan, productionDayInfo, minAllocationDays)) {
+            if (productionDayInfo.size() > BigDecimal.ZERO.intValue()) {
+                TbrProductionGroupLogRecorder.addGroupNoReachMinAllocationDayLog(productionContext, groupName, productionDayInfo.size(), minAllocationDays);
+            }
+            return false;
+        }
+        Set<Integer> hasProductionDaySet = singleMachine.confirmProductionRange(productionContext, productionDayInfo);
+        if (CollectionUtils.isEmpty(hasProductionDaySet)) {
+            return false;
+        }
+        Integer capacityDays = hasProductionDaySet.size();
+        if (capacityDays < minAllocationDays) {
+            return false;
+        }
+        //设置历史信息
+        singleMachine.setLastBoardingDate(BigDecimal.ZERO.intValue());
+        singleMachine.setProductionCount(BigDecimal.ZERO.intValue());
+        productionHistoryHandler.setCxMachineProductionGroupPlanHistory(productionContext, addNewGroupPlan, singleMachine);
+        //设置产能
+        singleMachine.setSelectedProductionDaySet(hasProductionDaySet);
+        singleMachine.setSelectedProductionDys(capacityDays);
+        Integer diffValue = capacityDays - needDays;
+        singleMachine.setCapacityDiffValue(diffValue);
+        return true;
+    }
+
+    /**
+     * 机台反向挑选结构，将成型产能能覆盖，
+     * 且成型工装也满足的结构加入到capacityCoverageMap集合中
+     *
+     * @param context             排产上下文
+     * @param capacityCoverageMap 需要加入的集合
+     * @param structureName       结构名
+     * @param groupPlan           分组计划信息
+     * @param cxMachineInfo       成型机台
+     */
+    private void addCapacityCoverageMap(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, String structureName, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo) {
+        Integer minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
+        if (null == minLhDayCapacityQty || minLhDayCapacityQty <= BigDecimal.ZERO.longValue()) {
+            //todo 记录日志
+            return;
+        }
+        Map<String, MonthPlanStructureLhRatioVo> lhRatioMap = groupPlan.getCxMachineLhRationMap();
+        if (CollectionUtils.isEmpty(lhRatioMap)) {
+            //todo 记录日志
+            return;
+        }
+        MonthPlanStructureLhRatioVo lhRatio = groupPlan.getLhRatio(cxMachineInfo);
+        if (null == lhRatio) {
+            //todo 记录日志
+            return;
+        }
+        Integer ratio = lhRatio.getLhMachineMaxQty();
+        if (null == ratio || ratio <= BigDecimal.ZERO.intValue()) {
+            //todo 记录日志
+            return;
+        }
+        //记录配比-需要传递
+        cxMachineInfo.setRatio(ratio);
+        //20260109--先采用天数来判断，因剩余未排产量存在模具受限的干扰 groupPlan.getRemainingProductionQty
+        Integer remainingNeedDays = groupPlan.getRemainingNeedAllocationDays();
+        if (remainingNeedDays <= BigDecimal.ZERO.intValue()) {
+            //todo 记录日志
+            return;
+        }
+        //20260120 真实可排产日，成型工装-成型鼓 日产能上限控制
+        Set<Integer> hasProductionSet = cxMachineInfo.confirmProductionRange(context, groupPlan);
+        if (CollectionUtils.isEmpty(hasProductionSet)) {
+            return;
+        }
+        //成型剩余产能
+        Integer realRemainingDays = hasProductionSet.size();
+        TbrProductionGroupLogRecorder.addReverseCxMachineMatchCapacityLog(context, cxMachineInfo, realRemainingDays, structureName, remainingNeedDays);
+        if (realRemainingDays < remainingNeedDays) {
+            return;
+        }
+        capacityCoverageMap.put(structureName, groupPlan);
+    }
+
+    /**
+     * 可满足的排产天信息
+     *
+     * @param groupPlanInfo     分组计划信息
+     * @param productionDayInfo 工装排产天数
+     * @param minAllocationDays 最小排产天数
+     * @return
+     */
+    private boolean isReachMinAllocationDays(ProductionPlanGroupInfo groupPlanInfo, Set<Integer> productionDayInfo, Integer minAllocationDays) {
+        if (CollectionUtils.isEmpty(productionDayInfo)) {
+            return false;
+        }
+        if (groupPlanInfo.isSpecialMaterial()) {
+            return true;
+        }
+        return productionDayInfo.size() >= minAllocationDays;
     }
 
 }

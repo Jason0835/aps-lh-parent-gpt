@@ -387,12 +387,20 @@ public class ExcelUtils {
 
             }
             if(context.containsKey(CELL_STYLE)){
-                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = (List<com.zlt.aps.common.core.domain.CellStyle>) context.get(CELL_STYLE);
-                for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
-                    CellStyle style2 = createColorCellStyle(workbook, cs.getColor(),cs.getWithBorder());
-                    // 设置多个单元格的背景颜色
-                    setCellRangeColor(sheet, cs.getStartRowNum(), cs.getStartCellNum(), cs.getEndRowNum(), cs.getEndCellNum(), style2);
+//                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = (List<com.zlt.aps.common.core.domain.CellStyle>) context.get(CELL_STYLE);
+                Object cellStyleObj = context.get(CELL_STYLE);
+                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = null;
+                if (cellStyleObj != null) {
+                    String jsonStr = com.alibaba.fastjson.JSON.toJSONString(cellStyleObj);
+                    cellStyleList = com.alibaba.fastjson.JSON.parseArray(jsonStr, com.zlt.aps.common.core.domain.CellStyle.class);
+                }
+                if (cellStyleList != null) {
+                    for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
+                        CellStyle style2 = createColorCellStyle(workbook, cs.getColor(),cs.getWithBorder());
+                        // 设置多个单元格的背景颜色
+                        setCellRangeColor(sheet, cs.getStartRowNum(), cs.getStartCellNum(), cs.getEndRowNum(), cs.getEndCellNum(), style2);
 
+                    }
                 }
 
             }

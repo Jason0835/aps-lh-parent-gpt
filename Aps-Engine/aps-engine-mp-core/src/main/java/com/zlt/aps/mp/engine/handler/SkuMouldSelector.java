@@ -255,6 +255,10 @@ public class SkuMouldSelector {
             if (MouldRelationTypeEnum.SKU_RELATION_CONFIGURATION != mouldInfo.getRelationType()) {
                 return;
             }
+            //续作模具不可有排产信息
+            if (!CollectionUtils.isEmpty(mouldInfo.getDayProductionInfo())) {
+                return;
+            }
             effectiveList.add(mouldInfo);
         });
         return effectiveList;

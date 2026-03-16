@@ -6,8 +6,8 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -137,7 +137,9 @@ public class DayCapacityLimitHelper implements Serializable {
      * 使用量
      */
     public void resetUsedQty() {
+        Integer currentAllocationQty = this.cxMachineAllocationQty;
         initUsedInfo();
+        this.cxMachineAllocationQty = currentAllocationQty;
     }
 
     /**
