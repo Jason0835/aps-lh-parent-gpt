@@ -417,20 +417,19 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
         }
         for (FactoryMonthPlanMouldDayResultExportVo result: recordList) {
-            subtotal.setAverageSaleQty(Optional.ofNullable(subtotal.getAverageSaleQty()).orElse(0) + result.getAverageSaleQty());
-            subtotal.setProdReqPlan(Optional.ofNullable(subtotal.getProdReqPlan()).orElse(0) + result.getProdReqPlan());
-            subtotal.setHeightQty(Optional.ofNullable(subtotal.getHeightQty()).orElse(0) + result.getHeightQty());
-            subtotal.setMidQty(Optional.ofNullable(subtotal.getMidQty()).orElse(0) + result.getMidQty());
-            subtotal.setCycleReserveQty(Optional.ofNullable(subtotal.getCycleReserveQty()).orElse(0) + result.getCycleReserveQty());
-            subtotal.setFactProdReqQty(Optional.ofNullable(subtotal.getFactProdReqQty()).orElse(0) + result.getFactProdReqQty());
-            subtotal.setTotalQty(Optional.ofNullable(subtotal.getTotalQty()).orElse(0) + result.getTotalQty());
-            subtotal.setHeightProductionQty(Optional.ofNullable(subtotal.getHeightProductionQty()).orElse(0) + result.getHeightProductionQty());
-            subtotal.setMidProductionQty(Optional.ofNullable(subtotal.getMidProductionQty()).orElse(0) + result.getMidProductionQty());
-            subtotal.setCycleProductionQty(Optional.ofNullable(subtotal.getCycleProductionQty()).orElse(0) + result.getCycleProductionQty());
-            subtotal.setConventionProductionQty(Optional.ofNullable(subtotal.getConventionProductionQty()).orElse(0) + result.getConventionProductionQty());
-            subtotal.setPostponeProductionQty(Optional.ofNullable(subtotal.getPostponeProductionQty()).orElse(0) + result.getPostponeProductionQty());
-            subtotal.setDifferenceQty(Optional.ofNullable(subtotal.getDifferenceQty()).orElse(0) + result.getDifferenceQty());
-            subtotal.setDifferenceQty(Optional.ofNullable(subtotal.getDifferenceQty()).orElse(0) + result.getDifferenceQty());
+            subtotal.setAverageSaleQty(this.safeAdd(subtotal.getAverageSaleQty(), result.getAverageSaleQty()));
+            subtotal.setProdReqPlan(this.safeAdd(subtotal.getProdReqPlan(), result.getProdReqPlan()));
+            subtotal.setHeightQty(this.safeAdd(subtotal.getHeightQty(), result.getHeightQty()));
+            subtotal.setMidQty(this.safeAdd(subtotal.getMidQty(), result.getMidQty()));
+            subtotal.setCycleReserveQty(this.safeAdd(subtotal.getCycleReserveQty(), result.getCycleReserveQty()));
+            subtotal.setFactProdReqQty(this.safeAdd(subtotal.getFactProdReqQty(), result.getFactProdReqQty()));
+            subtotal.setTotalQty(this.safeAdd(subtotal.getTotalQty(), result.getTotalQty()));
+            subtotal.setHeightProductionQty(this.safeAdd(subtotal.getHeightProductionQty(), result.getHeightProductionQty()));
+            subtotal.setMidProductionQty(this.safeAdd(subtotal.getMidProductionQty(), result.getMidProductionQty()));
+            subtotal.setCycleProductionQty(this.safeAdd(subtotal.getCycleProductionQty(), result.getCycleProductionQty()));
+            subtotal.setConventionProductionQty(this.safeAdd(subtotal.getConventionProductionQty(), result.getConventionProductionQty()));
+            subtotal.setPostponeProductionQty(this.safeAdd(subtotal.getPostponeProductionQty(), result.getPostponeProductionQty()));
+            subtotal.setDifferenceQty(this.safeAdd(subtotal.getDifferenceQty(), result.getDifferenceQty()));
             for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
                 String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
                 Integer dayPlanQty = Optional.ofNullable((Integer)result.getFieldValueByFieldName(dayFieldName)).orElse(0);
@@ -441,5 +440,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
         }
         return subtotal;
+    }
+    
+    private Integer safeAdd(Integer value1, Integer value2) {
+        return Optional.ofNullable(value1).orElse(0) + Optional.ofNullable(value2).orElse(0);
     }
 }
