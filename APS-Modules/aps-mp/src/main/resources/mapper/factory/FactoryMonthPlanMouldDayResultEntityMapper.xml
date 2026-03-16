@@ -197,6 +197,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.DISPLAY_SEQ 
 		ORDER BY
 		    r.PRO_SIZE,
-		    r.STRUCTURE_NAME
+		    r.STRUCTURE_NAME,
+		    r.MAIN_PATTERN,
+		    r.MAIN_MATERIAL_DESC,
+		    r.MOULD_CAVITY_QTY DESC
     </select>
 </mapper>

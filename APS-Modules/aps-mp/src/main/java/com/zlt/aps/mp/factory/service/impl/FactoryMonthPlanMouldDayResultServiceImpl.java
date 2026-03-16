@@ -116,8 +116,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         if (CollectionUtils.isEmpty(recordList)) {
             return recordList;
         }
-        Map<String, List<FactoryMonthPlanMouldDayResultExportVo>> structureMap = recordList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResultExportVo::getStructureName)); // 排产明细按结构分组
         // 1.2、加载本次版本已生成的统计记录
         LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
@@ -141,18 +139,30 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         List<FactoryMonthPlanMouldDayResultExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
         List<FactoryMonthPlanMouldDayResultExportVo> subtotalList = new ArrayList<>(); // 小计列表
         // 2.1、按结构遍历每一组排产明细记录，并构建该结构的明细数据 + 胎胚总类汇总 + 小计数据
-        for (Entry<String, List<FactoryMonthPlanMouldDayResultExportVo>> entry : structureMap.entrySet()) {
-            String structureName = entry.getKey();
-            // 2.1.1、把明细记录添加到总表
-            List<FactoryMonthPlanMouldDayResultExportVo> structureList = entry.getValue();
+        String structureName = null; // 当前结构名称
+        List<FactoryMonthPlanMouldDayResultExportVo> structureList = new ArrayList<>(); // 同结构排产记录列表
+        for (Integer i = 0, size = recordList.size(); i < size; i ++) {
+            // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
+            FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
+            if (structureName == null) {
+                structureName = record.getStructureName();
+            }
+            if (structureName.equals(record.getStructureName())) { // 结构没有变化，则添加到列表
+                structureList.add(record);
+                if (i < size - 1) { // 结构发生没发生变化，且还不是最后一笔记录，继续遍历下一笔数据
+                    continue;
+                }
+            } 
+            
+            // 2.1.2、把明细记录添加到总表
             for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
                 if (result.getDayVulcanizationQty() != null) {
                     result.setDayVulcanizationQty(result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 日硫化量调整为双模
                 }
             }
-            
             totalRecordList.addAll(structureList);
-            // 2.1.2、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
+            
+            // 2.1.3、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
             FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
             embryoCountStatisticsRecord.setStructureName(structureName);
             embryoCountStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getCode());
@@ -175,11 +185,16 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
             totalRecordList.add(embryoCountStatisticsRecord);
             totalRecordList.add(lhMachinesStatisticsRecord);
-            // 2.1.3、构建小计行
+            
+            // 2.1.4、构建小计行
             FactoryMonthPlanMouldDayResultExportVo subtotalRecord = this.buildSubtotalRecord(structureName,
                     structureList, structureAllocationMap, MonthPlanExportDataTypeEnum.SUBTOTAL);
             subtotalList.add(subtotalRecord); // 添加至小计表，最后需要将小计汇总成总计
             totalRecordList.add(subtotalRecord); // 添加至总表
+            
+            // 2.1.5、结束本结束数据构建，清空数据
+            structureList.clear();
+            structureName = record.getStructureName(); // 更新当前结构名称为下一个规格
         }
 
         // 3、构建总计行
@@ -354,7 +369,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     // Excel行号从2开始（第1行是表头）
                     int rowNum = beginIndex + i;
                     cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 67, color, true));
-                }else {
+                    if (MonthPlanExportDataTypeEnum.SUBTOTAL.getCode().equals(exportVo.getDataType())
+                            || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) { // 小计、合计行也要加上合计排产
+                        listDataMap.put("totalAll", totolAll);
+                    }
+                } else {
                     listDataMap.put("totalAll", totolAll);
                 }
                 listData.add(listDataMap);
