@@ -144,15 +144,15 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
             // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
-            if (structureName == null) {
-                structureName = record.getStructureName();
-            }
-            if (structureName.equals(record.getStructureName())) { // 结构没有变化，则添加到列表
-                structureList.add(record);
-                if (i < size - 1) { // 结构发生没发生变化，且还不是最后一笔记录，继续遍历下一笔数据
+            structureList.add(record); // 先添加到列表
+            structureName = record.getStructureName(); // 更新结构
+            if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个结构
+                // 下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
+                FactoryMonthPlanMouldDayResultExportVo nextRecord = recordList.get(i + 1);
+                if (structureName.equals(nextRecord.getStructureName())) { // 结构没有变化，则添继续往下
                     continue;
-                }
-            } 
+                } 
+            }
             
             // 2.1.2、把明细记录添加到总表
             for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
@@ -194,7 +194,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             
             // 2.1.5、结束本结束数据构建，清空数据
             structureList.clear();
-            structureName = record.getStructureName(); // 更新当前结构名称为下一个规格
         }
 
         // 3、构建总计行
