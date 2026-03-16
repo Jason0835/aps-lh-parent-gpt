@@ -36,8 +36,11 @@
         <el-button
           v-hasPermi="['monthplan:mpTrialPlan:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
+          >{{ $t("ui.frame.btn.import") }}
+          <el-tooltip content="导入按照下载的模板来导入" placement="top">
+            <i class="el-icon-info"></i>
+          </el-tooltip>
+        </el-button>
         <el-button
           @click="handleExport"
           v-hasPermi="['monthplan:mpTrialPlan:export']"
@@ -79,7 +82,6 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
-import { di } from "@fullcalendar/core/internal-common";
 
 export default {
   name: "TrialPlan",
@@ -97,7 +99,7 @@ export default {
     "biz_urgency_type",
     "trial_construction_stage",
     "trial_status",
-    "biz_yes_no"
+    "biz_yes_no",
   ],
   provide() {
     return {
