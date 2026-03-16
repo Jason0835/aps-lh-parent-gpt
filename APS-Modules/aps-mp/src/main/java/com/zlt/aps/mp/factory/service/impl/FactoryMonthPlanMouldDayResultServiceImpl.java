@@ -8,6 +8,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
+import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
@@ -151,9 +152,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 FactoryMonthPlanMouldDayResultExportVo nextRecord = recordList.get(i + 1);
                 if (structureName.equals(nextRecord.getStructureName())) { // 结构没有变化，则添继续往下
                     continue;
-                } 
+                }
             }
-            
+
             // 2.1.2、把明细记录添加到总表
             for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
                 if (result.getDayVulcanizationQty() != null) {
@@ -161,7 +162,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 }
             }
             totalRecordList.addAll(structureList);
-            
+
             // 2.1.3、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
             FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
             embryoCountStatisticsRecord.setStructureName(structureName);
@@ -185,13 +186,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
             totalRecordList.add(embryoCountStatisticsRecord);
             totalRecordList.add(lhMachinesStatisticsRecord);
-            
+
             // 2.1.4、构建小计行
             FactoryMonthPlanMouldDayResultExportVo subtotalRecord = this.buildSubtotalRecord(structureName,
                     structureList, structureAllocationMap, MonthPlanExportDataTypeEnum.SUBTOTAL);
             subtotalList.add(subtotalRecord); // 添加至小计表，最后需要将小计汇总成总计
             totalRecordList.add(subtotalRecord); // 添加至总表
-            
+
             // 2.1.5、结束本结束数据构建，清空数据
             structureList.clear();
         }
@@ -367,14 +368,19 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     String color = "#DAEEF3";
                     // Excel行号从2开始（第1行是表头）
                     int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 67, color, true));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 65, color, false, true, ""));
                     if (MonthPlanExportDataTypeEnum.SUBTOTAL.getCode().equals(exportVo.getDataType())
                             || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) { // 小计、合计行也要加上合计排产
                         listDataMap.put("totalAll", totolAll);
                     }
-                } else {
+                }else {
+//                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
+//                    excelStyleVo.setFontName("Arial");
+//                    excelStyleVo.setBorder( true);
+//                    listDataMap.put("style", excelStyleVo);
                     listDataMap.put("totalAll", totolAll);
                 }
+
                 listData.add(listDataMap);
             }
             // 将处理好的数据添加到excelDataList
@@ -440,7 +446,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
         return subtotal;
     }
-    
+
     private Integer safeAdd(Integer value1, Integer value2) {
         return Optional.ofNullable(value1).orElse(0) + Optional.ofNullable(value2).orElse(0);
     }
