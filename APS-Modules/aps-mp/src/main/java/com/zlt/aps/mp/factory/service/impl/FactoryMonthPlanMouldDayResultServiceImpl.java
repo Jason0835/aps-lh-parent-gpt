@@ -368,16 +368,16 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     String color = "#DAEEF3";
                     // Excel行号从2开始（第1行是表头）
                     int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 65, color, true, true, "Arial"));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 65, color, false, true, ""));
                     if (MonthPlanExportDataTypeEnum.SUBTOTAL.getCode().equals(exportVo.getDataType())
                             || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) { // 小计、合计行也要加上合计排产
                         listDataMap.put("totalAll", totolAll);
                     }
                 }else {
-                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-                    excelStyleVo.setFontName("Arial");
-                    excelStyleVo.setBorder( true);
-                    listDataMap.put("style", excelStyleVo);
+//                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
+//                    excelStyleVo.setFontName("Arial");
+//                    excelStyleVo.setBorder( true);
+//                    listDataMap.put("style", excelStyleVo);
                     listDataMap.put("totalAll", totolAll);
                 }
 
