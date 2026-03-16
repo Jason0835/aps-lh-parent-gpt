@@ -1309,7 +1309,7 @@ export default {
 
       try {
         let res = await saveAdjust(row);
-        this.$modal.msgSuccess(res.msg);
+        // this.$modal.msgSuccess(res.msg);
         this.getList();
       } catch (err) {}
     },
@@ -1332,7 +1332,7 @@ export default {
       }
       try {
         let res = await editOutHistory(row);
-        this.$modal.msgSuccess(res.msg);
+        // this.$modal.msgSuccess(res.msg);
         this.getSingleList({
           factoryCode: row.factoryCode,
           year: row.year,
