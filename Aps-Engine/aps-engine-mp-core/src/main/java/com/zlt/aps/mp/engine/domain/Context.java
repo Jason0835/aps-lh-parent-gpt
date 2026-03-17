@@ -198,6 +198,20 @@ public class Context {
     }
 
     /**
+     * 获取一个可排产日
+     *
+     * @param productionDay 当前排产日
+     * @param stopDay       停工日集合
+     * @return
+     */
+    public Integer getNextHasProductionDay(Integer productionDay, Set<Integer> stopDay) {
+        Integer newProductionDay = productionDay + BigDecimal.ONE.intValue();
+        if (stopDay.contains(newProductionDay)) {
+            return getNextHasProductionDay(newProductionDay, stopDay);
+        }
+        return newProductionDay;
+    }
+    /**
      * 创建新的版本号，如果排产版本号已经有值，则不进行创建
      * 否则创建新的排产版本号：规则 前缀 + yyyyMMddHHMMSS
      *

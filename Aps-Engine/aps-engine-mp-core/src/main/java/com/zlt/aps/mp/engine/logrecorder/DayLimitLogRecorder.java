@@ -58,17 +58,51 @@ public class DayLimitLogRecorder {
     }
 
     /**
-     * 每日换模次数，结构切换次数统计
+     * 每日换模次数，统计
      *
      * @param context        排产上下文
      * @param statisticsInfo 统计信息
      * @return
      */
     public static String addDayStatisticsInfo(Context context, String statisticsInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，换模次数及切换结构次数：%s====";
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，换模次数：%s====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 statisticsInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
+     * 每日产能占用统计
+     *
+     * @param context                   排产上下文
+     * @param dayCapacityStatisticsInfo 统计信息
+     * @return
+     */
+    public static String addDayCapacityStatisticsInfo(Context context, String dayCapacityStatisticsInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，日产能占用量：%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                dayCapacityStatisticsInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
+     * 每日产能占用统计
+     *
+     * @param context                      排产上下文
+     * @param dayChangeGroupStatisticsInfo 统计信息
+     * @return
+     */
+    public static String addChangeGroupStatisticsInfo(Context context, String dayChangeGroupStatisticsInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，切换结构次数：%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                dayChangeGroupStatisticsInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
         return logContent;

@@ -15,7 +15,8 @@ public enum MonthPlanExportDataTypeEnum {
     EMBRYO_TYPE_COUNT("2","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.embryoTypeCount"), // 胎胚种类数
     LH_MACHINES("3","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.lhMachines"), // 硫化机台数
     SUBTOTAL("4","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.subtotal"), // 小计
-    TOTAL("5","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.total"); // 合计
+    TOTAL("5","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.total"), // 合计
+    CHANGE_MOULDS("6","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.changeMoulds"); // 换模次数
     final String code;
     final String name;
 }
