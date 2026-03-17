@@ -30,7 +30,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    max(md.STRUCTURE_TYPE ) STRUCTURE_TYPE,
 		    sum(md.TOTAL_QTY ) TOTAL_QTY,
 		    sum(md.DIFFERENCE_QTY ) DIFFERENCE_QTY,
-		    max(PRODUCT_TYPE_CODE) PRODUCT_TYPE_CODE
+		    max(md.PRODUCT_TYPE_CODE) PRODUCT_TYPE_CODE,
+		    max(md.PRO_SIZE) PRO_SIZE
 		FROM
 		    T_MP_STRUCTURE_ALLOCATION t
 		    LEFT JOIN t_mdm_molding_machine mm ON t.CX_MACHINE_CODE = mm.CX_MACHINE_CODE 
@@ -73,6 +74,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    t.END_DAY,
 		    t.ALLOT_DAYS,
 		    mm.CX_MACHINE_TYPE_CODE
-		ORDER BY t.CX_MACHINE_CODE, BEGIN_DAY
+		ORDER BY t.CX_MACHINE_CODE, t.BEGIN_DAY
     </select>
 </mapper>

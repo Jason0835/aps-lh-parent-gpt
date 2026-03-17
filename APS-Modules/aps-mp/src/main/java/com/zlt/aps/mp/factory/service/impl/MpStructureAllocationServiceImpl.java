@@ -46,6 +46,7 @@ import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
@@ -929,31 +930,31 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         
         // 3、构建导出总表
         List<MpStructureAllocationExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
-        // 3.1、构建统计行
-        // 3.1.1、排产合计
+        // 3、构建统计行
+        // 3.1、排产合计
         MpStructureAllocationExportVo totalRecord = new MpStructureAllocationExportVo();
         totalRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.TOTAL.getName()));
         totalRecord.setDataType(StructureAllocationExportDataTypeEnum.TOTAL.getCode());
-        // 3.1.2、最大产能
+        // 3.2、最大产能
         MpStructureAllocationExportVo maxProductQtyRecord = new MpStructureAllocationExportVo();
         maxProductQtyRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getName()));
         maxProductQtyRecord.setDataType(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode());
-        // 3.1.3、可用台数
+        // 3.3、可用台数
         MpStructureAllocationExportVo enableCountRecord = new MpStructureAllocationExportVo();
         enableCountRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getName()));
         enableCountRecord.setDataType(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode());
         
-        // 3.1.4、构建主题表格
+        // 3.4、构建主题表格
         String cxMachineCode = null; // 当前结构名称
         List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
-            // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
+            // 3.4.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             MpStructureAllocationExportVo record = recordList.get(i);
             machineStructureList.add(record); // 先添加到列表
             cxMachineCode = record.getStructureName(); // 更新结构
+            // 3.4.2、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
             if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个结构
-                // 3.1.4.1、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
                 MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
                 if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 结构没有变化，则添继续往下
                     continue;
@@ -975,11 +976,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         totalMap.put(day, totalMap.getOrDefault(day, 0) + realLhMachines); // 更新汇总map
                     }
                 }
-                machineRecord.setChangeRank(changeRank ++);
+                machineRecord.setChangeRank(changeRank ++); // 设置序号
             }
             totalRecordList.addAll(machineStructureList);
         }
-        // 更新统计行数值
+        // 3.5、更新统计行数值
         for (Entry<Integer, Integer> entry: totalMap.entrySet()) {
             Integer day = entry.getKey();
             Integer realLhMachines = entry.getValue();
@@ -991,8 +992,44 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         totalRecordList.add(totalRecord);
         totalRecordList.add(maxProductQtyRecord);
         totalRecordList.add(enableCountRecord);
-        
-        // 3、构建报表头
+        exportVo.setRecordList(totalRecordList);
+
+        // 4、构建切换数子表
+        Map<String, List<MpStructureAllocationExportVo>> cxMachineExportMap = recordList.stream()
+                .collect(Collectors.groupingBy(MpStructureAllocationExportVo::getCxMachineCode)); // 按机台分好组
+        Map<Integer, Integer> changeStructureCountMap = new HashMap<>(); // 记录统计的规格切换次数，key切换次数，value该切换次数的机台数
+        // 4.1、遍历每个机台的结构排产记录，统计相关数据
+        for (List<MpStructureAllocationExportVo> cxMachineExportList: cxMachineExportMap.values()) {
+            // 4.1.1、统计结构切换次数
+            Long changeStructureCount = cxMachineExportList.stream()
+                    .map(MpStructureAllocationExportVo::getStructureName).distinct().count() - 1;
+            if (changeStructureCount > 0) {
+                Integer oldCount = changeStructureCountMap.getOrDefault(changeStructureCount, 0);
+                changeStructureCountMap.put(changeStructureCount.intValue(), oldCount + 1);
+            }
+            // 4.1.2、统计英寸交替次数
+            Long changeProSize = cxMachineExportList.stream().map(MpStructureAllocationExportVo::getProSize).distinct()
+                    .count() - 1;
+            if (changeProSize > 0) {
+                Integer oldValue = Optional.ofNullable(exportVo.getProSizeChangeCount()).orElse(0);
+                exportVo.setProSizeChangeCount(oldValue + changeProSize.intValue());
+            }
+        }
+        // 4.2、统计的规格切换次数转换成表格
+        List<MpStructureAllocationExportChangeCountVo> changeCountList = new LinkedList<>();
+        changeStructureCountMap.keySet().stream().sorted(Integer::compareTo).forEach(changeCount -> {
+            Integer machineCount = changeStructureCountMap.get(changeCount);
+            MpStructureAllocationExportChangeCountVo changeCountRecord = new MpStructureAllocationExportChangeCountVo(
+                    changeCount, machineCount, StructureAllocationExportDataTypeEnum.RECORD.getCode());
+            changeCountList.add(changeCountRecord);
+        });
+        // 4.3、构建切换次数统计行
+        Integer totalChangeCount = changeCountList.stream().mapToInt(r -> r.getChangeCount() * r.getMachineCount()).sum();
+        MpStructureAllocationExportChangeCountVo totalChangeCountRecord = new MpStructureAllocationExportChangeCountVo(
+                0, totalChangeCount, StructureAllocationExportDataTypeEnum.TOTAL_CHANGE_COUNT.getCode());
+        changeCountList.add(totalChangeCountRecord);
+        exportVo.setChangeCountList(changeCountList);
+        exportVo.setStructureChangeCount(totalChangeCount); // 更新结构切换
         
         return exportVo;
     }

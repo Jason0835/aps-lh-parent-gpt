@@ -50,6 +50,11 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 未排产量
      */
     private Integer differenceQty;
+    
+    /**
+     * 英寸
+     */
+    private String proSize;
 
     /**
      * DAY_1
