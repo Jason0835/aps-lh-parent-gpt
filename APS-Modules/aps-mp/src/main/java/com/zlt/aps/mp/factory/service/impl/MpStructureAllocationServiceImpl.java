@@ -914,22 +914,36 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 获取最大硫化机数
         Integer lhmachineCount = 176; // TODO 确认从什么地方获取后再改
 
-        // 2、构建导出总表
+        // 2、构建导出数据
+        MpStructureAllocationExportStatisticsVo exportVo = new MpStructureAllocationExportStatisticsVo();
+        // 2、构建报表头
+        exportVo.setFactoryCode(param.getFactoryCode());
+        exportVo.setYear(param.getYear());
+        exportVo.setMonth(param.getMonth());
+        exportVo.setMonthPlanVersion(param.getMonthPlanVersion());
+        exportVo.setProductionVersion(param.getProductionVersion());
+        if (recordList != null) {
+            MpStructureAllocationExportVo firstRecotd = recordList.get(0);
+            exportVo.setProductTypeCode(firstRecotd.getProductTypeCode());
+        }
+        
+        // 3、构建导出总表
         List<MpStructureAllocationExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
-        // 构建统计行
-        // 排产合计
+        // 3.1、构建统计行
+        // 3.1.1、排产合计
         MpStructureAllocationExportVo totalRecord = new MpStructureAllocationExportVo();
         totalRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.TOTAL.getName()));
         totalRecord.setDataType(StructureAllocationExportDataTypeEnum.TOTAL.getCode());
-        // 最大产能
+        // 3.1.2、最大产能
         MpStructureAllocationExportVo maxProductQtyRecord = new MpStructureAllocationExportVo();
         maxProductQtyRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getName()));
         maxProductQtyRecord.setDataType(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode());
-        // 可用台数
+        // 3.1.3、可用台数
         MpStructureAllocationExportVo enableCountRecord = new MpStructureAllocationExportVo();
         enableCountRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getName()));
         enableCountRecord.setDataType(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode());
         
+        // 3.1.4、构建主题表格
         String cxMachineCode = null; // 当前结构名称
         List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
@@ -939,7 +953,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             machineStructureList.add(record); // 先添加到列表
             cxMachineCode = record.getStructureName(); // 更新结构
             if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个结构
-                // 下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
+                // 3.1.4.1、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
                 MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
                 if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 结构没有变化，则添继续往下
                     continue;
@@ -977,15 +991,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         totalRecordList.add(totalRecord);
         totalRecordList.add(maxProductQtyRecord);
         totalRecordList.add(enableCountRecord);
-
-        MpStructureAllocationExportStatisticsVo exportVo = new MpStructureAllocationExportStatisticsVo();
-        exportVo.setFactoryCode(param.getFactoryCode());
-        exportVo.setYear(param.getYear());
-        exportVo.setMonth(param.getMonth());
-        if (recordList != null) {
-            MpStructureAllocationExportVo firstRecotd = recordList.get(0);
-            exportVo.setProductTypeCode(firstRecotd.getProductTypeCode());
-        }
+        
+        // 3、构建报表头
+        
         return exportVo;
     }
     

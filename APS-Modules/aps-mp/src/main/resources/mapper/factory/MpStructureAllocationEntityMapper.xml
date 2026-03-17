@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper">
+    <!-- 获取结构转产表导出数据 -->
+    <select id="getExportList" resultType="com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo">
+        SELECT
+		    t.ID,
+		    t.FACTORY_CODE,
+		    t.YEAR,
+		    t.MONTH,
+		    t.MONTH_PLAN_VERSION,
+		    t.PRODUCTION_VERSION,
+		    t.PLAN_TYPE,
+		    t.DATA_SOURCE,
+		    t.CX_MACHINE_CODE,
+		    t.STRUCTURE_NAME,
+		    t.IS_HAS_SPECIAL_MATERIAL,
+		    t.MAX_EMBRYO_CODE_COUNT,
+		    t.MAX_LH_MACHINE_COUNT,
+		    t.MIN_LH_MACHINE_COUNT,
+		    t.NET_QTY,
+		    t.LOSS_QTY,
+		    t.BEGIN_DAY,
+		    t.END_DAY,
+		    t.ALLOT_DAYS,
+		    mm.CX_MACHINE_TYPE_CODE,
+		    1 data_type,
+		    max(md.STRUCTURE_TYPE ) STRUCTURE_TYPE,
+		    sum(md.TOTAL_QTY ) TOTAL_QTY,
+		    sum(md.DIFFERENCE_QTY ) DIFFERENCE_QTY,
+		    max(PRODUCT_TYPE_CODE) PRODUCT_TYPE_CODE
+		FROM
+		    T_MP_STRUCTURE_ALLOCATION t
+		    LEFT JOIN t_mdm_molding_machine mm ON t.CX_MACHINE_CODE = mm.CX_MACHINE_CODE 
+		    AND mm.IS_DELETE = 0
+		    LEFT JOIN T_MP_MOULDING_DAY_RESULT md ON md.STRUCTURE_NAME = t.STRUCTURE_NAME 
+		    AND md.PRODUCTION_VERSION = t.PRODUCTION_VERSION
+		    AND md.FACTORY_CODE = t.FACTORY_CODE
+		    and md.year = t.year
+		    and md.month = t.month
+		    and md.MONTH_PLAN_VERSION = t.MONTH_PLAN_VERSION 
+		    AND md.IS_DELETE = 0 
+		WHERE
+		    t.factory_code = #{factoryCode}
+		    AND t.PRODUCTION_VERSION = #{productionVersion}
+		    AND t.MONTH_PLAN_VERSION = #{monthPlanVersion}
+		    AND t.YEAR = #{year}
+		    AND t.MONTH = #{month}
+		    AND t.IS_DELETE = 0
+        <if test="cxMachineCode != null and cxMachineCode != ''">
+		    AND t.CX_MACHINE_CODE LIKE concat('%', #{cxMachineCode}, '%')
+        </if>
+		GROUP BY
+		    t.ID,
+		    t.FACTORY_CODE,
+		    t.YEAR,
+		    t.MONTH,
+		    t.MONTH_PLAN_VERSION,
+		    t.PRODUCTION_VERSION,
+		    t.PLAN_TYPE,
+		    t.DATA_SOURCE,
+		    t.CX_MACHINE_CODE,
+		    t.STRUCTURE_NAME,
+		    t.IS_HAS_SPECIAL_MATERIAL,
+		    t.MAX_EMBRYO_CODE_COUNT,
+		    t.MAX_LH_MACHINE_COUNT,
+		    t.MIN_LH_MACHINE_COUNT,
+		    t.NET_QTY,
+		    t.LOSS_QTY,
+		    t.BEGIN_DAY,
+		    t.END_DAY,
+		    t.ALLOT_DAYS,
+		    mm.CX_MACHINE_TYPE_CODE
+		ORDER BY t.CX_MACHINE_CODE, BEGIN_DAY
+    </select>
+</mapper>
