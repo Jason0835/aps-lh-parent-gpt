@@ -208,6 +208,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         createCondition.setMonthPlanVersion(monthPlanVersion);
         // 3. 并行获取数据
         PredictionContext data = fetchRequiredDataInParallel(createCondition);
+        data.setPostponeOrders(null);
         // 4. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
