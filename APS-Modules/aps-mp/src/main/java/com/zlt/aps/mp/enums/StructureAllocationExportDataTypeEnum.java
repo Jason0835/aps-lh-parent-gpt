@@ -12,10 +12,10 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum StructureAllocationExportDataTypeEnum {
     RECORD("1","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.record"), // 明细记录
-    TOTAL("2","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.embryoTypeCount"), // 排产合计
-    MAX_PRODUCT_QTY("3","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.lhMachines"), // 最大产能
-    ENABLE_COUNT("4","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.subtotal"), // 可用台数
-    TOTAL_CHANGE_COUNT("4","ui.data.column.factoryMonthPlanMouldDayResult.export.dataType.subtotal"); // 合计切换次数
+    TOTAL("2","ui.data.column.mpStructureAllocation.total"), // 排产合计
+    MAX_PRODUCT_QTY("3","ui.data.column.mpStructureAllocation.maxProductQty"), // 最大产能
+    ENABLE_COUNT("4","ui.data.column.mpStructureAllocation.enableCount"), // 可用台数
+    TOTAL_CHANGE_COUNT("5","ui.data.column.mpStructureAllocation.totalChangeCount"); // 合计切换次数
     final String code;
     final String name;
 }

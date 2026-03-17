@@ -12,6 +12,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.common.utils.PubUtil;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
@@ -198,9 +199,9 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         setProductionVersion(queryVO);
-//        List<MpStructureAllocationExportVo> list = mpStructureAllocationService.getExportList(queryVO);
-        List<MpStructureAllocationExportVo> list = new ArrayList<>();
-        byte[] resultBytes = mpStructureAllocationService.getMpStructureAllocationExportByte(list);
+        MpStructureAllocationExportStatisticsVo statisticsVo = mpStructureAllocationService.getExportVo(queryVO);
+        List<MpStructureAllocationExportVo> list = statisticsVo.getRecordList();
+        byte[] resultBytes = mpStructureAllocationService.getMpStructureAllocationExportByte(statisticsVo);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");
