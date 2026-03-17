@@ -32,9 +32,9 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
     private String structureType;
 
     /**
-     * 设备类型，数据字典：biz_machine_brand
+     * 设备类型，数据字典：cx_machine_type_code
      */
-    private String cxMachineBrandCode;
+    private String cxMachineTypeCode;
 
     /**
      * 实际排产
