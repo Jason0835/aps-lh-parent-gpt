@@ -1342,14 +1342,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 //                .filter(x->x.getChangeCount()!=null)
 //                .sorted(Comparator.comparingInt(MpStructureAllocationExportChangeCountVo::getChangeCount))
 //                .collect(Collectors.toList());
-        //合计次数
+        // 获取次数
         int changeAllCount = 0;
         if (PubUtil.isNotEmpty(statisticsVo.getChangeCountList())) {
             changeAllCount = statisticsVo.getChangeCountList().stream()
-                    .mapToInt(MpStructureAllocationExportChangeCountVo::getChangeCount).sum();
+                    .filter(s -> StructureAllocationExportDataTypeEnum.TOTAL_CHANGE_COUNT.getCode()
+                            .equals(s.getDataType()))
+                    .map(MpStructureAllocationExportChangeCountVo::getMachineCount).findFirst().orElse(0);
             List<Map<String, Object>> listChangeCountData = new ArrayList<>();
             String changeMsg = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.changeCount");
             for (MpStructureAllocationExportChangeCountVo countVo : statisticsVo.getChangeCountList()) {
+                if (!StructureAllocationExportDataTypeEnum.RECORD.getCode().equals(countVo.getDataType())) {
+                    continue; // 只取明细数据
+                }
                 Map<String, Object> changeMap = new HashMap<>();
                 changeMap.put("changeCount", String.format(changeMsg, countVo.getChangeCount().toString()));
                 changeMap.put("machineCount", countVo.getMachineCount());
