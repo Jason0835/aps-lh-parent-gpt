@@ -1158,7 +1158,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         String factoryName = factoryMap.getOrDefault(statisticsVo.getFactoryCode(), "");
         String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
-        tableMap.put("factoryName", String.format(titleFormat, factoryName, statisticsVo.getYear(), statisticsVo.getMonth()));
+        tableMap.put("factoryName", String.format(titleFormat, factoryName, statisticsVo.getYear().toString(), statisticsVo.getMonth().toString(),""));
         tableMap.put("monthPlanVersion", statisticsVo.getMonthPlanVersion());
         tableMap.put("productionVersion", statisticsVo.getProductionVersion());
         List<Map<String, Object>> listData = new ArrayList<>();
@@ -1270,6 +1270,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
                 totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
                 // 处理底色：只有成型机不一样时，切换颜色区分
+                // Excel行号从2开始（第1行是表头）
+                int rowNum = beginIndex + i;
                 if ("1".equals(exportVo.getDataType())) {
                     // 如果成型机改变，切换颜色
                     if (prevCxMachineCode == null || !prevCxMachineCode.equals(currentCxMachineCode)) {
@@ -1278,9 +1280,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     }
                     // 交替使用两种颜色
                     String color = toggleColor ? "#e2efda" : "#d9d9d9";
-                    // Excel行号从2开始（第1行是表头）
-                    int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 8, color, false, false, ""));
+
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 8, color, true, false, ""));
 
                     // 根据changeRank设置渐变颜色
                     Integer changeRank = exportVo.getChangeRank();
@@ -1314,22 +1315,20 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第9列开始
                             int startCol = 9 + firstDayWithValue;
                             int endCol = 9 + lastDayWithValue;
-                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, false, false, ""));
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, true, false, ""));
+
+                        }else {
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
                         }
+
+                    }else {
+                        cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
                     }
                 }
-
-                if (!"1".equals(exportVo.getDataType())) {
-
+                if ("2".equals(exportVo.getDataType()) || "3".equals(exportVo.getDataType())|| "4".equals(exportVo.getDataType())) {
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, true, ""));
                 }
-                // 计算合计时
-                if (!"1".equals(exportVo.getDataType())) {
-                    // 交替使用两种颜色
-                    String color = "";
-                    // Excel行号从2开始（第1行是表头）
-                    int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 45, color, false, true, ""));
-                }
+
                 listDataMap.put("totalAll", totalAll);
 
                 listData.add(listDataMap);
@@ -1349,9 +1348,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             changeAllCount = statisticsVo.getChangeCountList().stream()
                     .mapToInt(MpStructureAllocationExportChangeCountVo::getChangeCount).sum();
             List<Map<String, Object>> listChangeCountData = new ArrayList<>();
+            String changeMsg = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.changeCount");
             for (MpStructureAllocationExportChangeCountVo countVo : statisticsVo.getChangeCountList()) {
                 Map<String, Object> changeMap = new HashMap<>();
-                changeMap.put("changeCount", countVo.getChangeCount());
+                changeMap.put("changeCount", String.format(changeMsg, countVo.getChangeCount().toString()));
                 changeMap.put("machineCount", countVo.getMachineCount());
                 listChangeCountData.add(changeMap);
             }
