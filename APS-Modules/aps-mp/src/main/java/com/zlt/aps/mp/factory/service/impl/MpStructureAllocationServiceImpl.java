@@ -37,6 +37,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -849,6 +850,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             return Collections.emptySet();
         }
         return  list.stream().map(MpStructureAllocation::getStructureName).collect(Collectors.toSet());
+    }
+    
+
+    /**
+     * 获取结构转产表导出数据
+     * @param param
+     * @return
+     */
+    @Override
+    public MpStructureAllocationExportVo getExportVo(MpStructureAllocation param) {
+        MpStructureAllocationExportVo exportVo = new MpStructureAllocationExportVo();
+        // TODO 添加构建逻辑
+        return exportVo;
     }
 
 
