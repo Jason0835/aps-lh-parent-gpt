@@ -2,6 +2,7 @@ package com.zlt.aps.mp.factory.service;
 
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.bill.common.service.IDocService;
 
@@ -56,7 +57,7 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @param param
      * @return
      */
-    MpStructureAllocationExportVo getExportVo(MpStructureAllocation param);
+    MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param);
 
 
     /**

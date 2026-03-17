@@ -4,6 +4,7 @@ import cn.hutool.core.convert.Convert;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -28,6 +29,7 @@ import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
+import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -39,8 +41,12 @@ import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
@@ -50,7 +56,6 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -62,13 +67,16 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -102,7 +110,16 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
     private final MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
     private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+    private final MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
+    /**
+     * 月份天数上限
+     */
+    private final static int MAX_MONTH_DAY = 31;
+    /**
+     * 日计划字段名称
+     */
+    private final static String DAY_FIELD_NAME_FORMAT = "day%s";
 
 
     @Override
@@ -868,10 +885,123 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * @return
      */
     @Override
-    public MpStructureAllocationExportVo getExportVo(MpStructureAllocation param) {
-        MpStructureAllocationExportVo exportVo = new MpStructureAllocationExportVo();
-        // TODO 添加构建逻辑
+    public MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param) {
+        // 1、加载构建导出列表的各项数据
+        // 1.1、加载月计划模具排产明细
+        List<MpStructureAllocationExportVo> recordList = entityMapper.getExportList(param);
+        // 1.2、加载本次版本已生成的统计记录
+        LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, param.getFactoryCode());
+        queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, param.getProductionVersion());
+        Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
+                .stream().collect(
+                        Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        Map<String, Map<Integer, Integer>> lhMachineStatisticsMap = new HashMap<>();
+        for (Entry<String, MpMonthPlanStatistics> entry: statisticsMap.entrySet()) {
+            Map<Integer, Integer> dayLhMachinesMap = new HashMap<>();
+            MpMonthPlanStatistics statistics = entry.getValue();
+            for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+                String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+                String dayStatisticsStr = (String)statistics.getFieldValueByFieldName(dayFieldName);
+                if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
+                    MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr, MpDayProductionStatisticsDetailVo.class);
+                    dayLhMachinesMap.put(day, dayStatistics.getLhMachines());
+                }
+            }
+            lhMachineStatisticsMap.put(entry.getKey(), dayLhMachinesMap);
+        }
+        // 获取最大硫化机数
+        Integer lhmachineCount = 176; // TODO 确认从什么地方获取后再改
+
+        // 2、构建导出总表
+        List<MpStructureAllocationExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
+        // 构建统计行
+        // 排产合计
+        MpStructureAllocationExportVo totalRecord = new MpStructureAllocationExportVo();
+        totalRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.TOTAL.getName()));
+        totalRecord.setDataType(StructureAllocationExportDataTypeEnum.TOTAL.getCode());
+        // 最大产能
+        MpStructureAllocationExportVo maxProductQtyRecord = new MpStructureAllocationExportVo();
+        maxProductQtyRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getName()));
+        maxProductQtyRecord.setDataType(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode());
+        // 可用台数
+        MpStructureAllocationExportVo enableCountRecord = new MpStructureAllocationExportVo();
+        enableCountRecord.setStructureName(I18nUtil.getMessage(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getName()));
+        enableCountRecord.setDataType(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode());
+        
+        String cxMachineCode = null; // 当前结构名称
+        List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
+        Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
+        for (Integer i = 0, size = recordList.size(); i < size; i ++) {
+            // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
+            MpStructureAllocationExportVo record = recordList.get(i);
+            machineStructureList.add(record); // 先添加到列表
+            cxMachineCode = record.getStructureName(); // 更新结构
+            if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个结构
+                // 下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
+                MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
+                if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 结构没有变化，则添继续往下
+                    continue;
+                }
+            }
+            Integer changeRank = 1;
+            for (MpStructureAllocationExportVo machineRecord: machineStructureList) {
+                Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(machineRecord.getStructureName());
+                if (dayLhMachinesMap == null) {
+                    continue;
+                }
+                for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+                    Integer lhMachines = dayLhMachinesMap.getOrDefault(day, 0);
+                    if (lhMachines > 0) {
+                        Integer realLhMachines = Math.min(machineRecord.getMaxLhMachineCount(), lhMachines);
+                        String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+                        dayLhMachinesMap.put(day, lhMachines - realLhMachines);
+                        this.updateExportDayField(machineRecord, dayFieldName, realLhMachines); // 更新明细
+                        totalMap.put(day, totalMap.getOrDefault(day, 0) + realLhMachines); // 更新汇总map
+                    }
+                }
+                machineRecord.setChangeRank(changeRank ++);
+            }
+            totalRecordList.addAll(machineStructureList);
+        }
+        // 更新统计行数值
+        for (Entry<Integer, Integer> entry: totalMap.entrySet()) {
+            Integer day = entry.getKey();
+            Integer realLhMachines = entry.getValue();
+            String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+            this.updateExportDayField(totalRecord, dayFieldName, realLhMachines); // 累加记录
+            this.updateExportDayField(maxProductQtyRecord, dayFieldName, lhmachineCount); // 填充最大产能数值 = 硫化机总数
+            this.updateExportDayField(enableCountRecord, dayFieldName, lhmachineCount - realLhMachines); // 可用机台数 = 排产合计 - 最大产能
+        }
+        totalRecordList.add(totalRecord);
+        totalRecordList.add(maxProductQtyRecord);
+        totalRecordList.add(enableCountRecord);
+
+        MpStructureAllocationExportStatisticsVo exportVo = new MpStructureAllocationExportStatisticsVo();
+        exportVo.setFactoryCode(param.getFactoryCode());
+        exportVo.setYear(param.getYear());
+        exportVo.setMonth(param.getMonth());
+        if (recordList != null) {
+            MpStructureAllocationExportVo firstRecotd = recordList.get(0);
+            exportVo.setProductTypeCode(firstRecotd.getProductTypeCode());
+        }
         return exportVo;
+    }
+    
+    /**
+     * 更新导出数据的日数据
+     * 
+     * @param exportVo     导出记录
+     * @param dayFieldName 日数据字段
+     * @param value        更新值
+     */
+    private void updateExportDayField(MpStructureAllocationExportVo exportVo, String dayFieldName, Integer value) {
+        if (value == null || value <= 0) {
+            return;
+        }
+        Integer newValue = value;
+        exportVo.setFieldValueByFieldName(dayFieldName, newValue);
     }
 
 

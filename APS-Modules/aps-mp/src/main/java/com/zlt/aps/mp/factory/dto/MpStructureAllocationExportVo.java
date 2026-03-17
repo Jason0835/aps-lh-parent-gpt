@@ -30,6 +30,11 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 结构类型 01 周期结构 02 常规结构，数据字典：structure_type
      */
     private String structureType;
+    
+    /**
+     * 产品品类 数据字典：biz_product_type  全钢 PCR 半钢
+     */
+    private String productTypeCode;
 
     /**
      * 设备类型，数据字典：cx_machine_type_code
