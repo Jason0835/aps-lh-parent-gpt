@@ -143,6 +143,27 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 分配到月底
+     *
+     * @param endDay  结束日
+     * @param addDays 增加的天数
+     */
+    public void addAllocationDayToFull(Integer endDay, Integer addDays) {
+        if (null == endDay || null == addDays) {
+            return;
+        }
+        if (endDay <= this.endDay) {
+            return;
+        }
+        if (addDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        this.endDay = endDay;
+        Integer currentAllocationDay = this.allocationDay;
+        this.allocationDay = currentAllocationDay + addDays;
+    }
+
+    /**
      * 同机台分配的天产能范围只能有一个结构
      * 结构|%|开始日|*|结束日
      *

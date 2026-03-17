@@ -41,13 +41,13 @@ public class ContinueSkuCalculator {
         List<MonthPlanProductionRequirePlanVo> groupPlanList = groupPlanInfo.getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanList)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addContinueGroupNoGroupPlanLog(context, groupName));
+            TbrProductionGroupLogRecorder.addContinueGroupNoGroupPlanLog(context, groupName);
             return;
         }
         Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuMouldNumberMap)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addContinueGroupNoContinueSkuLog(context, groupName));
+            TbrProductionGroupLogRecorder.addContinueGroupNoContinueSkuLog(context, groupName);
             return;
         }
         //20260119 初始设置：续作在产机台信息，可能续作本身没有计划(高优先级没有量或是计划没有量)
@@ -57,7 +57,7 @@ public class ContinueSkuCalculator {
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = groupPlanList.stream().filter(groupPlan -> groupPlan.hasProduction() && skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuEmptyPlanLog(context, groupName));
+            TbrProductionGroupLogRecorder.addContinueGroupContinueSkuEmptyPlanLog(context, groupName);
             return;
         }
         //分组合计续作Sku的计划量-高优先级
@@ -65,11 +65,12 @@ public class ContinueSkuCalculator {
         //设置续作Sku的高优级量及单模日硫化量
         continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> {
             List<MonthPlanProductionRequirePlanVo> planList = continueSkuGroupMap.get(materialDesc);
-            Integer planDemandQty = getContinueSkuSummaryQty(planList);
+            //20260316 续作SKu-使用续作模具采用按总量排-续作优先
+            Integer planDemandQty = getContinueMouldSkuSummaryQty(planList);
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
             if (CollectionUtils.isEmpty(planList)) {
-                log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc));
+                TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc);
                 return;
             }
             MonthPlanProductionRequirePlanVo plan = planList.get(BigDecimal.ZERO.intValue());
@@ -130,6 +131,21 @@ public class ContinueSkuCalculator {
             cxLhRatioMap.put(lhGroupNo, cxLhGroup);
         }
         groupPlanInfo.setCxLhRatioMap(cxLhRatioMap);
+    }
+
+    /**
+     * 汇总续作Sku-续作模具的初始排产量
+     * 全部按总需求
+     *
+     * @param planList 续作Sku计划集合
+     * @return
+     */
+    public static Integer getContinueMouldSkuSummaryQty(List<MonthPlanProductionRequirePlanVo> planList) {
+        if (CollectionUtils.isEmpty(planList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //总净需求量
+        return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
     }
 
     /**

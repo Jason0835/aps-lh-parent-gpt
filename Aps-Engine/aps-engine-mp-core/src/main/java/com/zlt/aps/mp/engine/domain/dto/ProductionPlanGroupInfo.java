@@ -3,11 +3,11 @@ package com.zlt.aps.mp.engine.domain.dto;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.engine.daylimit.*;
-import com.zlt.aps.mp.engine.domain.vo.*;
-import com.zlt.aps.utils.ProductSpecificationsUtils;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -15,7 +15,7 @@ import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.utils.ProductSpecificationsUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -181,7 +181,7 @@ public class ProductionPlanGroupInfo {
         Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
         // 本结构涉及的特殊材料清单
         Map<String, BigDecimal> materialMap = new HashMap<>();
-        for (MonthPlanProductionRequirePlanVo planVo: groupPlanData) { // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
+        for (MonthPlanProductionRequirePlanVo planVo : groupPlanData) { // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
             Map<String, BigDecimal> skuMaterialMap = embryoSpecialMaterialInfoMap.get(planVo.getEmbryoCode());
             if (!CollectionUtils.isEmpty(skuMaterialMap)) {
                 materialMap.putAll(skuMaterialMap);
@@ -197,7 +197,7 @@ public class ProductionPlanGroupInfo {
         List<String> materialCodeList = groupPlanData.stream()
                 .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
         Set<String> mouldCodeSet = new HashSet<>();
-        for (String materialCode: materialCodeList) {
+        for (String materialCode : materialCodeList) {
             List<MonthPlanProductMouldInfoVo> mouldList = productionContext.getBaseDataContainer()
                     .getSkuMouldRelationMap().get(materialCode);
             if (CollectionUtils.isEmpty(mouldList)) {
@@ -213,7 +213,7 @@ public class ProductionPlanGroupInfo {
         }
         // 模具数换算成硫化机台数
         groupInfo.minLhMachineCountBymould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        
+
         return groupInfo;
     }
 
@@ -394,9 +394,10 @@ public class ProductionPlanGroupInfo {
     /**
      * 更新设置整个分组计划不排产
      * 因提前收尾导致不满足最低排产天数
-     * @param minLhMachineCount 最低硫化机台数
+     *
+     * @param minLhMachineCount                 最低硫化机台数
      * @param realAllocationDayBeforeConclusion 高于最低硫化机台数的天数
-     * @param minProductionDays 最低上机天数
+     * @param minProductionDays                 最低上机天数
      */
     public void setNoProductionLowMinLhMachineNoReachMinProductionDays(Integer minLhMachineCount, Integer realAllocationDayBeforeConclusion, Integer minProductionDays) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -821,6 +822,16 @@ public class ProductionPlanGroupInfo {
         if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
             return BigDecimal.ZERO.intValue();
         }
+        return getBoostReplenishmentQuota();
+    }
+
+    /**
+     * 获取还需要进行成型机台小于最短上机天数场景
+     * 还有实单需求的结构
+     *
+     * @return
+     */
+    public Integer getBoostReplenishmentQuota() {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -1014,9 +1025,10 @@ public class ProductionPlanGroupInfo {
     public boolean isSpecialMaterial() {
         return !CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap);
     }
-    
+
     /**
      * 判断结构是否含有专用特殊材料同时也有共用特殊材料（排产优先级最高）
+     *
      * @param productionContext
      * @return
      */
@@ -1026,7 +1038,7 @@ public class ProductionPlanGroupInfo {
         }
         boolean hasDedicatedSpecialMaterials = false; // 是否包含专用特殊材料
         boolean hasShareSpecialMaterials = false; // 是否包含共用特殊材料
-        for (String specialMaterialCode: this.embryoSpecialMaterialInfoMap.keySet()) {
+        for (String specialMaterialCode : this.embryoSpecialMaterialInfoMap.keySet()) {
             Set<String> structureNameSet = productionContext.getSpecialMaterialStructureRelationMap().get(specialMaterialCode); // 获取使用该特殊材料的结构
             if (CollectionUtils.isEmpty(structureNameSet)) {
                 continue;

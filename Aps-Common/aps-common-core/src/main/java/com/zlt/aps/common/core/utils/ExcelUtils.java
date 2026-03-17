@@ -752,9 +752,9 @@ public class ExcelUtils {
                 cellStyle.setRightBorderColor(xssfBorderColor);
             }
 
-            if (bold || fontName != null) {
+            if (bold || StringUtils.isNotEmpty(fontName)) {
                 Font font = workbook.createFont();
-                if (fontName != null) {
+                if (StringUtils.isNotEmpty(fontName)) {
                     font.setFontName(fontName);
                 }
                 if (bold) {
