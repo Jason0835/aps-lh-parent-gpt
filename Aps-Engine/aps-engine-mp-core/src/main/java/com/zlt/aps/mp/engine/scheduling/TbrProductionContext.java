@@ -809,6 +809,9 @@ public class TbrProductionContext extends Context {
             Long stock = specialMaterialInfo.values().stream().mapToLong(s -> stockGetter.apply(s) - sumQtyGetter.apply(s)).sum();
             // 1.2剩余库存换算成条数
             Integer canProductQty = BigDecimalUtils.div(stock, unitConsumeQty, 0).intValue();
+            if (canProductQty < this.baseDataContainer.getParamConfiguration().getChangeMouldFirstQty()) {
+                canProductQty = 0; // 如果剩余库存小于首日排产量，直接返回0
+            }
             minProductQty = Math.min(minProductQty, canProductQty);
             if (minProductQty <= 0) {
                 break;
