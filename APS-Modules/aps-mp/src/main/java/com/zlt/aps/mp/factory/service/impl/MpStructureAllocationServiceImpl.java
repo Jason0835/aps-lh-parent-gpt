@@ -983,6 +983,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 machineRecord.setChangeRank(changeRank ++); // 设置序号
             }
             totalRecordList.addAll(machineStructureList);
+            machineStructureList.clear();
         }
         // 3.5、更新统计行数值
         for (Entry<Integer, Integer> entry: totalMap.entrySet()) {
