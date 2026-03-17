@@ -1394,7 +1394,7 @@ export default {
         yearMonth: val,
       };
 
-      this.getVersionList();
+      this.getVersionList(true);
     },
     handleMaterialCodeChange(val) {
       this.search = {
