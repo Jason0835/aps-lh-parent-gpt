@@ -78,7 +78,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //3、对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, allGroupPlanMap);
         //4、对成型剩余不满足最短上机天数的机台进行分配结构处理
-//        supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
+        supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
 
     /**

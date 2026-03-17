@@ -89,7 +89,7 @@ public class GroupPlanCxMachineSelector {
             }
         });
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName);
             return Collections.emptyList();
         }
         return enableCxMachineList;

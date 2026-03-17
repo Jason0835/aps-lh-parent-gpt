@@ -61,6 +61,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     private Integer maxEmbryoCodeCount;
     /**
+     * 是否结构切换：结构切换时，设置标记
+     */
+    private Boolean isChangeGroup;
+    /**
      * 实际排产规格计划
      */
     private List<MonthPlanProductionRequirePlanVo> realProductionPlanList;

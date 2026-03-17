@@ -144,7 +144,7 @@ public class CxLhMouldProductionCalculator {
                 //记录已排产量及损耗量
                 productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
                 Integer beforeDay = day;
-                day = getNextHasProductionDay(day, stopDay);
+                day = context.getNextHasProductionDay(day, stopDay);
                 handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
                 if (day > endDay) {
                     break;
@@ -244,7 +244,7 @@ public class CxLhMouldProductionCalculator {
                 //记录已排产量及损耗量
                 productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
                 Integer beforeDay = day;
-                day = getNextHasProductionDay(day, stopDay);
+                day = context.getNextHasProductionDay(day, stopDay);
                 handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
                 if (day > endDay) {
                     break;
@@ -561,21 +561,6 @@ public class CxLhMouldProductionCalculator {
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, boostDayQty, BigDecimal.ZERO.intValue());
         }
-    }
-
-    /**
-     * 获取一个可排产日
-     *
-     * @param productionDay 当前排产日
-     * @param stopDay       停工日集合
-     * @return
-     */
-    private static Integer getNextHasProductionDay(Integer productionDay, Set<Integer> stopDay) {
-        Integer newProductionDay = productionDay + BigDecimal.ONE.intValue();
-        if (stopDay.contains(newProductionDay)) {
-            return getNextHasProductionDay(newProductionDay, stopDay);
-        }
-        return newProductionDay;
     }
 
     /**
