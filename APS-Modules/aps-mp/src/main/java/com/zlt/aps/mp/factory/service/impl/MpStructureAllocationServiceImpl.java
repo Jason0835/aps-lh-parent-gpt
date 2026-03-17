@@ -57,6 +57,7 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.actuate.autoconfigure.metrics.startup.StartupTimeMetricsListenerAutoConfiguration;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -367,9 +368,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     /**
      * 筛选工作日历数据(停产)
+     *
      * @param workCalendarList 原始日历列表
-     * @param beginDay 起始天（包含）
-     * @param endDay 结束天（包含）
+     * @param beginDay         起始天（包含）
+     * @param endDay           结束天（包含）
      * @return 符合条件的日历列表
      */
     public List<MdmWorkCalendar> filterWorkCalendar(List<MdmWorkCalendar> workCalendarList, Integer beginDay, Integer endDay) {
@@ -415,9 +417,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     /**
      * 判断是否特殊材料
-     * @param targetEmbryoCode 目标胚胎编码
+     *
+     * @param targetEmbryoCode             目标胚胎编码
      * @param mdmMaterialConsumeDetailList BOM物料消耗明细列表
-     * @param specialMaterialList 特殊材料清单列表
+     * @param specialMaterialList          特殊材料清单列表
      * @return
      */
     protected boolean hasSpecialMaterial(String targetEmbryoCode, List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList,
@@ -675,12 +678,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     /**
      * 判断开始时间和结束时间是否有交叉
+     *
      * @param targetAlloc
      * @param structureAllocationList
      * @return
      */
     private List<String> getDateCrossedErrorMsgList(MpStructureAllocation targetAlloc,
-                                                        List<MpStructureAllocation> structureAllocationList) {
+                                                    List<MpStructureAllocation> structureAllocationList) {
         if (PubUtil.isEmpty(structureAllocationList)) {
             return Collections.emptyList();
         }
@@ -923,7 +927,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         exportVo.setMonth(param.getMonth());
         exportVo.setMonthPlanVersion(param.getMonthPlanVersion());
         exportVo.setProductionVersion(param.getProductionVersion());
-        if (recordList != null) {
+        if (PubUtil.isNotEmpty(recordList)) {
             MpStructureAllocationExportVo firstRecotd = recordList.get(0);
             exportVo.setProductTypeCode(firstRecotd.getProductTypeCode());
         }
@@ -968,7 +972,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
                 for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
                     Integer lhMachines = dayLhMachinesMap.getOrDefault(day, 0);
-                    if (lhMachines > 0) {
+                    if (lhMachines!= null && lhMachines > 0) {
                         Integer realLhMachines = Math.min(machineRecord.getMaxLhMachineCount(), lhMachines);
                         String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
                         dayLhMachinesMap.put(day, lhMachines - realLhMachines);
@@ -1052,10 +1056,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     /**
      * 从集合中找出日期最接近目标开始/结束日的上一个结构
-     * @param list 结构排产列表
-     * @param excludeId 排除的目标结构ID
+     *
+     * @param list           结构排产列表
+     * @param excludeId      排除的目标结构ID
      * @param targetBeginDay 目标开始日
-     * @param targetEndDay 目标结束日
+     * @param targetEndDay   目标结束日
      * @return 最接近的上一个结构
      */
     private MpStructureAllocation getClosestPreviousStructureAllocation(List<MpStructureAllocation> list,
@@ -1108,11 +1113,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         else if (begin.equals(targetBegin)) {
             return end < targetEnd;
         }
-         // 其他情况（开始日更大）→ 不是上一个
-         else {
-             return  Boolean.FALSE;
-         }
-     }
+        // 其他情况（开始日更大）→ 不是上一个
+        else {
+            return Boolean.FALSE;
+        }
+    }
 
     /**
      * 导出结构转产表数据
@@ -1121,10 +1126,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      * @return
      */
     @Override
-    public byte[] getMpStructureAllocationExportByte(List<MpStructureAllocationExportVo> list) {
+    public byte[] getMpStructureAllocationExportByte(MpStructureAllocationExportStatisticsVo statisticsVo) {
+
+
         // 获取模板
         ClassLoader classLoader = this.getClass().getClassLoader();
         InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+
+        // 表头信息
+        Map<String, Object> tableMap = new HashMap<>(16);
+
+        // 列表数据
+        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+        List<CellStyle> cellStyleList = new ArrayList<>();
 
         // 加载字典数据
         // 工厂名称字典
@@ -1140,29 +1154,33 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         List<SysDictData> machineBrandDatas = sysDictDataCacheService.getType("biz_machine_brand");
         Map<String, String> machineBrandMap = machineBrandDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
 
-        // 表头信息
-        Map<String, Object> tableMap = new HashMap<>(16);
-        // 列表数据
-        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        List<CellStyle> cellStyleList = new ArrayList<>();
+
+        String factoryName = factoryMap.getOrDefault(statisticsVo.getFactoryCode(), "");
+        String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
+        tableMap.put("factoryName", String.format(titleFormat, factoryName, statisticsVo.getYear(), statisticsVo.getMonth()));
+        tableMap.put("monthPlanVersion", statisticsVo.getMonthPlanVersion());
+        tableMap.put("productionVersion", statisticsVo.getProductionVersion());
+        List<Map<String, Object>> listData = new ArrayList<>();
+
+
+        //主明细
+        List<MpStructureAllocationExportVo> mpStructureAllocationExportVoList = statisticsVo.getRecordList();
+
         // 查询数据
-        if (PubUtil.isNotEmpty(list)) {
-            MpStructureAllocationExportVo firstItem = list.get(0);
-            String factoryName = factoryMap.getOrDefault(firstItem.getFactoryCode(), "");
-            String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
-            tableMap.put("factoryName", String.format(titleFormat, factoryName, firstItem.getYear(), firstItem.getMonth()));
-            tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
-            tableMap.put("productionVersion", firstItem.getProductionVersion());
-            List<Map<String, Object>> listData = new ArrayList<>();
-            int beginIndex = 2;
+        if (PubUtil.isNotEmpty(mpStructureAllocationExportVoList)) {
+            int beginIndex = 3;
             // 记录上一个成型机编码，用于区分颜色
             String prevCxMachineCode = null;
             // 交替颜色标记，true使用颜色1，false使用颜色2
             boolean toggleColor = false;
-
-            for (int i = 0; i < list.size(); i++) {
-                Map<String, Object> listDataMap = new HashMap<>(16);
-                MpStructureAllocationExportVo exportVo = list.get(i);
+            // 10种逐步加深的颜色，从 #fce4d6 开始逐步加深
+            String[] gradientColors = {
+                    "#fce4d6", "#f9d8c4", "#f6ccb2", "#f3c0a0", "#f0b48e",
+                    "#eda87c", "#ea9c6a", "#e79058", "#e48446", "#e17834"
+            };
+            for (int i = 0; i < mpStructureAllocationExportVoList.size(); i++) {
+                Map<String, Object> listDataMap = new HashMap<>(32);
+                MpStructureAllocationExportVo exportVo = mpStructureAllocationExportVoList.get(i);
                 String currentCxMachineCode = exportVo.getCxMachineCode();
                 listDataMap.put("changeRank", exportVo.getChangeRank());
                 listDataMap.put("factoryCode", factoryMap.getOrDefault(exportVo.getFactoryCode(), exportVo.getFactoryCode()));
@@ -1251,7 +1269,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
                 totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
                 // 处理底色：只有成型机不一样时，切换颜色区分
-                if("1".equals(exportVo.getDataType())){
+                if ("1".equals(exportVo.getDataType())) {
                     // 如果成型机改变，切换颜色
                     if (prevCxMachineCode == null || !prevCxMachineCode.equals(currentCxMachineCode)) {
                         toggleColor = !toggleColor;
@@ -1261,9 +1279,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     String color = toggleColor ? "#e2efda" : "#d9d9d9";
                     // Excel行号从2开始（第1行是表头）
                     int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 9, color, false, false, ""));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 8, color, false, false, ""));
 
-                    // 数据类型为1（明细）时，根据changeRank设置渐变颜色
+                    // 根据changeRank设置渐变颜色
                     Integer changeRank = exportVo.getChangeRank();
                     if (changeRank != null && changeRank >= 1) {
                         // 找到第一个和最后一个有值的day列
@@ -1279,13 +1297,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                                 exportVo.getDay25(), exportVo.getDay26(), exportVo.getDay27(), exportVo.getDay28(),
                                 exportVo.getDay29(), exportVo.getDay30(), exportVo.getDay31()
                         };
-
-                        // 10种逐步加深的颜色，从 #fce4d6 开始逐步加深
-                        String[] gradientColors = {
-                                "#fce4d6", "#f9d8c4", "#f6ccb2", "#f3c0a0", "#f0b48e",
-                                "#eda87c", "#ea9c6a", "#e79058", "#e48446", "#e17834"
-                        };
-
                         // 查找第一个和最后一个有值的day
                         for (int d = 0; d < days.length; d++) {
                             if (days[d] != null && days[d] > 0) {
@@ -1295,47 +1306,28 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                                 lastDayWithValue = d;
                             }
                         }
-
                         // 如果找到有值的范围并且changeRank >= 2
                         if (firstDayWithValue != -1 && lastDayWithValue != -1 && changeRank >= 2) {
-//                            int rowNum = beginIndex + i;
-//                            int colorIndex = Math.min(changeRank - 2, gradientColors.length - 1);
-//                            String color = gradientColors[colorIndex];
-                            // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第7列开始？需要重新确认：
-                            // 前面列：changeRank(0), factoryCode(1), year(2), month(3), structureName(4), structureType(5),
-                            // cxMachineCode(6), cxMachineTypeCode(7), maxEmbryoCodeCount(8), maxLhMachineCount(9),
-                            // minLhMachineCount(10), planType(11), netQty(12), lossQty(13), beginDay(14), endDay(15),
-                            // allotDays(16), isHasSpecialMaterial(17), remark(18), totalQty(19), differenceQty(20),
-                            // 所以day1是从21开始，day1对应第一列索引21
-                            int startCol = 21 + firstDayWithValue;
-                            int endCol = 21 + lastDayWithValue;
-                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, color, false, true, ""));
+                            int colorIndex = Math.min(changeRank - 2, gradientColors.length - 1);
+                            String colorSelect = gradientColors[colorIndex];
+                            // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第9列开始
+                            int startCol = 9 + firstDayWithValue;
+                            int endCol = 9 + lastDayWithValue;
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, false, false, ""));
                         }
                     }
-
-
-
-
                 }
 
-                if(!"1".equals(exportVo.getDataType())){
+                if (!"1".equals(exportVo.getDataType())) {
 
                 }
-
-                // 处理底色：只有成型机不一样时，切换颜色区分
-                if(!"1".equals(exportVo.getDataType())){
-                    // 如果成型机改变，切换颜色
-                    if (prevCxMachineCode == null || !prevCxMachineCode.equals(currentCxMachineCode)) {
-                        toggleColor = !toggleColor;
-                        prevCxMachineCode = currentCxMachineCode;
-                    }
+                // 计算合计时
+                if (!"1".equals(exportVo.getDataType())) {
                     // 交替使用两种颜色
-                    String color = toggleColor ? "#DAEEF3" : "#F2F2F2";
+                    String color = "";
                     // Excel行号从2开始（第1行是表头）
                     int rowNum = beginIndex + i;
                     cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 45, color, false, true, ""));
-                } else {
-                    // 数据类型为1时不改变前一个成型机编码
                 }
                 listDataMap.put("totalAll", totalAll);
 
@@ -1344,12 +1336,40 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
         }
+        //切换次数
+//        List<MpStructureAllocationExportChangeCountVo> changeCountList = statisticsVo.getChangeCountList()
+//                .stream()
+//                .filter(x->x.getChangeCount()!=null)
+//                .sorted(Comparator.comparingInt(MpStructureAllocationExportChangeCountVo::getChangeCount))
+//                .collect(Collectors.toList());
+        //合计次数
+        int changeAllCount = 0;
+        if (PubUtil.isNotEmpty(statisticsVo.getChangeCountList())) {
+            changeAllCount = statisticsVo.getChangeCountList().stream()
+                    .mapToInt(MpStructureAllocationExportChangeCountVo::getChangeCount).sum();
+            List<Map<String, Object>> listChangeCountData = new ArrayList<>();
+            for (MpStructureAllocationExportChangeCountVo countVo : statisticsVo.getChangeCountList()) {
+                Map<String, Object> changeMap = new HashMap<>();
+                changeMap.put("changeCount", countVo.getChangeCount());
+                changeMap.put("machineCount", countVo.getMachineCount());
+                listChangeCountData.add(changeMap);
+            }
+            excelDataList.add(listChangeCountData);
+        }
+        tableMap.put("changeAllCount", changeAllCount);
+
+
+        //英寸交替
+        //结构切换
+        tableMap.put("proSizeChangeCount", statisticsVo.getProSizeChangeCount());
+        tableMap.put("structureChangeCount", statisticsVo.getStructureChangeCount());
+
         // 将单元格样式放入context
-        if(PubUtil.isNotEmpty(cellStyleList)){
+        if (PubUtil.isNotEmpty(cellStyleList)) {
             tableMap.put("CELL_STYLE", cellStyleList);
         }
-         // 写到文件
-         return ExcelUtils.writeMultiList(inputStream
-                 , 0, tableMap, excelDataList);
-     }
- }
+        // 写到文件
+        return ExcelUtils.writeMultiList(inputStream
+                , 0, tableMap, excelDataList);
+    }
+}
