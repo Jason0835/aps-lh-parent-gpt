@@ -189,7 +189,11 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 f.get();
             } catch (Exception e) {
                 log.error("线程执行异常", e);
-                throw new BusinessException(e.getMessage());
+                // 获取原始异常
+                Throwable cause = e.getCause();
+                String errorMsg = cause != null ? cause.getMessage() : e.getMessage();
+                // 只抛出消息，不带类名
+                throw new BusinessException(errorMsg);
             }
         });
         contextDTO.setSaveMpProdFinalList(newMpFinalList);

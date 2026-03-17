@@ -515,6 +515,9 @@ public class MatchingProductionHandler {
         Integer skuEndDay = plan.getEndDay();
         // 2、向前看是否有超出二次上机限制
         for (Integer i = checkDay - 1; i >= skuBeginDay; i--) {
+            if (i == 0){
+                break;
+            }
             Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
                 isSecOnLine = checkDay - checkDayProductQty - 1 <= skuSecondProduction;
