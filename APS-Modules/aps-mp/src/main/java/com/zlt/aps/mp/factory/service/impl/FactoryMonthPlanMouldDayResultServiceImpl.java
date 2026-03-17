@@ -142,6 +142,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 2.1、按结构遍历每一组排产明细记录，并构建该结构的明细数据 + 胎胚总类汇总 + 小计数据
         String structureName = null; // 当前结构名称
         List<FactoryMonthPlanMouldDayResultExportVo> structureList = new ArrayList<>(); // 同结构排产记录列表
+        Map<Integer, Integer> changeMouldMap = new HashMap<>();
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
             // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
@@ -181,6 +182,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                         MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr, MpDayProductionStatisticsDetailVo.class);
                         embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getEmbryoCount());
                         lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getLhMachines());
+                        Integer changeMould = Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0);
+                        if (changeMould > 0) {
+                            changeMouldMap.put(day, changeMouldMap.getOrDefault(day, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
+                        }
                     }
                 }
             }
@@ -201,7 +206,16 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         FactoryMonthPlanMouldDayResultExportVo totalRecord = this.buildSubtotalRecord("", subtotalList, null,
                 MonthPlanExportDataTypeEnum.TOTAL); // 将小计列表汇总为总计
         totalRecordList.add(totalRecord); // 添加至总表
-
+        
+        // 4、构建换模次数列
+        FactoryMonthPlanMouldDayResultExportVo changeMouldStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
+        changeMouldStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode());
+        for (Entry<Integer, Integer> entry: changeMouldMap.entrySet()) {
+            Integer day = entry.getKey();
+            Integer mould = entry.getValue();
+            changeMouldStatisticsRecord.setFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, day), mould);
+        }
+        totalRecordList.add(changeMouldStatisticsRecord);
         return totalRecordList;
     }
 
@@ -250,10 +264,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         List<CellStyle> cellStyleList = new ArrayList<>();
         //需要增加的第二部分
         if (PubUtil.isNotEmpty(list)) {
+            
+            
             List<Map<String, Object>> listData = new ArrayList<>();
-            for (int i = 0; i < list.size(); i++) {
+            list.stream()
+            .filter(r -> MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode().equals(r.getDataType())
+                    || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(r.getDataType()))
+            .forEach(exportVo -> {
                 Map<String, Object> listDataMap = new HashMap<>(16);
-                FactoryMonthPlanMouldDayResultExportVo exportVo = list.get(i);
                 listDataMap.put("planTypeA", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
                 listDataMap.put("materialCodeA", exportVo.getMaterialCode());
                 listDataMap.put("mesMaterialCodeA", exportVo.getMesMaterialCode());
@@ -353,27 +371,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 totolAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
                 totolAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
                 totolAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
-
-
-//                if(!MonthPlanExportDataTypeEnum.RECORD.getCode().equals(exportVo.getDataType())){
-//                    String color = "#DAEEF3";
-//                    // Excel行号从2开始（第1行是表头）
-//                    int rowNum = beginIndex + i;
-//                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 65, color, false, true, ""));
-//                    if (MonthPlanExportDataTypeEnum.SUBTOTAL.getCode().equals(exportVo.getDataType())
-//                            || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) { // 小计、合计行也要加上合计排产
-//                        listDataMap.put("totalAll", totolAll);
-//                    }
-//                }else {
-////                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-////                    excelStyleVo.setFontName("Arial");
-////                    excelStyleVo.setBorder( true);
-////                    listDataMap.put("style", excelStyleVo);
-//                    listDataMap.put("totalAll", totolAll);
-//                }
-
                 listData.add(listDataMap);
-            }
+            });
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
         }
