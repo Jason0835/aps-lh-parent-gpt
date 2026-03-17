@@ -37,5 +37,5 @@ public interface IDpDemandPlanSumService  extends IDocService<DpDemandPlanSum>{
    * @param selectedRequireVersion 选择的需求版本
    * @return
    */
-  String  getPlanType(FactoryProductionPlanVo selectedRequireVersion);
+  DpDemandPlanSum  getDpDemandPlanSumByParam(FactoryProductionPlanVo selectedRequireVersion);
 }

@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.itf.mes.mapper.MesViewMapper">
     <select id="selectProductStock" resultType="com.zlt.aps.mp.api.domain.entity.MdmProductStock">
-        SELECT CONVERT(DATE, STOCK_DATE, 23) AS STOCK_DATE,
+        SELECT
         MATERIAL_CODE,
         MES_MATERIAL_CODE,
         STOCK_NUM AS STOCK_QTY,

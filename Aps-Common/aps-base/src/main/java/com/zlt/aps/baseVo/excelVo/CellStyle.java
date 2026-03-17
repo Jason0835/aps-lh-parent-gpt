@@ -14,6 +14,17 @@ public class CellStyle {
         this.withBorder = withBorder;
     }
 
+    public CellStyle(int startRowNum, int endRowNum, int startCellNum, int endCellNum, String color, boolean withBorder, boolean bold, String fontName) {
+        this.startRowNum = startRowNum;
+        this.endRowNum = endRowNum;
+        this.startCellNum = startCellNum;
+        this.endCellNum = endCellNum;
+        this.color = color;
+        this.withBorder = withBorder;
+        this.bold = bold;
+        this.fontName = fontName;
+    }
+
     /**
      * 开始行
      */
@@ -39,5 +50,15 @@ public class CellStyle {
      * 是否保留边框
      */
     private Boolean withBorder;
+
+    /**
+     * 是否加粗
+     */
+    private Boolean bold;
+
+    /**
+     * 字体名称
+     */
+    private String fontName;
 
 }

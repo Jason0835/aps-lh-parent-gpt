@@ -101,7 +101,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
     }
 
     @Override
-    public String getPlanType(FactoryProductionPlanVo selectedRequireVersion) {
+    public DpDemandPlanSum getDpDemandPlanSumByParam(FactoryProductionPlanVo selectedRequireVersion) {
         LambdaQueryWrapper<DpDemandPlanSum> wrapper = Wrappers.lambdaQuery();
         wrapper.eq(DpDemandPlanSum::getFactoryCode, selectedRequireVersion.getFactoryCode());
         wrapper.eq(DpDemandPlanSum::getYear, selectedRequireVersion.getYear());
@@ -112,7 +112,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
         if(CollectionUtils.isEmpty(list)) {
             return null;
         }
-        return list.get(0).getPlanType();
+        return list.get(0);
     }
 
     private void updateDpDemandPlanSum(DpDemandPlanSum billVO) {

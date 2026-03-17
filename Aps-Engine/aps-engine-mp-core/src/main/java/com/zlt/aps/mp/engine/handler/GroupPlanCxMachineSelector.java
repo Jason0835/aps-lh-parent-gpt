@@ -6,8 +6,8 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
-import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -51,19 +51,7 @@ public class GroupPlanCxMachineSelector {
             return Collections.emptyList();
         }
         //成型机台基础条件匹配
-        List<CxMachineBaseInfoVo> enableCxMachineList = new ArrayList<>(leftOverCxMachineList.size());
-        leftOverCxMachineList.forEach(cxMachineInfo -> {
-            //零度匹配，不可作业剔除
-            boolean isSelected = isMatch(context, addNewGroupPlan, cxMachineInfo);
-            if (isSelected) {
-                enableCxMachineList.add(cxMachineInfo);
-            }
-        });
-        if (CollectionUtils.isEmpty(enableCxMachineList)) {
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
-            return Collections.emptyList();
-        }
-        return enableCxMachineList;
+        return getEnableCxMachineListByAppoint(context, addNewGroupPlan, leftOverCxMachineList);
 //        //如果结构有固定机台，则只能从固定中选择
 //        Set<String> fixedCxMachineSet = addNewGroupPlan.getFixedCxMachineSet();
 //        if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
@@ -76,6 +64,35 @@ public class GroupPlanCxMachineSelector {
 //            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, fixedMachineInfo));
 //        }
 //        return finalResult;
+    }
+
+    /**
+     * 从指定的机台列表中获取 符合基本条件的机台
+     *
+     * @param context              排产上下文
+     * @param matchGroup           需要匹配的分组计划
+     * @param appointCxMachineList 指定机台列表
+     * @return
+     */
+    public static List<CxMachineBaseInfoVo> getEnableCxMachineListByAppoint(Context context, ProductionPlanGroupInfo matchGroup, List<CxMachineBaseInfoVo> appointCxMachineList) {
+        if (null == matchGroup || CollectionUtils.isEmpty(appointCxMachineList)) {
+            return Collections.emptyList();
+        }
+        String structureName = matchGroup.getGroupName();
+        //成型机台基础条件匹配
+        List<CxMachineBaseInfoVo> enableCxMachineList = new ArrayList<>(appointCxMachineList.size());
+        appointCxMachineList.forEach(cxMachineInfo -> {
+            //零度匹配，不可作业剔除
+            boolean isSelected = isMatch(context, matchGroup, cxMachineInfo);
+            if (isSelected) {
+                enableCxMachineList.add(cxMachineInfo);
+            }
+        });
+        if (CollectionUtils.isEmpty(enableCxMachineList)) {
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
+            return Collections.emptyList();
+        }
+        return enableCxMachineList;
     }
 
     /**

@@ -6,6 +6,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -153,16 +154,20 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
         MpFactoryProductionVersion find = factoryProductionVersionMapper.selectOne(queryWrapper);
         //数据不存在
         if (null == find) {
-            MpFactoryProductionVersion version = new MpFactoryProductionVersion();
-            version.setFactoryCode(factoryCode);
-            version.setYear(year);
-            version.setMonth(month);
-            version.setMonthPlanVersion(monthPlanVersion);
-            version.setIsFinal(YesOrNoEnum.NO.getCode());
-            version.setIsSelectedDemand(YesOrNoEnum.YES.getCode());
-            version.setPlanType(this.dpDemandPlanSumService.getPlanType(selectedRequireVersion));
-            this.setProductionVersionCycleDate(version);
-            factoryProductionVersionMapper.insert(version);
+            DpDemandPlanSum demandPlanSum =  this.dpDemandPlanSumService.getDpDemandPlanSumByParam(selectedRequireVersion);
+            if(null != demandPlanSum) {
+                MpFactoryProductionVersion version = new MpFactoryProductionVersion();
+                version.setFactoryCode(factoryCode);
+                version.setYear(year);
+                version.setMonth(month);
+                version.setMonthPlanVersion(monthPlanVersion);
+                version.setIsFinal(YesOrNoEnum.NO.getCode());
+                version.setIsSelectedDemand(YesOrNoEnum.YES.getCode());
+                version.setProductTypeCode(demandPlanSum.getProductTypeCode());
+                version.setPlanType(demandPlanSum.getPlanType());
+                this.setProductionVersionCycleDate(version);
+                factoryProductionVersionMapper.insert(version);
+            }
             return AjaxResult.success();
         }
         //已经加入列表
