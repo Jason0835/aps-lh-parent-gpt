@@ -8,13 +8,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Sets;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
@@ -46,16 +50,20 @@ import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -94,6 +102,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
     private final MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
     private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+    private final ISysDictDataCacheService sysDictDataCacheService;
 
 
     @Override
@@ -924,9 +933,248 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         else if (begin.equals(targetBegin)) {
             return end < targetEnd;
         }
-        // 其他情况（开始日更大）→ 不是上一个
-        else {
-            return Boolean.FALSE;
+         // 其他情况（开始日更大）→ 不是上一个
+         else {
+             return  Boolean.FALSE;
+         }
+     }
+
+    /**
+     * 导出结构转产表数据
+     *
+     * @param list
+     * @return
+     */
+    @Override
+    public byte[] getMpStructureAllocationExportByte(List<MpStructureAllocationExportVo> list) {
+        // 获取模板
+        ClassLoader classLoader = this.getClass().getClassLoader();
+        InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+
+        // 加载字典数据
+        // 工厂名称字典
+        List<SysDictData> factoryDatas = sysDictDataCacheService.getType("biz_factory_name");
+        Map<String, String> factoryMap = factoryDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        // 计划类型字典
+        List<SysDictData> planTypeDatas = sysDictDataCacheService.getType("biz_plan_type");
+        Map<String, String> planTypeMap = planTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        // 结构类型字典
+        List<SysDictData> structureTypeDatas = sysDictDataCacheService.getType("structure_type");
+        Map<String, String> structureTypeMap = structureTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        // 设备类型字典
+        List<SysDictData> machineBrandDatas = sysDictDataCacheService.getType("biz_machine_brand");
+        Map<String, String> machineBrandMap = machineBrandDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+
+        // 表头信息
+        Map<String, Object> tableMap = new HashMap<>(16);
+        // 列表数据
+        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+        List<CellStyle> cellStyleList = new ArrayList<>();
+        // 查询数据
+        if (PubUtil.isNotEmpty(list)) {
+            MpStructureAllocationExportVo firstItem = list.get(0);
+            String factoryName = factoryMap.getOrDefault(firstItem.getFactoryCode(), "");
+            String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
+            tableMap.put("factoryName", String.format(titleFormat, factoryName, firstItem.getYear(), firstItem.getMonth()));
+            tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
+            tableMap.put("productionVersion", firstItem.getProductionVersion());
+            List<Map<String, Object>> listData = new ArrayList<>();
+            int beginIndex = 2;
+            // 记录上一个成型机编码，用于区分颜色
+            String prevCxMachineCode = null;
+            // 交替颜色标记，true使用颜色1，false使用颜色2
+            boolean toggleColor = false;
+
+            for (int i = 0; i < list.size(); i++) {
+                Map<String, Object> listDataMap = new HashMap<>(16);
+                MpStructureAllocationExportVo exportVo = list.get(i);
+                String currentCxMachineCode = exportVo.getCxMachineCode();
+                listDataMap.put("changeRank", exportVo.getChangeRank());
+                listDataMap.put("factoryCode", factoryMap.getOrDefault(exportVo.getFactoryCode(), exportVo.getFactoryCode()));
+                listDataMap.put("year", exportVo.getYear());
+                listDataMap.put("month", exportVo.getMonth());
+                listDataMap.put("structureName", exportVo.getStructureName());
+                listDataMap.put("structureType", structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
+                listDataMap.put("cxMachineCode", exportVo.getCxMachineCode());
+                listDataMap.put("cxMachineTypeCode", machineBrandMap.getOrDefault(exportVo.getCxMachineTypeCode(), exportVo.getCxMachineTypeCode()));
+                listDataMap.put("maxEmbryoCodeCount", exportVo.getMaxEmbryoCodeCount());
+                listDataMap.put("maxLhMachineCount", exportVo.getMaxLhMachineCount());
+                listDataMap.put("minLhMachineCount", exportVo.getMinLhMachineCount());
+                listDataMap.put("planType", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
+                listDataMap.put("netQty", exportVo.getNetQty());
+                listDataMap.put("lossQty", exportVo.getLossQty());
+                listDataMap.put("beginDay", exportVo.getBeginDay());
+                listDataMap.put("endDay", exportVo.getEndDay());
+                listDataMap.put("allotDays", exportVo.getAllotDays());
+                listDataMap.put("isHasSpecialMaterial", exportVo.getIsHasSpecialMaterial());
+                listDataMap.put("remark", exportVo.getRemark());
+                listDataMap.put("totalQty", exportVo.getTotalQty());
+                listDataMap.put("differenceQty", exportVo.getDifferenceQty());
+                listDataMap.put("day1", exportVo.getDay1());
+                listDataMap.put("day2", exportVo.getDay2());
+                listDataMap.put("day3", exportVo.getDay3());
+                listDataMap.put("day4", exportVo.getDay4());
+                listDataMap.put("day5", exportVo.getDay5());
+                listDataMap.put("day6", exportVo.getDay6());
+                listDataMap.put("day7", exportVo.getDay7());
+                listDataMap.put("day8", exportVo.getDay8());
+                listDataMap.put("day9", exportVo.getDay9());
+                listDataMap.put("day10", exportVo.getDay10());
+                listDataMap.put("day11", exportVo.getDay11());
+                listDataMap.put("day12", exportVo.getDay12());
+                listDataMap.put("day13", exportVo.getDay13());
+                listDataMap.put("day14", exportVo.getDay14());
+                listDataMap.put("day15", exportVo.getDay15());
+                listDataMap.put("day16", exportVo.getDay16());
+                listDataMap.put("day17", exportVo.getDay17());
+                listDataMap.put("day18", exportVo.getDay18());
+                listDataMap.put("day19", exportVo.getDay19());
+                listDataMap.put("day20", exportVo.getDay20());
+                listDataMap.put("day21", exportVo.getDay21());
+                listDataMap.put("day22", exportVo.getDay22());
+                listDataMap.put("day23", exportVo.getDay23());
+                listDataMap.put("day24", exportVo.getDay24());
+                listDataMap.put("day25", exportVo.getDay25());
+                listDataMap.put("day26", exportVo.getDay26());
+                listDataMap.put("day27", exportVo.getDay27());
+                listDataMap.put("day28", exportVo.getDay28());
+                listDataMap.put("day29", exportVo.getDay29());
+                listDataMap.put("day30", exportVo.getDay30());
+                listDataMap.put("day31", exportVo.getDay31());
+
+                // 计算day1到day31的数量合计
+                Integer totalAll = 0;
+                totalAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
+                totalAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
+                totalAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
+                totalAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
+                totalAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
+                totalAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
+                totalAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
+                totalAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
+                totalAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
+                totalAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
+                totalAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
+                totalAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
+                totalAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
+                totalAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
+                totalAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
+                totalAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
+                totalAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
+                totalAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
+                totalAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
+                totalAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
+                totalAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
+                totalAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
+                totalAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
+                totalAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
+                totalAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
+                totalAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
+                totalAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
+                totalAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
+                totalAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
+                totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
+                totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
+                // 处理底色：只有成型机不一样时，切换颜色区分
+                if("1".equals(exportVo.getDataType())){
+                    // 如果成型机改变，切换颜色
+                    if (prevCxMachineCode == null || !prevCxMachineCode.equals(currentCxMachineCode)) {
+                        toggleColor = !toggleColor;
+                        prevCxMachineCode = currentCxMachineCode;
+                    }
+                    // 交替使用两种颜色
+                    String color = toggleColor ? "#e2efda" : "#d9d9d9";
+                    // Excel行号从2开始（第1行是表头）
+                    int rowNum = beginIndex + i;
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 9, color, false, false, ""));
+
+                    // 数据类型为1（明细）时，根据changeRank设置渐变颜色
+                    Integer changeRank = exportVo.getChangeRank();
+                    if (changeRank != null && changeRank >= 1) {
+                        // 找到第一个和最后一个有值的day列
+                        int firstDayWithValue = -1;
+                        int lastDayWithValue = -1;
+                        Integer[] days = {
+                                exportVo.getDay1(), exportVo.getDay2(), exportVo.getDay3(), exportVo.getDay4(),
+                                exportVo.getDay5(), exportVo.getDay6(), exportVo.getDay7(), exportVo.getDay8(),
+                                exportVo.getDay9(), exportVo.getDay10(), exportVo.getDay11(), exportVo.getDay12(),
+                                exportVo.getDay13(), exportVo.getDay14(), exportVo.getDay15(), exportVo.getDay16(),
+                                exportVo.getDay17(), exportVo.getDay18(), exportVo.getDay19(), exportVo.getDay20(),
+                                exportVo.getDay21(), exportVo.getDay22(), exportVo.getDay23(), exportVo.getDay24(),
+                                exportVo.getDay25(), exportVo.getDay26(), exportVo.getDay27(), exportVo.getDay28(),
+                                exportVo.getDay29(), exportVo.getDay30(), exportVo.getDay31()
+                        };
+
+                        // 10种逐步加深的颜色，从 #fce4d6 开始逐步加深
+                        String[] gradientColors = {
+                                "#fce4d6", "#f9d8c4", "#f6ccb2", "#f3c0a0", "#f0b48e",
+                                "#eda87c", "#ea9c6a", "#e79058", "#e48446", "#e17834"
+                        };
+
+                        // 查找第一个和最后一个有值的day
+                        for (int d = 0; d < days.length; d++) {
+                            if (days[d] != null && days[d] > 0) {
+                                if (firstDayWithValue == -1) {
+                                    firstDayWithValue = d;
+                                }
+                                lastDayWithValue = d;
+                            }
+                        }
+
+                        // 如果找到有值的范围并且changeRank >= 2
+                        if (firstDayWithValue != -1 && lastDayWithValue != -1 && changeRank >= 2) {
+//                            int rowNum = beginIndex + i;
+//                            int colorIndex = Math.min(changeRank - 2, gradientColors.length - 1);
+//                            String color = gradientColors[colorIndex];
+                            // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第7列开始？需要重新确认：
+                            // 前面列：changeRank(0), factoryCode(1), year(2), month(3), structureName(4), structureType(5),
+                            // cxMachineCode(6), cxMachineTypeCode(7), maxEmbryoCodeCount(8), maxLhMachineCount(9),
+                            // minLhMachineCount(10), planType(11), netQty(12), lossQty(13), beginDay(14), endDay(15),
+                            // allotDays(16), isHasSpecialMaterial(17), remark(18), totalQty(19), differenceQty(20),
+                            // 所以day1是从21开始，day1对应第一列索引21
+                            int startCol = 21 + firstDayWithValue;
+                            int endCol = 21 + lastDayWithValue;
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, color, false, true, ""));
+                        }
+                    }
+
+
+
+
+                }
+
+                if(!"1".equals(exportVo.getDataType())){
+
+                }
+
+                // 处理底色：只有成型机不一样时，切换颜色区分
+                if(!"1".equals(exportVo.getDataType())){
+                    // 如果成型机改变，切换颜色
+                    if (prevCxMachineCode == null || !prevCxMachineCode.equals(currentCxMachineCode)) {
+                        toggleColor = !toggleColor;
+                        prevCxMachineCode = currentCxMachineCode;
+                    }
+                    // 交替使用两种颜色
+                    String color = toggleColor ? "#DAEEF3" : "#F2F2F2";
+                    // Excel行号从2开始（第1行是表头）
+                    int rowNum = beginIndex + i;
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 45, color, false, true, ""));
+                } else {
+                    // 数据类型为1时不改变前一个成型机编码
+                }
+                listDataMap.put("totalAll", totalAll);
+
+                listData.add(listDataMap);
+            }
+            // 将处理好的数据添加到excelDataList
+            excelDataList.add(listData);
         }
-    }
-}
+        // 将单元格样式放入context
+        if(PubUtil.isNotEmpty(cellStyleList)){
+            tableMap.put("CELL_STYLE", cellStyleList);
+        }
+         // 写到文件
+         return ExcelUtils.writeMultiList(inputStream
+                 , 0, tableMap, excelDataList);
+     }
+ }
