@@ -483,7 +483,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 重算每日产能限制，包括硫化机台数、胎胚种类数
+     * 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
      * @param contextDTO 周程滚动上下文
      * @param mpProdFinalList 定稿记录列表
      */
@@ -561,7 +561,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
         dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
         dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
-        dayProductionStatisticsDetailVo.setChangeMould(null);
+        dayProductionStatisticsDetailVo.setChangeMould(Convert.toInt(capacityVo.getUsedChangeMould(), 0).equals(0) ? null : capacityVo.getUsedChangeMould());
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 

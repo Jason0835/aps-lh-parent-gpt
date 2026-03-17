@@ -329,7 +329,9 @@ public abstract class AbstractDailyCapacityLimit {
         dailyCapacityLimitVo.setUsedLhMachines(iCount);
         // 已用胎胚种类数
         dailyCapacityLimitVo.setUsedEmbryoTypes(dailyCapacityLimitVo.getEmbryoCodes().size());
-
+        // 已用换模次数
+        int iChangeMouldCount = machineResultVo.getMatchedPairs() + machineResultVo.getIsolatedIncreases() + machineResultVo.getIsolatedChanges();
+        dailyCapacityLimitVo.setUsedChangeMould(iChangeMouldCount);
         //==================计算主花纹向下的硫化机台数==========================
         // 计算机台组合（减模、增模、换活字块）
         int mpPatternNoAddDecMould = patternNoAddDecMouldMap.get(mainPattern) == null ? 0:patternNoAddDecMouldMap.get(mainPattern);

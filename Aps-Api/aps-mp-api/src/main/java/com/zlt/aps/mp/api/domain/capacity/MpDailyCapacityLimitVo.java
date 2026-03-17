@@ -42,6 +42,11 @@ public class MpDailyCapacityLimitVo {
     private Integer usedEmbryoTypes = 0;
 
     /**
+     * 已用换模次数
+     */
+    private Integer usedChangeMould = 0;
+
+    /**
      *  当日使用的胎胚编码
      */
     private Set<String> embryoCodes = new HashSet<>();
