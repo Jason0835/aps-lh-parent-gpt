@@ -951,18 +951,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         enableCountRecord.setDataType(StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode());
         
         // 3.4、构建主题表格
-        String cxMachineCode = null; // 当前结构名称
+        String cxMachineCode = null; // 当前机台
         List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
             // 3.4.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             MpStructureAllocationExportVo record = recordList.get(i);
             machineStructureList.add(record); // 先添加到列表
-            cxMachineCode = record.getStructureName(); // 更新结构
+            cxMachineCode = record.getCxMachineCode(); // 更新机台
             // 3.4.2、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
-            if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个结构
+            if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个机台
                 MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
-                if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 结构没有变化，则添继续往下
+                if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 机台没有变化，则添继续往下
                     continue;
                 }
             }
@@ -1036,7 +1036,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 0, totalChangeCount, StructureAllocationExportDataTypeEnum.TOTAL_CHANGE_COUNT.getCode());
         changeCountList.add(totalChangeCountRecord);
         exportVo.setChangeCountList(changeCountList);
-        exportVo.setStructureChangeCount(totalChangeCount); // 更新结构切换
+        exportVo.setStructureChangeCount(totalChangeCount - exportVo.getProSizeChangeCount()); // 更新结构切换 = 总结构切换数 - 换英寸数
         
         return exportVo;
     }
@@ -1182,9 +1182,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     "#eda87c", "#ea9c6a", "#e79058", "#e48446", "#e17834"
             };
             for (int i = 0; i < mpStructureAllocationExportVoList.size(); i++) {
-                Map<String, Object> listDataMap = new HashMap<>(32);
                 MpStructureAllocationExportVo exportVo = mpStructureAllocationExportVoList.get(i);
                 String currentCxMachineCode = exportVo.getCxMachineCode();
+                Map<String, Object> listDataMap = new HashMap<>(32);
                 listDataMap.put("changeRank", exportVo.getChangeRank());
                 listDataMap.put("factoryCode", factoryMap.getOrDefault(exportVo.getFactoryCode(), exportVo.getFactoryCode()));
                 listDataMap.put("year", exportVo.getYear());
@@ -1271,10 +1271,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 totalAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
                 totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
                 totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
+                listDataMap.put("totalAll", totalAll);
                 // 处理底色：只有成型机不一样时，切换颜色区分
                 // Excel行号从2开始（第1行是表头）
                 int rowNum = beginIndex + i;
-                if ("1".equals(exportVo.getDataType())) {
+                if (StructureAllocationExportDataTypeEnum.RECORD.getCode().equals(exportVo.getDataType())) {
                     // 如果成型机改变，切换颜色
                     if (prevCxMachineCode == null || !prevCxMachineCode.equals(currentCxMachineCode)) {
                         toggleColor = !toggleColor;
@@ -1327,11 +1328,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 //                        cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
                     }
                 }
-                if ("2".equals(exportVo.getDataType()) || "3".equals(exportVo.getDataType())|| "4".equals(exportVo.getDataType())) {
+                if (StructureAllocationExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())
+                        || StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode().equals(exportVo.getDataType())
+                        || StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode().equals(exportVo.getDataType())) {
                     cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", false, true, ""));
                 }
-
-                listDataMap.put("totalAll", totalAll);
 
                 listData.add(listDataMap);
             }
