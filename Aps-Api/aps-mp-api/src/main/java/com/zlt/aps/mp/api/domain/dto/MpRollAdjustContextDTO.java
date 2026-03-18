@@ -166,6 +166,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "BOM物料消耗明细列表")
     private List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList;
 
+    @ApiModelProperty(value = "提示信息Map key = 提示类型（0-告警 1-错误）, value = 提示信息列表")
+    private Map<String, List<String>> messageMap;
+
     @ApiModelProperty(value = "排程过程日志")
     private StringBuilder logDetail;
 
