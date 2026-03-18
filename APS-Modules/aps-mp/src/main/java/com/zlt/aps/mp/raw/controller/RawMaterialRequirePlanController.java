@@ -78,6 +78,15 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
     }
 
     /**
+     * 获取原材料需求版本列表（最新的放前面）
+     */
+    @ApiOperation("获取原材料需求版本列表")
+    @PostMapping("/getVersionList")
+    public AjaxResult getVersionList(@RequestBody RawMaterialRequirePlan queryVO){
+        return rawMaterialRequirePlanService.getVersionList(queryVO);
+    }
+
+    /**
      * 保存
      */
     @Log(title = "ui.data.column.rawMaterialRequirePlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
@@ -171,6 +180,7 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("t1MonthEudrQty")), "T1_MONTH_EUDR_QTY", queryVO.getFieldValueByFieldName("t1MonthEudrQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("t2MonthQty")), "T2_MONTH_QTY", queryVO.getFieldValueByFieldName("t2MonthQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("t2MonthEudrQty")), "T2_MONTH_EUDR_QTY", queryVO.getFieldValueByFieldName("t2MonthEudrQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("version")), "VERSION", queryVO.getFieldValueByFieldName("version"));
     }
 
 
@@ -203,4 +213,6 @@ public class RawMaterialRequirePlanController extends AbstractDocBizController<R
                                   @RequestParam Integer month) {
         return rawMaterialRequirePlanService.checkGeneratingStatus(year, month);
     }
+
+
 }

@@ -81,6 +81,14 @@ public class RawSpecialMaterialRecord extends BaseEntity {
     @TableField(value = "UNIT")
     private String unit;
 
+    /** 部件名称 */
+    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.partName")
+    @ImportExcelValidated(required = true, maxLength = 100)
+    @ApiModelProperty(value = "部件名称", name = "partName")
+    @TableField(value = "PART_NAME")
+    private String partName;
+
+
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
     @ImportExcelValidated(maxLength = 300)
     @ApiModelProperty("备注")

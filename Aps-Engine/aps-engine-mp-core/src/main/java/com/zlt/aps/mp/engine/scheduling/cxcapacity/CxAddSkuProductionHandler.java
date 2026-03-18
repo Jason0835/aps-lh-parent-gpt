@@ -102,6 +102,7 @@ public class CxAddSkuProductionHandler {
         }
         //20260129 修正前排产Sku信息，可能因为模具排产日
         correctBeforeSku(context, lhGroup, doubleMouldList, groupName, startDay);
+//        startDay = lhGroup.getClosingDay();
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
@@ -110,6 +111,10 @@ public class CxAddSkuProductionHandler {
         //开始排产
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList(), false);
         //递归：重新获取下一组
+        Integer productionQty = lhProductionQtyHelper.getRealSumProductionQty();
+        if (productionQty > BigDecimal.ZERO.intValue()) {
+            afterProductionResetThisRound(groupPlanInfo);
+        }
         productionAddSkuByContinueCxMachine(context, groupPlanInfo, excludeDays);
     }
 
@@ -142,9 +147,6 @@ public class CxAddSkuProductionHandler {
         Integer startDay = cxLhGroup.getProductionDay();
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = productionPlan.getEndDay();
-        //todo 不用计算日期-计算量即可 根据结构特殊材料情况重算结束日期
-//        endDay = specialMaterialScheduleHandler.calculateEndDayBySpecialMaterial(startDay, endDay, productionContext, productionPlanInfo);
-
         if (startDay > endDay) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupStartLimitEndLog(context, groupName, cxMachineCode, startDay, endDay));
@@ -198,6 +200,26 @@ public class CxAddSkuProductionHandler {
         CxLhMouldProductionCalculator.lhProductionByCxMachineHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap);
+    }
+
+    /**
+     * 一轮排产后完毕后，将还有计划的Sku重新标记参与排产
+     *
+     * @param groupPlanInfo 结构信息
+     */
+    private void afterProductionResetThisRound(ProductionPlanGroupInfo groupPlanInfo) {
+        if (null == groupPlanInfo) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(single -> single.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return;
+        }
+        hasProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.YES.getValue()));
     }
 
     /**
@@ -612,6 +634,7 @@ public class CxAddSkuProductionHandler {
                 if (null == previousDay) {
                     return;
                 }
+//                lhGroup.updateClosingDay(previousDay);
                 dayProductionList = allDayProductionInfo.get(previousDay);
             }
             if (CollectionUtils.isEmpty(dayProductionList)) {

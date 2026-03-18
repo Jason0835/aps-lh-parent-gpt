@@ -1008,18 +1008,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 4.1、遍历每个机台的结构排产记录，统计相关数据
         for (List<MpStructureAllocationExportVo> cxMachineExportList: cxMachineExportMap.values()) {
             // 4.1.1、统计结构切换次数
-            Long changeStructureCount = cxMachineExportList.stream()
+            Integer changeStructureCount = (int)cxMachineExportList.stream()
                     .map(MpStructureAllocationExportVo::getStructureName).distinct().count() - 1;
             if (changeStructureCount > 0) {
                 Integer oldCount = changeStructureCountMap.getOrDefault(changeStructureCount, 0);
-                changeStructureCountMap.put(changeStructureCount.intValue(), oldCount + 1);
+                changeStructureCountMap.put(changeStructureCount, oldCount + 1);
             }
             // 4.1.2、统计英寸交替次数
-            Long changeProSize = cxMachineExportList.stream().map(MpStructureAllocationExportVo::getProSize).distinct()
+            Integer changeProSize = (int)cxMachineExportList.stream().map(MpStructureAllocationExportVo::getProSize).distinct()
                     .count() - 1;
             if (changeProSize > 0) {
                 Integer oldValue = Optional.ofNullable(exportVo.getProSizeChangeCount()).orElse(0);
-                exportVo.setProSizeChangeCount(oldValue + changeProSize.intValue());
+                exportVo.setProSizeChangeCount(oldValue + 1);
             }
         }
         // 4.2、统计的规格切换次数转换成表格
@@ -1181,6 +1181,20 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     "#fce4d6", "#f9d8c4", "#f6ccb2", "#f3c0a0", "#f0b48e",
                     "#eda87c", "#ea9c6a", "#e79058", "#e48446", "#e17834"
             };
+            
+            // 复制统计行
+            List<Map<String, Object>> totalList = new ArrayList<>();
+            mpStructureAllocationExportVoList.stream()
+                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.TOTAL.getCode()
+                            .equals(exportVo.getDataType()))
+                    .forEach(exportVo -> {
+                        Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap,
+                                structureTypeMap, machineBrandMap, "A"); // 生成一份后缀带A的版本
+                        totalList.add(listDataMap);
+                    });
+            excelDataList.add(totalList);
+            beginIndex += totalList.size(); // 如果表头有复制统计行，起始行要往下顺延
+            
             for (int i = 0; i < mpStructureAllocationExportVoList.size(); i++) {
                 MpStructureAllocationExportVo exportVo = mpStructureAllocationExportVoList.get(i);
                 String currentCxMachineCode = exportVo.getCxMachineCode();
@@ -1232,7 +1246,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第9列开始
                             int startCol = 9 + firstDayWithValue;
                             int endCol = 9 + lastDayWithValue;
-                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, false, false, ""));
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, true, false, ""));
 
                         }else {
 //                            cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
@@ -1245,24 +1259,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if (StructureAllocationExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())
                         || StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode().equals(exportVo.getDataType())
                         || StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode().equals(exportVo.getDataType())) {
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", false, true, ""));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#DAEEF3", true, true, ""));
                 }
 
                 listData.add(listDataMap);
             }
             // 将处理好的数据添加到excelDataList
-            excelDataList.add(listData);
-            
-            // 复制统计行
-            List<Map<String, Object>> totalList = new ArrayList<>();
-            mpStructureAllocationExportVoList.stream()
-                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode()
-                            .equals(exportVo.getDataType()))
-                    .forEach(exportVo -> {
-                        Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap,
-                                structureTypeMap, machineBrandMap, "A"); // 生成一份
-                        totalList.add(listDataMap);
-                    });
             excelDataList.add(listData);
         }
         //切换次数
@@ -1374,41 +1376,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         listDataMap.put(this.getRealFieldName("day29", suffix), exportVo.getDay29());
         listDataMap.put(this.getRealFieldName("day30", suffix), exportVo.getDay30());
         listDataMap.put(this.getRealFieldName("day31", suffix), exportVo.getDay31());
-
-        // 计算day1到day31的数量合计
-        Integer totalAll = 0;
-        totalAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
-        totalAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
-        totalAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
-        totalAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
-        totalAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
-        totalAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
-        totalAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
-        totalAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
-        totalAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
-        totalAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
-        totalAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
-        totalAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
-        totalAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
-        totalAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
-        totalAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
-        totalAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
-        totalAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
-        totalAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
-        totalAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
-        totalAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
-        totalAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
-        totalAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
-        totalAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
-        totalAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
-        totalAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
-        totalAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
-        totalAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
-        totalAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
-        totalAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
-        totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
-        totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
-        listDataMap.put(this.getRealFieldName("totalAll", suffix), totalAll);
         return listDataMap;
     }
 
