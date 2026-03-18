@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +46,11 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
      * 使用的模具
      */
     private Set<String> usedMouldSet;
+    /**
+     * 理论的起始排产日-即最原始可衔接的排产日--初始化后不再变化
+     * 在初始获取最早硫化组时赋值
+     */
+    private Integer theoryStartDay;
 
     /**
      * 构造函数
@@ -62,6 +68,7 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         this.beforeProductionQty = beforeProductionQty;
         this.beforeDayMaxQty = beforeDayMaxQty;
         this.closingDay = closingDay;
+        this.theoryStartDay = closingDay;
         this.endDay = endDay;
         this.usedMouldSet = usedMouldSet;
     }
@@ -103,11 +110,13 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
      */
     public CxLhProductionHelper transformCxLhGroup() {
         CxLhProductionHelper cxLhGroup = new CxLhProductionHelper();
-        cxLhGroup.setMaterialDesc(this.beforeMaterialDesc);
-        cxLhGroup.setMaterialCode(this.beforeMaterialCode);
-        cxLhGroup.setDayMaxProductionQty(this.beforeDayMaxQty);
-        cxLhGroup.setProductionQty(this.beforeProductionQty);
-        cxLhGroup.setProductionMouldSet(this.usedMouldSet);
+        BeforeSkuProductionInfo beforeSku = new BeforeSkuProductionInfo(beforeMaterialDesc, beforeMaterialCode, "", closingDay, beforeProductionQty, beforeDayMaxQty);
+        cxLhGroup.setBeforeSku(beforeSku);
+//        cxLhGroup.setMaterialDesc(this.beforeMaterialDesc);
+//        cxLhGroup.setMaterialCode(this.beforeMaterialCode);
+//        cxLhGroup.setDayMaxProductionQty(this.beforeDayMaxQty);
+//        cxLhGroup.setProductionQty(this.beforeProductionQty);
+//        cxLhGroup.setProductionMouldSet(this.usedMouldSet);
         return cxLhGroup;
     }
 
@@ -150,4 +159,5 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         this.beforeProductionQty = beforeProductionQty;
         this.beforeDayMaxQty = beforeDayMaxQty;
     }
+
 }

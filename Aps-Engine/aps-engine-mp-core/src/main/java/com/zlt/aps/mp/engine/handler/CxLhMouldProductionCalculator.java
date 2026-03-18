@@ -328,7 +328,8 @@ public class CxLhMouldProductionCalculator {
      */
     public static DayProductionQtyHelper calculateSingleLhGroupQty(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer productionDay, Integer firstDay, Integer conclusionDay, MonthPlanProductionRequirePlanVo productionSkuInfo) {
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
-        String beforeSku = cxLhGroup.getMaterialDesc();
+//        String beforeSku = cxLhGroup.getMaterialDesc();
+        String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
         String needProductionSku = productionSkuInfo.getMaterialDesc();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //不是首日
@@ -344,9 +345,11 @@ public class CxLhMouldProductionCalculator {
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
         //同Sku，则是不同优先级的衔接
-        Integer beforeSkuDayMaxQty = cxLhGroup.getDayMaxProductionQty();
+//        Integer beforeSkuDayMaxQty = cxLhGroup.getDayMaxProductionQty();
+        Integer beforeSkuDayMaxQty = cxLhGroup.getBeforeSku().getDayMaxQty();
         //前Sku的排产量
-        Integer beforeSkuProductionQty = cxLhGroup.getProductionQty();
+//        Integer beforeSkuProductionQty = cxLhGroup.getProductionQty();
+        Integer beforeSkuProductionQty = cxLhGroup.getBeforeSku().getProductionQty();
         if (needProductionSku.equals(beforeSku)) {
             Integer needProductionQty = beforeSkuDayMaxQty - beforeSkuProductionQty;
             return new DayProductionQtyHelper(productionDay, false, needProductionQty, BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), false);
@@ -589,7 +592,8 @@ public class CxLhMouldProductionCalculator {
      */
     private static DayProductionQtyHelper buildByChangeMould(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, ProductionCapacityParamConfiguration paramConfiguration) {
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
-        String beforeSku = cxLhGroup.getMaterialDesc();
+//        String beforeSku = cxLhGroup.getMaterialDesc();
+        String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
         Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
         //没有前规格，通常为结构上机首日
         if (StringUtils.isBlank(beforeSku)) {
@@ -597,8 +601,10 @@ public class CxLhMouldProductionCalculator {
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
         //衔接
-        Integer beforeSkuProductionQty = cxLhGroup.getProductionQty();
-        Integer beforeSkuDayMaxQty = cxLhGroup.getDayMaxProductionQty();
+//        Integer beforeSkuProductionQty = cxLhGroup.getProductionQty();
+//        Integer beforeSkuDayMaxQty = cxLhGroup.getDayMaxProductionQty();
+        Integer beforeSkuProductionQty = cxLhGroup.getBeforeSku().getProductionQty();
+        Integer beforeSkuDayMaxQty = cxLhGroup.getBeforeSku().getDayMaxQty();
         //当天损耗量 = 日硫化量 - 前Sku排产量
         Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
         Integer halfQty = beforeSkuDayMaxQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
@@ -793,13 +799,15 @@ public class CxLhMouldProductionCalculator {
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         //排产信息更新
         String materialDesc = productionSkuInfo.getMaterialDesc();
-        cxLhGroup.setProductionQty(realDayProductionQty);
+//        cxLhGroup.setProductionQty(realDayProductionQty);
         cxLhGroup.setProductionDay(productionDay);
-        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-        cxLhGroup.setMaterialDesc(materialDesc);
-        cxLhGroup.setMaterialCode(productionSkuInfo.getMaterialCode());
-        cxLhGroup.setEmbryoCode(productionSkuInfo.getEmbryoCode());
-        cxLhGroup.setProductionMouldSet(usedMouldSet);
+//        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+//        cxLhGroup.setMaterialDesc(materialDesc);
+//        cxLhGroup.setMaterialCode(productionSkuInfo.getMaterialCode());
+//        cxLhGroup.setEmbryoCode(productionSkuInfo.getEmbryoCode());
+//        cxLhGroup.setProductionMouldSet(usedMouldSet);
+        BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.createByProductionPlan(productionSkuInfo, realDayProductionQty, productionDay, usedMouldSet);
+        cxLhGroup.setBeforeSku(beforeSku);
         cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
         //成型机台-日排产信息
         Integer lossQty = updateInfo.getLossQty();

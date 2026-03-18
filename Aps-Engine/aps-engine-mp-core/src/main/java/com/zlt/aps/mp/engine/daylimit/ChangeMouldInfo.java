@@ -44,13 +44,13 @@ public class ChangeMouldInfo implements Serializable {
      * 判断是否需要换模
      *
      * @param context             排产上下文
-     * @param addSkuInfo          新增Sku
-     * @param materialDesc        前Sku
-     * @param productionQty       前Sku排产量
-     * @param dayMaxProductionQty 前Sku日硫化量
+
      * @return
      */
-    public static ChangeMouldInfo buildChangeMouldInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, String materialDesc, Integer productionQty, Integer dayMaxProductionQty) {
+    public static ChangeMouldInfo buildChangeMouldInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, BeforeSkuProductionInfo beforeSkuInfo) {
+        String materialDesc = beforeSkuInfo.getMaterialDesc();
+        Integer productionQty = beforeSkuInfo.getProductionQty();
+        Integer dayMaxProductionQty = beforeSkuInfo.getDayMaxQty();
         boolean isChangeMould = isChangeMould(addSkuInfo, materialDesc);
         //无需换模
         if (!isChangeMould) {

@@ -811,6 +811,20 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 一轮排产完毕后，将还有计划的Sku重新标记参与排产
+     */
+    public void afterProductionResetThisRound() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(single -> single.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return;
+        }
+        hasProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.YES.getValue()));
+    }
+
+    /**
      * 获取结构剩余待分配天数
      * 不能根据剩余待排产量来估算，
      * 因为有超出模具产能的干扰
