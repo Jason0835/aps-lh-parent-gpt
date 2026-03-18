@@ -49,7 +49,15 @@ public interface IRawMaterialRequirePlanRemoteService {
     @PostMapping("/rawMaterialRequirePlan/generateVersion")
      AjaxResult generateVersion(@RequestBody RawMaterialRequirePlan billVO);
 
-        /**
+    /**
+     * 获取原材料需求版本列表
+     */
+    @ApiOperation("获取原材料需求版本列表")
+    @PostMapping("/rawMaterialRequirePlan/getVersionList")
+    AjaxResult getVersionList(@RequestBody RawMaterialRequirePlan queryVO);
+
+
+    /**
          * 删除
          */
     @ApiOperation("删除")
