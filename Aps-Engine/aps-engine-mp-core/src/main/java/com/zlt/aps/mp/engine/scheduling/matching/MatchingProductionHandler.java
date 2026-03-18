@@ -51,6 +51,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitHelper;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
@@ -2095,15 +2096,13 @@ public class MatchingProductionHandler {
                 // 查找模具上一天的生产计划，并构建硫化分组
                 CxLhProductionHelper cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupInfo.getGroupName(),
                         1, cxMachineInfoSet);
-                cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-                cxLhGroup.setProductionMouldSet(newMouldCodeSet);
                 for (ProductionMouldInfoVo mould: newDoubleMouldList) {
                     List<CxMouldDayProductionHelper> latestPlanList = mould.getDayProductionInfo().get(lastDay); // 上一天计划
                     CxMouldDayProductionHelper production = CollectionUtils.firstElement(latestPlanList);
                     if (production != null) {
-                        cxLhGroup.setMaterialCode(production.getMaterialCode());
-                        cxLhGroup.setMaterialDesc(production.getMaterialDesc());
-                        cxLhGroup.setProductionQty(0);
+                        BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.createBySku(production.getMaterialDesc(), production.getMaterialCode()
+                                , null, BigDecimal.ZERO.intValue(), dayMaxProductionQty, newMouldCodeSet);
+                        cxLhGroup.setBeforeSku(beforeSku);
                     }
                 }
                 
