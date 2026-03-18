@@ -1008,18 +1008,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 4.1、遍历每个机台的结构排产记录，统计相关数据
         for (List<MpStructureAllocationExportVo> cxMachineExportList: cxMachineExportMap.values()) {
             // 4.1.1、统计结构切换次数
-            Long changeStructureCount = cxMachineExportList.stream()
+            Integer changeStructureCount = (int)cxMachineExportList.stream()
                     .map(MpStructureAllocationExportVo::getStructureName).distinct().count() - 1;
             if (changeStructureCount > 0) {
                 Integer oldCount = changeStructureCountMap.getOrDefault(changeStructureCount, 0);
-                changeStructureCountMap.put(changeStructureCount.intValue(), oldCount + 1);
+                changeStructureCountMap.put(changeStructureCount, oldCount + 1);
             }
             // 4.1.2、统计英寸交替次数
-            Long changeProSize = cxMachineExportList.stream().map(MpStructureAllocationExportVo::getProSize).distinct()
+            Integer changeProSize = (int)cxMachineExportList.stream().map(MpStructureAllocationExportVo::getProSize).distinct()
                     .count() - 1;
             if (changeProSize > 0) {
                 Integer oldValue = Optional.ofNullable(exportVo.getProSizeChangeCount()).orElse(0);
-                exportVo.setProSizeChangeCount(oldValue + changeProSize.intValue());
+                exportVo.setProSizeChangeCount(oldValue + 1);
             }
         }
         // 4.2、统计的规格切换次数转换成表格
@@ -1185,7 +1185,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 复制统计行
             List<Map<String, Object>> totalList = new ArrayList<>();
             mpStructureAllocationExportVoList.stream()
-                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode()
+                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.TOTAL.getCode()
                             .equals(exportVo.getDataType()))
                     .forEach(exportVo -> {
                         Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap,
@@ -1193,6 +1193,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         totalList.add(listDataMap);
                     });
             excelDataList.add(totalList);
+            beginIndex += totalList.size(); // 如果表头有复制统计行，起始行要往下顺延
             
             for (int i = 0; i < mpStructureAllocationExportVoList.size(); i++) {
                 MpStructureAllocationExportVo exportVo = mpStructureAllocationExportVoList.get(i);
@@ -1245,7 +1246,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第9列开始
                             int startCol = 9 + firstDayWithValue;
                             int endCol = 9 + lastDayWithValue;
-                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, false, false, ""));
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, true, false, ""));
 
                         }else {
 //                            cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
@@ -1258,7 +1259,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if (StructureAllocationExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())
                         || StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode().equals(exportVo.getDataType())
                         || StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode().equals(exportVo.getDataType())) {
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", false, true, ""));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#DAEEF3", true, true, ""));
                 }
 
                 listData.add(listDataMap);
