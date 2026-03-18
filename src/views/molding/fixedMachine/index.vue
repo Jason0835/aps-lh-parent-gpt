@@ -226,6 +226,17 @@ export default {
           width: 300,
           render: ({ row }) => {
             return (
+              // <el-popover
+              //   placement="left"
+              //   title={this.$t("ui.data.column.workWearInfo.fixedMaterialCode")}
+              //   width="500"
+              //   trigger="click"
+              //   content={row.fixedMaterialCode}
+              // >
+              //   <span slot="reference" style="cursor: pointer;">
+              //     {row.fixedMaterialCode}
+              //   </span>
+              // </el-popover>
               <el-popover
                 placement="left"
                 title={this.$t("ui.data.column.workWearInfo.fixedMaterialCode")}
@@ -233,9 +244,12 @@ export default {
                 trigger="click"
                 content={row.fixedMaterialCode}
               >
-                <span slot="reference" style="cursor: pointer;">
-                  {row.fixedMaterialCode}
-                </span>
+                <div domPropsInnerHTML={this.renderHtml(row.fixedMaterialCode)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedMaterialCode)}
+                ></div>
               </el-popover>
             );
           },
@@ -246,6 +260,17 @@ export default {
           width: 300,
           render: ({ row }) => {
             return (
+              // <el-popover
+              //   placement="left"
+              //   title={this.$t("固定物料描述")}
+              //   width="500"
+              //   trigger="click"
+              //   content={row.fixedMaterialDesc}
+              // >
+              //   <span slot="reference" style="cursor: pointer;">
+              //     {row.fixedMaterialDesc}
+              //   </span>
+              // </el-popover>
               <el-popover
                 placement="left"
                 title={this.$t("固定物料描述")}
@@ -253,9 +278,12 @@ export default {
                 trigger="click"
                 content={row.fixedMaterialDesc}
               >
-                <span slot="reference" style="cursor: pointer;">
-                  {row.fixedMaterialDesc}
-                </span>
+                <div domPropsInnerHTML={this.renderHtml(row.fixedMaterialDesc)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedMaterialDesc)}
+                ></div>
               </el-popover>
             );
           },
@@ -266,6 +294,17 @@ export default {
           width: 300,
           render: ({ row }) => {
             return (
+              // <el-popover
+              //   placement="left"
+              //   title={this.$t("ui.data.column.workWearInfo.disableStructure")}
+              //   width="500"
+              //   trigger="click"
+              //   content={row.disableStructure}
+              // >
+              //   <span slot="reference" style="cursor: pointer;">
+              //     {row.disableStructure}
+              //   </span>
+              // </el-popover>
               <el-popover
                 placement="left"
                 title={this.$t("ui.data.column.workWearInfo.disableStructure")}
@@ -273,9 +312,12 @@ export default {
                 trigger="click"
                 content={row.disableStructure}
               >
-                <span slot="reference" style="cursor: pointer;">
-                  {row.disableStructure}
-                </span>
+                <div domPropsInnerHTML={this.renderHtml(row.disableStructure)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.disableStructure)}
+                ></div>
               </el-popover>
             );
           },
@@ -286,18 +328,32 @@ export default {
           width: 300,
           render: ({ row }) => {
             return (
+              // <el-popover
+              //   placement="left"
+              //   title={this.$t(
+              //     "ui.data.column.workWearInfo.disableMaterialCode"
+              //   )}
+              //   width="500"
+              //   trigger="click"
+              //   content={row.disableMaterialCode}
+              // >
+              //   <span slot="reference" style="cursor: pointer;">
+              //     {row.disableMaterialCode}
+              //   </span>
+              // </el-popover>
               <el-popover
                 placement="left"
-                title={this.$t(
-                  "ui.data.column.workWearInfo.disableMaterialCode"
-                )}
+                title={this.$t("ui.data.column.workWearInfo.disableStructure")}
                 width="500"
                 trigger="click"
                 content={row.disableMaterialCode}
               >
-                <span slot="reference" style="cursor: pointer;">
-                  {row.disableMaterialCode}
-                </span>
+                <div domPropsInnerHTML={this.renderHtml(row.disableMaterialCode)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.disableMaterialCode)}
+                ></div>
               </el-popover>
             );
           },
@@ -308,6 +364,17 @@ export default {
           width: 300,
           render: ({ row }) => {
             return (
+              // <el-popover
+              //   placement="left"
+              //   title={this.$t("不可作业物料描述")}
+              //   width="500"
+              //   trigger="click"
+              //   content={row.disableMaterialDesc}
+              // >
+              //   <span slot="reference" style="cursor: pointer;">
+              //     {row.disableMaterialDesc}
+              //   </span>
+              // </el-popover>
               <el-popover
                 placement="left"
                 title={this.$t("不可作业物料描述")}
@@ -315,9 +382,12 @@ export default {
                 trigger="click"
                 content={row.disableMaterialDesc}
               >
-                <span slot="reference" style="cursor: pointer;">
-                  {row.disableMaterialDesc}
-                </span>
+                <div domPropsInnerHTML={this.renderHtml(row.disableMaterialDesc)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.disableMaterialDesc)}
+                ></div>
               </el-popover>
             );
           },

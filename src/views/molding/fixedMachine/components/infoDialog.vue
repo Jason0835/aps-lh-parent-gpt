@@ -242,7 +242,7 @@ export default {
        if(i==row.length-1){
         text=text+row[i].materialDesc
        }else{
-        text=text+row[i].materialDesc+','
+        text=text+row[i].materialDesc+'<,>'
        }
       }
       this.$set(this.form,'fixedMaterialDesc',text)

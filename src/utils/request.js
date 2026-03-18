@@ -180,7 +180,7 @@ service.interceptors.request.use(
       ) {
         cache.session.setJSON('sessionObj', requestObj)
       } else {
-        const s_url = sessionObj.url // 请求地址
+        const s_url =sessionObj.url=='/lean/productinfo/list'?false: sessionObj.url // 请求地址
         const s_data = sessionObj.data // 请求数据
         const s_time = sessionObj.time // 请求时间
         const interval = 200 // 间隔时间(ms)，小于此时间视为重复提交

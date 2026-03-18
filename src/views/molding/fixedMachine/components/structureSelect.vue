@@ -139,7 +139,7 @@ export default {
 
   methods: {
     // 排序并选中数据
-    sortAndSelectData(list, isFirst=false) {
+    sortAndSelectData(list, isFirst = false) {
       const tableRef = this.$refs.tableRef.getTableRef();
       // 1. 将数据分为两组：需要置顶的 和 普通的
       const topItems = [];
@@ -147,10 +147,10 @@ export default {
 
       if (!isFirst) {
         list.forEach((item) => {
-          let ids2 =[]
+          let ids2 = [];
           this.selection.forEach((item) => {
             ids2.push(item.structureName);
-        });
+          });
           if (ids2.includes(item.structureName)) {
             topItems.push(item);
           } else {
@@ -158,8 +158,9 @@ export default {
           }
         });
       } else {
+        let setList = this.oldList.split(",");
         list.forEach((item) => {
-          if (this.oldList.includes(item.structureName)) {
+          if (setList.includes(item.structureName)) {
             topItems.push(item);
           } else {
             normalItems.push(item);
@@ -190,7 +191,6 @@ export default {
         }
         // this.data = data.rows;
 
-        console.log(this.oldList);
         // this.$nextTick(()=>{
         //   if(this.oldList&&this.oldList.length>0){
         //     const tableRef = this.$refs.tableRef.getTableRef();

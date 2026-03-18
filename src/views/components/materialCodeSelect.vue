@@ -195,13 +195,16 @@ export default {
         let that=this
         if (isFirst) {
           if (this.multiple) {
-            const topItems = [];
-            console.log(that.oldList)
-            data.rows.forEach((item) => {
-              if (that.oldList.includes(item.materialCode)) {
-                topItems.push(item);
-              }
-            });
+            let topItems = [];
+            let res=await listProductinfo({materialCodes:this.oldList})
+            topItems=res.rows
+            // console.log(that.oldList)
+            // let setList = this.oldList.split(",");
+            // data.rows.forEach((item) => {
+            //   if (setList.includes(item.materialCode)) {
+            //     topItems.push(item);
+            //   }
+            // });
             this.$nextTick(() => {
               const tableRef = this.$refs.tableRef.getTableRef();
               topItems.forEach((item) => {
