@@ -196,8 +196,11 @@ export default {
         if (isFirst) {
           if (this.multiple) {
             let topItems = [];
-            let res=await listProductinfo({materialCodes:this.oldList})
-            topItems=res.rows
+            if(this.oldList){
+              let res=await listProductinfo({materialCodes:this.oldList})
+              topItems=res.rows
+            }
+
             // console.log(that.oldList)
             // let setList = this.oldList.split(",");
             // data.rows.forEach((item) => {
