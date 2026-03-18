@@ -445,6 +445,17 @@ public class MatchingProductionHandler {
                         }
                         continue;
                     }
+                    // 如果有余量，需要检查当天是否有其他排产量小于余量的，有说明是拼机台的，不要尝试补
+                    if (mouldRemaindCapacity > 0) {
+                        List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(day);
+                        if (dayProductionList != null && dayProductionList.stream().anyMatch(p -> !Objects.equals(p.getMaterialDesc(), materialDesc) && p.getProductionQty() <= mouldRemaindCapacity)) {
+                            if (isBegin) { // 防止中断不连续的问题出现
+                                realEndDay = day; // 中断后记录当前日期作为下一次轮询的结束日
+                                break;
+                            }
+                            continue;
+                        }
+                    }
                     // 检查胎胚数是否满足条件
                     if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
                         Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
