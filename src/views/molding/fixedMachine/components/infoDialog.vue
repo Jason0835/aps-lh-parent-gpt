@@ -222,6 +222,7 @@ export default {
                 multiple={true}
                 v-model={form.disableMaterialCode}
                 onChange={this.handleDisableMaterialChange}
+                oldList={form.disableMaterialCode}
               />
             );
           },
