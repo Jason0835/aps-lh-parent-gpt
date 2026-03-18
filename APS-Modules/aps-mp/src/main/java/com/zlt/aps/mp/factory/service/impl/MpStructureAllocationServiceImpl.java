@@ -1317,18 +1317,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第9列开始
                             int startCol = 9 + firstDayWithValue;
                             int endCol = 9 + lastDayWithValue;
-                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, true, false, ""));
+                            cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, false, false, ""));
 
                         }else {
-                            cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
+//                            cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
                         }
 
                     }else {
-                        cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
+//                        cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, false, ""));
                     }
                 }
                 if ("2".equals(exportVo.getDataType()) || "3".equals(exportVo.getDataType())|| "4".equals(exportVo.getDataType())) {
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", true, true, ""));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#e2efda", false, true, ""));
                 }
 
                 listDataMap.put("totalAll", totalAll);
