@@ -1,11 +1,13 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.SupplementCxMachineDistributionLogRecorder;
+import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxCapacityAllocationHandler;
@@ -271,6 +273,7 @@ public class SupplementCxMachineDistributionHandler {
         //判断切换结构的点
         CxMachineAllocationPlanHelper lastGroup = selectCxMachine.getLastAllocationInfo();
         if (null == lastGroup) {
+//            handlerEmptyCxMachine(productionContext, addPlanGroup, selectCxMachine);
             return null;
         }
         boolean isChange = !lastGroup.getProductionPlanInfo().getGroupName().equals(addPlanGroup.getGroupName());
@@ -278,6 +281,41 @@ public class SupplementCxMachineDistributionHandler {
             return changeHandler(productionContext, addPlanGroup, selectCxMachine);
         }
         return noChangeHandler(productionContext, addPlanGroup, selectCxMachine);
+    }
+
+    /**
+     * 选中的为空机台
+     *
+     * @param productionContext 排产上下文
+     * @param addPlanGroup      新增结构
+     * @param selectCxMachine   机台
+     * @return
+     */
+    private CxMachineAllocationPlanHelper handlerEmptyCxMachine(TbrProductionContext productionContext, ProductionPlanGroupInfo addPlanGroup, CxMachineBaseInfoVo selectCxMachine) {
+        String groupName = addPlanGroup.getGroupName();
+        Set<Integer> hasProductionDaySet = selectCxMachine.getTheoryProductionDaySet();
+        Integer startDay = hasProductionDaySet.stream().mapToInt(Integer::intValue).min().getAsInt();
+        //20260121 切换结构控制
+        DayCapacityLimitVo dayCapacityLimitVo = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer realChangeDay = dayCapacityLimitVo.confirmStartDayByChangeGroup(productionContext, startDay, groupName, selectCxMachine, hasProductionDaySet);
+        if (null == realChangeDay) {
+            //记录日志
+            Integer maxChangeLimit = productionContext.getBaseDataContainer().getParamConfiguration().getDayChangeGroupCount();
+            log.info(TbrProductionGroupLogRecorder.addChangeGroupLimitCxMachineLog(productionContext, selectCxMachine.getCxMachineCode(), maxChangeLimit));
+            return null;
+        }
+        ProductGroupCxCapacityInfo lhRatioInfo = addPlanGroup.getLhRatioByCxMachine(selectCxMachine);
+        startDay = realChangeDay;
+        Set<Integer> realProductionDaySet = hasProductionDaySet.stream().filter(singleDay -> singleDay >= realChangeDay).collect(Collectors.toSet());
+        Integer remainingDays = realProductionDaySet.size();
+        //分配产能
+        Integer needDays = addPlanGroup.getLeftOverNeedAllocationDays();
+        Integer realAllocationDays = Math.min(remainingDays, needDays);
+        //更新剩余天数
+        addPlanGroup.updateLeftOverNeedAllocationDays(realAllocationDays);
+        CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, realAllocationDays, startDay, productionContext.getMonthDays());
+        selectCxMachine.addAllocationPlanInfo(productionContext, addHelper);
+        return addHelper;
     }
 
     /**

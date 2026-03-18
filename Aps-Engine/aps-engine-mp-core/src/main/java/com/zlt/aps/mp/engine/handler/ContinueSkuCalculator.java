@@ -170,58 +170,6 @@ public class ContinueSkuCalculator {
         return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
 
-    /**
-     * 结构计划下的续作Sku分配硫化组信息
-     *
-     * @param groupPlanInfo     结构计划信息
-     * @param assignedLhGroupNo 结构下已分配的硫化组集合信息
-     * @param continueSkuInfo   待分配硫化组的续作Sku信息
-     * @return
-     */
-    @Deprecated
-    public static List<CxLhProductionHelper> continueSkuAllocationLhGroup(Context context, ProductionPlanGroupInfo groupPlanInfo, Set<Integer> assignedLhGroupNo, CxContinueSkuInfoHelper continueSkuInfo) {
-        Map<Integer, CxLhProductionHelper> cxLhRatioMap = groupPlanInfo.getCxLhRatioMap();
-        Integer maxLhGroupNo = cxLhRatioMap.size();
-        Integer mouldNumber = continueSkuInfo.getMouldNumber();
-        Integer continueSkuMaxLhGroup = continueSkuInfo.getUsedLhMachineCountByMouldNumber();
-        List<ProductionMouldInfoVo> mouldList = new ArrayList<>(mouldNumber);
-        List<CxLhProductionHelper> allocationGroupList = new ArrayList<>();
-        int assignedCount = BigDecimal.ONE.intValue();
-        for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= maxLhGroupNo; lhGroupNo++) {
-            if (assignedLhGroupNo.contains(lhGroupNo)) {
-                continue;
-            }
-            if (assignedCount > continueSkuMaxLhGroup) {
-                break;
-            }
-            assignedLhGroupNo.add(lhGroupNo);
-            CxLhProductionHelper allocationGroup = cxLhRatioMap.get(lhGroupNo);
-            Integer startMouldNumber = continueSkuInfo.getUsedMouldIndex(assignedCount - BigDecimal.ONE.intValue());
-            Integer endMouldNumber = continueSkuInfo.getUsedMouldIndex(assignedCount);
-            List<ProductionMouldInfoVo> selectedDoubleMouldList = mouldList.subList(startMouldNumber, endMouldNumber);
-            allocationGroupList.add(allocationGroup);
-            fullContinueMaterialAndMould(allocationGroup, continueSkuInfo, selectedDoubleMouldList);
-            assignedCount = assignedCount + BigDecimal.ONE.intValue();
-        }
-        return allocationGroupList;
-    }
-
-    /**
-     * 填充续作物料及模具
-     *
-     * @param cxLhGroup               成型硫化分组
-     * @param continueSkuInfo         续作Sku信息
-     * @param selectedDoubleMouldList 选中的模具
-     */
-    private static void fullContinueMaterialAndMould(CxLhProductionHelper cxLhGroup, CxContinueSkuInfoHelper continueSkuInfo, List<ProductionMouldInfoVo> selectedDoubleMouldList) {
-        cxLhGroup.setMaterialCode(continueSkuInfo.getMaterialCode());
-        cxLhGroup.setMaterialDesc(continueSkuInfo.getMaterialDesc());
-        if (CollectionUtils.isEmpty(selectedDoubleMouldList)) {
-            return;
-        }
-        Set<String> mouldCodeSet = selectedDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        cxLhGroup.setProductionMouldSet(mouldCodeSet);
-    }
 
     private ContinueSkuCalculator() {
 

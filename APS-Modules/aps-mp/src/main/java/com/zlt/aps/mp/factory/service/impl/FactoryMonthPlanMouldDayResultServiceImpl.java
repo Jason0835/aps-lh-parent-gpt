@@ -8,15 +8,12 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
-import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo;
-import com.zlt.aps.mp.api.domain.vo.MonthFinishRateVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -127,15 +124,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
         // 1.3、加载结构排产数据
-        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<MpStructureAllocation>();
-        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion,
-                factoryMonthPlanMouldDayResult.getProductionVersion());
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode,
-                factoryMonthPlanMouldDayResult.getFactoryCode());
+        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
+        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, factoryMonthPlanMouldDayResult.getProductionVersion());
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
         Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
-
+        
         // 2、构建导出总表
         List<FactoryMonthPlanMouldDayResultExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
         List<FactoryMonthPlanMouldDayResultExportVo> subtotalList = new ArrayList<>(); // 小计列表

@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
@@ -142,7 +143,9 @@ public class CxMouldProductionHandler {
         cxMachineInfo.add(cxMachineCode);
         CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo, cxMachineInfo);
         newHelper.setProductionDay(startDay);
-        newHelper.setProductionQty(BigDecimal.ZERO.intValue());
+        BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.buildEmpty(startDay);
+//        newHelper.setProductionQty(BigDecimal.ZERO.intValue());
+        newHelper.setBeforeSku(beforeSku);
         cxLhRatioMap.put(cxLhGroupNo, newHelper);
     }
 

@@ -706,7 +706,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         //按最后排产日，进行升序排序
         hasProductionList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
-        return hasProductionList.get(BigDecimal.ZERO.intValue());
+        CxLhProductionHelper earliestConclusionLhMachine = hasProductionList.get(BigDecimal.ZERO.intValue());
+        return earliestConclusionLhMachine;
     }
 
     /**
@@ -723,12 +724,12 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
             return null;
         }
-        //todo 修正当前的排产Sku
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = selectedLhGroup.getProductionDay();
         Integer preEndDay = endDay;
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku());
         boolean isChangeMould = selectedLhGroup.isChangeMould(addSkuInfo);
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
