@@ -210,6 +210,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 4、构建换模次数列
         FactoryMonthPlanMouldDayResultExportVo changeMouldStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
         changeMouldStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode());
+        changeMouldStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getName()));
         for (Entry<Integer, Integer> entry: changeMouldMap.entrySet()) {
             Integer day = entry.getKey();
             Integer mould = entry.getValue();
