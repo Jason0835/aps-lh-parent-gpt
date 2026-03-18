@@ -150,7 +150,8 @@ export default {
         {
           prop: "mouldCode",
           label: this.$t("ui.data.column.moldLedger.mouldCode"),
-          width:180
+          width:180,
+          sortable:true
         },
         {
           prop: "mouldType",
@@ -158,6 +159,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_mould_Type, value);
           },
+          sortable:true
         },
         {
           prop: "mouldStatus",
@@ -165,6 +167,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_available_status, value);
           },
+          sortable:true
         },
         {
           prop: "logisticsStatus",
@@ -172,24 +175,29 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.logistics_status, value);
           },
+          sortable:true
         },
         {
           prop: "specifications",
           label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
-          width:180
+          width:180,
+          sortable:true
         },
         {
           prop: "mainPattern",
           label: this.$t("ui.data.column.moldLedger.mainPattern"),
+          sortable:true
         },
         {
           prop: "pattern",
           label: this.$t("ui.data.column.moldLedger.pattern"),
-          width:180
+          width:180,
+          sortable:true
         },
         {
           prop: "shellStandard",
           label: this.$t("ui.data.column.moldLedger.shellStandard"),
+          sortable:true
         },
         {
           prop: "remark",
