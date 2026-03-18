@@ -1263,7 +1263,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                                 structureTypeMap, machineBrandMap, "A"); // 生成一份
                         totalList.add(listDataMap);
                     });
-            excelDataList.add(listData);
+            excelDataList.add(totalList);
         }
         //切换次数
 //        List<MpStructureAllocationExportChangeCountVo> changeCountList = statisticsVo.getChangeCountList()
@@ -1374,41 +1374,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         listDataMap.put(this.getRealFieldName("day29", suffix), exportVo.getDay29());
         listDataMap.put(this.getRealFieldName("day30", suffix), exportVo.getDay30());
         listDataMap.put(this.getRealFieldName("day31", suffix), exportVo.getDay31());
-
-        // 计算day1到day31的数量合计
-        Integer totalAll = 0;
-        totalAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
-        totalAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
-        totalAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
-        totalAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
-        totalAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
-        totalAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
-        totalAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
-        totalAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
-        totalAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
-        totalAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
-        totalAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
-        totalAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
-        totalAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
-        totalAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
-        totalAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
-        totalAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
-        totalAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
-        totalAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
-        totalAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
-        totalAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
-        totalAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
-        totalAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
-        totalAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
-        totalAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
-        totalAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
-        totalAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
-        totalAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
-        totalAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
-        totalAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
-        totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
-        totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
-        listDataMap.put(this.getRealFieldName("totalAll", suffix), totalAll);
         return listDataMap;
     }
 
