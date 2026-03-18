@@ -26,7 +26,8 @@
         @pageChange="handlePageChange"
         @selection-change="handleSelectionChange"
         @search="handleSearch"
-        row-key="id"
+        row-key="structureName"
+        :reserve-selection="true"
       >
       </page-table>
     </div>
@@ -138,20 +139,33 @@ export default {
 
   methods: {
     // 排序并选中数据
-    sortAndSelectData(list) {
-
+    sortAndSelectData(list, isFirst=false) {
       const tableRef = this.$refs.tableRef.getTableRef();
       // 1. 将数据分为两组：需要置顶的 和 普通的
       const topItems = [];
       const normalItems = [];
 
-      list.forEach((item) => {
-        if (this.oldList.includes(item.structureName)) {
-          topItems.push(item);
-        } else {
-          normalItems.push(item);
-        }
-      });
+      if (!isFirst) {
+        list.forEach((item) => {
+          let ids2 =[]
+          this.selection.forEach((item) => {
+            ids2.push(item.structureName);
+        });
+          if (ids2.includes(item.structureName)) {
+            topItems.push(item);
+          } else {
+            normalItems.push(item);
+          }
+        });
+      } else {
+        list.forEach((item) => {
+          if (this.oldList.includes(item.structureName)) {
+            topItems.push(item);
+          } else {
+            normalItems.push(item);
+          }
+        });
+      }
 
       // 2. 合并数据：置顶的数据在前，普通数据在后
       //    如果需要按topIdList的顺序置顶，可以进一步排序
@@ -165,14 +179,14 @@ export default {
         });
       });
     },
-    async getList() {
+    async getList(isFirst = false) {
       try {
         this.loading = true;
         const data = await selectSkuStructure(this.formatParams());
-        if(!this.oldList){
+        if (!this.oldList) {
           this.data = data.rows;
-        }else{
-          this.sortAndSelectData(data.rows)
+        } else {
+          this.sortAndSelectData(data.rows, isFirst);
         }
         // this.data = data.rows;
 
@@ -248,7 +262,7 @@ export default {
       this.query = {
         ...defaultParams,
       };
-      this.getList();
+      this.getList(true);
     },
     handleCancel() {
       this.data = [];
