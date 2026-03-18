@@ -927,6 +927,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         exportVo.setMonth(param.getMonth());
         exportVo.setMonthPlanVersion(param.getMonthPlanVersion());
         exportVo.setProductionVersion(param.getProductionVersion());
+        exportVo.setStructureChangeCount(0);
+        exportVo.setProSizeChangeCount(0);
         if (PubUtil.isNotEmpty(recordList)) {
             MpStructureAllocationExportVo firstRecotd = recordList.get(0);
             exportVo.setProductTypeCode(firstRecotd.getProductTypeCode());
