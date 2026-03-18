@@ -1181,6 +1181,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     "#fce4d6", "#f9d8c4", "#f6ccb2", "#f3c0a0", "#f0b48e",
                     "#eda87c", "#ea9c6a", "#e79058", "#e48446", "#e17834"
             };
+            
+            // 复制统计行
+            List<Map<String, Object>> totalList = new ArrayList<>();
+            mpStructureAllocationExportVoList.stream()
+                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode()
+                            .equals(exportVo.getDataType()))
+                    .forEach(exportVo -> {
+                        Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap,
+                                structureTypeMap, machineBrandMap, "A"); // 生成一份后缀带A的版本
+                        totalList.add(listDataMap);
+                    });
+            excelDataList.add(totalList);
+            
             for (int i = 0; i < mpStructureAllocationExportVoList.size(); i++) {
                 MpStructureAllocationExportVo exportVo = mpStructureAllocationExportVoList.get(i);
                 String currentCxMachineCode = exportVo.getCxMachineCode();
@@ -1252,18 +1265,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
-            
-            // 复制统计行
-            List<Map<String, Object>> totalList = new ArrayList<>();
-            mpStructureAllocationExportVoList.stream()
-                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode()
-                            .equals(exportVo.getDataType()))
-                    .forEach(exportVo -> {
-                        Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap,
-                                structureTypeMap, machineBrandMap, "A"); // 生成一份
-                        totalList.add(listDataMap);
-                    });
-            excelDataList.add(totalList);
         }
         //切换次数
 //        List<MpStructureAllocationExportChangeCountVo> changeCountList = statisticsVo.getChangeCountList()
