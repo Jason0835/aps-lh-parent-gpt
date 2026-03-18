@@ -1,6 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
-import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -29,7 +29,6 @@ import org.apache.commons.io.IOUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -86,8 +85,6 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         TableDataInfo list = iMpStructureAllocationService.list(mpStructureAllocation);
         // 实体转换
         List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
-        // 排序
-        sortStructureAllocation(resultList);
         return getTableDataInfo(resultList, list.getTotal());
     }
 
@@ -99,22 +96,6 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         rspData.setTotal(total);
         return rspData;
     }
-
-    private void sortStructureAllocation(List<MpStructureAllocation> list) {
-        if (PubUtil.isEmpty(list)) {
-            return;
-        }
-        Collections.sort(list, getStructureAllocationComparator());
-    }
-
-    private Comparator<MpStructureAllocation> getStructureAllocationComparator() {
-        return Comparator
-                .comparing(MpStructureAllocation::getStructureName,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(MpStructureAllocation::getCxMachineCode,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-    }
-
 
     /**
      * 将List中的LinkedHashMap转换为MpStructureAllocation实体类
@@ -257,7 +238,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, MpStructureAllocation entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(DateUtil.date(), "yyyyMMdd");
         byte[] excelBytes = iMpStructureAllocationService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

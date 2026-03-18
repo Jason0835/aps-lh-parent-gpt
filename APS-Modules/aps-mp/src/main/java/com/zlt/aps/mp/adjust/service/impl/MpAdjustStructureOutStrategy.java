@@ -17,7 +17,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
-import com.zlt.aps.mp.adjust.engine.MpWeekRollAdjustEngine;
+import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureOutService;
 import com.zlt.aps.mp.api.annotation.WeekAdjustType;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;

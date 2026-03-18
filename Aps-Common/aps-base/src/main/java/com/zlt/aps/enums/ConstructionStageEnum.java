@@ -12,19 +12,19 @@ public enum ConstructionStageEnum {
     /**
      * 0 无施工
      */
-    NO_CONSTRUCTION("00", "无施工"),
+    NO_CONSTRUCTION("00", "无施工", "00", 99),
     /**
      * 1 试制
      */
-    MEASUREMENT("01", "试制"),
+    MEASUREMENT("01", "试制", ConstructionStageEnum.MEASUREMENT_FLAG, 3),
     /**
      * 2 量试
      */
-    TRIAL_PRODUCTION("02", "量试"),
+    TRIAL_PRODUCTION("02", "量试", ConstructionStageEnum.TRIAL_FLAG, 2),
     /**
      * 3 正式
      */
-    FORMAL_PRODUCTION("03", "正式");
+    FORMAL_PRODUCTION("03", "正式", ConstructionStageEnum.FORMAL_FLAG, 1);
     /**
      * T 量试标记
      */
@@ -39,12 +39,22 @@ public enum ConstructionStageEnum {
     public static final String FORMAL_FLAG = "S";
 
     private String stage;
+    /**
+     * 标记
+     */
+    private String markFlag;
 
     private String desc;
+    /**
+     * 顺序
+     */
+    private Integer sort;
 
-    ConstructionStageEnum(String stage, String desc) {
+    ConstructionStageEnum(String stage, String desc, String markFlag, Integer sort) {
         this.stage = stage;
         this.desc = desc;
+        this.markFlag = markFlag;
+        this.sort = sort;
     }
 
     /**
@@ -74,6 +84,28 @@ public enum ConstructionStageEnum {
     }
 
     /**
+     * 根据标记获取
+     *
+     * @param markFlag 标记值
+     * @return
+     */
+    public static ConstructionStageEnum matchByMarkFlag(String markFlag) {
+        if (StringUtils.isBlank(markFlag)) {
+            return ConstructionStageEnum.NO_CONSTRUCTION;
+        }
+        if (ConstructionStageEnum.FORMAL_FLAG.equalsIgnoreCase(markFlag)) {
+            return ConstructionStageEnum.FORMAL_PRODUCTION;
+        }
+        if (ConstructionStageEnum.TRIAL_FLAG.equalsIgnoreCase(markFlag)) {
+            return ConstructionStageEnum.TRIAL_PRODUCTION;
+        }
+        if (ConstructionStageEnum.MEASUREMENT_FLAG.equalsIgnoreCase(markFlag)) {
+            return ConstructionStageEnum.MEASUREMENT;
+        }
+        return ConstructionStageEnum.NO_CONSTRUCTION;
+    }
+
+    /**
      * 根据施工阶段值，获取施工枚举实例
      *
      * @param stage
@@ -97,5 +129,13 @@ public enum ConstructionStageEnum {
 
     public String getDesc() {
         return desc;
+    }
+
+    public String getMarkFlag() {
+        return markFlag;
+    }
+
+    public Integer getSort() {
+        return sort;
     }
 }

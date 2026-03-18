@@ -31,6 +31,12 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_structure_allocation
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+          AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_proc_no_production_plan
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
@@ -72,8 +78,7 @@
     <delete id="deletedLastVersionByProductionVersion"
             parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         UPDATE t_mp_proc_version
-           SET IS_SELECTED_DEMAND      = NULL,
-               PRODUCTION_INIT_VERSION = NULL,
+           SET PRODUCTION_INIT_VERSION = NULL,
                PRODUCTION_ST_VERSION   = NULL,
                PRODUCTION_VERSION      = NULL,
                IS_NATURAL_MONTH        = NULL,
@@ -86,6 +91,12 @@
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_proc_month_plan_init
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_structure_allocation
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}

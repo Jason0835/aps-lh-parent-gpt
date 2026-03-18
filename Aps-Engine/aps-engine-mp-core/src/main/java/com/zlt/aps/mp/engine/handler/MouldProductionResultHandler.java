@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
@@ -195,7 +196,7 @@ public class MouldProductionResultHandler {
         //硫化施工信息
         logDetail.setConstructionStage(planInfo.getConstructionStage());
         logDetail.setDayVulcanizationQty(planInfo.getDayVulcanizationQty());
-        BigDecimal curingTime = planInfo.getCuringTime();
+        BigDecimal curingTime = Optional.ofNullable(planInfo.getCuringTime()).orElse(BigDecimal.ZERO);
         logDetail.setCuringTime(curingTime.intValue());
         //需求量信息
         logDetail.setHeightQty(planInfo.getHeightQty());
@@ -222,8 +223,11 @@ public class MouldProductionResultHandler {
         MonthPlanProductionRequirePlanVo requirePlan = requireList.get(BigDecimal.ZERO.intValue());
         BeanUtils.copyProperties(requirePlan, dayResult);
         dayResult.setId(null);
+        // pancd+ 2026-03-17 库销比复制
+        dayResult.setInventorySalesRatio(BigDecimalUtil.getValue(requirePlan.getInventorySalesRatio()));
         dayResult.setIsImport(YesOrNoEnum.NO.getCode());
-        dayResult.setCuringTime(requirePlan.getCuringTime().intValue());
+        BigDecimal curingTime = Optional.ofNullable(requirePlan.getCuringTime()).orElse(BigDecimal.ZERO);
+        dayResult.setCuringTime(curingTime.intValue());
         //设置年月值
         Integer year = requirePlan.getYear();
         Integer month = requirePlan.getMonth();

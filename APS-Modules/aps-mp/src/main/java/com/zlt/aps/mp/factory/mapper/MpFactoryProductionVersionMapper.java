@@ -39,6 +39,7 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * 根据分厂、年份、月份。需求版本，排产版本，删除对应的排产版本计划
      * t_mp_proc_version
      * t_mp_proc_month_plan_init
+     * t_mp_structure_allocation
      * t_mp_proc_no_production_record
      * t_mp_proc_no_production_plan
      * t_mp_moulding_day_result
@@ -55,6 +56,7 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * 根据分厂、年份、月份。需求版本，排产版本，删除对应的排产版本计划（针对只有最后一个版本的情况，不能直接删除版本表的数据）
      * t_mp_proc_version
      * t_mp_proc_month_plan_init
+     * t_mp_structure_allocation
      * t_mp_proc_no_production_record
      * t_mp_proc_no_production_plan
      * t_mp_moulding_day_result

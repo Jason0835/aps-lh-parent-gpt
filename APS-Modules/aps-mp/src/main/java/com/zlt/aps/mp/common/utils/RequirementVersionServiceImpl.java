@@ -30,17 +30,19 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
   private final RedisSequenceStorageService sequenceService;
 
   @Override
-  public String generateVersion(String prefix) {
+  public String generateVersion(String prefix,boolean incrementFlag) {
     lock.lock();
     try {
       String dateStr = getTodayDate();
-      long sequence = sequenceService.incrementAndGet(dateStr);
-
-      validateSequence(sequence);
-
-      // 记录每日生成计数
-      sequenceService.incrementDailyCounter();
-
+      long sequence;
+      if(incrementFlag) {
+        sequence = sequenceService.incrementAndGet(dateStr);
+        validateSequence(sequence);
+        // 记录每日生成计数
+        sequenceService.incrementDailyCounter();
+      }else{
+        sequence = getCurrentSequence() + 1;
+      }
       return formatVersion(prefix,dateStr, sequence);
     } finally {
       lock.unlock();
@@ -92,9 +94,21 @@ public class RequirementVersionServiceImpl implements RequirementVersionService 
   }
 
   @Override
+  public void incrementDailyCounter() {
+    // 记录每日生成计数
+    sequenceService.incrementDailyCounter();
+  }
+
+  @Override
+  public void incrementAndGet() {
+    String dateStr = getTodayDate();
+    sequenceService.incrementAndGet(dateStr);
+  }
+
+  @Override
   public VersionInfo parseVersion(String version) {
     if (!validateVersionFormat(version)) {
-      throw new BusinessException("无效的版本号格式: " + version);
+      return null;
     }
 
     String prefix = version.substring(0, 3);

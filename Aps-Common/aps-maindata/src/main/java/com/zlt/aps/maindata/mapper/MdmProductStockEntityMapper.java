@@ -2,6 +2,9 @@ package com.zlt.aps.maindata.mapper;
 
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
+
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -20,5 +23,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface MdmProductStockEntityMapper extends CommBaseMapper<MdmProductStock> {
-
+    /**
+     * 获取最新库存
+     * @param mdmProductStock
+     * @return
+     */
+    List<MdmProductStock> getLatestStock(MdmProductStock mdmProductStock);
 }

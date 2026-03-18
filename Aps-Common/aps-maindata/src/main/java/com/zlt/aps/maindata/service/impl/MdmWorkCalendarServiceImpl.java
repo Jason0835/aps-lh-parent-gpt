@@ -22,6 +22,8 @@ import com.zlt.aps.maindata.service.IMdmWorkCalendarService;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -30,6 +32,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -109,6 +114,28 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
         importDocEntity.setYear(year);
         importDocEntity.setMonth(month);
         importDocEntity.setDay(day);
+        if (ApsConstant.APS_ZERO_1.equals(importDocEntity.getProcCode())) {
+            // 停产，比例大于0，校验不通过
+            if (YesOrNoEnum.NO.getCode().equals(importDocEntity.getDayFlag()) && importDocEntity.getRate() > 0) {
+                String message = I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.stopError");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorRowNum, String.format(message, errorRowNum), importErrorLogs);
+                return Boolean.FALSE;
+            }
+            // 开产，比例小于等于0，校验不通过
+            if (YesOrNoEnum.YES.getCode().equals(importDocEntity.getDayFlag()) && importDocEntity.getRate() <= 0) {
+                String message = I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.startError");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorRowNum, message, importErrorLogs);
+                return Boolean.FALSE;
+            }
+        }
+        if (!isValidDate(DateUtils.parseDateToStr("yyyy-MM-dd", productionDate))) {
+            String message = I18nUtil.getMessage("ui.data.column.mdmWorkCalendar.dateError");
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorRowNum, message, importErrorLogs);
+            return Boolean.FALSE;
+        }
         // 停产比例改成0
         if (YesOrNoEnum.NO.getCode().equals(importDocEntity.getDayFlag())) {
             importDocEntity.setRate(0);
@@ -119,6 +146,18 @@ public class MdmWorkCalendarServiceImpl extends AbstractDocService<MdmWorkCalend
             importDocEntity.setDayFlag(YesOrNoEnum.NO.getCode());
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+    }
+
+    public static boolean isValidDate(String date) {
+        try {
+            // 创建DateTimeFormatter并设置日期格式
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            // 解析日期， 如果解析成功则为合法日期，否则抛出DateTimeParseException异常
+            LocalDate.parse(date, formatter);
+            return true;
+        } catch (DateTimeParseException e) {
+            return false;
+        }
     }
 
     @Autowired

@@ -248,13 +248,21 @@ public class ExcelUtils {
                                     }
                                     setCellValue(newCell, newValue);
                                     // 设置样式
+
                                     if(map.containsKey("style")){
                                         CellStyle style = workbook.createCellStyle();
                                         //创建字体样式
                                         Font font = workbook.createFont();
 
                                         //true为加粗，默认为不加粗
-                                        ExcelStyleVo excelStyleVo = (ExcelStyleVo) map.get("style");
+
+                                        Object cellStyleObj = map.get("style");
+                                        ExcelStyleVo excelStyleVo = null;
+                                        if (cellStyleObj != null) {
+                                            String jsonStr = com.alibaba.fastjson.JSON.toJSONString(cellStyleObj);
+                                            excelStyleVo = com.alibaba.fastjson.JSON.parseObject(jsonStr, com.zlt.aps.common.core.domain.ExcelStyleVo.class);
+                                        }
+
                                         if(StringUtils.isNotEmpty(excelStyleVo.getFontName())){
                                             font.setFontName(excelStyleVo.getFontName());
                                         }
@@ -387,12 +395,28 @@ public class ExcelUtils {
 
             }
             if(context.containsKey(CELL_STYLE)){
-                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = (List<com.zlt.aps.common.core.domain.CellStyle>) context.get(CELL_STYLE);
-                for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
-                    CellStyle style2 = createColorCellStyle(workbook, cs.getColor(),cs.getWithBorder());
-                    // 设置多个单元格的背景颜色
-                    setCellRangeColor(sheet, cs.getStartRowNum(), cs.getStartCellNum(), cs.getEndRowNum(), cs.getEndCellNum(), style2);
+//                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = (List<com.zlt.aps.common.core.domain.CellStyle>) context.get(CELL_STYLE);
+                Object cellStyleObj = context.get(CELL_STYLE);
+                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = null;
+                if (cellStyleObj != null) {
+                    String jsonStr = com.alibaba.fastjson.JSON.toJSONString(cellStyleObj);
+                    cellStyleList = com.alibaba.fastjson.JSON.parseArray(jsonStr, com.zlt.aps.common.core.domain.CellStyle.class);
+                }
+                if (cellStyleList != null) {
+                    for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
+                        boolean bold = cs.getBold() != null ? cs.getBold() : false;
+                        String fontName = cs.getFontName();
+                        CellStyle oldStyle = sheet.getRow(cs.getStartRowNum()).getCell(cs.getStartCellNum()).getCellStyle(); // 加载原单元格
+                        CellStyle style2 = createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, oldStyle);
+                        if(cs.getWithBorder()){
+                            style2.setBorderTop(BorderStyle.THIN);
+                            style2.setBorderBottom(BorderStyle.THIN);
+                            style2.setBorderLeft(BorderStyle.THIN);
+                            style2.setBorderRight(BorderStyle.THIN);
+                        }
+                        setCellRangeColor(sheet, cs.getStartRowNum(), cs.getStartCellNum(), cs.getEndRowNum(), cs.getEndCellNum(), style2);
 
+                    }
                 }
 
             }
@@ -545,6 +569,7 @@ public class ExcelUtils {
                 FileUtils.writeByteArrayToFile(temp, tempBytes);
             }
             byte [] output = FileUtils.readFileToByteArray(temp);
+//            FileUtils.writeByteArrayToFile(new File("test.xlsx"), output);
             if(temp.exists()) {
                 boolean delete = temp.delete();
             }
@@ -703,6 +728,10 @@ public class ExcelUtils {
      * @return
      */
     private static CellStyle createColorCellStyle(Workbook workbook, String colorCode, boolean withBorder) {
+        return createColorCellStyle(workbook, colorCode, withBorder, false, null, null);
+    }
+
+    private static CellStyle createColorCellStyle(Workbook workbook, String colorCode, boolean withBorder, boolean bold, String fontName, CellStyle oldStyle) {
         XSSFCellStyle cellStyle = (XSSFCellStyle) workbook.createCellStyle();
         cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
@@ -712,12 +741,10 @@ public class ExcelUtils {
             XSSFColor xssfColor = new XSSFColor(rgb, null);
             cellStyle.setFillForegroundColor(xssfColor);
             if (withBorder) {
-                // 设置边框
                 cellStyle.setBorderBottom(BorderStyle.THIN);
                 cellStyle.setBorderTop(BorderStyle.THIN);
                 cellStyle.setBorderLeft(BorderStyle.THIN);
                 cellStyle.setBorderRight(BorderStyle.THIN);
-                // 设置边框颜色
                 java.awt.Color borderColor = java.awt.Color.decode("#D4D4D4");
                 byte[] borderRGB = new byte[]{(byte) borderColor.getRed(), (byte) borderColor.getGreen(), (byte) borderColor.getBlue()};
                 XSSFColor xssfBorderColor = new XSSFColor(borderRGB, null);
@@ -725,6 +752,24 @@ public class ExcelUtils {
                 cellStyle.setTopBorderColor(xssfBorderColor);
                 cellStyle.setLeftBorderColor(xssfBorderColor);
                 cellStyle.setRightBorderColor(xssfBorderColor);
+            }
+
+            if (bold || StringUtils.isNotEmpty(fontName)) {
+                Font font = workbook.createFont();
+                if (oldStyle != null) { // 原单元格样式复制回去
+                    XSSFFont oldFont = (XSSFFont) workbook.getFontAt(oldStyle.getFontIndexAsInt());
+                    if (oldFont != null) {
+                        font.setFontName(oldFont.getFontName());
+                        font.setBold(oldFont.getBold());
+                    }
+                }
+                if (StringUtils.isNotEmpty(fontName)) {
+                    font.setFontName(fontName);
+                }
+                if (bold) {
+                    font.setBold(true);
+                }
+                cellStyle.setFont(font);
             }
         } catch (NumberFormatException e) {
             System.out.println("无效的色号：" + colorCode);

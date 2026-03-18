@@ -78,7 +78,7 @@ public class DayCapacityLimitVo implements Serializable {
         if (CollectionUtils.isEmpty(afterTheoryChangeDayList)) {
             return null;
         }
-        Set<Integer> resultSet = hasChangeGroupSet.stream().filter(afterTheoryChangeDayList::contains).collect(Collectors.toSet());
+        Set<Integer> resultSet = hasProductionDaySet.stream().filter(afterTheoryChangeDayList::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(resultSet)) {
             return null;
         }
@@ -402,7 +402,7 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
-     * 增加每日结构切换使用次数
+     * 减少每日换模使用次数 -1
      *
      * @param context         排产上下文
      * @param changeMouldDate 换模日

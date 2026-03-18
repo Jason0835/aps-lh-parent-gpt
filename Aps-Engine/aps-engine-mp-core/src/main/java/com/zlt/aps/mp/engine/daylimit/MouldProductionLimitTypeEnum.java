@@ -73,6 +73,10 @@ public enum MouldProductionLimitTypeEnum {
      */
     DAY_CAPACITY_DOUBLE_LIMIT("16", "胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数、日产能上限多重限制", "alg.data.mouldProduction.dayCapacityDoubleLimit"),
     /**
+     * 18 胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数、日产能上限、换模次数多重限制
+     */
+    CHANGE_MOULD_CAPACITY_DOUBLE_LIMIT("16", "胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数、日产能上限、换模次数多重限制", "alg.data.mouldProduction.changeMouldCapacityDoubleLimit"),
+    /**
      * 17 特殊原材料库存限制
      */
     SPECIAL_MATERIAL_STOCK_LIMIT("17", "特殊原材料库存限制", "alg.data.mouldProduction.specialMaterialStockLimit");

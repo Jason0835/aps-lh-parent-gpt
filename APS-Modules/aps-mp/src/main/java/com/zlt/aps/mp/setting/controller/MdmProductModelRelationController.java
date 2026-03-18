@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.setting.controller;
 
+import com.alibaba.cloud.commons.lang.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -31,7 +32,9 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -248,5 +251,23 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @PostMapping("/updateMainPatternToMaterial")
     public AjaxResult updateMainPatternToMaterial(@RequestBody MdmSkuMouldRel queryVO) {
         return mdmProductModelRelationService.updateMainPatternToMaterial(queryVO);
+    }
+
+    /**
+     * 查询模具数量
+     *
+     * @param queryVO 参数
+     * @return 结果
+     */
+    @ApiOperation("查询模具数量")
+    @PostMapping("/selectMouldNumSum")
+    public AjaxResult selectMouldNumSum(@RequestBody MdmSkuMouldRel queryVO) {
+        QueryWrapper<MdmSkuMouldRel> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryVO);
+        List<MdmSkuMouldRel> list = entityMapper.selectList(wrapper);
+        long count = list.stream().map(MdmSkuMouldRel::getMouldCode).filter(StringUtils::isNotBlank).distinct().count();
+        Map<String, Long> map = new HashMap<>();
+        map.put("totalNum", count);
+        return AjaxResult.success(map);
     }
 }

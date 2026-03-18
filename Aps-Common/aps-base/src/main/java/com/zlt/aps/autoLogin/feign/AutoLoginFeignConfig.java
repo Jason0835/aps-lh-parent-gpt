@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
  * 同步服务Feign配置
  */
 @Configuration
-public class SyncFeignConfig {
+public class AutoLoginFeignConfig {
     @Bean
     public DynamicHeaderInterceptor dynamicHeaderInterceptor() {
         return new DynamicHeaderInterceptor();

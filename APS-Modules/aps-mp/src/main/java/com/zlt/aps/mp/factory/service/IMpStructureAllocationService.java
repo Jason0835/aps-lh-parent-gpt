@@ -2,6 +2,7 @@ package com.zlt.aps.mp.factory.service;
 
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -49,4 +50,19 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @return 分配结构
      */
     Set<String> findStructureNames(DpDemandPlan createCondition);
+
+    /**
+     * 获取结构转产表导出数据
+     * @param param
+     * @return
+     */
+    MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param);
+
+
+    /**
+     * 导出结构转产表数据
+     * @param list
+     * @return
+     */
+    byte[] getMpStructureAllocationExportByte(MpStructureAllocationExportStatisticsVo list);
 }

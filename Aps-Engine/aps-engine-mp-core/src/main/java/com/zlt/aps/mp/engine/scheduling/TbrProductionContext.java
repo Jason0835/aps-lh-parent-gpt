@@ -371,17 +371,7 @@ public class TbrProductionContext extends Context {
         if (CollectionUtils.isEmpty(hasDayCapacitySet)) {
             return Collections.emptySet();
         }
-        if (hasDayCapacitySet.size() == BigDecimal.ONE.intValue()) {
-            List<Integer> dayList = new ArrayList<>(hasDayCapacitySet);
-            Integer productionDay = dayList.get(BigDecimal.ZERO.intValue());
-            if (productionDay.equals(getProductionEndDay())) {
-                return hasDayCapacitySet;
-            }
-            return Collections.emptySet();
-        }
-        //取得一段连续的时间范围
-        Set<Integer> continueRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(hasDayCapacitySet, getStopDays());
-        return continueRangeSet;
+        return hasDayCapacitySet;
     }
 
     /**
@@ -819,6 +809,9 @@ public class TbrProductionContext extends Context {
             Long stock = specialMaterialInfo.values().stream().mapToLong(s -> stockGetter.apply(s) - sumQtyGetter.apply(s)).sum();
             // 1.2剩余库存换算成条数
             Integer canProductQty = BigDecimalUtils.div(stock, unitConsumeQty, 0).intValue();
+            if (canProductQty < this.baseDataContainer.getParamConfiguration().getChangeMouldFirstQty()) {
+                canProductQty = 0; // 如果剩余库存小于首日排产量，直接返回0
+            }
             minProductQty = Math.min(minProductQty, canProductQty);
             if (minProductQty <= 0) {
                 break;

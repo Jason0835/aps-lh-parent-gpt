@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.mp.engine.domain.Context;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -41,6 +42,31 @@ public class ContinuousProductionDayHandler {
     }
 
     /**
+     * 从sumProductionDay中取得最早的一段连续排产日
+     * 1、如果只有1天，则判断是否月末，月末允许
+     * 2、否则，至少需要连续两天
+     *
+     * @param context          排产上下文
+     * @param sumProductionDay 可排产日
+     * @param stopDay          停工日
+     * @return
+     */
+    public static Set<Integer> getEarliestContinuousRange(Context context, Set<Integer> sumProductionDay, Set<Integer> stopDay) {
+        if (CollectionUtils.isEmpty(sumProductionDay)) {
+            return sumProductionDay;
+        }
+        boolean hasNext;
+        Set<Integer> finalResult;
+        do {
+            EffectiveResult result = getEffectiveEarliestContinuousRange(context, sumProductionDay, stopDay);
+            finalResult = result.getProductionRange();
+            sumProductionDay = finalResult;
+            hasNext = !result.isEffectiveFlag();
+        } while (hasNext);
+        return finalResult;
+    }
+
+    /**
      * 从sumProductionDay中获取日期最早的一段连续排产日
      * 此时返回的连续集合中还会包含stopDay
      *
@@ -74,6 +100,56 @@ public class ContinuousProductionDayHandler {
             }
         }
         return getEarliestContinuousRange(result);
+    }
+
+    /**
+     * 获取有效的排产范围，月末可一天
+     * 否则至少需要两天
+     *
+     * @param context          排产上下文
+     * @param sumProductionDay 所有排产天数
+     * @param stopDay          停产天数
+     * @return
+     */
+    private static EffectiveResult getEffectiveEarliestContinuousRange(Context context, Set<Integer> sumProductionDay, Set<Integer> stopDay) {
+        if (CollectionUtils.isEmpty(sumProductionDay)) {
+            return new EffectiveResult(true, Collections.emptySet());
+        }
+        Set<Integer> rangeSet = getEarliestContinuousRange(sumProductionDay, stopDay);
+        if (CollectionUtils.isEmpty(rangeSet)) {
+            return new EffectiveResult(true, rangeSet);
+        }
+        Set<Integer> effectiveSet;
+        if (CollectionUtils.isEmpty(stopDay)) {
+            effectiveSet = rangeSet;
+        } else {
+            effectiveSet = new HashSet<>();
+            rangeSet.forEach(day -> {
+                if (stopDay.contains(day)) {
+                    return;
+                }
+                effectiveSet.add(day);
+            });
+        }
+        if (CollectionUtils.isEmpty(effectiveSet)) {
+            return new EffectiveResult(true, Collections.emptySet());
+        }
+        if (effectiveSet.size() > BigDecimal.ONE.intValue()) {
+            return new EffectiveResult(true, rangeSet);
+        }
+        Integer productionDay = new ArrayList<>(effectiveSet).get(BigDecimal.ZERO.intValue());
+        Integer monthEndDay = context.getProductionEndDay();
+        if (monthEndDay.equals(productionDay)) {
+            return new EffectiveResult(true, rangeSet);
+        }
+        Set<Integer> newSumProductionDay = new HashSet<>();
+        sumProductionDay.forEach(day -> {
+            if (productionDay.equals(day)) {
+                return;
+            }
+            newSumProductionDay.add(day);
+        });
+        return new EffectiveResult(false, newSumProductionDay);
     }
 
     /**
@@ -118,4 +194,27 @@ public class ContinuousProductionDayHandler {
         return result;
     }
 
+}
+
+/**
+ * 有效结果
+ */
+class EffectiveResult {
+
+    private boolean effectiveFlag;
+
+    private Set<Integer> productionRange;
+
+    public EffectiveResult(boolean effectiveFlag, Set<Integer> productionRange) {
+        this.effectiveFlag = effectiveFlag;
+        this.productionRange = productionRange;
+    }
+
+    public boolean isEffectiveFlag() {
+        return effectiveFlag;
+    }
+
+    public Set<Integer> getProductionRange() {
+        return productionRange;
+    }
 }

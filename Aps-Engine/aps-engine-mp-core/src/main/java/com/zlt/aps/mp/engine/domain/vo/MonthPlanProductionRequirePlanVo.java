@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.domain.vo;
 import com.zlt.aps.enums.*;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
+import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
@@ -16,7 +17,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -338,7 +339,8 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         if (null != singleLhMachineQty) {
             setDayVulcanizationQty(singleLhMachineQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION);
         }
-        setCuringTime(lhCapacity.getVulcanizationTime());
+        BigDecimal curingTime = Optional.ofNullable(lhCapacity.getVulcanizationTime()).orElse(BigDecimal.ZERO);
+        setCuringTime(curingTime);
     }
 
     /**
@@ -674,11 +676,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     private MonthPlanProductConstructionInfoVo setConstructionStage(List<MonthPlanProductConstructionInfoVo> constructionConfigurationList, String productTypeCode) {
         boolean isPCR = ProductTypeEnum.SEMI_STEEL.getValue().equalsIgnoreCase(getProductTypeCode());
-        if (isPCR) {
-            //优先一次法 按成型法排序 1-1次法 2-2次法
-            constructionConfigurationList.sort(Comparator.comparing(MonthPlanProductConstructionInfoVo::getMouldMethod));
-        }
-        MonthPlanProductConstructionInfoVo constructionInfo = constructionConfigurationList.get(BigDecimal.ZERO.intValue());
+        MonthPlanProductConstructionInfoVo constructionInfo = ConstructionSelector.selectOneConstruction(constructionConfigurationList, getProductTypeCode());
         String constructionCode = constructionInfo.getConstructionCode();
         if (isPCR) {
             ConstructionStageEnum stage = ConstructionStageEnum.matchByConstructionCode(constructionCode);
@@ -687,7 +685,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             }
             return constructionInfo;
         }
-        //全钢TBR -施工阶段-正式
+        //全钢TBR -排产类型-正式
         if (StringUtils.isBlank(constructionCode)) {
             setConstructionStage(ConstructionStageEnum.NO_CONSTRUCTION.getStage());
         } else {
@@ -709,11 +707,27 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             addNoProductionReason(noConfigurationConstructionReason);
             return YesOrNoEnum.NO.getCode();
         }
+        List<MonthPlanNoProductionReasonEnum> noProductionReasonList = new ArrayList<>();
         //没有胎胚号
         if (StringUtils.isBlank(getEmbryoCode())) {
-            String emptyEmbryoReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_EMBRYO_CODE);
-            addNoProductionReason(emptyEmbryoReason);
             isProduction = YesOrNoEnum.NO.getCode();
+            noProductionReasonList.add(MonthPlanNoProductionReasonEnum.NO_EMBRYO_CODE);
+        }
+        //没有制造示方书号
+        if (StringUtils.isBlank(getEmbryoNo())) {
+            noProductionReasonList.add(MonthPlanNoProductionReasonEnum.NO_EMBRYO_NO);
+        }
+        //没有文字示方书号
+        if (StringUtils.isBlank(getTextNo())) {
+            noProductionReasonList.add(MonthPlanNoProductionReasonEnum.NO_TEXT_NO);
+        }
+        //没有硫化示方书号
+        if (StringUtils.isBlank(getLhNo())) {
+            noProductionReasonList.add(MonthPlanNoProductionReasonEnum.NO_LH_NO);
+        }
+        if (!CollectionUtils.isEmpty(noProductionReasonList)) {
+            String noConstructionAllInfoReason = NoProductionReasonUtils.getConstructionConfigurationAllInfo(noProductionReasonList);
+            addNoProductionReason(noConstructionAllInfoReason);
         }
         //非半钢业务--不继续检测
         if (!ProductTypeEnum.SEMI_STEEL.getValue().equals(getProductTypeCode())) {
@@ -811,10 +825,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     public int getCxCapacityRequireQty() {
         cxCapacityRequireQty = getFactProdReqQty();
-//        Integer heightLossQty = getHeightLossQty() - getHeightQty();
-//        Integer noHeightLossQty = getFactProdReqQty() - getNetQty();
-//        Integer sumLossQty = noHeightLossQty - heightLossQty;
-//        cxCapacityRequireQty = getNetQty() + sumLossQty;
         return cxCapacityRequireQty;
     }
 

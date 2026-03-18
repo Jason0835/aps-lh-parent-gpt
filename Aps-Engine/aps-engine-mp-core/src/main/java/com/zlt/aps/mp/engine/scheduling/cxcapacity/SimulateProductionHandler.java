@@ -2,19 +2,18 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
-import com.zlt.aps.mp.engine.daylimit.GroupCapacityProductionLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
-import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -56,6 +55,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
+    private final SupplementCxMachineDistributionHandler supplementCxMachineDistributionHandler;
+
     /**
      * 模拟排产计划
      *
@@ -76,6 +77,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
         //3、对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, allGroupPlanMap);
+        //4、对成型剩余不满足最短上机天数的机台进行分配结构处理
+        supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
 
     /**
@@ -195,7 +198,6 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         String groupName = addNewGroupPlan.getGroupName();
         //最小分配天数
         Integer minAllocationDays = addNewGroupPlan.getMinAllocationDays(productionContext);
@@ -209,25 +211,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
             return;
         }
-        /**
-         * 20260120 判断成型鼓是否符合条件
-         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
-         */
-        GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
-        //获取成型工装的排产日集合
-        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
-        if (!isReachMinAllocationDays(addNewGroupPlan, productionDayInfo, minAllocationDays)) {
-            if (productionDayInfo.size() > BigDecimal.ZERO.intValue()) {
-                log.info(TbrProductionGroupLogRecorder.addGroupNoReachMinAllocationDayLog(context, groupName, productionDayInfo.size(), minAllocationDays));
-            }
-            //20260120 标记分配完成--没有成型工装,没有日产能，说明后面也找不到
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-            return;
-        }
         //对挑选出的结构，匹配还有排产量的成型机台
-        CxMachineBaseInfoVo selectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan, productionDayInfo);
+        CxMachineBaseInfoVo selectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan);
         if (null == selectedCxMachine) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, groupName));

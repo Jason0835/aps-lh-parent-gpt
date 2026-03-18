@@ -7,6 +7,7 @@ import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.common.utils.PubUtil;
@@ -29,24 +30,20 @@ public abstract class AbstractDailyCapacityLimit {
 
     /**
      * 初始化日产能
-     * @param startDay 开始日
-     * @param mpProdFinalList 月计划定稿列表
-     * @param mpStructAllocList 月计划结构转产列表
+     * @param contextDTO 周程滚动上下文
      */
-    public Map<Integer, MpDailyCapacityLimitVo> getDailyCapacityLimitMap(int startDay, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                        List<MpStructureAllocation> mpStructAllocList){
+    public Map<Integer, MpDailyCapacityLimitVo> getDailyCapacityLimitMap(MpRollAdjustContextDTO contextDTO){
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
-        for (int i = startDay; i<= FactoryConstant.MONTH_MAX_DAY; i++){
+        Integer decLhMachines = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        for (int i = contextDTO.getStructureStartDay(); i<= FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
                 dailyCapacityLimitVo = new MpDailyCapacityLimitVo();
             }
             dailyCapacityLimitVo.setDailyDate(i);
             // 1、设置每日硫化机台总限制数、每日胎胚种类总限制数
-            setMaxLhMachinesWithEmbryoTypes(mpStructAllocList,i,dailyCapacityLimitVo);
-            // 2、计算每日硫化机台数、每日胎胚种类数
-            //calcLhMachinesWithEmbryoTypes(mpProdFinalList,i,dailyCapacityLimitVo,null);
+            setMaxLhMachinesWithEmbryoTypes(contextDTO.getOneStructureAllocationList(),i,dailyCapacityLimitVo,decLhMachines);
             dailyCapacityLimitVoMap.put(i,dailyCapacityLimitVo);
         }
         return dailyCapacityLimitVoMap;
@@ -59,7 +56,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @param dailyCapacityLimitVo 日产能限制Vo
      */
     public void setMaxLhMachinesWithEmbryoTypes(List<MpStructureAllocation> mpStructAllocList, int iDay,
-                                                 MpDailyCapacityLimitVo dailyCapacityLimitVo) {
+                                                 MpDailyCapacityLimitVo dailyCapacityLimitVo,int decLhMachines) {
         if(PubUtil.isEmpty(mpStructAllocList)){
             return;
         }
@@ -70,6 +67,10 @@ public abstract class AbstractDailyCapacityLimit {
             if (iDay >= strutAllocVo.getBeginDay() && iDay <= strutAllocVo.getEndDay()){
                 iMaxLhMachines += Convert.toInt(strutAllocVo.getMaxLhMachineCount(), 0);
                 iMaxEmbryoTypes += Convert.toInt(strutAllocVo.getMaxEmbryoCodeCount(), 0);
+            }
+            if (iDay == strutAllocVo.getBeginDay()){
+                //若当前日 = 结构转产开始日，减 硫化机台数 ,防止切换结构时，换模过多
+                iMaxLhMachines -= (decLhMachines > strutAllocVo.getMaxLhMachineCount() ? strutAllocVo.getMaxLhMachineCount() : decLhMachines);
             }
         }
         dailyCapacityLimitVo.setMaxLhMachines(iMaxLhMachines);
@@ -238,6 +239,7 @@ public abstract class AbstractDailyCapacityLimit {
         //Map<String,Integer> patternTwentyBlockAddMouldMap = new HashMap<>();
 
         int dayPlanQty,dailyLhQty;
+        Integer changeMouldFirstDay;
         // 当日字段-dayField，昨日字段-day1Field，次日字段-day2Field
         String dayField = FactoryConstant.DAY_FIELD + iDay;
         String day1Field = FactoryConstant.DAY_FIELD + (iDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:iDay -1);
@@ -312,8 +314,10 @@ public abstract class AbstractDailyCapacityLimit {
                 //patternMachinesCountMap(patternTwentyBlockAddMouldMap, mpFinalVo, addMouldArr[1]);
             }
 
-            // 统计胎胚种类数
-            if (dayPlanQty > 0){
+            // 统计胎胚种类数, >= 换模首日的量才计算
+            changeMouldFirstDay =(Integer)paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
+            changeMouldFirstDay = changeMouldFirstDay == null ? 0 : changeMouldFirstDay;
+            if (dayPlanQty >= changeMouldFirstDay){
                 embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
                 dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
             }
@@ -329,7 +333,9 @@ public abstract class AbstractDailyCapacityLimit {
         dailyCapacityLimitVo.setUsedLhMachines(iCount);
         // 已用胎胚种类数
         dailyCapacityLimitVo.setUsedEmbryoTypes(dailyCapacityLimitVo.getEmbryoCodes().size());
-
+        // 已用换模次数
+        int iChangeMouldCount = machineResultVo.getMatchedPairs() + machineResultVo.getIsolatedIncreases() + machineResultVo.getIsolatedChanges();
+        dailyCapacityLimitVo.setUsedChangeMould(iChangeMouldCount);
         //==================计算主花纹向下的硫化机台数==========================
         // 计算机台组合（减模、增模、换活字块）
         int mpPatternNoAddDecMould = patternNoAddDecMouldMap.get(mainPattern) == null ? 0:patternNoAddDecMouldMap.get(mainPattern);

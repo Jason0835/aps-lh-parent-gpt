@@ -6,8 +6,8 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -137,7 +137,9 @@ public class DayCapacityLimitHelper implements Serializable {
      * 使用量
      */
     public void resetUsedQty() {
+        Integer currentAllocationQty = this.cxMachineAllocationQty;
         initUsedInfo();
+        this.cxMachineAllocationQty = currentAllocationQty;
     }
 
     /**
@@ -226,7 +228,7 @@ public class DayCapacityLimitHelper implements Serializable {
         if (!checkBeforeOperateResult(productionDay, productionPlan, doubleMould, productionQty, lossQty)) {
             return;
         }
-        Integer realProductionQty = getRealProductionQty(productionQty, lossQty);
+        Integer realProductionQty = getRealProductionQty(productionQty, lossQty, false);
         sumProductionCapacityQty = sumProductionCapacityQty + realProductionQty;
         String materialDesc = productionPlan.getMaterialDesc();
         DayProductionCapacityDetailHelper skuInfo = skuProductionInfo.get(materialDesc);
@@ -255,7 +257,7 @@ public class DayCapacityLimitHelper implements Serializable {
         if (null == productionDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(usedMouldSet)) {
             return;
         }
-        Integer realProductionQty = getRealProductionQty(productionQty, lossQty);
+        Integer realProductionQty = getRealProductionQty(productionQty, lossQty, false);
         if (realProductionQty <= BigDecimal.ZERO.intValue()) {
             return;
         }
@@ -459,7 +461,7 @@ public class DayCapacityLimitHelper implements Serializable {
         if (StringUtils.isBlank(productionPlan.getMaterialDesc()) || CollectionUtils.isEmpty(mouldCodeSet) || ProductionConstant.DOUBLE_MOULD_PRODUCTION != mouldCodeSet.size()) {
             return false;
         }
-        Integer realProductionQty = getRealProductionQty(productionQty, lossQty);
+        Integer realProductionQty = getRealProductionQty(productionQty, lossQty, false);
         return realProductionQty > BigDecimal.ZERO.intValue();
     }
 
@@ -469,17 +471,23 @@ public class DayCapacityLimitHelper implements Serializable {
      *
      * @param productionQty 排产量
      * @param lossQty       损耗量
+     * @param isAddLossQty  是否加入损耗
      * @return
      */
-    private Integer getRealProductionQty(Integer productionQty, Integer lossQty) {
-        Integer realProductionQty = BigDecimal.ZERO.intValue();
-        if (null != productionQty && productionQty > BigDecimal.ZERO.intValue()) {
-            realProductionQty = realProductionQty + productionQty;
+    private Integer getRealProductionQty(Integer productionQty, Integer lossQty, boolean isAddLossQty) {
+        Integer sumProductionQty = BigDecimal.ZERO.intValue();
+        Integer realProductionQty = Optional.ofNullable(productionQty).orElse(BigDecimal.ZERO.intValue());
+        if (realProductionQty > BigDecimal.ZERO.intValue()) {
+            sumProductionQty = sumProductionQty + productionQty;
         }
-        if (null != lossQty && lossQty > BigDecimal.ZERO.intValue()) {
-            realProductionQty = realProductionQty + lossQty;
+        if (!isAddLossQty) {
+            return sumProductionQty;
         }
-        return realProductionQty;
+        Integer realLossQty = Optional.ofNullable(lossQty).orElse(BigDecimal.ZERO.intValue());
+        if (realLossQty > BigDecimal.ZERO.intValue()) {
+            sumProductionQty = sumProductionQty + lossQty;
+        }
+        return sumProductionQty;
     }
 
     /**

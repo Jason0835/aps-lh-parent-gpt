@@ -15,7 +15,7 @@ public interface RequirementVersionService {
    * 生成单个需求版本号
    * @return REQ+yyyymmdd+3位流水号
    */
-  String generateVersion(String prefix);
+  String generateVersion(String prefix,boolean incrementFlag);
 
   /**
    * 批量生成需求版本号
@@ -36,14 +36,20 @@ public interface RequirementVersionService {
    * @return 是否有效
    */
   boolean validateVersionFormat(String version);
-
+  /**
+   * 增加每日计数
+   */
+  void incrementDailyCounter();
+  /**
+   *  添加并获取下一个序列号
+   */
+  void incrementAndGet();
   /**
    * 解析版本号信息
    * @param version 版本号
    * @return 版本号详情
    */
   VersionInfo parseVersion(String version);
-
   /**
    * 版本号信息类
    */

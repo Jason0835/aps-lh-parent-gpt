@@ -194,6 +194,10 @@ public enum TbrMouldProductionLogType {
      */
     REVERSE_MACHINE_NO_FIND_MACHINE("20-14-04", "收尾机台在基础信息中没有找到"),
     /**
+     * 20-14-99 在机结构模拟排产后收尾机台排产
+     */
+    REVERSE_MACHINE_PRODUCTION_INFO("20-14-99", "在机结构模拟排产后收尾机台排产"),
+    /**
      * 20-14-05 收尾机台没有排产计划
      */
     REVERSE_MACHINE_NO_FIND_GROUP_PLAN("20-14-05", "收尾机台没有排产计划"),
@@ -282,6 +286,10 @@ public enum TbrMouldProductionLogType {
      * 20-16-02 机台找分组计划
      */
     CX_MACHINE_SELECTED_GROUP("20-16-02", "机台找分组计划"),
+    /**
+     * 20-90 成型补量分配
+     */
+    SUPPLEMENT_CX_MACHINE_DISTRIBUTION("20-90","成型补量分配"),
     /**
      * 30-01-00 开始分组计划模具排产
      */

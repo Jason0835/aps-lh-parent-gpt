@@ -56,9 +56,25 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_CONSTRUCTION_STAGE_OR_NO_FORMAL("MP1302", "施工阶段为空/施工阶段非正式", "alg.data.initCheck.noConstructionStageOrNoFormal"),
     /**
+     * MP1303 【SKU与示方书关系】未找到%s
+     */
+    NO_CONSTRUCTION_ALL_INFO("MP1303", "【SKU与示方书关系】未找到%s", "alg.data.initCheck.noConstructionConfigurationInfo"),
+    /**
      * MP1303 没有胎胚号
      */
-    NO_EMBRYO_CODE("MP1303", "没有胎胚号", "alg.data.initCheck.noEmbryoCode"),
+    NO_EMBRYO_CODE("MP1303", "没有胎胚号", "alg.data.initCheck.noFindEmbryoCode"),
+    /**
+     * MP1303-1 没有制造示方书号
+     */
+    NO_EMBRYO_NO("MP1303-1","没有制造示方书号","alg.data.initCheck.noFindEmbryoNo"),
+    /**
+     * MP1303-2 没有文字示方书号
+     */
+    NO_TEXT_NO("MP1303-2","没有文字示方书号","alg.data.initCheck.noFindTextNo"),
+    /**
+     * MP1303-3 没有硫化示方书号
+     */
+    NO_LH_NO("MP1303-2","没有硫化示方书号","alg.data.initCheck.noFindLhNo"),
     /**
      * MP1304 没有规格代号
      */

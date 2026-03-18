@@ -1,42 +1,38 @@
 package com.zlt.aps.mp.factory.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.text.Convert;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
-import com.zlt.aps.utils.JsonI18nConvertUtils;
-import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.common.utils.PubUtil;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-
+import com.ruoyi.common.text.Convert;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
+import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
+import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
+import com.zlt.aps.utils.JsonI18nConvertUtils;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -60,8 +56,12 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     @Autowired
     private IFactoryMonthPlanMouldDayResultService factoryMonthPlanMouldDayResultService;
 
+
     @Autowired
     private FactoryMonthPlanMouldDayResultEntityMapper entityMapper;
+
+    @Autowired
+    private IExportLogService iExportLogService;
 
     /**
      * 查询S2-0604.排产结果-生产计划排产结果列表
@@ -93,7 +93,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
 
     @Override
     protected String getOrderBy() {
-        return "STRUCTURE_NAME,MAIN_PATTERN,MAIN_MATERIAL_DESC";
+        return "PRO_SIZE,STRUCTURE_NAME,MAIN_PATTERN,MAIN_MATERIAL_DESC,MOULD_CAVITY_QTY DESC";
     }
 
     /**
@@ -153,7 +153,23 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     @Override
     public byte[] exportData(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        Date beginTime = DateUtils.getNowDate();
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO);
+        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(list);
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
     }
 
     @Override

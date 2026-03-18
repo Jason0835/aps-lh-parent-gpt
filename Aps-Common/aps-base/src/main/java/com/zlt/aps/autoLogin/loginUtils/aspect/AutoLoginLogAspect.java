@@ -26,7 +26,7 @@ import java.util.UUID;
  */
 @Aspect
 @Component
-public class SyncLogAspect {
+public class AutoLoginLogAspect {
 
 
     public static final String REQUEST_ID = "requestId";
@@ -35,7 +35,7 @@ public class SyncLogAspect {
 
     private final TokenUtils tokenUtils;
 
-    public SyncLogAspect( TokenUtils tokenUtils) {
+    public AutoLoginLogAspect(TokenUtils tokenUtils) {
         this.tokenUtils = tokenUtils;
     }
 
