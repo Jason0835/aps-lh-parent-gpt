@@ -18,13 +18,15 @@
         :data="data"
         :toolbar="false"
         :page="page"
-         :search="search"
+        :search="search"
         :highlight-current-row="true"
         @current-change="handleCurrentChange"
         @row-dblclick="handleDbClick"
         @pageChange="handlePageChange"
         @selection-change="handleSelectionChange"
         @search="handleSearch"
+        row-key="id"
+        :reserve-selection="true"
       >
       </page-table>
     </div>
@@ -52,11 +54,13 @@ export default {
     multiple: {
       type: Boolean,
       default: false,
+
     },
+    oldList: Array | [],
   },
   data() {
     return {
-      search:{},
+      search: {},
       searchKey: "",
       // searchColumns: [
 
@@ -77,12 +81,14 @@ export default {
       valueProp: "materialCode",
       labelProp: "materialCode",
       data: [],
+
+      allSelectData: [],
     };
   },
   computed: {
     searchColumns: function () {
       return [
-              {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select", //GLUE_TYPE
@@ -154,7 +160,7 @@ export default {
       if (this.multiple) {
         list.unshift({
           type: "selection",
-          reserveSelection:true
+          reserveSelection: true,
         });
       }
 
@@ -179,12 +185,32 @@ export default {
   },
 
   methods: {
-    async getList() {
+    async getList(isFirst = false) {
+
       try {
         this.loading = true;
         const data = await listProductinfo(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
+        let that=this
+        if (isFirst) {
+          if (this.multiple) {
+            const topItems = [];
+            console.log(that.oldList)
+            data.rows.forEach((item) => {
+              if (that.oldList.includes(item.materialCode)) {
+                topItems.push(item);
+              }
+            });
+            this.$nextTick(() => {
+              const tableRef = this.$refs.tableRef.getTableRef();
+              topItems.forEach((item) => {
+                // 使用toggleRowSelection方法选中行
+                tableRef.toggleRowSelection(item, true);
+              });
+            });
+          }
+        }
       } catch (error) {
         console.log(error);
       } finally {
@@ -243,7 +269,7 @@ export default {
       this.query = {
         ...defaultParams,
       };
-      this.getList();
+      this.getList(true);
     },
     handleCancel() {
       this.data = [];
@@ -266,6 +292,7 @@ export default {
       });
     },
     handleSelectionChange(rows) {
+      console.log(rows);
       this.selection = rows;
     },
     handleClear() {
@@ -296,9 +323,9 @@ export default {
             .join(",");
           this.$emit("updateValue", ids);
           this.$emit("change", ids, deepClone(this.selection));
-        }else{
-          this.$modal.msgWarning(this.$t('common.rule.select'));
-          return
+        } else {
+          this.$modal.msgWarning(this.$t("common.rule.select"));
+          return;
         }
 
         done();

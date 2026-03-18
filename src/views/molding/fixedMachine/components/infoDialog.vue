@@ -185,6 +185,8 @@ export default {
                 key={form.fixedMaterialCode}
                 multiple={true}
                 v-model={form.fixedMaterialCode}
+                onChange={this.handleFixedMaterialChange}
+                oldList={form.fixedMaterialCode}
               />
             );
           },
@@ -219,6 +221,7 @@ export default {
                 key={form.disableMaterialCode}
                 multiple={true}
                 v-model={form.disableMaterialCode}
+                onChange={this.handleDisableMaterialChange}
               />
             );
           },
@@ -232,6 +235,28 @@ export default {
     },
   },
   methods: {
+    handleFixedMaterialChange(val,row){
+      let text=''
+      for (let i = 0; i < row.length; i++) {
+       if(i==row.length-1){
+        text=text+row[i].materialDesc
+       }else{
+        text=text+row[i].materialDesc+','
+       }
+      }
+      this.$set(this.form,'fixedMaterialDesc',text)
+    },
+    handleDisableMaterialChange(val,row){
+      let text=''
+      for (let i = 0; i < row.length; i++) {
+       if(i==row.length-1){
+        text=text+row[i].materialDesc
+       }else{
+        text=text+row[i].materialDesc+','
+       }
+      }
+      this.$set(this.form,'disableMaterialDesc',text)
+    },
     // api
     async save(params) {
       try {
