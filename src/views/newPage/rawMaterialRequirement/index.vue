@@ -26,12 +26,15 @@
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         > -->
-        <el-button type="primary" v-hasPermi="['maindata:rawMaterialRequirePlan:generate']" @click="generatePlan">{{
-          $t("ui.data.column.rawMaterial.genger")
-        }}</el-button>
-          <el-button
+        <el-button
+          type="primary"
+          v-hasPermi="['maindata:rawMaterialRequirePlan:generate']"
+          @click="generatePlan"
+          >{{ $t("ui.data.column.rawMaterial.genger") }}</el-button
+        >
+        <el-button
           type="danger"
-           v-hasPermi="['maindata:rawMaterialRequirePlan:remove']"
+          v-hasPermi="['maindata:rawMaterialRequirePlan:remove']"
           :disabled="selection.length == 0"
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
@@ -53,12 +56,18 @@
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         > -->
-        <el-button @click="handleExport" v-hasPermi="['maindata:rawMaterialRequirePlan:export']">{{
-          $t("ui.frame.btn.export")
-        }}</el-button>
-        <el-button type="primary" @click="goRawUsage" plain v-hasPermi="['maindata:rawWeekUsage:list']">{{
-          $t("ui.data.column.rawMaterial.usage")
-        }}</el-button>
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['maindata:rawMaterialRequirePlan:export']"
+          >{{ $t("ui.frame.btn.export") }}</el-button
+        >
+        <el-button
+          type="primary"
+          @click="goRawUsage"
+          plain
+          v-hasPermi="['maindata:rawWeekUsage:list']"
+          >{{ $t("ui.data.column.rawMaterial.usage") }}</el-button
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -81,7 +90,8 @@ import { downloadLink } from "@/utils/request";
 import {
   listMdmProductConstruction,
   generateMdmProductConstruction,
-  removeMdmProductConstruction
+  removeMdmProductConstruction,
+  getMdmProductVersion,
 } from "@/api/maindata/rawMaterialRequirePlan​";
 
 //components
@@ -95,9 +105,15 @@ export default {
   components: {
     tltUpload,
     infoDialog,
-    createDialog
+    createDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE", "biz_factory_name",'biz_rawMaterial_type','biz_yes_no'],
+  dicts: [
+    "LINE_TYPE",
+    "JOB_TYPE",
+    "biz_factory_name",
+    "biz_rawMaterial_type",
+    "biz_yes_no",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -118,6 +134,7 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      selectList: [],
     };
   },
   computed: {
@@ -155,17 +172,17 @@ export default {
               value
             );
           },
-          width:120
+          width: 120,
         },
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
-          width:200
+          width: 200,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width:180
+          width: 180,
         },
         // {
         //   prop: "物料代码",
@@ -203,7 +220,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
-          width:180
+          width: 180,
         },
         {
           prop: "updateTime",
@@ -211,9 +228,7 @@ export default {
           width: 200,
           render: ({ row }) => {
             return (
-              <div>
-                {row.updateTime?row.updateTime:row.createTime}
-              </div>
+              <div>{row.updateTime ? row.updateTime : row.createTime}</div>
             );
           },
         },
@@ -257,6 +272,9 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -265,6 +283,9 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           prop: "materialCode",
@@ -283,6 +304,12 @@ export default {
         //   label: this.$t("材料名称"),
         // },
         {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
+          type: "select",
+          dictData: this.selectList,
+        },
+        {
           prop: "materialType",
           label: this.$t("ui.data.column.trialPlan.trialType"),
           type: "select",
@@ -292,19 +319,45 @@ export default {
     },
   },
   methods: {
-    goRawUsage(){
-      {/* this.$router.push("/rawMaterial/rawWeekUsage"); */}
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.getVersion();
+
+      // this.$set(this.search,'materialCode',val)
+      // this.$set(this.query,'materialCode',val)
+    },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+
+      this.getVersion();
+    },
+    goRawUsage() {
+      {
+        /* this.$router.push("/rawMaterial/rawWeekUsage"); */
+      }
       this.$router.push({
         name: "RawWeekUsage",
-
       });
     },
     async generatePlan() {
-
       if (this.$refs.createRef) {
         this.$refs.createRef.show();
       }
-      return
+      return;
       try {
         this.loading = true;
         let res = await generateMdmProductConstruction(this.formatParams());
@@ -396,7 +449,7 @@ export default {
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
-        ...this.sort,
+        ...this.search,
       };
 
       if (hasPage) {
@@ -426,16 +479,53 @@ export default {
         this.loading = false;
       }
     },
+    async getVersion(isGet = false) {
+      try {
+        this.loading = true;
+        const params = {
+          ...this.query,
+          ...this.search,
+        };
+        let arr = params.yearMonth.split("-");
+        const res = await getMdmProductVersion({
+          factoryCode: params.factoryCode,
+          year: arr[0],
+          month: arr[1],
+        });
+        let list = [];
+        for (let i = 0; i < res.length; i++) {
+          list.push({
+            label: res[i].version,
+            value: res[i].version,
+          });
+        }
+        this.selectList = list;
+        if (res.length > 0) {
+          this.$set(this.query, "version", res[0].version);
+          this.$set(this.search, "version", res[0].version);
+        } else {
+          this.$set(this.query, "version", "");
+          this.$set(this.search, "version", "");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+        if (isGet) {
+          this.getList();
+        }
+      }
+    },
   },
   created() {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
+    const year = nextMonth.getFullYear();
+    const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
 
     let defaultParams = {
       factoryCode: "116",
-      yearMonth: `${year}-${month < 10 ? "0" + month : month}`
+      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
     };
     this.search = {
       ...defaultParams,
@@ -443,7 +533,8 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    // this.getList();
+    this.getVersion(true);
   },
   activated() {
     // this.getList();

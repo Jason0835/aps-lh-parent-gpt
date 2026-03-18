@@ -41,3 +41,13 @@ export function generateVersion(query) {
     },
   })
 }
+export function getMdmProductVersion(query) {
+  return request({
+    url: '/maindata/rawMaterialRequirePlan/getVersionList',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}

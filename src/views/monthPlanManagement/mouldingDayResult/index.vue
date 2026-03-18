@@ -137,7 +137,7 @@ export default {
         current: 1,
         pageSize: 20,
         total: 0,
-        pageSizes: [10, 20, 30, 40, 50, 100, 200, 300],
+        pageSizes: [10, 20, 30, 40, 50, 100, 200, 300,500,1000],
       },
       sort: {},
       search: {},
