@@ -535,7 +535,7 @@ public class MatchingProductionHandler {
             }
             Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = checkDay - checkDayProductQty - 1 <= skuSecondProduction;
+                isSecOnLine = checkDay - i - 1 >= skuSecondProduction;
                 break;
             }
         }
@@ -547,7 +547,7 @@ public class MatchingProductionHandler {
         for (Integer i = checkDay + 1; i <= skuEndDay; i++) {
             Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = checkDayProductQty - checkDay - 1 <= skuSecondProduction;
+                isSecOnLine = i - checkDay - 1 >= skuSecondProduction;
                 break;
             }
         }
