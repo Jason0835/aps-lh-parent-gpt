@@ -78,8 +78,7 @@
     <delete id="deletedLastVersionByProductionVersion"
             parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         UPDATE t_mp_proc_version
-           SET IS_SELECTED_DEMAND      = NULL,
-               PRODUCTION_INIT_VERSION = NULL,
+           SET PRODUCTION_INIT_VERSION = NULL,
                PRODUCTION_ST_VERSION   = NULL,
                PRODUCTION_VERSION      = NULL,
                IS_NATURAL_MONTH        = NULL,
