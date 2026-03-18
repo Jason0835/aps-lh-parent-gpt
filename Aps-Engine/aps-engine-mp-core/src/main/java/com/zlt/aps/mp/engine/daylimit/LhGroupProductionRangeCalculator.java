@@ -129,8 +129,8 @@ public class LhGroupProductionRangeCalculator {
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.DAY_CAPACITY_DOUBLE_LIMIT);
         }
         Integer continueDays = 2;
-//        return handlerChangeMouldContinueControl(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould, continueDays);
-        return handlerChangeMouldNoContinue(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould);
+        return handlerChangeMouldContinueControl(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould, continueDays);
+//        return handlerChangeMouldNoContinue(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould);
     }
 
     /**

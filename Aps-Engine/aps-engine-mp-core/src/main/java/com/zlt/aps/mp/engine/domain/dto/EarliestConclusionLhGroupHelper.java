@@ -110,7 +110,7 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
      */
     public CxLhProductionHelper transformCxLhGroup() {
         CxLhProductionHelper cxLhGroup = new CxLhProductionHelper();
-        BeforeSkuProductionInfo beforeSku = new BeforeSkuProductionInfo(beforeMaterialDesc, beforeMaterialCode, "", closingDay, beforeProductionQty, beforeDayMaxQty);
+        BeforeSkuProductionInfo beforeSku = getBeforeSkuInfo();
         cxLhGroup.setBeforeSku(beforeSku);
 //        cxLhGroup.setMaterialDesc(this.beforeMaterialDesc);
 //        cxLhGroup.setMaterialCode(this.beforeMaterialCode);
@@ -120,6 +120,13 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         return cxLhGroup;
     }
 
+    /**
+     * 构建前Sku信息
+     * @return
+     */
+    public BeforeSkuProductionInfo getBeforeSkuInfo(){
+        return new BeforeSkuProductionInfo(beforeMaterialDesc, beforeMaterialCode, "", theoryStartDay, beforeProductionQty, beforeDayMaxQty);
+    }
     /**
      * 当前硫化组是否需要换模
      *

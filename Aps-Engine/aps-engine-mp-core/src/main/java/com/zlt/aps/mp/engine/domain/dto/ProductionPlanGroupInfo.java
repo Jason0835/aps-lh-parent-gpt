@@ -692,12 +692,19 @@ public class ProductionPlanGroupInfo {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<Integer> stopDayInfo = productionContext.getStopDays();
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays(), isChangeMould);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo());
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
+//        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));

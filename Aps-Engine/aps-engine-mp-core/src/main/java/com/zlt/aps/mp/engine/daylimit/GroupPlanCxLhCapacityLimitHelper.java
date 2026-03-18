@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -7,7 +8,6 @@ import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
@@ -782,6 +782,10 @@ class SkuUsedLhMachineInfo {
         Integer allMachineCount = getWholeMachineCount() + getLeftOverMachineCount();
         if (null == nextDayInfo) {
             return BigDecimal.ZERO.intValue() - allMachineCount;
+        }
+        //如果整台数都为零，则表示可以释放一台
+        if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
+            return  getWholeMachineCount() - nextDayInfo.getLeftOverMachineCount();
         }
         return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
     }

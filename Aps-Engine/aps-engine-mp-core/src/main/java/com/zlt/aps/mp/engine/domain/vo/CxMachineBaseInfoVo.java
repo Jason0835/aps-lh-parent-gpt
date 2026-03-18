@@ -730,7 +730,11 @@ public class CxMachineBaseInfoVo implements Serializable {
         Integer preEndDay = endDay;
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
         ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku());
-        boolean isChangeMould = selectedLhGroup.isChangeMould(addSkuInfo);
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
@@ -743,16 +747,16 @@ public class CxMachineBaseInfoVo implements Serializable {
         List<Integer> sortList = new ArrayList<>(effectiveRangeSet);
         Collections.sort(sortList);
         int size = sortList.size();
-        newLhGroup.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
-        //20260122 换模判断
+        Integer newStartDay = sortList.get(BigDecimal.ZERO.intValue());
+        newLhGroup.updateProductionDateRange(newStartDay, sortList.get(size - BigDecimal.ONE.intValue()));
+        //20260122 换模次数判断
         if (!isChangeMould) {
             return newLhGroup;
         }
         //需要换模-换模次数处理
         DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer changeMouldDay = newLhGroup.getProductionDay();
         Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, newStartDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
         return newLhGroup;
     }
 

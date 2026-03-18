@@ -3,7 +3,9 @@ package com.zlt.aps.mp.engine.daylimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 
@@ -27,7 +29,14 @@ public class ChangeMouldInfo implements Serializable {
      * 是否需要隔天换模
      */
     private boolean isProductionNextDay;
-
+    /**
+     * 换模时：预计排产量
+     */
+    private Integer preProductionQty;
+    /**
+     * 换模时：损耗量
+     */
+    private Integer lossQty;
     /**
      * 构造函数
      *
@@ -43,8 +52,7 @@ public class ChangeMouldInfo implements Serializable {
     /**
      * 判断是否需要换模
      *
-     * @param context             排产上下文
-
+     * @param context 排产上下文
      * @return
      */
     public static ChangeMouldInfo buildChangeMouldInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, BeforeSkuProductionInfo beforeSkuInfo) {
@@ -52,11 +60,13 @@ public class ChangeMouldInfo implements Serializable {
         Integer productionQty = beforeSkuInfo.getProductionQty();
         Integer dayMaxProductionQty = beforeSkuInfo.getDayMaxQty();
         boolean isChangeMould = isChangeMould(addSkuInfo, materialDesc);
-        //无需换模
         if (!isChangeMould) {
+            //无需换模：同Sku，则是不同优先级的衔接
             return new ChangeMouldInfo(false, false);
         }
-        //同Sku，则是不同优先级的衔接
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
         Integer beforeSkuDayMaxQty = Optional.ofNullable(dayMaxProductionQty).orElse(BigDecimal.ZERO.intValue());
         if (beforeSkuDayMaxQty <= BigDecimal.ZERO.intValue()) {
             return new ChangeMouldInfo(true, false);
@@ -66,14 +76,13 @@ public class ChangeMouldInfo implements Serializable {
         }
         //前Sku的排产量
         Integer beforeSkuProductionQty = Optional.ofNullable(productionQty).orElse(BigDecimal.ZERO.intValue());
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         String connectSkuMaterialDesc = addSkuInfo.getMaterialDesc();
-        boolean isShareMould = !productionContext.getBaseDataContainer().isShareMouldSameGroup(materialDesc, connectSkuMaterialDesc);
+        boolean isShareMould = !baseDataContainer.isShareMouldSameGroup(materialDesc, connectSkuMaterialDesc);
         //换活字块
         if (isShareMould) {
             //前Sku排产量与前Sku日硫化量的差值
             Integer beforeSkuDiffValue = Math.abs(beforeSkuDayMaxQty - beforeSkuProductionQty);
-            Integer changeTypeBlockQtyDiff = productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQtyDiff();
+            Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
             //当天换
             if (beforeSkuDiffValue >= changeTypeBlockQtyDiff) {
                 return new ChangeMouldInfo(true, false);
