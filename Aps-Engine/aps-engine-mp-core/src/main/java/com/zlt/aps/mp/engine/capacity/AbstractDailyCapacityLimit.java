@@ -314,7 +314,7 @@ public abstract class AbstractDailyCapacityLimit {
                 //patternMachinesCountMap(patternTwentyBlockAddMouldMap, mpFinalVo, addMouldArr[1]);
             }
 
-            // 统计胎胚种类数, 大于换模首日的量才计算
+            // 统计胎胚种类数, >= 换模首日的量才计算
             changeMouldFirstDay =(Integer)paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
             changeMouldFirstDay = changeMouldFirstDay == null ? 0 : changeMouldFirstDay;
             if (dayPlanQty >= changeMouldFirstDay){
