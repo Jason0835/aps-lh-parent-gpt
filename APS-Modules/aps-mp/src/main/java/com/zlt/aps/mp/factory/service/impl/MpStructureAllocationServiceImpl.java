@@ -972,7 +972,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if (dayLhMachinesMap == null) {
                     continue;
                 }
-                for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+                for (int day = machineRecord.getBeginDay(); day <= machineRecord.getEndDay(); day ++) {
                     Integer lhMachines = dayLhMachinesMap.getOrDefault(day, 0);
                     if (lhMachines!= null && lhMachines > 0) {
                         Integer realLhMachines = Math.min(machineRecord.getMaxLhMachineCount(), lhMachines);
@@ -1184,94 +1184,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             for (int i = 0; i < mpStructureAllocationExportVoList.size(); i++) {
                 MpStructureAllocationExportVo exportVo = mpStructureAllocationExportVoList.get(i);
                 String currentCxMachineCode = exportVo.getCxMachineCode();
-                Map<String, Object> listDataMap = new HashMap<>(32);
-                listDataMap.put("changeRank", exportVo.getChangeRank());
-                listDataMap.put("factoryCode", factoryMap.getOrDefault(exportVo.getFactoryCode(), exportVo.getFactoryCode()));
-                listDataMap.put("year", exportVo.getYear());
-                listDataMap.put("month", exportVo.getMonth());
-                listDataMap.put("structureName", exportVo.getStructureName());
-                listDataMap.put("structureType", structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
-                listDataMap.put("cxMachineCode", exportVo.getCxMachineCode());
-                listDataMap.put("cxMachineTypeCode", machineBrandMap.getOrDefault(exportVo.getCxMachineTypeCode(), exportVo.getCxMachineTypeCode()));
-                listDataMap.put("maxEmbryoCodeCount", exportVo.getMaxEmbryoCodeCount());
-                listDataMap.put("maxLhMachineCount", exportVo.getMaxLhMachineCount());
-                listDataMap.put("minLhMachineCount", exportVo.getMinLhMachineCount());
-                listDataMap.put("planType", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
-                listDataMap.put("netQty", exportVo.getNetQty());
-                listDataMap.put("lossQty", exportVo.getLossQty());
-                listDataMap.put("beginDay", exportVo.getBeginDay());
-                listDataMap.put("endDay", exportVo.getEndDay());
-                listDataMap.put("allotDays", exportVo.getAllotDays());
-                listDataMap.put("isHasSpecialMaterial", exportVo.getIsHasSpecialMaterial());
-                listDataMap.put("remark", exportVo.getRemark());
-                listDataMap.put("totalQty", exportVo.getTotalQty());
-                listDataMap.put("differenceQty", exportVo.getDifferenceQty());
-                listDataMap.put("day1", exportVo.getDay1());
-                listDataMap.put("day2", exportVo.getDay2());
-                listDataMap.put("day3", exportVo.getDay3());
-                listDataMap.put("day4", exportVo.getDay4());
-                listDataMap.put("day5", exportVo.getDay5());
-                listDataMap.put("day6", exportVo.getDay6());
-                listDataMap.put("day7", exportVo.getDay7());
-                listDataMap.put("day8", exportVo.getDay8());
-                listDataMap.put("day9", exportVo.getDay9());
-                listDataMap.put("day10", exportVo.getDay10());
-                listDataMap.put("day11", exportVo.getDay11());
-                listDataMap.put("day12", exportVo.getDay12());
-                listDataMap.put("day13", exportVo.getDay13());
-                listDataMap.put("day14", exportVo.getDay14());
-                listDataMap.put("day15", exportVo.getDay15());
-                listDataMap.put("day16", exportVo.getDay16());
-                listDataMap.put("day17", exportVo.getDay17());
-                listDataMap.put("day18", exportVo.getDay18());
-                listDataMap.put("day19", exportVo.getDay19());
-                listDataMap.put("day20", exportVo.getDay20());
-                listDataMap.put("day21", exportVo.getDay21());
-                listDataMap.put("day22", exportVo.getDay22());
-                listDataMap.put("day23", exportVo.getDay23());
-                listDataMap.put("day24", exportVo.getDay24());
-                listDataMap.put("day25", exportVo.getDay25());
-                listDataMap.put("day26", exportVo.getDay26());
-                listDataMap.put("day27", exportVo.getDay27());
-                listDataMap.put("day28", exportVo.getDay28());
-                listDataMap.put("day29", exportVo.getDay29());
-                listDataMap.put("day30", exportVo.getDay30());
-                listDataMap.put("day31", exportVo.getDay31());
-
-                // 计算day1到day31的数量合计
-                Integer totalAll = 0;
-                totalAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
-                totalAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
-                totalAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
-                totalAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
-                totalAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
-                totalAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
-                totalAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
-                totalAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
-                totalAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
-                totalAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
-                totalAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
-                totalAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
-                totalAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
-                totalAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
-                totalAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
-                totalAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
-                totalAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
-                totalAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
-                totalAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
-                totalAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
-                totalAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
-                totalAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
-                totalAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
-                totalAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
-                totalAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
-                totalAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
-                totalAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
-                totalAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
-                totalAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
-                totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
-                totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
-                listDataMap.put("totalAll", totalAll);
+                Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap, structureTypeMap,
+                        machineBrandMap, null);
                 // 处理底色：只有成型机不一样时，切换颜色区分
                 // Excel行号从2开始（第1行是表头）
                 int rowNum = beginIndex + i;
@@ -1338,6 +1252,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
+            
+            // 复制统计行
+            List<Map<String, Object>> totalList = new ArrayList<>();
+            mpStructureAllocationExportVoList.stream()
+                    .filter(exportVo -> StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode()
+                            .equals(exportVo.getDataType()))
+                    .forEach(exportVo -> {
+                        Map<String, Object> listDataMap = this.buildListDataMap(exportVo, factoryMap, planTypeMap,
+                                structureTypeMap, machineBrandMap, "A"); // 生成一份
+                        totalList.add(listDataMap);
+                    });
+            excelDataList.add(listData);
         }
         //切换次数
 //        List<MpStructureAllocationExportChangeCountVo> changeCountList = statisticsVo.getChangeCountList()
@@ -1380,5 +1306,122 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 写到文件
         return ExcelUtils.writeMultiList(inputStream
                 , 0, tableMap, excelDataList);
+    }
+
+    /**
+     * 构建导出行
+     * @param exportVo
+     * @param factoryMap
+     * @param planTypeMap
+     * @param structureTypeMap
+     * @param machineBrandMap
+     * @param suffix    后缀，用于复制合计行
+     * @return
+     */
+    private Map<String, Object> buildListDataMap(MpStructureAllocationExportVo exportVo, Map<String, String> factoryMap,
+                                                 Map<String, String> planTypeMap, Map<String, String> structureTypeMap,
+                                                 Map<String, String> machineBrandMap, String suffix) {
+        Map<String, Object> listDataMap = new HashMap<>(32);
+        listDataMap.put(this.getRealFieldName("changeRank", suffix), exportVo.getChangeRank());
+        listDataMap.put(this.getRealFieldName("factoryCode", suffix), factoryMap.getOrDefault(exportVo.getFactoryCode(), exportVo.getFactoryCode()));
+        listDataMap.put(this.getRealFieldName("year", suffix), exportVo.getYear());
+        listDataMap.put(this.getRealFieldName("month", suffix), exportVo.getMonth());
+        listDataMap.put(this.getRealFieldName("structureName", suffix), exportVo.getStructureName());
+        listDataMap.put(this.getRealFieldName("structureType", suffix), structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
+        listDataMap.put(this.getRealFieldName("cxMachineCode", suffix), exportVo.getCxMachineCode());
+        listDataMap.put(this.getRealFieldName("cxMachineTypeCode", suffix), machineBrandMap.getOrDefault(exportVo.getCxMachineTypeCode(), exportVo.getCxMachineTypeCode()));
+        listDataMap.put(this.getRealFieldName("maxEmbryoCodeCount", suffix), exportVo.getMaxEmbryoCodeCount());
+        listDataMap.put(this.getRealFieldName("maxLhMachineCount", suffix), exportVo.getMaxLhMachineCount());
+        listDataMap.put(this.getRealFieldName("minLhMachineCount", suffix), exportVo.getMinLhMachineCount());
+        listDataMap.put(this.getRealFieldName("planType", suffix), planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
+        listDataMap.put(this.getRealFieldName("netQty", suffix), exportVo.getNetQty());
+        listDataMap.put(this.getRealFieldName("lossQty", suffix), exportVo.getLossQty());
+        listDataMap.put(this.getRealFieldName("beginDay", suffix), exportVo.getBeginDay());
+        listDataMap.put(this.getRealFieldName("endDay", suffix), exportVo.getEndDay());
+        listDataMap.put(this.getRealFieldName("allotDays", suffix), exportVo.getAllotDays());
+        listDataMap.put(this.getRealFieldName("isHasSpecialMaterial", suffix), exportVo.getIsHasSpecialMaterial());
+        listDataMap.put(this.getRealFieldName("remark", suffix), exportVo.getRemark());
+        listDataMap.put(this.getRealFieldName("totalQty", suffix), exportVo.getTotalQty());
+        listDataMap.put(this.getRealFieldName("differenceQty", suffix), exportVo.getDifferenceQty());
+        listDataMap.put(this.getRealFieldName("day1", suffix), exportVo.getDay1());
+        listDataMap.put(this.getRealFieldName("day2", suffix), exportVo.getDay2());
+        listDataMap.put(this.getRealFieldName("day3", suffix), exportVo.getDay3());
+        listDataMap.put(this.getRealFieldName("day4", suffix), exportVo.getDay4());
+        listDataMap.put(this.getRealFieldName("day5", suffix), exportVo.getDay5());
+        listDataMap.put(this.getRealFieldName("day6", suffix), exportVo.getDay6());
+        listDataMap.put(this.getRealFieldName("day7", suffix), exportVo.getDay7());
+        listDataMap.put(this.getRealFieldName("day8", suffix), exportVo.getDay8());
+        listDataMap.put(this.getRealFieldName("day9", suffix), exportVo.getDay9());
+        listDataMap.put(this.getRealFieldName("day10", suffix), exportVo.getDay10());
+        listDataMap.put(this.getRealFieldName("day11", suffix), exportVo.getDay11());
+        listDataMap.put(this.getRealFieldName("day12", suffix), exportVo.getDay12());
+        listDataMap.put(this.getRealFieldName("day13", suffix), exportVo.getDay13());
+        listDataMap.put(this.getRealFieldName("day14", suffix), exportVo.getDay14());
+        listDataMap.put(this.getRealFieldName("day15", suffix), exportVo.getDay15());
+        listDataMap.put(this.getRealFieldName("day16", suffix), exportVo.getDay16());
+        listDataMap.put(this.getRealFieldName("day17", suffix), exportVo.getDay17());
+        listDataMap.put(this.getRealFieldName("day18", suffix), exportVo.getDay18());
+        listDataMap.put(this.getRealFieldName("day19", suffix), exportVo.getDay19());
+        listDataMap.put(this.getRealFieldName("day20", suffix), exportVo.getDay20());
+        listDataMap.put(this.getRealFieldName("day21", suffix), exportVo.getDay21());
+        listDataMap.put(this.getRealFieldName("day22", suffix), exportVo.getDay22());
+        listDataMap.put(this.getRealFieldName("day23", suffix), exportVo.getDay23());
+        listDataMap.put(this.getRealFieldName("day24", suffix), exportVo.getDay24());
+        listDataMap.put(this.getRealFieldName("day25", suffix), exportVo.getDay25());
+        listDataMap.put(this.getRealFieldName("day26", suffix), exportVo.getDay26());
+        listDataMap.put(this.getRealFieldName("day27", suffix), exportVo.getDay27());
+        listDataMap.put(this.getRealFieldName("day28", suffix), exportVo.getDay28());
+        listDataMap.put(this.getRealFieldName("day29", suffix), exportVo.getDay29());
+        listDataMap.put(this.getRealFieldName("day30", suffix), exportVo.getDay30());
+        listDataMap.put(this.getRealFieldName("day31", suffix), exportVo.getDay31());
+
+        // 计算day1到day31的数量合计
+        Integer totalAll = 0;
+        totalAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
+        totalAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
+        totalAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
+        totalAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
+        totalAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
+        totalAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
+        totalAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
+        totalAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
+        totalAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
+        totalAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
+        totalAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
+        totalAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
+        totalAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
+        totalAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
+        totalAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
+        totalAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
+        totalAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
+        totalAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
+        totalAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
+        totalAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
+        totalAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
+        totalAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
+        totalAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
+        totalAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
+        totalAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
+        totalAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
+        totalAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
+        totalAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
+        totalAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
+        totalAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
+        totalAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
+        listDataMap.put(this.getRealFieldName("totalAll", suffix), totalAll);
+        return listDataMap;
+    }
+
+    /**
+     * 获取实际字段名，后缀有值需要拼接上后缀
+     * @param fieldName
+     * @param suffix
+     * @return
+     */
+    private String getRealFieldName(String fieldName, String suffix) {
+        if (StringUtils.isNotEmpty(suffix)) {
+            return fieldName + suffix;
+        }
+        return fieldName;
     }
 }
