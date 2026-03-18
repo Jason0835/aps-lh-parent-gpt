@@ -194,4 +194,14 @@ public class RawMaterialRequirePlanUIController extends BaseUIController<RawMate
     public AjaxResult generateVersion(@RequestBody RawMaterialRequirePlan billVO){
         return iRawMaterialRequirePlanService.generateVersion(billVO);
     }
+
+    /**
+     * 获取原材料需求计划版本列表
+     */
+    @ApiOperation("获取原材料需求计划版本列表")
+    @PostMapping("/getVersionList")
+    @ResponseBody
+    public AjaxResult getVersionList(@RequestBody RawMaterialRequirePlan billVO){
+        return iRawMaterialRequirePlanService.getVersionList(billVO);
+    }
 }

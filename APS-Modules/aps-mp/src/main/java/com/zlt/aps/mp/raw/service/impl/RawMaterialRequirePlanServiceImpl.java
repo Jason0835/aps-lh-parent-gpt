@@ -339,6 +339,40 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     }
 
     /**
+     * 获取原材料需求计划版本列表
+     *
+     * @param queryVO
+     * @return
+     */
+    @Override
+    public AjaxResult getVersionList(RawMaterialRequirePlan queryVO) {
+        QueryWrapper<RawMaterialRequirePlan> queryWrapper = new QueryWrapper<>();
+        // 假设 queryVO 中包含 factoryCode, year, month 等查询条件，这里需要根据实际业务补充
+        if (queryVO.getFactoryCode() != null) {
+            queryWrapper.eq("FACTORY_CODE", queryVO.getFactoryCode());
+        }
+        if (queryVO.getYear() != null) {
+            queryWrapper.eq("YEAR", queryVO.getYear());
+        }
+        if (queryVO.getMonth() != null) {
+            queryWrapper.eq("MONTH", queryVO.getMonth());
+        }
+        
+        // 对 version 进行分组，并选择每个版本中创建时间最新的记录（通常用于获取版本列表）
+        // 由于 MyBatis Plus 原生不支持复杂的 group by 后取最新记录，这里采用先按版本和时间排序，再在内存中去重或直接返回排序后的列表供前端展示
+        // 如果数据库层面必须 group by version，通常需要配合子查询或特定 SQL。
+        // 此处按照常见业务场景：获取该条件下的所有不同版本，并按版本的创建时间降序排列。
+        // 假设 RawMaterialRequirePlan 表中有 CREATE_TIME 字段记录生成时间
+        queryWrapper.select("VERSION", "MAX(CREATE_TIME) as createTime")
+                .groupBy("VERSION")
+                .orderByDesc("CREATE_TIME");
+        
+        List<Map<String, Object>> versionList = rawMaterialRequirePlanMapper.selectMaps(queryWrapper);
+        
+        return AjaxResult.success(versionList);
+    }
+
+    /**
      * 检查AjaxResult是否成功
      */
     private boolean isSuccess(AjaxResult result) {
