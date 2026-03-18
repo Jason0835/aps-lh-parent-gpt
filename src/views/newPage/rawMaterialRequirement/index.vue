@@ -308,6 +308,7 @@ export default {
           label: this.$t("plan.planProduction.planVersion"),
           type: "select",
           dictData: this.selectList,
+          clearable: false,
         },
         {
           prop: "materialType",
@@ -447,9 +448,13 @@ export default {
     },
 
     formatParams(hasPage = true) {
+      console.log(this.query)
+      console.log(this.search)
+      console.log(this.sort)
       const params = {
-        ...this.query,
+
         ...this.search,
+        ...this.query,
       };
 
       if (hasPage) {
@@ -483,8 +488,8 @@ export default {
       try {
         this.loading = true;
         const params = {
-          ...this.query,
           ...this.search,
+        ...this.query,
         };
         let arr = params.yearMonth.split("-");
         const res = await getMdmProductVersion({
