@@ -239,6 +239,7 @@ public abstract class AbstractDailyCapacityLimit {
         //Map<String,Integer> patternTwentyBlockAddMouldMap = new HashMap<>();
 
         int dayPlanQty,dailyLhQty;
+        Integer changeMouldFirstDay;
         // 当日字段-dayField，昨日字段-day1Field，次日字段-day2Field
         String dayField = FactoryConstant.DAY_FIELD + iDay;
         String day1Field = FactoryConstant.DAY_FIELD + (iDay -1 < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY:iDay -1);
@@ -313,8 +314,10 @@ public abstract class AbstractDailyCapacityLimit {
                 //patternMachinesCountMap(patternTwentyBlockAddMouldMap, mpFinalVo, addMouldArr[1]);
             }
 
-            // 统计胎胚种类数
-            if (dayPlanQty > 0){
+            // 统计胎胚种类数, 大于换模首日的量才计算
+            changeMouldFirstDay =(Integer)paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
+            changeMouldFirstDay = changeMouldFirstDay == null ? 0 : changeMouldFirstDay;
+            if (dayPlanQty >= changeMouldFirstDay){
                 embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
                 dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
             }
