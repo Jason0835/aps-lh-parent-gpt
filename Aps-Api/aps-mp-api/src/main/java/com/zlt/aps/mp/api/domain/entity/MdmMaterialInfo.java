@@ -114,6 +114,13 @@ public class MdmMaterialInfo extends BaseEntity {
     private String materialCode;
 
     /**
+     * 物料编号(查询参数，可传多个)
+     */
+    @ApiModelProperty(value = "物料编号(查询参数，可传多个)", name = "materialCodes")
+    @TableField(exist = false)
+    private String materialCodes;
+
+    /**
      * MES物料编号
      */
     @ImportExcelValidated(required = true, maxLength = 20)
@@ -424,7 +431,9 @@ public class MdmMaterialInfo extends BaseEntity {
     @TableField(exist = false)
     private String lhNo;
 
-    /** 质控状态 */
+    /**
+     * 质控状态
+     */
     @Excel(name = "ui.data.column.GoodsBox.qualityStateCode", dictType = "quality_state")
     @ApiModelProperty(value = "质控状态", name = "qualityStateCode")
     @TableField(value = "QUALITY_STATE_CODE")
