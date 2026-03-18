@@ -173,6 +173,15 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                     return AjaxResult.error(message);
                 }
 
+                // 3.1补充版本重复校验
+                if (!checkVersionExist(factoryCode, year, month, version)) {
+                    String message = StringUtils.format(
+                            I18nUtil.getMessage("raw.material.require.plan.version.exist"),
+                            year, String.format("%02d", month), version
+                    );
+                    return AjaxResult.error(message);
+                }
+
                 // 4. 检查订单预测生产计划
                 AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
                 if (isSuccess(predictionCheck)) {
@@ -390,6 +399,20 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         Long count = mpFactoryProductionVersionMapper.selectCount(queryWrapper);
         return count > 0;
     }
+
+    /**
+     * 检查版本是否存在重复
+     */
+    private boolean checkVersionExist(String factoryCode, Integer year, Integer month, String version) {
+        QueryWrapper<RawMaterialRequirePlan> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("VERSION", version);
+        Long count = rawMaterialRequirePlanMapper.selectCount(queryWrapper);
+        return count > 0;
+    }
+
 
     /**
      * 检查订单预测生产计划
