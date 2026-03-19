@@ -112,8 +112,6 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
     @Autowired
     protected DistributedVersionGenerator versionGenerator;
-    @Autowired
-    private DistributedVersionGenerator distributedVersionGenerator;
 
 
     @Override
@@ -174,7 +172,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                 }
 
                 // 3.1补充版本重复校验
-                if (!checkVersionExist(factoryCode, year, month, version)) {
+                if (checkVersionExist(factoryCode, year, month, version)) {
                     String message = StringUtils.format(
                             I18nUtil.getMessage("raw.material.require.plan.version.exist"),
                             year, String.format("%02d", month), version
