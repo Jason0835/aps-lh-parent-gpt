@@ -29,24 +29,37 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 
 /**
-* Copyright (c) 2022, All rights reserved。
-* 文件名称：SalesOrderPoolController.java
-* 描    述：销售订单池 控制层类：....
-*@author zlt
-*@date 2025-12-04
-*@version 1.0
-*
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：SalesOrderPoolController.java
+ * 描    述：销售订单池 控制层类：....
+ *@author zlt
+ *@date 2025-12-04
+ *@version 1.0
+ *
  *  修改记录：
-*     修改时间：...
-*     修 改 人：zlt
-*     修改内容：...
-*/
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
+ */
 @Slf4j
 @Api(tags = "销售订单池")
 @RestController
@@ -59,10 +72,10 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @Autowired
     private SalesOrderPoolEntityMapper entityMapper;
 
-	@Autowired
-	private DpAreaEntityMapper dpAreaEntityMapper;
-	@Autowired
-	private DpNationEntityMapper dpNationEntityMapper;
+    @Autowired
+    private DpAreaEntityMapper dpAreaEntityMapper;
+    @Autowired
+    private DpNationEntityMapper dpNationEntityMapper;
 
     /**
      * 查询销售订单池列表
@@ -72,8 +85,8 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody SalesOrderPool queryVO) {
-    	TableDataInfo tableResult = super.list(queryVO);
-		this.translationList((List<SalesOrderPool>)tableResult.getRows());
+        TableDataInfo tableResult = super.list(queryVO);
+        this.translationList((List<SalesOrderPool>)tableResult.getRows());
         return tableResult;
     }
 
@@ -105,10 +118,10 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         return salesOrderPoolService.editBySalCodePo(billVO);
     }
 
-	/**
-	 * 锁定订单池
-	 * @return
-	 */
+    /**
+     * 锁定订单池
+     * @return
+     */
     @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @RequiresPermissions( "monthplan:SalesOrderPool:lock")
     @ApiOperation("锁定订单池")
@@ -117,10 +130,10 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
         return salesOrderPoolService.lockSalesOrderPool(billVO);
     }
 
-	/**
-	 * 解锁订单池
-	 * @return 结果
-	 */
+    /**
+     * 解锁订单池
+     * @return 结果
+     */
     @Log(title = "ui.data.column.SalesOrderPool.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @RequiresPermissions("monthplan:SalesOrderPool:unlock")
     @ApiOperation("解锁订单池")
@@ -174,12 +187,13 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
      */
     @RequiresPermissions( "monthplan:SalesOrderPool:export")
     @Log(title = "销售订单池", businessType = BusinessType.EXPORT)
-    @ApiOperation("导入数据")
+    @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
     public byte[] exportData(@RequestBody SalesOrderPool queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        // 调用service层的导出方法
+        return salesOrderPoolService.exportSalesOrderPool(queryVO);
     }
 
     @Override
@@ -206,10 +220,10 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @ApiOperation("抓取SCM数据")
     @PostMapping("/getSCMData")
     @DistributedLock(key = "'redissonLock:salesOrderPool:getSCMData:' + #salesOrderPool.factoryCode + #salesOrderPool.year + #salesOrderPool.month",
-        failMsg = "ui.data.alert.SalesOrderPool.getSCMData.lock",
-        args = {"#salesOrderPool.factoryCode", "#salesOrderPool.year", "#salesOrderPool.month"},
-        waitTime = 1,
-        leaseTime = 300
+            failMsg = "ui.data.alert.SalesOrderPool.getSCMData.lock",
+            args = {"#salesOrderPool.factoryCode", "#salesOrderPool.year", "#salesOrderPool.month"},
+            waitTime = 1,
+            leaseTime = 300
     )
     public AjaxResult getSCMData(@RequestBody SalesOrderPool salesOrderPool){
         return salesOrderPoolService.getSCMData(salesOrderPool);
@@ -276,26 +290,26 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
      * 翻译列表
      * @param resultList
      */
-	private List<SalesOrderPool> translationList(List<SalesOrderPool> resultList) {
-		// 加载区域
-		List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
-		JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
-		Map<String, String> areaMap = dpAreaList.stream()
-				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
-		// 加载国家地区
-		List<DpNation> dpNationList = dpNationEntityMapper.selectList(new LambdaQueryWrapper<>());
-		JsonI18nConvertUtils.conventJsonI18n(dpNationList, DpNation.class);
-		Map<String, String> nationMap = dpNationList.stream()
-				.collect(Collectors.toMap(DpNation::getNationCode, DpNation::getNationNameI18n));
-		for (SalesOrderPool item: resultList) {
-			String salNCode = item.getSalNCode();
-			String natCode = item.getNatCode();
-			String area = item.getArea();
-			item.setSalNCode(nationMap.getOrDefault(salNCode, ""));
-			item.setNatCode(nationMap.getOrDefault(natCode, ""));
-			item.setArea(areaMap.getOrDefault(area, ""));
-			item.setUpdateTimeExport(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
-		}
-		return resultList;
-	}
+    private List<SalesOrderPool> translationList(List<SalesOrderPool> resultList) {
+        // 加载区域
+        List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
+        JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
+        Map<String, String> areaMap = dpAreaList.stream()
+                .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
+        // 加载国家地区
+        List<DpNation> dpNationList = dpNationEntityMapper.selectList(new LambdaQueryWrapper<>());
+        JsonI18nConvertUtils.conventJsonI18n(dpNationList, DpNation.class);
+        Map<String, String> nationMap = dpNationList.stream()
+                .collect(Collectors.toMap(DpNation::getNationCode, DpNation::getNationNameI18n));
+        for (SalesOrderPool item: resultList) {
+            String salNCode = item.getSalNCode();
+            String natCode = item.getNatCode();
+            String area = item.getArea();
+            item.setSalNCode(nationMap.getOrDefault(salNCode, ""));
+            item.setNatCode(nationMap.getOrDefault(natCode, ""));
+            item.setArea(areaMap.getOrDefault(area, ""));
+            item.setUpdateTimeExport(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
+        }
+        return resultList;
+    }
 }
