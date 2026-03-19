@@ -208,7 +208,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             "plannedSurplus", "netQty", "postponeNetQty", "unPostponeNetQty",
             "heightQty", "midQty", "postponeQty", "cycleReserveQty",
             "conventionReserveQty", "isReachMinProductionQty", "minProductionQty",
-            "isProduction", "updateDate"
+            "isProduction", "updateTime"
         );
         for (String field : headerFields) {
             header.put(field, I18nUtil.getMessage("ui.data.column.demandPlanSum." + field));
