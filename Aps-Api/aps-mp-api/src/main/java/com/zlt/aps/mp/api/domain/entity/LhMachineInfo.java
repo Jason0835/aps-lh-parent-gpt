@@ -121,7 +121,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "MOLD_RELATION_LIST")
     private String moldRelationList;
 
-    @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
+    @ImportExcelValidated(digits = true, min = 0, max = 9999)
     @Excel(name = "ui.data.column.info.machineOrder", cellType = Excel.ColumnType.NUMERIC, sort = 110)
     @ApiModelProperty(value = "机台顺序", name = "machineOrder")
     @TableField(value = "MACHINE_ORDER", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.INTEGER)
