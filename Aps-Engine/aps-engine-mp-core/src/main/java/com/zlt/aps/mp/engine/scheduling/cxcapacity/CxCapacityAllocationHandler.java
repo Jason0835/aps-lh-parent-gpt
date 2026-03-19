@@ -317,7 +317,7 @@ public class CxCapacityAllocationHandler {
         //挑选机台
         List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
         if (CollectionUtils.isEmpty(enableCxMachineList)) {
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(context, structureName);
             return null;
         }
         //20260120 挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
@@ -339,12 +339,53 @@ public class CxCapacityAllocationHandler {
         }
         if (selectedCapacityList.size() == BigDecimal.ONE.intValue()) {
             CxMachineBaseInfoVo minProductionSelected = selectedCapacityList.get(BigDecimal.ZERO.intValue());
-            log.info(TbrProductionGroupLogRecorder.addSelectedFinalByMaxCapacityMachineLog(context, structureName, isZeroRack, minProductionSelected.getCxMachineCode(), minProductionSelected.getCxMachineTypeCode()));
+            TbrProductionGroupLogRecorder.addSelectedFinalByMaxCapacityMachineLog(context, structureName, isZeroRack, minProductionSelected.getCxMachineCode(), minProductionSelected.getCxMachineTypeCode());
             return minProductionSelected;
         }
         return selectOneCxMachine(context, selectedCapacityList, addNewGroupPlan);
     }
 
+    /**
+     * 从canSelectedList机台中获取机台
+     *
+     * @param productionContext   排产上下文
+     * @param canSelectedList     可选机台
+     * @param productionGroupInfo 排产分组计划
+     * @return
+     */
+    public CxMachineBaseInfoVo selectedCxMachineForGroupPlanByAppoint(TbrProductionContext productionContext, List<CxMachineBaseInfoVo> canSelectedList, ProductionPlanGroupInfo productionGroupInfo) {
+        if (CollectionUtils.isEmpty(canSelectedList) || null == productionGroupInfo) {
+            return null;
+        }
+        String structureName = productionGroupInfo.getGroupName();
+        String isZeroRack = productionGroupInfo.getIsZero();
+        //挑选排产日有交集的，结合成型工装数量-成型鼓，日产能上限
+        List<CxMachineBaseInfoVo> hasProductionDayList = canSelectedList.stream().filter(singleMachine -> selectEnableMachineAndSetInfo(productionContext, productionGroupInfo, singleMachine)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionDayList)) {
+            return null;
+        }
+        Integer needDays = productionGroupInfo.getLeftOverNeedAllocationDays();
+        canSelectedList.forEach(single -> single.setLeftOverDays(productionContext));
+        List<CxMachineBaseInfoVo> preSelectedList;
+        List<CxMachineBaseInfoVo> passCapacityList = canSelectedList.stream().filter(single -> single.getLastCanProductionDays() >= needDays).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(passCapacityList)) {
+            Integer minDays = passCapacityList.stream().mapToInt(CxMachineBaseInfoVo::getLastCanProductionDays).min().getAsInt();
+            preSelectedList = passCapacityList.stream().filter(single -> minDays.equals(single.getLastCanProductionDays())).collect(Collectors.toList());
+        } else {
+            Integer maxDays = canSelectedList.stream().mapToInt(CxMachineBaseInfoVo::getLastCanProductionDays).max().getAsInt();
+            preSelectedList = canSelectedList.stream().filter(single -> maxDays.equals(single.getLastCanProductionDays())).collect(Collectors.toList());
+        }
+        if (CollectionUtils.isEmpty(preSelectedList)) {
+            TbrProductionGroupLogRecorder.addGroupNoSelectedCxMachineLog(productionContext, structureName);
+            return null;
+        }
+        if (preSelectedList.size() == BigDecimal.ONE.intValue()) {
+            CxMachineBaseInfoVo minProductionSelected = preSelectedList.get(BigDecimal.ZERO.intValue());
+            TbrProductionGroupLogRecorder.addSelectedFinalByMaxCapacityMachineLog(productionContext, structureName, isZeroRack, minProductionSelected.getCxMachineCode(), minProductionSelected.getCxMachineTypeCode());
+            return preSelectedList.get(BigDecimal.ZERO.intValue());
+        }
+        return selectOneCxMachine(productionContext, preSelectedList, productionGroupInfo);
+    }
 
     /**
      * 获取符合条件的成型机台，且设置对应的信息
@@ -395,6 +436,7 @@ public class CxCapacityAllocationHandler {
         singleMachine.setCapacityDiffValue(diffValue);
         return true;
     }
+
     /**
      * 获取产能可覆盖，机台可匹配的分组计划
      * 通过机台反向匹配计划
@@ -644,11 +686,11 @@ public class CxCapacityAllocationHandler {
             return selected;
         }
         //同规格优先 -> 同英寸优先 -> 断面宽优先 -> 历史最近优先 -> n个月生产最多优先 -> 非零度优先 -> 机台编号
-        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getLastBoardingDate, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.reverseOrder())
+        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(CxMachineBaseInfoVo::getIsZeroRack)
                 .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
         sectionWidthList.sort(sortComparator);

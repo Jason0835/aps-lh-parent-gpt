@@ -8,15 +8,12 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
-import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo;
-import com.zlt.aps.mp.api.domain.vo.MonthFinishRateVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -127,21 +124,21 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
         // 1.3、加载结构排产数据
-        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<MpStructureAllocation>();
-        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion,
-                factoryMonthPlanMouldDayResult.getProductionVersion());
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode,
-                factoryMonthPlanMouldDayResult.getFactoryCode());
+        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
+        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, factoryMonthPlanMouldDayResult.getProductionVersion());
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
         Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
-
+        
         // 2、构建导出总表
         List<FactoryMonthPlanMouldDayResultExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
         List<FactoryMonthPlanMouldDayResultExportVo> subtotalList = new ArrayList<>(); // 小计列表
         // 2.1、按结构遍历每一组排产明细记录，并构建该结构的明细数据 + 胎胚总类汇总 + 小计数据
         String structureName = null; // 当前结构名称
         List<FactoryMonthPlanMouldDayResultExportVo> structureList = new ArrayList<>(); // 同结构排产记录列表
+        Map<Integer, Integer> changeMouldMap = new HashMap<>();
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
             // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
@@ -181,6 +178,10 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                         MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr, MpDayProductionStatisticsDetailVo.class);
                         embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getEmbryoCount());
                         lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getLhMachines());
+                        Integer changeMould = Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0);
+                        if (changeMould > 0) {
+                            changeMouldMap.put(day, changeMouldMap.getOrDefault(day, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
+                        }
                     }
                 }
             }
@@ -201,7 +202,17 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         FactoryMonthPlanMouldDayResultExportVo totalRecord = this.buildSubtotalRecord("", subtotalList, null,
                 MonthPlanExportDataTypeEnum.TOTAL); // 将小计列表汇总为总计
         totalRecordList.add(totalRecord); // 添加至总表
-
+        
+        // 4、构建换模次数列
+        FactoryMonthPlanMouldDayResultExportVo changeMouldStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
+        changeMouldStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode());
+        changeMouldStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getName()));
+        for (Entry<Integer, Integer> entry: changeMouldMap.entrySet()) {
+            Integer day = entry.getKey();
+            Integer mould = entry.getValue();
+            changeMouldStatisticsRecord.setFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, day), mould);
+        }
+        totalRecordList.add(changeMouldStatisticsRecord);
         return totalRecordList;
     }
 
@@ -248,6 +259,121 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 列表数据
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         List<CellStyle> cellStyleList = new ArrayList<>();
+        //需要增加的第二部分
+        if (PubUtil.isNotEmpty(list)) {
+            
+            
+            List<Map<String, Object>> listData = new ArrayList<>();
+            list.stream()
+            .filter(r -> MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode().equals(r.getDataType())
+                    || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(r.getDataType()))
+            .forEach(exportVo -> {
+                Map<String, Object> listDataMap = new HashMap<>(16);
+                listDataMap.put("planTypeA", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
+                listDataMap.put("materialCodeA", exportVo.getMaterialCode());
+                listDataMap.put("mesMaterialCodeA", exportVo.getMesMaterialCode());
+                listDataMap.put("materialDescA", exportVo.getMaterialDesc());
+                listDataMap.put("structureNameA", exportVo.getStructureName());
+                listDataMap.put("productStatusA", productStatusMap.getOrDefault(exportVo.getProductStatus(), exportVo.getProductStatus()));
+                listDataMap.put("embryoCodeA", exportVo.getEmbryoCode());
+                listDataMap.put("structureTypeA", structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
+                listDataMap.put("mainMaterialDescA", exportVo.getMainMaterialDesc());
+                listDataMap.put("constructionStageA", constructionStageMap.getOrDefault(exportVo.getConstructionStage(), exportVo.getConstructionStage()));
+                listDataMap.put("brandA", brandMap.getOrDefault(exportVo.getBrand(), exportVo.getBrand()));
+                listDataMap.put("specificationsA", exportVo.getSpecifications());
+                listDataMap.put("mainPatternA", exportVo.getMainPattern());
+                listDataMap.put("patternA", exportVo.getPattern());
+                listDataMap.put("proSizeA", exportVo.getProSize());
+                listDataMap.put("productCategoryA", productCategoryMap.getOrDefault(exportVo.getProductCategory(), exportVo.getProductCategory()));
+                listDataMap.put("mouldCavityQtyA", exportVo.getMouldCavityQty());
+                listDataMap.put("typeBlockQtyA", exportVo.getTypeBlockQty());
+                listDataMap.put("averageSaleQtyA", exportVo.getAverageSaleQty());
+                listDataMap.put("inventorySalesRatioA", exportVo.getInventorySalesRatio());
+                listDataMap.put("dayVulcanizationQtyA", exportVo.getDayVulcanizationQty());
+                listDataMap.put("prodReqPlanA", exportVo.getProdReqPlan());
+                listDataMap.put("heightQtyA", exportVo.getHeightQty());
+                listDataMap.put("midQtyA", exportVo.getMidQty());
+                listDataMap.put("cycleReserveQtyA", exportVo.getCycleReserveQty());
+                listDataMap.put("totalQtyA", exportVo.getTotalQty());
+                listDataMap.put("heightProductionQtyA", exportVo.getHeightProductionQty());
+                listDataMap.put("midProductionQtyA", exportVo.getMidProductionQty());
+                listDataMap.put("cycleProductionQtyA", exportVo.getCycleProductionQty());
+                listDataMap.put("conventionProductionQtyA", exportVo.getConventionProductionQty());
+                listDataMap.put("postponeProductionQtyA", exportVo.getPostponeProductionQty());
+                listDataMap.put("differenceQtyA", exportVo.getDifferenceQty());
+                listDataMap.put("beginDayA", exportVo.getBeginDay());
+                listDataMap.put("endDayA", exportVo.getEndDay());
+                listDataMap.put("day1A", exportVo.getDay1());
+                listDataMap.put("day2A", exportVo.getDay2());
+                listDataMap.put("day3A", exportVo.getDay3());
+                listDataMap.put("day4A", exportVo.getDay4());
+                listDataMap.put("day5A", exportVo.getDay5());
+                listDataMap.put("day6A", exportVo.getDay6());
+                listDataMap.put("day7A", exportVo.getDay7());
+                listDataMap.put("day8A", exportVo.getDay8());
+                listDataMap.put("day9A", exportVo.getDay9());
+                listDataMap.put("day10A", exportVo.getDay10());
+                listDataMap.put("day11A", exportVo.getDay11());
+                listDataMap.put("day12A", exportVo.getDay12());
+                listDataMap.put("day13A", exportVo.getDay13());
+                listDataMap.put("day14A", exportVo.getDay14());
+                listDataMap.put("day15A", exportVo.getDay15());
+                listDataMap.put("day16A", exportVo.getDay16());
+                listDataMap.put("day17A", exportVo.getDay17());
+                listDataMap.put("day18A", exportVo.getDay18());
+                listDataMap.put("day19A", exportVo.getDay19());
+                listDataMap.put("day20A", exportVo.getDay20());
+                listDataMap.put("day21A", exportVo.getDay21());
+                listDataMap.put("day22A", exportVo.getDay22());
+                listDataMap.put("day23A", exportVo.getDay23());
+                listDataMap.put("day24A", exportVo.getDay24());
+                listDataMap.put("day25A", exportVo.getDay25());
+                listDataMap.put("day26A", exportVo.getDay26());
+                listDataMap.put("day27A", exportVo.getDay27());
+                listDataMap.put("day28A", exportVo.getDay28());
+                listDataMap.put("day29A", exportVo.getDay29());
+                listDataMap.put("day30A", exportVo.getDay30());
+                listDataMap.put("day31A", exportVo.getDay31());
+
+                // 计算day1到day31的数量合计
+                Integer totolAll = 0;
+                totolAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
+                totolAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
+                totolAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
+                totolAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
+                totolAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
+                totolAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
+                totolAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
+                totolAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
+                totolAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
+                totolAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
+                totolAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
+                totolAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
+                totolAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
+                totolAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
+                totolAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
+                totolAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
+                totolAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
+                totolAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
+                totolAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
+                totolAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
+                totolAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
+                totolAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
+                totolAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
+                totolAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
+                totolAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
+                totolAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
+                totolAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
+                totolAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
+                totolAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
+                totolAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
+                totolAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
+                listData.add(listDataMap);
+            });
+            // 将处理好的数据添加到excelDataList
+            excelDataList.add(listData);
+        }
+
         // 查询数据
         if (PubUtil.isNotEmpty(list)) {
             FactoryMonthPlanMouldDayResultExportVo firstItem = list.get(0);
@@ -258,7 +384,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
             tableMap.put("productionVersion", firstItem.getProductionVersion());
             List<Map<String, Object>> listData = new ArrayList<>();
-            int beginIndex = 2;
+            int beginIndex =4;
 
             for (int i = 0; i < list.size(); i++) {
                 Map<String, Object> listDataMap = new HashMap<>(16);
@@ -386,6 +512,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
         }
+
+
+
         // 将单元格样式放入context
         if(PubUtil.isNotEmpty(cellStyleList)){
             tableMap.put("CELL_STYLE", cellStyleList);

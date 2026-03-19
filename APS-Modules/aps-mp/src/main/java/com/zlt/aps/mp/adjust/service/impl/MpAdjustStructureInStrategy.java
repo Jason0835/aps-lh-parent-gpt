@@ -76,6 +76,20 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 //        Assert.isFalse(PubUtil.isNotEmpty(errorMsgList), () -> {
 //            return new BusinessException(errorMsg);
 //        });
+
+        // 检查有错误的信息
+        Map<String, List<String>> messageMap = contextDTO.getMessageMap();
+        List<String> errorMsgList = messageMap.get(ApsConstant.APS_STRING_1);
+        if (PubUtil.isNotEmpty(errorMsgList)) {
+            String errorMsg = Optional.ofNullable(errorMsgList)
+                    .orElse(Collections.emptyList())
+                    .stream()
+                    .distinct()
+                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+            Assert.isFalse(StringUtils.isNotEmpty(errorMsg), () -> {
+                return new BusinessException(errorMsg);
+            });
+        }
         // 5、通过结构过滤调整明细
         filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
@@ -189,7 +203,11 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 f.get();
             } catch (Exception e) {
                 log.error("线程执行异常", e);
-                throw new BusinessException(e.getMessage());
+                // 获取原始异常
+                Throwable cause = e.getCause();
+                String errorMsg = cause != null ? cause.getMessage() : e.getMessage();
+                // 只抛出消息，不带类名
+                throw new BusinessException(errorMsg);
             }
         });
         contextDTO.setSaveMpProdFinalList(newMpFinalList);

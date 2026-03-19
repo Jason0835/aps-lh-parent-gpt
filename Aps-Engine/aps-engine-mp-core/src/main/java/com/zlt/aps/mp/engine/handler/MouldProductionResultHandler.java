@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
@@ -222,6 +223,8 @@ public class MouldProductionResultHandler {
         MonthPlanProductionRequirePlanVo requirePlan = requireList.get(BigDecimal.ZERO.intValue());
         BeanUtils.copyProperties(requirePlan, dayResult);
         dayResult.setId(null);
+        // pancd+ 2026-03-17 库销比复制
+        dayResult.setInventorySalesRatio(BigDecimalUtil.getValue(requirePlan.getInventorySalesRatio()));
         dayResult.setIsImport(YesOrNoEnum.NO.getCode());
         BigDecimal curingTime = Optional.ofNullable(requirePlan.getCuringTime()).orElse(BigDecimal.ZERO);
         dayResult.setCuringTime(curingTime.intValue());

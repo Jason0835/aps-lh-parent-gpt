@@ -173,6 +173,15 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                     return AjaxResult.error(message);
                 }
 
+                // 3.1补充版本重复校验
+                if (!checkVersionExist(factoryCode, year, month, version)) {
+                    String message = StringUtils.format(
+                            I18nUtil.getMessage("raw.material.require.plan.version.exist"),
+                            year, String.format("%02d", month), version
+                    );
+                    return AjaxResult.error(message);
+                }
+
                 // 4. 检查订单预测生产计划
                 AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
                 if (isSuccess(predictionCheck)) {
@@ -339,6 +348,35 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     }
 
     /**
+     * 获取原材料需求计划版本列表
+     *
+     * @param queryVO
+     * @return
+     */
+    @Override
+    public AjaxResult getVersionList(RawMaterialRequirePlan queryVO) {
+        QueryWrapper<RawMaterialRequirePlan> queryWrapper = new QueryWrapper<>();
+        // 假设 queryVO 中包含 factoryCode, year, month 等查询条件，这里需要根据实际业务补充
+        if (queryVO.getFactoryCode() != null) {
+            queryWrapper.eq("FACTORY_CODE", queryVO.getFactoryCode());
+        }
+        if (queryVO.getYear() != null) {
+            queryWrapper.eq("YEAR", queryVO.getYear());
+        }
+        if (queryVO.getMonth() != null) {
+            queryWrapper.eq("MONTH", queryVO.getMonth());
+        }
+
+        queryWrapper.select("version", "MAX(CREATE_TIME) as createTime")
+                .groupBy("version")
+                .orderByDesc("create_time");
+        
+        List<Map<String, Object>> versionList = rawMaterialRequirePlanMapper.selectMaps(queryWrapper);
+        
+        return AjaxResult.success(versionList);
+    }
+
+    /**
      * 检查AjaxResult是否成功
      */
     private boolean isSuccess(AjaxResult result) {
@@ -361,6 +399,20 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
         Long count = mpFactoryProductionVersionMapper.selectCount(queryWrapper);
         return count > 0;
     }
+
+    /**
+     * 检查版本是否存在重复
+     */
+    private boolean checkVersionExist(String factoryCode, Integer year, Integer month, String version) {
+        QueryWrapper<RawMaterialRequirePlan> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode)
+                .eq("YEAR", year)
+                .eq("MONTH", month)
+                .eq("VERSION", version);
+        Long count = rawMaterialRequirePlanMapper.selectCount(queryWrapper);
+        return count > 0;
+    }
+
 
     /**
      * 检查订单预测生产计划

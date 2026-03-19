@@ -7,6 +7,7 @@ import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.common.utils.PubUtil;
@@ -29,24 +30,20 @@ public abstract class AbstractDailyCapacityLimit {
 
     /**
      * 初始化日产能
-     * @param startDay 开始日
-     * @param mpProdFinalList 月计划定稿列表
-     * @param mpStructAllocList 月计划结构转产列表
+     * @param contextDTO 周程滚动上下文
      */
-    public Map<Integer, MpDailyCapacityLimitVo> getDailyCapacityLimitMap(int startDay, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                        List<MpStructureAllocation> mpStructAllocList){
+    public Map<Integer, MpDailyCapacityLimitVo> getDailyCapacityLimitMap(MpRollAdjustContextDTO contextDTO){
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
-        for (int i = startDay; i<= FactoryConstant.MONTH_MAX_DAY; i++){
+        Integer decLhMachines = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        for (int i = contextDTO.getStructureStartDay(); i<= FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
                 dailyCapacityLimitVo = new MpDailyCapacityLimitVo();
             }
             dailyCapacityLimitVo.setDailyDate(i);
             // 1、设置每日硫化机台总限制数、每日胎胚种类总限制数
-            setMaxLhMachinesWithEmbryoTypes(mpStructAllocList,i,dailyCapacityLimitVo);
-            // 2、计算每日硫化机台数、每日胎胚种类数
-            //calcLhMachinesWithEmbryoTypes(mpProdFinalList,i,dailyCapacityLimitVo,null);
+            setMaxLhMachinesWithEmbryoTypes(contextDTO.getOneStructureAllocationList(),i,dailyCapacityLimitVo,decLhMachines);
             dailyCapacityLimitVoMap.put(i,dailyCapacityLimitVo);
         }
         return dailyCapacityLimitVoMap;
@@ -59,7 +56,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @param dailyCapacityLimitVo 日产能限制Vo
      */
     public void setMaxLhMachinesWithEmbryoTypes(List<MpStructureAllocation> mpStructAllocList, int iDay,
-                                                 MpDailyCapacityLimitVo dailyCapacityLimitVo) {
+                                                 MpDailyCapacityLimitVo dailyCapacityLimitVo,int decLhMachines) {
         if(PubUtil.isEmpty(mpStructAllocList)){
             return;
         }
@@ -70,6 +67,10 @@ public abstract class AbstractDailyCapacityLimit {
             if (iDay >= strutAllocVo.getBeginDay() && iDay <= strutAllocVo.getEndDay()){
                 iMaxLhMachines += Convert.toInt(strutAllocVo.getMaxLhMachineCount(), 0);
                 iMaxEmbryoTypes += Convert.toInt(strutAllocVo.getMaxEmbryoCodeCount(), 0);
+            }
+            if (iDay == strutAllocVo.getBeginDay()){
+                //若当前日 = 结构转产开始日，减 硫化机台数 ,防止切换结构时，换模过多
+                iMaxLhMachines -= (decLhMachines > strutAllocVo.getMaxLhMachineCount() ? strutAllocVo.getMaxLhMachineCount() : decLhMachines);
             }
         }
         dailyCapacityLimitVo.setMaxLhMachines(iMaxLhMachines);
@@ -216,6 +217,8 @@ public abstract class AbstractDailyCapacityLimit {
         int openMachinesAddMould = 0;
         int blockMachinesAddMould = 0;
 
+        int iChangeMouldCount = 0;
+
         // 按日期+主花纹向下，统计日硫化机台数
         int mpFullMachinesDecMould = 0;
         int mpCloseMachinesDecMould = 0;
@@ -298,7 +301,8 @@ public abstract class AbstractDailyCapacityLimit {
                 int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day2Field);
                 openMachinesAddMould += addMouldArr[0];
                 blockMachinesAddMould += addMouldArr[1] + addMouldArr[2];
-
+                // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
+                iChangeMouldCount += addMouldArr[3];
                 // 计算主花纹向下的硫化机台数
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
                     mpFullMachinesAddMould += dayPlanQty / dailyLhQty;
@@ -313,7 +317,7 @@ public abstract class AbstractDailyCapacityLimit {
             }
 
             // 统计胎胚种类数
-            if (dayPlanQty > 0){
+            if (dayPlanQty >= 0){
                 embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
                 dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
             }
@@ -329,7 +333,8 @@ public abstract class AbstractDailyCapacityLimit {
         dailyCapacityLimitVo.setUsedLhMachines(iCount);
         // 已用胎胚种类数
         dailyCapacityLimitVo.setUsedEmbryoTypes(dailyCapacityLimitVo.getEmbryoCodes().size());
-
+        // 已用换模次数
+        dailyCapacityLimitVo.setUsedChangeMould(iChangeMouldCount);
         //==================计算主花纹向下的硫化机台数==========================
         // 计算机台组合（减模、增模、换活字块）
         int mpPatternNoAddDecMould = patternNoAddDecMouldMap.get(mainPattern) == null ? 0:patternNoAddDecMouldMap.get(mainPattern);
@@ -509,6 +514,7 @@ public abstract class AbstractDailyCapacityLimit {
      * [0]--新增模机台数
      * [1]--换活字块机台数20条
      * [2]--换活字块机台数X条(32)
+     * [3]--换模次数
      * @param mpFinalVo
      */
     public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day2Field) {
@@ -525,7 +531,7 @@ public abstract class AbstractDailyCapacityLimit {
         int changeMouldXBlockQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
         //余量
         int remainQty = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) % dailyLhQty;
-        int[] resultArr = {0,0,0};
+        int[] resultArr = {0,0,0,0};
         if (remainQty == 0){
             //没有余量，直接退回
             return resultArr;
@@ -533,11 +539,14 @@ public abstract class AbstractDailyCapacityLimit {
         if (remainQty == changeMouldFirstQty){
             //若余数 == 换模起排量，则视新增机台数
             resultArr[0] = 1;
+            resultArr[3] = 1;
         }else if (remainQty == changeMouldBlockQty){
             //若余数 == 换活字块20条
             resultArr[1] = 1;
+            resultArr[3] = 1;
         }else if (remainQty == changeMouldXBlockQty){
             resultArr[2] = 1;
+            resultArr[3] = 1;
         }else {
             resultArr[0] = 1;
         }
@@ -557,12 +566,14 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[0] = afterMachines;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
+                resultArr[3] = afterMachines;
                 //例子：
                 //16 46
                 if (remainQty != changeMouldBlockQty || remainQty != changeMouldXBlockQty){
                     int mouldCount = remainQty / changeMouldFirstQty;
                     if (mouldCount > afterMachines){
                         resultArr[0] = mouldCount;
+                        resultArr[3] = mouldCount;
                     }
                 }
             }
@@ -573,6 +584,7 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[0] = afterMachines - intPart;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
+                resultArr[3] = afterMachines - intPart;
             }
         }
        return resultArr;

@@ -221,6 +221,11 @@ public enum MonthPlanEnums {
      * SYS0209003 APS通用班制
      */
     APS_GENERAL_SHIFT("SYS0209003", "SKU双模日硫化量，倒算班产使用"),
+
+    /**
+     * SYS0209004 单位：台，成型机在结构切换时，首日应减少硫化机台数
+     */
+    CHANGE_STRUCT_DEC_LH_MACHINES("SYS0209004", "单位：台，成型机在结构切换时，首日应减少硫化机台数"),
     ;
 
     private final String code;
