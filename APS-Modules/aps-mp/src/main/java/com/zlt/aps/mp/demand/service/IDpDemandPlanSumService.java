@@ -38,4 +38,11 @@ public interface IDpDemandPlanSumService  extends IDocService<DpDemandPlanSum>{
    * @return
    */
   DpDemandPlanSum  getDpDemandPlanSumByParam(FactoryProductionPlanVo selectedRequireVersion);
+  /**
+   * 净需求核算导出
+   * @param queryVO
+   * @param list
+   * @return
+   */
+  byte[] exportDemandPlanSum(DpDemandPlanSum queryVO, List<DpDemandPlanSum> list);
 }
