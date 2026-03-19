@@ -148,6 +148,11 @@ export default {
           maxlength:10
         },
         {
+          prop: "partName",
+          label: this.$t("部件名称"),
+          maxlength: 100,
+        },
+        {
           prop: "remark",
           label: this.$t("common.remark"),
           maxlength:300

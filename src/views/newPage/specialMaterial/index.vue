@@ -174,6 +174,11 @@ export default {
           label: this.$t("common.unit"),
         },
         {
+          prop: "partName",
+          label: this.$t("部件名称"),
+        },
+
+        {
           prop: "remark",
           label: this.$t("common.remark"),
         },

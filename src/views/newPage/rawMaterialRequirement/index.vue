@@ -309,6 +309,7 @@ export default {
           type: "select",
           dictData: this.selectList,
           clearable: false,
+          filterable: true,
         },
         {
           prop: "materialType",
