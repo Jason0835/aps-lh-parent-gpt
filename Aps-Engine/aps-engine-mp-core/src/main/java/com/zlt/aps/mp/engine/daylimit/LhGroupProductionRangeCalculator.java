@@ -146,21 +146,13 @@ public class LhGroupProductionRangeCalculator {
      */
     private static MouldProductionDayLimitHelper handlerChangeMouldContinueControl(TbrProductionContext productionContext, Set<Integer> intersectionSet, Set<Integer> stopDaySet, String materialDesc, boolean isChangeMould, Integer continueDays) {
         //取得最早的一段连续时间
-        Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionContext, continueDays, intersectionSet, stopDaySet);
-        //7、20260313 换模能力
-        MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, continueDays, materialDesc, earliestContinuousSet, stopDaySet);
+        MouldProductionDayLimitHelper handlerMould = getHasChangeMouldRange(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould, continueDays);
         if (MouldProductionLimitTypeEnum.NO_LIMIT != handlerMould.getLimitType()) {
             return handlerMould;
         }
         intersectionSet = handlerMould.getProductionDaySet();
         //剔除停机日
-        Set<Integer> result = new HashSet<>();
-        intersectionSet.forEach(productionDay -> {
-            if (stopDaySet.contains(productionDay)) {
-                return;
-            }
-            result.add(productionDay);
-        });
+        Set<Integer> result = ContinuousProductionDayHandler.extractRetainDay(intersectionSet, stopDaySet);
         return new MouldProductionDayLimitHelper(result, MouldProductionLimitTypeEnum.NO_LIMIT);
     }
 
@@ -213,6 +205,36 @@ public class LhGroupProductionRangeCalculator {
             return Collections.emptySet();
         }
         return limitProductionDaySet.stream().filter(intersectionSet::contains).collect(Collectors.toSet());
+    }
+
+    /**
+     * 取得一段最早有效连续生产的排产范围，
+     *
+     * @param productionContext 排产上下文
+     * @param intersectionSet   可排产日期
+     * @param stopDaySet        停产日
+     * @param materialDesc      物料信息
+     * @param isChangeMould     是否换模
+     * @param continueDays      最低可连续生产天数
+     * @return
+     */
+    private static MouldProductionDayLimitHelper getHasChangeMouldRange(TbrProductionContext productionContext, Set<Integer> intersectionSet, Set<Integer> stopDaySet, String materialDesc, boolean isChangeMould, Integer continueDays) {
+        //取得最早的一段有效连续时间
+        Set<Integer> earliestContinuousSet = ContinuousProductionDayHandler.getEarliestContinuousRange(productionContext, continueDays, intersectionSet, stopDaySet);
+        if (CollectionUtils.isEmpty(earliestContinuousSet)) {
+            return new MouldProductionDayLimitHelper(earliestContinuousSet, MouldProductionLimitTypeEnum.CONTINUE_DAY_LIMIT);
+        }
+        //7、20260313 换模能力
+        MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, materialDesc, intersectionSet);
+        if (MouldProductionLimitTypeEnum.NO_LIMIT == handlerMould.getLimitType()) {
+            return handlerMould;
+        }
+        //剔除前面的，取得下一段连续生产
+        Set<Integer> newIntersectionSet = ContinuousProductionDayHandler.extractRetainDay(intersectionSet, earliestContinuousSet);
+        if (CollectionUtils.isEmpty(newIntersectionSet)) {
+            return new MouldProductionDayLimitHelper(earliestContinuousSet, MouldProductionLimitTypeEnum.CHANGE_MOULD_CONTINUE_DAY_DOUBLE_LIMIT);
+        }
+        return getHasChangeMouldRange(productionContext, newIntersectionSet, stopDaySet, materialDesc, isChangeMould, continueDays);
     }
 
     /**

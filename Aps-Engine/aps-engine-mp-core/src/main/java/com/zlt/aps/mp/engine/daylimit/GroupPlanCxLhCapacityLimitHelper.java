@@ -783,9 +783,32 @@ class SkuUsedLhMachineInfo {
         if (null == nextDayInfo) {
             return BigDecimal.ZERO.intValue() - allMachineCount;
         }
+        Integer nextAllMachineCount = nextDayInfo.getWholeMachineCount() + nextDayInfo.getLeftOverMachineCount();
+        if(allMachineCount.equals(nextAllMachineCount)){
+            return getSingleChange(nextDayInfo);
+        }
+        return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
+    }
+
+    /**
+     * 单台变化处理
+     *
+     * @param nextDayInfo
+     * @return
+     */
+    private Integer getSingleChange(SkuUsedLhMachineInfo nextDayInfo) {
         //如果整台数都为零，则表示可以释放一台
         if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
-            return  getWholeMachineCount() - nextDayInfo.getLeftOverMachineCount();
+            return getWholeMachineCount() - nextDayInfo.getLeftOverMachineCount();
+        }
+        if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getLeftOverMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
         }
         return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
     }
