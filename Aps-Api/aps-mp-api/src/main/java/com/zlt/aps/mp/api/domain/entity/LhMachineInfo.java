@@ -67,14 +67,14 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String centripetalMechanism;
 
     /** 生产寸口范围下限，单位：英寸 */
-    @ImportExcelValidated(required = true, digits = true, min = 0, max = 9999)
+    @ImportExcelValidated(required = true, number = true, min = 0, max = 9999)
     @Excel(name = "ui.data.column.info.dimensionMinimum", cellType = Excel.ColumnType.NUMERIC, sort = 60)
     @ApiModelProperty(value = "生产寸口范围下限，单位：英寸", name = "dimensionMinimum")
     @TableField(value = "DIMENSION_MINIMUM")
     private BigDecimal dimensionMinimum;
 
     /** 生产寸口范围上限，单位：英寸 */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 9999)
+    @ImportExcelValidated(required = true, number = true, min = 1, max = 9999)
     @Excel(name = "ui.data.column.info.dimensionMaximum", cellType = Excel.ColumnType.NUMERIC, sort = 70)
     @ApiModelProperty(value = "生产寸口范围上限，单位：英寸", name = "dimensionMaximum")
     @TableField(value = "DIMENSION_MAXIMUM")
