@@ -693,13 +693,20 @@ public class CxMachineBaseInfoVo implements Serializable {
      *
      * @return
      */
-    public CxLhProductionHelper getEarliestConclusionLhGroup() {
+    public CxLhProductionHelper getEarliestConclusionLhGroup(Set<Integer> excludeDays) {
         //获取成型硫化组
         if (CollectionUtils.isEmpty(cxLhRatioMap)) {
             return null;
         }
         List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
         List<CxLhProductionHelper> hasProductionList = cxLhGroupList.stream().filter(singleGroup -> !YesOrNoEnum.NO.getValue().equals(singleGroup.getIsProduction())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return null;
+        }
+        if (!CollectionUtils.isEmpty(excludeDays)) {
+            //20260113 剔除需要排除的收尾时间点
+            hasProductionList = hasProductionList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getProductionDay())).collect(Collectors.toList());
+        }
         if (CollectionUtils.isEmpty(hasProductionList)) {
             return null;
         }

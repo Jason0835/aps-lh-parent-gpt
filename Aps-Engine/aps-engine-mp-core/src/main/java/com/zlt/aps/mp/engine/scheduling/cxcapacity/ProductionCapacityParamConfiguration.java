@@ -143,5 +143,9 @@ public class ProductionCapacityParamConfiguration {
      * 周程滚动调整日
      */
     private String weekRollAdjustDate;
+    /**
+     * 切换结构首日需要扣减的硫化机台数
+     */
+    private Integer deductionLhMachineCount;
 
 }

@@ -10,6 +10,7 @@ import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -86,15 +87,15 @@ public class CxLhMouldProductionCalculator {
      * 此时为在机结构对在产机台进行新增Sku排产的场景
      * 以结构为维度，(多台成型机台-忽略机台)进行排产
      *
-     * @param context                 排产上下文
-     * @param lhProductionQtyHelper   排产基础信息
-     * @param startDay                排产开始日
-     * @param endDay                  排产结束日
-     * @param doubleMouldList         排产的双模模具
-     * @param skuProductionPlanList   sku的排产计划
-     * @param isContinueSkuProduction 是否续作Sku排产(包含同规格同花纹、共生胎同模具 = true， 否则为false)
+     * @param context               排产上下文
+     * @param lhProductionQtyHelper 排产基础信息
+     * @param startDay              排产开始日
+     * @param endDay                排产结束日
+     * @param doubleMouldList       排产的双模模具
+     * @param skuProductionPlanList sku的排产计划
+     * @param continueType          续作Sku排产类型(包含同规格同花纹、共生胎同模具，非续作SKU)
      */
-    public static void lhProductionByGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, boolean isContinueSkuProduction) {
+    public static void lhProductionByGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, ContinueTypeEnum continueType) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
         Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
@@ -106,7 +107,7 @@ public class CxLhMouldProductionCalculator {
         Set<Integer> replenishmentDay = context.getReplenishmentDay();
         Integer dayLhQty = productionPlan.getMaxDaySingleLhMachineQty();
         //非续作需要重新判断胎胚种类数及配比限制
-        if (!isContinueSkuProduction) {
+        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
             //得到真正上机日
             Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
             if (null == realStartDay) {
@@ -138,17 +139,17 @@ public class CxLhMouldProductionCalculator {
             DayProductionQtyHelper dayProductionInfo = calculateSingleLhGroupQty(context, lhProductionQtyHelper, day, firstDay, startDay, productionPlan);
             dayProductionInfo.updateDoubleProductionQty();
             Integer lossQty;
-            if (dayProductionInfo.isProductionNextDay()) {
-//                //隔天换模，更新当前排产完毕信息
-//                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
-//                //记录已排产量及损耗量
-//                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
-//                Integer beforeDay = day;
-//                day = context.getNextHasProductionDay(day, stopDay);
-//                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
-//                if (day > endDay) {
-//                    break;
-//                }
+            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType && dayProductionInfo.isProductionNextDay()) {
+                //隔天换模，更新当前排产完毕信息
+                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
+                //记录已排产量及损耗量
+                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
+                day = context.getNextHasProductionDay(day, stopDay);
+                if (day > endDay) {
+                    break;
+                }
+                //处理续作换活字块的换膜
+                handlerDayShareMouldChangeMould(productionContext, day, skuMaterialDesc, doubleMouldList);
                 lossQty = dayProductionInfo.getNextDayLossQty();
             } else {
                 lossQty = dayProductionInfo.getLossQty();
@@ -647,6 +648,24 @@ public class CxLhMouldProductionCalculator {
         changeMouldLimitHandler.deductionChangeMouldUsedQty(productionContext, beforeDay, materialDesc, mouldCode);
         //隔天+1
         changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, realChangeDay, materialDesc, mouldCodeSet);
+    }
+
+    /**
+     * 续作换活字块的处理
+     *
+     * @param productionContext 排产上下文
+     * @param changeMouldDay    换模日
+     * @param materialDesc      物料描述
+     * @param doubleMouldList   使用模具
+     */
+    private static void handlerDayShareMouldChangeMould(TbrProductionContext productionContext, Integer changeMouldDay, String materialDesc, List<ProductionMouldInfoVo> doubleMouldList) {
+        if (null == changeMouldDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(doubleMouldList)) {
+            return;
+        }
+        Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        //隔天+1
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, materialDesc, mouldCodeSet);
     }
 
     /**

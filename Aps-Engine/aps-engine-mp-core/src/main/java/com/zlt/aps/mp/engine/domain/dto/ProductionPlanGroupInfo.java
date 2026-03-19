@@ -718,14 +718,14 @@ public class ProductionPlanGroupInfo {
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
         //20260122 换模判断
-        if (!isChangeMould) {
-            return;
-        }
+//        if (!isChangeMould) {
+//            return;
+//        }
         //需要换模-换模次数处理
-        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer changeMouldDay = preSelected.getClosingDay();
-        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+//        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+//        Integer changeMouldDay = preSelected.getClosingDay();
+//        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+//        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
 
     /**

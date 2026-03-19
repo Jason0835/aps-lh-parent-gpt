@@ -45,6 +45,10 @@ public class MpStructureAllocationExportStatisticsVo {
      */
     private Integer structureChangeCount;
     /**
+     * 头部行
+     */
+    private List<MpStructureAllocationExportVo> headList;
+    /**
      * 主表明细记录（含小计、合计行等所有内容）
      */
     private List<MpStructureAllocationExportVo> recordList;
