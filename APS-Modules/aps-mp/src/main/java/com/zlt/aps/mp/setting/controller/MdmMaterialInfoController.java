@@ -445,6 +445,15 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         queryWrapper.apply(isCommonTypeNullData && ApsConstant.APS_STRING_1.equals(queryVO.getIsCommonTypeNullData()), " COMMON_TYPE IS NULL OR COMMON_TYPE = '' ");
         boolean isBrandNullData = PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isBrandNullData"));
         queryWrapper.apply(isBrandNullData && ApsConstant.APS_STRING_1.equals(queryVO.getIsBrandNullData()), " BRAND IS NULL OR BRAND = '' ");
+
+        // 新增多个物料查询 20260318
+        Object materialCodesObj = queryVO.getFieldValueByFieldName("materialCodes");
+        if (PubUtil.isNotEmpty(materialCodesObj)) {
+            String materialCodesStr = materialCodesObj.toString();
+            List<String> codeList = Arrays.asList(materialCodesStr.split(","));
+            List<String> trimmedList = codeList.stream().map(String::trim).collect(Collectors.toList());
+            queryWrapper.in("MATERIAL_CODE", trimmedList);
+        }
     }
 
     /**

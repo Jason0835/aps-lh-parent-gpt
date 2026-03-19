@@ -4,10 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.ProductionPlanType;
@@ -36,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.YearMonth;
@@ -79,6 +83,9 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
     private final IFactoryParamService iFactoryParamService;
 
     private final StockAllocationService stockAllocationService;
+
+    private final ISysDictDataCacheService sysDictDataCacheService;
+
 
 
     @Override
@@ -293,6 +300,163 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         }
         return result;
     }
+
+    @Override
+    public byte[] exportSupplyOrder(SupplyOrderPool queryVO, List<SupplyOrderPool> list) {
+        // 1. 加载模板流（使用try-with-resources确保关闭）
+        byte[] result;
+        try (InputStream inputStream = getClass().getClassLoader()
+            .getResourceAsStream("excelModel/supplyOrderExportTemplate.xlsx")) {
+            if (inputStream == null) {
+                throw new BusinessException("Excel模板文件不存在: excelModel/supplyOrderExportTemplate.xlsx");
+            }
+
+            // 2. 预加载所有字典映射（一次获取，多次使用）
+            Map<String, String> factoryMap = loadDictMap("biz_factory_name");
+            Map<String, String> productTypeMap = loadDictMap("biz_product_type");
+            Map<String, String> brandMap = loadDictMap("biz_brand_type");
+            Map<String, String> locationTypeMap = loadDictMap("biz_stor_type");
+            Map<String, String> productCategoryMap = loadDictMap("product_category");
+            Map<String, String> supplyOrderTypeMap = loadDictMap("supply_order_type");
+
+            // 3. 构建表头信息（使用预定义列顺序，便于维护）
+            Map<String, Object> tableMap = buildTableHeader(queryVO);
+
+            // 4. 遍历数据，同时计算合计并构建行数据
+            List<Map<String, Object>> rows = new ArrayList<>();
+            // 自定义累加器，避免多个long变量
+            SumAccumulator sums = new  SumAccumulator();
+            if (!CollectionUtils.isEmpty(list)) {
+                String factoryName = factoryMap.getOrDefault(queryVO.getFactoryCode(), "");
+                for (SupplyOrderPool item : list) {
+                    // 累加各项数值
+                    sums.add(item);
+                    // 构建行数据
+                    rows.add(buildRowData(item, factoryName, productTypeMap, brandMap,
+                        locationTypeMap, productCategoryMap,supplyOrderTypeMap));
+                }
+            }
+
+            // 5. 将合计值放入tableMap
+            sums.putToMap(tableMap);
+
+            // 6. 组装最终数据结构
+            List<List<Map<String, Object>>> excelDataList = Collections.singletonList(rows);
+
+            // 7. 写入Excel并返回字节数组
+            result = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+        } catch (Exception e) {
+            log.error("导出供应链订单异常", e);
+            throw new BusinessException("导出失败", e);
+        }
+        return result;
+    }
+
+    /**
+     * 加载字典并转换为Map<value, label>
+     */
+    private Map<String, String> loadDictMap(String dictType) {
+        List<SysDictData> dictList = sysDictDataCacheService.getType(dictType);
+        if (org.springframework.util.CollectionUtils.isEmpty(dictList)) {
+            return Collections.emptyMap();
+        }
+        return dictList.stream()
+            .collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+    }
+
+    /**
+     * 构建表头信息
+     */
+    private Map<String, Object> buildTableHeader(SupplyOrderPool queryVO) {
+        // 保持顺序
+        Map<String, Object> header = new LinkedHashMap<>();
+        String titleFormat = I18nUtil.getMessage("ui.data.column.supplyOrderPool.exportTitle");
+        header.put("title", String.format(titleFormat, queryVO.getYear(), queryVO.getMonth()));
+        // 表头字段定义（保持与Excel模板的变量名一致）
+        List<String> headerFields = Arrays.asList(
+            "factoryCode", "productTypeCode", "locationType", "brand",
+            "materialCode", "materialDesc", "productCategory", "saleArea",
+            "qty", "threeAverageQty", "sixAverageQty", "deliveryFrequency",
+            "structureFrequency", "threeOverdueStockQty", "sixOverdueStockQty",
+            "nightOverdueStockQty", "twelveOverdueStockQty", "stockLimit", "orderType",
+            "updateDate"
+        );
+        for (String field : headerFields) {
+            header.put(field, I18nUtil.getMessage("ui.data.column.supplyOrderPool." + field));
+        }
+        return header;
+    }
+
+    /**
+     * 构建单行数据
+     */
+    private Map<String, Object> buildRowData(SupplyOrderPool item,
+                                             String factoryName,
+                                             Map<String, String> productTypeMap,
+                                             Map<String, String> brandMap,
+                                             Map<String, String> locationTypeMap,
+                                             Map<String, String> productCategoryMap,
+                                             Map<String, String> supplyOrderTypeMap) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("factoryName", factoryName);
+        row.put("productTypeName", productTypeMap.getOrDefault(item.getProductTypeCode(), ""));
+        row.put("brand", brandMap.getOrDefault(item.getBrand(), ""));
+        row.put("locationType", locationTypeMap.getOrDefault(item.getLocationType(), ""));
+        row.put("materialCode", nullToEmpty(item.getMaterialCode()));
+        row.put("materialDesc", nullToEmpty(item.getMaterialDesc()));
+        row.put("productCategory", productCategoryMap.getOrDefault(item.getProductCategory(), ""));
+        row.put("saleArea", item.getSaleAreaName());
+        row.put("qty",item.getQty());
+        row.put("threeAverageQty",item.getThreeAverageQty());
+        row.put("deliveryFrequency", item.getDeliveryFrequency());
+        row.put("structureFrequency", item.getStructureFrequency());
+        row.put("threeOverdueStockQty", item.getThreeOverdueStockQty());
+        row.put("sixOverdueStockQty", item.getSixOverdueStockQty());
+        row.put("nightOverdueStockQty", item.getNightOverdueStockQty());
+        row.put("twelveOverdueStockQty", item.getTwelveOverdueStockQty());
+        row.put("stockLimit", item.getStockLimit());
+        row.put("orderType",supplyOrderTypeMap.getOrDefault(item.getOrderType(), ""));
+        row.put("updateDate", item.getUpdateDate());
+        return row;
+    }
+
+    /**
+     * 空字符串处理
+     */
+    private String nullToEmpty(Object obj) {
+        return obj == null ? "" : obj.toString();
+    }
+
+    /**
+     * 内部累加器，避免多个零散long变量
+     */
+    private static class SumAccumulator {
+        private long qty, threeAverageQty, sixAverageQty, threeOverdueStockQty, sixOverdueStockQty;
+        private long nightOverdueStockQty, twelveOverdueStockQty, stockLimit;
+
+        public void add(SupplyOrderPool item) {
+            qty += item.getQty();
+            threeAverageQty += item.getThreeAverageQty();
+            sixAverageQty += item.getSixAverageQty();
+            threeOverdueStockQty += item.getThreeOverdueStockQty();
+            sixOverdueStockQty += item.getSixOverdueStockQty();
+            nightOverdueStockQty += item.getNightOverdueStockQty();
+            twelveOverdueStockQty += item.getTwelveOverdueStockQty();
+            stockLimit += item.getStockLimit();
+        }
+
+        public void putToMap(Map<String, Object> map) {
+            map.put("sumQty", qty);
+            map.put("sumThreeAverageQty", threeAverageQty);
+            map.put("sumSixAverageQty", sixAverageQty);
+            map.put("sumThreeOverdueStockQty", threeOverdueStockQty);
+            map.put("sumSixOverdueStockQty", sixOverdueStockQty);
+            map.put("sumNightOverdueStockQty", nightOverdueStockQty);
+            map.put("sumTwelveOverdueStockQty", twelveOverdueStockQty);
+            map.put("sumStockLimit", stockLimit);
+        }
+    }
+
 
     /**
      * 获取配置信息

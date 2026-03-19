@@ -46,6 +46,11 @@ public enum MsgTemplateEnums {
      * 工作日历提醒通知
      */
     WORK_CALENDAR_NOTICE("WORK_CALENDAR_NOTICE", "工作日历提醒通知"),
+
+    /**
+     * SKU的排产类型与SKU与示方书匹配到的产品状态不一致提醒
+     */
+    MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME("MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME", "SKU的排产类型与SKU与示方书匹配到的产品状态不一致提醒"),
     ;
 
     private final String code;

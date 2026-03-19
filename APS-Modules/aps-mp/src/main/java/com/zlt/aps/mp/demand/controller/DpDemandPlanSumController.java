@@ -2,6 +2,10 @@ package com.zlt.aps.mp.demand.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -53,9 +58,11 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
 
     @Autowired
     private IDpDemandPlanSumService dpDemandPlanSumService;
-
     @Autowired
     private DpDemandPlanSumEntityMapper entityMapper;
+
+    @Autowired
+    private IExportLogService iExportLogService;
 
     /**
      * 查询需求计划汇总列表
@@ -127,7 +134,23 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
     @Override
     public byte[] exportData(@RequestBody DpDemandPlanSum queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        Date beginTime = DateUtils.getNowDate();
+        List<DpDemandPlanSum> list = this.listExportData(queryVO);
+        byte[] resultBytes = dpDemandPlanSumService.exportDemandPlanSum(queryVO,list);
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
     }
 
     @Override

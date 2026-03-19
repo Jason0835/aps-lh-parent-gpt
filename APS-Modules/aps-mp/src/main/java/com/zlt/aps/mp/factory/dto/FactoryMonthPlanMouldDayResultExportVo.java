@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.factory.dto;
 
+import java.math.BigDecimal;
+
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -28,4 +30,15 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
     @ApiModelProperty(value = "周期储备需求", name = "cycleReserveQty")
     private Integer cycleReserveQty;
 
+    /**
+     * 内外销，数据字典：biz_stor_type
+     */
+    @ApiModelProperty(value = "内外销", name = "locationType")
+    private String locationType;
+
+    /**
+     * 单胎重量
+     */
+    @ApiModelProperty(value = "单胎重量", name = "singleTireWeight")
+    private BigDecimal singleTireWeight;
 }
