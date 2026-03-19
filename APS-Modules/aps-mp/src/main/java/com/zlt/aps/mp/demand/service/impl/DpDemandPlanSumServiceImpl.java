@@ -173,7 +173,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             result = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         } catch (Exception e) {
             log.error("导出需求计划汇总异常", e);
-            throw new RuntimeException("导出失败", e);
+            throw new BusinessException("导出失败", e);
         }
         return result;
     }

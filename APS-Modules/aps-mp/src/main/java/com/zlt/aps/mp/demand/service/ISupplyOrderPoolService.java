@@ -53,4 +53,11 @@ public interface ISupplyOrderPoolService  extends IDocService<SupplyOrderPool>{
    * @return 供应链订单
    */
   List<SupplyOrderPool> findAdjustSupplyOrderPool(DpDemandPlan createCondition, Set<String> eligibleSkus);
+  /**
+   * 导出供应链订单
+   * @param queryVO
+   * @param list
+   * @return
+   */
+  byte[] exportSupplyOrder(SupplyOrderPool queryVO, List<SupplyOrderPool> list);
 }

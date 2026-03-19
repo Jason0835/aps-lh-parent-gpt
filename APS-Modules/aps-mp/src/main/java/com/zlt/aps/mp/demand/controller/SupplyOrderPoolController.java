@@ -2,7 +2,11 @@ package com.zlt.aps.mp.demand.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
@@ -63,6 +67,8 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     private final CycleStockUpService cycleStockUpService;
 
     private final PrecedentStockUpService precedentStockUpService;
+
+    private final IExportLogService iExportLogService;
     /**
      * 查询供应链订单池列表
      */
@@ -196,7 +202,23 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
     @Override
     public byte[] exportData(@RequestBody SupplyOrderPool queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        Date beginTime = DateUtils.getNowDate();
+        List<SupplyOrderPool> list = this.listExportData(queryVO);
+        byte[] resultBytes = this.supplyOrderPoolService.exportSupplyOrder(queryVO,list);
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
     }
 
     @Override
