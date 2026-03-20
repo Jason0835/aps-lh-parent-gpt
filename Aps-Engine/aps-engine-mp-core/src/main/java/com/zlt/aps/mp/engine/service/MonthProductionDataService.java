@@ -1,10 +1,10 @@
 package com.zlt.aps.mp.engine.service;
 
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ContinueGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.ContinueProductInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.api.domain.entity.*;
 
 import java.util.List;
 import java.util.Map;
@@ -139,13 +139,11 @@ public interface MonthProductionDataService {
     /**
      * 获取在机结构信息，从结构排产表中获取
      *
-     * @param factoryCode 工厂编码
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
+     * @param previousVersion 前一个月的排产版本信息
+     * @param lastDay         最后一天
      * @return
      */
-    List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay);
+    List<ContinueGroupInfo> getContinueGroupInfo(MpFactoryProductionVersion previousVersion, Integer lastDay);
 
     /**
      * 获取历史分组排产数据信息

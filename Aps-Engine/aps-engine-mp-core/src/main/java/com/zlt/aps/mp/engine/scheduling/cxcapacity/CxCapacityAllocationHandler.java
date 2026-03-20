@@ -263,9 +263,9 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        // 如果有在机的特殊结构，则优先取出特殊结构
-        if (productionContext.getBaseDataContainer().getCxMachineBaseInfo().values()
-                .stream().anyMatch(machine -> this.hasSpecialStructure(machine))) {
+        // 如果有在机的特殊结构，则优先取出特殊结构(即已分配了特殊结构)
+        boolean onLineCxMachineSpecialStructure = productionContext.getBaseDataContainer().getCxMachineBaseInfo().values().stream().anyMatch(machine -> this.hasSpecialStructure(machine));
+        if (onLineCxMachineSpecialStructure) {
             List<ProductionPlanGroupInfo> specialMaterialList = needProductionGroupList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(specialMaterialList)) {
                 needProductionGroupList = specialMaterialList;
