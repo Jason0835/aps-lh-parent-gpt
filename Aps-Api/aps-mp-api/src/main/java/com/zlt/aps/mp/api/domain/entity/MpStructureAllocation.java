@@ -178,7 +178,7 @@ public class MpStructureAllocation extends BaseEntity {
 
 
     /**
-     * 交替类型
+     * 交替类型 
      */
     @ApiModelProperty(value = "交替类型", name = "alternatingType")
     @TableField(value = "ALTERNATING_TYPE")
