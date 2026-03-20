@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.factory.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
@@ -8,14 +9,18 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.utils.JsonUtils;
 import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.mp.api.domain.vo.MonthPlanStatisticsVo;
+import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
 import com.zlt.aps.mp.factory.mapper.MonthPlanNoProductionPlanMapper;
 import com.zlt.aps.mp.factory.service.IMonthPlanNoProductionPlanService;
 import com.zlt.common.utils.PubUtil;
@@ -58,6 +63,17 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
 
     private final MonthPlanNoProductionPlanMapper monthPlanNoProductionPlanMapper;
     private final MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
+    private final FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
+    private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+    /**
+     * 结构类型
+     */
+    private final static String STRUCTURE_TYPE_CYCL = "01"; // 周期
+    private final static String STRUCTURE_TYPE_COMMON = "02"; // 常规
+    /**
+     * 内外销类型
+     */
+    private final static String LOCATION_TYPE_OUT = "2"; // 外销
 
     @Override
     protected String getDocTypeCode() {
@@ -142,6 +158,9 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         // 排产分类字典
         List<SysDictData> productionTypeDatas = sysDictDataCacheService.getType("biz_schedule_type");
         Map<String, String> productionTypeMap = productionTypeDatas != null ? productionTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+        // 产品分类字典
+        List<SysDictData> productCategoryDatas = sysDictDataCacheService.getType("product_category");
+        Map<String, String> productCategoryMap = productCategoryDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
         // 施工阶段字典
         List<SysDictData> constructionStageDatas = sysDictDataCacheService.getType("biz_construction_stage");
         Map<String, String> constructionStageMap = constructionStageDatas != null ? constructionStageDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
@@ -154,15 +173,15 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         // 是否排产字典
         List<SysDictData> isProductionDatas = sysDictDataCacheService.getType("biz_yes_no");
         Map<String, String> isProductionMap = isProductionDatas != null ? isProductionDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
-
+        // 结构类型
+        List<SysDictData> structureTypeDatas = sysDictDataCacheService.getType("structure_type");
+        Map<String, String> structureTypeDictMap = structureTypeDatas != null ? structureTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+        
+        
         // 表头信息
         Map<String, Object> tableMap = new HashMap<>(16);
         // 列表数据
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        List<CellStyle> cellStyleList = new ArrayList<>();
-
-        // 添加第一行表头样式：等线、9号、白色、加粗、表头底色绿色
-        cellStyleList.add(new CellStyle(0, 0, 0, 28, "#FFFFFF", true, true, "等线"));
 
         // 按当前年月取数
         Calendar calendar = Calendar.getInstance();
@@ -173,13 +192,33 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
         builderCondition(wrapper, queryVO);
         // 按物料编码分组，只选择有@Excel注解的字段（共29列）
-        wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE", "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE", "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "IS_PRODUCTION", "sum(STOCK_QTY) as stockQty", "sum(AVERAGE_SALE_QTY) as averageSaleQty", "sum(NET_QTY) as netQty", "sum(POSTPONE_NET_QTY) as postponeNetQty", "sum(UN_POSTPONE_NET_QTY) as unPostponeNetQty", "sum(HEIGHT_QTY) as heightQty", "sum(MID_QTY) as midQty", "sum(POSTPONE_QTY) as postponeQty", "sum(CYCLE_RESERVE_QTY) as cycleReserveQty", "sum(CONVENTION_RESERVE_QTY) as conventionReserveQty", "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty", "sum(UN_PRODUCTION_QTY) as unProductionQty");
+        wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
+                "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
+                "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
+                "PATTERN", "IS_PRODUCTION", "max(STOCK_QTY) as stockQty", "max(AVERAGE_SALE_QTY) as averageSaleQty",
+                "sum(NET_QTY) as netQty", "sum(POSTPONE_NET_QTY) as postponeNetQty",
+                "sum(UN_POSTPONE_NET_QTY) as unPostponeNetQty", "sum(HEIGHT_QTY) as heightQty",
+                "sum(MID_QTY) as midQty", "sum(POSTPONE_QTY) as postponeQty",
+                "sum(CYCLE_RESERVE_QTY) as cycleReserveQty", "sum(CONVENTION_RESERVE_QTY) as conventionReserveQty",
+                "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty",
+                "sum(UN_PRODUCTION_QTY) as unProductionQty", "GROUP_CONCAT(distinct reason SEPARATOR '|') as reason",
+                "max(UPDATE_TIME) as UPDATE_TIME");
         wrapper.groupBy("MATERIAL_CODE");
+        wrapper.orderBy(true, true, "STRUCTURE_NAME", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC", "PRO_SIZE");
+        wrapper.orderBy(true, false, "UPDATE_TIME");
         List<MonthPlanNoProductionPlan> dataList = monthPlanNoProductionPlanMapper.selectList(wrapper);
+        
+        // 加载月计划排产明细
+        LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
+        resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, queryVO.getProductionVersion());
+        Map<String, Integer> mouldingDayResultMap = factoryMouldingDayResultMapper
+                .selectList(resultQueryWrapper).stream().collect(Collectors
+                        .toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, FactoryMonthPlanMouldDayResult::getTotalQty, (r1, r2) -> r1)); // 按模具编号对排产结果分组
 
         // 查询结构类型：通过结构名称关联T_DP_CYCLE_STRUCT_CONFIG表
         // 存在这个表就是周期性结构，否则都是常规结构
         Map<String, String> structureTypeMap = new HashMap<>();
+        Map<String, String> materialProductCategoryMap = new HashMap<>();
         if (dataList != null && !dataList.isEmpty()) {
             // 获取所有不同的结构名称
             List<String> structureNames = dataList.stream()
@@ -200,8 +239,24 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                         .collect(Collectors.toSet());
 
                 for (String structureName : structureNames) {
-                    structureTypeMap.put(structureName, cycleStructNames.contains(structureName) ? "周期性结构" : "常规结构");
+                    structureTypeMap.put(structureName, cycleStructNames.contains(structureName)? structureTypeDictMap.get(STRUCTURE_TYPE_CYCL): structureTypeDictMap.get(STRUCTURE_TYPE_COMMON));
                 }
+            }
+
+            // 加载物料表获取产品分类
+            List<String> materialCodeList = dataList.stream()
+                    .map(MonthPlanNoProductionPlan::getMaterialCode)
+                    .filter(StringUtils::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.toList());
+            List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000); // 按每1000行查询，防止超出限制
+            for (List<String> splitList: materialCodeSplitList) {
+                QueryWrapper<MdmMaterialInfo> materialInfoWrapper = new QueryWrapper<>();
+                materialInfoWrapper.in("MATERIAL_CODE", splitList);
+                materialInfoWrapper.isNotNull("PRODUCT_CATEGORY");
+                materialProductCategoryMap.putAll(mdmMaterialInfoEntityMapper.selectList(materialInfoWrapper).stream()
+                        .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getProductCategory,
+                                (m1, m2) -> m1)));
             }
         }
 
@@ -212,16 +267,12 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
             MonthPlanNoProductionPlan firstItem = dataList.get(0);
             tableMap.put("factoryCode", factoryMap.getOrDefault(firstItem.getFactoryCode(), firstItem.getFactoryCode() != null ? firstItem.getFactoryCode() : ""));
             tableMap.put("productTypeCode", productTypeMap.getOrDefault(firstItem.getProductTypeCode(), firstItem.getProductTypeCode() != null ? firstItem.getProductTypeCode() : ""));
-            tableMap.put("monthPlanVersion", productTypeMap.getOrDefault(firstItem.getMonthPlanVersion(), firstItem.getMonthPlanVersion() != null ? firstItem.getMonthPlanVersion() : ""));
-            tableMap.put("productionVersion", productTypeMap.getOrDefault(firstItem.getProductionVersion(), firstItem.getProductionVersion() != null ? firstItem.getProductionVersion() : ""));
+            tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
+            tableMap.put("productionVersion", firstItem.getProductionVersion());
         }
 
         if (dataList != null && !dataList.isEmpty()) {
             List<Map<String, Object>> list = new ArrayList<>();
-            // 根据模板结构：第1行标题，第2行表头，第3行合计，第4行开始数据
-            // Excel行号从0开始，所以数据从第3行开始
-            int dataStartRowIndex = 3; // 对应Excel第4行（数据开始行）
-
             for (int i = 0; i < dataList.size(); i++) {
                 Map<String, Object> listDataMap = new HashMap<>(16);
                 MonthPlanNoProductionPlan item = dataList.get(i);
@@ -229,18 +280,16 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 // 转义字典值
                 listDataMap.put("factoryCode", factoryMap.getOrDefault(item.getFactoryCode(), item.getFactoryCode() != null ? item.getFactoryCode() : ""));
                 listDataMap.put("productionVersion", item.getProductionVersion() != null ? item.getProductionVersion() : "");
-                listDataMap.put("productTypeCode", productTypeMap.getOrDefault(item.getProductTypeCode(), item.getProductTypeCode() != null ? item.getProductTypeCode() : ""));
+                listDataMap.put("productCategory", productCategoryMap.getOrDefault(materialProductCategoryMap.get(item.getMaterialCode()), ""));
                 listDataMap.put("materialCode", item.getMaterialCode() != null ? item.getMaterialCode() : "");
                 listDataMap.put("materialDesc", item.getMaterialDesc() != null ? item.getMaterialDesc() : "");
                 listDataMap.put("structureName", item.getStructureName() != null ? item.getStructureName() : "");
-                // 结构类型：通过结构名称关联T_DP_CYCLE_STRUCT_CONFIG表，存在就是周期性结构，否则都是常规结构
-                String structureType = structureTypeMap.getOrDefault(item.getStructureName(), "常规结构");
-                listDataMap.put("structureType", structureType);
+                listDataMap.put("structureType", structureTypeMap.getOrDefault(item.getStructureName(), ""));
                 listDataMap.put("proSize", item.getProSize() != null ? item.getProSize() : "");
                 listDataMap.put("productionType", productionTypeMap.getOrDefault(item.getProductionType(), item.getProductionType() != null ? item.getProductionType() : ""));
                 listDataMap.put("constructionStage", constructionStageMap.getOrDefault(item.getConstructionStage(), item.getConstructionStage() != null ? item.getConstructionStage() : ""));
                 listDataMap.put("mainMaterialDesc", item.getMainMaterialDesc() != null ? item.getMainMaterialDesc() : "");
-                listDataMap.put("locationType", locationTypeMap.getOrDefault(item.getLocationType(), item.getLocationType() != null ? item.getLocationType() : ""));
+                listDataMap.put("locationType", locationTypeMap.getOrDefault(LOCATION_TYPE_OUT, "")); // TODO 与数据字典不一致，暂时固定取外销
                 listDataMap.put("brand", brandMap.getOrDefault(item.getBrand(), item.getBrand() != null ? item.getBrand() : ""));
                 listDataMap.put("specifications", item.getSpecifications() != null ? item.getSpecifications() : "");
                 listDataMap.put("mainPattern", item.getMainPattern() != null ? item.getMainPattern() : "");
@@ -257,17 +306,18 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 listDataMap.put("cycleReserveQty", item.getCycleReserveQty() != null ? item.getCycleReserveQty() : 0);
                 listDataMap.put("conventionReserveQty", item.getConventionReserveQty() != null ? item.getConventionReserveQty() : 0);
                 listDataMap.put("heightLossQty", item.getHeightLossQty() != null ? item.getHeightLossQty() : 0);
-                listDataMap.put("factProdReqQty", item.getFactProdReqQty() != null ? item.getFactProdReqQty() : 0);
                 listDataMap.put("unProductionQty", item.getUnProductionQty() != null ? item.getUnProductionQty() : 0);
+                
                 // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0;
-                long factProdReqQty = item.getFactProdReqQty() != null ? item.getFactProdReqQty() : 0;
-                long actualOrderUnproduced = heightQty + midQty - factProdReqQty;
+                int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
+                long actualOrderUnproduced = heightQty + midQty - factProdQty;
+                listDataMap.put("factProdReqQty", factProdQty);
                 listDataMap.put("actualOrderUnproduced", actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0);
                 // 更新日期
                 if (item.getUpdateTime() != null) {
-                    listDataMap.put("updateTime", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
+                    listDataMap.put("updateTime", DateUtils.parseDateToStr("yyyy/MM/dd HH:mm", item.getUpdateTime()));
                 } else {
                     listDataMap.put("updateTime", "");
                 }
@@ -282,7 +332,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                             String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
                             reasonList.add(convertValue);
                         }
-                        listDataMap.put("reason", String.join(",", reasonList));
+                        listDataMap.put("reason", reasonList.stream().distinct().collect(Collectors.joining(",")));
                     } else {
                         String convertValue = JsonI18nConvertUtils.getConvertValue(reason, locale);
                         listDataMap.put("reason", convertValue);
@@ -291,20 +341,9 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                     listDataMap.put("reason", "");
                 }
 
-                // 计算行号（Excel行号从0开始）
-                int rowNum = dataStartRowIndex + i;
-
-                // 添加样式（确保样式作用在实际的数据行上）
-                cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 28, "#FFFFFF", true, false, "等线"));
-
                 list.add(listDataMap);
             }
             excelDataList.add(list);
-        }
-
-        // 将单元格样式放入context
-        if (PubUtil.isNotEmpty(cellStyleList)) {
-            tableMap.put("CELL_STYLE", cellStyleList);
         }
 
         // 写到文件

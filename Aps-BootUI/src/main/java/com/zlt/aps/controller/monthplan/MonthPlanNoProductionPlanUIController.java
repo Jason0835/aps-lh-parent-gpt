@@ -7,6 +7,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.mp.api.service.IMonthPlanNoProductionPlanRemoteService;
+
+import cn.hutool.core.date.DateUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.LocalDateTime;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -105,7 +108,7 @@ public class MonthPlanNoProductionPlanUIController extends BaseUIController<Mont
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, MonthPlanNoProductionPlan entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(LocalDateTime.now(),"yyyyMMdd");;
         byte[] excelBytes = iMonthPlanNoProductionPlanService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
