@@ -96,11 +96,15 @@ public class SkuMouldSelector {
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return Collections.emptyList();
         }
+        Integer usedMouldCount = Math.min(max, mouldNumber);
+        if (usedMouldCount < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            return Collections.emptyList();
+        }
         effectiveList.sort(Comparator.comparing(ProductionMouldInfoVo::getCommonalityValue)
                 .thenComparing(ProductionMouldInfoVo::getLeftOverCapacity)
                 .thenComparing(ProductionMouldInfoVo::getMouldCode, Comparator.reverseOrder()));
-        if (max >= mouldNumber) {
-            return effectiveList.subList(BigDecimal.ZERO.intValue(), mouldNumber);
+        if (usedMouldCount <= effectiveList.size()) {
+            return effectiveList.subList(BigDecimal.ZERO.intValue(), usedMouldCount);
         }
         return effectiveList;
     }
