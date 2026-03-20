@@ -969,7 +969,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
             monthPlan.setProductionNo(productionNo);
-            // 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
+            // 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号、主物料(胎胚号)
             setSkuConstructionRefField(contextDTO, monthPlan);
             // 净需求
             monthPlan.setProdReqPlan(adjustDetailVo.getCurrentNetQty());
@@ -1582,7 +1582,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
+     * 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号、主物料(胎胚号)
      * @param contextDTO
      * @param monthPlan
      */
@@ -1596,8 +1596,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String materialCode = monthPlan.getMaterialCode();
         // 产品状态
         String productStatus = monthPlan.getProductStatus();
-        // 根据物料编码和产品状态匹配SKU与施工关系数据
-        MdmSkuConstructionRef mdmSkuConstructionRef = getSkuConstructionRefByCondition(skuConstructionRefList, materialCode, productStatus);
+        // 按物料编码+产品状态优先级匹配SKU与示方书记录
+        MdmSkuConstructionRef mdmSkuConstructionRef = matchSkuConstruction(materialCode, productStatus, skuConstructionRefList);
         if (mdmSkuConstructionRef != null) {
             // 是否零度材料
             monthPlan.setIsZeroRack(mdmSkuConstructionRef.getIsZeroRack());
