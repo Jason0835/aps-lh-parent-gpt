@@ -228,12 +228,8 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
 
                 // 转义字典值
                 listDataMap.put("factoryCode", factoryMap.getOrDefault(item.getFactoryCode(), item.getFactoryCode() != null ? item.getFactoryCode() : ""));
-                listDataMap.put("year", item.getYear() != null ? item.getYear() : "");
-                listDataMap.put("month", item.getMonth() != null ? item.getMonth() : "");
-                listDataMap.put("monthPlanVersion", item.getMonthPlanVersion() != null ? item.getMonthPlanVersion() : "");
                 listDataMap.put("productionVersion", item.getProductionVersion() != null ? item.getProductionVersion() : "");
                 listDataMap.put("productTypeCode", productTypeMap.getOrDefault(item.getProductTypeCode(), item.getProductTypeCode() != null ? item.getProductTypeCode() : ""));
-                listDataMap.put("mesMaterialCode", item.getMesMaterialCode() != null ? item.getMesMaterialCode() : "");
                 listDataMap.put("materialCode", item.getMaterialCode() != null ? item.getMaterialCode() : "");
                 listDataMap.put("materialDesc", item.getMaterialDesc() != null ? item.getMaterialDesc() : "");
                 listDataMap.put("structureName", item.getStructureName() != null ? item.getStructureName() : "");
