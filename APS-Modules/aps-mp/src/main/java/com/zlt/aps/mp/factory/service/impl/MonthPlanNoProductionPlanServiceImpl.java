@@ -10,6 +10,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.utils.JsonUtils;
 import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
@@ -52,8 +54,10 @@ import com.ruoyi.common.exception.ServiceException;
 @Transactional(rollbackFor = Exception.class)
 @RequiredArgsConstructor
 public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<MonthPlanNoProductionPlan> implements IMonthPlanNoProductionPlanService {
-    private final MonthPlanNoProductionPlanMapper monthPlanNoProductionPlanMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
+
+    private final MonthPlanNoProductionPlanMapper monthPlanNoProductionPlanMapper;
+    private final MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -157,6 +161,9 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         List<CellStyle> cellStyleList = new ArrayList<>();
 
+        // 添加第一行表头样式：等线、9号、白色、加粗、表头底色绿色
+        cellStyleList.add(new CellStyle(0, 0, 0, 28, "#FFFFFF", true, true, "等线"));
+
         // 按当前年月取数
         Calendar calendar = Calendar.getInstance();
         int currentYear = calendar.get(Calendar.YEAR);
@@ -166,9 +173,37 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
         builderCondition(wrapper, queryVO);
         // 按物料编码分组，只选择有@Excel注解的字段（共29列）
-        wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE", "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "REASON", "UPDATE_TIME", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE", "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "IS_PRODUCTION", "sum(STOCK_QTY) as stockQty", "sum(AVERAGE_SALE_QTY) as averageSaleQty", "sum(NET_QTY) as netQty", "sum(POSTPONE_NET_QTY) as postponeNetQty", "sum(UN_POSTPONE_NET_QTY) as unPostponeNetQty", "sum(HEIGHT_QTY) as heightQty", "sum(MID_QTY) as midQty", "sum(POSTPONE_QTY) as postponeQty", "sum(CYCLE_RESERVE_QTY) as cycleReserveQty", "sum(CONVENTION_RESERVE_QTY) as conventionReserveQty", "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty", "sum(UN_PRODUCTION_QTY) as unProductionQty");
+        wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE", "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE", "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "IS_PRODUCTION", "sum(STOCK_QTY) as stockQty", "sum(AVERAGE_SALE_QTY) as averageSaleQty", "sum(NET_QTY) as netQty", "sum(POSTPONE_NET_QTY) as postponeNetQty", "sum(UN_POSTPONE_NET_QTY) as unPostponeNetQty", "sum(HEIGHT_QTY) as heightQty", "sum(MID_QTY) as midQty", "sum(POSTPONE_QTY) as postponeQty", "sum(CYCLE_RESERVE_QTY) as cycleReserveQty", "sum(CONVENTION_RESERVE_QTY) as conventionReserveQty", "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty", "sum(UN_PRODUCTION_QTY) as unProductionQty");
         wrapper.groupBy("MATERIAL_CODE");
         List<MonthPlanNoProductionPlan> dataList = monthPlanNoProductionPlanMapper.selectList(wrapper);
+
+        // 查询结构类型：通过结构名称关联T_DP_CYCLE_STRUCT_CONFIG表
+        // 存在这个表就是周期性结构，否则都是常规结构
+        Map<String, String> structureTypeMap = new HashMap<>();
+        if (dataList != null && !dataList.isEmpty()) {
+            // 获取所有不同的结构名称
+            List<String> structureNames = dataList.stream()
+                    .map(MonthPlanNoProductionPlan::getStructureName)
+                    .distinct()
+                    .filter(StringUtils::isNotBlank)
+                    .collect(Collectors.toList());
+
+            // 批量查询T_DP_CYCLE_STRUCT_CONFIG表
+            if (!structureNames.isEmpty()) {
+                QueryWrapper<MdmCycleSchStruConf> structWrapper = new QueryWrapper<>();
+                structWrapper.in("STRUCTURE_NAME", structureNames);
+                List<MdmCycleSchStruConf> structList = mdmCycleSchStruConfEntityMapper.selectList(structWrapper);
+
+                // 构建结构类型Map：存在配置表的就是周期性结构，否则是常规结构
+                Set<String> cycleStructNames = structList.stream()
+                        .map(MdmCycleSchStruConf::getStructureName)
+                        .collect(Collectors.toSet());
+
+                for (String structureName : structureNames) {
+                    structureTypeMap.put(structureName, cycleStructNames.contains(structureName) ? "周期性结构" : "常规结构");
+                }
+            }
+        }
 
         // 设置年月标题和工厂、产品品类（第一行）
         tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
@@ -193,15 +228,14 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
 
                 // 转义字典值
                 listDataMap.put("factoryCode", factoryMap.getOrDefault(item.getFactoryCode(), item.getFactoryCode() != null ? item.getFactoryCode() : ""));
-                listDataMap.put("year", item.getYear() != null ? item.getYear() : "");
-                listDataMap.put("month", item.getMonth() != null ? item.getMonth() : "");
-                listDataMap.put("monthPlanVersion", item.getMonthPlanVersion() != null ? item.getMonthPlanVersion() : "");
                 listDataMap.put("productionVersion", item.getProductionVersion() != null ? item.getProductionVersion() : "");
                 listDataMap.put("productTypeCode", productTypeMap.getOrDefault(item.getProductTypeCode(), item.getProductTypeCode() != null ? item.getProductTypeCode() : ""));
-                listDataMap.put("mesMaterialCode", item.getMesMaterialCode() != null ? item.getMesMaterialCode() : "");
                 listDataMap.put("materialCode", item.getMaterialCode() != null ? item.getMaterialCode() : "");
                 listDataMap.put("materialDesc", item.getMaterialDesc() != null ? item.getMaterialDesc() : "");
                 listDataMap.put("structureName", item.getStructureName() != null ? item.getStructureName() : "");
+                // 结构类型：通过结构名称关联T_DP_CYCLE_STRUCT_CONFIG表，存在就是周期性结构，否则都是常规结构
+                String structureType = structureTypeMap.getOrDefault(item.getStructureName(), "常规结构");
+                listDataMap.put("structureType", structureType);
                 listDataMap.put("proSize", item.getProSize() != null ? item.getProSize() : "");
                 listDataMap.put("productionType", productionTypeMap.getOrDefault(item.getProductionType(), item.getProductionType() != null ? item.getProductionType() : ""));
                 listDataMap.put("constructionStage", constructionStageMap.getOrDefault(item.getConstructionStage(), item.getConstructionStage() != null ? item.getConstructionStage() : ""));
@@ -225,12 +259,12 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 listDataMap.put("heightLossQty", item.getHeightLossQty() != null ? item.getHeightLossQty() : 0);
                 listDataMap.put("factProdReqQty", item.getFactProdReqQty() != null ? item.getFactProdReqQty() : 0);
                 listDataMap.put("unProductionQty", item.getUnProductionQty() != null ? item.getUnProductionQty() : 0);
-                // 实单未排产 = 高优先级 + 中优先级 - 实际生产量
+                // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0;
                 long factProdReqQty = item.getFactProdReqQty() != null ? item.getFactProdReqQty() : 0;
                 long actualOrderUnproduced = heightQty + midQty - factProdReqQty;
-                listDataMap.put("actualOrderUnproduced", actualOrderUnproduced > 0 ? actualOrderUnproduced : 0);
+                listDataMap.put("actualOrderUnproduced", actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0);
                 // 更新日期
                 if (item.getUpdateTime() != null) {
                     listDataMap.put("updateTime", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
