@@ -7,6 +7,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -14,6 +15,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
@@ -150,16 +152,58 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
 
             // 4. 遍历数据，同时计算合计并构建行数据
             List<Map<String, Object>> rows = new ArrayList<>();
+            List<CellStyle> cellStyleList = new ArrayList<>();
             // 自定义累加器，避免多个long变量
             SumAccumulator sums = new SumAccumulator();
             if (!CollectionUtils.isEmpty(list)) {
+                // 根据模板结构：第1行标题，第2行表头，第3行合计，第4行开始数据
+                // Excel行号从0开始，所以数据从第3行开始
+                // 对应Excel第4行（数据开始行）
+                int dataStartRowIndex = 3;
                 String factoryName = factoryMap.getOrDefault(queryVO.getFactoryCode(), "");
-                for (DpDemandPlanSum item : list) {
+                DpDemandPlanSum item;
+                for (int i = 0; i < list.size(); i++) {
+                    item = list.get(i);
                     // 累加各项数值
                     sums.add(item);
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("factoryName", factoryName);
+                    row.put("productTypeName", productTypeMap.getOrDefault(item.getProductTypeCode(), ""));
+                    row.put("brand", brandMap.getOrDefault(item.getBrand(), ""));
+                    row.put("locationType", locationTypeMap.getOrDefault(item.getLocationType(), ""));
+                    row.put("materialCode", nullToEmpty(item.getMaterialCode()));
+                    row.put("materialDesc", nullToEmpty(item.getMaterialDesc()));
+                    row.put("structureName", nullToEmpty(item.getStructureName()));
+                    row.put("mainPattern", nullToEmpty(item.getMainPattern()));
+                    row.put("productionType", productionTypeMap.getOrDefault(item.getProductionType(), ""));
+                    row.put("scmPriority", yesNoMap.getOrDefault(item.getScmPriority(), ""));
+                    row.put("orderQty", item.getOrderQty());
+                    row.put("stockQty", item.getStockQty());
+                    row.put("sub2YearStockQty", item.getSub2YearStockQty());
+                    row.put("sub1YearStockQty", item.getSub1YearStockQty());
+                    row.put("currentYearStockQty", item.getCurrentYearStockQty());
+                    row.put("plannedSurplus", item.getPlannedSurplus());
+                    row.put("netQty", item.getNetQty());
+                    row.put("postponeNetQty", item.getPostponeNetQty());
+                    row.put("unPostponeNetQty", item.getUnPostponeNetQty());
+                    row.put("heightQty", item.getHeightQty());
+                    row.put("midQty", item.getMidQty());
+                    row.put("postponeQty", item.getPostponeQty());
+                    row.put("cycleReserveQty", item.getCycleReserveQty());
+                    row.put("conventionReserveQty", item.getConventionReserveQty());
+                    row.put("isProduction", yesNoMap.getOrDefault(item.getIsProduction(), ""));
+                    row.put("minProductionQty", item.getMinProductionQty());
+                    row.put("isReachMinProductionQty", yesNoMap.getOrDefault(item.getIsReachMinProductionQty(), ""));
+                    row.put("updateDate", item.getUpdateDate());
+                    // 计算行号（Excel行号从0开始）
+                    // 数据行号 = 数据开始行号 + 数据索引
+                    int rowNum = dataStartRowIndex + i;
+                    // 添加样式（确保样式作用在实际的数据行上）
+                    // 使用白色背景色（#FFFFFF）代替null，避免Color.decode抛出异常
+                    // 等线字体，9号大小，黑色，不加粗，带边框
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 18, "#FFFFFF", true, false, "等线"));
                     // 构建行数据
-                    rows.add(buildRowData(item, factoryName, productTypeMap, brandMap,
-                        locationTypeMap, productionTypeMap, yesNoMap));
+                    rows.add(row);
                 }
             }
 
@@ -168,7 +212,10 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
 
             // 6. 组装最终数据结构
             List<List<Map<String, Object>>> excelDataList = Collections.singletonList(rows);
-
+            // 将单元格样式放入context
+            if (PubUtil.isNotEmpty(cellStyleList)) {
+                tableMap.put("CELL_STYLE", cellStyleList);
+            }
             // 7. 写入Excel并返回字节数组
             result = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
         } catch (Exception e) {
@@ -214,48 +261,6 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             header.put(field, I18nUtil.getMessage("ui.data.column.demandPlanSum." + field));
         }
         return header;
-    }
-
-    /**
-     * 构建单行数据
-     */
-    private Map<String, Object> buildRowData(DpDemandPlanSum item,
-                                             String factoryName,
-                                             Map<String, String> productTypeMap,
-                                             Map<String, String> brandMap,
-                                             Map<String, String> locationTypeMap,
-                                             Map<String, String> productionTypeMap,
-                                             Map<String, String> yesNoMap) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("factoryName", factoryName);
-        row.put("productTypeName", productTypeMap.getOrDefault(item.getProductTypeCode(), ""));
-        row.put("brand", brandMap.getOrDefault(item.getBrand(), ""));
-        row.put("locationType", locationTypeMap.getOrDefault(item.getLocationType(), ""));
-        row.put("materialCode", nullToEmpty(item.getMaterialCode()));
-        row.put("materialDesc", nullToEmpty(item.getMaterialDesc()));
-        row.put("structureName", nullToEmpty(item.getStructureName()));
-        row.put("mainPattern", nullToEmpty(item.getMainPattern()));
-        row.put("productionType", productionTypeMap.getOrDefault(item.getProductionType(), ""));
-        row.put("scmPriority", yesNoMap.getOrDefault(item.getScmPriority(), ""));
-        row.put("orderQty", item.getOrderQty());
-        row.put("stockQty", item.getStockQty());
-        row.put("sub2YearStockQty", item.getSub2YearStockQty());
-        row.put("sub1YearStockQty", item.getSub1YearStockQty());
-        row.put("currentYearStockQty", item.getCurrentYearStockQty());
-        row.put("plannedSurplus", item.getPlannedSurplus());
-        row.put("netQty", item.getNetQty());
-        row.put("postponeNetQty", item.getPostponeNetQty());
-        row.put("unPostponeNetQty", item.getUnPostponeNetQty());
-        row.put("heightQty", item.getHeightQty());
-        row.put("midQty", item.getMidQty());
-        row.put("postponeQty", item.getPostponeQty());
-        row.put("cycleReserveQty", item.getCycleReserveQty());
-        row.put("conventionReserveQty", item.getConventionReserveQty());
-        row.put("isProduction", yesNoMap.getOrDefault(item.getIsProduction(), ""));
-        row.put("minProductionQty", item.getMinProductionQty());
-        row.put("isReachMinProductionQty", yesNoMap.getOrDefault(item.getIsReachMinProductionQty(), ""));
-        row.put("updateDate", item.getUpdateDate());
-        return row;
     }
 
     /**
