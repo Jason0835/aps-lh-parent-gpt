@@ -1,13 +1,14 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -28,39 +29,14 @@ public class CxLhProductionHelper implements Serializable {
      * 分组信息--TBR = 结构名
      */
     private String groupName;
-
     /**
-     * 物料编码
+     * 排产的前Sku信息
      */
-    private String materialCode;
-
+    private BeforeSkuProductionInfo beforeSku;
     /**
-     * 物料描述
-     */
-    private String materialDesc;
-    /**
-     * 胎胚号
-     */
-    private String embryoCode;
-    /**
-     * 当天排产量
-     */
-    private Integer productionQty;
-
-    /**
-     * 排产模具
-     */
-    private Set<String> productionMouldSet;
-
-    /**
-     * 排产天 周期第几天
+     * 排产日
      */
     private Integer productionDay;
-
-    /**
-     * 天日硫化量--满产
-     */
-    private Integer dayMaxProductionQty;
     /**
      * 成型机台编码信息
      * 有可能一个，也有可能多个
@@ -86,6 +62,7 @@ public class CxLhProductionHelper implements Serializable {
         CxLhProductionHelper cxLh = new CxLhProductionHelper();
         cxLh.setGroupName(groupName);
         cxLh.setLhGroupNo(lhGroupNo);
+        cxLh.setBeforeSku(BeforeSkuProductionInfo.buildEmpty(null));
         cxLh.setIsProduction(YesOrNoEnum.YES.getValue());
         if (CollectionUtils.isEmpty(cxMachineInfo)) {
             cxMachineInfo = new HashSet<>();
@@ -103,14 +80,22 @@ public class CxLhProductionHelper implements Serializable {
     public void resetProductionInfoByNewGroupName(String groupName, Integer startDay) {
         this.groupName = groupName;
         this.productionDay = startDay;
-        this.productionQty = BigDecimal.ZERO.intValue();
-        this.dayMaxProductionQty = null;
-        this.materialCode = null;
-        this.materialDesc = null;
+        this.beforeSku = BeforeSkuProductionInfo.buildEmpty(startDay);
         this.isProduction = YesOrNoEnum.YES.getValue();
         //排产模具是否要清空？
     }
 
+    /**
+     * 获取当前排产模具
+     *
+     * @return
+     */
+    public Set<String> getProductionMouldSet() {
+        if (null == beforeSku) {
+            return Collections.emptySet();
+        }
+        return beforeSku.getProductionMouldSet();
+    }
 
     /**
      * 当前硫化组是否需要换模
@@ -122,9 +107,11 @@ public class CxLhProductionHelper implements Serializable {
         if (null == addSkuInfo || StringUtils.isEmpty(addSkuInfo.getMaterialDesc())) {
             return false;
         }
+        String materialDesc = null == beforeSku ? "" : beforeSku.getMaterialDesc();
         String connectSkuMaterialDesc = addSkuInfo.getMaterialDesc();
         return !connectSkuMaterialDesc.equals(materialDesc);
     }
+
     /**
      * 更新可排产时间范围
      *

@@ -6,6 +6,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 获取一段连续排产的日期
@@ -47,23 +48,86 @@ public class ContinuousProductionDayHandler {
      * 2、否则，至少需要连续两天
      *
      * @param context          排产上下文
+     * @param continueDays     可连续排产日
      * @param sumProductionDay 可排产日
      * @param stopDay          停工日
      * @return
      */
-    public static Set<Integer> getEarliestContinuousRange(Context context, Set<Integer> sumProductionDay, Set<Integer> stopDay) {
-        if (CollectionUtils.isEmpty(sumProductionDay)) {
-            return sumProductionDay;
+    public static Set<Integer> getEarliestContinuousRange(Context context, Integer continueDays, Set<Integer> sumProductionDay, Set<Integer> stopDay) {
+        if (CollectionUtils.isEmpty(sumProductionDay) || null == continueDays || continueDays < BigDecimal.ONE.intValue()) {
+            return Collections.emptySet();
         }
-        boolean hasNext;
-        Set<Integer> finalResult;
-        do {
-            EffectiveResult result = getEffectiveEarliestContinuousRange(context, sumProductionDay, stopDay);
-            finalResult = result.getProductionRange();
-            sumProductionDay = finalResult;
-            hasNext = !result.isEffectiveFlag();
-        } while (hasNext);
-        return finalResult;
+        Set<Integer> matchStopDay = Optional.ofNullable(stopDay).orElse(new HashSet<>());
+        //先取得最早的一段可连续排产时间
+        Set<Integer> earliestContinuousRangeResult = getEarliestContinuousRange(sumProductionDay, stopDay);
+        if (CollectionUtils.isEmpty(earliestContinuousRangeResult)) {
+            return Collections.emptySet();
+        }
+        List<Integer> realProductionDayResult = new ArrayList<>();
+        earliestContinuousRangeResult.forEach(day -> {
+            if (matchStopDay.contains(day)) {
+                return;
+            }
+            realProductionDayResult.add(day);
+        });
+        //真实没有排产天数
+        if (CollectionUtils.isEmpty(realProductionDayResult)) {
+            return Collections.emptySet();
+        }
+        Integer realProductionDays = realProductionDayResult.size();
+        //超过continueDays天
+        if (realProductionDays >= continueDays) {
+            return earliestContinuousRangeResult;
+        }
+        Set<Integer> realProductionDaySet = realProductionDayResult.stream().collect(Collectors.toSet());
+        //只有一天：只看月末
+        if (realProductionDays == BigDecimal.ONE.intValue()) {
+            Integer monthEndDay = context.getProductionEndDay();
+            Integer realProductionDay = realProductionDayResult.get(BigDecimal.ZERO.intValue());
+            if (monthEndDay.equals(realProductionDay)) {
+                return realProductionDaySet;
+            }
+            //不是在月末，重新获取
+            Set<Integer> newSumProductionDay = extractRetainDay(sumProductionDay, realProductionDaySet);
+            if (CollectionUtils.isEmpty(newSumProductionDay)) {
+                return Collections.emptySet();
+            }
+            return getEarliestContinuousRange(context, continueDays, newSumProductionDay, stopDay);
+        }
+        //剔除之后，重新获取
+        Set<Integer> newSumProductionDay = extractRetainDay(sumProductionDay, realProductionDaySet);
+        if (CollectionUtils.isEmpty(newSumProductionDay)) {
+            return Collections.emptySet();
+        }
+        return getEarliestContinuousRange(context, continueDays, newSumProductionDay, stopDay);
+    }
+
+    /**
+     * 得到满足大于dayCount的集合
+     *
+     * @param context     排产上下文
+     * @param preDayRange 预计集合
+     * @param dayCount    需要大于数
+     * @return
+     */
+    public static Set<Integer> getGreaterDayRange(Context context, Set<Integer> preDayRange, Integer dayCount) {
+        if (CollectionUtils.isEmpty(preDayRange)) {
+            return Collections.emptySet();
+        }
+        Integer minSize = Optional.ofNullable(dayCount).orElse(BigDecimal.ONE.intValue());
+        Integer days = preDayRange.size();
+        if (days >= minSize) {
+            return preDayRange;
+        }
+        List<Integer> dayRangeList = preDayRange.stream().collect(Collectors.toList());
+        if (days == BigDecimal.ONE.intValue()) {
+            Integer day = dayRangeList.get(BigDecimal.ZERO.intValue());
+            if (context.getProductionEndDay().equals(day)) {
+                return preDayRange;
+            }
+            return Collections.emptySet();
+        }
+        return Collections.emptySet();
     }
 
     /**
@@ -100,6 +164,30 @@ public class ContinuousProductionDayHandler {
             }
         }
         return getEarliestContinuousRange(result);
+    }
+
+    /**
+     * 提取真实排产日期集合
+     * 从allDays中移除rejectDays集合信息
+     * 并得到新的集合对象
+     *
+     * @param allDays    所有集合信息
+     * @param rejectDays 需要移除的集合信息
+     * @return
+     */
+    public static Set<Integer> extractRetainDay(Set<Integer> allDays, Set<Integer> rejectDays) {
+        if (CollectionUtils.isEmpty(allDays)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> realRetainDaySet = new HashSet<>();
+        Set<Integer> matchRejectDays = Optional.ofNullable(rejectDays).orElse(Collections.emptySet());
+        allDays.forEach(day -> {
+            if (matchRejectDays.contains(day)) {
+                return;
+            }
+            realRetainDaySet.add(day);
+        });
+        return realRetainDaySet;
     }
 
     /**

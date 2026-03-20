@@ -263,9 +263,9 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        // 如果有在机的特殊结构，则优先取出特殊结构(即已分配了特殊结构)
-        boolean onLineCxMachineSpecialStructure = productionContext.getBaseDataContainer().getCxMachineBaseInfo().values().stream().anyMatch(machine -> this.hasSpecialStructure(machine));
-        if (onLineCxMachineSpecialStructure) {
+        // 如果有在机的特殊结构，则优先取出特殊结构
+        if (productionContext.getBaseDataContainer().getCxMachineBaseInfo().values()
+                .stream().anyMatch(machine -> this.hasSpecialStructure(machine))) {
             List<ProductionPlanGroupInfo> specialMaterialList = needProductionGroupList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
             if (!CollectionUtils.isEmpty(specialMaterialList)) {
                 needProductionGroupList = specialMaterialList;
@@ -686,11 +686,11 @@ public class CxCapacityAllocationHandler {
             return selected;
         }
         //同规格优先 -> 同英寸优先 -> 断面宽优先 -> 历史最近优先 -> n个月生产最多优先 -> 非零度优先 -> 机台编号
-        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getLastBoardingDate, Comparator.reverseOrder())
-                .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.reverseOrder())
+        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(CxMachineBaseInfoVo::getIsZeroRack)
                 .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
         sectionWidthList.sort(sortComparator);

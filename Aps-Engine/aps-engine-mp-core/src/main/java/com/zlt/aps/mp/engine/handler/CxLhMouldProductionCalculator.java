@@ -10,6 +10,7 @@ import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -86,15 +87,15 @@ public class CxLhMouldProductionCalculator {
      * 此时为在机结构对在产机台进行新增Sku排产的场景
      * 以结构为维度，(多台成型机台-忽略机台)进行排产
      *
-     * @param context                 排产上下文
-     * @param lhProductionQtyHelper   排产基础信息
-     * @param startDay                排产开始日
-     * @param endDay                  排产结束日
-     * @param doubleMouldList         排产的双模模具
-     * @param skuProductionPlanList   sku的排产计划
-     * @param isContinueSkuProduction 是否续作Sku排产(包含同规格同花纹、共生胎同模具 = true， 否则为false)
+     * @param context               排产上下文
+     * @param lhProductionQtyHelper 排产基础信息
+     * @param startDay              排产开始日
+     * @param endDay                排产结束日
+     * @param doubleMouldList       排产的双模模具
+     * @param skuProductionPlanList sku的排产计划
+     * @param continueType          续作Sku排产类型(包含同规格同花纹、共生胎同模具，非续作SKU)
      */
-    public static void lhProductionByGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, boolean isContinueSkuProduction) {
+    public static void lhProductionByGroupHandler(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer startDay, Integer endDay, List<ProductionMouldInfoVo> doubleMouldList, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, ContinueTypeEnum continueType) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer sumProductionQty = lhProductionQtyHelper.getSumProductionQty();
         Integer realSumProductionQty = lhProductionQtyHelper.getRealSumProductionQty();
@@ -106,7 +107,7 @@ public class CxLhMouldProductionCalculator {
         Set<Integer> replenishmentDay = context.getReplenishmentDay();
         Integer dayLhQty = productionPlan.getMaxDaySingleLhMachineQty();
         //非续作需要重新判断胎胚种类数及配比限制
-        if (!isContinueSkuProduction) {
+        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
             //得到真正上机日
             Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
             if (null == realStartDay) {
@@ -138,17 +139,17 @@ public class CxLhMouldProductionCalculator {
             DayProductionQtyHelper dayProductionInfo = calculateSingleLhGroupQty(context, lhProductionQtyHelper, day, firstDay, startDay, productionPlan);
             dayProductionInfo.updateDoubleProductionQty();
             Integer lossQty;
-            if (dayProductionInfo.isProductionNextDay()) {
+            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType && dayProductionInfo.isProductionNextDay()) {
                 //隔天换模，更新当前排产完毕信息
                 doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
                 //记录已排产量及损耗量
                 productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
-                Integer beforeDay = day;
                 day = context.getNextHasProductionDay(day, stopDay);
-                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
                 if (day > endDay) {
                     break;
                 }
+                //处理续作换活字块的换膜
+                handlerDayShareMouldChangeMould(productionContext, day, skuMaterialDesc, doubleMouldList);
                 lossQty = dayProductionInfo.getNextDayLossQty();
             } else {
                 lossQty = dayProductionInfo.getLossQty();
@@ -239,16 +240,16 @@ public class CxLhMouldProductionCalculator {
             dayProductionInfo.updateDoubleProductionQty();
             Integer lossQty;
             if (dayProductionInfo.isProductionNextDay()) {
-                //隔天换模，更新当前排产完毕信息
-                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
-                //记录已排产量及损耗量
-                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
-                Integer beforeDay = day;
-                day = context.getNextHasProductionDay(day, stopDay);
-                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
-                if (day > endDay) {
-                    break;
-                }
+//                //隔天换模，更新当前排产完毕信息
+//                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
+//                //记录已排产量及损耗量
+//                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
+//                Integer beforeDay = day;
+//                day = context.getNextHasProductionDay(day, stopDay);
+//                handlerNextDayChangeMould(productionContext, beforeDay, day, endDay, skuMaterialDesc, doubleMouldList);
+//                if (day > endDay) {
+//                    break;
+//                }
                 lossQty = dayProductionInfo.getNextDayLossQty();
             } else {
                 lossQty = dayProductionInfo.getLossQty();
@@ -327,26 +328,26 @@ public class CxLhMouldProductionCalculator {
      * @return
      */
     public static DayProductionQtyHelper calculateSingleLhGroupQty(Context context, LhProductionQtyHelper lhProductionQtyHelper, Integer productionDay, Integer firstDay, Integer conclusionDay, MonthPlanProductionRequirePlanVo productionSkuInfo) {
-        CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
-        String beforeSku = cxLhGroup.getMaterialDesc();
-        String needProductionSku = productionSkuInfo.getMaterialDesc();
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         //不是首日
         if (!firstDay.equals(productionDay)) {
             return new DayProductionQtyHelper(productionDay, false, lhProductionQtyHelper.getDayMaxProductionQty(), BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), false);
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         //首日排产量参数
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
-        //首日非收尾日
+        //首日非前Sku收尾日
         if (!firstDay.equals(conclusionDay)) {
             Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
+        CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
+        String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
+        String needProductionSku = productionSkuInfo.getMaterialDesc();
         //同Sku，则是不同优先级的衔接
-        Integer beforeSkuDayMaxQty = cxLhGroup.getDayMaxProductionQty();
+        Integer beforeSkuDayMaxQty = cxLhGroup.getBeforeSku().getDayMaxQty();
         //前Sku的排产量
-        Integer beforeSkuProductionQty = cxLhGroup.getProductionQty();
+        Integer beforeSkuProductionQty = cxLhGroup.getBeforeSku().getProductionQty();
         if (needProductionSku.equals(beforeSku)) {
             Integer needProductionQty = beforeSkuDayMaxQty - beforeSkuProductionQty;
             return new DayProductionQtyHelper(productionDay, false, needProductionQty, BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), false);
@@ -589,7 +590,7 @@ public class CxLhMouldProductionCalculator {
      */
     private static DayProductionQtyHelper buildByChangeMould(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, ProductionCapacityParamConfiguration paramConfiguration) {
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
-        String beforeSku = cxLhGroup.getMaterialDesc();
+        String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
         Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
         //没有前规格，通常为结构上机首日
         if (StringUtils.isBlank(beforeSku)) {
@@ -597,8 +598,8 @@ public class CxLhMouldProductionCalculator {
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
         //衔接
-        Integer beforeSkuProductionQty = cxLhGroup.getProductionQty();
-        Integer beforeSkuDayMaxQty = cxLhGroup.getDayMaxProductionQty();
+        Integer beforeSkuProductionQty = cxLhGroup.getBeforeSku().getProductionQty();
+        Integer beforeSkuDayMaxQty = cxLhGroup.getBeforeSku().getDayMaxQty();
         //当天损耗量 = 日硫化量 - 前Sku排产量
         Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
         Integer halfQty = beforeSkuDayMaxQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
@@ -647,6 +648,24 @@ public class CxLhMouldProductionCalculator {
         changeMouldLimitHandler.deductionChangeMouldUsedQty(productionContext, beforeDay, materialDesc, mouldCode);
         //隔天+1
         changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, realChangeDay, materialDesc, mouldCodeSet);
+    }
+
+    /**
+     * 续作换活字块的处理
+     *
+     * @param productionContext 排产上下文
+     * @param changeMouldDay    换模日
+     * @param materialDesc      物料描述
+     * @param doubleMouldList   使用模具
+     */
+    private static void handlerDayShareMouldChangeMould(TbrProductionContext productionContext, Integer changeMouldDay, String materialDesc, List<ProductionMouldInfoVo> doubleMouldList) {
+        if (null == changeMouldDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(doubleMouldList)) {
+            return;
+        }
+        Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        //隔天+1
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, materialDesc, mouldCodeSet);
     }
 
     /**
@@ -793,13 +812,15 @@ public class CxLhMouldProductionCalculator {
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         //排产信息更新
         String materialDesc = productionSkuInfo.getMaterialDesc();
-        cxLhGroup.setProductionQty(realDayProductionQty);
+//        cxLhGroup.setProductionQty(realDayProductionQty);
         cxLhGroup.setProductionDay(productionDay);
-        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-        cxLhGroup.setMaterialDesc(materialDesc);
-        cxLhGroup.setMaterialCode(productionSkuInfo.getMaterialCode());
-        cxLhGroup.setEmbryoCode(productionSkuInfo.getEmbryoCode());
-        cxLhGroup.setProductionMouldSet(usedMouldSet);
+//        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
+//        cxLhGroup.setMaterialDesc(materialDesc);
+//        cxLhGroup.setMaterialCode(productionSkuInfo.getMaterialCode());
+//        cxLhGroup.setEmbryoCode(productionSkuInfo.getEmbryoCode());
+//        cxLhGroup.setProductionMouldSet(usedMouldSet);
+        BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.createByProductionPlan(productionSkuInfo, realDayProductionQty, productionDay, usedMouldSet);
+        cxLhGroup.setBeforeSku(beforeSku);
         cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);
         //成型机台-日排产信息
         Integer lossQty = updateInfo.getLossQty();

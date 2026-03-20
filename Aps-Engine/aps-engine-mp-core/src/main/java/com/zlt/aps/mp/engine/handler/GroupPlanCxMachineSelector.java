@@ -9,10 +9,14 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -113,7 +117,6 @@ public class GroupPlanCxMachineSelector {
         //分组信息：TBR 结构名、是否要求零度供料架、排产计划集合
         String structureName = groupPlanInfo.getGroupName();
         String isZeroRack = groupPlanInfo.getIsZero();
-        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
         //成型机台信息
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         String machineIsZeroRack = cxMachineInfo.getIsZeroRack();
@@ -127,29 +130,7 @@ public class GroupPlanCxMachineSelector {
             log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
             return false;
         }
-        if (CollectionUtils.isEmpty(groupPlanData)) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedGroupNoProductionLog(context, structureName, isZeroRack, cxMachineCode));
-            return false;
-        }
-        Set<String> materialCodeSet = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(materialCodeSet)) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedGroupMaterialDescExceptionLog(context, structureName, isZeroRack, cxMachineCode));
-            return false;
-        }
-        boolean isProduction = true;
-        for (String materialCode : materialCodeSet) {
-            if (cxMachineInfo.isNoProductionMaterial(materialCode)) {
-                isProduction = false;
-                break;
-            }
-        }
-        if (!isProduction) {
-            //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
-            return false;
-        }
+        //20260318 选成型机阶段，不控到Sku
         String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         MonthPlanStructureLhRatioVo lhRatioInfo = groupPlanInfo.getLhRatio(cxMachineInfo);
         if (null == lhRatioInfo) {
@@ -159,6 +140,40 @@ public class GroupPlanCxMachineSelector {
         }
         cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
         log.info(TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
+        return true;
+    }
+
+    /**
+     * 单计划Sku匹配，成型限制作业
+     *
+     * @param context       排产上下文
+     * @param cxMachineInfo 机台
+     * @param singleSku     单计划Sku
+     * @return
+     */
+    public static boolean isMatchSku(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanProductionRequirePlanVo singleSku) {
+        if (null == cxMachineInfo) {
+            return false;
+        }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        if (null == singleSku) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedGroupNoProductionLog(context, "", "", cxMachineCode));
+            return false;
+
+        }
+        String structureName = singleSku.getStructureName();
+        if (StringUtils.isBlank(singleSku.getMaterialDesc())) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedGroupMaterialDescExceptionLog(context, structureName, "", cxMachineCode));
+            return false;
+        }
+        String materialCode = singleSku.getMaterialCode();
+        if (cxMachineInfo.isNoProductionMaterial(materialCode)) {
+            //记录日志
+            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, "", cxMachineCode));
+            return false;
+        }
         return true;
     }
 }

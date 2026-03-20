@@ -692,12 +692,19 @@ public class ProductionPlanGroupInfo {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<Integer> stopDayInfo = productionContext.getStopDays();
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays(), isChangeMould);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo());
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
+//        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
@@ -711,14 +718,14 @@ public class ProductionPlanGroupInfo {
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
         //20260122 换模判断
-        if (!isChangeMould) {
-            return;
-        }
+//        if (!isChangeMould) {
+//            return;
+//        }
         //需要换模-换模次数处理
-        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer changeMouldDay = preSelected.getClosingDay();
-        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+//        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+//        Integer changeMouldDay = preSelected.getClosingDay();
+//        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+//        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
 
     /**
@@ -808,6 +815,20 @@ public class ProductionPlanGroupInfo {
             return null;
         }
         return realStartDay;
+    }
+
+    /**
+     * 一轮排产完毕后，将还有计划的Sku重新标记参与排产
+     */
+    public void afterProductionResetThisRound() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(single -> single.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return;
+        }
+        hasProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.YES.getValue()));
     }
 
     /**

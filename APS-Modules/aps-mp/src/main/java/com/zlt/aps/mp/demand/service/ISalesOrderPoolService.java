@@ -5,7 +5,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.bill.common.service.IDocService;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
@@ -76,12 +75,4 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @return
 	 */
 	AjaxResult getMonthLock(SalesOrderPool salesOrderPool);
-
-	/**
-	 * 导出销售订单池数据
-	 * @param queryVO 查询条件
-	 * @return 导出的字节数组
-	 * @throws IOException IO异常
-	 */
-	byte[] exportSalesOrderPool(SalesOrderPool queryVO) throws IOException;
-} 
+}
