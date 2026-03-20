@@ -546,9 +546,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
      * PCR-英寸、寸别、寸口
      *
      * @param context     排产上下文
-     * @param factoryCode 工厂
-     * @param year        年份
-     * @param month       月份
+     * @param previousVersion 前一个月定稿版本信息
      * @param lastDay     最后一天
      * @return
      */

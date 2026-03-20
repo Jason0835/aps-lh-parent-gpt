@@ -33,6 +33,7 @@ import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.mp.engine.handler.DayProductionStatisticsHandler;
 import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
+import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanMouldDayDetailMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
@@ -3743,16 +3744,14 @@ public class MatchingProductionHandler {
     /**
      * 获取工厂年份-月份的最后一天排产的分组信息 TBR-结构 PCR-英寸、寸别、寸口
      *
-     * @param context     排产上下文
-     * @param factoryCode 工厂
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
+     * @param context         排产上下文
+     * @param previousVersion 前一个定稿版本信息
+     * @param lastDay         最后一天
      * @return
      */
     private Map<String, Set<String>> getContinueGroupInfo(Context context, MpFactoryProductionVersion previousVersion, Integer lastDay) {
         List<ContinueGroupInfo> continueGroupInfoList = monthProductionDataService.getContinueGroupInfo(previousVersion, lastDay);
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
+        TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList);
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             return Collections.emptyMap();
         }
@@ -3787,7 +3786,7 @@ public class MatchingProductionHandler {
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-//            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet));
+//            TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet);
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });
     }
