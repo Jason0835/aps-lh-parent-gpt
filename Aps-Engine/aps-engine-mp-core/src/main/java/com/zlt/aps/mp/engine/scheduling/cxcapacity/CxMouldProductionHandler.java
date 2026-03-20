@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
@@ -77,7 +78,7 @@ public class CxMouldProductionHandler {
         buildNewLhConclusionInfo(context, cxMachineInfo, cxLhRatio, productionPlan);
         //20260108 开启本轮可排产
         productionPlanInfo.setThisRoundCanProduction();
-        cxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap());
+        cxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap(), new HashSet<>());
         //处理结构提前收尾
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
     }
@@ -95,10 +96,18 @@ public class CxMouldProductionHandler {
         Integer startDay = productionPlan.getStartDay();
         Integer maxLhCount = ratio.getLhMachineMaxQty();
         Set<Integer> newCxLhGroupNo = new HashSet<>();
+        //切换结构首日需要扣减的硫化机台数
+        Integer deductionLhMachineCount = ((TbrProductionContext)context).getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = cxMachineInfo.getCxLhRatioMap();
+        Integer newStartDay = 0;
         for (Integer cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= maxLhCount; cxLhGroupNo++) {
+            newStartDay = startDay;
+            if (cxLhGroupNo <= deductionLhMachineCount){
+                //模拟排产，成型机只会有1台；将小于扣减的硫化机台数的起始日+1，即首日不上机; sandy+ 2026.3.19
+                newStartDay = startDay + 1;
+            }
             newCxLhGroupNo.add(cxLhGroupNo);
-            updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), cxMachineInfo.getCxMachineCode(), startDay);
+            updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), cxMachineInfo.getCxMachineCode(), newStartDay);
         }
         Set<Integer> needDeletedGroupNo = new HashSet<>();
         cxLhRatioMap.forEach((cxLhGroupNo, helper) -> {
@@ -142,7 +151,9 @@ public class CxMouldProductionHandler {
         cxMachineInfo.add(cxMachineCode);
         CxLhProductionHelper newHelper = CxLhProductionHelper.createEmptyLhGroup(groupName, cxLhGroupNo, cxMachineInfo);
         newHelper.setProductionDay(startDay);
-        newHelper.setProductionQty(BigDecimal.ZERO.intValue());
+        BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.buildEmpty(startDay);
+//        newHelper.setProductionQty(BigDecimal.ZERO.intValue());
+        newHelper.setBeforeSku(beforeSku);
         cxLhRatioMap.put(cxLhGroupNo, newHelper);
     }
 

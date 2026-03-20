@@ -408,6 +408,7 @@ public class SupplyOrderPoolServiceImpl extends AbstractDocService<SupplyOrderPo
         row.put("saleArea", item.getSaleAreaName());
         row.put("qty",item.getQty());
         row.put("threeAverageQty",item.getThreeAverageQty());
+        row.put("sixAverageQty",item.getSixAverageQty());
         row.put("deliveryFrequency", item.getDeliveryFrequency());
         row.put("structureFrequency", item.getStructureFrequency());
         row.put("threeOverdueStockQty", item.getThreeOverdueStockQty());

@@ -84,4 +84,4 @@ public interface ISalesOrderPoolService  extends IDocService<SalesOrderPool>{
 	 * @throws IOException IO异常
 	 */
 	byte[] exportSalesOrderPool(SalesOrderPool queryVO) throws IOException;
-} 
+}

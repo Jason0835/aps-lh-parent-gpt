@@ -3,6 +3,8 @@ package com.zlt.aps.mp.engine.domain.dto;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 排产计划-续作分组信息

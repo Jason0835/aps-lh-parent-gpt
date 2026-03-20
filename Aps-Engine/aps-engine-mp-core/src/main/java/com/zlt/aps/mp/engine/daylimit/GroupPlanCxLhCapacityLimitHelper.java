@@ -1,5 +1,8 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -7,7 +10,6 @@ import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
@@ -140,10 +142,11 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        Integer decLhMachines =  productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
         groupAllocationList.forEach(singleCxMachineAllocation -> {
             String cxMachineCode = singleCxMachineAllocation.getCxMachineCode();
             CxMachineBaseInfoVo cxMachineInfo = cxMachineBaseInfo.get(cxMachineCode);
-            updateBaseLimitInfo(initLimitHelper, cxMachineInfo, singleCxMachineAllocation);
+            updateBaseLimitInfo(initLimitHelper, cxMachineInfo, singleCxMachineAllocation,decLhMachines);
         });
         return initLimitHelper;
     }
@@ -688,7 +691,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param cxMachineInfo             成型机台信息
      * @param singleCxMachineAllocation 某条转产配置
      */
-    private static void updateBaseLimitInfo(GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
+    private static void updateBaseLimitInfo(GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation,Integer decLhMachines) {
         Integer productionDay = initLimitHelper.getDay();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (null == cxMachineInfo) {
@@ -705,9 +708,16 @@ public class GroupPlanCxLhCapacityLimitHelper {
             return;
         }
         initLimitHelper.getCxMachineCodeSet().add(cxMachineCode);
+
         //最大硫化配比
         Integer maxLhMachineCount = initLimitHelper.getMaxLhMachineCount();
-        maxLhMachineCount = maxLhMachineCount + singleCxMachineAllocation.getMaxLhMachineCount();
+        Integer singleCxMachineCount = singleCxMachineAllocation.getMaxLhMachineCount();
+        if (singleCxMachineAllocation.getBeginDay().equals(productionDay)){
+            //若是结构开产首日，将最大成型机数-3 sandy+ 2026.3.19
+            decLhMachines = (decLhMachines > singleCxMachineCount) ? singleCxMachineCount:decLhMachines;
+            singleCxMachineCount -= decLhMachines;
+        }
+        maxLhMachineCount = maxLhMachineCount + singleCxMachineCount;
         initLimitHelper.maxLhMachineCount = maxLhMachineCount;
         //最低硫化配比
         initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, singleCxMachineAllocation.getMinLhMachineCount());
@@ -782,6 +792,33 @@ class SkuUsedLhMachineInfo {
         Integer allMachineCount = getWholeMachineCount() + getLeftOverMachineCount();
         if (null == nextDayInfo) {
             return BigDecimal.ZERO.intValue() - allMachineCount;
+        }
+        Integer nextAllMachineCount = nextDayInfo.getWholeMachineCount() + nextDayInfo.getLeftOverMachineCount();
+        if(allMachineCount.equals(nextAllMachineCount)){
+            return getSingleChange(nextDayInfo);
+        }
+        return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
+    }
+
+    /**
+     * 单台变化处理
+     *
+     * @param nextDayInfo
+     * @return
+     */
+    private Integer getSingleChange(SkuUsedLhMachineInfo nextDayInfo) {
+        //如果整台数都为零，则表示可以释放一台
+        if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
+            return getWholeMachineCount() - nextDayInfo.getLeftOverMachineCount();
+        }
+        if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getLeftOverMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
         }
         return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
     }

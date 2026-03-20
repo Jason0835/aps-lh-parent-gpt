@@ -285,28 +285,13 @@ public class ProductionCxMachineCalculationHandler {
         if (ProductionConstant.MONTH_START_DAY.equals(minAllocationDays)) {
             leftOverSplitDays = sumDays;
             minAllocationDays = BigDecimal.ZERO.intValue();
-//            for (ProductGroupCxCapacityInfo cxCapacityInfo : effectiveList) {
-//                CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
-//                Integer remainingDays = cxMachineInfo.getRemainingDays();
-//                Integer allocationDay = Math.min(sumDays, remainingDays);
-//                if (allocationDay <= BigDecimal.ZERO.intValue()) {
-//                    break;
-//                }
-//                // 更新特殊材料库存
-//                productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
-//                groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
-//                CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
-//                cxMachineInfo.addAllocationPlanInfo(context, helper);
-//                allocationList.add(helper);
-//                sumDays = sumDays - allocationDay;
-//            }
-//            //20260109 标记分组计划分配完毕
-//            groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-//            return allocationList;
-        }else{
+        } else {
             //至少每台都需要分配最低天数
             Integer sumMinAllocationDays = minAllocationDays * effectiveList.size();
             leftOverSplitDays = sumDays - sumMinAllocationDays;
+            if(leftOverSplitDays < BigDecimal.ZERO.intValue()){
+                leftOverSplitDays = BigDecimal.ZERO.intValue();
+            }
         }
         for (ProductGroupCxCapacityInfo cxCapacityInfo : effectiveList) {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
@@ -323,7 +308,7 @@ public class ProductionCxMachineCalculationHandler {
             cxMachineInfo.addAllocationPlanInfo(context, helper);
             allocationList.add(helper);
             leftOverSplitDays = leftOverSplitDays - leftOverAllocationDay;
-            if(leftOverSplitDays <= BigDecimal.ZERO.intValue()){
+            if (leftOverSplitDays <= BigDecimal.ZERO.intValue()) {
                 leftOverSplitDays = BigDecimal.ZERO.intValue();
             }
         }
@@ -366,19 +351,11 @@ public class ProductionCxMachineCalculationHandler {
         release.setDeductionMachineCount(releaseCount);
         //需要机台数 + 释放机台数 = 在产机台数
         if (needWholeCount + releaseCount == continueMachineCount) {
-            //逐步释放
-            Integer deductionMachineCount = release.getDeductionMachineCount();
+            //尝试再减一台：逐步释放
+            Integer deductionMachineCount = release.getDeductionMachineCount() + BigDecimal.ONE.intValue();
             Integer deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
-            //理论会出现在第一天，此时尝试扣减一台，看最低要求生产天数
-            if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
-                deductionMachineCount = deductionMachineCount + BigDecimal.ONE.intValue();
-                Integer newDeductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
-                if (null != newDeductionDay) {
-                    deductionDay = newDeductionDay;
-                }
-            }
             //释放台数
-            release.setReleaseMachineCount(releaseCount);
+            release.setReleaseMachineCount(deductionMachineCount);
             release.setEarliestConclusionDay(deductionDay);
             return;
         }

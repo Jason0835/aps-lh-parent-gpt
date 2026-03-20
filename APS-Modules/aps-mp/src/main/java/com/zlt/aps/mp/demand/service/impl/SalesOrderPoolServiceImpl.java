@@ -14,7 +14,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
@@ -74,15 +73,16 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	private IMesItfService iMesItfService;
 
 	@Autowired
+	private ISysDictDataCacheService sysDictDataCacheService;
+
+	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
 	private SalesOrderPoolRecordEntityMapper salesOrderPoolRecordEntityMapper;
 	@Autowired
-    private DpAreaEntityMapper dpAreaEntityMapper;
+	private DpAreaEntityMapper dpAreaEntityMapper;
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
-    @Autowired
-    private ISysDictDataCacheService sysDictDataCacheService;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -661,7 +661,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		int currentMonth = calendar.get(Calendar.MONTH) + 1;
 
 		// 设置年月标题
-		tableMap.put("title", currentYear + "年" + currentMonth + "月份");
+		tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
 		// 查询数据
 		QueryWrapper<SalesOrderPool> wrapper = new QueryWrapper<>();
 		// 构建查询条件
@@ -741,8 +741,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 
 				// 添加样式（确保样式作用在实际的数据行上）
 				// 使用白色背景色（#FFFFFF）代替null，避免Color.decode抛出异常
-				// 等线字体，9号大小，黑色，不加粗
-				cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 18, "#FFFFFF", Boolean.FALSE, false, "等线"));
+				// 等线字体，9号大小，黑色，不加粗，带边框
+				cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 18, "#FFFFFF", true, false, "等线"));
 
 				list.add(listDataMap);
 			}

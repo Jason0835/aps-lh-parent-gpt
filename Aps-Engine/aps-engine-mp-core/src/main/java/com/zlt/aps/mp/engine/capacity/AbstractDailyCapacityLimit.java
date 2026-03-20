@@ -217,6 +217,8 @@ public abstract class AbstractDailyCapacityLimit {
         int openMachinesAddMould = 0;
         int blockMachinesAddMould = 0;
 
+        int iChangeMouldCount = 0;
+
         // 按日期+主花纹向下，统计日硫化机台数
         int mpFullMachinesDecMould = 0;
         int mpCloseMachinesDecMould = 0;
@@ -299,7 +301,8 @@ public abstract class AbstractDailyCapacityLimit {
                 int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day2Field);
                 openMachinesAddMould += addMouldArr[0];
                 blockMachinesAddMould += addMouldArr[1] + addMouldArr[2];
-
+                // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
+                iChangeMouldCount += addMouldArr[3];
                 // 计算主花纹向下的硫化机台数
                 if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
                     mpFullMachinesAddMould += dayPlanQty / dailyLhQty;
@@ -314,7 +317,7 @@ public abstract class AbstractDailyCapacityLimit {
             }
 
             // 统计胎胚种类数
-            if (dayPlanQty > 0){
+            if (dayPlanQty >= 0){
                 embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
                 dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
             }
@@ -331,7 +334,6 @@ public abstract class AbstractDailyCapacityLimit {
         // 已用胎胚种类数
         dailyCapacityLimitVo.setUsedEmbryoTypes(dailyCapacityLimitVo.getEmbryoCodes().size());
         // 已用换模次数
-        int iChangeMouldCount = machineResultVo.getMatchedPairs() + machineResultVo.getIsolatedIncreases() + machineResultVo.getIsolatedChanges();
         dailyCapacityLimitVo.setUsedChangeMould(iChangeMouldCount);
         //==================计算主花纹向下的硫化机台数==========================
         // 计算机台组合（减模、增模、换活字块）
@@ -512,6 +514,7 @@ public abstract class AbstractDailyCapacityLimit {
      * [0]--新增模机台数
      * [1]--换活字块机台数20条
      * [2]--换活字块机台数X条(32)
+     * [3]--换模次数
      * @param mpFinalVo
      */
     public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day2Field) {
@@ -528,7 +531,7 @@ public abstract class AbstractDailyCapacityLimit {
         int changeMouldXBlockQty = (Integer) paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
         //余量
         int remainQty = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) % dailyLhQty;
-        int[] resultArr = {0,0,0};
+        int[] resultArr = {0,0,0,0};
         if (remainQty == 0){
             //没有余量，直接退回
             return resultArr;
@@ -536,11 +539,14 @@ public abstract class AbstractDailyCapacityLimit {
         if (remainQty == changeMouldFirstQty){
             //若余数 == 换模起排量，则视新增机台数
             resultArr[0] = 1;
+            resultArr[3] = 1;
         }else if (remainQty == changeMouldBlockQty){
             //若余数 == 换活字块20条
             resultArr[1] = 1;
+            resultArr[3] = 1;
         }else if (remainQty == changeMouldXBlockQty){
             resultArr[2] = 1;
+            resultArr[3] = 1;
         }else {
             resultArr[0] = 1;
         }
@@ -560,12 +566,14 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[0] = afterMachines;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
+                resultArr[3] = afterMachines;
                 //例子：
                 //16 46
                 if (remainQty != changeMouldBlockQty || remainQty != changeMouldXBlockQty){
                     int mouldCount = remainQty / changeMouldFirstQty;
                     if (mouldCount > afterMachines){
                         resultArr[0] = mouldCount;
+                        resultArr[3] = mouldCount;
                     }
                 }
             }
@@ -576,6 +584,7 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[0] = afterMachines - intPart;
                 resultArr[1] = 0;
                 resultArr[2] = 0;
+                resultArr[3] = afterMachines - intPart;
             }
         }
        return resultArr;

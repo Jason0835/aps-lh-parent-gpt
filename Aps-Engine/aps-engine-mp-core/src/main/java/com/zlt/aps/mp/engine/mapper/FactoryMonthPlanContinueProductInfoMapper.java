@@ -33,14 +33,18 @@ public interface FactoryMonthPlanContinueProductInfoMapper {
     /**
      * 根据上个月最后一天，获取在机结构信息
      *
-     * @param factoryCode 工厂编码
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
+     * @param factoryCode       工厂编码
+     * @param year              年份
+     * @param month             月份
+     * @param monthPlanVersion  需求版本号
+     * @param productionVersion 排产版本号
+     * @param lastDay           最后一天
      * @return
      */
     List<ContinueGroupInfo> getContinueGroupInfo(@Param("factoryCode") String factoryCode,
                                                  @Param("year") Integer year,
                                                  @Param("month") Integer month,
+                                                 @Param("monthPlanVersion") String monthPlanVersion,
+                                                 @Param("productionVersion") String productionVersion,
                                                  @Param("lastDay") Integer lastDay);
 }

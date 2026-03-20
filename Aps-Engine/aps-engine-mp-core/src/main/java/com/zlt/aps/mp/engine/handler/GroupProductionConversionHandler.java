@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.entity.RawMaterialMonthDiff;
+import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
@@ -8,6 +10,7 @@ import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.common.utils.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -61,7 +64,44 @@ public class GroupProductionConversionHandler {
         if (CollectionUtils.isEmpty(resultMap)) {
             return Collections.emptyList();
         }
-        return resultMap.values().stream().collect(Collectors.toList());
+
+        List<MpStructureAllocation> structureAllocationList = resultMap.values().stream().collect(Collectors.toList());
+        //处理交替类型 sandy+ 2026.3.19
+        setAlternatingType(structureAllocationList,productionContext.getContinueStructureMap());
+        return structureAllocationList;
+    }
+
+
+    /**
+     * 设置交替类型
+     * @param structureAllocationList 结构分配列表
+     * @param continueStructureMap 机台续作结构Map
+     */
+    private static void setAlternatingType(List<MpStructureAllocation> structureAllocationList,Map<String,String> continueStructureMap){
+        List<MpStructureAllocation> machineStructureAllocationList;
+        //按机台维度序列化
+        Map<String, List< MpStructureAllocation>> structureAllocationMap = structureAllocationList.stream().collect(Collectors.groupingBy(MpStructureAllocation::getCxMachineCode));
+        for (Map.Entry entry : structureAllocationMap.entrySet()) {
+            machineStructureAllocationList = (List< MpStructureAllocation>)entry.getValue();
+            machineStructureAllocationList.sort(Comparator.comparing(MpStructureAllocation::getBeginDay,
+                    Comparator.nullsLast(Integer::compareTo)));
+            //1. 将上个月有续作的机台,加到第1的位置
+            MpStructureAllocation firstStructureAlloc = new MpStructureAllocation();
+            String continueStructure = continueStructureMap.get(entry.getKey());
+            firstStructureAlloc.setStructureName(StringUtil.isEmptyWithTrim(continueStructure) ? machineStructureAllocationList.get(0).getStructureName() : continueStructure);
+            machineStructureAllocationList.add(0,firstStructureAlloc);
+
+            // 2. 遍历判断相邻元素
+            for (int i = 0; i < machineStructureAllocationList.size()-1; i++) {
+                MpStructureAllocation current = machineStructureAllocationList.get(i);
+                MpStructureAllocation next = machineStructureAllocationList.get(i + 1);
+                if (!current.tbrProSize().equals(next.tbrProSize())){
+                    next.setAlternatingType(AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode());
+                }else{
+                    next.setAlternatingType(AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode());
+                }
+            }
+        }
     }
 
     /**
@@ -113,5 +153,6 @@ public class GroupProductionConversionHandler {
         allocationInfo.setMonthPlanVersion(context.getMonthPlanVersion());
         allocationInfo.setProductionVersion(context.getProductionVersion());
         allocationInfo.setPlanType(context.getPlanType());
+
     }
 }

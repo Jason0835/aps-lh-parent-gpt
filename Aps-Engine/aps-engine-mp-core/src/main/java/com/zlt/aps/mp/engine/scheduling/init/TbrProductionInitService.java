@@ -266,6 +266,9 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
                 return;
             }
             Integer sumNetQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+            if(sumNetQty <= BigDecimal.ZERO.intValue()){
+                return;
+            }
             Integer minQty = planList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
             if (null == minQty) {
                 return;

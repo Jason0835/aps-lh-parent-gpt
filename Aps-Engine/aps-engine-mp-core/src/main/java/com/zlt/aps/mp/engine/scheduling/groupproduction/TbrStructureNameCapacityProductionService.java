@@ -5,6 +5,7 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
@@ -118,6 +119,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        // 设置成型机台续作结构 sandy+ 2026.3.19
+        productionContext.setContinueStructureMap(getContinueStructureMap(cxContinueInfoMap));
         // 结构特殊材料排产
 //        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
@@ -272,7 +275,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
-        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
+        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, previousVersion, lastDay);
         //构建续作分组信息(TBR为结构，PCR为英寸)
         BaseDataContainer baseDataContainer = ((TbrProductionContext) context).getBaseDataContainer();
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = baseDataContainer.getCxMachineBaseInfo();
@@ -397,15 +400,13 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
      * TBR-结构
      * PCR-英寸、寸别、寸口
      *
-     * @param context     排产上下文
-     * @param factoryCode 工厂
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
+     * @param context         排产上下文
+     * @param previousVersion 前一个月定稿版本
+     * @param lastDay         最后一天
      * @return
      */
-    private Map<String, Set<String>> getContinueGroupInfo(Context context, String factoryCode, Integer year, Integer month, Integer lastDay) {
-        List<ContinueGroupInfo> continueGroupInfoList = getMonthProductionDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
+    private Map<String, Set<String>> getContinueGroupInfo(Context context, MpFactoryProductionVersion previousVersion, Integer lastDay) {
+        List<ContinueGroupInfo> continueGroupInfoList = getMonthProductionDataService().getContinueGroupInfo(previousVersion, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             return Collections.emptyMap();
