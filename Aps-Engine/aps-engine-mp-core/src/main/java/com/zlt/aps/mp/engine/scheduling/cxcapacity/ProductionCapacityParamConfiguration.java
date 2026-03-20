@@ -147,5 +147,4 @@ public class ProductionCapacityParamConfiguration {
      * 切换结构首日需要扣减的硫化机台数
      */
     private Integer deductionLhMachineCount;
-
 }

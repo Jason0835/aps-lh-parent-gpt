@@ -5,6 +5,7 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
@@ -118,6 +119,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        // 设置成型机台续作结构 sandy+ 2026.3.19
+        productionContext.setContinueStructureMap(getContinueStructureMap(cxContinueInfoMap));
         // 结构特殊材料排产
 //        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息

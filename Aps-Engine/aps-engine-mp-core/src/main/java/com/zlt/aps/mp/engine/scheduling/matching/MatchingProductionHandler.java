@@ -3175,6 +3175,7 @@ public class MatchingProductionHandler {
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MIN_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
         // 排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
@@ -3245,6 +3246,7 @@ public class MatchingProductionHandler {
         configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
         configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
         configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
+        configuration.setDeductionLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode()));
         //降膜排产相关
         configuration.setDeductMouldMinLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode()));
         configuration.setFirstNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
