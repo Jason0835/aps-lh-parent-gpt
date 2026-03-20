@@ -631,10 +631,10 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		List<SysDictData> productTypeDatas = sysDictDataCacheService.getType("biz_product_type");
 		Map<String, String> productTypeMap = productTypeDatas != null ? productTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
 		// 订单优先级字典
-		List<SysDictData> orderPriorityDatas = sysDictDataCacheService.getType("biz_order_priority");
+		List<SysDictData> orderPriorityDatas = sysDictDataCacheService.getType("biz_order_type");
 		Map<String, String> orderPriorityMap = orderPriorityDatas != null ? orderPriorityDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
 		// 内外销字典
-		List<SysDictData> locationTypeDatas = sysDictDataCacheService.getType("biz_location_type");
+		List<SysDictData> locationTypeDatas = sysDictDataCacheService.getType("biz_stor_type");
 		Map<String, String> locationTypeMap = locationTypeDatas != null ? locationTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
 		// 品牌字典
 		List<SysDictData> brandDatas = sysDictDataCacheService.getType("biz_brand_type");
@@ -646,7 +646,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		List<SysDictData> deliverGoodsTypeDatas = sysDictDataCacheService.getType("biz_deliver_goods_type");
 		Map<String, String> deliverGoodsTypeMap = deliverGoodsTypeDatas != null ? deliverGoodsTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
 		// 供应链优先级字典
-		List<SysDictData> scmPriorityDatas = sysDictDataCacheService.getType("biz_scm_priority");
+		List<SysDictData> scmPriorityDatas = sysDictDataCacheService.getType("biz_scm_type");
 		Map<String, String> scmPriorityMap = scmPriorityDatas != null ? scmPriorityDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
 
 		// 表头信息
@@ -654,6 +654,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		// 列表数据
 		List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
 		List<CellStyle> cellStyleList = new ArrayList<>();
+
+		// 添加第一行表头样式：9号、白色、加粗
+		cellStyleList.add(new CellStyle(1, 1, 0, 18, "#FFFFFF", true, true, "等线"));
 
 		// 按当前年月取数
 		Calendar calendar = Calendar.getInstance();
