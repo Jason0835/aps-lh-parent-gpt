@@ -3039,15 +3039,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 4. 根据产品状态确定匹配优先级
         List<String> priorityStatusList;
         switch (trialStatus) {
-            case "正式":
+            case ConstructionStageEnum.FORMAL_FLAG:
                 // 正式：优先级
                 priorityStatusList = Arrays.asList(ConstructionStageEnum.FORMAL_FLAG, ConstructionStageEnum.TRIAL_FLAG, ConstructionStageEnum.MEASUREMENT_FLAG);
                 break;
-            case "量试":
+            case ConstructionStageEnum.TRIAL_FLAG:
                 // 量试：优先级
                 priorityStatusList = Arrays.asList(ConstructionStageEnum.TRIAL_FLAG, ConstructionStageEnum.MEASUREMENT_FLAG);
                 break;
-            case "试制":
+            case ConstructionStageEnum.MEASUREMENT_FLAG:
                 // 试制：优先级
                 priorityStatusList = Arrays.asList(ConstructionStageEnum.MEASUREMENT_FLAG);
                 break;
@@ -3671,11 +3671,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<String> errorMsgList = messageMap.computeIfAbsent(ApsConstant.APS_STRING_1, k -> new ArrayList<>());
         contextDTO.setMessageMap(messageMap);
 
+        List<String> msgResultList = new ArrayList<>();
         // 未匹配到SKU与示方书记录
         if (skuConstructionRef == null) {
             String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchSkuConstructionRef"),
                     materialCode);
             errorMsgList.add(errorMsg);
+            msgResultList.add(errorMsg);
         }
         //  匹配到SKU与示方书记录，检查制造示方、硫化示方、文字示方是否为空
         if (skuConstructionRef != null) {
@@ -3683,19 +3685,22 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkEmbryoNoEmpty"),
                         materialCode);
                 errorMsgList.add(errorMsg);
+                msgResultList.add(errorMsg);
             }
             if (StringUtils.isEmpty(skuConstructionRef.getLhNo())) {
                 String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkLhNoEmpty"),
                         materialCode);
                 errorMsgList.add(errorMsg);
+                msgResultList.add(errorMsg);
             }
             if (StringUtils.isEmpty(skuConstructionRef.getTextNo())) {
                 String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkTextNoEmpty"),
                         materialCode);
                 errorMsgList.add(errorMsg);
+                msgResultList.add(errorMsg);
             }
         }
-        return errorMsgList;
+        return msgResultList;
     }
 
     /**
