@@ -33,6 +33,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SupplementCxMachineDistributionHandler {
 
+    private final GroupPlanPrioritySelector groupPlanPrioritySelector;
+
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
 
     /**
@@ -238,23 +240,13 @@ public class SupplementCxMachineDistributionHandler {
         } else {
             sort = Comparator.comparing(ProductionPlanGroupInfo::getHeightPriorityCount, Comparator.reverseOrder());
         }
-        sort.thenComparing(Comparator.comparing(ProductionPlanGroupInfo::getSpecialMaterialsCount, Comparator.reverseOrder())
+        sort.thenComparing(Comparator.comparing(ProductionPlanGroupInfo::getUsedSpecialMaterialCount, Comparator.reverseOrder())
                 .thenComparing(new Comparator() {
                     @Override
                     public int compare(Object obj1, Object obj2) {
-                        ProductionPlanGroupInfo groupInfo1 = (ProductionPlanGroupInfo) obj1;
-                        ProductionPlanGroupInfo groupInfo2 = (ProductionPlanGroupInfo) obj2;
-                        // 判断如果都是特殊材料，同时包含专用与共用特殊材料的结构优先
-                        Boolean hasDedicatedSpecialMaterials1 = groupInfo1.hasDedicatedSpecialMaterials(productionContext);
-                        Boolean hasDedicatedSpecialMaterials2 = groupInfo2.hasDedicatedSpecialMaterials(productionContext);
-                        int result = hasDedicatedSpecialMaterials2.compareTo(hasDedicatedSpecialMaterials1); // 倒序
-                        if (result != 0) {
-                            return result;
-                        }
-                        Integer remainingNeedAllocationDays1 = Optional.ofNullable(groupInfo1.getRemainingNeedAllocationDays()).orElse(0);
-                        Integer remainingNeedAllocationDays2 = Optional.ofNullable(groupInfo2.getRemainingNeedAllocationDays()).orElse(0);
-                        result = remainingNeedAllocationDays1.compareTo(remainingNeedAllocationDays2);
-                        return result;
+                        ProductionPlanGroupInfo before = (ProductionPlanGroupInfo) obj1;
+                        ProductionPlanGroupInfo after = (ProductionPlanGroupInfo) obj2;
+                        return groupPlanPrioritySelector.compareSpecialMaterial(before, after);
                     }
                 }));
 

@@ -9,6 +9,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -44,6 +45,8 @@ import java.util.stream.Collectors;
 public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final CxMouldProductionHandler cxMouldProductionHandler;
+
+    private final GroupPlanPrioritySelector groupPlanPrioritySelector;
 
     private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
 
@@ -134,23 +137,12 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         productionContinue(ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        //2、在机结构-新增Sku排产
+        //2、在机结构-新增Sku排产 优先给特殊结构所在机台选择
         allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {
                     // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
-                    ProductionPlanGroupInfo continueGroup = allGroupPlanMap.get(entry1.getKey());
-                    ProductionPlanGroupInfo continueGroup2 = allGroupPlanMap.get(entry2.getKey());
-                    Boolean isSpecial1 = null == continueGroup ? false : continueGroup.isSpecialMaterial();
-                    Boolean isSpecial2 = null == continueGroup2 ? false : continueGroup2.isSpecialMaterial();
-                    // Boolean的true比false大，因此需要倒序，优先处理true的
-                    int result = isSpecial2.compareTo(isSpecial1);
-                    if (result != 0) {
-                        return result;
-                    }
-                    // 判断如果都是特殊材料，同时包含专用与共用特殊材料的结构优先
-                    Boolean hasDedicatedSpecialMaterials1 = continueGroup.hasDedicatedSpecialMaterials(productionContext);
-                    Boolean hasDedicatedSpecialMaterials2 = continueGroup2.hasDedicatedSpecialMaterials(productionContext);
-                    result = hasDedicatedSpecialMaterials2.compareTo(hasDedicatedSpecialMaterials1); // 倒序
-                    return result;
+                    ProductionPlanGroupInfo before = allGroupPlanMap.get(entry1.getKey());
+                    ProductionPlanGroupInfo after = allGroupPlanMap.get(entry2.getKey());
+                    return groupPlanPrioritySelector.compareContinueGroup(before, after);
                 })
                 .forEach(entry -> {
                     String structureName = entry.getKey();

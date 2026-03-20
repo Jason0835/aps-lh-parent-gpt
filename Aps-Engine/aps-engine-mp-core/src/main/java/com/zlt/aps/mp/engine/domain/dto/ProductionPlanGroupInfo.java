@@ -1048,6 +1048,18 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 使用的特殊原材料的种类数
+     *
+     * @return
+     */
+    public Integer getUsedSpecialMaterialCount() {
+        if (CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return embryoSpecialMaterialInfoMap.keySet().size();
+    }
+
+    /**
      * 判断结构是否含有专用特殊材料同时也有共用特殊材料（排产优先级最高）
      *
      * @param productionContext

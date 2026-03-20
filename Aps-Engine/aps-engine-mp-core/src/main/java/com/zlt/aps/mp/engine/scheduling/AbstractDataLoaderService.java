@@ -483,6 +483,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -532,6 +533,14 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
         Integer deductionLhMachine = Optional.ofNullable((Integer) deductionLhMachineValue).orElse(BigDecimal.ZERO.intValue());
         configuration.setDeductionLhMachineCount(deductionLhMachine);
+        //特殊原材料
+        Object specialMaterialCodeValue = paramConfigurationMap.get(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
+        String specialMaterialCode = (String) Optional.ofNullable(specialMaterialCodeValue).orElse("");
+        if (StringUtils.isBlank(specialMaterialCode)) {
+            configuration.setSpecialMaterialCodeSet(Collections.emptySet());
+        } else {
+            configuration.setSpecialMaterialCodeSet(Stream.of(specialMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
         return configuration;
     }
 
@@ -1045,6 +1054,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
             return;
         }
+        Set<String> specialMaterialCodeSet = productionContext.getBaseDataContainer().getParamConfiguration().getSpecialMaterialCodeSet();
         //转化胎胚号-特殊材料
         Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
         allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
@@ -1059,6 +1069,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
                 String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
                 if (StringUtils.isBlank(specialMaterialCode)) {
+                    continue;
+                }
+                if (!specialMaterialCodeSet.contains(specialMaterialCode)) {
                     continue;
                 }
                 BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();

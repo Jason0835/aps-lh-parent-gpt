@@ -147,4 +147,8 @@ public class ProductionCapacityParamConfiguration {
      * 切换结构首日需要扣减的硫化机台数
      */
     private Integer deductionLhMachineCount;
+    /**
+     * 参与排产的特殊原材料编码信息
+     */
+    private Set<String> specialMaterialCodeSet;
 }
