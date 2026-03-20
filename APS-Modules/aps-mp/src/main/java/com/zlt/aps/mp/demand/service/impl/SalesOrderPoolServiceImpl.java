@@ -315,12 +315,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		Integer year = salesOrderPool.getYear();
 		Integer month = salesOrderPool.getMonth();
 		String factoryCode = salesOrderPool.getFactoryCode();
-		LambdaQueryWrapper<SalesOrderPoolRecord> recordQueryWrapper = new LambdaQueryWrapper<>();
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getFactoryCode, factoryCode);
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getYear, year);
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getMonth, month);
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getIsDelete, ApsConstant.APS_YES_NO_0);
-		boolean isFirstCatch = !salesOrderPoolRecordEntityMapper.exists(recordQueryWrapper); // 如果抓取不到，是年月首次抓取
+        boolean isFirstCatch = !syncResultList.stream()
+                .anyMatch(r -> ApsConstant.SCM_PLANED_NOT_SHIP_SYNC_STATUS_LOCK.equals(r.getSyncStatus())); // 数据全部都不是锁定的，为首次抓取
 
 		// 排产参数
 		String scmOrderMatralCodePrefix = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
@@ -417,7 +413,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			return newVO;
 		}).collect(Collectors.toList());
 
-		if (isFirstCatch) { // 年月首次抓取
+		if (isFirstCatch) { // 年月首次抓取（20260320，改为锁定前）
 			// 根据发货模式，当发货模式 = 整单发货的订单，对其下所有SKU获取供应链优先级最高的值(即供应链优先级的值最小)，
 			List<String> salCodePoList = newSalesOrderPoolList.stream()
 					.filter(s -> ApsConstant.DELIVERY_MODE_ALL.equals(s.getDeliverGoodsType()))
@@ -466,7 +462,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					}
 				}
 			}
-		} else { // 年月再次抓取数据
+		} else { // 年月再次抓取数据（20260320，改为锁定后）
 			LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
 			queryWrapper.eq(SalesOrderPool::getFactoryCode, factoryCode);
 			queryWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
@@ -478,7 +474,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 				SalesOrderPool oldPool = CollectionUtils.firstElement(scmDetailMap.get(pool.getScmDetailId()));
 				if (oldPool != null) {
 					// 如果(SCM行ID)存在，则订单类型 = 旧订单类型，供应链优先级 = 旧供应链优先级；同时，更新订单其他字段数据；
-//					pool.setOrderPriority(oldPool.getOrderPriority()); // 260320要求改成以SCM的数据为准
+					pool.setOrderPriority(oldPool.getOrderPriority());
 					pool.setScmPriority(oldPool.getScmPriority());
 				} else {
 					// 如果(SCM行ID)不存在，则订单类型=抓取数据的订单类型；供应链优先级 = 中优先级；

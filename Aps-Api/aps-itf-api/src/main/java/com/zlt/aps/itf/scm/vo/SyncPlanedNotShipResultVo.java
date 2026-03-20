@@ -233,8 +233,8 @@ public class SyncPlanedNotShipResultVo {
 	private String salPriority;
 
 	/** APS数据同步状态，0：未同步，1：已同步 */
-	@ApiModelProperty(value = "APS数据同步状态", name = "apsSyncStatus")
-	private String apsSyncStatus;
+	@ApiModelProperty(value = "APS数据同步状态", name = "syncStatus")
+	private String syncStatus;
 
 	/** 销售订单明细关联ID */
 	@ApiModelProperty(value = "销售订单明细关联ID", name = "saleBillDetailId")
