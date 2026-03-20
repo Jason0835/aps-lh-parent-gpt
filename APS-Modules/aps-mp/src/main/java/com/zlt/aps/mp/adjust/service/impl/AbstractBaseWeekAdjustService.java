@@ -2317,7 +2317,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
 
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
-        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.FALSE);
         List<MdmSkuConstructionRef> mdmSkuConstructionRefList = dataManager.listSkuConstructionRefs(dataDTO);
 
         contextDTO.setMdmSkuConstructionRefList(mdmSkuConstructionRefList);
