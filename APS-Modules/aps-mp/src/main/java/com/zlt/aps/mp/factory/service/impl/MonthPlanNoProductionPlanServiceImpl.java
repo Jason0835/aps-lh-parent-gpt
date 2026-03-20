@@ -295,7 +295,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 int rowNum = dataStartRowIndex + i;
 
                 // 添加样式（确保样式作用在实际的数据行上）
-                cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 30, "#FFFFFF", true, false, "等线"));
+                cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 28, "#FFFFFF", true, false, "等线"));
 
                 list.add(listDataMap);
             }
