@@ -12,7 +12,8 @@ import lombok.Getter;
 public enum AlternativeTypeEnum {
 
     PRO_SIZE_ALTERNATIVE("0", "英寸交替"),
-    STRUCT_ALTERNATIVE("1","结构交替")
+    STRUCT_ALTERNATIVE("1","结构交替"),
+    CONTINUE("2","续作")
     ;
 
     private String code;

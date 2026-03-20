@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -142,11 +143,10 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        Integer decLhMachines =  productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
         groupAllocationList.forEach(singleCxMachineAllocation -> {
             String cxMachineCode = singleCxMachineAllocation.getCxMachineCode();
             CxMachineBaseInfoVo cxMachineInfo = cxMachineBaseInfo.get(cxMachineCode);
-            updateBaseLimitInfo(initLimitHelper, cxMachineInfo, singleCxMachineAllocation,decLhMachines);
+            updateBaseLimitInfo(context,initLimitHelper, cxMachineInfo, singleCxMachineAllocation);
         });
         return initLimitHelper;
     }
@@ -691,7 +691,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param cxMachineInfo             成型机台信息
      * @param singleCxMachineAllocation 某条转产配置
      */
-    private static void updateBaseLimitInfo(GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation,Integer decLhMachines) {
+    private static void updateBaseLimitInfo(Context context, GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
         Integer productionDay = initLimitHelper.getDay();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (null == cxMachineInfo) {
@@ -712,10 +712,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
         //最大硫化配比
         Integer maxLhMachineCount = initLimitHelper.getMaxLhMachineCount();
         Integer singleCxMachineCount = singleCxMachineAllocation.getMaxLhMachineCount();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String continueStruct = productionContext.getContinueStructureMap() == null ? "" : productionContext.getContinueStructureMap().get(singleCxMachineAllocation.getCxMachineCode());
         if (singleCxMachineAllocation.getBeginDay().equals(productionDay)){
-            //若是结构开产首日，将最大成型机数-3 sandy+ 2026.3.19
-            decLhMachines = (decLhMachines > singleCxMachineCount) ? singleCxMachineCount:decLhMachines;
-            singleCxMachineCount -= decLhMachines;
+            if (!(singleCxMachineAllocation.getBeginDay().equals(FactoryConstant.MONTH_START_DAY) &&
+                    singleCxMachineAllocation.getStructureName().equals(continueStruct))){
+                //若非（1号且续作结构）
+                //若是结构开产首日，将最大成型机数-3 sandy+ 2026.3.19
+                Integer decLhMachines =  productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
+                decLhMachines = (decLhMachines > singleCxMachineCount) ? singleCxMachineCount:decLhMachines;
+                singleCxMachineCount -= decLhMachines;
+            }
         }
         maxLhMachineCount = maxLhMachineCount + singleCxMachineCount;
         initLimitHelper.maxLhMachineCount = maxLhMachineCount;
