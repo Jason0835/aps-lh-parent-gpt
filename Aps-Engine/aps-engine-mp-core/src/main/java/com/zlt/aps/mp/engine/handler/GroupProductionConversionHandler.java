@@ -95,7 +95,7 @@ public class GroupProductionConversionHandler {
             for (int i = 0; i < machineStructureAllocationList.size()-1; i++) {
                 MpStructureAllocation current = machineStructureAllocationList.get(i);
                 MpStructureAllocation next = machineStructureAllocationList.get(i + 1);
-                if (!current.getTbrProSize().equals(next.getTbrProSize())){
+                if (!current.tbrProSize().equals(next.tbrProSize())){
                     next.setAlternatingType(AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode());
                 }else{
                     next.setAlternatingType(AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode());

@@ -225,7 +225,7 @@ public class MpStructureAllocation extends BaseEntity {
      * 从结构信息中解析出英寸
      * @return 英寸
      */
-    public String getTbrProSize(){
+    public String tbrProSize(){
         if (StringUtil.isEmptyWithTrim(this.structureName)){
             return "";
         }
