@@ -2153,7 +2153,7 @@ public class MatchingProductionHandler {
             }
             Integer checkDayProductQty = this.sumMaterialProductQty(productionContext, materialDesc, i);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = day - i > skuSecondProduction;
+                isSecOnLine = day - i <= skuSecondProduction;
                 break;
             }
         }
@@ -2164,7 +2164,7 @@ public class MatchingProductionHandler {
         for (Integer i = day + 1; i <= endDay; i++) {
             Integer checkDayProductQty = this.sumMaterialProductQty(productionContext, materialDesc, i);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = i - day > skuSecondProduction;
+                isSecOnLine = i - day <= skuSecondProduction;
                 break;
             }
         }
