@@ -555,25 +555,6 @@ public class CxMachineBaseInfoVo implements Serializable {
         allocationList.add(addAllocationPlan);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         handlerLimitInfo(productionContext, addAllocationPlan, productionPlanInfo);
-//        //20260119 处理成型工装的日使用量
-//        Integer endDay = addAllocationPlan.getEndDay();
-//        String proSize = productionPlanInfo.getProSizeInfo();
-//        baseDataContainer.getCxMachineBaseInfo().get(cxMachineCode);
-//        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
-//        for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
-//            if (stopDayInfo.contains(productionDay)) {
-//                continue;
-//            }
-//            //20260123 成型已分配日
-//            allocationDaySet.add(productionDay);
-//            //20260120 成型工装占用量
-//            baseDataContainer.addUsedCount(productionDay, proSize, cxMachineCode);
-//            //20260125 分组占用每日产能
-//            dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, productionDay, addAllocationPlan);
-//        }
-//        //todo 20260211 特殊材料分配库存更新
-//        Integer allocationDay = addAllocationPlan.getAllocationDay();
-//        productionContext.updateSpecialMaterialInfoMap(productionPlanInfo, allocationDay);
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Integer startDay = addAllocationPlan.getStartDay();
         //20260121 切换结构
