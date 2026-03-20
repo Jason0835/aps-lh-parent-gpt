@@ -7,8 +7,10 @@ import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.aps.utils.JsonUtils;
 import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.mp.api.domain.vo.MonthPlanStatisticsVo;
@@ -235,7 +237,25 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 } else {
                     listDataMap.put("updateTime", "");
                 }
-                listDataMap.put("reason", item.getReason() != null ? item.getReason() : "");
+                // 未排产原因 - 解析国际化json数据
+                String reason = item.getReason();
+                if (StringUtils.isNotBlank(reason)) {
+                    Locale locale = I18nUtil.getLocaleFromRedis();
+                    if (reason.contains("|")) {
+                        String[] split = reason.split("\\|");
+                        List<String> reasonList = new ArrayList<>(split.length);
+                        for (String reasonI18n : split) {
+                            String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, locale);
+                            reasonList.add(convertValue);
+                        }
+                        listDataMap.put("reason", String.join(",", reasonList));
+                    } else {
+                        String convertValue = JsonI18nConvertUtils.getConvertValue(reason, locale);
+                        listDataMap.put("reason", convertValue);
+                    }
+                } else {
+                    listDataMap.put("reason", "");
+                }
 
                 // 计算行号（Excel行号从0开始）
                 int rowNum = dataStartRowIndex + i;
