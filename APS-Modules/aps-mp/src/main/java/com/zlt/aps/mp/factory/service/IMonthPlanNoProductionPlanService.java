@@ -5,6 +5,7 @@ import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.aps.mp.api.domain.vo.MonthPlanStatisticsVo;
 import com.zlt.bill.common.service.IDocService;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -30,4 +31,12 @@ public interface IMonthPlanNoProductionPlanService  extends IDocService<MonthPla
    * 统计未排SAP总量
    */
   void statistics(MonthPlanStatisticsVo statisticsVo, MonthPlanNoProductionPlan noProductionPlan);
+
+  /**
+   * 导出未排产数据
+   * @param queryVO 查询条件
+   * @return 导出的字节数组
+   * @throws IOException IO异常
+   */
+  byte[] exportMonthPlanNoProductionPlan(MonthPlanNoProductionPlan queryVO) throws IOException;
 }

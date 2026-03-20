@@ -179,7 +179,8 @@ public class SalesOrderPoolController extends AbstractDocBizController<SalesOrde
     @Override
     public byte[] exportData(@RequestBody SalesOrderPool queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        // 调用service层的导出方法
+        return salesOrderPoolService.exportSalesOrderPool(queryVO);
     }
 
     @Override

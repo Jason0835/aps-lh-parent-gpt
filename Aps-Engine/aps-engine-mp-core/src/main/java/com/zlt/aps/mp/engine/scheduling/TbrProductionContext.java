@@ -78,6 +78,12 @@ public class TbrProductionContext extends Context {
      * 排产计数器
      */
     private SkuProductionCounter productionCounter;
+
+    /**
+     * 机台续作结构Map, continueStructureMap <机台，续作结构>
+     */
+    private Map<String,String> continueStructureMap;
+
     /**
      * 模具排产限制信息记录
      * key=物料描述 ： value=限制原因集合
