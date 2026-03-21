@@ -952,6 +952,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     Integer value = Optional.ofNullable((Integer)result.getFieldValueByFieldName(dayFieldName)).orElse(0);
                     mouldingDayResultAggregated.setFieldValueByFieldName(dayFieldName, sumValue + value);
                 }
+                Integer sumTotalQty = Optional.ofNullable(mouldingDayResultAggregated.getTotalQty()).orElse(0);
+                Integer totalQty = Optional.ofNullable(result.getTotalQty()).orElse(0);
+                mouldingDayResultAggregated.setTotalQty(sumTotalQty + totalQty);
             }
             structureDayResultMap.put(structureName, mouldingDayResultAggregated);
         }
