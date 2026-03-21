@@ -749,10 +749,16 @@ public class ExcelUtils {
                 cellStyle.setLeftBorderColor(xssfBorderColor);
                 cellStyle.setRightBorderColor(xssfBorderColor);
             }
+
+            if (oldStyle != null) { // 原单元格对其方式复制过去
+                cellStyle.setAlignment(oldStyle.getAlignment());
+                cellStyle.setVerticalAlignment(oldStyle.getVerticalAlignment());
+            }
+            
             // 修改字体样式
             if (bold || StringUtils.isNotEmpty(fontName)) {
                 Font font = workbook.createFont();
-                if (oldStyle != null) { // 原单元格样式复制回去
+                if (oldStyle != null) { // 原单元格样式复制过去
                     XSSFFont oldFont = (XSSFFont) workbook.getFontAt(oldStyle.getFontIndexAsInt());
                     if (oldFont != null) {
                         font.setFontName(oldFont.getFontName());
