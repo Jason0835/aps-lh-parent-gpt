@@ -287,6 +287,9 @@ public class ProductionCxMachineCalculationHandler {
             minAllocationDays = BigDecimal.ZERO.intValue();
         } else {
             //至少每台都需要分配最低天数
+            if(null == minAllocationDays){
+                minAllocationDays = context.getMaxProductionDays();
+            }
             Integer sumMinAllocationDays = minAllocationDays * effectiveList.size();
             leftOverSplitDays = sumDays - sumMinAllocationDays;
             if (leftOverSplitDays < BigDecimal.ZERO.intValue()) {
@@ -357,6 +360,7 @@ public class ProductionCxMachineCalculationHandler {
         //月初可释放
         if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
             release.setReleaseMachineCount(deductionMachineCount);
+            release.setEarliestConclusionDay(deductionDay);
             getContinueMachineRelease(context, release, needWholeCount, continueMachineCount, groupPlanInfo, groupContinueInfo);
             return;
         }

@@ -87,9 +87,9 @@ public class SkuMouldSelector {
         //20260116 得到模壳标准：理论只有一个模壳标准
         Integer mouldShellLimitQty = getMouldShellQty(productionContext, productionStage, groupName, materialDesc, effectiveList.get(BigDecimal.ZERO.intValue()));
         max = Math.min(max, mouldShellLimitQty);
-        //20260117 获取模具分配比例
+        //20260117 获取模具分配比例 续作Sku不参与模壳比例
         Integer mouldAllocationLimitQty = getMouldAllocationQty(productionContext, productionStage, groupName, materialDesc, productionPlan);
-        max = Math.min(max, mouldAllocationLimitQty);
+//        max = Math.min(max, mouldAllocationLimitQty);
         //20260119 获取胶囊卡盘的数量
         Integer capsuleChuckLimitQty = getCapsuleChuckQty(productionContext, productionStage, groupName, materialDesc, productionPlan);
         max = Math.min(max, capsuleChuckLimitQty);
