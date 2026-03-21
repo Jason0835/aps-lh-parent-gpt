@@ -946,12 +946,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     mouldingDayResultAggregated = result;
                     continue;
                 }
+                // 1.4.1.1、统计结构每日排产量
                 for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
                     String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
                     Integer sumValue = Optional.ofNullable((Integer)mouldingDayResultAggregated.getFieldValueByFieldName(dayFieldName)).orElse(0);
                     Integer value = Optional.ofNullable((Integer)result.getFieldValueByFieldName(dayFieldName)).orElse(0);
                     mouldingDayResultAggregated.setFieldValueByFieldName(dayFieldName, sumValue + value);
                 }
+                // 1.4.1.2、统计结构总排产量
                 Integer sumTotalQty = Optional.ofNullable(mouldingDayResultAggregated.getTotalQty()).orElse(0);
                 Integer totalQty = Optional.ofNullable(result.getTotalQty()).orElse(0);
                 mouldingDayResultAggregated.setTotalQty(sumTotalQty + totalQty);
@@ -972,15 +974,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         
         // 3、构建导出总表
         List<MpStructureAllocationExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
-        // 3、构建统计行
-        // 3.1、排产合计
+        // 3.1、构建统计行
+        // 3.1.1、排产合计
         MpStructureAllocationExportVo totalRecord = this.createExportRecord(StructureAllocationExportDataTypeEnum.TOTAL);
-        // 3.2、最大产能
+        // 3.1.2、最大产能
         MpStructureAllocationExportVo maxProductQtyRecord = this.createExportRecord(StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY);
-        // 3.3、可用台数
+        // 3.1.3、可用台数
         MpStructureAllocationExportVo enableCountRecord = this.createExportRecord(StructureAllocationExportDataTypeEnum.ENABLE_COUNT);
         
-        // 3.4、构建主题表格
+        // 3.2、构建主题表格
         String cxMachineCode = null; // 当前机台
         List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
@@ -988,18 +990,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             totalMap.put(day, 0);
         }
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
-            // 3.4.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
+            // 3.2.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             MpStructureAllocationExportVo record = recordList.get(i);
             machineStructureList.add(record); // 先添加到列表
             cxMachineCode = record.getCxMachineCode(); // 更新机台
-            // 3.4.2、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
+            // 3.2.2、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
             if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个机台
                 MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
                 if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 机台没有变化，则添继续往下
                     continue;
                 }
             }
-            // 3.4.3、处理列表明细的数据
+            // 3.2.3、处理列表明细的数据
             Integer changeRank = 1;
             for (MpStructureAllocationExportVo machineRecord: machineStructureList) {
                 Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(machineRecord.getStructureName());
@@ -1008,6 +1010,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
                 Integer beginDay = null;
                 Integer endDay = null;
+                // 3.2.3.1、处理在机天数区间内的硫化机数
                 for (int day = machineRecord.getBeginDay(); day <= machineRecord.getEndDay(); day ++) {
                     Integer lhMachines = dayLhMachinesMap.getOrDefault(day, 0);
                     if (lhMachines!= null && lhMachines > 0) {
@@ -1023,11 +1026,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         endDay = day;
                     }
                 }
+                // 3.2.3.2、统计结构排产汇总数据
                 FactoryMonthPlanMouldDayResult mouldingDayResultAggregated = structureDayResultMap.get(machineRecord.getStructureName());
                 if (mouldingDayResultAggregated != null) {
-                    machineRecord.setStructureType(mouldingDayResultAggregated.getStructureType());
-                    machineRecord.setTotalQty(mouldingDayResultAggregated.getTotalQty());
-                    machineRecord.setDifferenceQty(mouldingDayResultAggregated.getDifferenceQty());
+                    machineRecord.setStructureType(mouldingDayResultAggregated.getStructureType()); // 结构类型
+                    machineRecord.setTotalQty(mouldingDayResultAggregated.getTotalQty()); // 结构总排产量
+                    Integer netQty = Optional.ofNullable(machineRecord.getNetQty()).orElse(0); // 净需求
+                    Integer differenceQty = Optional.ofNullable(mouldingDayResultAggregated.getTotalQty()).orElse(0); // 未排量 = 净需求 - 总排产量
+                    machineRecord.setDifferenceQty(netQty > differenceQty? netQty - differenceQty: 0); // 未排量小于0的按0算
                     machineRecord.setProductTypeCode(mouldingDayResultAggregated.getProductTypeCode());
                     machineRecord.setProSize(mouldingDayResultAggregated.getProSize());
                 }
@@ -1041,7 +1047,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             totalRecordList.addAll(machineStructureList);
             machineStructureList.clear();
         }
-        // 3.5、更新统计行数值
+        // 3.3、更新统计行数值
         for (Entry<Integer, Integer> entry: totalMap.entrySet()) {
             Integer day = entry.getKey();
             Integer realLhMachines = entry.getValue();
