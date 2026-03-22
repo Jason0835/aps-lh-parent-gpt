@@ -1,7 +1,9 @@
 package com.zlt.aps.mp.engine.scheduling.matching;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -19,6 +21,7 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -161,8 +164,10 @@ public class MatchingProductionHandler {
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         this.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap);
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = this.getContinueInfo(productionContext); // 加载续作规格
-        // 更新换模次数
+        // 初始化换模次数
         this.initChangeMouldUsedQty(productionContext);
+        // 初始化结构的每日生产统计
+        this.initDayProductionInfo(productionContext);
 
         // 调用主流程的入口 -> 搭配排程算法
         Map<String, Integer> newSkuQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
@@ -2456,7 +2461,7 @@ public class MatchingProductionHandler {
         List<FactoryMonthPlanMouldDayDetail> detailResultList = this.buildDetailResultList(detailLogList, detailList,
                 productionContext, newSkuQtyMap);
         List<MpMonthPlanStatistics> productionStatisticsList = this.buildProductionStatisticsList(productionContext,
-                mouldResultList, detailResultList);
+                mouldResultList, dayResultList);
 
         baseDao.saveBatch(detailResultList);
         baseDao.saveBatch(mouldResultList);
@@ -2472,44 +2477,30 @@ public class MatchingProductionHandler {
      */
     private List<MpMonthPlanStatistics> buildProductionStatisticsList(TbrProductionContext productionContext,
                                                                       List<FactoryMonthPlanMouldDayResult> mouldResultList,
-                                                                      List<FactoryMonthPlanMouldDayDetail> detailResultList) {
-        // 更新各结构的每日生产统计
-        Map<String, ProductionPlanGroupInfo> allGroupPlanList = productionContext.getGroupProductionInfo();
-        Map<String, List<CxMouldDayProductionHelper>> mouldProductionGroup = this.buildMouldProductionGroup(productionContext);
-        Map<String, List<FactoryMonthPlanMouldDayDetail>> mouldDetailStructureNameMap = detailResultList.stream().collect(Collectors.groupingBy(FactoryMonthPlanMouldDayDetail::getStructureName));
-        Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
-        for (ProductionPlanGroupInfo groupPlanInfo : allGroupPlanList.values()) {
-            String structureName = groupPlanInfo.getGroupName();
-            List<FactoryMonthPlanMouldDayDetail> mouldDetailList = mouldDetailStructureNameMap.get(structureName);
-            List<CxMouldDayProductionHelper> mouldProductionList = mouldProductionGroup.get(structureName);
-            if (CollectionUtils.isEmpty(mouldDetailList) || CollectionUtils.isEmpty(mouldProductionList)) {
+                                                                      List<FactoryMonthPlanMouldDayResult> dayResultList) {
+        // 1、按结构统计本次月计划所有模具排产记录
+        Map<String, List<FactoryMonthPlanMouldDayResult>> allStructureGroupResultMap = new HashMap<>();
+        // 1.1、统计本次更新的模具排产结果
+        allStructureGroupResultMap.putAll(mouldResultList.stream()
+                .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getStructureName)));
+        // 1.2、把本次未更新的模具排产结果也合并进来
+        for (FactoryMonthPlanMouldDayResult result : dayResultList) {
+            List<FactoryMonthPlanMouldDayResult> resultStructureGroupList = allStructureGroupResultMap
+                    .get(result.getStructureName());
+            if (resultStructureGroupList == null) {
+                resultStructureGroupList = new ArrayList<>();
+                resultStructureGroupList.add(result);
+                allStructureGroupResultMap.put(result.getStructureName(), resultStructureGroupList);
                 continue;
             }
-            Map<Integer, List<CxMouldDayProductionHelper>> mouldProductionDayMap = mouldProductionList.stream()
-                    .collect(Collectors.groupingBy(CxMouldDayProductionHelper::getProductionDate));
-            for (Entry<Integer, List<CxMouldDayProductionHelper>> allEntry : mouldProductionDayMap.entrySet()) {
-                Integer day = allEntry.getKey();
-                List<CxMouldDayProductionHelper> productionList = allEntry.getValue();
-
-                productionList.stream().collect(Collectors.groupingBy(CxMouldDayProductionHelper::getMonthPlanId)).entrySet().forEach(entry -> {
-                    MonthPlanProductionRequirePlanVo productionPlan = productionPlanMap.get(entry.getKey());
-                    if (productionPlan == null) {
-                        return;
-                    }
-                    Set<String> usedMouldSet = entry.getValue().stream().map(CxMouldDayProductionHelper::getMouldCode).distinct().collect(Collectors.toSet());
-                    Integer realDayProductionQty = entry.getValue().stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
-                    SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(day, productionPlan, realDayProductionQty, 0, usedMouldSet);
-                    groupPlanInfo.addDayProductionInfo(skuDayProductionInfo);
-                });
+            if (resultStructureGroupList.stream()
+                    .anyMatch(r -> r.getId() != null && result.getId().equals(r.getId()))) {
+                continue;
             }
+            resultStructureGroupList.add(result);
         }
-        // 根据上下文生成新统计信息
-        List<MpMonthPlanStatistics> newProductionStatisticsList = dayProductionStatisticsHandler
-                .buildDayProductionStatisticsResult(productionContext);
-        // 本次搭配涉及的结构
-        List<String> structureNameList = mouldResultList.stream().map(FactoryMonthPlanMouldDayResult::getStructureName)
-                .distinct().collect(Collectors.toList());
-        // 加载本次版本已生成的统计记录
+        
+        // 2、加载本次版本已生成的统计记录
         LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, productionContext.getFactoryCode());
         queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
@@ -2519,22 +2510,56 @@ public class MatchingProductionHandler {
         Map<String, MpMonthPlanStatistics> oldProductionStatisticsMap = oldProductionStatisticsList.stream()
                 .filter(s -> StringUtils.isNoneEmpty(s.getStructureName())).collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
-        // 根据结构取出本次需要保存的统计信息，原有结构的统计记录直接覆盖更新
+        
+        // 3、根据结构取出本次需要保存的统计信息，原有结构的统计记录直接覆盖更新
         List<MpMonthPlanStatistics> productionStatisticsList = new ArrayList<>();
-        for (MpMonthPlanStatistics newStatistics : newProductionStatisticsList) {
-            String structureName = newStatistics.getStructureName();
-            if (!structureNameList.contains(structureName)) {
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit(); // 产能占用计算类
+        Date now = DateUtils.getNowDate();
+        // 3.1、加载计算产能需要的参数
+        Map<String, Object> paramMap = new HashMap<>();
+        ProductionCapacityParamConfiguration configuration = productionContext.getBaseDataContainer().getParamConfiguration();
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode(), configuration.getChangeTypeBlockQtyDiff());
+        paramMap.put(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), configuration.getChangeMouldFirstQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode(), configuration.getChangeTypeBlockQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode(), configuration.getChangeTypeBlockMaxQty());
+        // 3.2、遍历所有结构
+        for (Entry<String, List<FactoryMonthPlanMouldDayResult>> entry: allStructureGroupResultMap.entrySet()) {
+            String structureName = entry.getKey();
+            List<FactoryMonthPlanMouldDayResult> resultList = entry.getValue();
+            ProductionPlanGroupInfo groupPlanInfo = productionContext.getGroupProductionInfo().get(structureName);
+            if (groupPlanInfo == null) {
                 continue;
             }
-            MpMonthPlanStatistics oldStatistics = oldProductionStatisticsMap.get(structureName);
-            if (oldStatistics != null) {
-                newStatistics.setId(oldStatistics.getId());
-                newStatistics.setCreateBy(oldStatistics.getCreateBy());
-                newStatistics.setCreateTime(oldStatistics.getCreateTime());
-                newStatistics.setUpdateBy(oldStatistics.getUpdateBy());
-                newStatistics.setUpdateTime(oldStatistics.getUpdateTime());
+            Map<Integer, MpDailyCapacityLimitVo> daylyCapacityLimitMap = groupPlanInfo.getDailyCapacityLimitVoMap();
+            if (daylyCapacityLimitMap == null) {
+                continue;
             }
-            productionStatisticsList.add(newStatistics);
+            // 3.2.1、取出已有的各结构统计信息，没有则新增
+            MpMonthPlanStatistics statistics = oldProductionStatisticsMap.get(structureName);
+            if (statistics == null) {
+                statistics = new MpMonthPlanStatistics();
+//                oldStatistics.setCreateTime(now);
+                oldProductionStatisticsMap.put(structureName, statistics);
+            }
+            statistics.setBaseVale(statistics.getId());
+//            oldStatistics.setUpdateTime(now);
+            // 3.2.2、遍历日排产限制
+            for (Integer day: daylyCapacityLimitMap.keySet()) {
+                MpDailyCapacityLimitVo daylyCapacityLimit = daylyCapacityLimitMap.get(day);
+                if (daylyCapacityLimit == null) {
+                    continue;
+                }
+                // 3.2.2.1、根据日计划、产能重算结构当天的产能占用情况
+                adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(resultList, day, daylyCapacityLimit, paramMap,
+                        null);
+                // 3.2.2.2、构建当天的产能统计
+                MpDayProductionStatisticsDetailVo statisticsDetailVo = new MpDayProductionStatisticsDetailVo();
+                statisticsDetailVo.setEmbryoCount(daylyCapacityLimit.getEmbryoCodes().size());
+                statisticsDetailVo.setLhMachines(daylyCapacityLimit.getUsedLhMachines());
+                statisticsDetailVo.setChangeMould(daylyCapacityLimit.getUsedChangeMould());
+                statistics.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, JSON.toJSONString(statisticsDetailVo));
+            }
+            productionStatisticsList.add(statistics);
         }
         return productionStatisticsList;
     }
@@ -2624,6 +2649,41 @@ public class MatchingProductionHandler {
                     changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, day, materialDesc, mouldCodeSet);
                     mouldCodeSet.clear();
                 }
+            }
+        }
+    }
+
+    /**
+     * 初始化结构的每日生产统计
+     * @param productionContext
+     */
+    private void initDayProductionInfo(TbrProductionContext productionContext) {
+        Map<String, ProductionPlanGroupInfo> allGroupPlanList = productionContext.getGroupProductionInfo();
+        Map<String, List<CxMouldDayProductionHelper>> mouldProductionGroup = this.buildMouldProductionGroup(productionContext);
+        Map<Long, MonthPlanProductionRequirePlanVo> productionPlanMap = productionContext.getAllProductionPlan();
+        for (ProductionPlanGroupInfo groupPlanInfo : allGroupPlanList.values()) {
+            groupPlanInfo.initMpDailyCapacityLimit(productionContext); // 初始化结构
+            String structureName = groupPlanInfo.getGroupName();
+            List<CxMouldDayProductionHelper> mouldProductionList = mouldProductionGroup.get(structureName);
+            if (CollectionUtils.isEmpty(mouldProductionList)) {
+                continue;
+            }
+            Map<Integer, List<CxMouldDayProductionHelper>> mouldProductionDayMap = mouldProductionList.stream()
+                    .collect(Collectors.groupingBy(CxMouldDayProductionHelper::getProductionDate));
+            for (Entry<Integer, List<CxMouldDayProductionHelper>> allEntry : mouldProductionDayMap.entrySet()) {
+                Integer day = allEntry.getKey();
+                List<CxMouldDayProductionHelper> productionList = allEntry.getValue();
+
+                productionList.stream().collect(Collectors.groupingBy(CxMouldDayProductionHelper::getMonthPlanId)).entrySet().forEach(entry -> {
+                    MonthPlanProductionRequirePlanVo productionPlan = productionPlanMap.get(entry.getKey());
+                    if (productionPlan == null) {
+                        return;
+                    }
+                    Set<String> usedMouldSet = entry.getValue().stream().map(CxMouldDayProductionHelper::getMouldCode).distinct().collect(Collectors.toSet());
+                    Integer realDayProductionQty = entry.getValue().stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+                    SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(day, productionPlan, realDayProductionQty, 0, usedMouldSet);
+                    groupPlanInfo.addDayProductionInfo(skuDayProductionInfo);
+                });
             }
         }
     }
