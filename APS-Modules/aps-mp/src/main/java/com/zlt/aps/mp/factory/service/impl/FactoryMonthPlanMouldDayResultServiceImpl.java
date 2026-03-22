@@ -161,6 +161,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
                 if (result.getDayVulcanizationQty() != null) {
                     result.setDayVulcanizationQty(result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 日硫化量调整为双模
+                    Integer differenceQty = Optional.ofNullable(result.getDifferenceQty()).orElse(0); // 未排量负数处理
+                    result.setDifferenceQty(differenceQty >= 0? differenceQty: 0);
                 }
             }
             totalRecordList.addAll(structureList);
