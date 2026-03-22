@@ -2051,22 +2051,28 @@ public class MatchingProductionHandler {
     private boolean checkLhMachineCount(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo,
                                         Integer day) {
         // 检查是否超结构最大硫化机数
-        GroupPlanCxLhCapacityLimitHelper limist = groupInfo.getDayProductionLimitInfo().get(day);
-        if (limist != null && limist.getMaxLhMachineCount() != null) {
-            Set<String> productionList = limist.getProductionMouldSet();
-            if (productionList != null && limist.getMaxLhMachineCount() <= productionList.size()
-                    / ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
-                return false;
-            }
-        }
-        // 检查是否超总硫化机数量
+//        GroupPlanCxLhCapacityLimitHelper limist = groupInfo.getDayProductionLimitInfo().get(day);
+//        if (limist != null && limist.getMaxLhMachineCount() != null) {
+//            Set<String> productionList = limist.getProductionMouldSet();
+//            if (productionList != null && limist.getMaxLhMachineCount() <= productionList.size()
+//                    / ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+//                return false;
+//            }
+//        }
         MpDailyCapacityLimitVo dayLimitVo = groupInfo.getDailyCapacityLimitVoMap().get(day);
         if (dayLimitVo != null) {
             Integer usedLhMachines = Optional.ofNullable(dayLimitVo.getUsedLhMachines()).orElse(0);
             Integer maxLhMachines = Optional.ofNullable(dayLimitVo.getMaxLhMachines()).orElse(0);
-            return usedLhMachines < maxLhMachines;
+            if (usedLhMachines >= maxLhMachines) {
+                return false;
+            }
         }
-        return true;
+        // 检查是否超总硫化机数量
+        Integer maxLhMachines = productionContext.getGroupProductionInfo().values().stream()
+                .map(g -> g.getDailyCapacityLimitVoMap().get(day)).filter(Objects::nonNull)
+                .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
+        Integer usedLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+        return usedLhMachines < maxLhMachines;
     }
 
     /**
