@@ -405,6 +405,9 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
             Set<String> allocationSet = groupAllocationList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
+
+            //将产能限制Map 置空
+            groupProductionInfo.setDailyCapacityLimitVoMap(null);
         });
     }
 

@@ -55,6 +55,7 @@ public class DayCapacityLimitHelper implements Serializable {
      * 每日换模硫化机台数上限
      */
     private Integer maxChangeLhMachineCount;
+
     /**
      * 产能比例值
      */
@@ -67,6 +68,7 @@ public class DayCapacityLimitHelper implements Serializable {
      * 切换换模硫化机台使用次数
      */
     private Integer usedChangeLhMachineCount;
+
     /**
      * 成型分配量
      */
@@ -354,6 +356,7 @@ public class DayCapacityLimitHelper implements Serializable {
         }
         return maxChangeLhMachineCount - usedChangeLhMachineCount;
     }
+
 
     /**
      * 增加换模使用量

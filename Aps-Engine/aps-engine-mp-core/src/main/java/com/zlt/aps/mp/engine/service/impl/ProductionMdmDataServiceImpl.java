@@ -56,6 +56,8 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
 
     private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
 
+    private final LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+
     private final FactoryMonthPlanCxInfoMapper factoryMonthPlanCxInfoMapper;
 
     private final FactoryMonthPlanProductInfoMapper factoryMonthPlanProductInfoMapper;
@@ -160,6 +162,33 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
     }
 
     @Override
+    public List<LhMachineInfo> listLhMachineInfo(Context context) {
+        if (isEmptyFactoryCode(context)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<LhMachineInfo> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("STATUS", YesOrNoEnum.YES.getValue());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return lhMachineInfoEntityMapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public Map<Integer, MdmWorkCalendar> getWorkCalendar(Context context) {
+        QueryWrapper<MdmWorkCalendar> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", context.getFactoryCode());
+        queryWrapper.eq("PROC_CODE", ProductionProcessesTypeEnum.MONTH_PLAN.getProcCode());
+        queryWrapper.eq("YEAR", context.getYear());
+        queryWrapper.eq("MONTH", context.getMonth());
+        List<MdmWorkCalendar> workCalendarList = mdmWorkCalendarEntityMapper.selectList(queryWrapper);
+        Map<Integer, MdmWorkCalendar> workCalendarMap = workCalendarList.stream().collect(Collectors.groupingBy(item->item.getDay(),
+                Collectors.collectingAndThen(Collectors.toList(),m-> {
+                    return m.get(0);
+                })));
+        return workCalendarMap;
+    }
+
+    @Override
     public List<MdmCapsuleChuck> getCapsuleChuck(Context context) {
         if (isEmptyFactoryCode(context)) {
             return Collections.emptyList();
@@ -260,6 +289,10 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         MdmProductStock mdmProductStock = new MdmProductStock();
         mdmProductStock.setFactoryCode(context.getFactoryCode());
         return mdmProductStockEntityMapper.getLatestStock(mdmProductStock);
+    }
+
+    public MdmWorkCalendarEntityMapper getMdmWorkCalendarEntityMapper() {
+        return mdmWorkCalendarEntityMapper;
     }
 
     @Override

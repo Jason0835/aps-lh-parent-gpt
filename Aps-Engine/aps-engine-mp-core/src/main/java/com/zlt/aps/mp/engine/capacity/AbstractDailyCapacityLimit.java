@@ -304,7 +304,8 @@ public abstract class AbstractDailyCapacityLimit {
                 // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
                 iChangeMouldCount += addMouldArr[3];
                 // 计算主花纹向下的硫化机台数
-                if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
+                if (mpFinalVo.getFieldValueByFieldName(getMainPatternField()) != null &&
+                        mpFinalVo.getFieldValueByFieldName(getMainPatternField()).equals(mainPattern)){
                     mpFullMachinesAddMould += dayPlanQty / dailyLhQty;
                     mpOpenMachinesAddMould += addMouldArr[0];
                     mpBlockMachinesAddMould += addMouldArr[1] + addMouldArr[2];

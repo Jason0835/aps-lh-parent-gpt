@@ -48,6 +48,13 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 最大硫化机台数
      */
     private Integer maxLhMachineCount;
+
+    /**
+     * 日控的 本结构剩余的最大硫化机台数
+     *  sandy+ 2026.3.22
+     */
+    private Integer remainMaxLhMachineCount;
+
     /**
      * 理论最大硫化机台(因切换结构首日减机台，引入)
      */
@@ -177,6 +184,16 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 更新数据
+     * 剩余的最大硫化机台数
+     *
+     * @param machines
+     */
+    public void updateRemainMaxLhMachines(Integer machines) {
+        remainMaxLhMachineCount = machines;
+    }
+
+    /**
      * 获取最早收尾的硫化组信息
      *
      * @param previousLimit         前一日的排产限制情况
@@ -279,11 +296,13 @@ public class GroupPlanCxLhCapacityLimitHelper {
      */
     public boolean isReachLimitByMouldNumber(GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
+        //实际的最大硫化机台数 = min(初始的最大硫化机台数,结构剩余可用的最大硫化机台数 sandy+ 2026.03.22
+        Integer realMaxLhMachineCount = maxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : maxLhMachineCount;
         //按模具数
         Integer currentLhMachineCount = getProductionLhMachineCountByMouldNumber();
         //如果前日没有排产信息，则表示结构排产首日
         if (null == previousDayLimitInfo) {
-            return currentLhMachineCount >= maxLhMachineCount;
+            return currentLhMachineCount >= realMaxLhMachineCount;
         }
         //当日没有硫化组信息
         Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
@@ -301,7 +320,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
             Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDayMouldNumber(nextDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + nextDayChangeQty;
         }
-        return realUsedLhMachineCount >= maxLhMachineCount;
+        return realUsedLhMachineCount >= realMaxLhMachineCount;
     }
 
     /**

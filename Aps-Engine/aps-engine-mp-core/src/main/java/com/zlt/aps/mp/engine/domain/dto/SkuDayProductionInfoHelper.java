@@ -37,6 +37,17 @@ public class SkuDayProductionInfoHelper implements Serializable {
      * 生胎代码
      */
     private String embryoCode;
+
+    /**
+     * 主胎胚描述
+     */
+    private String mainMaterialDesc;
+
+    /**
+     * 主花纹
+     */
+    private String mainPattern;
+
     /**
      * 使用的模具编号
      */
@@ -79,6 +90,8 @@ public class SkuDayProductionInfoHelper implements Serializable {
         helper.embryoCode = productionPlan.getEmbryoCode();
         helper.usedMouldSet = usedMouldSet;
         helper.lossQty = lossQty;
+        helper.mainMaterialDesc = productionPlan.getMainMaterialDesc();
+        helper.mainPattern = productionPlan.getMainPattern();
         return helper;
     }
 

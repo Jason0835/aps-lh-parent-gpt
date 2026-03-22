@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -16,6 +17,7 @@ import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
 import com.zlt.aps.mp.engine.handler.SkuPrioritySelector;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.common.utils.PubUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -493,5 +495,71 @@ public class CxAddSkuProductionHandler {
         Integer changeMouldDay = startDay;
         Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+    }
+
+    /**
+     * 设置剩余的每日硫化机台数
+     * @param context
+     * @param allGroupPlanInfo
+     * @param currentStructName
+     */
+    public void setRemainLhMachineCount(Context context,Map<String, ProductionPlanGroupInfo> allGroupPlanInfo ,String currentStructName){
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer endDay = productionContext.getMonthDays();
+        GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
+        ProductionPlanGroupInfo groupPlan;
+        int accUsedLhMachines;
+        // 1. 获取总的硫化机台数
+        Integer totalLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+        // 2. 按日更新 结构下每日剩余可用的硫化机台数
+        for (int i = ProductionConstant.MONTH_START_DAY; i<= endDay; i++) {
+            // 更新当前结构的 剩余可使用的硫化机台
+            groupPlan = allGroupPlanInfo.get(currentStructName);
+            if (groupPlan == null){
+                continue;
+            }
+
+            // 获取其他结构已使用的硫化机台数
+            accUsedLhMachines = getOtherStructUsedLhMachines(allGroupPlanInfo, currentStructName, i);
+            // 是更新每日剩余可用的硫化机台数
+            if (PubUtil.isEmpty(groupPlan.getDayProductionLimitInfo())){
+                continue;
+            }
+            capacityLimitHelper = groupPlan.getDayProductionLimitInfo().get(i);
+            if (capacityLimitHelper == null){
+                continue;
+            }
+            capacityLimitHelper.updateRemainMaxLhMachines(totalLhMachines - accUsedLhMachines);
+        }
+    }
+
+    /**
+     * 获取其他结构已使用的硫化机台数
+     * @param allGroupPlanInfo 所有结构计划
+     * @param currentStructName 当前结构名称
+     * @param iDay 当前日
+     * @return 其他结构已使用的硫化机台数
+     */
+    private Integer getOtherStructUsedLhMachines(Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String currentStructName, int iDay) {
+        MpDailyCapacityLimitVo dailyCapacityLimitVo;
+        ProductionPlanGroupInfo groupPlan;
+        int accUsedLhMachines = 0;
+        for (Map.Entry<String, ProductionPlanGroupInfo> entry: allGroupPlanInfo.entrySet()) {
+            if (entry.getKey().equals(currentStructName)) {
+                //排除当前结构
+                continue;
+            }
+            groupPlan = entry.getValue();
+            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = groupPlan.getDailyCapacityLimitVoMap();
+            if (PubUtil.isEmpty(dailyCapacityLimitVoMap)){
+                continue;
+            }
+            dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(iDay);
+            if (dailyCapacityLimitVo == null){
+                continue;
+            }
+            accUsedLhMachines += dailyCapacityLimitVo.getUsedLhMachines();
+        }
+        return accUsedLhMachines;
     }
 }

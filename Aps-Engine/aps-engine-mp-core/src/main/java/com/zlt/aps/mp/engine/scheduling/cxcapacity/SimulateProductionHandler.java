@@ -155,6 +155,11 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                         log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
                         return;
                     }
+                    //3.1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+                    cxAddSkuProductionHandler.setRemainLhMachineCount(context,allGroupPlanMap,structureName);
+                    //3.2 初始日产能限制信息，用于统计使用
+                    groupPlanInfo.initMpDailyCapacityLimit(context);
+
                     //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
                     groupPlanInfo.setThisRoundCanProduction();
                     //在机结构-新增Sku模拟排产
@@ -173,6 +178,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                             productionContext.addReverseMachine(machineInfo.getCxMachineCode());
                         }
                     });
+
+                    //3.3 重新计算统计产能
+                    groupPlanInfo.reCalcMpDailyCapacityLimit(context);
                 });
     }
 

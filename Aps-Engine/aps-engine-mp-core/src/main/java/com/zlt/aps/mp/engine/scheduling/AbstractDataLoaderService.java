@@ -136,6 +136,12 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         });
         //15、构建结构、主花纹的模具信息
         buildGroupMainPatternInfo(productionContext);
+
+        //16. 初始工作日历
+        productionContext.getBaseDataContainer().setWorkCalendarMap(getDataService().getWorkCalendar(productionContext));
+
+        //17. 初始硫化机台信息
+        productionContext.getBaseDataContainer().setLhMachineInfoList(getDataService().listLhMachineInfo(productionContext));
     }
 
     /**
