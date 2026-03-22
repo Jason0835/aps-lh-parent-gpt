@@ -2046,7 +2046,7 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 计划日硫化机台数、胎胚种类数、换模次数
-     *
+     * 统计使用
      * @param context
      */
     public void reCalcMpDailyCapacityLimit(Context context) {
@@ -2056,12 +2056,7 @@ public class ProductionPlanGroupInfo {
         //1. 转换模具排产结果
         List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
         //2. 组装参数Map
-        Map<String, Object> paramMap = new HashMap<>();
-        paramMap.put(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty());
-        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQty());
-        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockMaxQty());
-        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQtyDiff());
-
+        Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
         //3. 循环计算日产能
         for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
             if (dailyCapacityLimitVoMap.get(i) == null) {
@@ -2069,6 +2064,39 @@ public class ProductionPlanGroupInfo {
             }
             dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, i, dailyCapacityLimitVoMap.get(i), paramMap, null);
         }
+    }
+
+    /**
+     * 计划日硫化机台数、胎胚种类数、换模次数
+     * @param context
+     */
+    public void reCalcMpDailyCapacityLimitByDay(Context context,Integer iDay,String mainPattern){
+        if (dailyCapacityLimitVoMap.get(iDay) == null){
+            return;
+        }
+        MpMonthPlanDailyCapacityLimit dailyCapacityLimitObj = new MpMonthPlanDailyCapacityLimit();
+        TbrProductionContext productionContext = (TbrProductionContext)context;
+        Integer endDay = productionContext.getMonthDays();
+        //1. 转换模具排产结果
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
+        //2. 组装参数Map
+        Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
+        //3. 计算日产能
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList,iDay, dailyCapacityLimitVoMap.get(iDay), paramMap,mainPattern);
+    }
+
+    /**
+     * 组装日产能参数Map
+     * @param productionContext
+     * @return
+     */
+    private Map<String, Object> composeDailyCapacityParamMap(TbrProductionContext productionContext) {
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockMaxQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQtyDiff());
+        return paramMap;
     }
 
     /**
