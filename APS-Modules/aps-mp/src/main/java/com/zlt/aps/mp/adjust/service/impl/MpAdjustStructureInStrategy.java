@@ -170,6 +170,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
                 reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
 
+
                 //2.4 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
                 //=========================================================
                 matchingProductionHandler.structureAdjuestBoots(copyContextDTO, oneStructMpFinalList); // 补量
