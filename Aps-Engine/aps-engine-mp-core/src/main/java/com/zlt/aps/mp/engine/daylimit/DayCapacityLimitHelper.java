@@ -140,10 +140,10 @@ public class DayCapacityLimitHelper implements Serializable {
      */
     public void resetUsedQty() {
         Integer currentAllocationQty = this.cxMachineAllocationQty;
-        Set<String> currentChangeCxMachineInfo = this.changeCxMachineInfo;
+        Integer currentUsedChangeCxMachineCount = this.usedChangeCxMachineCount;
         initUsedInfo();
         this.cxMachineAllocationQty = currentAllocationQty;
-        this.changeCxMachineInfo = currentChangeCxMachineInfo;
+        this.usedChangeCxMachineCount = currentUsedChangeCxMachineCount;
     }
 
     /**
