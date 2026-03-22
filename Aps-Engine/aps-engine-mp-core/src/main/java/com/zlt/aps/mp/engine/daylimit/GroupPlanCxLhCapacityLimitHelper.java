@@ -824,7 +824,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      */
     private Integer getInitChangeLhMachineCount() {
         Integer realMaxLhMachineCount = Optional.ofNullable(maxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
-        Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(BigDecimal.ZERO.intValue());
+        Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(realMaxLhMachineCount);
         return realMaxLhMachineCount - theoryMaxLhMachineCount;
     }
 }
@@ -933,8 +933,8 @@ class SkuUsedLhMachineInfo {
         if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
             return BigDecimal.ZERO.intValue();
         }
-        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getLeftOverMachineCount() == BigDecimal.ONE.intValue()) {
-            return BigDecimal.ZERO.intValue();
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue() - nextDayInfo.getLeftOverMachineCount();
         }
         if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
             return BigDecimal.ZERO.intValue();
