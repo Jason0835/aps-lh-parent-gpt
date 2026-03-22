@@ -178,7 +178,7 @@ public class MatchingProductionHandler {
         TbrProductionContext productionContext = this.initProductionContext(contextDTO); // 初始化上下文
         this.getMdmProductStock(contextDTO, productionContext);
         this.getSkuLhCapacity(contextDTO);
-        ; // 日硫化产能表，key:物料描述
+        // 日硫化产能表，key:物料描述
         this.getMdmSkuConstructionRefMap(contextDTO); // 获取SKU与施工关系，key：物料号
     }
 
@@ -2485,6 +2485,18 @@ public class MatchingProductionHandler {
             MpMonthPlanStatistics statistics = oldProductionStatisticsMap.get(structureName);
             if (statistics == null) {
                 statistics = new MpMonthPlanStatistics();
+                statistics.setFactoryCode(productionContext.getFactoryCode());
+                statistics.setYear(productionContext.getYear());
+                statistics.setMonth(productionContext.getMonth());
+                statistics.setYearMonth(productionContext.getFullYearAndMonth());
+                statistics.setMonthPlanVersion(productionContext.getMonthPlanVersion());
+                statistics.setProductionVersion(productionContext.getProductionVersion());
+                statistics.setLastMonthPlanVersion(productionContext.getMonthPlanVersion());
+                MonthPlanProductionRequirePlanVo singlePlan = groupPlanInfo.getGroupPlanData().get(BigDecimal.ZERO.intValue());
+                statistics.setProSize(singlePlan.getProSize());
+                statistics.setStructureType(singlePlan.getStructureType());
+                statistics.setProductTypeCode(singlePlan.getProductTypeCode());
+                statistics.setStructureName(structureName);
                 oldProductionStatisticsMap.put(structureName, statistics);
             }
             statistics.setBaseVale(statistics.getId());
