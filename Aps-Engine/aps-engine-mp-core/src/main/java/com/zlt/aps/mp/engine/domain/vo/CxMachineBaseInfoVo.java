@@ -237,6 +237,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(localProductionInfo)) {
             return Collections.emptySet();
         }
+        String cxMachineDaysInfo = localProductionInfo.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        DayLimitLogRecorder.addCxMachineCanProductionDayLog(productionContext, cxMachineCode, cxMachineDaysInfo);
         //取得交集
         Set<Integer> intersectionSet = localProductionInfo.stream().filter(productionDayInfo::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
@@ -1088,8 +1090,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         //没有分配信息，看续作
         if (null == beforeAllocation) {
             TbrProductionContext productionContext = (TbrProductionContext) context;
-            Map<String,String> continueGroupInfoMap = productionContext.getContinueStructureMap();
-            if(CollectionUtils.isEmpty(continueGroupInfoMap)){
+            Map<String, String> continueGroupInfoMap = productionContext.getContinueStructureMap();
+            if (CollectionUtils.isEmpty(continueGroupInfoMap)) {
                 return false;
             }
             String continueGroupName = continueGroupInfoMap.get(cxMachineCode);
