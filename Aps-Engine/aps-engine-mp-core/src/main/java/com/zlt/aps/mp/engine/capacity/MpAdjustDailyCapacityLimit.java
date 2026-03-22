@@ -13,16 +13,9 @@ public class MpAdjustDailyCapacityLimit extends AbstractDailyCapacityLimit
 {
     @Override
     public Integer getDayVulcanizationQty(BaseEntity mpFinalVo) {
-        if (mpFinalVo instanceof FactoryMonthPlanFinalAdjustVo) {
-            FactoryMonthPlanFinalAdjustVo finalVo = (FactoryMonthPlanFinalAdjustVo) mpFinalVo;
-            // 日硫化量 = 单模硫化量 * 2；
-            return finalVo.getDayVulcanizationQty() * 2;
-        } else if (mpFinalVo instanceof FactoryMonthPlanMouldDayResult) {
-            FactoryMonthPlanMouldDayResult finalVo = (FactoryMonthPlanMouldDayResult) mpFinalVo;
-            // 日硫化量本身就是双模产能
-            return finalVo.getDayVulcanizationQty();
-        }
-        return 0;
+        FactoryMonthPlanFinalAdjustVo finalVo = (FactoryMonthPlanFinalAdjustVo) mpFinalVo;
+        // 日硫化量 = 单模硫化量 * 2；
+        return finalVo.getDayVulcanizationQty() * 2;
     }
 
     @Override
