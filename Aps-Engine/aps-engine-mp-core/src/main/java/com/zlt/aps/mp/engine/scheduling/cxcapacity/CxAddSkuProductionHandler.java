@@ -483,7 +483,7 @@ public class CxAddSkuProductionHandler {
      * @param doubleMouldList   排产模具
      */
     private void addChangeMouldInfo(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer startDay, BeforeSkuProductionInfo beforeSku, List<ProductionMouldInfoVo> doubleMouldList) {
-        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(productionContext, addSkuInfo, beforeSku);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(productionContext, addSkuInfo, beforeSku, beforeSku);
         boolean isChangeMould = changeMouldInfo.isChangeMould();
         if (!isChangeMould) {
             return;

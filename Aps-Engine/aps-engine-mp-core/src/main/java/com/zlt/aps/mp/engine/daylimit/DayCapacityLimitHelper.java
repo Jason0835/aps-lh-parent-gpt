@@ -151,7 +151,8 @@ public class DayCapacityLimitHelper implements Serializable {
      * @return
      */
     public boolean isAllocationCapacity() {
-        return cxMachineAllocationQty < maxAllocationCapacity;
+        return sumProductionCapacityQty < maxAllocationCapacity;
+//        return cxMachineAllocationQty < maxAllocationCapacity;
     }
 
     /**

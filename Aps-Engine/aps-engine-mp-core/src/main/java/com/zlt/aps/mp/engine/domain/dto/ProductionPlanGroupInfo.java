@@ -697,13 +697,13 @@ public class ProductionPlanGroupInfo {
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo());
+        BeforeSkuProductionInfo mouldSkuInfo = ChangeMouldInfo.buildBeforeSkuProductionInfoByMould(productionContext, preClosingDay, selectedMould);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo(), mouldSkuInfo);
         boolean isChangeMould = changeMouldInfo.isChangeMould();
         //隔天换模
         if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
             preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
         }
-//        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
@@ -717,15 +717,6 @@ public class ProductionPlanGroupInfo {
         Integer newClosingDay = sortList.get(BigDecimal.ZERO.intValue());
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
-        //20260122 换模判断
-//        if (!isChangeMould) {
-//            return;
-//        }
-        //需要换模-换模次数处理
-//        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-//        Integer changeMouldDay = preSelected.getClosingDay();
-//        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-//        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
 
     /**
@@ -1331,6 +1322,13 @@ public class ProductionPlanGroupInfo {
         planned.getUsedMouldSet().addAll(currentUsedMouldSet);
         //更新数量
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+
+        List<SkuDayProductionInfoHelper> detailList = limitInfo.getSkuProductionDetailInfo().get(materialDesc);
+        if (null == detailList) {
+            detailList = new ArrayList<>();
+            limitInfo.getSkuProductionDetailInfo().put(materialDesc, detailList);
+        }
+        detailList.add(skuDayProductionInfo);
     }
 
     /**

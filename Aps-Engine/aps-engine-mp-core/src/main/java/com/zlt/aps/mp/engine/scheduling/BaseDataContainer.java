@@ -267,7 +267,7 @@ public class BaseDataContainer implements Serializable {
         Set<Integer> dayCapacitySet = dayCapacityLimit.getHasCapacityProductionDayInfo();
         if (CollectionUtils.isEmpty(dayCapacitySet)) {
             limitType = GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_LIMIT;
-            log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
+            DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType);
             return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
         }
         String dayInfo = dayCapacitySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
