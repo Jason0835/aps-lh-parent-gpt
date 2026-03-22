@@ -558,7 +558,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Integer startDay = addAllocationPlan.getStartDay();
         //20260121 切换结构
-        if (isChangeGroup(lastAllocation, addAllocationPlan)) {
+        if (isChangeGroup(context, lastAllocation, addAllocationPlan)) {
             String groupName = addAllocationPlan.getAllocationGroup();
             log.info(TbrProductionGroupLogRecorder.addCxMachineChangeGroupLog(productionContext, cxMachineCode, startDay, groupName));
             baseDataContainer.getDayCapacityLimit().addChangeGroupNameUsedQty(productionContext, startDay, cxMachineCode, groupName);
@@ -592,13 +592,14 @@ public class CxMachineBaseInfoVo implements Serializable {
     /**
      * 判断是否切换分组(TBR-结构)
      *
+     * @param context         排产上下文
      * @param changeDay       切换日
      * @param changeGroupName 切换分组名
      * @return
      */
-    public boolean isChangeGroup(Integer changeDay, String changeGroupName) {
+    public boolean isChangeGroup(Context context, Integer changeDay, String changeGroupName) {
         CxMachineAllocationPlanHelper lastAllocation = getLastAllocationInfo();
-        return isChangeGroup(lastAllocation, changeDay, changeGroupName);
+        return isChangeGroup(context, lastAllocation, changeDay, changeGroupName);
     }
 
     /**
@@ -1007,10 +1008,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         Integer changeDay = allocationInfo.getStartDay();
         CxMachineAllocationPlanHelper lastInfo = getLastAllocationInfo();
-        if (isChangeGroup(lastInfo, allocationInfo)) {
+        if (isChangeGroup(context, lastInfo, allocationInfo)) {
             TbrProductionContext productionContext = (TbrProductionContext) context;
             String groupName = allocationInfo.getAllocationGroup();
-            log.info(TbrProductionGroupLogRecorder.addReleaseCxMachineChangeGroupLog(productionContext, cxMachineCode, changeDay, groupName));
+            TbrProductionGroupLogRecorder.addReleaseCxMachineChangeGroupLog(productionContext, cxMachineCode, changeDay, groupName);
             productionContext.getBaseDataContainer().getDayCapacityLimit().deductionChangeGroupNameUsedQty(productionContext, changeDay, cxMachineCode, groupName);
         }
     }
@@ -1058,37 +1059,41 @@ public class CxMachineBaseInfoVo implements Serializable {
      * @param afterAllocation  后一个配置
      * @return
      */
-    private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, CxMachineAllocationPlanHelper afterAllocation) {
+    private boolean isChangeGroup(Context context, CxMachineAllocationPlanHelper beforeAllocation, CxMachineAllocationPlanHelper afterAllocation) {
         if (null == afterAllocation) {
             return false;
         }
         Integer startDay = afterAllocation.getStartDay();
         String groupName = afterAllocation.getAllocationGroup();
-        return isChangeGroup(beforeAllocation, startDay, groupName);
+        return isChangeGroup(context, beforeAllocation, startDay, groupName);
     }
 
     /**
      * 判断是否切换分组(TBR为结构)
      *
+     * @param context          排产上下文
      * @param beforeAllocation 前一配置
      * @param changeStartDay   切换日
      * @param changeGroupName  切换的分组名
      * @return
      */
-    private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, Integer changeStartDay, String changeGroupName) {
+    private boolean isChangeGroup(Context context, CxMachineAllocationPlanHelper beforeAllocation, Integer changeStartDay, String changeGroupName) {
         if (null == changeStartDay || StringUtils.isBlank(changeGroupName)) {
             return false;
         }
-        if(null == beforeAllocation){
-
-        }
-        //第一天先不判断
-        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
-            return false;
-        }
-        //前面没有，不算切换
+//        //第一天先不判断
+//        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
+//            return false;
+//        }
+        //没有分配信息，看续作
         if (null == beforeAllocation) {
-            return false;
+            TbrProductionContext productionContext = (TbrProductionContext) context;
+            Map<String,String> continueGroupInfoMap = productionContext.getContinueStructureMap();
+            if(CollectionUtils.isEmpty(continueGroupInfoMap)){
+                return false;
+            }
+            String continueGroupName = continueGroupInfoMap.get(cxMachineCode);
+            return !changeGroupName.equals(continueGroupName);
         }
         //分组名是否相同
         return !beforeAllocation.getAllocationGroup().equals(changeGroupName);

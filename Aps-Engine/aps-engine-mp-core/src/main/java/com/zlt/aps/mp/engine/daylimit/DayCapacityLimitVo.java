@@ -65,7 +65,7 @@ public class DayCapacityLimitVo implements Serializable {
      */
     public Integer confirmStartDayByChangeGroup(Context context, Integer theoryChangeDay, String changeGroupName, CxMachineBaseInfoVo selectedCxMachineInfo, Set<Integer> hasProductionDaySet) {
         //没有切换结构
-        if (!selectedCxMachineInfo.isChangeGroup(theoryChangeDay, changeGroupName)) {
+        if (!selectedCxMachineInfo.isChangeGroup(context, theoryChangeDay, changeGroupName)) {
             return theoryChangeDay;
         }
         Set<Integer> hasChangeGroupSet = getHasChangeGroupProductionDay(context);
