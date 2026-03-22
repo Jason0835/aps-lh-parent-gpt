@@ -403,18 +403,24 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @return
      */
     private Map<String, Integer> getSkuUsedMachineRejectLeftOver() {
-        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
         Map<String, Integer> skuUsedLhMachine = new HashMap<>();
-        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
-            Integer productionQty = skuProductionInfo.getSumProductionQty();
-            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-            //表示换模或是换活字块
-            if (productionQty < lhMachineQty) {
+        skuProductionDetailInfo.forEach((materialDesc, skuProductionInfoList) -> {
+            if (CollectionUtils.isEmpty(skuProductionInfoList)) {
                 return;
             }
-            int wholeNumber = productionQty / lhMachineQty;
+            Integer wholeNumber = BigDecimal.ZERO.intValue();
+            for (SkuDayProductionInfoHelper skuProductionInfo : skuProductionInfoList) {
+                Integer productionQty = skuProductionInfo.getSumProductionQty();
+                Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+                //表示换模或是换活字块 todo 开产日
+                if (productionQty < lhMachineQty) {
+                    continue;
+                }
+                wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
+            }
             if (wholeNumber >= BigDecimal.ONE.intValue()) {
                 skuUsedLhMachine.put(materialDesc, wholeNumber);
             }
@@ -433,10 +439,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         Map<String, Integer> skuUsedLhMachine = new HashMap<>();
         productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
-            Integer productionQty = skuProductionInfo.getSumProductionQty();
-            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-            int upMachineCount = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(lhMachineQty), 0, RoundingMode.UP).intValue();
-            skuUsedLhMachine.put(materialDesc, upMachineCount);
+            Set<String> usedMouldSet = skuProductionInfo.getUsedMouldSet();
+            Integer usedMachineCount;
+            if (CollectionUtils.isEmpty(usedMouldSet)) {
+                usedMachineCount = BigDecimal.ZERO.intValue();
+            } else {
+                usedMachineCount = usedMouldSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            }
+//            Integer productionQty = skuProductionInfo.getSumProductionQty();
+//            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+//            int upMachineCount = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(lhMachineQty), 0, RoundingMode.UP).intValue();
+            skuUsedLhMachine.put(materialDesc, usedMachineCount);
         });
         return skuUsedLhMachine;
     }
@@ -643,20 +656,21 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @return
      */
     private Map<String, SkuUsedLhMachineInfo> getSkuUsedDetailInfoByQty() {
-        if(CollectionUtils.isEmpty(skuProductionDetailInfo)){
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
         Map<String, SkuUsedLhMachineInfo> skuUsedLhMachineDetailMap = new HashMap<>();
-        skuProductionDetailInfo.forEach((materialDesc, skuProductionDetailList) ->{
-            if(CollectionUtils.isEmpty(skuProductionDetailList)){
-                return ;
+        skuProductionDetailInfo.forEach((materialDesc, skuProductionDetailList) -> {
+            if (CollectionUtils.isEmpty(skuProductionDetailList)) {
+                return;
             }
             Integer wholeNumber = BigDecimal.ZERO.intValue();
             Integer remainder = BigDecimal.ZERO.intValue();
             for (SkuDayProductionInfoHelper lhDetail : skuProductionDetailList) {
-                if(lhDetail.getSumProductionQty().equals(lhDetail.getDayLhMachineQty())){
-                    wholeNumber  = wholeNumber + BigDecimal.ONE.intValue();
-                }else{
+                //todo 需要考虑开产日
+                if (lhDetail.getSumProductionQty().equals(lhDetail.getDayLhMachineQty())) {
+                    wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
+                } else {
                     remainder = remainder + BigDecimal.ONE.intValue();
                 }
             }
@@ -838,9 +852,9 @@ class SkuUsedLhMachineInfo {
     /**
      * 构建Sku使用硫化机台数明细对象
      *
-     * @param materialDesc          Sku
-     * @param wholeMachineCount     整数台
-     * @param leftOverCount 余量台
+     * @param materialDesc      Sku
+     * @param wholeMachineCount 整数台
+     * @param leftOverCount     余量台
      * @return
      */
     public static SkuUsedLhMachineInfo buildLhCount(String materialDesc, Integer wholeMachineCount, Integer leftOverCount) {
@@ -851,9 +865,9 @@ class SkuUsedLhMachineInfo {
         } else {
             detail.setWholeMachineCount(wholeMachineCount);
         }
-        if(null == leftOverCount){
+        if (null == leftOverCount) {
             detail.setLeftOverMachineCount(BigDecimal.ZERO.intValue());
-        }else{
+        } else {
             detail.setLeftOverMachineCount(leftOverCount);
         }
         return detail;
@@ -887,7 +901,7 @@ class SkuUsedLhMachineInfo {
      * @return
      */
     private Integer getSingleChange(SkuUsedLhMachineInfo nextDayInfo) {
-        //如果整台数都为零，则表示可以释放一台
+        //如果是单台
         if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
             return getWholeMachineCount() - nextDayInfo.getLeftOverMachineCount();
         }
@@ -900,6 +914,7 @@ class SkuUsedLhMachineInfo {
         if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
             return BigDecimal.ZERO.intValue();
         }
-        return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
+        //多台，看余量变，减
+        return BigDecimal.ZERO.intValue() - nextDayInfo.getLeftOverMachineCount();
     }
 }

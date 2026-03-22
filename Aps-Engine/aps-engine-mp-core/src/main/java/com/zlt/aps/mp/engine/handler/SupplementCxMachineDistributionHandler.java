@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -44,6 +45,7 @@ public class SupplementCxMachineDistributionHandler {
      * @param allGroupPlanMap   所有分组计划
      */
     public void handlerTailCapacity(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap) {
+        SupplementCxMachineDistributionLogRecorder.addStartSupplementLog(productionContext);
         //获取还有剩余产能的机台
         List<CxMachineBaseInfoVo> hasLeftOverCxMachineList = getAllLeftOverCxMachineInfo(productionContext);
         if (CollectionUtils.isEmpty(hasLeftOverCxMachineList)) {
@@ -59,6 +61,8 @@ public class SupplementCxMachineDistributionHandler {
             addBeforeGroupToFull(productionContext, hasLeftOverCxMachineList);
             return;
         }
+        String supplementCxMachineInfo = hasLeftOverCxMachineList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.joining(StringConstant.COMMA));
+        SupplementCxMachineDistributionLogRecorder.addNeedSupplementAllocationInfoLog(productionContext, supplementCxMachineInfo);
         //按结构优先级排序，进行分配
         productionTailCapacity(productionContext, hasLeftOverCxMachineList, hasLeftOverGroupList);
         //最后还有剩余机台产能的机台，则将前结构顺延到底

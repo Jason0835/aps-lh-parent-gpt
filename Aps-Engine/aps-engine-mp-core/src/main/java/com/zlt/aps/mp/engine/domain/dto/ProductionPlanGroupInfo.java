@@ -664,7 +664,7 @@ public class ProductionPlanGroupInfo {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
-        //可释放的机台 Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
+        //可释放的机台
         Integer canAddCount = previousLimit.getReleaseLhMachineCount(selectedDayLimit);
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
@@ -1316,19 +1316,15 @@ public class ProductionPlanGroupInfo {
         SkuDayProductionInfoHelper planned = limitInfo.getProductionSkuQtyInfo().get(materialDesc);
         if (null == planned) {
             limitInfo.getProductionSkuQtyInfo().put(materialDesc, skuDayProductionInfo);
+            addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
             return;
         }
         //更新使用模具
         planned.getUsedMouldSet().addAll(currentUsedMouldSet);
         //更新数量
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
-
-        List<SkuDayProductionInfoHelper> detailList = limitInfo.getSkuProductionDetailInfo().get(materialDesc);
-        if (null == detailList) {
-            detailList = new ArrayList<>();
-            limitInfo.getSkuProductionDetailInfo().put(materialDesc, detailList);
-        }
-        detailList.add(skuDayProductionInfo);
+        //加入Sku排产明细信息
+        addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
     }
 
     /**
@@ -1746,6 +1742,37 @@ public class ProductionPlanGroupInfo {
             return previousDay;
         }
         return getPreviousDay(previousDay);
+    }
+
+    /**
+     * 加入Sku排产明细，以Sku为维度，同一模具合并
+     *
+     * @param limitInfo            日排产信息
+     * @param skuDayProductionInfo sku日排产信息
+     */
+    private void addSkuProductionDetailInfo(GroupPlanCxLhCapacityLimitHelper limitInfo, SkuDayProductionInfoHelper skuDayProductionInfo) {
+        if (null == limitInfo || null == skuDayProductionInfo || StringUtils.isBlank(skuDayProductionInfo.getMaterialDesc())) {
+            return;
+        }
+        SkuDayProductionInfoHelper skuDayInfo = SkuDayProductionInfoHelper.createClone(skuDayProductionInfo);
+        String materialDesc = skuDayInfo.getMaterialDesc();
+        List<SkuDayProductionInfoHelper> detailList = limitInfo.getSkuProductionDetailInfo().get(materialDesc);
+        if (null == detailList) {
+            detailList = new ArrayList<>();
+            detailList.add(skuDayInfo);
+            limitInfo.getSkuProductionDetailInfo().put(materialDesc, detailList);
+            return;
+        }
+        boolean isHandler = false;
+        for (SkuDayProductionInfoHelper alreadyInfo : detailList) {
+            if (alreadyInfo.mergeNewProductionInfo(skuDayInfo)) {
+                isHandler = true;
+                break;
+            }
+        }
+        if (!isHandler) {
+            detailList.add(skuDayInfo);
+        }
     }
 
     /**

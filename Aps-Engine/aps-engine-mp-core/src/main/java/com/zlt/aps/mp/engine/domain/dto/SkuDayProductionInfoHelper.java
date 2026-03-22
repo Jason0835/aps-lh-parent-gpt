@@ -3,10 +3,14 @@ package com.zlt.aps.mp.engine.domain.dto;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Getter;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Sku日排产信息对象
@@ -79,6 +83,31 @@ public class SkuDayProductionInfoHelper implements Serializable {
     }
 
     /**
+     * 复制
+     *
+     * @param origin
+     * @return
+     */
+    public static SkuDayProductionInfoHelper createClone(SkuDayProductionInfoHelper origin) {
+        if (null == origin) {
+            return null;
+        }
+        SkuDayProductionInfoHelper result = new SkuDayProductionInfoHelper();
+        result.productionDay = origin.getProductionDay();
+        result.materialDesc = origin.getMaterialDesc();
+        result.materialCode = origin.getMaterialCode();
+        result.embryoCode = origin.getEmbryoCode();
+        Set<String> newUsedMouldSet = new HashSet<>();
+        newUsedMouldSet.addAll(origin.getUsedMouldSet());
+        result.usedMouldSet = newUsedMouldSet;
+        result.groupName = origin.getGroupName();
+        result.sumProductionQty = origin.getSumProductionQty();
+        result.dayVulcanizationQty = origin.getDayVulcanizationQty();
+        result.lossQty = origin.getLossQty();
+        return result;
+    }
+
+    /**
      * 增加排产量
      *
      * @param productionQty 需要增加的排产量
@@ -129,6 +158,47 @@ public class SkuDayProductionInfoHelper implements Serializable {
         this.groupName = groupName;
         this.sumProductionQty = BigDecimal.ZERO.intValue();
         this.dayVulcanizationQty = dayVulcanizationQty;
+    }
+
+    /**
+     * 空的构造函数
+     */
+    private SkuDayProductionInfoHelper() {
+
+    }
+
+    /**
+     * 同模具同Sku不同优先级排产量合并
+     * 同天
+     * true 表示可合并 false表示不可合并
+     *
+     * @param skuDayProductionInfo
+     */
+    public boolean mergeNewProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo) {
+        if (null == skuDayProductionInfo) {
+            return false;
+        }
+        if (!materialDesc.equals(skuDayProductionInfo.getMaterialDesc())) {
+            return false;
+        }
+        if (!productionDay.equals(skuDayProductionInfo.getProductionDay())) {
+            return false;
+        }
+        Set<String> newProduction = skuDayProductionInfo.getUsedMouldSet();
+        if (CollectionUtils.isEmpty(usedMouldSet) || CollectionUtils.isEmpty(newProduction)) {
+            return false;
+        }
+        Set<String> intersectionSet = usedMouldSet.stream().filter(newProduction::contains).collect(Collectors.toSet());
+        if (intersectionSet.size() != usedMouldSet.size()) {
+            return false;
+        }
+        Integer addQty = Optional.ofNullable(skuDayProductionInfo.getSumProductionQty()).orElse(BigDecimal.ZERO.intValue());
+        Integer sumQty = Optional.ofNullable(sumProductionQty).orElse(BigDecimal.ZERO.intValue());
+        sumProductionQty = sumQty + addQty;
+        Integer addLossQty = Optional.ofNullable(skuDayProductionInfo.getLossQty()).orElse(BigDecimal.ZERO.intValue());
+        Integer lossQty = Optional.ofNullable(this.lossQty).orElse(BigDecimal.ZERO.intValue());
+        this.lossQty = lossQty + addLossQty;
+        return true;
     }
 
     /**

@@ -262,7 +262,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         Integer leftOver = selectedCxMachine.getRemainingDays();
         //反向机台匹配结构计划
         if (leftOver > BigDecimal.ZERO.intValue()) {
-            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
+            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine, new HashSet<>());
         }
         //下一新增结构
         addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
