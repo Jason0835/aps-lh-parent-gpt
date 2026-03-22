@@ -717,7 +717,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         Integer preClosingDay = selectedLhGroup.getProductionDay();
         Integer preEndDay = endDay;
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku());
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku(), selectedLhGroup.getBeforeSku());
         boolean isChangeMould = changeMouldInfo.isChangeMould();
         //隔天换模
         if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
@@ -1078,6 +1078,9 @@ public class CxMachineBaseInfoVo implements Serializable {
     private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, Integer changeStartDay, String changeGroupName) {
         if (null == changeStartDay || StringUtils.isBlank(changeGroupName)) {
             return false;
+        }
+        if(null == beforeAllocation){
+
         }
         //第一天先不判断
         if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {

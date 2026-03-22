@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.logrecorder;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
@@ -8,8 +9,11 @@ import com.zlt.aps.mp.engine.enums.GroupCxMachineSelectedTypeEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * TBR 结构分组排产日志记录器
@@ -354,6 +358,29 @@ public class TbrProductionGroupLogRecorder {
                 cxMachineInfo.getCxMachineCode());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.REVERSE_MACHINE_CAPACITY_NO_COVER_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加每日结构切换次数信息日志
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，%s：%s ====
+     *
+     * @param context      排程上下文
+     * @param limitContent 限制信息 如 1、结构切换信息 2、 日产上限 3、 工装限制
+     * @param limitSet     有能力天数信息
+     * @return
+     */
+    public static String addLimitInfoLog(Context context, String limitContent, Set<Integer> limitSet) {
+        String changeContent = "";
+        if (!CollectionUtils.isEmpty(limitSet)) {
+            changeContent = limitSet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        }
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，%s：%s ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                limitContent, changeContent);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
         return logContent;
     }
 

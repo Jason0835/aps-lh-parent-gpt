@@ -8,6 +8,8 @@ import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.handler.GroupChangeCalculator;
+import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -58,7 +60,7 @@ public class DayCapacityLimitVo implements Serializable {
      * @param theoryChangeDay       理论的切换结构日
      * @param changeGroupName       切换后的结构
      * @param selectedCxMachineInfo 选中的机台
-     * @param hasProductionDaySet   可排产日集合
+     * @param hasProductionDaySet   机台可排产日集合
      * @return
      */
     public Integer confirmStartDayByChangeGroup(Context context, Integer theoryChangeDay, String changeGroupName, CxMachineBaseInfoVo selectedCxMachineInfo, Set<Integer> hasProductionDaySet) {
@@ -70,21 +72,8 @@ public class DayCapacityLimitVo implements Serializable {
         if (CollectionUtils.isEmpty(hasChangeGroupSet)) {
             return null;
         }
-        if (hasChangeGroupSet.contains(theoryChangeDay)) {
-            return theoryChangeDay;
-        }
-        //提取在theoryChangeDay后，首个最小的日期
-        Set<Integer> afterTheoryChangeDayList = hasChangeGroupSet.stream().filter(singleDay -> singleDay >= theoryChangeDay).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(afterTheoryChangeDayList)) {
-            return null;
-        }
-        Set<Integer> resultSet = hasProductionDaySet.stream().filter(afterTheoryChangeDayList::contains).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(resultSet)) {
-            return null;
-        }
-        List<Integer> resultList = new ArrayList<>(resultSet);
-        resultList.sort(Comparator.comparing(Integer::intValue));
-        return resultList.get(BigDecimal.ZERO.intValue());
+        TbrProductionGroupLogRecorder.addLimitInfoLog(context, "日切换结构能力", hasChangeGroupSet);
+        return GroupChangeCalculator.getFirstHasChangeGroupDay(theoryChangeDay, hasChangeGroupSet, hasProductionDaySet);
     }
 
     /**

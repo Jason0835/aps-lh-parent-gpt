@@ -25,6 +25,7 @@ import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipResultVo;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
+import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -83,6 +84,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	private DpAreaEntityMapper dpAreaEntityMapper;
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+    @Autowired
+    private DpNationEntityMapper dpNationEntityMapper;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -644,15 +647,20 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		// 供应链优先级字典
 		List<SysDictData> scmPriorityDatas = sysDictDataCacheService.getType("biz_scm_type");
 		Map<String, String> scmPriorityMap = scmPriorityDatas != null ? scmPriorityDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
-
+        // 加载区域
+        List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
+        JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class); // 翻译国际化栏位
+        Map<String, String> areaMap = dpAreaList.stream().collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
+        // 加载国家地区
+        List<DpNation> dpNationList = dpNationEntityMapper.selectList(new LambdaQueryWrapper<>());
+        JsonI18nConvertUtils.conventJsonI18n(dpNationList, DpNation.class);
+        Map<String, String> nationMap = dpNationList.stream()
+                .collect(Collectors.toMap(DpNation::getNationCode, DpNation::getNationNameI18n));
+		
 		// 表头信息
 		Map<String, Object> tableMap = new HashMap<>(16);
 		// 列表数据
 		List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-		List<CellStyle> cellStyleList = new ArrayList<>();
-
-		// 添加第一行表头样式：9号、白色、加粗
-		cellStyleList.add(new CellStyle(1, 1, 0, 18, "#FFFFFF", true, true, "等线"));
 
 		// 按当前年月取数
 		Calendar calendar = Calendar.getInstance();
@@ -660,7 +668,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		int currentMonth = calendar.get(Calendar.MONTH) + 1;
 
 		// 设置年月标题
-		tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
+		String titleFormat = I18nUtil.getMessage("ui.data.column.SalesOrderPool.export.title");
+        tableMap.put("title", String.format(titleFormat, currentYear, currentMonth));
 		// 查询数据
 		QueryWrapper<SalesOrderPool> wrapper = new QueryWrapper<>();
 		// 构建查询条件
@@ -687,16 +696,33 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmDetailId")), "SCM_DETAIL_ID", queryVO.getFieldValueByFieldName("scmDetailId"));
 
 		List<SalesOrderPool> dataList = salesOrderPoolEntityMapper.selectList(wrapper);
-
-		// 翻译数据
-		dataList = translationList(dataList);
+		
+		// 设置表头
+        tableMap.put("factoryCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.factoryCode"));
+        tableMap.put("productType", I18nUtil.getMessage("ui.data.column.SalesOrderPool.productType"));
+        tableMap.put("orderPriority", I18nUtil.getMessage("ui.data.column.SalesOrderPool.orderPriority"));
+        tableMap.put("area", I18nUtil.getMessage("ui.data.column.SalesOrderPool.area"));
+        tableMap.put("salCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.salCode"));
+        tableMap.put("locationType", I18nUtil.getMessage("ui.data.column.SalesOrderPool.locationType"));
+        tableMap.put("salNCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.salNCode"));
+        tableMap.put("natCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.natCode"));
+        tableMap.put("brand", I18nUtil.getMessage("ui.data.column.SalesOrderPool.brand"));
+        tableMap.put("salCodePo", I18nUtil.getMessage("ui.data.column.SalesOrderPool.salCodePo"));
+        tableMap.put("billDate", I18nUtil.getMessage("ui.data.column.SalesOrderPool.billDate"));
+        tableMap.put("oriMaterialCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.oriMaterialCode"));
+        tableMap.put("materialDesc", I18nUtil.getMessage("ui.data.column.SalesOrderPool.materialDesc"));
+        tableMap.put("ordQty", I18nUtil.getMessage("ui.data.column.SalesOrderPool.ordQty"));
+        tableMap.put("weekYear", I18nUtil.getMessage("ui.data.column.SalesOrderPool.weekYear"));
+        tableMap.put("isUniformity", I18nUtil.getMessage("ui.data.column.SalesOrderPool.isUniformity"));
+        tableMap.put("isDynamicBalance", I18nUtil.getMessage("ui.data.column.SalesOrderPool.isDynamicBalance"));
+        tableMap.put("isEudr", I18nUtil.getMessage("ui.data.column.SalesOrderPool.isEudr"));
+        tableMap.put("deliverGoodsType", I18nUtil.getMessage("ui.data.column.SalesOrderPool.deliverGoodsType"));
+        tableMap.put("scmPriority", I18nUtil.getMessage("ui.data.column.SalesOrderPool.scmPriority"));
+        tableMap.put("updateTimeExport", I18nUtil.getMessage("ui.data.column.SalesOrderPool.updateTime"));
+        tableMap.put("total", I18nUtil.getMessage("ui.data.column.SalesOrderPool.export.total"));
 
 		if (dataList != null && !dataList.isEmpty()) {
 			List<Map<String, Object>> list = new ArrayList<>();
-			// 根据模板结构：第1行标题，第2行表头，第3行合计，第4行开始数据
-			// Excel行号从0开始，所以数据从第3行开始
-			int dataStartRowIndex = 3; // 对应Excel第4行（数据开始行）
-
 			for (int i = 0; i < dataList.size(); i++) {
 				Map<String, Object> listDataMap = new HashMap<>(16);
 				SalesOrderPool item = dataList.get(i);
@@ -705,25 +731,17 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 				listDataMap.put("factoryCode", factoryMap.getOrDefault(item.getFactoryCode(), item.getFactoryCode()));
 				listDataMap.put("productType", productTypeMap.getOrDefault(item.getProductType(), item.getProductType()));
 				listDataMap.put("orderPriority", orderPriorityMap.getOrDefault(item.getOrderPriority(), item.getOrderPriority()));
-				listDataMap.put("area", item.getArea() != null ? item.getArea() : "");
+				listDataMap.put("area", areaMap.getOrDefault(item.getArea(), item.getArea()));
 				listDataMap.put("salCode", item.getSalCode() != null ? item.getSalCode() : "");
 				listDataMap.put("locationType", locationTypeMap.getOrDefault(item.getLocationType(), item.getLocationType()));
-				listDataMap.put("salNCode", item.getSalNCode() != null ? item.getSalNCode() : "");
-				listDataMap.put("natCode", item.getNatCode() != null ? item.getNatCode() : "");
+				listDataMap.put("salNCode", nationMap.getOrDefault(item.getSalNCode(), item.getSalNCode()));
+				listDataMap.put("natCode", nationMap.getOrDefault(item.getNatCode(), item.getNatCode()));
 				listDataMap.put("brand", brandMap.getOrDefault(item.getBrand(), item.getBrand()));
 				listDataMap.put("salCodePo", item.getSalCodePo() != null ? item.getSalCodePo() : "");
-				if (item.getBillDate() != null) {
-					listDataMap.put("billDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, item.getBillDate()));
-				} else {
-					listDataMap.put("billDate", "");
-				}
+                listDataMap.put("billDate", item.getBillDate() != null ? DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, item.getBillDate()): "");
 				listDataMap.put("oriMaterialCode", item.getOriMaterialCode() != null ? item.getOriMaterialCode() : "");
 				listDataMap.put("materialDesc", item.getMaterialDesc() != null ? item.getMaterialDesc() : "");
-				if (item.getOrdQty() != null) {
-					listDataMap.put("ordQty", item.getOrdQty().doubleValue());
-				} else {
-					listDataMap.put("ordQty", 0);
-				}
+				listDataMap.put("ordQty", item.getOrdQty() != null? item.getOrdQty().doubleValue(): 0);
 				listDataMap.put("weekYear", item.getWeekYear() != null ? item.getWeekYear() : "");
 				listDataMap.put("isUniformity", item.getIsUniformity() != null ? item.getIsUniformity() : "");
 				listDataMap.put("isDynamicBalance", item.getIsDynamicBalance() != null ? item.getIsDynamicBalance() : "");
@@ -731,55 +749,15 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 				listDataMap.put("deliverGoodsType", deliverGoodsTypeMap.getOrDefault(item.getDeliverGoodsType(), item.getDeliverGoodsType()));
 				listDataMap.put("scmPriority", scmPriorityMap.getOrDefault(item.getScmPriority(), item.getScmPriority()));
 				listDataMap.put("scmDetailId", item.getScmDetailId() != null ? item.getScmDetailId().toString() : "");
-				listDataMap.put("updateTimeExport", item.getUpdateTimeExport() != null ? item.getUpdateTimeExport() : "");
+				listDataMap.put("updateTimeExport", item.getUpdateTime() != null ? DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()) : "");
 				listDataMap.put("orderStatus", item.getOrderStatus() != null ? item.getOrderStatus() : "");
-
-				// 计算行号（Excel行号从0开始）
-				// 数据行号 = 数据开始行号 + 数据索引
-				int rowNum = dataStartRowIndex + i;
-
-				// 添加样式（确保样式作用在实际的数据行上）
-				// 使用白色背景色（#FFFFFF）代替null，避免Color.decode抛出异常
-				// 等线字体，9号大小，黑色，不加粗，带边框
-				cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 18, "#FFFFFF", true, false, "等线"));
 
 				list.add(listDataMap);
 			}
 			excelDataList.add(list);
 		}
-
-		// 将单元格样式放入context
-		if (PubUtil.isNotEmpty(cellStyleList)) {
-			tableMap.put("CELL_STYLE", cellStyleList);
-		}
-
+		log.debug("开始生成excel");
 		// 写到文件
 		return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
-	}
-
-	/**
-	 * 翻译列表
-	 * @param resultList
-	 */
-	private List<SalesOrderPool> translationList(List<SalesOrderPool> resultList) {
-		// 加载区域
-		List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
-		JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class);
-		Map<String, String> areaMap = dpAreaList.stream()
-				.collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
-		// 加载国家地区
-		List<DpNation> dpNationList = new ArrayList<>(); // 假设这里有获取国家地区的逻辑
-		Map<String, String> nationMap = new HashMap<>(); // 假设这里有国家地区映射
-
-		for (SalesOrderPool item : resultList) {
-			String salNCode = item.getSalNCode();
-			String natCode = item.getNatCode();
-			String area = item.getArea();
-			item.setSalNCode(nationMap.getOrDefault(salNCode, salNCode));
-			item.setNatCode(nationMap.getOrDefault(natCode, natCode));
-			item.setArea(areaMap.getOrDefault(area, area));
-			item.setUpdateTimeExport(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()));
-		}
-		return resultList;
 	}
 }

@@ -108,7 +108,7 @@ public class MonthPlanNoProductionPlanUIController extends BaseUIController<Mont
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, MonthPlanNoProductionPlan entity) throws IOException {
-        String fileName = this.getExportTemplateFileName()+ DateUtil.format(LocalDateTime.now(),"yyyyMMdd");;
+        String fileName = this.getExportTemplateFileName() + DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
         byte[] excelBytes = iMonthPlanNoProductionPlanService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

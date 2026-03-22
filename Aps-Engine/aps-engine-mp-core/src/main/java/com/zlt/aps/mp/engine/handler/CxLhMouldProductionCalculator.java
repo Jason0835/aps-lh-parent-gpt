@@ -15,6 +15,7 @@ import com.zlt.aps.mp.engine.logrecorder.TbrBoostQtyProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -107,20 +108,24 @@ public class CxLhMouldProductionCalculator {
         Set<Integer> replenishmentDay = context.getReplenishmentDay();
         Integer dayLhQty = productionPlan.getMaxDaySingleLhMachineQty();
         //非续作需要重新判断胎胚种类数及配比限制
-        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
-            //得到真正上机日
-            Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
-            if (null == realStartDay) {
-                //本轮不再参与排产
-                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
-                return;
-            }
-            //SKU二次上机检查 sandy+ 20260129
-            if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
-                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
-                return;
-            }
+        if (isEndHandler(productionContext, continueType, productionPlanInfo, skuProductionPlanList, startDay, endDay)) {
+            return;
         }
+        Integer maxProductionDays = productionContext.getRealProductionDaysByRange(startDay, endDay);
+//        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
+//            //得到真正上机日
+//            Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
+//            if (null == realStartDay) {
+//                //本轮不再参与排产
+//                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+//                return;
+//            }
+//            //SKU二次上机检查 sandy+ 20260129
+//            if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
+//                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+//                return;
+//            }
+//        }
         //逐日进行排产，从起始日到结构收尾日
         String skuMaterialDesc = productionPlan.getMaterialDesc();
         Integer firstDay = null;
@@ -138,23 +143,32 @@ public class CxLhMouldProductionCalculator {
             //需要考虑首日：换活字块，换模场景，此时双模日硫化量会有变化
             DayProductionQtyHelper dayProductionInfo = calculateSingleLhGroupQty(context, lhProductionQtyHelper, day, firstDay, startDay, productionPlan);
             dayProductionInfo.updateDoubleProductionQty();
-            Integer lossQty;
-            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType && dayProductionInfo.isProductionNextDay()) {
-                //隔天换模，更新当前排产完毕信息
-                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
-                //记录已排产量及损耗量
-                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
-                day = context.getNextHasProductionDay(day, stopDay);
-                if (day > endDay) {
-                    break;
-                }
-                //处理续作换活字块的换膜
-                handlerDayShareMouldChangeMould(productionContext, day, skuMaterialDesc, doubleMouldList);
-                lossQty = dayProductionInfo.getNextDayLossQty();
-            } else {
-                lossQty = dayProductionInfo.getLossQty();
-            }
             Integer dayProductionQty = dayProductionInfo.getProductionQty();
+            if (!isContinueProduction(sumProductionQty, firstDay, day, dayProductionQty, continueType, maxProductionDays, skuProductionPlanList)) {
+                break;
+            }
+            NewProductionInfo newInfo = handlerLossQty(productionContext, continueType, day, skuMaterialDesc, dayProductionInfo, doubleMouldList, endDay);
+            if (null == newInfo) {
+                break;
+            }
+            day = newInfo.getProductionDay();
+            Integer lossQty = newInfo.getLossQty();
+
+//            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType && dayProductionInfo.isProductionNextDay()) {
+//                //隔天换模，更新当前排产完毕信息
+//                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
+//                //记录已排产量及损耗量
+//                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
+//                day = context.getNextHasProductionDay(day, stopDay);
+//                if (day > endDay) {
+//                    break;
+//                }
+//                //处理续作换活字块的换膜
+//                handlerDayShareMouldChangeMould(productionContext, day, skuMaterialDesc, doubleMouldList);
+//                lossQty = dayProductionInfo.getNextDayLossQty();
+//            } else {
+//                lossQty = dayProductionInfo.getLossQty();
+//            }
             Integer realDayProductionQty = Math.min(sumProductionQty, dayProductionQty);
             Integer theoryProductionQty = realDayProductionQty;
             //20260127 开产日-量放一半
@@ -422,6 +436,100 @@ public class CxLhMouldProductionCalculator {
         updateCapsuleChuckInfoByMould(capsuleChuckInfo, beforeConclusionDay, singleMould, YesOrNoEnum.NO.getValue());
         //20260122 换模次数 -1
         updateChangeMouldInfoByMould(context, beforeConclusionDay, productionPlan.getMaterialDesc(), singleMould);
+    }
+
+    /**
+     * 判断是否需要结束标记
+     * 1、看是否需要重新判断胎胚种类数及配比
+     * 2、看是否超出二次上机
+     * true 表示结束 false表示继续
+     *
+     * @param productionContext     排产上下文
+     * @param continueType          续作类型
+     * @param productionPlanInfo    排产分组
+     * @param skuProductionPlanList 排产计划
+     * @param startDay              开始排产日
+     * @param endDay                排产结束日
+     * @return
+     */
+    private static boolean isEndHandler(TbrProductionContext productionContext, ContinueTypeEnum continueType, ProductionPlanGroupInfo productionPlanInfo, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, Integer startDay, Integer endDay) {
+        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
+        //非续作需要重新判断胎胚种类数及配比限制
+        if (ContinueTypeEnum.NO_CONTINUE != continueType) {
+            return false;
+        }
+        //得到真正上机日
+        Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
+        if (null == realStartDay) {
+            //本轮不再参与排产
+            skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+            return true;
+        }
+        //SKU二次上机检查 sandy+ 20260129
+        if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
+            skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 计算是否可连续排产
+     *
+     * @param sumProductionQty   还需排产量
+     * @param firstDay           首日排产
+     * @param day                当前排产日
+     * @param firstProductionQty 首日量
+     * @param continueType       排产续作类型
+     * @param maxProductionDays  最大排产天数
+     * @param skuProductionPlanList sku-排产计划
+     * @return
+     */
+    private static boolean isContinueProduction(Integer sumProductionQty, Integer firstDay, Integer day, Integer firstProductionQty, ContinueTypeEnum continueType, Integer maxProductionDays, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList) {
+        if (ContinueTypeEnum.SAME_SKU == continueType || ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType) {
+            return true;
+        }
+        if (BigDecimal.ONE.intValue() == maxProductionDays) {
+            return true;
+        }
+        if (firstDay.equals(day) && sumProductionQty <= firstProductionQty) {
+            //本轮不再参与排产
+            skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 处理新的日期和损耗量
+     *
+     * @param productionContext 排产上下文
+     * @param continueType      续作排产类型
+     * @param day               当前排产日
+     * @param skuMaterialDesc   排产Sku
+     * @param dayProductionInfo 日排产量信息
+     * @param doubleMouldList   双模信息
+     * @param endDay            结束日
+     * @return
+     */
+    private static NewProductionInfo handlerLossQty(TbrProductionContext productionContext, ContinueTypeEnum continueType, Integer day, String skuMaterialDesc, DayProductionQtyHelper dayProductionInfo, List<ProductionMouldInfoVo> doubleMouldList, Integer endDay) {
+        Integer lossQty;
+        if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType && dayProductionInfo.isProductionNextDay()) {
+            //隔天换模，更新当前排产完毕信息
+            doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
+            //记录已排产量及损耗量
+            productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
+            day = productionContext.getNextHasProductionDay(day, productionContext.getStopDays());
+            if (day > endDay) {
+                return null;
+            }
+            //处理续作换活字块的换膜
+            handlerDayShareMouldChangeMould(productionContext, day, skuMaterialDesc, doubleMouldList);
+            lossQty = dayProductionInfo.getNextDayLossQty();
+        } else {
+            lossQty = dayProductionInfo.getLossQty();
+        }
+        return new NewProductionInfo(day, lossQty);
     }
 
     /**
@@ -960,5 +1068,21 @@ public class CxLhMouldProductionCalculator {
 
     private CxLhMouldProductionCalculator() {
 
+    }
+}
+
+/**
+ * 新排产日信息
+ */
+@Getter
+class NewProductionInfo {
+
+    private Integer productionDay;
+
+    private Integer lossQty;
+
+    public NewProductionInfo(Integer productionDay, Integer lossQty) {
+        this.productionDay = productionDay;
+        this.lossQty = lossQty;
     }
 }
