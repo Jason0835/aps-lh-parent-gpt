@@ -51,7 +51,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
 
     /**
      * 日控的 本结构剩余的最大硫化机台数
-     *  sandy+ 2026.3.22
+     * sandy+ 2026.3.22
      */
     private Integer remainMaxLhMachineCount;
 
@@ -200,9 +200,9 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param releaseLhMachineCount 需要释放的硫化组机台数
      * @return
      */
-    public SkuDayProductionInfoHelper getEarliestConclusionSkuInfo(GroupPlanCxLhCapacityLimitHelper previousLimit, Integer releaseLhMachineCount) {
+    public SkuDayProductionInfoHelper getEarliestConclusionSkuInfo(Context context, GroupPlanCxLhCapacityLimitHelper previousLimit, Integer releaseLhMachineCount) {
         Map<String, Integer> previousSkuUsedMachine = previousLimit.getSkuTheoryUsedMachine();
-        Map<String, Integer> currentSkuUsedMachine = getSkuUsedMachineRejectLeftOver();
+        Map<String, Integer> currentSkuUsedMachine = getSkuUsedMachineRejectLeftOver(context);
         List<String> reductionSkuList = new ArrayList<>();
         previousSkuUsedMachine.forEach((materialDesc, usedMachineCount) -> {
             Integer leaveCount = currentSkuUsedMachine.get(materialDesc);
@@ -290,11 +290,12 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 硫化配比数没有超
      * 先挑选还有硫化组的，胎胚种类数也没超的
      *
+     * @param context              排产上下文
      * @param previousDayLimitInfo 前一日的限制情况
      * @param nextDayLimitInfo     后一日的限制情况
      * @return
      */
-    public boolean isReachLimitByMouldNumber(GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    public boolean isReachLimitByMouldNumber(Context context, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
         //实际的最大硫化机台数 = min(初始的最大硫化机台数,结构剩余可用的最大硫化机台数 sandy+ 2026.03.22
         Integer realMaxLhMachineCount = maxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : maxLhMachineCount;
@@ -313,7 +314,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer realUsedLhMachineCount;
         if (null == nextDayLimitInfo) {
             //结构收尾日
-            Integer previousDayChangeQty = getChangeUsedLhMachineQtyByPreviousDay(previousDayLimitInfo);
+            Integer previousDayChangeQty = getChangeUsedLhMachineQtyByPreviousDay(context, previousDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + previousDayChangeQty;
         } else {
             //中间排产
@@ -326,12 +327,13 @@ public class GroupPlanCxLhCapacityLimitHelper {
     /**
      * 根据后一天的排产信息，获取可释放的机台信息
      *
+     * @param context     排产上下文
      * @param nextDayInfo 后一天排产信息
      * @return
      */
-    public Integer getReleaseLhMachineCount(GroupPlanCxLhCapacityLimitHelper nextDayInfo) {
-        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
-        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayInfo.getSkuUsedDetailInfoByQty();
+    public Integer getReleaseLhMachineCount(Context context, GroupPlanCxLhCapacityLimitHelper nextDayInfo) {
+        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty(context);
+        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayInfo.getSkuUsedDetailInfoByQty(context);
         Map<String, Integer> changeMap = new HashMap<>();
         //前日变化
         previousDaySkuLhMachineDetailMap.forEach((materialDesc, previousUsedMachineDetail) -> {
@@ -421,7 +423,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      *
      * @return
      */
-    private Map<String, Integer> getSkuUsedMachineRejectLeftOver() {
+    private Map<String, Integer> getSkuUsedMachineRejectLeftOver(Context context) {
         if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
@@ -433,8 +435,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
             Integer wholeNumber = BigDecimal.ZERO.intValue();
             for (SkuDayProductionInfoHelper skuProductionInfo : skuProductionInfoList) {
                 Integer productionQty = skuProductionInfo.getSumProductionQty();
-                Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-                //表示换模或是换活字块 todo 开产日
+                //表示换模或是换活字块 开产日
+                Integer lhMachineQty = context.getOpenDayMaxQty(day, skuProductionInfo.getDayLhMachineQty());
                 if (productionQty < lhMachineQty) {
                     continue;
                 }
@@ -556,16 +558,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 根据当日各Sku使用的硫化组数，结合前一日排产情况，计算实际变化的硫化组数
      * 即新增硫化组 + 减的硫化组数
      *
+     * @param context              排产上下文
      * @param previousDayLimitInfo 前一日排产情况信息
      * @return
      */
-    private Integer getChangeUsedLhMachineQtyByPreviousDay(GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo) {
+    private Integer getChangeUsedLhMachineQtyByPreviousDay(Context context, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo) {
         //根据前日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = previousDayLimitInfo.getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = previousDayLimitInfo.getSkuUsedDetailInfoByQty(context);
         //当前日Sku使用的硫化组数-根据模具数
         Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
         //当前日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty(context);
         //新增Sku-使用的硫化组数
         Map<String, Integer> addSkuMap = new HashMap<>();
         currentDaySkuLhMachineInfoMap.forEach((materialDesc, addQty) -> {
@@ -588,16 +591,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 根据当日各Sku使用的硫化组数，结合前一日排产情况，计算实际变化的硫化组数
      * 即新增硫化组 + 减的硫化组数
      *
+     * @param context          排产上下文
      * @param nextDayLimitInfo 后一日排产情况信息
      * @return
      */
-    private Integer getChangeUsedLhMachineQtyByNextDay(GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    private Integer getChangeUsedLhMachineQtyByNextDay(Context context, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         //根据后一日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayLimitInfo.getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayLimitInfo.getSkuUsedDetailInfoByQty(context);
         //后一日Sku使用的硫化组数-根据模具数
         Map<String, Integer> nextDaySkuLhMachineInfoMap = nextDayLimitInfo.getSkuUsedLhMachineCountByMouldNumber();
         //当前日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty(context);
         //新增Sku-使用的硫化组数
         Map<String, Integer> addSkuMap = new HashMap<>();
         nextDaySkuLhMachineInfoMap.forEach((materialDesc, addQty) -> {
@@ -672,9 +676,10 @@ public class GroupPlanCxLhCapacityLimitHelper {
     /**
      * 获取各Sku使用的硫化机台明细信息，根据排产量
      *
+     * @param context 排产上下文
      * @return
      */
-    private Map<String, SkuUsedLhMachineInfo> getSkuUsedDetailInfoByQty() {
+    private Map<String, SkuUsedLhMachineInfo> getSkuUsedDetailInfoByQty(Context context) {
         if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
@@ -686,8 +691,9 @@ public class GroupPlanCxLhCapacityLimitHelper {
             Integer wholeNumber = BigDecimal.ZERO.intValue();
             Integer remainder = BigDecimal.ZERO.intValue();
             for (SkuDayProductionInfoHelper lhDetail : skuProductionDetailList) {
-                //todo 需要考虑开产日
-                if (lhDetail.getSumProductionQty().equals(lhDetail.getDayLhMachineQty())) {
+                //需要考虑开产日
+                Integer dayLhMachineQty = context.getOpenDayMaxQty(day, lhDetail.getDayLhMachineQty());
+                if (lhDetail.getSumProductionQty().equals(dayLhMachineQty)) {
                     wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
                 } else {
                     remainder = remainder + BigDecimal.ONE.intValue();

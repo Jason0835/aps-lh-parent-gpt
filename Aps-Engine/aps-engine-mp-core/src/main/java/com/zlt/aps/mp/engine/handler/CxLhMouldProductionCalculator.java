@@ -112,20 +112,6 @@ public class CxLhMouldProductionCalculator {
             return;
         }
         Integer maxProductionDays = productionContext.getRealProductionDaysByRange(startDay, endDay);
-//        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
-//            //得到真正上机日
-//            Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
-//            if (null == realStartDay) {
-//                //本轮不再参与排产
-//                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
-//                return;
-//            }
-//            //SKU二次上机检查 sandy+ 20260129
-//            if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
-//                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
-//                return;
-//            }
-//        }
         //逐日进行排产，从起始日到结构收尾日
         String skuMaterialDesc = productionPlan.getMaterialDesc();
         Integer firstDay = null;
@@ -153,22 +139,6 @@ public class CxLhMouldProductionCalculator {
             }
             day = newInfo.getProductionDay();
             Integer lossQty = newInfo.getLossQty();
-
-//            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType && dayProductionInfo.isProductionNextDay()) {
-//                //隔天换模，更新当前排产完毕信息
-//                doubleMouldList.forEach(productionMould -> productionMould.getFinishDaySet().add(dayProductionInfo.getProductionDay()));
-//                //记录已排产量及损耗量
-//                productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, BigDecimal.ZERO.intValue(), dayProductionInfo.getLossQty());
-//                day = context.getNextHasProductionDay(day, stopDay);
-//                if (day > endDay) {
-//                    break;
-//                }
-//                //处理续作换活字块的换膜
-//                handlerDayShareMouldChangeMould(productionContext, day, skuMaterialDesc, doubleMouldList);
-//                lossQty = dayProductionInfo.getNextDayLossQty();
-//            } else {
-//                lossQty = dayProductionInfo.getLossQty();
-//            }
             Integer realDayProductionQty = Math.min(sumProductionQty, dayProductionQty);
             Integer theoryProductionQty = realDayProductionQty;
             //20260127 开产日-量放一半
