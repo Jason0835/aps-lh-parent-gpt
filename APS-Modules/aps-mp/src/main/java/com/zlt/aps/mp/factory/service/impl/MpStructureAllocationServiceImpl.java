@@ -1389,7 +1389,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         // 构建切换类型子表
         tableMap.put("changeType", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.changeType"));
-        tableMap.put("changeCount", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.changeCount"));
         tableMap.put("proSizeChangeCountLabel", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.proSizeChangeCount"));
         tableMap.put("structureChangeCountLabel", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureChangeCount"));
         // 填充数据
