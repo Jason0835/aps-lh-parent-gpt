@@ -7,6 +7,7 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -25,8 +26,11 @@ import org.apache.ibatis.annotations.Mapper;
 public interface FactoryMonthPlanMouldDayResultEntityMapper extends CommBaseMapper<FactoryMonthPlanMouldDayResult> {
     /**
      * 查询导出列表
+     * 
      * @param factoryMonthPlanMouldDayResult
+     * @param isAllMaterial                  是否查全物料
      * @return
      */
-    List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult);
+    List<FactoryMonthPlanMouldDayResultExportVo> getExportList(@Param("dayResult") FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult,
+                                                               @Param("isAllMaterial") Boolean isAllMaterial);
 }

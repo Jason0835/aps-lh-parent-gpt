@@ -34,5 +34,5 @@ public interface IFactoryMonthPlanMouldDayResultService extends IDocService<Fact
      * @param list
      * @return
      */
-    byte[] getFactoryMonthPlanMouldDayResultExportByte(List<FactoryMonthPlanMouldDayResultExportVo> list);
+    byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult, List<FactoryMonthPlanMouldDayResultExportVo> list);
 }
