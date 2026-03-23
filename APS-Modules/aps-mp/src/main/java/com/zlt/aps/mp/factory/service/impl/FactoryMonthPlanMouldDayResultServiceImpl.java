@@ -108,7 +108,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * 获取导出数据
      */
     @Override
-    public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult) {
+    public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult,
+                                                                      boolean isAllMaterial) {
         // 1、加载构建导出列表的各项数据
         // 1.1、加载月计划模具排产明细
         List<FactoryMonthPlanMouldDayResultExportVo> recordList = factoryMonthPlanMouldDayResultEntityMapper
