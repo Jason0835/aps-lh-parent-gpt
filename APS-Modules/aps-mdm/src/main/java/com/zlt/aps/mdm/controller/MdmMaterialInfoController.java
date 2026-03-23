@@ -17,19 +17,19 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.mdm.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.mdm.service.IMdmMaterialInfoService;
-import com.zlt.aps.mdm.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mdm.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.mdm.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.mdm.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mdm.service.IMdmMaterialInfoService;
+import com.zlt.aps.mdm.utils.ScmListUtils;
+import com.zlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
@@ -82,7 +82,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("create_time desc");
+        startPage("create_time desc, id desc");
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
