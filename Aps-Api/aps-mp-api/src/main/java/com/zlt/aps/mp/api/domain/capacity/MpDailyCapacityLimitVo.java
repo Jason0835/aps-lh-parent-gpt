@@ -2,7 +2,9 @@ package com.zlt.aps.mp.api.domain.capacity;
 
 import lombok.Data;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -40,6 +42,11 @@ public class MpDailyCapacityLimitVo {
      * 已用胎胚种类数
      */
     private Integer usedEmbryoTypes = 0;
+
+    /**
+     * 已用换模次数
+     */
+    private Integer usedChangeMould = 0;
 
     /**
      *  当日使用的胎胚编码

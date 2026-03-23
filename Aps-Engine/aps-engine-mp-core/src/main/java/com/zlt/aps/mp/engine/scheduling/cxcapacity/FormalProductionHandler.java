@@ -2,6 +2,9 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
@@ -13,12 +16,14 @@ import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
+import com.zlt.common.utils.PubUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +79,14 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 return;
             }
             log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName));
+            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+            cxAddSkuProductionHandler.setRemainLhMachineCount(context,allGroupPlanInfo,structureName);
+            //4.1 初始日产能限制信息，用于统计使用
+            groupPlan.initMpDailyCapacityLimit(context);
+            //4.2 SKU排产
             cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
+            //4.3 重新计算统计产能
+            groupPlan.reCalcMpDailyCapacityLimit(context);
         });
         //5、非在机结构，新增规格排产
         allGroupPlanInfo.forEach((structureName, groupPlan) -> {
@@ -82,8 +94,48 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 return;
             }
             log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName));
+            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+            cxAddSkuProductionHandler.setRemainLhMachineCount(context,allGroupPlanInfo,structureName);
+            //5.1 初始日产能限制信息，用于统计使用
+            groupPlan.initMpDailyCapacityLimit(context);
+            //5.2 SKU排产
             cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, groupPlan, new HashSet<>());
+            //5.3 重新计算统计产能
+            groupPlan.reCalcMpDailyCapacityLimit(context);
         });
+    }
+
+
+
+    /**
+     * 获取其他结构已使用的硫化机台数
+     * @param allGroupPlanInfo 所有结构计划
+     * @param currentStructName 当前结构名称
+     * @param iDay 当前日
+     * @return 其他结构已使用的硫化机台数
+     */
+    private Integer getOtherStructUsedLhMachines(Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String currentStructName, int iDay) {
+        int accUsedLhMachines;
+        MpDailyCapacityLimitVo dailyCapacityLimitVo;
+        ProductionPlanGroupInfo groupPlan;
+        accUsedLhMachines = 0;
+        for (Map.Entry<String, ProductionPlanGroupInfo> entry: allGroupPlanInfo.entrySet()) {
+            if (entry.getKey().equals(currentStructName)) {
+                //排除当前结构
+                continue;
+            }
+            groupPlan = entry.getValue();
+            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = groupPlan.getDailyCapacityLimitVoMap();
+            if (PubUtil.isEmpty(dailyCapacityLimitVoMap)){
+                continue;
+            }
+            dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(iDay);
+            if (dailyCapacityLimitVo == null){
+                continue;
+            }
+            accUsedLhMachines += dailyCapacityLimitVo.getUsedLhMachines();
+        }
+        return accUsedLhMachines;
     }
 
     /**

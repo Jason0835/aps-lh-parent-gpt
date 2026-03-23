@@ -41,13 +41,13 @@ public class ContinueSkuCalculator {
         List<MonthPlanProductionRequirePlanVo> groupPlanList = groupPlanInfo.getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanList)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addContinueGroupNoGroupPlanLog(context, groupName));
+            TbrProductionGroupLogRecorder.addContinueGroupNoGroupPlanLog(context, groupName);
             return;
         }
         Map<String, CxContinueSkuInfoHelper> continueSkuMouldNumberMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuMouldNumberMap)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addContinueGroupNoContinueSkuLog(context, groupName));
+            TbrProductionGroupLogRecorder.addContinueGroupNoContinueSkuLog(context, groupName);
             return;
         }
         //20260119 初始设置：续作在产机台信息，可能续作本身没有计划(高优先级没有量或是计划没有量)
@@ -57,7 +57,7 @@ public class ContinueSkuCalculator {
         List<MonthPlanProductionRequirePlanVo> continueSkuPlanList = groupPlanList.stream().filter(groupPlan -> groupPlan.hasProduction() && skuMaterialDescSet.contains(groupPlan.getMaterialDesc())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(continueSkuPlanList)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuEmptyPlanLog(context, groupName));
+            TbrProductionGroupLogRecorder.addContinueGroupContinueSkuEmptyPlanLog(context, groupName);
             return;
         }
         //分组合计续作Sku的计划量-高优先级
@@ -65,11 +65,12 @@ public class ContinueSkuCalculator {
         //设置续作Sku的高优级量及单模日硫化量
         continueSkuMouldNumberMap.forEach((materialDesc, cxContinueSkuInfo) -> {
             List<MonthPlanProductionRequirePlanVo> planList = continueSkuGroupMap.get(materialDesc);
-            Integer planDemandQty = getContinueSkuSummaryQty(planList);
+            //20260316 续作SKu-使用续作模具采用按总量排-续作优先
+            Integer planDemandQty = getContinueMouldSkuSummaryQty(planList);
             cxContinueSkuInfo.setPlanDemandQty(planDemandQty);
             cxContinueSkuInfo.setContinueSkuPlanList(planList);
             if (CollectionUtils.isEmpty(planList)) {
-                log.info(TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc));
+                TbrProductionGroupLogRecorder.addContinueGroupContinueSkuNoPlanLog(context, groupName, materialDesc);
                 return;
             }
             MonthPlanProductionRequirePlanVo plan = planList.get(BigDecimal.ZERO.intValue());
@@ -133,6 +134,21 @@ public class ContinueSkuCalculator {
     }
 
     /**
+     * 汇总续作Sku-续作模具的初始排产量
+     * 全部按总需求
+     *
+     * @param planList 续作Sku计划集合
+     * @return
+     */
+    public static Integer getContinueMouldSkuSummaryQty(List<MonthPlanProductionRequirePlanVo> planList) {
+        if (CollectionUtils.isEmpty(planList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //总净需求量
+        return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+    }
+
+    /**
      * 汇总续作Sku初始排产量
      * 如果是按总量排，则Sum(净需求排产量)
      * 否则Sum(高优先级排产量)
@@ -154,58 +170,6 @@ public class ContinueSkuCalculator {
         return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
 
-    /**
-     * 结构计划下的续作Sku分配硫化组信息
-     *
-     * @param groupPlanInfo     结构计划信息
-     * @param assignedLhGroupNo 结构下已分配的硫化组集合信息
-     * @param continueSkuInfo   待分配硫化组的续作Sku信息
-     * @return
-     */
-    @Deprecated
-    public static List<CxLhProductionHelper> continueSkuAllocationLhGroup(Context context, ProductionPlanGroupInfo groupPlanInfo, Set<Integer> assignedLhGroupNo, CxContinueSkuInfoHelper continueSkuInfo) {
-        Map<Integer, CxLhProductionHelper> cxLhRatioMap = groupPlanInfo.getCxLhRatioMap();
-        Integer maxLhGroupNo = cxLhRatioMap.size();
-        Integer mouldNumber = continueSkuInfo.getMouldNumber();
-        Integer continueSkuMaxLhGroup = continueSkuInfo.getUsedLhMachineCountByMouldNumber();
-        List<ProductionMouldInfoVo> mouldList = new ArrayList<>(mouldNumber);
-        List<CxLhProductionHelper> allocationGroupList = new ArrayList<>();
-        int assignedCount = BigDecimal.ONE.intValue();
-        for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= maxLhGroupNo; lhGroupNo++) {
-            if (assignedLhGroupNo.contains(lhGroupNo)) {
-                continue;
-            }
-            if (assignedCount > continueSkuMaxLhGroup) {
-                break;
-            }
-            assignedLhGroupNo.add(lhGroupNo);
-            CxLhProductionHelper allocationGroup = cxLhRatioMap.get(lhGroupNo);
-            Integer startMouldNumber = continueSkuInfo.getUsedMouldIndex(assignedCount - BigDecimal.ONE.intValue());
-            Integer endMouldNumber = continueSkuInfo.getUsedMouldIndex(assignedCount);
-            List<ProductionMouldInfoVo> selectedDoubleMouldList = mouldList.subList(startMouldNumber, endMouldNumber);
-            allocationGroupList.add(allocationGroup);
-            fullContinueMaterialAndMould(allocationGroup, continueSkuInfo, selectedDoubleMouldList);
-            assignedCount = assignedCount + BigDecimal.ONE.intValue();
-        }
-        return allocationGroupList;
-    }
-
-    /**
-     * 填充续作物料及模具
-     *
-     * @param cxLhGroup               成型硫化分组
-     * @param continueSkuInfo         续作Sku信息
-     * @param selectedDoubleMouldList 选中的模具
-     */
-    private static void fullContinueMaterialAndMould(CxLhProductionHelper cxLhGroup, CxContinueSkuInfoHelper continueSkuInfo, List<ProductionMouldInfoVo> selectedDoubleMouldList) {
-        cxLhGroup.setMaterialCode(continueSkuInfo.getMaterialCode());
-        cxLhGroup.setMaterialDesc(continueSkuInfo.getMaterialDesc());
-        if (CollectionUtils.isEmpty(selectedDoubleMouldList)) {
-            return;
-        }
-        Set<String> mouldCodeSet = selectedDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        cxLhGroup.setProductionMouldSet(mouldCodeSet);
-    }
 
     private ContinueSkuCalculator() {
 

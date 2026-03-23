@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.capacity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 
 /**
@@ -12,7 +13,7 @@ public class MpAdjustDailyCapacityLimit extends AbstractDailyCapacityLimit
 {
     @Override
     public Integer getDayVulcanizationQty(BaseEntity mpFinalVo) {
-        FactoryMonthPlanFinalAdjustVo finalVo = (FactoryMonthPlanFinalAdjustVo)mpFinalVo;
+        FactoryMonthPlanFinalAdjustVo finalVo = (FactoryMonthPlanFinalAdjustVo) mpFinalVo;
         // 日硫化量 = 单模硫化量 * 2；
         return finalVo.getDayVulcanizationQty() * 2;
     }

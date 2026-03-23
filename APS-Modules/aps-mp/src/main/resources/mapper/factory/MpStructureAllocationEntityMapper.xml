@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper">
+    <!-- 获取结构转产表导出数据 -->
+    <select id="getExportList" resultType="com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo">
+        SELECT
+		    t.ID,
+		    t.FACTORY_CODE,
+		    t.YEAR,
+		    t.MONTH,
+		    t.MONTH_PLAN_VERSION,
+		    t.PRODUCTION_VERSION,
+		    t.PLAN_TYPE,
+		    t.DATA_SOURCE,
+		    t.CX_MACHINE_CODE,
+		    t.STRUCTURE_NAME,
+		    t.IS_HAS_SPECIAL_MATERIAL,
+		    t.MAX_EMBRYO_CODE_COUNT,
+		    t.MAX_LH_MACHINE_COUNT,
+		    t.MIN_LH_MACHINE_COUNT,
+		    t.NET_QTY,
+		    t.LOSS_QTY,
+		    t.BEGIN_DAY,
+		    t.END_DAY,
+		    t.ALLOT_DAYS,
+		    mm.CX_MACHINE_TYPE_CODE,
+		    1 data_type
+		FROM
+		    T_MP_STRUCTURE_ALLOCATION t
+		    LEFT JOIN t_mdm_molding_machine mm ON t.CX_MACHINE_CODE = mm.CX_MACHINE_CODE 
+		    AND mm.IS_DELETE = 0
+		WHERE
+		    t.factory_code = #{factoryCode}
+		    AND t.PRODUCTION_VERSION = #{productionVersion}
+		    AND t.MONTH_PLAN_VERSION = #{monthPlanVersion}
+		    AND t.YEAR = #{year}
+		    AND t.MONTH = #{month}
+		    AND t.IS_DELETE = 0
+        <if test="cxMachineCode != null and cxMachineCode != ''">
+		    AND t.CX_MACHINE_CODE LIKE concat('%', #{cxMachineCode}, '%')
+        </if>
+		GROUP BY
+		    t.STRUCTURE_NAME
+		ORDER BY t.CX_MACHINE_CODE, t.BEGIN_DAY
+    </select>
+</mapper>

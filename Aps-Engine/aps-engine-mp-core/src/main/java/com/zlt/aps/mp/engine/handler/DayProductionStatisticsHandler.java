@@ -102,6 +102,7 @@ public class DayProductionStatisticsHandler {
             });
             resultList.add(info);
         });
+        buildDayCapacityStatisticsInfo(productionContext);
         return resultList;
     }
 
@@ -183,6 +184,47 @@ public class DayProductionStatisticsHandler {
     }
 
     /**
+     * 日产限制量信息
+     *
+     * @param context
+     * @return
+     */
+    private void buildDayCapacityStatisticsInfo(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        if (null == baseDataContainer) {
+            return;
+        }
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return;
+        }
+        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = dayCapacityLimit.getDayCapacityLimitMap();
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return;
+        }
+        Map<Integer, Integer> dayCapacityValue = new HashMap<>();
+        Map<Integer, Integer> dayChangeGroupValue = new HashMap<>();
+        dayCapacityLimitMap.forEach((day, dayCapacityLimitInfo) -> {
+            if (null == dayCapacityLimitInfo) {
+                return;
+            }
+            Integer sumDayCapacity = Optional.ofNullable(dayCapacityLimitInfo.getSumProductionCapacityQty()).orElse(BigDecimal.ZERO.intValue());
+            dayCapacityValue.put(day, sumDayCapacity);
+            Integer sumChangeGroup = Optional.ofNullable(dayCapacityLimitInfo.getUsedChangeCxMachineCount()).orElse(BigDecimal.ZERO.intValue());
+            dayChangeGroupValue.put(day, sumChangeGroup);
+        });
+        if (!CollectionUtils.isEmpty(dayCapacityValue)) {
+            String dayCapacityContentInfo = JSON.toJSONString(dayCapacityValue);
+            DayLimitLogRecorder.addDayCapacityStatisticsInfo(productionContext, dayCapacityContentInfo);
+        }
+        if (!CollectionUtils.isEmpty(dayChangeGroupValue)) {
+            String dayChangeContentInfo = JSON.toJSONString(dayChangeGroupValue);
+            DayLimitLogRecorder.addChangeGroupStatisticsInfo(productionContext, dayChangeContentInfo);
+        }
+    }
+
+    /**
      * 构建日排产统计对象-基础信息
      * 胎胚种类数
      * 硫化机台数
@@ -252,7 +294,6 @@ public class DayProductionStatisticsHandler {
         detail.setLhMachines(lhMachineCount);
         return detail;
     }
-
 }
 
 /**

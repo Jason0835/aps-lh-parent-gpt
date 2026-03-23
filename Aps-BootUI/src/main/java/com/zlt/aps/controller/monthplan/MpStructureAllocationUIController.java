@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.date.DateUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -237,7 +238,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, MpStructureAllocation entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(DateUtil.date(), "yyyyMMdd");
         byte[] excelBytes = iMpStructureAllocationService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

@@ -1,13 +1,19 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.engine.daylimit.*;
-import com.zlt.aps.mp.engine.domain.vo.*;
-import com.zlt.aps.utils.ProductSpecificationsUtils;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -15,7 +21,8 @@ import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.utils.ProductSpecificationsUtils;
+import com.zlt.common.utils.PubUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -107,6 +114,13 @@ public class ProductionPlanGroupInfo {
      * key=day : value=日成型硫化产能限制实例
      */
     private Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo;
+
+    /**
+     * 日产能限制Map
+     * 用于统计每日已排硫化机台数、胎胚种类数等信息 sandy+2026.3.21
+     */
+    private Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap;
+
     /**
      * 分配的成型机台
      */
@@ -181,7 +195,7 @@ public class ProductionPlanGroupInfo {
         Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
         // 本结构涉及的特殊材料清单
         Map<String, BigDecimal> materialMap = new HashMap<>();
-        for (MonthPlanProductionRequirePlanVo planVo: groupPlanData) { // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
+        for (MonthPlanProductionRequirePlanVo planVo : groupPlanData) { // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
             Map<String, BigDecimal> skuMaterialMap = embryoSpecialMaterialInfoMap.get(planVo.getEmbryoCode());
             if (!CollectionUtils.isEmpty(skuMaterialMap)) {
                 materialMap.putAll(skuMaterialMap);
@@ -197,7 +211,7 @@ public class ProductionPlanGroupInfo {
         List<String> materialCodeList = groupPlanData.stream()
                 .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
         Set<String> mouldCodeSet = new HashSet<>();
-        for (String materialCode: materialCodeList) {
+        for (String materialCode : materialCodeList) {
             List<MonthPlanProductMouldInfoVo> mouldList = productionContext.getBaseDataContainer()
                     .getSkuMouldRelationMap().get(materialCode);
             if (CollectionUtils.isEmpty(mouldList)) {
@@ -213,7 +227,7 @@ public class ProductionPlanGroupInfo {
         }
         // 模具数换算成硫化机台数
         groupInfo.minLhMachineCountBymould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        
+
         return groupInfo;
     }
 
@@ -394,9 +408,10 @@ public class ProductionPlanGroupInfo {
     /**
      * 更新设置整个分组计划不排产
      * 因提前收尾导致不满足最低排产天数
-     * @param minLhMachineCount 最低硫化机台数
+     *
+     * @param minLhMachineCount                 最低硫化机台数
      * @param realAllocationDayBeforeConclusion 高于最低硫化机台数的天数
-     * @param minProductionDays 最低上机天数
+     * @param minProductionDays                 最低上机天数
      */
     public void setNoProductionLowMinLhMachineNoReachMinProductionDays(Integer minLhMachineCount, Integer realAllocationDayBeforeConclusion, Integer minProductionDays) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -523,6 +538,21 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 20260323 结构收尾需要将以分配天数扣减
+     *
+     * @param deductionDays 收尾的天数
+     */
+    public void deductionAllocationDays(Integer deductionDays) {
+        if (null == deductionDays || deductionDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        if (null == leftOverNeedAllocationDays) {
+            return;
+        }
+        leftOverNeedAllocationDays = leftOverNeedAllocationDays + deductionDays;
+    }
+
+    /**
      * 获取结构下，最早收尾的硫化机台组
      *
      * @return
@@ -610,11 +640,11 @@ public class ProductionPlanGroupInfo {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
-        Integer canAddCount = previousLimit.getReleaseLhMachineCount(selectedDayLimit);
+        Integer canAddCount = previousLimit.getReleaseLhMachineCount(context, selectedDayLimit);
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
-        SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
+        SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(context, previousLimit, canAddCount);
         if (null == previousSku) {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
@@ -633,23 +663,25 @@ public class ProductionPlanGroupInfo {
             return null;
         }
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        //获取可释放机台的排产日信息
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> {
             //前一日排产情况
             GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
             //后一日排产情况
             GroupPlanCxLhCapacityLimitHelper nexDayLimit = getNextDayInfo(dayLimit);
-            return !dayLimit.isReachLimitByMouldNumber(previousDayLimit, nexDayLimit);
+            return !dayLimit.isReachLimitByMouldNumber(context, previousDayLimit, nexDayLimit);
         }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
+        //20260113 剔除需要排除的收尾时间点
         if (!CollectionUtils.isEmpty(excludeDays)) {
-            //20260113 剔除需要排除的收尾时间点
             hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
         }
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
+        //得到最早的收尾点
         hasAddSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
         GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
         GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
@@ -663,12 +695,12 @@ public class ProductionPlanGroupInfo {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
         GroupPlanCxLhCapacityLimitHelper previousLimit = dayProductionLimitInfo.get(previousDay);
-        //可释放的机台 Integer canAddCount = previousLimit.getUsedLhMachineCount() - selectedDayLimit.getUsedLhMachineCount();
-        Integer canAddCount = previousLimit.getReleaseLhMachineCount(selectedDayLimit);
+        //可释放的机台
+        Integer canAddCount = previousLimit.getReleaseLhMachineCount(context, selectedDayLimit);
         if (canAddCount <= BigDecimal.ZERO.intValue()) {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
-        SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(previousLimit, canAddCount);
+        SkuDayProductionInfoHelper previousSku = selectedDayLimit.getEarliestConclusionSkuInfo(context, previousLimit, canAddCount);
         if (null == previousSku) {
             return EarliestConclusionLhGroupHelper.createEmptyEarliestConclusionLhGroup(conclusionDay, endDay);
         }
@@ -691,12 +723,19 @@ public class ProductionPlanGroupInfo {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<Integer> stopDayInfo = productionContext.getStopDays();
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        boolean isChangeMould = preSelected.isChangeMould(addSkuInfo);
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, productionContext.getStopDays(), isChangeMould);
+        BeforeSkuProductionInfo mouldSkuInfo = ChangeMouldInfo.buildBeforeSkuProductionInfoByMould(productionContext, preClosingDay, selectedMould);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo(), mouldSkuInfo);
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
+        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
@@ -709,15 +748,6 @@ public class ProductionPlanGroupInfo {
         Integer newClosingDay = sortList.get(BigDecimal.ZERO.intValue());
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
-        //20260122 换模判断
-        if (!isChangeMould) {
-            return;
-        }
-        //需要换模-换模次数处理
-        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer changeMouldDay = preSelected.getClosingDay();
-        Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
 
     /**
@@ -810,6 +840,20 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 一轮排产完毕后，将还有计划的Sku重新标记参与排产
+     */
+    public void afterProductionResetThisRound() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(single -> single.hasProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return;
+        }
+        hasProductionList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.YES.getValue()));
+    }
+
+    /**
      * 获取结构剩余待分配天数
      * 不能根据剩余待排产量来估算，
      * 因为有超出模具产能的干扰
@@ -821,6 +865,16 @@ public class ProductionPlanGroupInfo {
         if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
             return BigDecimal.ZERO.intValue();
         }
+        return getBoostReplenishmentQuota();
+    }
+
+    /**
+     * 获取还需要进行成型机台小于最短上机天数场景
+     * 还有实单需求的结构
+     *
+     * @return
+     */
+    public Integer getBoostReplenishmentQuota() {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -1014,9 +1068,22 @@ public class ProductionPlanGroupInfo {
     public boolean isSpecialMaterial() {
         return !CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap);
     }
-    
+
+    /**
+     * 使用的特殊原材料的种类数
+     *
+     * @return
+     */
+    public Integer getUsedSpecialMaterialCount() {
+        if (CollectionUtils.isEmpty(embryoSpecialMaterialInfoMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return embryoSpecialMaterialInfoMap.keySet().size();
+    }
+
     /**
      * 判断结构是否含有专用特殊材料同时也有共用特殊材料（排产优先级最高）
+     *
      * @param productionContext
      * @return
      */
@@ -1026,7 +1093,7 @@ public class ProductionPlanGroupInfo {
         }
         boolean hasDedicatedSpecialMaterials = false; // 是否包含专用特殊材料
         boolean hasShareSpecialMaterials = false; // 是否包含共用特殊材料
-        for (String specialMaterialCode: this.embryoSpecialMaterialInfoMap.keySet()) {
+        for (String specialMaterialCode : this.embryoSpecialMaterialInfoMap.keySet()) {
             Set<String> structureNameSet = productionContext.getSpecialMaterialStructureRelationMap().get(specialMaterialCode); // 获取使用该特殊材料的结构
             if (CollectionUtils.isEmpty(structureNameSet)) {
                 continue;
@@ -1280,12 +1347,15 @@ public class ProductionPlanGroupInfo {
         SkuDayProductionInfoHelper planned = limitInfo.getProductionSkuQtyInfo().get(materialDesc);
         if (null == planned) {
             limitInfo.getProductionSkuQtyInfo().put(materialDesc, skuDayProductionInfo);
+            addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
             return;
         }
         //更新使用模具
         planned.getUsedMouldSet().addAll(currentUsedMouldSet);
         //更新数量
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+        //加入Sku排产明细信息
+        addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
     }
 
     /**
@@ -1706,6 +1776,37 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 加入Sku排产明细，以Sku为维度，同一模具合并
+     *
+     * @param limitInfo            日排产信息
+     * @param skuDayProductionInfo sku日排产信息
+     */
+    private void addSkuProductionDetailInfo(GroupPlanCxLhCapacityLimitHelper limitInfo, SkuDayProductionInfoHelper skuDayProductionInfo) {
+        if (null == limitInfo || null == skuDayProductionInfo || StringUtils.isBlank(skuDayProductionInfo.getMaterialDesc())) {
+            return;
+        }
+        SkuDayProductionInfoHelper skuDayInfo = SkuDayProductionInfoHelper.createClone(skuDayProductionInfo);
+        String materialDesc = skuDayInfo.getMaterialDesc();
+        List<SkuDayProductionInfoHelper> detailList = limitInfo.getSkuProductionDetailInfo().get(materialDesc);
+        if (null == detailList) {
+            detailList = new ArrayList<>();
+            detailList.add(skuDayInfo);
+            limitInfo.getSkuProductionDetailInfo().put(materialDesc, detailList);
+            return;
+        }
+        boolean isHandler = false;
+        for (SkuDayProductionInfoHelper alreadyInfo : detailList) {
+            if (alreadyInfo.mergeNewProductionInfo(skuDayInfo)) {
+                isHandler = true;
+                break;
+            }
+        }
+        if (!isHandler) {
+            detailList.add(skuDayInfo);
+        }
+    }
+
+    /**
      * 获取各排产日所处位置
      * 返还排产日及排产位置index
      *
@@ -1876,5 +1977,185 @@ public class ProductionPlanGroupInfo {
         theoryDays = BigDecimal.ZERO.intValue();
         leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
         isAllocationFinish = YesOrNoEnum.YES.getValue();
+    }
+
+    /**
+     * 初始化日产能限制信息
+     *
+     * @param context
+     * @return
+     */
+    public void initMpDailyCapacityLimit(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        if (dailyCapacityLimitVoMap == null) {
+            dailyCapacityLimitVoMap = new HashMap<>();
+        }
+        MpDailyCapacityLimitVo dailyCapacityLimitVo;
+        Integer endDay = productionContext.getMonthDays();
+        GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
+        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
+            dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
+            if (dailyCapacityLimitVo == null) {
+                dailyCapacityLimitVo = new MpDailyCapacityLimitVo();
+            }
+            dailyCapacityLimitVo.setDailyDate(i);
+            // 1、设置每日硫化机台总限制数、每日胎胚种类总限制数
+            capacityLimitHelper = dayProductionLimitInfo.get(i);
+            if (capacityLimitHelper == null) {
+                continue;
+            }
+            dailyCapacityLimitVo.setMaxLhMachines(capacityLimitHelper.getMaxLhMachineCount());
+            dailyCapacityLimitVo.setMaxEmbryoTypes(capacityLimitHelper.getMaxEmbryoCodeCount());
+
+            dailyCapacityLimitVoMap.put(i, dailyCapacityLimitVo);
+        }
+        //初始化日产信息（包括日最大排产量、开停产标识、日产比例）
+        initDayProductionInfo(productionContext, dailyCapacityLimitVoMap);
+    }
+
+    /**
+     * 初始化日产信息（包括日最大排产量、开停产标识、日产比例）
+     *
+     * @param context
+     * @param dailyCapacityLimitVoMap
+     */
+    private void initDayProductionInfo(Context context, Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<Integer, MdmWorkCalendar> workCalendarMap = productionContext.getBaseDataContainer().getWorkCalendarMap();
+        if (PubUtil.isEmpty(dailyCapacityLimitVoMap) || PubUtil.isEmpty(workCalendarMap)) {
+            return;
+        }
+
+        Integer dayMaxCapacity = productionContext.getBaseDataContainer().getParamConfiguration().getDayMaxCapacity();
+        MpDailyCapacityLimitVo dailyCapacityLimitVo;
+        MdmWorkCalendar workCalendar;
+        for (Map.Entry<Integer, MpDailyCapacityLimitVo> entry : dailyCapacityLimitVoMap.entrySet()) {
+            dailyCapacityLimitVo = entry.getValue();
+            workCalendar = workCalendarMap.get(entry.getKey());
+            if (workCalendar == null) {
+                continue;
+            }
+            dailyCapacityLimitVo.setDayOpenCloseFlag(workCalendar.getDayFlag());
+            dailyCapacityLimitVo.setDayProductionRate(workCalendar.getRate());
+            //日最大排产量 = 日最大产能*比率/100
+            dailyCapacityLimitVo.setMaxDayProductionQty(dayMaxCapacity * workCalendar.getRate() / 100);
+            //若前日是停产，今日第1天开产，即开产首日，则仍按正常产能分配
+            dailyCapacityLimitVo.setOpenProductionFirstDay(isOpenProductionFirstDay(workCalendarMap, entry.getKey()));
+            if (dailyCapacityLimitVo.isOpenProductionFirstDay()) {
+                dailyCapacityLimitVo.setMaxDayProductionQty(dayMaxCapacity);
+            }
+        }
+    }
+
+    /**
+     * 检查是否开产首日
+     *
+     * @param workCalendarMap 日历Map
+     * @param checkDay        检查日
+     * @return true--开产首日，false--不是开产首日
+     */
+    private boolean isOpenProductionFirstDay(Map<Integer, MdmWorkCalendar> workCalendarMap, int checkDay) {
+        int preDay = checkDay - 1;
+        preDay = preDay < FactoryConstant.MONTH_START_DAY ? FactoryConstant.MONTH_START_DAY : preDay;
+        return !YesOrNoEnum.YES.getCode().equals(workCalendarMap.get(preDay).getDayFlag()) &&
+                YesOrNoEnum.YES.getCode().equals(workCalendarMap.get(checkDay).getDayFlag());
+    }
+
+    /**
+     * 计划日硫化机台数、胎胚种类数、换模次数
+     * 统计使用
+     *
+     * @param context
+     */
+    public void reCalcMpDailyCapacityLimit(Context context) {
+        MpMonthPlanDailyCapacityLimit dailyCapacityLimitObj = new MpMonthPlanDailyCapacityLimit();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer endDay = productionContext.getMonthDays();
+        //1. 转换模具排产结果
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
+        //2. 组装参数Map
+        Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
+        //3. 循环计算日产能
+        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
+            if (dailyCapacityLimitVoMap.get(i) == null) {
+                continue;
+            }
+            dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, i, dailyCapacityLimitVoMap.get(i), paramMap, null);
+        }
+    }
+
+    /**
+     * 计划日硫化机台数、胎胚种类数、换模次数
+     *
+     * @param context
+     */
+    public void reCalcMpDailyCapacityLimitByDay(Context context, Integer iDay, String mainPattern) {
+        if (dailyCapacityLimitVoMap.get(iDay) == null) {
+            return;
+        }
+        MpMonthPlanDailyCapacityLimit dailyCapacityLimitObj = new MpMonthPlanDailyCapacityLimit();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer endDay = productionContext.getMonthDays();
+        //1. 转换模具排产结果
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
+        //2. 组装参数Map
+        Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
+        //3. 计算日产能
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern);
+    }
+
+    /**
+     * 组装日产能参数Map
+     *
+     * @param productionContext
+     * @return
+     */
+    private Map<String, Object> composeDailyCapacityParamMap(TbrProductionContext productionContext) {
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockMaxQty());
+        paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQtyDiff());
+        return paramMap;
+    }
+
+    /**
+     * 转换模具排产结果
+     *
+     * @param endDay 结束日
+     * @return 模具排产结果列表
+     */
+    private List<FactoryMonthPlanMouldDayResult> convertMouldDayResult(Integer endDay) {
+        GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
+        Map<String, FactoryMonthPlanMouldDayResult> mpProdFinalMap = new HashMap<>();
+        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
+            String dayField = FactoryConstant.DAY_FIELD + i;
+            capacityLimitHelper = dayProductionLimitInfo.get(i);
+            if (capacityLimitHelper == null) {
+                continue;
+            }
+            Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = capacityLimitHelper.getProductionSkuQtyInfo();
+            if (PubUtil.isEmpty(productionSkuQtyMap)) {
+                continue;
+            }
+
+            // 组装模具日排产结果
+            productionSkuQtyMap.forEach((materialDesc, skuProductionInfo) -> {
+                FactoryMonthPlanMouldDayResult mpMouldDayResult = mpProdFinalMap.get(skuProductionInfo.getMaterialCode());
+                if (mpMouldDayResult == null) {
+                    mpMouldDayResult = new FactoryMonthPlanMouldDayResult();
+                    mpMouldDayResult.setStructureName(groupName);
+                    mpMouldDayResult.setMaterialCode(skuProductionInfo.getMaterialCode());
+                    mpMouldDayResult.setMaterialDesc(skuProductionInfo.getMaterialDesc());
+                    mpMouldDayResult.setEmbryoCode(skuProductionInfo.getEmbryoCode());
+                    mpMouldDayResult.setMainMaterialDesc(skuProductionInfo.getMainMaterialDesc());
+                    mpMouldDayResult.setMainPattern(skuProductionInfo.getMainPattern());
+                    mpMouldDayResult.setDayVulcanizationQty(skuProductionInfo.getDayVulcanizationQty());
+                }
+                mpMouldDayResult.setFieldValueByFieldName(dayField, skuProductionInfo.getSumProductionQty());
+                mpProdFinalMap.put(skuProductionInfo.getMaterialCode(), mpMouldDayResult);
+            });
+        }
+        return mpProdFinalMap.values().stream().collect(Collectors.toList());
     }
 }

@@ -204,6 +204,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         setNullFieldsToZero(adjustDetailList);
         // 将集合中指定字段的0值替换为null
         setZeroFieldsToNull(adjustDetailList);
+        // 发送消息
+        Map<String, List<String>> messageMap = Optional.ofNullable(contextDTO.getMessageMap())
+                .orElseGet(HashMap::new);
+        if (PubUtil.isNotEmpty(messageMap.get(ApsConstant.APS_STRING_0))) {
+            List<String> msgList = messageMap.get(ApsConstant.APS_STRING_0);
+            String msg = Optional.ofNullable(msgList)
+                    .orElse(Collections.emptyList())
+                    .stream()
+                    .distinct()
+                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_SEMICOLON));
+            sendMessage(MsgTemplateEnums.MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME.getCode(),
+                    MsgTypeEnums.NOTICE.getCode(), msg);
+        }
     }
 
 
@@ -483,7 +496,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 重算每日产能限制，包括硫化机台数、胎胚种类数
+     * 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
      * @param contextDTO 周程滚动上下文
      * @param mpProdFinalList 定稿记录列表
      */
@@ -561,7 +574,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
         dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
         dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
-        dayProductionStatisticsDetailVo.setChangeMould(null);
+        dayProductionStatisticsDetailVo.setChangeMould(Convert.toInt(capacityVo.getUsedChangeMould(), 0).equals(0) ? null : capacityVo.getUsedChangeMould());
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 
@@ -956,7 +969,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setBaseVale(null);
             String productionNo = incrementService.getBillNoSequenceByExpire(prefixKey + batchNo, 5, 60 * 24 * 7);
             monthPlan.setProductionNo(productionNo);
-            // 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
+            // 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号、主物料(胎胚号)
             setSkuConstructionRefField(contextDTO, monthPlan);
             // 净需求
             monthPlan.setProdReqPlan(adjustDetailVo.getCurrentNetQty());
@@ -1569,7 +1582,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号
+     * 设置SKU与示方书关联字段：是否零度材料、制造示方书号、文字示方书号、硫化示方书号、主物料(胎胚号)
      * @param contextDTO
      * @param monthPlan
      */
@@ -1583,8 +1596,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String materialCode = monthPlan.getMaterialCode();
         // 产品状态
         String productStatus = monthPlan.getProductStatus();
-        // 根据物料编码和产品状态匹配SKU与施工关系数据
-        MdmSkuConstructionRef mdmSkuConstructionRef = getSkuConstructionRefByCondition(skuConstructionRefList, materialCode, productStatus);
+        // 按物料编码+产品状态优先级匹配SKU与示方书记录
+        MdmSkuConstructionRef mdmSkuConstructionRef = matchSkuConstruction(materialCode, productStatus, skuConstructionRefList);
         if (mdmSkuConstructionRef != null) {
             // 是否零度材料
             monthPlan.setIsZeroRack(mdmSkuConstructionRef.getIsZeroRack());
@@ -2196,6 +2209,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
             }
         }
+        contextDTO.setMessageMap(new HashMap<>());
     }
 
 
@@ -2303,7 +2317,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
 
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
-        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.FALSE);
         List<MdmSkuConstructionRef> mdmSkuConstructionRefList = dataManager.listSkuConstructionRefs(dataDTO);
 
         contextDTO.setMdmSkuConstructionRefList(mdmSkuConstructionRefList);
@@ -2393,7 +2407,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
 
         String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
-        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.FALSE);
         List<MdmSkuLhCapacity> mdmSkuLhCapacityList = dataManager.listSkuLhCapacitys(dataDTO);
 
         Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = convertToSkuLhCapacityMap(mdmSkuLhCapacityList);
@@ -2804,9 +2818,31 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected void setPlanRelatedFields(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan, Long busiId) {
         // 物料编码
         String materialCode = adjustDetailVo.getMaterialCode();
+        // 试制量试计划
+        Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
+        List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
+        MpTrialPlan trialPlan = new MpTrialPlan();
         // SKU与施工（示方书）关系
-        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = contextDTO.getMdmSkuConstructionRefMap();
-        MdmSkuConstructionRef skuConstructionRef = MapUtils.getObject(mdmSkuConstructionRefMap, materialCode, new MdmSkuConstructionRef());
+        List<MdmSkuConstructionRef> mdmSkuConstructionRefList = contextDTO.getMdmSkuConstructionRefList();
+        // 产品状态
+        String productStatus = ConstructionStageEnum.FORMAL_FLAG;
+        if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+            // 获取试制量试
+            trialPlan = getMpTrialPlan(trialPlanList, busiId);
+            if (ConstructionStageEnum.MEASUREMENT.getStage().equals(trialPlan.getTrialStatus())) {
+                productStatus = ConstructionStageEnum.MEASUREMENT_FLAG;
+            }
+            if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(trialPlan.getTrialStatus())) {
+                productStatus = ConstructionStageEnum.TRIAL_FLAG;
+            }
+        }
+        // 按物料编码+产品状态优先级匹配SKU与示方书记录
+        MdmSkuConstructionRef skuConstructionRef = matchSkuConstruction(materialCode, productStatus, mdmSkuConstructionRefList);
+        // 检查SKU与示方书关系
+        List<String> errorMsgList = checkSkuConstructionRef(contextDTO, skuConstructionRef, materialCode);
+        if (PubUtil.isNotEmpty(errorMsgList)) {
+            return;
+        }
         // 胎胚号
         adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
         // 物料信息
@@ -2819,9 +2855,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
         // 排产机台,多个机台用逗号分隔
         adjustDetailVo.setScheduledMachines(getCxMachineCodes(structureAllocationList));
-        // 试制量试计划
-        Map<String, List<MpTrialPlan>> mpTrialPlanMap = contextDTO.getMpTrialPlanMap();
-        List<MpTrialPlan> trialPlanList = MapUtils.getObject(mpTrialPlanMap, materialCode, new ArrayList<>());
         if (monthPlan == null) {
             // SKU日硫化产能
             Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap();
@@ -2841,22 +2874,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
-            adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
+            adjustDetailVo.setProductStatus(productStatus);
             adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
-                // 获取试制量试
-                MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, busiId);
                 // 施工阶段
                 adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
                 // 产品状态
-                String productStatus = null;
-                if (ConstructionStageEnum.MEASUREMENT.getStage().equals(trialPlan.getTrialStatus())) {
-                    productStatus = ConstructionStageEnum.MEASUREMENT_FLAG;
-                }
-                if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(trialPlan.getTrialStatus())) {
-                    productStatus = ConstructionStageEnum.TRIAL_FLAG;
-                }
                 adjustDetailVo.setProductStatus(productStatus);
                 // 紧急程度
                 adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
@@ -2865,6 +2889,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 试制量试ID
                 adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
             }
+            // 检查SKU的产品状态与【SKU与示方书】匹配到的产品状态是否一致
+            checkSkuTypeAndProductStatus(contextDTO, adjustDetailVo, skuConstructionRef, materialCode);
             return;
         }
         // 有月度生产计划时，赋值关联字段
@@ -2889,8 +2915,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setEmbryoNo(monthPlan.getEmbryoNo());
         // 试制量制关联字段设置
         if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
-            // 获取试制量试
-            MpTrialPlan trialPlan = getMpTrialPlan(trialPlanList, busiId);
             // 紧急程度
             adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
             // 施工阶段
@@ -2900,6 +2924,170 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
     }
 
+
+    /**
+     * 发送消息
+     * @param templateCode 消息模板编码（对应MsgTemplateEnums的code）
+     * @param msgTypeCode  消息类型编码（对应MsgTypeEnums的code）
+     * @param msgContent   消息内容
+     */
+    public void sendMessage(String templateCode, String msgTypeCode, String msgContent) {
+        // 核心参数为空时直接返回
+        if (StringUtils.isEmpty(templateCode) || StringUtils.isEmpty(msgTypeCode) || StringUtils.isEmpty(msgContent)) {
+            log.warn("消息发送失败：核心参数为空！templateCode={}, msgTypeCode={}, msgContent={}",
+                    templateCode, msgTypeCode, msgContent);
+            return;
+        }
+
+        // 构建消息上下文
+        MessageContext context = messageServiceAdapter.buildMessageContext(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                SecurityUtils.getUsername(),
+                null
+        );
+
+        // 发送消息
+        messageServiceAdapter.sendBatchMessage(
+                templateCode,
+                msgTypeCode,
+                msgContent,
+                null,
+                null,
+                context
+        );
+    }
+
+
+    /**
+     * 检查SKU的产品状态与【SKU与示方书】匹配到的产品状态是否一致
+     * @param contextDTO
+     * @param adjustDetailVo
+     * @param skuConstructionRef
+     * @param materialCode
+     */
+    protected void checkSkuTypeAndProductStatus(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, MdmSkuConstructionRef skuConstructionRef,
+                                                String materialCode) {
+
+        String productStatus = adjustDetailVo.getProductStatus();
+        String matchProductStatus = skuConstructionRef.getTrialStatus();
+
+        if (!StringUtils.equals(productStatus, matchProductStatus)) {
+            Map<String, List<String>> messageMap = Optional.ofNullable(contextDTO.getMessageMap())
+                    .orElseGet(HashMap::new);
+            List<String> warnMsgList = messageMap.computeIfAbsent(ApsConstant.APS_STRING_0, k -> new ArrayList<>());
+            contextDTO.setMessageMap(messageMap);
+            String warnMsg = StrUtil.format(
+                    I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkSkuTypeAndProductStatus"),
+                    materialCode, convertToProductStatusName(productStatus), convertToProductStatusName(matchProductStatus)
+            );
+            warnMsgList.add(warnMsg);
+        }
+    }
+
+
+    /**
+     * 根据产品状态转换产品状态名称
+     * @param productStatus
+     * @return
+     */
+    public String convertToProductStatusName(String productStatus) {
+        if (StringUtils.isEmpty(productStatus)) {
+            return "";
+        }
+        if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(productStatus)) {
+            return ConstructionStageEnum.MEASUREMENT.getDesc();
+        } else if (ConstructionStageEnum.TRIAL_FLAG.equals(productStatus)) {
+            return ConstructionStageEnum.TRIAL_PRODUCTION.getDesc();
+        }
+        return ConstructionStageEnum.FORMAL_PRODUCTION.getDesc();
+    }
+
+
+    /**
+     * 根据施工阶段转换为对应的产品状态标识
+     * @param constructionStage
+     * @return
+     */
+    public String convertToProductStatusFlag(String constructionStage) {
+        if (StringUtils.isEmpty(constructionStage)) {
+            return "";
+        }
+        if (ConstructionStageEnum.MEASUREMENT.getStage().equals(constructionStage)) {
+            return ConstructionStageEnum.MEASUREMENT_FLAG;
+        } else if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(constructionStage)) {
+            return ConstructionStageEnum.TRIAL_FLAG;
+        }
+        return ConstructionStageEnum.FORMAL_FLAG;
+    }
+
+
+    /**
+     * 按物料编码+产品状态优先级匹配SKU与示方书记录
+     * @param materialCode 物料编码
+     * @param trialStatus 产品状态
+     * @param skuConstructionRefList SKU与示方书列表
+     * @return 匹配到的记录
+     */
+    private MdmSkuConstructionRef matchSkuConstruction(String materialCode, String trialStatus,
+                                                             List<MdmSkuConstructionRef> skuConstructionRefList) {
+        // 1、基础参数校验
+        if (StringUtils.isEmpty(materialCode)) {
+            log.warn("物料编码为空，无法匹配！");
+            return null;
+        }
+        if (StringUtils.isEmpty(trialStatus)) {
+            log.warn("产品状态为空，无法匹配！");
+            return null;
+        }
+        if (PubUtil.isEmpty(skuConstructionRefList)) {
+            log.warn("SKU与示方书列表为空，无法匹配！");
+            return null;
+        }
+        // 2、过滤出物料编码匹配的所有记录
+        List<MdmSkuConstructionRef> materialMatchedList = skuConstructionRefList.stream()
+                .filter(item -> Objects.equals(materialCode, item.getMaterialCode()))
+                .collect(Collectors.toList());
+        // 物料编码无匹配
+        if (PubUtil.isEmpty(materialMatchedList)) {
+            log.warn("物料编码:{} 未匹配到示方书！", materialCode);
+            return null;
+        }
+
+        // 4. 根据产品状态确定匹配优先级
+        List<String> priorityStatusList;
+        switch (trialStatus) {
+            case ConstructionStageEnum.FORMAL_FLAG:
+                // 正式：优先级
+                priorityStatusList = Arrays.asList(ConstructionStageEnum.FORMAL_FLAG, ConstructionStageEnum.TRIAL_FLAG, ConstructionStageEnum.MEASUREMENT_FLAG);
+                break;
+            case ConstructionStageEnum.TRIAL_FLAG:
+                // 量试：优先级
+                priorityStatusList = Arrays.asList(ConstructionStageEnum.TRIAL_FLAG, ConstructionStageEnum.MEASUREMENT_FLAG);
+                break;
+            case ConstructionStageEnum.MEASUREMENT_FLAG:
+                // 试制：优先级
+                priorityStatusList = Arrays.asList(ConstructionStageEnum.MEASUREMENT_FLAG);
+                break;
+            default:
+                log.warn("产品状态[{}]不合法，仅支持:正式/量试/试制", trialStatus);
+                return null;
+        }
+        // 4、按优先级遍历，返回第一个匹配的记录
+        for (String targetStatus : priorityStatusList) {
+            for (MdmSkuConstructionRef item : materialMatchedList) {
+                if (Objects.equals(targetStatus, item.getTrialStatus())) {
+                    return item;
+                }
+            }
+        }
+        log.warn("物料编码:{} 所有优先级均未匹配到示方书！", materialCode);
+        return null;
+    }
 
     protected MpTrialPlan getMpTrialPlan(List<MpTrialPlan> trialPlanList, Long trialId) {
         if (PubUtil.isEmpty(trialPlanList) || trialId == null) {
@@ -3489,6 +3677,52 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         return monitorList.stream()
                 .filter(monitor -> monitor != null && monitor.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(MpMonthPlanMonitor::getMaterialCode));
+    }
+
+
+    /**
+     * 检查SKU与示方书
+     * @param contextDTO
+     * @param skuConstructionRef
+     * @param materialCode
+     * @return
+     */
+    protected List<String> checkSkuConstructionRef(MpRollAdjustContextDTO contextDTO, MdmSkuConstructionRef skuConstructionRef, String materialCode) {
+        Map<String, List<String>> messageMap = Optional.ofNullable(contextDTO.getMessageMap())
+                .orElseGet(HashMap::new);
+        List<String> errorMsgList = messageMap.computeIfAbsent(ApsConstant.APS_STRING_1, k -> new ArrayList<>());
+        contextDTO.setMessageMap(messageMap);
+
+        List<String> msgResultList = new ArrayList<>();
+        // 未匹配到SKU与示方书记录
+        if (skuConstructionRef == null) {
+            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notMatchSkuConstructionRef"),
+                    materialCode);
+            errorMsgList.add(errorMsg);
+            msgResultList.add(errorMsg);
+        }
+        //  匹配到SKU与示方书记录，检查制造示方、硫化示方、文字示方是否为空
+        if (skuConstructionRef != null) {
+            if (StringUtils.isEmpty(skuConstructionRef.getEmbryoNo())) {
+                String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkEmbryoNoEmpty"),
+                        materialCode);
+                errorMsgList.add(errorMsg);
+                msgResultList.add(errorMsg);
+            }
+            if (StringUtils.isEmpty(skuConstructionRef.getLhNo())) {
+                String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkLhNoEmpty"),
+                        materialCode);
+                errorMsgList.add(errorMsg);
+                msgResultList.add(errorMsg);
+            }
+            if (StringUtils.isEmpty(skuConstructionRef.getTextNo())) {
+                String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkTextNoEmpty"),
+                        materialCode);
+                errorMsgList.add(errorMsg);
+                msgResultList.add(errorMsg);
+            }
+        }
+        return msgResultList;
     }
 
     /**

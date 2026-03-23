@@ -188,6 +188,18 @@ public class FactoryMonthPlanMouldDayResultUIController extends BaseUIController
         response.flushBuffer();
     }
 
+    @ApiOperation("全物料导出")
+    @GetMapping({"/exportAllMaterial"})
+    @ResponseBody
+    public void exportAllMaterial(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
+        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportAllMaterial(entity,fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

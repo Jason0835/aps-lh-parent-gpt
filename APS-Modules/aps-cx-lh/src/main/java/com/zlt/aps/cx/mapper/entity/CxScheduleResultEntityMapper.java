@@ -2,7 +2,7 @@ package com.zlt.aps.cx.mapper.entity;
 
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxProductConstructionInfo;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
@@ -18,7 +18,7 @@ import java.util.List;
  * @author 16799
  */
 @Mapper
-public interface CxScheduleResultEntityMapper extends CommBaseMapper<CxScheduleResult> {
+public interface CxScheduleResultEntityMapper extends CommBaseMapper<CxScheduleResultOld> {
 
     /**
      * 根据id查询当前日期发布状态为"发布中"或"超时失败"的记录
@@ -32,7 +32,7 @@ public interface CxScheduleResultEntityMapper extends CommBaseMapper<CxScheduleR
      * @param entity 排程日期
      * @return 结果
      */
-    int changeReleaseStatus(CxScheduleResult entity);
+    int changeReleaseStatus(CxScheduleResultOld entity);
 
 
     public int batchUpdate(@Param("array") Long[] ids, @Param("status") String status);
@@ -50,7 +50,7 @@ public interface CxScheduleResultEntityMapper extends CommBaseMapper<CxScheduleR
      *
      * @param ids
      */
-    public List<CxScheduleResult> selectRemoveList(@Param("ids") Long[] ids);
+    public List<CxScheduleResultOld> selectRemoveList(@Param("ids") Long[] ids);
 
     /**
      * 把排程数据发布到中间库
@@ -98,9 +98,9 @@ public interface CxScheduleResultEntityMapper extends CommBaseMapper<CxScheduleR
      * @param partFieldName 半部件属性名
      * @return 结果
      */
-    List<CxScheduleResult> selectByEmbryoCodeAndScheduleDate(@Param("oldFieldValue") Object oldFieldValue,
-                                                             @Param("scheduleDate") Date scheduleDate,
-                                                             @Param("partFieldName") String partFieldName);
+    List<CxScheduleResultOld> selectByEmbryoCodeAndScheduleDate(@Param("oldFieldValue") Object oldFieldValue,
+                                                                @Param("scheduleDate") Date scheduleDate,
+                                                                @Param("partFieldName") String partFieldName);
 
     /**
      * 根据半部件属性名查询半部件对应库存

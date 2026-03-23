@@ -94,7 +94,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
     /**
      * <成型机编号, 成型机今日排程记录上下文>
      **/
-    private static final Map<String, CxScheduleResult> CX_SCHEDULE_RESULT_CONTEXT_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, CxScheduleResultOld> CX_SCHEDULE_RESULT_CONTEXT_MAP = new ConcurrentHashMap<>();
 
 
     /**
@@ -200,10 +200,10 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
      */
     public String generateBatchNumber(Date scheduleDate) {
         //更新半部件删除字段
-        LambdaUpdateWrapper<CxScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(CxScheduleResult::getScheduleDate, scheduleDate)
-                .set(CxScheduleResult::getDelFlag, 1)
-                .set(CxScheduleResult::getIsDelete,1);
+        LambdaUpdateWrapper<CxScheduleResultOld> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(CxScheduleResultOld::getScheduleDate, scheduleDate)
+                .set(CxScheduleResultOld::getDelFlag, 1)
+                .set(CxScheduleResultOld::getIsDelete,1);
         cxScheduleResultEntityMapper.update(null, updateWrapper);
 
         //删除未排产的排程记录
@@ -259,7 +259,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         logDebug("结束合并→：相同生胎代码的硫化任务");
 
         // 步骤2:获取前日调整后的成型排程
-        List<CxScheduleResult> lastDayCxResults = cxScheduleResultService.getScheduleCxScheduleResults(previousDay, scheduleLog, CX_SCHEDULE_RESULT_CONTEXT_MAP.values());
+        List<CxScheduleResultOld> lastDayCxResults = cxScheduleResultService.getScheduleCxScheduleResults(previousDay, scheduleLog, CX_SCHEDULE_RESULT_CONTEXT_MAP.values());
         // 步骤2:获取前日调整后的硫化排程
         List<LhScheduleResult> lastDayLhResults = lhScheduleResultService.getScheduleLhScheduleResults(previousDay, scheduleLog);
 
@@ -620,7 +620,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
      * @param scheduleDate               排程日期-1天
      * @param isTomorrow  是否预排
      */
-    private void analyzeYesterdayPlanAndCalculateStock(List<LhScheduleResult> correctedLhScheduleResults, List<CxScheduleResult> correctedCxScheduleResults, Date scheduleDate, boolean isTomorrow) {
+    private void analyzeYesterdayPlanAndCalculateStock(List<LhScheduleResult> correctedLhScheduleResults, List<CxScheduleResultOld> correctedCxScheduleResults, Date scheduleDate, boolean isTomorrow) {
         // 1.1: 取排程开始班次库存：即库存初始化库存上下文
         logDebug("//==================== 预测胎胚库存 ====================//");
         logInfo("▶ 开始加载：[{}]真实MES库存数据", formatDate(scheduleDate));
@@ -690,7 +690,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
     }
 
 
-    private  int getCxCurrentStock(boolean isTomorrow, CxScheduleResult cxScheduleResult, CxStock cxStock) {
+    private  int getCxCurrentStock(boolean isTomorrow, CxScheduleResultOld cxScheduleResult, CxStock cxStock) {
         int currentStock = cxStock.getStockNum();
         logDebug("◉ 胎胚[{}]当前库存：{}条", cxStock.getEmbryoCode(),currentStock);
         if (isTomorrow) {
@@ -868,12 +868,12 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
      * @param yesterdayLhScheduleResults 前日硫化排程计划
      * @param scheduleDate               排程日期
      */
-    private void markTasks(List<CxScheduleResult> correctedCxScheduleResults, List<LhScheduleResult> yesterdayLhScheduleResults, Date scheduleDate) {
+    private void markTasks(List<CxScheduleResultOld> correctedCxScheduleResults, List<LhScheduleResult> yesterdayLhScheduleResults, Date scheduleDate) {
         logInfo("【Step 3.1: 任务标记限制/续作/收尾/普通/新增/大规格/小规格开始=========》】");
 
         // 3.1.数据准备：前日成型排程按[机台编号]分组
-        Map<String, List<CxScheduleResult>> groupResultByMachineCode = correctedCxScheduleResults.stream()
-                .collect(Collectors.groupingBy(CxScheduleResult::getCxMachineCode));
+        Map<String, List<CxScheduleResultOld>> groupResultByMachineCode = correctedCxScheduleResults.stream()
+                .collect(Collectors.groupingBy(CxScheduleResultOld::getCxMachineCode));
         logInfo("前日成型排程按机台编号分组完成，分组数量：" + groupResultByMachineCode.size());
 
         // 3.2.数据准备：限制机台信息依据[胎胚]分组
@@ -890,7 +890,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
         }
 
         // 3.4.数据准备：将前日成型依据[胎胚+Bom]分组
-        Map<String, List<CxScheduleResult>> groupResultByEmbryoCode = correctedCxScheduleResults.stream()
+        Map<String, List<CxScheduleResultOld>> groupResultByEmbryoCode = correctedCxScheduleResults.stream()
                 .collect(Collectors.groupingBy(item -> item.getEmbryoCode() + item.getBomDataVersion()));
         logInfo("前日成型排程按胎胚+Bom分组完成，分组数量：" + groupResultByEmbryoCode.size());
 
@@ -961,16 +961,16 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
      * @return 是否续作
      */
     @Override
-    public boolean isContinueTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResult>> groupResultByMachineCode) {
+    public boolean isContinueTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResultOld>> groupResultByMachineCode) {
         // 1 遍历前日成型排程按机台编号分组列表
-        for (Map.Entry<String, List<CxScheduleResult>> entry : groupResultByMachineCode.entrySet()) {
+        for (Map.Entry<String, List<CxScheduleResultOld>> entry : groupResultByMachineCode.entrySet()) {
             LhScheduleResult lhScheduleResult = lhAlgorithmScheduleResultDto.getLhScheduleResult();
-            List<CxScheduleResult> results = entry.getValue();
+            List<CxScheduleResultOld> results = entry.getValue();
 
             // 找到机台中前日最后一个班次 Sort 最大 并且  plan > 0 的
             String classPlanKey = "class" + cxShiftConfig.getShiftCount() + "ModifyQty";
             String classSortKey = "class" + cxShiftConfig.getShiftCount() + "ModifySort";
-            Optional<CxScheduleResult> maxResult = results.stream()
+            Optional<CxScheduleResultOld> maxResult = results.stream()
                     .filter(result -> result.getFieldValueByFieldName(classPlanKey) != null && (int) result.getFieldValueByFieldName(classPlanKey) > 0 && result.getFieldValueByFieldName(classSortKey) != null)
                     .max(Comparator.comparing(item -> (int) item.getFieldValueByFieldName(classSortKey)));
 
@@ -2708,7 +2708,7 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
     /**
      * 将机台剩余产能分配
      */
-    private void allocateRemainingCapacity(List<CxScheduleResult> lastDayCxResults) {
+    private void allocateRemainingCapacity(List<CxScheduleResultOld> lastDayCxResults) {
         // 1.已安排任务按照机台分组
         Map<String, List<LhAlgorithmScheduleResultDto>> machineTaskMap = LH_MISS_TIRE_TIME_CONTEXT_MAP.stream()
                 .filter(LhAlgorithmScheduleResultDto::getIsScheduleEnd)
@@ -3049,11 +3049,11 @@ public class CxSchedulingAlgorithmResultServiceImpl extends CommonEngineService 
             String resultKey = task.getLhScheduleResult().getEmbryoCode() +
                     task.getFinalMachine() +
                     task.getLhScheduleResult().getBomVersion();
-            CxScheduleResult cxScheduleResult = CX_SCHEDULE_RESULT_CONTEXT_MAP.get(resultKey);
+            CxScheduleResultOld cxScheduleResult = CX_SCHEDULE_RESULT_CONTEXT_MAP.get(resultKey);
 
             if (cxScheduleResult == null) {
                 logDebug("{}创建新排程结果 | 任务ID:{}", logPrefix, task);
-                cxScheduleResult = new CxScheduleResult();
+                cxScheduleResult = new CxScheduleResultOld();
                 CX_SCHEDULE_RESULT_CONTEXT_MAP.put(resultKey,cxScheduleResult);
                 BeanUtils.copyProperties(task, cxScheduleResult);
 

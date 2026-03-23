@@ -18,6 +18,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -27,6 +28,7 @@ import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
+import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -134,6 +136,12 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         });
         //15、构建结构、主花纹的模具信息
         buildGroupMainPatternInfo(productionContext);
+
+        //16. 初始工作日历
+        productionContext.getBaseDataContainer().setWorkCalendarMap(getDataService().getWorkCalendar(productionContext));
+
+        //17. 初始硫化机台信息
+        productionContext.getBaseDataContainer().setLhMachineInfoList(getDataService().listLhMachineInfo(productionContext));
     }
 
     /**
@@ -421,6 +429,28 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
+     * 获取续作机台的结构信息
+     * @param cxContinueInfoMap
+     * @return Map<成型机台，续作结构>
+     */
+    protected Map<String,String> getContinueStructureMap(Map<String, CxContinueInfoHelper> cxContinueInfoMap){
+        Map<String,String> machineStructureMap = new HashMap<>();
+        if (PubUtil.isEmpty(cxContinueInfoMap)){
+            return machineStructureMap;
+        }
+        // 从续作信息中解析出成型机台对应的续作结构
+        CxContinueInfoHelper cxContinueInfoHelper;
+        for (Map.Entry<String, CxContinueInfoHelper> entry : cxContinueInfoMap.entrySet()) {
+            cxContinueInfoHelper = entry.getValue();
+            Set<String> cxMachineCodeSet = cxContinueInfoHelper.getCxMachineCodeSet();
+            for (String machineCode:cxMachineCodeSet){
+                machineStructureMap.put(machineCode,entry.getKey());
+            }
+        }
+        return machineStructureMap;
+    }
+
+    /**
      * 2.1.1：获取初始化业务的参数设定
      *
      * @param productionContext
@@ -448,6 +478,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
         //降膜排产相关
         paramCodeList.add(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode());
@@ -458,6 +491,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
         //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
+        paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -479,6 +514,18 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         } else {
             configuration.setBoostProductionType(Stream.of(boostProductionTypeValue.split(StringConstant.COMMA)).collect(Collectors.toSet()));
         }
+        //外销贴牌-品牌配置
+        String oemBrandConfig = (String) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        if (StringUtils.isBlank(oemBrandConfig)) {
+            configuration.setOemBrandConfig(Collections.emptySet());
+        } else {
+            configuration.setOemBrandConfig(Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        //外销贴牌-总产量配置，单位条
+        configuration.setOemBrandCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+        //周期储备量占实单的比例(%)
+        configuration.setReservePercent((Integer) paramConfigurationMap.get(MonthPlanEnums.RESERVE_PERCENT.getCode()));
+
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
         configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
@@ -504,6 +551,17 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
         //其它
         configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
+        Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        Integer deductionLhMachine = Optional.ofNullable((Integer) deductionLhMachineValue).orElse(BigDecimal.ZERO.intValue());
+        configuration.setDeductionLhMachineCount(deductionLhMachine);
+        //特殊原材料
+        Object specialMaterialCodeValue = paramConfigurationMap.get(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
+        String specialMaterialCode = (String) Optional.ofNullable(specialMaterialCodeValue).orElse("");
+        if (StringUtils.isBlank(specialMaterialCode)) {
+            configuration.setSpecialMaterialCodeSet(Collections.emptySet());
+        } else {
+            configuration.setSpecialMaterialCodeSet(Stream.of(specialMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
         return configuration;
     }
 
@@ -1017,6 +1075,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
             return;
         }
+        Set<String> specialMaterialCodeSet = productionContext.getBaseDataContainer().getParamConfiguration().getSpecialMaterialCodeSet();
         //转化胎胚号-特殊材料
         Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
         allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
@@ -1031,6 +1090,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
                 String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
                 if (StringUtils.isBlank(specialMaterialCode)) {
+                    continue;
+                }
+                if (!specialMaterialCodeSet.contains(specialMaterialCode)) {
                     continue;
                 }
                 BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();

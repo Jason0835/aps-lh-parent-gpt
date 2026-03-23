@@ -2,19 +2,19 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
-import com.zlt.aps.mp.engine.daylimit.GroupCapacityProductionLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
+import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
-import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -46,6 +46,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final CxMouldProductionHandler cxMouldProductionHandler;
 
+    private final GroupPlanPrioritySelector groupPlanPrioritySelector;
+
     private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
@@ -55,6 +57,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
 
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
+
+    private final SupplementCxMachineDistributionHandler supplementCxMachineDistributionHandler;
 
     /**
      * 模拟排产计划
@@ -75,7 +79,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //2、对在产机台-收尾成型机台，反向匹配待排结构
         cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
         //3、对还需排产结构，获取优先级最高的结构--结构新增
-        addNewGroupPlanHandler(productionContext, allGroupPlanMap);
+        addNewGroupPlanHandler(productionContext, allGroupPlanMap, new HashSet<>());
+        //4、对成型剩余不满足最短上机天数的机台进行分配结构处理
+        supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
 
     /**
@@ -131,23 +137,12 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         productionContinue(ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        //2、在机结构-新增Sku排产
+        //2、在机结构-新增Sku排产 优先给特殊结构所在机台选择
         allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {
                     // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
-                    ProductionPlanGroupInfo continueGroup = allGroupPlanMap.get(entry1.getKey());
-                    ProductionPlanGroupInfo continueGroup2 = allGroupPlanMap.get(entry2.getKey());
-                    Boolean isSpecial1 = null == continueGroup ? false : continueGroup.isSpecialMaterial();
-                    Boolean isSpecial2 = null == continueGroup2 ? false : continueGroup2.isSpecialMaterial();
-                    // Boolean的true比false大，因此需要倒序，优先处理true的
-                    int result = isSpecial2.compareTo(isSpecial1);
-                    if (result != 0) {
-                        return result;
-                    }
-                    // 判断如果都是特殊材料，同时包含专用与共用特殊材料的结构优先
-                    Boolean hasDedicatedSpecialMaterials1 = continueGroup.hasDedicatedSpecialMaterials(productionContext);
-                    Boolean hasDedicatedSpecialMaterials2 = continueGroup2.hasDedicatedSpecialMaterials(productionContext);
-                    result = hasDedicatedSpecialMaterials2.compareTo(hasDedicatedSpecialMaterials1); // 倒序
-                    return result;
+                    ProductionPlanGroupInfo before = allGroupPlanMap.get(entry1.getKey());
+                    ProductionPlanGroupInfo after = allGroupPlanMap.get(entry2.getKey());
+                    return groupPlanPrioritySelector.compareContinueGroup(before, after);
                 })
                 .forEach(entry -> {
                     String structureName = entry.getKey();
@@ -160,6 +155,11 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                         log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
                         return;
                     }
+                    //3.1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+                    cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanMap, structureName);
+                    //3.2 初始日产能限制信息，用于统计使用
+                    groupPlanInfo.initMpDailyCapacityLimit(context);
+
                     //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
                     groupPlanInfo.setThisRoundCanProduction();
                     //在机结构-新增Sku模拟排产
@@ -178,6 +178,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                             productionContext.addReverseMachine(machineInfo.getCxMachineCode());
                         }
                     });
+
+                    //3.3 重新计算统计产能
+                    groupPlanInfo.reCalcMpDailyCapacityLimit(context);
                 });
     }
 
@@ -186,9 +189,10 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
      *
      * @param context                      排产上下文
      * @param estimateGroupCxAllocationMap 分组计划需求量
+     * @param excludeGroupPlan             不再参与的分组
      */
-    private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
-        ProductionPlanGroupInfo addNewGroupPlan = cxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap);
+    private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Set<String> excludeGroupPlan) {
+        ProductionPlanGroupInfo addNewGroupPlan = cxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap, excludeGroupPlan);
         if (null == addNewGroupPlan) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
@@ -205,26 +209,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                 log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
             }
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
             return;
         }
-//        /**
-//         * 20260120 判断成型鼓是否符合条件
-//         * 20260125 分配产能限制控制 1、成型工装数量 2、日产能上限
-//         */
-//        GroupCapacityProductionLimitHelper limitResult = baseDataContainer.getLeftOverProductionDayInfo(context, addNewGroupPlan, null);
-//        //获取成型工装的排产日集合
-//        Set<Integer> productionDayInfo = limitResult.getProductionDaySet();
-//        if (!isReachMinAllocationDays(addNewGroupPlan, productionDayInfo, minAllocationDays)) {
-//            if (productionDayInfo.size() > BigDecimal.ZERO.intValue()) {
-//                log.info(TbrProductionGroupLogRecorder.addGroupNoReachMinAllocationDayLog(context, groupName, productionDayInfo.size(), minAllocationDays));
-//            }
-//            //20260120 标记分配完成--没有成型工装,没有日产能，说明后面也找不到
-//            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-//            //下一新增结构
-//            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
-//            return;
-//        }
         //对挑选出的结构，匹配还有排产量的成型机台
         CxMachineBaseInfoVo selectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlan(context, addNewGroupPlan);
         if (null == selectedCxMachine) {
@@ -233,7 +220,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //20260109 标记分配完成--没有找到合适，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
             return;
         }
         Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
@@ -248,7 +235,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //20260109 标记分配完成--没有找到合适，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
             return;
         }
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
@@ -265,29 +252,35 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //标记分配完成--没有找到合适，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
             return;
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
-        //更新剩余天数
+        Integer originNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
+        Integer originLeftOverByCxMachine = selectedCxMachine.getRemainingDays();
+        //更新剩余天数：分组的剩余天数、成型机台剩余可分配天数
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         selectedCxMachine.addAllocationPlanInfo(context, addHelper);
         //对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper);
-        if (needAllocationDays <= remainingDays) {
-            //20260108 标记分配完成
-            addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+        //20260323 重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能比较分配完成
+        Integer newNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
+        if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
+            excludeGroupPlan.add(groupName);
+        } else {
+            excludeGroupPlan.remove(groupName);
         }
-        //重新获取机台的剩余日 提前收尾
+        //重新获取机台的剩余日：可能因提前收尾变化，导致实际分配天数与初始分配天数不一致
         Integer leftOver = selectedCxMachine.getRemainingDays();
-        //反向机台匹配结构计划
-        if (leftOver > BigDecimal.ZERO.intValue()) {
-            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine);
+        boolean isProductionByCxMachine = !originLeftOverByCxMachine.equals(leftOver);
+        //有排产：机台反向匹配分组计划
+        if (isProductionByCxMachine && leftOver > BigDecimal.ZERO.intValue()) {
+            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine, new HashSet<>());
         }
         //下一新增结构
-        addNewGroupPlanHandler(context, estimateGroupCxAllocationMap);
+        addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, excludeGroupPlan);
     }
 
     /**

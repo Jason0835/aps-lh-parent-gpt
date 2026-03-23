@@ -61,6 +61,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     private Integer maxEmbryoCodeCount;
     /**
+     * 是否结构切换：结构切换时，设置标记
+     */
+    private Boolean isChangeGroup;
+    /**
      * 实际排产规格计划
      */
     private List<MonthPlanProductionRequirePlanVo> realProductionPlanList;
@@ -140,6 +144,27 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         }
         //不同机台，只判断结构
         return currentGroupName.equals(getAllocationGroup());
+    }
+
+    /**
+     * 分配到月底
+     *
+     * @param endDay  结束日
+     * @param addDays 增加的天数
+     */
+    public void addAllocationDayToFull(Integer endDay, Integer addDays) {
+        if (null == endDay || null == addDays) {
+            return;
+        }
+        if (endDay <= this.endDay) {
+            return;
+        }
+        if (addDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        this.endDay = endDay;
+        Integer currentAllocationDay = this.allocationDay;
+        this.allocationDay = currentAllocationDay + addDays;
     }
 
     /**

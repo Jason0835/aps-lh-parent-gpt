@@ -12,6 +12,8 @@ import com.zlt.aps.mp.api.domain.dto.SalesOrderPoolDto;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.mp.api.service.ISalesOrderPoolRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
+
+import cn.hutool.core.date.DateUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 
 /**
@@ -246,7 +249,7 @@ public class SalesOrderPoolUIController extends BaseUIController<SalesOrderPool>
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, SalesOrderPool entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = this.getExportTemplateFileName() + DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
         byte[] excelBytes = iSalesOrderPoolService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

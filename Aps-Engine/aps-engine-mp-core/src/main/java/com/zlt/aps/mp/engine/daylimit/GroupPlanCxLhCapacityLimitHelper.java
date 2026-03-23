@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -7,7 +9,6 @@ import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import lombok.Data;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
@@ -15,6 +16,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 分组计划 - TBR为结构，PCR为英寸(寸口、寸别)
@@ -49,6 +51,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
     private Integer maxLhMachineCount;
 
     /**
+     * 日控的 本结构剩余的最大硫化机台数
+     * sandy+ 2026.3.22
+     */
+    private Integer remainMaxLhMachineCount;
+
+    /**
+     * 理论最大硫化机台(因切换结构首日减机台，引入)
+     */
+    private Integer maxTheoryLhMachineCount;
+
+    /**
      * 实单最低硫化机台数,到机台需要进行组合
      */
     private Map<String, Integer> minLhMachineInfo;
@@ -69,9 +82,14 @@ public class GroupPlanCxLhCapacityLimitHelper {
      */
     private Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo;
     /**
+     * 各Sku排产的明细信息
+     */
+    private Map<String, List<SkuDayProductionInfoHelper>> skuProductionDetailInfo;
+    /**
      * 成型机台集合
      */
     private Set<String> cxMachineCodeSet;
+
 
     /**
      * 根据续作在产机台分配情况，构建日排产限制数据对象
@@ -143,7 +161,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         groupAllocationList.forEach(singleCxMachineAllocation -> {
             String cxMachineCode = singleCxMachineAllocation.getCxMachineCode();
             CxMachineBaseInfoVo cxMachineInfo = cxMachineBaseInfo.get(cxMachineCode);
-            updateBaseLimitInfo(initLimitHelper, cxMachineInfo, singleCxMachineAllocation);
+            updateBaseLimitInfo(context, initLimitHelper, cxMachineInfo, singleCxMachineAllocation);
         });
         return initLimitHelper;
     }
@@ -167,15 +185,26 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 更新数据
+     * 剩余的最大硫化机台数
+     *
+     * @param machines
+     */
+    public void updateRemainMaxLhMachines(Integer machines) {
+        remainMaxLhMachineCount = machines;
+    }
+
+    /**
      * 获取最早收尾的硫化组信息
      *
+     * @param context               排产上下文
      * @param previousLimit         前一日的排产限制情况
      * @param releaseLhMachineCount 需要释放的硫化组机台数
      * @return
      */
-    public SkuDayProductionInfoHelper getEarliestConclusionSkuInfo(GroupPlanCxLhCapacityLimitHelper previousLimit, Integer releaseLhMachineCount) {
+    public SkuDayProductionInfoHelper getEarliestConclusionSkuInfo(Context context, GroupPlanCxLhCapacityLimitHelper previousLimit, Integer releaseLhMachineCount) {
         Map<String, Integer> previousSkuUsedMachine = previousLimit.getSkuTheoryUsedMachine();
-        Map<String, Integer> currentSkuUsedMachine = getSkuUsedMachineRejectLeftOver();
+        Map<String, Integer> currentSkuUsedMachine = getSkuUsedMachineRejectLeftOver(context);
         List<String> reductionSkuList = new ArrayList<>();
         previousSkuUsedMachine.forEach((materialDesc, usedMachineCount) -> {
             Integer leaveCount = currentSkuUsedMachine.get(materialDesc);
@@ -263,17 +292,20 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 硫化配比数没有超
      * 先挑选还有硫化组的，胎胚种类数也没超的
      *
+     * @param context              排产上下文
      * @param previousDayLimitInfo 前一日的限制情况
      * @param nextDayLimitInfo     后一日的限制情况
      * @return
      */
-    public boolean isReachLimitByMouldNumber(GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    public boolean isReachLimitByMouldNumber(Context context, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
+        //实际的最大硫化机台数 = min(初始的最大硫化机台数,结构剩余可用的最大硫化机台数 sandy+ 2026.03.22
+        Integer realMaxLhMachineCount = maxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : maxLhMachineCount;
         //按模具数
         Integer currentLhMachineCount = getProductionLhMachineCountByMouldNumber();
         //如果前日没有排产信息，则表示结构排产首日
         if (null == previousDayLimitInfo) {
-            return currentLhMachineCount >= maxLhMachineCount;
+            return currentLhMachineCount >= realMaxLhMachineCount;
         }
         //当日没有硫化组信息
         Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
@@ -284,34 +316,46 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer realUsedLhMachineCount;
         if (null == nextDayLimitInfo) {
             //结构收尾日
-            Integer previousDayChangeQty = getChangeUsedLhMachineQtyByPreviousDay(previousDayLimitInfo);
+            Integer previousDayChangeQty = getChangeUsedLhMachineQtyByPreviousDay(context, previousDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + previousDayChangeQty;
         } else {
             //中间排产
-            Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDayMouldNumber(nextDayLimitInfo);
+            Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDayMouldNumber(context, nextDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + nextDayChangeQty;
         }
-        return realUsedLhMachineCount >= maxLhMachineCount;
+        return realUsedLhMachineCount >= realMaxLhMachineCount;
     }
 
     /**
      * 根据后一天的排产信息，获取可释放的机台信息
      *
+     * @param context     排产上下文
      * @param nextDayInfo 后一天排产信息
      * @return
      */
-    public Integer getReleaseLhMachineCount(GroupPlanCxLhCapacityLimitHelper nextDayInfo) {
-        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
-        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayInfo.getSkuUsedDetailInfoByQty();
+    public Integer getReleaseLhMachineCount(Context context, GroupPlanCxLhCapacityLimitHelper nextDayInfo) {
+        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty(context);
+        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayInfo.getSkuUsedDetailInfoByQty(context);
         Map<String, Integer> changeMap = new HashMap<>();
+        //前日变化
         previousDaySkuLhMachineDetailMap.forEach((materialDesc, previousUsedMachineDetail) -> {
             SkuUsedLhMachineInfo currentDetail = nextDaySkuLhMachineDetailMap.get(materialDesc);
             changeMap.put(materialDesc, previousUsedMachineDetail.getChangeMachineCount(currentDetail));
         });
+        //后日新增
+        nextDaySkuLhMachineDetailMap.forEach((materialDesc, nextUsedMachineDetail) -> {
+            SkuUsedLhMachineInfo previousDetail = previousDaySkuLhMachineDetailMap.get(materialDesc);
+            if (null != previousDetail) {
+                return;
+            }
+            changeMap.put(materialDesc, nextUsedMachineDetail.getLeftOverMachineCount());
+        });
+        Integer initChangeCount = getInitChangeLhMachineCount();
         if (CollectionUtils.isEmpty(changeMap)) {
-            return BigDecimal.ZERO.intValue();
+            return Math.abs(initChangeCount);
         }
         Integer reduction = changeMap.values().stream().mapToInt(Integer::intValue).sum();
+        reduction = reduction + initChangeCount;
         return Math.abs(reduction);
     }
 
@@ -373,6 +417,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         this.cxMachineCodeSet = new HashSet<>();
         this.skuProductionMouldMap = new HashMap<>();
         this.productionSkuQtyInfo = new HashMap<>();
+        this.skuProductionDetailInfo = new HashMap<>();
     }
 
     /**
@@ -380,19 +425,25 @@ public class GroupPlanCxLhCapacityLimitHelper {
      *
      * @return
      */
-    private Map<String, Integer> getSkuUsedMachineRejectLeftOver() {
-        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+    private Map<String, Integer> getSkuUsedMachineRejectLeftOver(Context context) {
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
         Map<String, Integer> skuUsedLhMachine = new HashMap<>();
-        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
-            Integer productionQty = skuProductionInfo.getSumProductionQty();
-            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-            //表示换模或是换活字块
-            if (productionQty < lhMachineQty) {
+        skuProductionDetailInfo.forEach((materialDesc, skuProductionInfoList) -> {
+            if (CollectionUtils.isEmpty(skuProductionInfoList)) {
                 return;
             }
-            int wholeNumber = productionQty / lhMachineQty;
+            Integer wholeNumber = BigDecimal.ZERO.intValue();
+            for (SkuDayProductionInfoHelper skuProductionInfo : skuProductionInfoList) {
+                Integer productionQty = skuProductionInfo.getSumProductionQty();
+                //表示换模或是换活字块 开产日
+                Integer lhMachineQty = context.getOpenDayMaxQty(day, skuProductionInfo.getDayLhMachineQty());
+                if (productionQty < lhMachineQty) {
+                    continue;
+                }
+                wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
+            }
             if (wholeNumber >= BigDecimal.ONE.intValue()) {
                 skuUsedLhMachine.put(materialDesc, wholeNumber);
             }
@@ -411,10 +462,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         Map<String, Integer> skuUsedLhMachine = new HashMap<>();
         productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
-            Integer productionQty = skuProductionInfo.getSumProductionQty();
-            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-            int upMachineCount = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(lhMachineQty), 0, RoundingMode.UP).intValue();
-            skuUsedLhMachine.put(materialDesc, upMachineCount);
+            Set<String> usedMouldSet = skuProductionInfo.getUsedMouldSet();
+            Integer usedMachineCount;
+            if (CollectionUtils.isEmpty(usedMouldSet)) {
+                usedMachineCount = BigDecimal.ZERO.intValue();
+            } else {
+                usedMachineCount = usedMouldSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            }
+//            Integer productionQty = skuProductionInfo.getSumProductionQty();
+//            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+//            int upMachineCount = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(lhMachineQty), 0, RoundingMode.UP).intValue();
+            skuUsedLhMachine.put(materialDesc, usedMachineCount);
         });
         return skuUsedLhMachine;
     }
@@ -502,16 +560,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 根据当日各Sku使用的硫化组数，结合前一日排产情况，计算实际变化的硫化组数
      * 即新增硫化组 + 减的硫化组数
      *
+     * @param context              排产上下文
      * @param previousDayLimitInfo 前一日排产情况信息
      * @return
      */
-    private Integer getChangeUsedLhMachineQtyByPreviousDay(GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo) {
+    private Integer getChangeUsedLhMachineQtyByPreviousDay(Context context, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo) {
         //根据前日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = previousDayLimitInfo.getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> previousDaySkuLhMachineDetailMap = previousDayLimitInfo.getSkuUsedDetailInfoByQty(context);
         //当前日Sku使用的硫化组数-根据模具数
         Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
         //当前日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty(context);
         //新增Sku-使用的硫化组数
         Map<String, Integer> addSkuMap = new HashMap<>();
         currentDaySkuLhMachineInfoMap.forEach((materialDesc, addQty) -> {
@@ -534,16 +593,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 根据当日各Sku使用的硫化组数，结合前一日排产情况，计算实际变化的硫化组数
      * 即新增硫化组 + 减的硫化组数
      *
+     * @param context          排产上下文
      * @param nextDayLimitInfo 后一日排产情况信息
      * @return
      */
-    private Integer getChangeUsedLhMachineQtyByNextDay(GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    private Integer getChangeUsedLhMachineQtyByNextDay(Context context, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         //根据后一日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayLimitInfo.getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> nextDaySkuLhMachineDetailMap = nextDayLimitInfo.getSkuUsedDetailInfoByQty(context);
         //后一日Sku使用的硫化组数-根据模具数
         Map<String, Integer> nextDaySkuLhMachineInfoMap = nextDayLimitInfo.getSkuUsedLhMachineCountByMouldNumber();
         //当前日排产，使用各Sku排产量计算各Sku使用的硫化组数
-        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty();
+        Map<String, SkuUsedLhMachineInfo> currentDaySkuLhMachineDetailMap = getSkuUsedDetailInfoByQty(context);
         //新增Sku-使用的硫化组数
         Map<String, Integer> addSkuMap = new HashMap<>();
         nextDaySkuLhMachineInfoMap.forEach((materialDesc, addQty) -> {
@@ -567,23 +627,30 @@ public class GroupPlanCxLhCapacityLimitHelper {
     /**
      * 根据后一日的排产信息，获取硫化变化组数
      *
+     * @param context          排产上下文
      * @param nextDayLimitInfo 下一日排产信息
      * @return
      */
-    private Integer getChangeUsedLhMachineQtyByNextDayMouldNumber(GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    private Integer getChangeUsedLhMachineQtyByNextDayMouldNumber(Context context, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         //后一日Sku使用的硫化组数-根据模具数
         Map<String, Integer> nextDaySkuLhMachineInfoMap = nextDayLimitInfo.getSkuUsedLhMachineCountByMouldNumber();
         Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
+        Map<String, Integer> currentDayFullSkuLhMachineInfoMap = getCurrentDayFullLhMachineInfoMap(context);
         //相比前一日，新增Sku增加的机台数
         Map<String, Integer> addSkuMap = new HashMap<>();
         Map<String, Integer> reductionSkuMap = new HashMap<>();
         currentDaySkuLhMachineInfoMap.forEach((materialDesc, lhMachineQty) -> {
             Integer nextDayLhMachineQty = nextDaySkuLhMachineInfoMap.get(materialDesc);
+            Integer fullLhMachineQty = currentDayFullSkuLhMachineInfoMap.get(materialDesc);
             if (null == nextDayLhMachineQty) {
                 nextDayLhMachineQty = BigDecimal.ZERO.intValue();
             }
             if (null == lhMachineQty) {
                 lhMachineQty = BigDecimal.ZERO.intValue();
+            }
+            //20260323 满台释放，则不减
+            if (lhMachineQty > nextDayLhMachineQty && lhMachineQty.equals(fullLhMachineQty)) {
+                return;
             }
             if (lhMachineQty > nextDayLhMachineQty) {
                 reductionSkuMap.put(materialDesc, nextDayLhMachineQty - lhMachineQty);
@@ -593,6 +660,29 @@ public class GroupPlanCxLhCapacityLimitHelper {
             }
         });
         return calculateChangeLhMachineQty(addSkuMap, reductionSkuMap);
+    }
+
+    /**
+     * 获取当前日Sku占满产的硫化机台数
+     *
+     * @return
+     */
+    private Map<String, Integer> getCurrentDayFullLhMachineInfoMap(Context context) {
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> fullSkuMap = new HashMap<>(16);
+        skuProductionDetailInfo.forEach((materialDesc, detailList) -> {
+            if (CollectionUtils.isEmpty(detailList)) {
+                return;
+            }
+            List<SkuDayProductionInfoHelper> fullList = detailList.stream().filter(single -> single.isFullProduction(context)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(fullList)) {
+                return;
+            }
+            fullSkuMap.put(materialDesc, fullList.size());
+        });
+        return fullSkuMap;
     }
 
     /**
@@ -618,24 +708,47 @@ public class GroupPlanCxLhCapacityLimitHelper {
     /**
      * 获取各Sku使用的硫化机台明细信息，根据排产量
      *
+     * @param context 排产上下文
      * @return
      */
-    private Map<String, SkuUsedLhMachineInfo> getSkuUsedDetailInfoByQty() {
-        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+    private Map<String, SkuUsedLhMachineInfo> getSkuUsedDetailInfoByQty(Context context) {
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
         Map<String, SkuUsedLhMachineInfo> skuUsedLhMachineDetailMap = new HashMap<>();
-        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
-            Integer productionQty = skuProductionInfo.getSumProductionQty();
-            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-            int remainder = productionQty % lhMachineQty;
-            int wholeNumber = productionQty / lhMachineQty;
-            SkuUsedLhMachineInfo usedDetail = SkuUsedLhMachineInfo.build(materialDesc, wholeNumber, remainder);
+        skuProductionDetailInfo.forEach((materialDesc, skuProductionDetailList) -> {
+            if (CollectionUtils.isEmpty(skuProductionDetailList)) {
+                return;
+            }
+            Integer wholeNumber = BigDecimal.ZERO.intValue();
+            Integer remainder = BigDecimal.ZERO.intValue();
+            for (SkuDayProductionInfoHelper lhDetail : skuProductionDetailList) {
+                //需要考虑开产日
+                Integer dayLhMachineQty = context.getOpenDayMaxQty(day, lhDetail.getDayLhMachineQty());
+                if (lhDetail.getSumProductionQty().equals(dayLhMachineQty)) {
+                    wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
+                } else {
+                    remainder = remainder + BigDecimal.ONE.intValue();
+                }
+            }
+            SkuUsedLhMachineInfo usedDetail = SkuUsedLhMachineInfo.buildLhCount(materialDesc, wholeNumber, remainder);
             skuUsedLhMachineDetailMap.put(materialDesc, usedDetail);
         });
-        if (CollectionUtils.isEmpty(skuUsedLhMachineDetailMap)) {
-            return Collections.emptyMap();
-        }
+//        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+//            return Collections.emptyMap();
+//        }
+//        Map<String, SkuUsedLhMachineInfo> skuUsedLhMachineDetailMap = new HashMap<>();
+//        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
+//            Integer productionQty = skuProductionInfo.getSumProductionQty();
+//            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
+//            int remainder = productionQty % lhMachineQty;
+//            int wholeNumber = productionQty / lhMachineQty;
+//            SkuUsedLhMachineInfo usedDetail = SkuUsedLhMachineInfo.build(materialDesc, wholeNumber, remainder);
+//            skuUsedLhMachineDetailMap.put(materialDesc, usedDetail);
+//        });
+//        if (CollectionUtils.isEmpty(skuUsedLhMachineDetailMap)) {
+//            return Collections.emptyMap();
+//        }
         return skuUsedLhMachineDetailMap;
     }
 
@@ -688,7 +801,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param cxMachineInfo             成型机台信息
      * @param singleCxMachineAllocation 某条转产配置
      */
-    private static void updateBaseLimitInfo(GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
+    private static void updateBaseLimitInfo(Context context, GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
         Integer productionDay = initLimitHelper.getDay();
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (null == cxMachineInfo) {
@@ -705,9 +818,23 @@ public class GroupPlanCxLhCapacityLimitHelper {
             return;
         }
         initLimitHelper.getCxMachineCodeSet().add(cxMachineCode);
+
         //最大硫化配比
         Integer maxLhMachineCount = initLimitHelper.getMaxLhMachineCount();
-        maxLhMachineCount = maxLhMachineCount + singleCxMachineAllocation.getMaxLhMachineCount();
+        Integer singleCxMachineCount = singleCxMachineAllocation.getMaxLhMachineCount();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String continueStruct = productionContext.getContinueStructureMap() == null ? "" : productionContext.getContinueStructureMap().get(singleCxMachineAllocation.getCxMachineCode());
+        if (singleCxMachineAllocation.getBeginDay().equals(productionDay)) {
+            if (!(singleCxMachineAllocation.getBeginDay().equals(FactoryConstant.MONTH_START_DAY) &&
+                    singleCxMachineAllocation.getStructureName().equals(continueStruct))) {
+                //若非（1号且续作结构）
+                //若是结构开产首日，将最大成型机数-3 sandy+ 2026.3.19
+                Integer decLhMachines = productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
+                decLhMachines = (decLhMachines > singleCxMachineCount) ? singleCxMachineCount : decLhMachines;
+                singleCxMachineCount -= decLhMachines;
+            }
+        }
+        maxLhMachineCount = maxLhMachineCount + singleCxMachineCount;
         initLimitHelper.maxLhMachineCount = maxLhMachineCount;
         //最低硫化配比
         initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, singleCxMachineAllocation.getMinLhMachineCount());
@@ -715,6 +842,22 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
         maxEmbryoCodeCount = maxEmbryoCodeCount + singleCxMachineAllocation.getMaxEmbryoCodeCount();
         initLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
+        //理论最大硫化配比
+        Integer maxTheoryLhMachineCount = Optional.ofNullable(initLimitHelper.getMaxTheoryLhMachineCount()).orElse(BigDecimal.ZERO.intValue());
+        maxTheoryLhMachineCount = maxTheoryLhMachineCount + Optional.ofNullable(singleCxMachineAllocation.getMaxLhMachineCount()).orElse(BigDecimal.ZERO.intValue());
+        initLimitHelper.maxTheoryLhMachineCount = maxTheoryLhMachineCount;
+    }
+
+    /**
+     * 获取初始的硫化机台变化数
+     * 因切换结构日需要减机台，引入
+     *
+     * @return
+     */
+    private Integer getInitChangeLhMachineCount() {
+        Integer realMaxLhMachineCount = Optional.ofNullable(maxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
+        Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(realMaxLhMachineCount);
+        return realMaxLhMachineCount - theoryMaxLhMachineCount;
     }
 }
 
@@ -738,10 +881,6 @@ class SkuUsedLhMachineInfo {
      * 非整台硫化组数
      */
     private Integer leftOverMachineCount;
-    /**
-     * 余量排产量
-     */
-    private Integer leftOverProductionQty;
 
     /**
      * 构建Sku使用硫化机台数明细对象
@@ -761,10 +900,32 @@ class SkuUsedLhMachineInfo {
         }
         if (null == leftOverProductionQty || leftOverProductionQty <= BigDecimal.ZERO.intValue()) {
             detail.setLeftOverMachineCount(BigDecimal.ZERO.intValue());
-            detail.setLeftOverProductionQty(BigDecimal.ZERO.intValue());
         } else {
             detail.setLeftOverMachineCount(BigDecimal.ONE.intValue());
-            detail.setLeftOverProductionQty(leftOverProductionQty);
+        }
+        return detail;
+    }
+
+    /**
+     * 构建Sku使用硫化机台数明细对象
+     *
+     * @param materialDesc      Sku
+     * @param wholeMachineCount 整数台
+     * @param leftOverCount     余量台
+     * @return
+     */
+    public static SkuUsedLhMachineInfo buildLhCount(String materialDesc, Integer wholeMachineCount, Integer leftOverCount) {
+        SkuUsedLhMachineInfo detail = new SkuUsedLhMachineInfo();
+        detail.setMaterialDesc(materialDesc);
+        if (null == wholeMachineCount) {
+            detail.setWholeMachineCount(BigDecimal.ZERO.intValue());
+        } else {
+            detail.setWholeMachineCount(wholeMachineCount);
+        }
+        if (null == leftOverCount) {
+            detail.setLeftOverMachineCount(BigDecimal.ZERO.intValue());
+        } else {
+            detail.setLeftOverMachineCount(leftOverCount);
         }
         return detail;
     }
@@ -783,6 +944,34 @@ class SkuUsedLhMachineInfo {
         if (null == nextDayInfo) {
             return BigDecimal.ZERO.intValue() - allMachineCount;
         }
+        Integer nextAllMachineCount = nextDayInfo.getWholeMachineCount() + nextDayInfo.getLeftOverMachineCount();
+        if (allMachineCount.equals(nextAllMachineCount)) {
+            return getSingleChange(nextDayInfo);
+        }
         return nextDayInfo.getWholeMachineCount() - getWholeMachineCount();
+    }
+
+    /**
+     * 单台变化处理
+     *
+     * @param nextDayInfo
+     * @return
+     */
+    private Integer getSingleChange(SkuUsedLhMachineInfo nextDayInfo) {
+        //如果是单台
+        if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
+            return getWholeMachineCount() - nextDayInfo.getLeftOverMachineCount();
+        }
+        if (getWholeMachineCount() == BigDecimal.ZERO.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO.intValue() - nextDayInfo.getLeftOverMachineCount();
+        }
+        if (getWholeMachineCount() == BigDecimal.ONE.intValue() && nextDayInfo.getWholeMachineCount() == BigDecimal.ONE.intValue()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        //多台，看余量变，减
+        return BigDecimal.ZERO.intValue() - nextDayInfo.getLeftOverMachineCount();
     }
 }

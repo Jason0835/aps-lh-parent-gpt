@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.engine.scheduling;
 
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.enums.WorkWearTypeEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
@@ -13,6 +15,7 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -41,6 +44,17 @@ public class BaseDataContainer implements Serializable {
      * key=cxMachineCode : value=成型机信息
      */
     private Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo;
+
+    /**
+     * 工作日历
+     */
+    private Map<Integer, MdmWorkCalendar> workCalendarMap;
+
+    /**
+     * 硫化机台信息
+     */
+    private List<LhMachineInfo> lhMachineInfoList;
+
     /**
      * 成型鼓(工装台账)信息集合
      * key=鼓类型 ：value=鼓类型台账信息{key=鼓groupId ：value=数量}
@@ -267,7 +281,7 @@ public class BaseDataContainer implements Serializable {
         Set<Integer> dayCapacitySet = dayCapacityLimit.getHasCapacityProductionDayInfo();
         if (CollectionUtils.isEmpty(dayCapacitySet)) {
             limitType = GroupAllocationCapacityLimitTypeEnum.DAY_MAX_CAPACITY_LIMIT;
-            log.info(DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType));
+            DayLimitLogRecorder.addReachDayControlLimitLog(context, selectedCxMachineInfo, groupName, proSize, limitType);
             return new GroupCapacityProductionLimitHelper(Collections.emptySet(), limitType);
         }
         String dayInfo = dayCapacitySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));

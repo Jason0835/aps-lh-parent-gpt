@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.factory.mapper;
 
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -30,4 +31,10 @@ public interface MpStructureAllocationEntityMapper extends CommBaseMapper<MpStru
      */
     List<MpStructureAllocation> getVersionList(MpStructureAllocation queryVO);
 
+    /**
+     * 获取结构转产表导出数据
+     * @param queryVO
+     * @return
+     */
+    List<MpStructureAllocationExportVo> getExportList(MpStructureAllocation queryVO);
 }

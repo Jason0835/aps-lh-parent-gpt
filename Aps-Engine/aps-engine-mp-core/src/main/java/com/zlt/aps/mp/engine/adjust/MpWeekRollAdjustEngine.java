@@ -115,7 +115,7 @@ public class MpWeekRollAdjustEngine {
         //3、初始日产能限制
         // 锁定次日 作为 可开始日
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO.getStructureStartDay(),mpProdFinalList,contextDTO.getOneStructureAllocationList());
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
         contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
         //4、拆出搭配量，用于快速判断是否搭配
@@ -411,7 +411,7 @@ public class MpWeekRollAdjustEngine {
         //3、初始日产能限制
         // 锁定次日 作为 可开始日
         int lockNextDay = contextDTO.getLockEndDay() + 1;
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO.getStructureStartDay(),mpProdFinalList,contextDTO.getOneStructureAllocationList());
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
         // 初始日最大排产量、开停产标识、比例
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
         contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
@@ -452,16 +452,26 @@ public class MpWeekRollAdjustEngine {
      * @param structureIn
      */
     private void checkDayLhQtyWithMainPattern(StringBuffer sbError, MpAdjustStructureIn structureIn){
+        //物料编码：[%s]，没有日硫化量！
         if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
+        //物料编码：[%s]，没有主花纹！
         if (StringUtil.isEmptyWithTrim(structureIn.getMainPattern())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
+        //物料编码：[%s]，确认调整量非偶数！
+        if (structureIn.getConfirmAdjustQty() != null && !isEven(structureIn.getConfirmAdjustQty())){
+            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
+                    structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+        }
     }
 
+    private boolean isEven(int number) {
+        return (number & 1) == 0;
+    }
     /**
      * 检查日硫化量及主花纹是否为空
      * @param sbError
@@ -474,6 +484,11 @@ public class MpWeekRollAdjustEngine {
         }
         if (StringUtil.isEmptyWithTrim(structureOut.getMainPattern())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
+                    structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+        }
+        //物料编码：[%s]，确认调整量非偶数！
+        if (structureOut.getConfirmAdjustQty() != null && !isEven(structureOut.getConfirmAdjustQty())){
+            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
     }

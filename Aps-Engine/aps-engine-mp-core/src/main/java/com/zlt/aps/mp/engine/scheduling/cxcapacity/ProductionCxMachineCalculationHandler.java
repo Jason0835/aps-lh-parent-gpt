@@ -123,7 +123,7 @@ public class ProductionCxMachineCalculationHandler {
             if (needCount.compareTo(BigDecimal.valueOf(productionCount)) > BigDecimal.ZERO.intValue()) {
                 return buildResult;
             }
-            //20260109 标记结构成型产能分配完成
+            //相等 20260109 标记结构成型产能分配完成
             groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             return buildResult;
         }
@@ -273,46 +273,37 @@ public class ProductionCxMachineCalculationHandler {
         CxContinueMachineReleaseHelper initReleaseInfo = new CxContinueMachineReleaseHelper(BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue());
         getContinueMachineRelease(context, initReleaseInfo, needWholeCount, productionCount, groupPlanInfo, groupContinueInfo);
         //根据分配信息，优先释放配比大的，成型编号大的
-        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount)
-                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode));
-        Integer releaseCount = initReleaseInfo.getReleaseMachineCount();
-        List<ProductGroupCxCapacityInfo> effectiveList;
-        if (null != releaseCount && releaseCount > BigDecimal.ZERO.intValue() && releaseCount < productionCount) {
-            int endIndex = cxCapacityInfoList.size() - releaseCount;
-            effectiveList = cxCapacityInfoList.subList(BigDecimal.ZERO.intValue(), endIndex);
-        } else {
-            effectiveList = cxCapacityInfoList;
-        }
+        List<ProductGroupCxCapacityInfo> effectiveList = getKeepCxMachineList(cxCapacityInfoList, initReleaseInfo);
         Integer minAllocationDays = initReleaseInfo.getEarliestConclusionDay();
         Integer sumDays = groupPlanInfo.getTheoryDays();
         Map<String, CxMachineBaseInfoVo> allCxMachineInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         Map<String, CxContinueSkuInfoHelper> continueSkuMap = groupContinueInfo.getContinueSkuMouldNumberMap();
         Integer monthDays = productionContext.getMonthDays();
         List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
+        Integer leftOverSplitDays;
         //如果是月初，则直接前面的整月分配，后续的取余
         if (ProductionConstant.MONTH_START_DAY.equals(minAllocationDays)) {
-            for (ProductGroupCxCapacityInfo cxCapacityInfo : effectiveList) {
-                CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
-                Integer remainingDays = cxMachineInfo.getRemainingDays();
-                Integer allocationDay = Math.min(sumDays, remainingDays);
-                // 更新特殊材料库存
-                productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
-                groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
-                CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
-                cxMachineInfo.addAllocationPlanInfo(context, helper);
-                allocationList.add(helper);
-                sumDays = sumDays - allocationDay;
+            leftOverSplitDays = sumDays;
+            minAllocationDays = BigDecimal.ZERO.intValue();
+        } else {
+            //至少每台都需要分配最低天数
+            if(null == minAllocationDays){
+                minAllocationDays = context.getMaxProductionDays();
             }
-            return allocationList;
+            Integer sumMinAllocationDays = minAllocationDays * effectiveList.size();
+            leftOverSplitDays = sumDays - sumMinAllocationDays;
+            if (leftOverSplitDays < BigDecimal.ZERO.intValue()) {
+                leftOverSplitDays = BigDecimal.ZERO.intValue();
+            }
         }
-        //至少每台都需要分配最低天数
-        Integer sumMinAllocationDays = minAllocationDays * effectiveList.size();
-        Integer leftOverSplitDays = sumDays - sumMinAllocationDays;
         for (ProductGroupCxCapacityInfo cxCapacityInfo : effectiveList) {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
             Integer remainingDays = cxMachineInfo.getRemainingDays() - minAllocationDays;
             Integer leftOverAllocationDay = Math.min(leftOverSplitDays, remainingDays);
             Integer allocationDay = leftOverAllocationDay + minAllocationDays;
+            if (allocationDay <= BigDecimal.ZERO.intValue()) {
+                break;
+            }
             // 更新特殊材料库存
             productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
@@ -320,6 +311,9 @@ public class ProductionCxMachineCalculationHandler {
             cxMachineInfo.addAllocationPlanInfo(context, helper);
             allocationList.add(helper);
             leftOverSplitDays = leftOverSplitDays - leftOverAllocationDay;
+            if (leftOverSplitDays <= BigDecimal.ZERO.intValue()) {
+                leftOverSplitDays = BigDecimal.ZERO.intValue();
+            }
         }
         //20260109 标记分组计划分配完毕
         groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
@@ -340,39 +334,22 @@ public class ProductionCxMachineCalculationHandler {
     private void getContinueMachineRelease(Context context, CxContinueMachineReleaseHelper release, Integer needWholeCount, Integer continueMachineCount, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
         //相等，则表示在产机台不能释放
         if (needWholeCount.equals(continueMachineCount)) {
-            //先不看扣减机台
-            Integer deductionMachineCount = BigDecimal.ZERO.intValue();
-            Integer deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
-            //理论会出现在第一天，此时尝试扣减一台，看最低要求生产天数
-            if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
-                deductionMachineCount = deductionMachineCount + BigDecimal.ONE.intValue();
-                Integer newDeductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
-                if (null != newDeductionDay) {
-                    deductionDay = newDeductionDay;
-                }
-            }
-            //不释放
-            release.setReleaseMachineCount(BigDecimal.ZERO.intValue());
-            release.setEarliestConclusionDay(deductionDay);
+            handlerSameWholeCxMachine(context, release, groupPlanInfo, groupContinueInfo);
             return;
         }
         Integer releaseCount = release.getReleaseMachineCount();
         release.setDeductionMachineCount(releaseCount);
         //需要机台数 + 释放机台数 = 在产机台数
         if (needWholeCount + releaseCount == continueMachineCount) {
-            //逐步释放
-            Integer deductionMachineCount = release.getDeductionMachineCount();
+            //能进入此处，则前面一定是月初释放，则继续尝试再减一台：逐步释放
+            Integer deductionMachineCount = release.getDeductionMachineCount() + BigDecimal.ONE.intValue();
             Integer deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
-            //理论会出现在第一天，此时尝试扣减一台，看最低要求生产天数
-            if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
-                deductionMachineCount = deductionMachineCount + BigDecimal.ONE.intValue();
-                Integer newDeductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
-                if (null != newDeductionDay) {
-                    deductionDay = newDeductionDay;
-                }
+            if (null == deductionDay) {
+                //表示不能再减，直接返回
+                return;
             }
             //释放台数
-            release.setReleaseMachineCount(releaseCount);
+            release.setReleaseMachineCount(deductionMachineCount);
             release.setEarliestConclusionDay(deductionDay);
             return;
         }
@@ -383,13 +360,14 @@ public class ProductionCxMachineCalculationHandler {
         //月初可释放
         if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
             release.setReleaseMachineCount(deductionMachineCount);
+            release.setEarliestConclusionDay(deductionDay);
             getContinueMachineRelease(context, release, needWholeCount, continueMachineCount, groupPlanInfo, groupContinueInfo);
             return;
         }
         //不能减，则再加回，看最先收尾时间点
         if (null == deductionDay) {
             deductionMachineCount = deductionMachineCount - BigDecimal.ONE.intValue();
-            if(deductionMachineCount < BigDecimal.ZERO.intValue()){
+            if (deductionMachineCount < BigDecimal.ZERO.intValue()) {
                 deductionMachineCount = BigDecimal.ZERO.intValue();
             }
             deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
@@ -397,6 +375,70 @@ public class ProductionCxMachineCalculationHandler {
         release.setReleaseMachineCount(deductionMachineCount);
         release.setEarliestConclusionDay(deductionDay);
         return;
+    }
+
+    /**
+     * 处理在产机台数与所需机台整数台相等的情形，此时表示机台数不能释放，看各台最小的分配天数
+     *
+     * @param context           排产上下文
+     * @param release           释放机台信息
+     * @param groupPlanInfo     分组计划
+     * @param groupContinueInfo 续作信息
+     */
+    private void handlerSameWholeCxMachine(Context context, CxContinueMachineReleaseHelper release, ProductionPlanGroupInfo groupPlanInfo, CxContinueInfoHelper groupContinueInfo) {
+        //先不扣减
+        Integer deductionMachineCount = BigDecimal.ZERO.intValue();
+        Integer deductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
+        if (null != deductionDay && context.isCycleFirstProductionDay(deductionDay)) {
+            //理论会出现在第一天，此时尝试扣减一台，看最低要求生产天数
+            deductionMachineCount = deductionMachineCount + BigDecimal.ONE.intValue();
+            Integer newDeductionDay = getMinDeductionMachineDay(deductionMachineCount, groupPlanInfo, groupContinueInfo);
+            if (null != newDeductionDay) {
+                deductionDay = newDeductionDay;
+            }
+        }
+        if (null == deductionDay) {
+            deductionDay = context.getMaxProductionDays();
+        }
+        //不释放
+        release.setReleaseMachineCount(BigDecimal.ZERO.intValue());
+        release.setEarliestConclusionDay(deductionDay);
+    }
+
+    /**
+     * 根据释放机台情况，按成型硫化配比大->机台编号大的优先释放原则，
+     * 得到需要保留的机台集合
+     *
+     * @param cxCapacityInfoList 在机结构在产机台集合
+     * @param initReleaseInfo    可释放信息
+     * @return
+     */
+    private List<ProductGroupCxCapacityInfo> getKeepCxMachineList(List<ProductGroupCxCapacityInfo> cxCapacityInfoList, CxContinueMachineReleaseHelper initReleaseInfo) {
+        if (CollectionUtils.isEmpty(cxCapacityInfoList)) {
+            return Collections.emptyList();
+        }
+        if (null == initReleaseInfo) {
+            return cxCapacityInfoList;
+        }
+        Integer releaseCount = initReleaseInfo.getReleaseMachineCount();
+        if (releaseCount <= BigDecimal.ZERO.intValue()) {
+            return cxCapacityInfoList;
+        }
+        //根据分配信息，优先释放配比大的，成型编号大的
+        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount)
+                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode));
+        Integer minAllocationDays = initReleaseInfo.getEarliestConclusionDay();
+        //月初就可释放，则直接释放对应
+        if (ProductionConstant.MONTH_START_DAY.equals(minAllocationDays)) {
+            Integer keepCount = cxCapacityInfoList.size() - releaseCount;
+            return cxCapacityInfoList.subList(BigDecimal.ZERO.intValue(), keepCount);
+        }
+        //月初不能释放，则需要看情况，如果releaseCount>1则表示月初可释放 releaseCount - 1台，其它台最少需要分配minAllocationDays
+        if (releaseCount > BigDecimal.ONE.intValue()) {
+            Integer keepCount = cxCapacityInfoList.size() - releaseCount + BigDecimal.ONE.intValue();
+            return cxCapacityInfoList.subList(BigDecimal.ZERO.intValue(), keepCount);
+        }
+        return cxCapacityInfoList;
     }
 
     /**
@@ -417,7 +459,8 @@ public class ProductionCxMachineCalculationHandler {
             return null;
         }
         canDeductionList.sort(Comparator.comparing(GroupDayProductionSummaryHelper::getProductionDay));
-        return canDeductionList.get(BigDecimal.ZERO.intValue()).getProductionDay();
+        Integer startDay = canDeductionList.get(BigDecimal.ZERO.intValue()).getProductionDay();
+        return startDay;
     }
 
 }

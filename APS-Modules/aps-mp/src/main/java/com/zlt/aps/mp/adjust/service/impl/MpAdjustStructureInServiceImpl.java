@@ -250,6 +250,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
         paramCodeList.add(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
+        paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
         return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 

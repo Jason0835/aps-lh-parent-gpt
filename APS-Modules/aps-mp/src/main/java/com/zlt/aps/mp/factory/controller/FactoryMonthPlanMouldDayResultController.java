@@ -93,7 +93,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
 
     @Override
     protected String getOrderBy() {
-        return "PRO_SIZE,STRUCTURE_NAME,MAIN_PATTERN,MAIN_MATERIAL_DESC,MOULD_CAVITY_QTY DESC";
+        return "PRO_SIZE,STRUCTURE_NAME,MOULD_CAVITY_QTY DESC,TYPE_BLOCK_QTY DESC,MAIN_PATTERN";
     }
 
     /**
@@ -154,8 +154,35 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     public byte[] exportData(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
-        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO);
-        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(list);
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false);
+        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
+    }
+
+    /**
+     * 全物料导出
+     */
+    @Log(title = "S2-0604.排产结果-全物料导出", businessType = BusinessType.EXPORT)
+    @ApiOperation("全物料导出")
+    @PostMapping("/exportAllMaterial/{fileName}")
+    public byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        Date beginTime = DateUtils.getNowDate();
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true);
+        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");

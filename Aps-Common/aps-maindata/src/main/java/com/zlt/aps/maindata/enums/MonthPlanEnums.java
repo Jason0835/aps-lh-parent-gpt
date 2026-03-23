@@ -100,6 +100,19 @@ public enum MonthPlanEnums {
      */
     DAY_MIN_CAPACITY("SYS0203009", "每日最小产能"),
     /**
+     * SYS0203011 外销贴牌-品牌配置
+     */
+    OEM_BRAND_CONFIG("SYS0203011", "外销贴牌-品牌配置"),
+    /**
+     * SYS0203012 外销贴牌-总产量配置，单位条
+     */
+    OEM_BRAND_CAPACITY("SYS0203012", "外销贴牌-总产量配置，单位条"),
+    /**
+     * SYS0203013 周期储备量占实单的比例(%)
+     */
+    RESERVE_PERCENT("SYS0203013", "周期储备量占实单的比例(%)"),
+
+    /**
      * SYS0204001 SKU总净需求量<=该值，SKU一次性排产
      */
     SUM_PRODUCTION_QTY("SYS0204001", "SKU总净需求量<=该值，SKU一次性排产"),
@@ -221,6 +234,16 @@ public enum MonthPlanEnums {
      * SYS0209003 APS通用班制
      */
     APS_GENERAL_SHIFT("SYS0209003", "SKU双模日硫化量，倒算班产使用"),
+
+    /**
+     * SYS0209004 单位：台，成型机在结构切换时，首日应减少硫化机台数
+     */
+    CHANGE_STRUCT_DEC_LH_MACHINES("SYS0209004", "单位：台，成型机在结构切换时，首日应减少硫化机台数"),
+
+    /**
+     * SYS0209005 参与排产的特殊原材料编码，多个以,分隔
+     */
+    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔"),
     ;
 
     private final String code;

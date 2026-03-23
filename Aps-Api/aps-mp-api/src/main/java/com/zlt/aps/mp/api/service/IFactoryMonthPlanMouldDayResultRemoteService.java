@@ -71,6 +71,13 @@ public interface IFactoryMonthPlanMouldDayResultRemoteService {
     byte[] exportData(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName);
 
     /**
+     * 全物料导出S2-0604.排产结果-生产计划排产结果列表
+    */
+    @ApiOperation("全物料导出")
+    @PostMapping("/factoryMonthPlanMouldDayResult/exportAllMaterial/{fileName}")
+    byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName);
+
+    /**
      * 导入S2-0604.排产结果-生产计划排产结果数据
      */
     @ApiOperation("导入S2-0604.排产结果-生产计划排产结果")

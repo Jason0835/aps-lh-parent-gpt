@@ -14,7 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </select>
 
-    <select id="changeReleaseStatus" parameterType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult"
+    <select id="changeReleaseStatus" parameterType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld"
             resultType="java.lang.Integer">
         update t_cx_schedule_result
         set IS_RELEASE = #{isRelease, jdbcType=VARCHAR}
@@ -62,7 +62,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <!--Joran 2021-12-13 查询出需要删除的数据集合-->
-    <select id="selectRemoveList" resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult">
+    <select id="selectRemoveList" resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld">
         WITH id_table AS (
         <foreach collection="ids" item="id" separator=" union ">
             SELECT #{id} id FROM dual
@@ -350,7 +350,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectByEmbryoCodeAndScheduleDate"
-            resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult">
+            resultType="com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld">
         SELECT
             *
         FROM

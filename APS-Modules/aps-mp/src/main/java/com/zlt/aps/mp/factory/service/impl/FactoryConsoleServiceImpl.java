@@ -25,6 +25,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -155,11 +156,31 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
         if (!CollectionUtils.isEmpty(hasFinalVersion)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.check.monthPlan.finalVersion"));
         }
-        //对第一条排产版本记录清除排产版本信息，其它排产版本记录删除
-        String leaveProductionVersion = findProductionList.get(BigDecimal.ZERO.intValue()).getProductionVersion();
-        factoryProductionParam.setProductionVersion(leaveProductionVersion);
-        //更新排产版本记录及删除所有需求的排产信息
-        factoryProductionVersionMapper.deletedProductionVersionAndUpdateLastFlag(factoryProductionParam);
+        MpFactoryProductionVersion productionVersion = findProductionList.stream().filter(item -> StringUtils.isNotBlank(item.getProductionVersion())).findFirst().orElse(null);
+        if(null != productionVersion) {
+            productionVersion.setProductionInitVersion(StringUtils.EMPTY);
+            productionVersion.setProductionVersion(StringUtils.EMPTY);
+            productionVersion.setProductionStVersion(StringUtils.EMPTY);
+            productionVersion.setIsSelectedDemand(YesOrNoEnum.NO.getCode());
+            this.factoryProductionVersionMapper.updateById(productionVersion);
+            Long id = productionVersion.getId();
+            List<Long>  ids = findProductionList.stream().filter(item -> !Objects.equals(id, item.getId())).map(MpFactoryProductionVersion::getId).collect(Collectors.toList());
+            if(!CollectionUtils.isEmpty(ids)) {
+                this.factoryProductionVersionMapper.deleteBatchIds(ids);
+            }
+            return AjaxResult.success();
+        }
+        productionVersion = findProductionList.get(0);
+        productionVersion.setProductionInitVersion(StringUtils.EMPTY);
+        productionVersion.setProductionVersion(StringUtils.EMPTY);
+        productionVersion.setProductionStVersion(StringUtils.EMPTY);
+        productionVersion.setIsSelectedDemand(YesOrNoEnum.NO.getCode());
+        this.factoryProductionVersionMapper.updateById(productionVersion);
+        Long id = productionVersion.getId();
+        List<Long>  ids = findProductionList.stream().filter(item -> !Objects.equals(id, item.getId())).map(MpFactoryProductionVersion::getId).collect(Collectors.toList());
+        if(!CollectionUtils.isEmpty(ids)) {
+            this.factoryProductionVersionMapper.deleteBatchIds(ids);
+        }
         return AjaxResult.success();
     }
 

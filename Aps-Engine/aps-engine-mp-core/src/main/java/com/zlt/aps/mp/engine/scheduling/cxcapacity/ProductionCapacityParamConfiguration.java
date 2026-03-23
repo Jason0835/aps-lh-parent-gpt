@@ -143,5 +143,28 @@ public class ProductionCapacityParamConfiguration {
      * 周程滚动调整日
      */
     private String weekRollAdjustDate;
+    /**
+     * 切换结构首日需要扣减的硫化机台数
+     */
+    private Integer deductionLhMachineCount;
 
+    /**
+     * SYS0203011 外销贴牌-品牌配置
+     */
+    private Set<String> oemBrandConfig;
+
+    /**
+     * SYS0203012 外销贴牌-总产量配置，单位条
+     */
+    private Integer oemBrandCapacity;
+
+    /**
+     * SYS0203013 周期储备量占实单的比例(%),防止储备量过大
+     */
+    private Integer reservePercent;
+
+    /**
+     * 参与排产的特殊原材料编码信息
+     */
+    private Set<String> specialMaterialCodeSet;
 }

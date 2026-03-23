@@ -51,4 +51,11 @@ public interface IRawMaterialRequirePlanService  extends IDocService<RawMaterial
      * 生成原材料需求计划版本
      */
     AjaxResult generateVersion(RawMaterialRequirePlan billVO);
+
+    /**
+     * 获取原材料需求计划版本列表
+     * @param queryVO
+     * @return
+     */
+    AjaxResult getVersionList(RawMaterialRequirePlan queryVO);
 }

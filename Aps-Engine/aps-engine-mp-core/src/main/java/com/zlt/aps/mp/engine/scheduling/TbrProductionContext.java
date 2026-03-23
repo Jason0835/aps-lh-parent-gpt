@@ -78,6 +78,12 @@ public class TbrProductionContext extends Context {
      * 排产计数器
      */
     private SkuProductionCounter productionCounter;
+
+    /**
+     * 机台续作结构Map, continueStructureMap <机台，续作结构>
+     */
+    private Map<String,String> continueStructureMap;
+
     /**
      * 模具排产限制信息记录
      * key=物料描述 ： value=限制原因集合
@@ -590,18 +596,6 @@ public class TbrProductionContext extends Context {
         if (null == allocationDays || allocationDays == BigDecimal.ZERO.intValue()) {
             return;
         }
-//        Integer leftOverNeedAllocationDays = Optional.ofNullable(groupInfo.getLeftOverNeedAllocationDays()).orElse(0);
-//        if (leftOverNeedAllocationDays <= allocationDays) {
-//            leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
-//        } else {
-//            leftOverNeedAllocationDays = leftOverNeedAllocationDays - allocationDays;
-//        }
-//        // 计算变化量
-//        Integer diffDays = leftOverNeedAllocationDays - groupInfo.getLeftOverNeedAllocationDays();
-//        if (diffDays == BigDecimal.ZERO.intValue()) {
-//            // 无变化直接结束
-//            return;
-//        }
         // 保留一天作为换模日，其余天才满额生产
         Integer firstQty = this.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
         BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountBymould());
@@ -746,9 +740,7 @@ public class TbrProductionContext extends Context {
      * @param groupInfo
      */
     private void roundSpecialMaterialPlanQtyStandardLength(ProductionPlanGroupInfo groupInfo) {
-//        BigDecimal threshold = BigDecimalUtils.valueOf(groupInfo.getThreshold());
         groupInfo.getEmbryoSpecialMaterialInfoMap().entrySet().forEach(entry -> {
-//            BigDecimal specialMaterialThreshold = entry.getValue().multiply(threshold);
             Map<Long, SpecialMaterialInfoVo> specialMaterialInfo = this.specialMaterialInfoMap.get(entry.getKey());
             if (specialMaterialInfo == null) {
                 return;
@@ -764,16 +756,6 @@ public class TbrProductionContext extends Context {
                         if (sumProductionQty.compareTo(stockQty) > 0) {
                             finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
                         } else if (sumProductionQty.compareTo(standardLength) > 0) {
-//                            BigDecimal remainderQty = sumProductionQty.remainder(standardLength); // 排产量余数
-//                            if (remainderQty.compareTo(BigDecimal.ZERO) != 0) {
-//                                // 判断如果余数低于最低硫化量 * 硫化机台数 * 用量，则舍弃掉该值；反之要加量补够标准长度的整倍数
-//                                BigDecimal modifyQty = remainderQty.compareTo(specialMaterialThreshold) < 0 ? remainderQty.negate()
-//                                        : standardLength.subtract(remainderQty);
-//                                finalProductionQty = BigDecimalUtils.add(sumProductionQty, modifyQty);
-//                            }
-//                            if (finalProductionQty.compareTo(stockQty) > 0) { // 如果取整后的量超过实际库存量，则最多只能处理至低于库存量的最大批次数
-//                                finalProductionQty = BigDecimalUtils.floor(stockQty, standardLength);
-//                            }
                             finalProductionQty = BigDecimalUtils.floor(sumProductionQty, standardLength);
                         }
                         stockInfo.setSumProductionQty(finalProductionQty.longValue()); // 计算结果设置到取整后的
@@ -809,6 +791,9 @@ public class TbrProductionContext extends Context {
             Long stock = specialMaterialInfo.values().stream().mapToLong(s -> stockGetter.apply(s) - sumQtyGetter.apply(s)).sum();
             // 1.2剩余库存换算成条数
             Integer canProductQty = BigDecimalUtils.div(stock, unitConsumeQty, 0).intValue();
+            if (canProductQty < this.baseDataContainer.getParamConfiguration().getChangeMouldFirstQty()) {
+                canProductQty = 0; // 如果剩余库存小于首日排产量，直接返回0
+            }
             minProductQty = Math.min(minProductQty, canProductQty);
             if (minProductQty <= 0) {
                 break;
@@ -848,7 +833,7 @@ public class TbrProductionContext extends Context {
             }
             // 取出库存还有剩余的库存信息
             List<SpecialMaterialInfoVo> stockList = specialMaterialInfo.values().stream()
-                    .filter(s -> sumQtyGetter.apply(s) < stockGetter.apply(s)).sorted((s1, s2) -> {
+                    .sorted((s1, s2) -> {
                         // 第一顺位：从已排量最大的开始分配
                         Long sumProductionQty1 = sumQtyGetter.apply(s1);
                         Long sumProductionQty2 = sumQtyGetter.apply(s2);

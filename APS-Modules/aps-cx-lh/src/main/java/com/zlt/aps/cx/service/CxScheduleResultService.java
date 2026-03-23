@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxOnlineImport;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo;
 import com.zlt.aps.lh.api.domain.bo.ValidateResult;
 import com.zlt.aps.mp.api.domain.vo.MdmProductConstructionVO;
@@ -23,7 +23,7 @@ import java.util.Map;
  * @author tlt Nick
  * time：2025-02-12
  */
-public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
+public interface CxScheduleResultService extends IDocService<CxScheduleResultOld> {
 
     /**
      * 查询导出数据
@@ -31,7 +31,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult
      * @return List<CxScheduleResult>
      */
-    List<CxScheduleResult> selectListExportData(QueryWrapper<CxScheduleResult> cxScheduleResult);
+    List<CxScheduleResultOld> selectListExportData(QueryWrapper<CxScheduleResultOld> cxScheduleResult);
 
     /**
      * 依据日期查询成型工序排程记录
@@ -39,7 +39,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param scheduleDate 排程天数
      * @return List<CxScheduleResult> 成型排程结果
      */
-    List<CxScheduleResult> selectListByDate(Date scheduleDate);
+    List<CxScheduleResultOld> selectListByDate(Date scheduleDate);
 
     /**
      * 导入期初数据
@@ -49,7 +49,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param scheduleDate 导入日期
      * @return 返回结果
      */
-    AjaxResult importData2(List<CxScheduleResult> list, Long id, String scheduleDate);
+    AjaxResult importData2(List<CxScheduleResultOld> list, Long id, String scheduleDate);
 
     /**
      * 导入期初数据
@@ -70,14 +70,14 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param values 排程结果
      * @return List<CxScheduleResult> 排程结果
      */
-    public List<CxScheduleResult> getScheduleCxScheduleResults(Date scheduleDate, StringBuilder scheduleLog, Collection<CxScheduleResult> values);
+    public List<CxScheduleResultOld> getScheduleCxScheduleResults(Date scheduleDate, StringBuilder scheduleLog, Collection<CxScheduleResultOld> values);
 
     /**
      * title: 生成最终排程
      *
      * @param cxScheduleResultContextMap 排程结果
      */
-    void generateFinalSchedule(Map<String, CxScheduleResult> cxScheduleResultContextMap);
+    void generateFinalSchedule(Map<String, CxScheduleResultOld> cxScheduleResultContextMap);
 
     /**
      * title: 生成最终排程过程日志
@@ -101,7 +101,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult 调量结果
      * @return 调整结果
      */
-    AjaxResult changeQty(CxScheduleResult cxScheduleResult);
+    AjaxResult changeQty(CxScheduleResultOld cxScheduleResult);
 
     /**
      * title: 修改排程
@@ -109,7 +109,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult 修改结果
      * @return 修改结果
      */
-    AjaxResult edit(CxScheduleResult cxScheduleResult);
+    AjaxResult edit(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录（查询成型排程结果）
@@ -125,7 +125,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult 排程结果
      * @return 新增结果
      */
-    AjaxResult add(CxScheduleResult cxScheduleResult);
+    AjaxResult add(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 手动插单参数验证及其他相关数据验证
@@ -133,7 +133,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult
      * @return
      */
-    public ValidateResult insertPreCheck(CxScheduleResult cxScheduleResult);
+    public ValidateResult insertPreCheck(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 根据id查询当前日期发布状态为"发布中"或"超时失败"的记录
@@ -149,7 +149,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param id
      * @return
      */
-    CxScheduleResult selectById(Long id);
+    CxScheduleResultOld selectById(Long id);
 
     /**
      * 根据机台编号和排程时间查询排程结果
@@ -159,7 +159,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param scheduleDate
      * @return
      */
-    CxScheduleResult getScheduleResultByMachineCodeAndScheduleDate(String factoryCode, String machineCode, Date scheduleDate);
+    CxScheduleResultOld getScheduleResultByMachineCodeAndScheduleDate(String factoryCode, String machineCode, Date scheduleDate);
 
     /**
      * 转机台
@@ -174,20 +174,20 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult
      * @return
      */
-    public ValidateResult changePlanQtyPreCheck(CxScheduleResult cxScheduleResult);
+    public ValidateResult changePlanQtyPreCheck(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 校验排程结果是否唯一
      * @param cxScheduleResult 校验对象
      * @return 校验结果
      */
-    public List<CxScheduleResult> checkScheduleResultUnique(CxScheduleResult cxScheduleResult);
+    public List<CxScheduleResultOld> checkScheduleResultUnique(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
      * @param operType 操作类型：0--转机台、1--调量、2--插单
      */
-    void insetDispatcherLogInsertOrder(String operType, List<CxScheduleResult> scheduleResults, CxScheduleResult newSchedule);
+    void insetDispatcherLogInsertOrder(String operType, List<CxScheduleResultOld> scheduleResults, CxScheduleResultOld newSchedule);
 
 
     /**
@@ -195,23 +195,23 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult  查询对象
      * @return Bom信息
      */
-    MdmProductConstructionVO getBomData(CxScheduleResult cxScheduleResult);
+    MdmProductConstructionVO getBomData(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 加载关联任务列表
      */
-    List<CxScheduleResult> loadRelatedTasks(CxScheduleResult cxScheduleResult);
+    List<CxScheduleResultOld> loadRelatedTasks(CxScheduleResultOld cxScheduleResult);
 
 
     /**
      * 任务重排核心方法 - 根据欠胎时间和班次产能重新分配生产任务
      */
-    List<CxScheduleResult> cxScheduleResultListReSort(List<CxScheduleResult> allTasks, Date scheduleDate);
+    List<CxScheduleResultOld> cxScheduleResultListReSort(List<CxScheduleResultOld> allTasks, Date scheduleDate);
 
     /**
      * 批量更新任务状态
      */
-    void updateTasksStatus(List<CxScheduleResult> resortedTasks);
+    void updateTasksStatus(List<CxScheduleResultOld> resortedTasks);
 
     /**
      * 依据ID获取未发布的数据条数
@@ -226,7 +226,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param ids
      * @return
      */
-    String removeResultCheck(Long[] ids,List<CxScheduleResult> removeList);
+    String removeResultCheck(Long[] ids,List<CxScheduleResultOld> removeList);
 
 
     /**
@@ -234,7 +234,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param removeList
      * @return
      */
-    int removeCxSecheduleResultByList(Long[] ids,List<CxScheduleResult> removeList);
+    int removeCxSecheduleResultByList(Long[] ids,List<CxScheduleResultOld> removeList);
 
 
     /**
@@ -243,7 +243,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @return 结果
      */
     @Transactional(rollbackFor = Exception.class)
-    public int changeReleaseStatus(CxScheduleResult entity);
+    public int changeReleaseStatus(CxScheduleResultOld entity);
 
 
 
@@ -269,7 +269,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResultList
      * @return
      */
-    String checkBomDataVersion(List<CxScheduleResult> cxScheduleResultList);
+    String checkBomDataVersion(List<CxScheduleResultOld> cxScheduleResultList);
 
     /**
      * 排程发布
@@ -286,13 +286,13 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult
      * @return
      */
-    AjaxResult parseCxScheduleResult(CxScheduleResult cxScheduleResult);
+    AjaxResult parseCxScheduleResult(CxScheduleResultOld cxScheduleResult);
 
 
     /**
      * 生产计划员可用的导出
      */
-    public List<CxOnlineImport> genXcScheduleResult(CxScheduleResult cxScheduleResult);
+    public List<CxOnlineImport> genXcScheduleResult(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 查询成型机台甘特图
@@ -309,7 +309,7 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @param cxScheduleResult 查询参数
      * @return 结果
      */
-    AjaxResult updateLhScheduleResult(CxScheduleResult cxScheduleResult);
+    AjaxResult updateLhScheduleResult(CxScheduleResultOld cxScheduleResult);
 
     /**
      * 校验施工切换版本是否还有剩余旧版本半部件的库存
