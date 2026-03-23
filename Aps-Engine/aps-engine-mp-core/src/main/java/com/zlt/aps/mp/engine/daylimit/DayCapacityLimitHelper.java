@@ -7,7 +7,10 @@ import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import com.zlt.common.utils.PubUtil;
+import com.zlt.common.utils.StringUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -39,6 +42,7 @@ public class DayCapacityLimitHelper implements Serializable {
      * 每日产能上限
      */
     private Integer maxCapacity;
+
     /**
      * 每日产能下限
      */
@@ -77,6 +81,12 @@ public class DayCapacityLimitHelper implements Serializable {
      * 总的排产量(包含换模等导致的损耗)
      */
     private Integer sumProductionCapacityQty;
+
+    /**
+     * 贴牌总的排产量(包含换模等导致的损耗)
+     */
+    private Integer sumBrandProductionCapacity;
+
     /**
      * 存储分组分配-占用产能信息
      */
@@ -235,6 +245,10 @@ public class DayCapacityLimitHelper implements Serializable {
         }
         Integer realProductionQty = getRealProductionQty(productionQty, lossQty, false);
         sumProductionCapacityQty = sumProductionCapacityQty + realProductionQty;
+        // 累计OEM贴牌数量，sandy+ 2026.3.23
+        if (checkIsOemBrand(context,productionPlan.getBrand())){
+            sumBrandProductionCapacity = sumBrandProductionCapacity + realProductionQty;
+        }
         String materialDesc = productionPlan.getMaterialDesc();
         DayProductionCapacityDetailHelper skuInfo = skuProductionInfo.get(materialDesc);
         if (null == skuInfo) {
@@ -249,6 +263,23 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
+     * 检查当前品牌是否OEM
+     * @param context 上下文
+     * @param brand 品牌
+     * @return true - OEM贴牌， false - 非OEM
+     */
+    public static boolean checkIsOemBrand(Context context,String brand){
+        if (StringUtil.isEmptyWithTrim(brand)){
+            return false;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext)context;
+        Set<String> oemBrandSet = productionContext.getBaseDataContainer().getParamConfiguration().getOemBrandConfig();
+        if (PubUtil.isEmpty(oemBrandSet)){
+            return false;
+        }
+        return oemBrandSet.contains(brand);
+    }
+    /**
      * 释放-排产量
      *
      * @param context       上下文
@@ -258,7 +289,7 @@ public class DayCapacityLimitHelper implements Serializable {
      * @param productionQty 排产量
      * @param lossQty       损耗量
      */
-    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty) {
+    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty,String brand) {
         if (null == productionDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(usedMouldSet)) {
             return;
         }
@@ -274,6 +305,13 @@ public class DayCapacityLimitHelper implements Serializable {
         sumProductionCapacityQty = sumProductionCapacityQty - realProductionQty;
         if (sumProductionCapacityQty <= BigDecimal.ZERO.intValue()) {
             sumProductionCapacityQty = BigDecimal.ZERO.intValue();
+        }
+        // 累计OEM贴牌数量，sandy+ 2026.3.23
+        if (checkIsOemBrand(context,brand)){
+            sumBrandProductionCapacity = sumBrandProductionCapacity - realProductionQty;
+            if (sumBrandProductionCapacity <= BigDecimal.ZERO.intValue()) {
+                sumBrandProductionCapacity = BigDecimal.ZERO.intValue();
+            }
         }
         skuInfo.deductionProductionQty(usedMouldSet, productionQty, lossQty);
         log.info(DayLimitLogRecorder.addDeductionDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty));
@@ -518,6 +556,7 @@ public class DayCapacityLimitHelper implements Serializable {
     private void initUsedInfo() {
         this.cxMachineAllocationQty = BigDecimal.ZERO.intValue();
         this.sumProductionCapacityQty = BigDecimal.ZERO.intValue();
+        this.sumBrandProductionCapacity = BigDecimal.ZERO.intValue();
         this.usedChangeCxMachineCount = BigDecimal.ZERO.intValue();
         this.usedChangeLhMachineCount = BigDecimal.ZERO.intValue();
         this.groupAllocationInfo = new HashSet<>();

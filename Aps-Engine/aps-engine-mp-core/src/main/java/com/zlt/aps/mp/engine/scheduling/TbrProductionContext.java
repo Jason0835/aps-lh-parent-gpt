@@ -381,6 +381,23 @@ public class TbrProductionContext extends Context {
     }
 
     /**
+     * 获取贴牌还有可排产量的日期集合
+     *
+     * @return
+     */
+    public Set<Integer> getOemBrandCapacityLimitRange(TbrProductionContext productionContext,MonthPlanProductionRequirePlanVo addSkuInfo) {
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return Collections.emptySet();
+        }
+        Set<Integer> hasDayCapacitySet = dayCapacityLimit.getEnableOemBrandProductionRange(productionContext,addSkuInfo);
+        if (CollectionUtils.isEmpty(hasDayCapacitySet)) {
+            return Collections.emptySet();
+        }
+        return hasDayCapacitySet;
+    }
+
+    /**
      * 清空所有的换模使用量
      */
     public void clearAllDayLimitUsed() {

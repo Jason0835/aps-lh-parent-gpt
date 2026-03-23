@@ -857,6 +857,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
     private Integer getInitChangeLhMachineCount() {
         Integer realMaxLhMachineCount = Optional.ofNullable(maxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
         Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(realMaxLhMachineCount);
+        //Integer realRemainMaxLhMachineCount = Optional.ofNullable(remainMaxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
+        //theoryMaxLhMachineCount = theoryMaxLhMachineCount > realRemainMaxLhMachineCount ? realRemainMaxLhMachineCount : theoryMaxLhMachineCount;
         return realMaxLhMachineCount - theoryMaxLhMachineCount;
     }
 }
