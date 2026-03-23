@@ -16,6 +16,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 分组计划 - TBR为结构，PCR为英寸(寸口、寸别)
@@ -196,6 +197,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
     /**
      * 获取最早收尾的硫化组信息
      *
+     * @param context               排产上下文
      * @param previousLimit         前一日的排产限制情况
      * @param releaseLhMachineCount 需要释放的硫化组机台数
      * @return
@@ -318,7 +320,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
             realUsedLhMachineCount = theoryUsedLhMachineCount + previousDayChangeQty;
         } else {
             //中间排产
-            Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDayMouldNumber(nextDayLimitInfo);
+            Integer nextDayChangeQty = getChangeUsedLhMachineQtyByNextDayMouldNumber(context, nextDayLimitInfo);
             realUsedLhMachineCount = theoryUsedLhMachineCount + nextDayChangeQty;
         }
         return realUsedLhMachineCount >= realMaxLhMachineCount;
@@ -625,23 +627,30 @@ public class GroupPlanCxLhCapacityLimitHelper {
     /**
      * 根据后一日的排产信息，获取硫化变化组数
      *
+     * @param context          排产上下文
      * @param nextDayLimitInfo 下一日排产信息
      * @return
      */
-    private Integer getChangeUsedLhMachineQtyByNextDayMouldNumber(GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    private Integer getChangeUsedLhMachineQtyByNextDayMouldNumber(Context context, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
         //后一日Sku使用的硫化组数-根据模具数
         Map<String, Integer> nextDaySkuLhMachineInfoMap = nextDayLimitInfo.getSkuUsedLhMachineCountByMouldNumber();
         Map<String, Integer> currentDaySkuLhMachineInfoMap = getSkuUsedLhMachineCountByMouldNumber();
+        Map<String, Integer> currentDayFullSkuLhMachineInfoMap = getCurrentDayFullLhMachineInfoMap(context);
         //相比前一日，新增Sku增加的机台数
         Map<String, Integer> addSkuMap = new HashMap<>();
         Map<String, Integer> reductionSkuMap = new HashMap<>();
         currentDaySkuLhMachineInfoMap.forEach((materialDesc, lhMachineQty) -> {
             Integer nextDayLhMachineQty = nextDaySkuLhMachineInfoMap.get(materialDesc);
+            Integer fullLhMachineQty = currentDayFullSkuLhMachineInfoMap.get(materialDesc);
             if (null == nextDayLhMachineQty) {
                 nextDayLhMachineQty = BigDecimal.ZERO.intValue();
             }
             if (null == lhMachineQty) {
                 lhMachineQty = BigDecimal.ZERO.intValue();
+            }
+            //20260323 满台释放，则不减
+            if (nextDayLhMachineQty == BigDecimal.ZERO.intValue() && lhMachineQty.equals(fullLhMachineQty)) {
+                return;
             }
             if (lhMachineQty > nextDayLhMachineQty) {
                 reductionSkuMap.put(materialDesc, nextDayLhMachineQty - lhMachineQty);
@@ -651,6 +660,29 @@ public class GroupPlanCxLhCapacityLimitHelper {
             }
         });
         return calculateChangeLhMachineQty(addSkuMap, reductionSkuMap);
+    }
+
+    /**
+     * 获取当前日Sku占满产的硫化机台数
+     *
+     * @return
+     */
+    private Map<String, Integer> getCurrentDayFullLhMachineInfoMap(Context context) {
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Integer> fullSkuMap = new HashMap<>(16);
+        skuProductionDetailInfo.forEach((materialDesc, detailList) -> {
+            if (CollectionUtils.isEmpty(detailList)) {
+                return;
+            }
+            List<SkuDayProductionInfoHelper> fullList = detailList.stream().filter(single -> single.isFullProduction(context)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(fullList)) {
+                return;
+            }
+            fullSkuMap.put(materialDesc, fullList.size());
+        });
+        return fullSkuMap;
     }
 
     /**

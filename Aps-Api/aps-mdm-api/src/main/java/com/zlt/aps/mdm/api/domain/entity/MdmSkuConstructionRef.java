@@ -217,6 +217,7 @@ public class MdmSkuConstructionRef extends BaseEntity {
     /**
      * 主物料(胎胚号)
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mdmSkuConstructionRef.mainMaterialDesc", width = 30, sort = 46)
     @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
     @TableField(value = "MAIN_MATERIAL_DESC")

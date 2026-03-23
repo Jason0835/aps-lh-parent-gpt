@@ -648,6 +648,7 @@ public class ProductionPlanGroupInfo {
             return null;
         }
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        //获取可释放机台的排产日信息
         List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList = dayLimitList.stream().filter(dayLimit -> {
             //前一日排产情况
             GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
@@ -658,13 +659,14 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
+        //20260113 剔除需要排除的收尾时间点
         if (!CollectionUtils.isEmpty(excludeDays)) {
-            //20260113 剔除需要排除的收尾时间点
             hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
         }
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
+        //得到最早的收尾点
         hasAddSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
         GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
         GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
@@ -2047,6 +2049,7 @@ public class ProductionPlanGroupInfo {
     /**
      * 计划日硫化机台数、胎胚种类数、换模次数
      * 统计使用
+     *
      * @param context
      */
     public void reCalcMpDailyCapacityLimit(Context context) {
@@ -2068,25 +2071,27 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 计划日硫化机台数、胎胚种类数、换模次数
+     *
      * @param context
      */
-    public void reCalcMpDailyCapacityLimitByDay(Context context,Integer iDay,String mainPattern){
-        if (dailyCapacityLimitVoMap.get(iDay) == null){
+    public void reCalcMpDailyCapacityLimitByDay(Context context, Integer iDay, String mainPattern) {
+        if (dailyCapacityLimitVoMap.get(iDay) == null) {
             return;
         }
         MpMonthPlanDailyCapacityLimit dailyCapacityLimitObj = new MpMonthPlanDailyCapacityLimit();
-        TbrProductionContext productionContext = (TbrProductionContext)context;
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer endDay = productionContext.getMonthDays();
         //1. 转换模具排产结果
         List<FactoryMonthPlanMouldDayResult> mouldDayResultList = convertMouldDayResult(endDay);
         //2. 组装参数Map
         Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
         //3. 计算日产能
-        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList,iDay, dailyCapacityLimitVoMap.get(iDay), paramMap,mainPattern);
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern);
     }
 
     /**
      * 组装日产能参数Map
+     *
      * @param productionContext
      * @return
      */
