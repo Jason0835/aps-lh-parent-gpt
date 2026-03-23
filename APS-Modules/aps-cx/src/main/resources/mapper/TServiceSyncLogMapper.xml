@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TServiceSyncLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mps.domain.TServiceSyncLog">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="serviceType" column="SERVICE_TYPE" jdbcType="CHAR"/>
+            <result property="serviceStatus" column="SERVICE_STATUS" jdbcType="CHAR"/>
+            <result property="serviceParams" column="SERVICE_PARAMS" jdbcType="VARCHAR"/>
+            <result property="serviceResult" column="SERVICE_RESULT" jdbcType="VARCHAR"/>
+            <result property="createBy" column="CREATE_BY" jdbcType="VARCHAR"/>
+            <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="updateBy" column="UPDATE_BY" jdbcType="VARCHAR"/>
+            <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
+            <result property="delFlag" column="DEL_FLAG" jdbcType="CHAR"/>
+            <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,SERVICE_TYPE,SERVICE_STATUS,
+        SERVICE_PARAMS,SERVICE_RESULT,CREATE_BY,
+        CREATE_TIME,UPDATE_BY,UPDATE_TIME,
+        DEL_FLAG,REMARK
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_SERVICE_SYNC_LOG
+        where ID = #{id,jdbcType=DECIMAL}
+    </select>
+    <select id="checkMpsExist" resultType="java.lang.Integer">
+        select case when exists(
+            select 1 from T_SYNC_MPS_2_APS_FAC
+                where
+                year = #{year,jdbcType=NUMERIC}
+                AND month = #{month,jdbcType=NUMERIC}
+                AND production_version = #{productionVersion,jdbcType=VARCHAR}
+                AND is_delete = 0
+                AND factory_code = 'L6'
+            ) then 1 else 0 end
+        from dual
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_SERVICE_SYNC_LOG
+        where ID = #{id,jdbcType=DECIMAL}
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TServiceSyncLog" useGeneratedKeys="true">
+        insert into T_SERVICE_SYNC_LOG
+        ( ID,SERVICE_TYPE,SERVICE_STATUS
+        ,SERVICE_PARAMS,SERVICE_RESULT,CREATE_BY
+        ,CREATE_TIME,UPDATE_BY,UPDATE_TIME
+        ,DEL_FLAG,REMARK)
+        values (SEQ_SERVICE_SYNC_LOG.NEXTVAL,#{serviceType,jdbcType=CHAR},#{serviceStatus,jdbcType=CHAR}
+        ,#{serviceParams,jdbcType=VARCHAR},#{serviceResult,jdbcType=VARCHAR},#{createBy,jdbcType=VARCHAR}
+        ,#{createTime,jdbcType=TIMESTAMP},#{updateBy,jdbcType=VARCHAR},#{updateTime,jdbcType=TIMESTAMP}
+        ,#{delFlag,jdbcType=CHAR},#{remark,jdbcType=VARCHAR})
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TServiceSyncLog" useGeneratedKeys="true">
+        insert into T_SERVICE_SYNC_LOG
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="serviceType != null">serviceType,</if>
+                <if test="serviceStatus != null">serviceStatus,</if>
+                <if test="serviceParams != null">serviceParams,</if>
+                <if test="serviceResult != null">serviceResult,</if>
+                <if test="createBy != null">createBy,</if>
+                <if test="createTime != null">createTime,</if>
+                <if test="updateBy != null">updateBy,</if>
+                <if test="updateTime != null">updateTime,</if>
+                <if test="delFlag != null">delFlag,</if>
+                <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                SEQ_SERVICE_SYNC_LOG.NEXTVAL,
+                <if test="serviceType != null">SERVICE_TYPE = #{serviceType,jdbcType=CHAR},</if>
+                <if test="serviceStatus != null">SERVICE_STATUS = #{serviceStatus,jdbcType=CHAR},</if>
+                <if test="serviceParams != null">SERVICE_PARAMS = #{serviceParams,jdbcType=VARCHAR},</if>
+                <if test="serviceResult != null">SERVICE_RESULT = #{serviceResult,jdbcType=VARCHAR},</if>
+                <if test="createBy != null">CREATE_BY = #{createBy,jdbcType=VARCHAR},</if>
+                <if test="createTime != null">CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},</if>
+                <if test="updateBy != null">UPDATE_BY = #{updateBy,jdbcType=VARCHAR},</if>
+                <if test="updateTime != null">UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},</if>
+                <if test="delFlag != null">DEL_FLAG = #{delFlag,jdbcType=CHAR},</if>
+                <if test="remark != null">REMARK = #{remark,jdbcType=VARCHAR},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.mps.domain.TServiceSyncLog">
+        update T_SERVICE_SYNC_LOG
+        <set>
+                <if test="serviceType != null">
+                    SERVICE_TYPE = #{serviceType,jdbcType=CHAR},
+                </if>
+                <if test="serviceStatus != null">
+                    SERVICE_STATUS = #{serviceStatus,jdbcType=CHAR},
+                </if>
+                <if test="serviceParams != null">
+                    SERVICE_PARAMS = #{serviceParams,jdbcType=VARCHAR},
+                </if>
+                <if test="serviceResult != null">
+                    SERVICE_RESULT = #{serviceResult,jdbcType=VARCHAR},
+                </if>
+                <if test="createBy != null">
+                    CREATE_BY = #{createBy,jdbcType=VARCHAR},
+                </if>
+                <if test="createTime != null">
+                    CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateBy != null">
+                    UPDATE_BY = #{updateBy,jdbcType=VARCHAR},
+                </if>
+                <if test="updateTime != null">
+                    UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+                </if>
+                <if test="delFlag != null">
+                    DEL_FLAG = #{delFlag,jdbcType=CHAR},
+                </if>
+                <if test="remark != null">
+                    REMARK = #{remark,jdbcType=VARCHAR},
+                </if>
+        </set>
+        where ID = #{id,jdbcType=DECIMAL}
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TServiceSyncLog">
+        update T_SERVICE_SYNC_LOG
+        set
+            SERVICE_TYPE =  #{serviceType,jdbcType=CHAR},
+            SERVICE_STATUS =  #{serviceStatus,jdbcType=CHAR},
+            SERVICE_PARAMS =  #{serviceParams,jdbcType=VARCHAR},
+            SERVICE_RESULT =  #{serviceResult,jdbcType=VARCHAR},
+            CREATE_BY =  #{createBy,jdbcType=VARCHAR},
+            CREATE_TIME =  #{createTime,jdbcType=TIMESTAMP},
+            UPDATE_BY =  #{updateBy,jdbcType=VARCHAR},
+            UPDATE_TIME =  #{updateTime,jdbcType=TIMESTAMP},
+            DEL_FLAG =  #{delFlag,jdbcType=CHAR},
+            REMARK =  #{remark,jdbcType=VARCHAR}
+        where ID = #{id,jdbcType=DECIMAL}
+    </update>
+
+    <update id="mergeSql" parameterType="list">
+        merge into T_SERVICE_SYNC_LOG a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.id,jdbcType=DECIMAL} ID,
+            #{ITEM.serviceType,jdbcType=CHAR} SERVICE_TYPE,
+            #{ITEM.serviceStatus,jdbcType=CHAR} SERVICE_STATUS,
+            #{ITEM.serviceParams,jdbcType=VARCHAR} SERVICE_PARAMS,
+            #{ITEM.serviceResult,jdbcType=VARCHAR} SERVICE_RESULT,
+            #{ITEM.createBy,jdbcType=VARCHAR} CREATE_BY,
+            #{ITEM.createTime,jdbcType=TIMESTAMP} CREATE_TIME,
+            #{ITEM.updateBy,jdbcType=VARCHAR} UPDATE_BY,
+            #{ITEM.updateTime,jdbcType=TIMESTAMP} UPDATE_TIME,
+            #{ITEM.delFlag,jdbcType=CHAR} DEL_FLAG,
+            #{ITEM.remark,jdbcType=VARCHAR} REMARK
+            from dual
+        </foreach>
+        ) b ON (
+        a.id = b.id
+        and b.CREATE_TIME = a.CREATE_TIME
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.SERVICE_TYPE = b.SERVICE_TYPE,
+        a.SERVICE_STATUS = b.SERVICE_STATUS,
+        a.SERVICE_PARAMS = b.SERVICE_PARAMS,
+        a.update_by = b.create_by,
+        a.update_time = now(),
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.SERVICE_TYPE, a.SERVICE_STATUS, a.SERVICE_PARAMS, a.SERVICE_RESULT, a.CREATE_BY, a.CREATE_TIME, a.UPDATE_BY, a.UPDATE_TIME, a.DEL_FLAG, a.REMARK)
+         values
+        (SEQ_SERVICE_SYNC_LOG.NEXTVAL, b.SERVICE_TYPE, b.SERVICE_STATUS, b.SERVICE_PARAMS, b.SERVICE_RESULT,
+        b.CREATE_BY, b.CREATE_TIME, b.UPDATE_BY, now(), '0', b.REMARK)
+    </update>
+</mapper>

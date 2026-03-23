@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.MesCxMidNightFinishMapper">
+	<!-- 统计需同步数据量 -->
+    <select id="countSyncData" resultType="int">
+    	SELECT COUNT(1)
+    	  FROM T_MES_MID_NIGHT_SHIFT_FINISH
+         WHERE IS_DELETE = 0
+           AND DATA_VERSION = #{dataVersion}
+    </select>
+    
+	<!-- 同步完成量
+		finish_date需要根据班别处理：如果是中班，实际上是明天的排程计划的第一个班，因此其完成量应该算到下一天中
+	 -->
+    <update id="mergeFinishQty">
+        merge into T_MID_NIGHT_SHIFT_FINISH a USING (
+            SELECT CASE WHEN QUERY_CODE = 'CLASS1' THEN FINISH_DATE + 1 ELSE FINISH_DATE END FINISH_DATE,
+                   CX_MACHINE_CODE,
+                   SAP_CODE,
+                   EMBRYO_CODE,
+                   BOM_DATA_VERSION,
+                   REMARK,
+                   CASE WHEN QUERY_CODE = 'CLASS1' THEN FINISH_QTY ELSE NULL END CLASS1_FINISH_QTY,
+                   CASE WHEN QUERY_CODE = 'CLASS2' THEN FINISH_QTY ELSE NULL END CLASS2_FINISH_QTY,
+                   nvl(UPDATE_DATE, CREATE_DATE) CREATE_TIME
+             FROM T_MES_MID_NIGHT_SHIFT_FINISH
+            WHERE data_version = #{dataVersion}
+        ) b ON (
+          a.FINISH_DATE = b.FINISH_DATE
+          AND b.CX_MACHINE_CODE = a.CX_MACHINE_CODE
+          AND b.EMBRYO_CODE = a.EMBRYO_CODE
+          AND b.BOM_DATA_VERSION = a.BOM_DATA_VERSION
+          AND a.DEL_FLAG = '0' )
+        WHEN MATCHED THEN
+          UPDATE SET
+            a.CLASS1_FINISH_QTY = CASE WHEN b.CLASS1_FINISH_QTY IS NULL THEN nvl(a.CLASS1_FINISH_QTY, 0) ELSE b.CLASS1_FINISH_QTY END,
+            a.CLASS2_FINISH_QTY = CASE WHEN b.CLASS2_FINISH_QTY IS NULL THEN nvl(a.CLASS2_FINISH_QTY, 0) ELSE b.CLASS2_FINISH_QTY END,
+            a.REMARK = b.REMARK,
+            a.UPDATE_TIME = b.CREATE_TIME
+        WHEN NOT MATCHED THEN
+          INSERT 
+            (a.id, a.FINISH_DATE, a.CX_MACHINE_CODE, a.SAP_CODE,a.embryo_code, a.bom_data_version, a.CLASS1_FINISH_QTY, a.CLASS2_FINISH_QTY, a.REMARK, a.create_time, a.del_flag)
+          VALUES
+            (get_sequence_nextval('SEQ_MID_NIGHT_SHIFT_FINISH'), b.FINISH_DATE, b.CX_MACHINE_CODE, b.SAP_CODE, b.embryo_code, b.bom_data_version, nvl(b.CLASS1_FINISH_QTY, 0), nvl(b.CLASS2_FINISH_QTY, 0), b.REMARK, b.create_time, '0')
+    </update>
+
+</mapper>

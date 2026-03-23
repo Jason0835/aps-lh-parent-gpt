@@ -1,0 +1,584 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TMesDayFinishQtyMapper">
+
+    <resultMap id="MesTmFinishResultMap" type="com.zlt.aps.mps.domain.TMesTmDayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="treadCode" column="TREAD_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesTmFinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,TREAD_CODE,
+        SAP_MATERIAL_CODE,DAY_FINISH_QTY,NIGHT_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesTcFinishResultMap" type="com.zlt.aps.mps.domain.TMesTcDayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="sidewallCode" column="SIDEWALL_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesTcFinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,SIDEWALL_CODE,
+        SAP_MATERIAL_CODE,DAY_FINISH_QTY,NIGHT_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesNcFinishResultMap" type="com.zlt.aps.mps.domain.TMesNcDayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="liningCode" column="LINING_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesNcFinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,LINING_CODE,
+        SAP_MATERIAL_CODE,DAY_FINISH_QTY,NIGHT_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesCd15FinishResultMap" type="com.zlt.aps.mps.domain.TMesCd15DayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="steelStripCode" column="STEEL_STRIP_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesCd15FinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,STEEL_STRIP_CODE,
+        SAP_MATERIAL_CODE,DAY_FINISH_QTY,NIGHT_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesCd90FinishResultMap" type="com.zlt.aps.mps.domain.TMesCd90DayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="clothCode" column="CLOTH_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesCd90FinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,CLOTH_CODE,
+        SAP_MATERIAL_CODE,DAY_FINISH_QTY,NIGHT_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesXwyyFinishResultMap" type="com.zlt.aps.mps.domain.TMesXwyyDayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="bigRollCode" column="BIG_ROLL_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesXwyyFinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,BIG_ROLL_CODE,
+        SAP_MATERIAL_CODE,DAY_FINISH_QTY,NIGHT_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesTqFinishResultMap" type="com.zlt.aps.mps.domain.TMesTqDayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="beadCode" column="BEAD_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="midFinishQty" column="MID_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesTqFinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,BEAD_CODE,
+        SAP_MATERIAL_CODE,MID_FINISH_QTY,NIGHT_FINISH_QTY,DAY_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <resultMap id="MesGsqFinishResultMap" type="com.zlt.aps.mps.domain.TMesGsqDayFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="orderNo" column="ORDER_NO" jdbcType="VARCHAR"/>
+            <result property="scheduleDate" column="SCHEDULE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="steelRingCode" column="STEEL_RING_CODE" jdbcType="VARCHAR"/>
+            <result property="sapMaterialCode" column="SAP_MATERIAL_CODE" jdbcType="VARCHAR"/>
+            <result property="midFinishQty" column="MID_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="nightFinishQty" column="NIGHT_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+    </resultMap>
+
+    <sql id="MesGsqFinishColumnList">
+        ID,ORDER_NO,SCHEDULE_DATE,STEEL_RING_CODE,
+        SAP_MATERIAL_CODE,MID_FINISH_QTY,NIGHT_FINISH_QTY,DAY_FINISH_QTY,
+        DATA_VERSION,CREATE_DATE,UPDATE_DATE,
+        IS_DELETE
+    </sql>
+
+    <select id="getTmByDataVersionAndIsDelete" resultMap="MesTmFinishResultMap">
+        select
+        <include refid="MesTmFinishColumnList"/>
+        from T_MES_TM_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getTcByDataVersionAndIsDelete" resultMap="MesTcFinishResultMap">
+        select
+        <include refid="MesTcFinishColumnList"/>
+        from T_MES_TC_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getNcByDataVersionAndIsDelete" resultMap="MesNcFinishResultMap">
+        select
+        <include refid="MesNcFinishColumnList"/>
+        from T_MES_NC_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getCd15ByDataVersionAndIsDelete" resultMap="MesCd15FinishResultMap">
+        select
+        <include refid="MesCd15FinishColumnList"/>
+        from T_MES_CD15_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getCd90ByDataVersionAndIsDelete" resultMap="MesCd90FinishResultMap">
+        select
+        <include refid="MesCd90FinishColumnList"/>
+        from T_MES_CD90_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getXwyyByDataVersionAndIsDelete" resultMap="MesXwyyFinishResultMap">
+        select
+        <include refid="MesXwyyFinishColumnList"/>
+        from T_MES_XWYY_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getTqByDataVersionAndIsDelete" resultMap="MesTqFinishResultMap">
+        select
+        <include refid="MesTqFinishColumnList"/>
+        from T_MES_TQ_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+    <select id="getGsqByDataVersionAndIsDelete" resultMap="MesGsqFinishResultMap">
+        select
+        <include refid="MesGsqFinishColumnList"/>
+        from T_MES_GSQ_DAY_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+
+    <update id="mergeTmFinish" parameterType="list">
+        merge into T_TM_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.treadCode,jdbcType=VARCHAR} TREAD_CODE,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.schedule_date, a.TREAD_CODE, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.TREAD_CODE, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeTcFinish" parameterType="list">
+        merge into T_TC_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.sidewallCode,jdbcType=VARCHAR} SIDEWALL_CODE,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.SIDEWALL_CODE, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.SIDEWALL_CODE, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeNcFinish" parameterType="list">
+        merge into T_NC_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.liningCode,jdbcType=VARCHAR} lining_code,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.lining_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.lining_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeCd15Finish" parameterType="list">
+        merge into T_CD15_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.steelStripCode,jdbcType=VARCHAR} steel_strip_code,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.steel_strip_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.steel_strip_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeCd90Finish" parameterType="list">
+        merge into T_CD90_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.clothCode,jdbcType=VARCHAR} cloth_code,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.cloth_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.cloth_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeXwyyFinish" parameterType="list">
+        merge into T_XWYY_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.bigRollCode,jdbcType=VARCHAR} big_roll_code,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.big_roll_code, a.day_finish_qty, a.night_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.big_roll_code, NVL(b.day_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeTqFinish" parameterType="list">
+        merge into T_TQ_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.beadCode,jdbcType=VARCHAR} bead_code,
+            #{ITEM.midFinishQty,jdbcType=DOUBLE} mid_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.mid_finish_qty = NVL(b.mid_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.bead_code, a.mid_finish_qty, a.night_finish_qty, a.day_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.bead_code, NVL(b.mid_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), NVL(b.day_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+    <update id="mergeGsqFinish" parameterType="list">
+        merge into T_GSQ_DAY_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.orderNo,jdbcType=VARCHAR} order_no,
+            #{ITEM.scheduleDate,jdbcType=DATE} SCHEDULE_DATE,
+            #{ITEM.steelRingCode,jdbcType=VARCHAR} steel_ring_code,
+            #{ITEM.midFinishQty,jdbcType=DOUBLE} mid_finish_qty,
+            #{ITEM.nightFinishQty,jdbcType=DOUBLE} night_finish_qty,
+            #{ITEM.dayFinishQty,jdbcType=DOUBLE} day_finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.order_no = b.order_no
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.mid_finish_qty = NVL(b.mid_finish_qty, 0),
+        a.night_finish_qty = NVL(b.night_finish_qty, 0),
+        a.day_finish_qty = NVL(b.day_finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.order_no, a.SCHEDULE_DATE, a.steel_ring_code, a.mid_finish_qty, a.night_finish_qty, a.day_finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.order_no, b.SCHEDULE_DATE, b.steel_ring_code, NVL(b.mid_finish_qty, 0),
+        NVL(b.night_finish_qty, 0), NVL(b.day_finish_qty, 0), b.create_by, now(),
+        b.remark, '0')
+    </update>
+
+    <select id="selectTmByScheduleDate" resultType="com.zlt.aps.mps.domain.TTmDayFinishQty">
+        select tread_code, sum(day_finish_qty + night_finish_qty) as day_finish_qty
+        from T_TM_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            tread_code
+    </select>
+    <select id="selectTcByScheduleDate" resultType="com.zlt.aps.mps.domain.TTcDayFinishQty">
+        select SIDEWALL_CODE, sum(day_finish_qty + night_finish_qty) as day_finish_qty
+        from T_TC_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            SIDEWALL_CODE
+    </select>
+    <select id="selectNcByScheduleDate" resultType="com.zlt.aps.mps.domain.TNcDayFinishQty">
+        select LINING_CODE, sum(day_finish_qty + night_finish_qty) as day_finish_qty
+        from T_NC_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            LINING_CODE
+    </select>
+    <select id="selectCd15ByScheduleDate" resultType="com.zlt.aps.mps.domain.TCd15DayFinishQty">
+        select STEEL_STRIP_CODE, sum(day_finish_qty + night_finish_qty) as day_finish_qty
+        from T_CD15_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            STEEL_STRIP_CODE
+    </select>
+    <select id="selectCd90ByScheduleDate" resultType="com.zlt.aps.mps.domain.TCd90DayFinishQty">
+        select CLOTH_CODE, sum(day_finish_qty + night_finish_qty) as day_finish_qty
+        from T_CD90_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            CLOTH_CODE
+    </select>
+    <select id="selectXwyyByScheduleDate" resultType="com.zlt.aps.mps.domain.TXwyyDayFinishQty">
+        select BIG_ROLL_CODE, sum(day_finish_qty + night_finish_qty) as day_finish_qty
+        from T_XWYY_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            BIG_ROLL_CODE
+    </select>
+    <select id="selectTqByScheduleDate" resultType="com.zlt.aps.mps.domain.TTqDayFinishQty">
+        select BEAD_CODE, sum(day_finish_qty + night_finish_qty + MID_FINISH_QTY) as day_finish_qty
+        from T_TQ_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            BEAD_CODE
+    </select>
+    <select id="selectGsqByScheduleDate" resultType="com.zlt.aps.mps.domain.TGsqDayFinishQty">
+        select STEEL_RING_CODE, sum(day_finish_qty + night_finish_qty + MID_FINISH_QTY) as day_finish_qty
+        from T_GSQ_DAY_FINISH_QTY
+        where 1=1
+          and schedule_date BETWEEN to_date(#{scheduleMonth}, 'yyyy-mm' )
+            and last_day( to_date(#{scheduleMonth}, 'yyyy-mm' ) )
+          and del_flag = '0'
+        GROUP BY
+            STEEL_RING_CODE
+    </select>
+</mapper>

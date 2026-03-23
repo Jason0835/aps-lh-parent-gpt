@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.mps.mapper.TMesCxPartFinishQtyMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mps.domain.TMesCxPartFinishQty">
+            <id property="id" column="ID" jdbcType="DECIMAL"/>
+            <result property="statDate" column="STAT_DATE" jdbcType="TIMESTAMP"/>
+            <result property="embryoCode" column="EMBRYO_CODE" jdbcType="VARCHAR"/>
+            <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+            <result property="finishQty" column="FINISH_QTY" jdbcType="DECIMAL"/>
+            <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
+            <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+            <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
+            <result property="bomDataVersion" column="BOM_DATA_VERSION" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        ID,STAT_DATE,EMBRYO_CODE,SAP_CODE,
+        FINISH_QTY,DATA_VERSION,CREATE_DATE,
+        UPDATE_DATE,IS_DELETE,BOM_DATA_VERSION
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from T_MES_CX_PART_FINISH_QTY
+        where ID = #{id,jdbcType=DECIMAL}
+    </select>
+
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+        delete from T_MES_CX_PART_FINISH_QTY
+        where ID = #{id,jdbcType=DECIMAL}
+    </delete>
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TMesCxPartFinishQty" useGeneratedKeys="true">
+        insert into T_MES_CX_PART_FINISH_QTY
+        ( ID,STAT_DATE,EMBRYO_CODE
+        ,FINISH_QTY,DATA_VERSION,CREATE_DATE
+        ,UPDATE_DATE,IS_DELETE)
+        values (#{id,jdbcType=DECIMAL},#{statDate,jdbcType=TIMESTAMP},#{embryoCode,jdbcType=VARCHAR}
+        ,#{finishQty,jdbcType=DECIMAL},#{dataVersion,jdbcType=VARCHAR},#{createDate,jdbcType=TIMESTAMP}
+        ,#{updateDate,jdbcType=TIMESTAMP},#{isDelete,jdbcType=DECIMAL})
+    </insert>
+    <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.zlt.aps.mps.domain.TMesCxPartFinishQty" useGeneratedKeys="true">
+        insert into T_MES_CX_PART_FINISH_QTY
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+                <if test="id != null">id,</if>
+                <if test="statDate != null">statDate,</if>
+                <if test="embryoCode != null">embryoCode,</if>
+                <if test="finishQty != null">finishQty,</if>
+                <if test="dataVersion != null">dataVersion,</if>
+                <if test="createDate != null">createDate,</if>
+                <if test="updateDate != null">updateDate,</if>
+                <if test="isDelete != null">isDelete,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+                <if test="id != null">ID = #{id,jdbcType=DECIMAL},</if>
+                <if test="statDate != null">STAT_DATE = #{statDate,jdbcType=TIMESTAMP},</if>
+                <if test="embryoCode != null">EMBRYO_CODE = #{embryoCode,jdbcType=VARCHAR},</if>
+                <if test="finishQty != null">FINISH_QTY = #{finishQty,jdbcType=DECIMAL},</if>
+                <if test="dataVersion != null">DATA_VERSION = #{dataVersion,jdbcType=VARCHAR},</if>
+                <if test="createDate != null">CREATE_DATE = #{createDate,jdbcType=TIMESTAMP},</if>
+                <if test="updateDate != null">UPDATE_DATE = #{updateDate,jdbcType=TIMESTAMP},</if>
+                <if test="isDelete != null">IS_DELETE = #{isDelete,jdbcType=DECIMAL},</if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="com.zlt.aps.mps.domain.TMesCxPartFinishQty">
+        update T_MES_CX_PART_FINISH_QTY
+        <set>
+                <if test="statDate != null">
+                    STAT_DATE = #{statDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="embryoCode != null">
+                    EMBRYO_CODE = #{embryoCode,jdbcType=VARCHAR},
+                </if>
+                <if test="finishQty != null">
+                    FINISH_QTY = #{finishQty,jdbcType=DECIMAL},
+                </if>
+                <if test="dataVersion != null">
+                    DATA_VERSION = #{dataVersion,jdbcType=VARCHAR},
+                </if>
+                <if test="createDate != null">
+                    CREATE_DATE = #{createDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="updateDate != null">
+                    UPDATE_DATE = #{updateDate,jdbcType=TIMESTAMP},
+                </if>
+                <if test="isDelete != null">
+                    IS_DELETE = #{isDelete,jdbcType=DECIMAL},
+                </if>
+        </set>
+        where ID = #{id,jdbcType=DECIMAL}
+    </update>
+    <update id="updateByPrimaryKey" parameterType="com.zlt.aps.mps.domain.TMesCxPartFinishQty">
+        update T_MES_CX_PART_FINISH_QTY
+        set
+            STAT_DATE =  #{statDate,jdbcType=TIMESTAMP},
+            EMBRYO_CODE =  #{embryoCode,jdbcType=VARCHAR},
+            FINISH_QTY =  #{finishQty,jdbcType=DECIMAL},
+            DATA_VERSION =  #{dataVersion,jdbcType=VARCHAR},
+            CREATE_DATE =  #{createDate,jdbcType=TIMESTAMP},
+            UPDATE_DATE =  #{updateDate,jdbcType=TIMESTAMP},
+            IS_DELETE =  #{isDelete,jdbcType=DECIMAL}
+        where ID = #{id,jdbcType=DECIMAL}
+    </update>
+    <select id="getAllByDataVersionAndIsDelete" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from T_MES_CX_PART_FINISH_QTY
+        where
+        data_version = #{dataVersion,jdbcType=VARCHAR}
+        AND is_delete = 0
+    </select>
+
+    <update id="mergeCxPart" parameterType="list">
+        merge into T_CX_PART_FINISH_QTY a USING (
+        <foreach collection="list" item="ITEM" separator=" union ">
+            select
+            #{ITEM.statDate,jdbcType=DATE} stat_date,
+            #{ITEM.embryoCode,jdbcType=VARCHAR} embryo_code,
+            #{ITEM.finishQty,jdbcType=DOUBLE} finish_qty,
+            #{ITEM.createBy,jdbcType=VARCHAR} create_by,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateBy,jdbcType=VARCHAR} update_by,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
+            #{ITEM.remark,jdbcType=VARCHAR} remark,
+            #{ITEM.bomDataVersion,jdbcType=VARCHAR} bom_data_version
+            from dual
+        </foreach>
+        ) b ON (
+        a.stat_date = b.stat_date
+        and b.embryo_code = a.embryo_code
+        and b.bom_data_version = a.bom_data_version
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.finish_qty = NVL(b.finish_qty, 0),
+        a.update_by = b.create_by,
+        a.update_time = now()
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.stat_date, a.embryo_code, a.finish_qty, a.create_by, a.create_time,
+        a.remark, a.del_flag, a.bom_data_version) values
+        (SEQ_CX_FINISH_QTY.NEXTVAL, b.stat_date, b.embryo_code, NVL(b.finish_qty, 0), b.create_by, now(),
+        b.remark, '0', b.bom_data_version)
+    </update>
+</mapper>

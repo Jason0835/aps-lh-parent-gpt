@@ -31,6 +31,7 @@
         <module>aps-itf</module>
         <module>aps-mdm</module>
         <module>aps-dp</module>
+        <module>aps-cx</module>
     </modules>
     <properties>
         <aps.version>1.0.3-SNAPSHOT</aps.version>
