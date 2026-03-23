@@ -1,12 +1,14 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -143,6 +145,19 @@ public class SkuDayProductionInfoHelper implements Serializable {
     }
 
     /**
+     * 当前排产是否是模具满产
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    public boolean isFullProduction(Context context) {
+        Integer dayLhMachineQty = dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        //考虑开产日
+        dayLhMachineQty = context.getOpenDayMaxQty(productionDay, dayLhMachineQty);
+        return sumProductionQty >= dayLhMachineQty;
+    }
+
+    /**
      * 是否匹配同日同Sku
      *
      * @param currentProduction
@@ -153,31 +168,6 @@ public class SkuDayProductionInfoHelper implements Serializable {
             return false;
         }
         return embryoCode.equals(currentProduction.getEmbryoCode());
-    }
-
-    /**
-     * 构建函数
-     *
-     * @param productionDay       排产日
-     * @param materialDesc        物料描述
-     * @param materialCode        物料编码
-     * @param groupName           分组名
-     * @param dayVulcanizationQty 日硫化产能
-     */
-    private SkuDayProductionInfoHelper(Integer productionDay, String materialDesc, String materialCode, String groupName, Integer dayVulcanizationQty) {
-        this.productionDay = productionDay;
-        this.materialDesc = materialDesc;
-        this.materialCode = materialCode;
-        this.groupName = groupName;
-        this.sumProductionQty = BigDecimal.ZERO.intValue();
-        this.dayVulcanizationQty = dayVulcanizationQty;
-    }
-
-    /**
-     * 空的构造函数
-     */
-    private SkuDayProductionInfoHelper() {
-
     }
 
     /**
@@ -230,5 +220,30 @@ public class SkuDayProductionInfoHelper implements Serializable {
      */
     public Integer getDayLhMachineQty() {
         return dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+    }
+
+    /**
+     * 构建函数
+     *
+     * @param productionDay       排产日
+     * @param materialDesc        物料描述
+     * @param materialCode        物料编码
+     * @param groupName           分组名
+     * @param dayVulcanizationQty 日硫化产能
+     */
+    private SkuDayProductionInfoHelper(Integer productionDay, String materialDesc, String materialCode, String groupName, Integer dayVulcanizationQty) {
+        this.productionDay = productionDay;
+        this.materialDesc = materialDesc;
+        this.materialCode = materialCode;
+        this.groupName = groupName;
+        this.sumProductionQty = BigDecimal.ZERO.intValue();
+        this.dayVulcanizationQty = dayVulcanizationQty;
+    }
+
+    /**
+     * 空的构造函数
+     */
+    private SkuDayProductionInfoHelper() {
+
     }
 }
