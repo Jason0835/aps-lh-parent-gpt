@@ -213,7 +213,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     .orElse(Collections.emptyList())
                     .stream()
                     .distinct()
-                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE));
+                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
             sendMessage(MsgTemplateEnums.MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME.getCode(),
                     MsgTypeEnums.NOTICE.getCode(), msg);
         }
@@ -2983,11 +2983,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             contextDTO.setMessageMap(messageMap);
             String warnMsg = StrUtil.format(
                     I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkSkuTypeAndProductStatus"),
-                    materialCode, productStatus, matchProductStatus
+                    materialCode, convertToProductStatusName(productStatus), convertToProductStatusName(matchProductStatus)
             );
             warnMsgList.add(warnMsg);
         }
     }
+
+
+    /**
+     * 根据产品状态转换产品状态名称
+     * @param productStatus
+     * @return
+     */
+    public String convertToProductStatusName(String productStatus) {
+        if (StringUtils.isEmpty(productStatus)) {
+            return "";
+        }
+        if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(productStatus)) {
+            return ConstructionStageEnum.MEASUREMENT.getDesc();
+        } else if (ConstructionStageEnum.TRIAL_FLAG.equals(productStatus)) {
+            return ConstructionStageEnum.TRIAL_PRODUCTION.getDesc();
+        }
+        return ConstructionStageEnum.FORMAL_PRODUCTION.getDesc();
+    }
+
 
     /**
      * 根据施工阶段转换为对应的产品状态标识
