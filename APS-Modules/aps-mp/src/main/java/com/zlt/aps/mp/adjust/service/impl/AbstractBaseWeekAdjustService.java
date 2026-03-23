@@ -213,7 +213,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     .orElse(Collections.emptyList())
                     .stream()
                     .distinct()
-                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_NEW_LINE));
             sendMessage(MsgTemplateEnums.MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME.getCode(),
                     MsgTypeEnums.NOTICE.getCode(), msg);
         }
@@ -2874,7 +2874,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
-            adjustDetailVo.setProductStatus(skuConstructionRef.getTrialStatus());
+            adjustDetailVo.setProductStatus(productStatus);
             adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
@@ -2889,8 +2889,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 // 试制量试ID
                 adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
             }
-            // 检查SKU的排产类型与【SKU与示方书】匹配到的产品状态是否一致
-            checkSkuTypeAndProductStatus(contextDTO, adjustDetailVo, materialCode);
+            // 检查SKU的产品状态与【SKU与示方书】匹配到的产品状态是否一致
+            checkSkuTypeAndProductStatus(contextDTO, adjustDetailVo, skuConstructionRef, materialCode);
             return;
         }
         // 有月度生产计划时，赋值关联字段
@@ -2964,23 +2964,26 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
 
     /**
-     * 检查SKU的排产类型与【SKU与示方书】匹配到的产品状态是否一致
+     * 检查SKU的产品状态与【SKU与示方书】匹配到的产品状态是否一致
      * @param contextDTO
      * @param adjustDetailVo
+     * @param skuConstructionRef
      * @param materialCode
      */
-    protected void checkSkuTypeAndProductStatus(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, String materialCode) {
-        // 根据施工阶段转换为对应的产品状态标识
-        String productStatus = convertToProductStatusFlag(adjustDetailVo.getConstructionStage());
+    protected void checkSkuTypeAndProductStatus(MpRollAdjustContextDTO contextDTO, MpAdjustDetailVo adjustDetailVo, MdmSkuConstructionRef skuConstructionRef,
+                                                String materialCode) {
 
-        if (!StringUtils.equals(adjustDetailVo.getProductStatus(), productStatus)) {
+        String productStatus = adjustDetailVo.getProductStatus();
+        String matchProductStatus = skuConstructionRef.getTrialStatus();
+
+        if (!StringUtils.equals(productStatus, matchProductStatus)) {
             Map<String, List<String>> messageMap = Optional.ofNullable(contextDTO.getMessageMap())
                     .orElseGet(HashMap::new);
             List<String> warnMsgList = messageMap.computeIfAbsent(ApsConstant.APS_STRING_0, k -> new ArrayList<>());
             contextDTO.setMessageMap(messageMap);
             String warnMsg = StrUtil.format(
                     I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.checkSkuTypeAndProductStatus"),
-                    materialCode
+                    materialCode, productStatus, matchProductStatus
             );
             warnMsgList.add(warnMsg);
         }
