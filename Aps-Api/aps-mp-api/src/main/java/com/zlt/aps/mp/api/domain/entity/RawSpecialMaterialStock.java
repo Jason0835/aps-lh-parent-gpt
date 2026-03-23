@@ -101,12 +101,50 @@ public class RawSpecialMaterialStock extends BaseEntity {
     @TableField(value = "STOCK")
     private Integer stock;
 
+    /**
+     * 原材料仓库数
+     */
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.warehouseStock")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ApiModelProperty(value = "原材料仓库数", name = "warehouseStock")
+    @TableField(value = "WAREHOUSE_STOCK")
+    private Integer warehouseStock;
+
+    /**
+     * 中间库库存数
+     */
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.midStock")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ApiModelProperty(value = "中间库库存数", name = "midStock")
+    @TableField(value = "MID_STOCK")
+    private Integer midStock;
+
+    /**
+     * 车间库库存数
+     */
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.workshopStock")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ApiModelProperty(value = "车间库库存数", name = "workshopStock")
+    @TableField(value = "WORKSHOP_STOCK")
+    private Integer workshopStock;
+
+    /**
+     * 总库存
+     */
+    @Excel(name = "ui.data.column.rawSpecialMaterialStock.totalStock")
+    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ApiModelProperty(value = "总库存", name = "totalStock")
+    @TableField(value = "TOTAL_STOCK")
+    private Integer totalStock;
+
+
     /** 单位 */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.unit")
     @ImportExcelValidated(required = true, maxLength = 10)
     @ApiModelProperty(value = "单位", name = "unit")
     @TableField(value = "UNIT")
     private String unit;
+
 
     @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
     @ImportExcelValidated(maxLength = 300)
