@@ -10,7 +10,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxOnlineImport;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo;
 import com.zlt.aps.cxlh.cx.api.service.ICxScheduleResultService;
 import com.zlt.aps.cxlh.cx.api.service.ICxSchedulingAlgorithmService;
@@ -40,7 +40,7 @@ import java.util.Date;
 @Api(tags = "成型排程结果")
 @Controller
 @RequestMapping("/cx/cxScheduleResult")
-public class CxScheduleResultUIController extends BaseUIController<CxScheduleResult> {
+public class CxScheduleResultUIController extends BaseUIController<CxScheduleResultOld> {
     @Autowired
     public ICxScheduleResultService iCxScheduleResultService;
     @Autowired
@@ -53,7 +53,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresPermissions("cx:cxScheduleResult:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(CxScheduleResult cxScheduleResult) {
+    public TableDataInfo list(CxScheduleResultOld cxScheduleResult) {
         return iCxScheduleResultService.list(cxScheduleResult);
     }
 
@@ -63,7 +63,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ApiOperation("根据条件查询主表数据-大屏使用(无权限)")
     @PostMapping("/list4BigScreen")
     @ResponseBody
-    public TableDataInfo list4BigScreen(CxScheduleResult cxScheduleResult) {
+    public TableDataInfo list4BigScreen(CxScheduleResultOld cxScheduleResult) {
         return iCxScheduleResultService.list(cxScheduleResult);
     }
 
@@ -107,7 +107,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
 
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<CxScheduleResult> util = new ExcelUtil<>(CxScheduleResult.class);
+        ExcelUtil<CxScheduleResultOld> util = new ExcelUtil<>(CxScheduleResultOld.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -116,7 +116,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, CxScheduleResult entity) throws IOException {
+    public void export(HttpServletResponse response, CxScheduleResultOld entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iCxScheduleResultService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
@@ -129,7 +129,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ApiOperation("数据现场计划")
     @GetMapping({"/export2"})
     @ResponseBody
-    public void export2(HttpServletResponse response, CxScheduleResult entity) throws IOException {
+    public void export2(HttpServletResponse response, CxScheduleResultOld entity) throws IOException {
         String fileName ="现场计划"+ DateUtils.parseDateToStr("yyyyMMddHHmmss",new Date())+".xlsx";
         byte[] excelBytes = iCxScheduleResultService.exportData2(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
@@ -194,7 +194,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresPermissions("cx:cxScheduleResult:edit")
     @PostMapping("/edit")
     @ResponseBody
-    public AjaxResult editSave(CxScheduleResult cxScheduleResult) {
+    public AjaxResult editSave(CxScheduleResultOld cxScheduleResult) {
         return iCxScheduleResultService.save(cxScheduleResult);
     }
 
@@ -218,7 +218,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresPermissions("cx:cxScheduleResult:autoPlan")
     @PostMapping("/autoPlan")
     @ResponseBody
-    public AjaxResult autoPlan( @RequestBody CxScheduleResult entity) {
+    public AjaxResult autoPlan( @RequestBody CxScheduleResultOld entity) {
         if (entity.getScheduleDate() == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.chooseScheduleDate"));
         }
@@ -230,7 +230,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      */
     @PostMapping("/validateAdd")
     @ResponseBody
-    public AjaxResult validateAdd(CxScheduleResult entity) {
+    public AjaxResult validateAdd(CxScheduleResultOld entity) {
         return iCxScheduleResultService.validateAdd(entity);
     }
 
@@ -247,7 +247,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      */
     @PostMapping("/validateChangeMachine")
     @ResponseBody
-    public AjaxResult validateChangeMachine(CxScheduleResult entity) {
+    public AjaxResult validateChangeMachine(CxScheduleResultOld entity) {
         return iCxScheduleResultService.validateChangeMachine(entity);
     }
 
@@ -265,7 +265,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      */
     @PostMapping("/validateChangeQty")
     @ResponseBody
-    public AjaxResult validateChangeQty(CxScheduleResult entity) {
+    public AjaxResult validateChangeQty(CxScheduleResultOld entity) {
         return iCxScheduleResultService.validateChangeQty(entity);
     }
 
@@ -274,7 +274,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      */
     @PostMapping("/getBomData")
     @ResponseBody
-    public AjaxResult getBomData(CxScheduleResult entity) {
+    public AjaxResult getBomData(CxScheduleResultOld entity) {
         return iCxScheduleResultService.getBomData(entity);
     }
 
@@ -286,7 +286,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ApiOperation("排程发布校验")
     @PostMapping("/publishValidate")
     @ResponseBody
-    public AjaxResult publishValidate(CxScheduleResult entity) {
+    public AjaxResult publishValidate(CxScheduleResultOld entity) {
         if (entity.getScheduleDate() == null) {
             entity.setScheduleDate(DateUtils.addDays(new Date(), 1));
         }
@@ -300,7 +300,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresPermissions("cx:cxScheduleResult:publish")
     @PostMapping("/publish")
     @ResponseBody
-    public AjaxResult publish(CxScheduleResult entity) {
+    public AjaxResult publish(CxScheduleResultOld entity) {
         if (entity.getScheduleDate() == null) {
             entity.setScheduleDate(DateUtils.addDays(new Date(), 1));
         }
@@ -326,7 +326,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresRoles("admin")
     @PostMapping("/changeReleaseStatus")
     @ResponseBody
-    public AjaxResult changeReleaseStatus(CxScheduleResult entity) {
+    public AjaxResult changeReleaseStatus(CxScheduleResultOld entity) {
         Date scheduleDate = entity.getScheduleDate();
         if (scheduleDate == null) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.chooseScheduleDate"));
@@ -341,7 +341,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ApiOperation("解析现场计划")
     @PostMapping("/parseCxScheduleResult")
     @ResponseBody
-    public AjaxResult parseCxScheduleResult(CxScheduleResult cxScheduleResult) {
+    public AjaxResult parseCxScheduleResult(CxScheduleResultOld cxScheduleResult) {
         return iCxScheduleResultService.parseCxScheduleResult(cxScheduleResult);
     }
 
@@ -365,7 +365,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ApiOperation("成型调整硫化")
     @PostMapping("/updateLhScheduleResult")
     @ResponseBody
-    public AjaxResult updateCxScheduleResult(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult updateCxScheduleResult(@RequestBody CxScheduleResultOld cxScheduleResult) {
         return iCxScheduleResultService.updateCxScheduleResult(cxScheduleResult);
     }
 }

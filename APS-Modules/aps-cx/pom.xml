@@ -33,11 +33,11 @@
             <artifactId>mybatis-plus-boot-starter</artifactId>
         </dependency>
 
-        <!-- SpringDoc OpenAPI (替代SpringFox) -->
+        <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
         <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
-            <version>1.7.0</version>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>swagger-bootstrap-ui</artifactId>
+            <version>1.9.6</version>
         </dependency>
 
         <dependency>

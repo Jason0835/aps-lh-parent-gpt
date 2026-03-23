@@ -5,7 +5,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -28,21 +28,21 @@ public interface ICxScheduleResultService {
      */
     @ApiOperation("查询列表")
     @PostMapping("/cxScheduleResult/list")
-    TableDataInfo list(@RequestBody CxScheduleResult queryVO);
+    TableDataInfo list(@RequestBody CxScheduleResultOld queryVO);
 
     /**
      * 成型硫化
      * */
     @ApiOperation("成型硫化")
     @PostMapping("/cxScheduleResult/sulfur")
-    AjaxResult sulfur(@RequestBody CxScheduleResult portVO);
+    AjaxResult sulfur(@RequestBody CxScheduleResultOld portVO);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
     @PostMapping("/cxScheduleResult/save")
-    AjaxResult save(@RequestBody CxScheduleResult port);
+    AjaxResult save(@RequestBody CxScheduleResultOld port);
 
     /**
      * 删除
@@ -56,25 +56,25 @@ public interface ICxScheduleResultService {
      */
     @ApiOperation("根据ID获取详细信息")
     @GetMapping(value = "/cxScheduleResult/{id}")
-    CxScheduleResult getInfo(@PathVariable("id") Long id);
+    CxScheduleResultOld getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/cxScheduleResult/checkUnique")
-    String checkUnique(@RequestBody CxScheduleResult portVO);
+    String checkUnique(@RequestBody CxScheduleResultOld portVO);
 
     /**
      * 导出目的港+目的国关系列表
      */
     @ApiOperation("导出列表")
     @PostMapping("/cxScheduleResult/exportData/{fileName}")
-    byte[] exportData(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName);
+    byte[] exportData(@RequestBody CxScheduleResultOld queryVO, @PathVariable("fileName") String fileName);
 
 
     @PostMapping("/cxScheduleResult/exportData2/{fileName}")
-     byte[] exportData2(@RequestBody CxScheduleResult obj, @PathVariable("fileName")String fileName);
+     byte[] exportData2(@RequestBody CxScheduleResultOld obj, @PathVariable("fileName")String fileName);
 
         /**
          * 导入
@@ -102,20 +102,20 @@ public interface ICxScheduleResultService {
      */
     @ApiOperation("查询所有的列表")
     @PostMapping("/port/getList")
-    List<CxScheduleResult> getList(@RequestBody CxScheduleResult queryVO);
+    List<CxScheduleResultOld> getList(@RequestBody CxScheduleResultOld queryVO);
 
 
     /**
      * 插单校验
      */
     @PostMapping("/cxScheduleResult/validateAdd")
-    AjaxResult validateAdd(@RequestBody CxScheduleResult cxScheduleResult);
+    AjaxResult validateAdd(@RequestBody CxScheduleResultOld cxScheduleResult);
 
     /**
      * 转机台校验校验
      */
     @PostMapping("/cxScheduleResult/validateChangeMachine")
-    AjaxResult validateChangeMachine(@RequestBody CxScheduleResult cxScheduleResult);
+    AjaxResult validateChangeMachine(@RequestBody CxScheduleResultOld cxScheduleResult);
 
     @PostMapping("/cxScheduleResult/changeMachine")
     AjaxResult changeMachine(@RequestBody CxTransferDeskDTO dto);
@@ -124,19 +124,19 @@ public interface ICxScheduleResultService {
      * 调量校验
      */
     @PostMapping("/cxScheduleResult/validateChangeQty")
-    public AjaxResult validateChangeQty(@RequestBody CxScheduleResult entity);
+    public AjaxResult validateChangeQty(@RequestBody CxScheduleResultOld entity);
 
     /**
      * 获取Bom版本
      */
     @PostMapping("/cxScheduleResult/getBomData")
-    public AjaxResult getBomData(@RequestBody CxScheduleResult entity);
+    public AjaxResult getBomData(@RequestBody CxScheduleResultOld entity);
 
     /**
      * 排程发布校验
      */
     @PostMapping("/cxScheduleResult/publishValidate")
-    AjaxResult publishValidate(@RequestBody CxScheduleResult cxScheduleResult);
+    AjaxResult publishValidate(@RequestBody CxScheduleResultOld cxScheduleResult);
 
 
     /**
@@ -152,20 +152,20 @@ public interface ICxScheduleResultService {
      * @return 结果
      */
     @PostMapping("/cxScheduleResult/changeReleaseStatus")
-    public AjaxResult changeReleaseStatus(@RequestBody CxScheduleResult entity);
+    public AjaxResult changeReleaseStatus(@RequestBody CxScheduleResultOld entity);
 
     /**
      * 排程发布
      */
     @PostMapping("/cxScheduleResult/publish")
-    AjaxResult publish(@RequestBody CxScheduleResult cxScheduleResult);
+    AjaxResult publish(@RequestBody CxScheduleResultOld cxScheduleResult);
 
 
     /**
      * 将成型排程解析成月度剩余量，胎胚库存，月度完成量
      */
     @PostMapping("/cxScheduleResult/parseCxScheduleResult")
-    AjaxResult parseCxScheduleResult(@RequestBody CxScheduleResult cxScheduleResult);
+    AjaxResult parseCxScheduleResult(@RequestBody CxScheduleResultOld cxScheduleResult);
 
     /**
      * 查询成型机台甘特图
@@ -182,6 +182,6 @@ public interface ICxScheduleResultService {
      */
     @ApiOperation("成型调整硫化")
     @PostMapping("/cxScheduleResult/updateLhScheduleResult")
-    public AjaxResult updateCxScheduleResult(@RequestBody CxScheduleResult cxScheduleResult);
+    public AjaxResult updateCxScheduleResult(@RequestBody CxScheduleResultOld cxScheduleResult);
 
 }

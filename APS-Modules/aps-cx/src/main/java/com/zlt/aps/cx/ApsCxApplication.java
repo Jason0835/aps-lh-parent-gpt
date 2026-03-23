@@ -1,34 +1,47 @@
 package com.zlt.aps.cx;
 
+
 import com.ruoyi.common.core.annotation.EnableRyFeignClients;
 import com.ruoyi.common.security.annotation.EnableCustomConfig;
-import com.ruoyi.common.swagger.annotation.EnableCustomSwagger2;
+import lombok.extern.slf4j.Slf4j;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.core.env.Environment;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
+import java.net.InetAddress;
 
 /**
- * 金宇轮胎APS系统-成型排程模块启动类
- *
- * @author APS Team
- * @version 1.0.0
+ *  Time 2025.02.11
+ *  @author TLT-Nick
+ *  Description APS-成型-硫化-主启动程序
  */
-@EnableAsync
+@Slf4j
 @EnableCustomConfig
 @SpringBootApplication
-@EnableCustomSwagger2
+@EnableSwagger2
 @EnableRyFeignClients
-@ComponentScan(value = {"com.zlt.*", "com.zlt.aps.**"})
+@ComponentScan(value = {"com.ruoyi.*", "com.zlt.*", "com.zlt.*"})
+@MapperScan({"com.ruoyi.**.mapper,com.tlt.**.mapper,com.zlt.**.mapper,com.zlt.aps.**.mapper"})
 public class ApsCxApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(ApsCxApplication.class, args);
-        System.out.println("========================================");
-        System.out.println("  APS成型排程系统启动成功!");
-        System.out.println("  Swagger文档地址: http://localhost:5000/api/doc.html");
-        System.out.println("========================================");
-    }
 
+    /** main启动函数 **/
+    public static void main(String[] args) throws Exception {
+        ConfigurableApplicationContext application = SpringApplication.run(ApsCxApplication.class, args);
+        String ip = InetAddress.getLocalHost().getHostAddress();
+        Environment env = application.getEnvironment();
+        String port = env.getProperty("server.port");
+
+        log.info("\n----------------------------------------------------------\n\t" +
+                "Application SCM-UI is running!\n\t" +
+                "双钱APS成型硫化接口文档 URLs:\n\t" +
+                "外销UI接口文档1: \thttp://" + ip + ":" + port + "/swagger-ui/index.html\n\t" +
+                "外销UI接口文档1: \thttp://" + ip + ":" + port + "/doc.html\n" +
+                "----------------------------------------------------------\n\t"
+        );
+    }
 }

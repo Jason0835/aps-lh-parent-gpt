@@ -2,7 +2,7 @@ package com.zlt.aps.lh;
 
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.cx.controller.CxScheduleResultController;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.controller.LhScheduleResultController;
 import com.zlt.aps.lh.handle.LhSyncDataHandle;
@@ -48,7 +48,7 @@ class LhScheduleResultTest {
 //	@Test
     public void test2() throws IOException {
         Long[] ids = new Long[] {395929L};
-        CxScheduleResult dto = new CxScheduleResult();
+        CxScheduleResultOld dto = new CxScheduleResultOld();
         dto.setIds(ids);
         String dateStr = "2025-08-19";
         Date scheduleDate = DateUtils.parseDate(dateStr);

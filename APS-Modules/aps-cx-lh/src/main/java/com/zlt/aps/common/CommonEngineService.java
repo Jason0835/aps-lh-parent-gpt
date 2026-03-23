@@ -6,7 +6,7 @@ import com.zlt.aps.config.CxShiftConfig;
 import com.zlt.aps.constants.CxEngineConstants;
 import com.zlt.aps.cx.service.ICxScheduleStopInfoService;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxParams;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxMachineInfoVo;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxProductConstructionInfoDto;
 import com.zlt.aps.cxlh.cx.api.domain.vo.LhAlgorithmScheduleResultDto;
@@ -597,7 +597,7 @@ public class CommonEngineService extends CommonLogService {
      * @param groupResultByMachineCode     前日成型排程按机台编号分组列表
      * @return 是否续作
      */
-    public boolean isContinueTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResult>> groupResultByMachineCode) {
+    public boolean isContinueTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResultOld>> groupResultByMachineCode) {
         // 继承类实现实际判断逻辑
         return false;
     }
@@ -662,14 +662,14 @@ public class CommonEngineService extends CommonLogService {
      * @param yesterdayCxScheduleResults   前日成型排程计划
      * @return 是否新增规格
      */
-    public boolean isNewTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResult>> yesterdayCxScheduleResults) {
+    public boolean isNewTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResultOld>> yesterdayCxScheduleResults) {
         LhScheduleResult lhScheduleResult = lhAlgorithmScheduleResultDto.getLhScheduleResult();
         lhAlgorithmScheduleResultDto.setIsNewTire(Boolean.TRUE);
         if (yesterdayCxScheduleResults.containsKey(lhScheduleResult.getEmbryoCode() + lhScheduleResult.getBomVersion())) {
-            List<CxScheduleResult> cxScheduleResults = yesterdayCxScheduleResults.get(lhScheduleResult.getEmbryoCode() + lhScheduleResult.getBomVersion());
+            List<CxScheduleResultOld> cxScheduleResults = yesterdayCxScheduleResults.get(lhScheduleResult.getEmbryoCode() + lhScheduleResult.getBomVersion());
             // 所有相关胎胚的计划量累计
             int totalPlanQty = 0;
-            for (CxScheduleResult cxScheduleResult : cxScheduleResults) {
+            for (CxScheduleResultOld cxScheduleResult : cxScheduleResults) {
                 // 使用Optional更安全的处理方式
                 totalPlanQty = Optional.ofNullable(cxScheduleResult.getClass1PlanQty()).orElse(0)
                         + Optional.ofNullable(cxScheduleResult.getClass2PlanQty()).orElse(0)
@@ -693,11 +693,11 @@ public class CommonEngineService extends CommonLogService {
      * @param yesterdayCxScheduleResults   前日成型排程计划
      * @return 是否普通规格
      */
-    public boolean isNormalTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResult>> yesterdayCxScheduleResults) {
+    public boolean isNormalTire(LhAlgorithmScheduleResultDto lhAlgorithmScheduleResultDto, Map<String, List<CxScheduleResultOld>> yesterdayCxScheduleResults) {
         LhScheduleResult lhScheduleResult = lhAlgorithmScheduleResultDto.getLhScheduleResult();
         if (yesterdayCxScheduleResults.containsKey(lhScheduleResult.getEmbryoCode()+lhScheduleResult.getBomVersion())) {
-            List<CxScheduleResult> cxScheduleResults = yesterdayCxScheduleResults.get(lhScheduleResult.getEmbryoCode()+lhScheduleResult.getBomVersion());
-            for (CxScheduleResult cxScheduleResult : cxScheduleResults) {
+            List<CxScheduleResultOld> cxScheduleResults = yesterdayCxScheduleResults.get(lhScheduleResult.getEmbryoCode()+lhScheduleResult.getBomVersion());
+            for (CxScheduleResultOld cxScheduleResult : cxScheduleResults) {
                 // 保存上次占用机台
                 lhAlgorithmScheduleResultDto.getLastOccupiedMachines().add(String.valueOf(cxScheduleResult.getCxMachineCode()));
                 logInfo("胎胚：[{}]，昨天在机台生产过[{}]", lhScheduleResult.getEmbryoCode(),cxScheduleResult.getCxMachineCode());

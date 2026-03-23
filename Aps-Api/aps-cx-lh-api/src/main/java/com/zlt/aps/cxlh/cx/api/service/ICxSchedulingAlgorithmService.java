@@ -1,18 +1,10 @@
 package com.zlt.aps.cxlh.cx.api.service;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
-import io.swagger.annotations.ApiOperation;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Date;
-import java.util.List;
 
 
 /**
@@ -25,6 +17,6 @@ import java.util.List;
 public interface ICxSchedulingAlgorithmService {
 
     @PutMapping("/cxSchedulingAlgorithm/calculateCarbonationPlan")
-    AjaxResult calculateCarbonationPlan(@RequestBody CxScheduleResult cxScheduleResult);
+    AjaxResult calculateCarbonationPlan(@RequestBody CxScheduleResultOld cxScheduleResult);
 
 }

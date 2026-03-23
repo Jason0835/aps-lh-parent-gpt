@@ -21,7 +21,7 @@ import java.util.Date;
 // @TableName(value = "T_CX_SCHEDULE_RESULT_REF")
 @TableName(value = "T_CX_SCHEDULE_RESULT")
 @ApiModel(value = "成型排程结果对象", description = "成型排程结果对象 ")
-public class CxScheduleResult extends BaseEntity {
+public class CxScheduleResultOld extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
     private static final String BILL_CODE = "CX2025212";

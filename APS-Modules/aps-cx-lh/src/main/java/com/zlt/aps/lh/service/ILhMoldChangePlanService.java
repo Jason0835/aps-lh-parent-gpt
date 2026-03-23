@@ -3,8 +3,6 @@ package com.zlt.aps.lh.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
-import com.zlt.aps.lh.api.domain.dto.AutoLhScheduleResultDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMoldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.bill.common.service.IDocService;

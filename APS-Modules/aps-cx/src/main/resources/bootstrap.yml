@@ -1,9 +1,9 @@
 server:
-  port: 9001
+  port: 9216
 
 nacos:
-  #  server-addr: 192.168.2.93:8848
-  server-addr: 127.0.0.1:8848
+   server-addr: 192.168.2.93:8848
+
 # Spring
 spring:
   # 添加了后端的swagger接口才会显示
@@ -15,7 +15,7 @@ spring:
     name: aps-cx
   profiles:
     # 环境配置
-    active: text
+    active: test
   main:
     allow-bean-definition-overriding: true
   cloud:

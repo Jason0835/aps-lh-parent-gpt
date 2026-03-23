@@ -3,7 +3,7 @@ package com.zlt.aps.cx.handle;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.lh.api.domain.bo.ValidateResult;
 import com.zlt.aps.maindata.service.IMdmMoldingMachineService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +35,7 @@ public class CxScheduleResultCheckHandle {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
         }
         //查询排程是否存在
-        CxScheduleResult cxscheduleResult = cxScheduleResultService.selectById(dto.getId());
+        CxScheduleResultOld cxscheduleResult = cxScheduleResultService.selectById(dto.getId());
         if (cxscheduleResult == null) {
             return ValidateResult.error(I18nUtil.getMessage("ui.data.column.lhScheduleResult.changeMachine.notExist"));
         }
