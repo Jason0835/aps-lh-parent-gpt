@@ -44,6 +44,11 @@
           v-hasPermi="['monthplan:mouldingDayResult:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="handleExportMaterial"
+          v-hasPermi="['monthplan:mouldingDayResult:exportAllMaterial']"
+          >{{ $t("全物料导出") }}</el-button
+        >
       </template>
       <!-- <template slot="headerRight">
         <span class="stat-info">
@@ -527,6 +532,12 @@ export default {
     handleExport() {
       downloadLink(
         "/monthplan/factoryMonthPlanMouldDayResult/export",
+        this.formatParams(false)
+      );
+    },
+    handleExportMaterial() {
+      downloadLink(
+        "/monthplan/factoryMonthPlanMouldDayResult/exportAllMaterial",
         this.formatParams(false)
       );
     },

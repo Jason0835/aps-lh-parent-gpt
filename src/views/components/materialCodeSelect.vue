@@ -209,11 +209,12 @@ export default {
           const data = await listProductinfo(this.formatParams());
           this.data = data.rows;
           this.page.total = data.total;
+          this.loading = false;
         }
       } catch (error) {
         console.log(error);
       } finally {
-        this.loading = false;
+
       }
     },
     async getFirstList() {
@@ -222,6 +223,9 @@ export default {
         this.data = data.rows;
         this.page.total = data.total;
       } catch (err) {}
+      finally{
+        this.loading = false;
+      }
     },
     //
     formatParams() {
