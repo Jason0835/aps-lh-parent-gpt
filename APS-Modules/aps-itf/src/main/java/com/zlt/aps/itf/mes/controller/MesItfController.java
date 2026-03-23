@@ -9,10 +9,7 @@ import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
-import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.aps.mp.api.domain.entity.*;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -303,5 +300,35 @@ public class MesItfController {
         syncDataLogs.setFactoryCode(factoryCode);
         syncDataLogs.setDataVersion(dataVersion);
         return mesBomItfService.syncBomInfo(syncDataLogs);
+    }
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型在机数据")
+    @PostMapping("/syncMachineOnlineInfo")
+    public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
+        String factoryCode = mdmCxMachineOnlineInfo.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmCxMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMachineOnlineInfo(mdmCxMachineOnlineInfo);
+    }
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化在机数据")
+    @PostMapping("/syncLhMachineOnlineInfo")
+    public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
+        String factoryCode = mdmLhMachineOnlineInfo.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmLhMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhMachineOnlineInfo(mdmLhMachineOnlineInfo);
     }
 }

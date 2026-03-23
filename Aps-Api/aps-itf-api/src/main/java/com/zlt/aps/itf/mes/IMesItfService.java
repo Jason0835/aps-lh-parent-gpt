@@ -149,4 +149,22 @@ public interface IMesItfService {
     @ApiOperation("生成超期SKU")
     @PostMapping("/mesItf/genOverDueSkuByStock")
     public AjaxResult genOverDueSkuByStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException;
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型在机数据")
+    @PostMapping("/mesItf/syncMachineOnlineInfo")
+    public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化在机数据")
+    @PostMapping("/mesItf/syncLhMachineOnlineInfo")
+    public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
 }

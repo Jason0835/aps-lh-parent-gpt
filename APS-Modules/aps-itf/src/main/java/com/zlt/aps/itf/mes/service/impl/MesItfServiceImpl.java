@@ -15,10 +15,7 @@ import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.scm.service.ScmItfService;
-import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.itf.vo.GoodsBoxVo;
-import com.zlt.aps.itf.vo.MdmProductStockContext;
-import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -809,5 +806,81 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MesBrandDict> selectMesBrandDict() {
         return mesViewMapper.selectMesBrandDict();
+    }
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMachineOnlineInfo(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
+        // 查询中间表数据
+        List<MdmCxMachineOnlineInfo> syncList = mesItfMapper.selectCxMachineOnlineSyncList(mdmCxMachineOnlineInfo);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            if (CollectionUtils.isNotEmpty(syncList)) {
+                // 先删除旧数据，再插入新数据
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", mdmCxMachineOnlineInfo.getFactoryCode());
+                baseDao.deleteByMap(MdmCxMachineOnlineInfo.class, map);
+
+                for (MdmCxMachineOnlineInfo info : syncList) {
+                    info.setCreateBy("MES");
+                    info.setUpdateBy("MES");
+                    info.setCreateTime(DateUtils.getNowDate());
+                    info.setUpdateTime(DateUtils.getNowDate());
+                }
+
+                List<List<MdmCxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+                for (List<MdmCxMachineOnlineInfo> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhMachineOnlineInfo(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
+        // 查询中间表数据
+        List<MdmLhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncList(mdmLhMachineOnlineInfo);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            if (CollectionUtils.isNotEmpty(syncList)) {
+                // 先删除旧数据，再插入新数据
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", mdmLhMachineOnlineInfo.getFactoryCode());
+                baseDao.deleteByMap(MdmLhMachineOnlineInfo.class, map);
+
+                for (MdmLhMachineOnlineInfo info : syncList) {
+                    info.setCreateBy("MES");
+                    info.setUpdateBy("MES");
+                    info.setCreateTime(DateUtils.getNowDate());
+                    info.setUpdateTime(DateUtils.getNowDate());
+                }
+
+                List<List<MdmLhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+                for (List<MdmLhMachineOnlineInfo> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
     }
 }
