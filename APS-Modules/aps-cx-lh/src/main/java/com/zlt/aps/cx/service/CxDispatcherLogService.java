@@ -1,7 +1,6 @@
 package com.zlt.aps.cx.service;
 
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxDispatcherLog;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;

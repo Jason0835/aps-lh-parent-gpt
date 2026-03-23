@@ -6,20 +6,16 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.CommonRedisService;
-import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.CxSchedulingAlgorithmResultService;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.mapper.LhScheduleResultEntityMapper;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 
@@ -55,7 +51,7 @@ public class CxSchedulingAlgorithmController {
     @Log(title = "ui.data.column.cx.calculateCarbonationPlan", businessType = BusinessType.GENERATE)
     @ApiOperation("成型自动排程")
     @PutMapping("/calculateCarbonationPlan")
-    public AjaxResult calculateCarbonationPlan(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult calculateCarbonationPlan(@RequestBody CxScheduleResultOld cxScheduleResult) {
         if (cxScheduleResult == null || cxScheduleResult.getScheduleDate() == null) {
             return AjaxResult.error("排程日期为空,停止排程！");
         }

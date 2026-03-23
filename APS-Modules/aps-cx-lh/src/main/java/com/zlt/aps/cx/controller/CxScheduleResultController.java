@@ -28,7 +28,7 @@ import com.zlt.aps.cx.mapper.entity.CxScheduleResultEntityMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cxlh.cx.api.domain.dto.CxTransferDeskDTO;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxOnlineImport;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.cxlh.cx.api.domain.vo.CxGanttVo;
 import com.zlt.aps.domain.SyncDataLogs;
 import com.zlt.aps.lh.api.domain.bo.ValidateResult;
@@ -65,7 +65,7 @@ import java.util.stream.Collectors;
 @Api("成型排程接口")
 @RestController
 @RequestMapping("/cxScheduleResult")
-public class CxScheduleResultController extends AbstractDocBizController<CxScheduleResult> {
+public class CxScheduleResultController extends AbstractDocBizController<CxScheduleResultOld> {
 
     @Autowired
     private CxScheduleResultService cxScheduleResultService;
@@ -93,7 +93,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
     @ApiOperation("查询默认子表数据")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody CxScheduleResult entity) {
+    public TableDataInfo list(@RequestBody CxScheduleResultOld entity) {
         return super.list(entity);
     }
 
@@ -114,7 +114,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
     @ApiOperation(value = "编辑", hidden = true)
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult save(@RequestBody CxScheduleResultOld cxScheduleResult) {
         AjaxResult ajaxResult = null;
         if (cxScheduleResult.getId() != null) {
             Long releasingOrTimeoutByIds = cxScheduleResultService.isReleasingOrTimeoutByIds(new Long[]{cxScheduleResult.getId()});
@@ -162,7 +162,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 成型插单校验
      */
     @PostMapping("/validateAdd")
-    public AjaxResult validateAdd(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult validateAdd(@RequestBody CxScheduleResultOld cxScheduleResult) {
         //此处调用插单校验接口，需覆盖 AjaxResult
         //ValidateResult validateResult = cxScheduleResultService.insertPreCheck(cxScheduleResult);
         //String msg = validateResult.getMsg();
@@ -179,7 +179,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      */
     @ApiOperation("获取BomData")
     @PostMapping("/getBomData")
-    public AjaxResult getBomData(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult getBomData(@RequestBody CxScheduleResultOld cxScheduleResult) {
         return AjaxResult.success(cxScheduleResultService.getBomData(cxScheduleResult));
     }
 
@@ -188,7 +188,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 调量校验
      */
     @PostMapping("/validateChangeQty")
-    public AjaxResult validateChangeQty(@RequestBody CxScheduleResult entity) {
+    public AjaxResult validateChangeQty(@RequestBody CxScheduleResultOld entity) {
         ValidateResult validateResult = cxScheduleResultService.changePlanQtyPreCheck(entity);
         String msg = validateResult.getMsg();
         if (validateResult.isSuccess()) {
@@ -202,8 +202,8 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 唯一性校验
      */
     @PostMapping("/checkScheduleResultUnique")
-    public List<CxScheduleResult> checkScheduleResultUnique(@RequestBody CxScheduleResult cxScheduleResult) {
-        List<CxScheduleResult> list = cxScheduleResultService.checkScheduleResultUnique(cxScheduleResult);
+    public List<CxScheduleResultOld> checkScheduleResultUnique(@RequestBody CxScheduleResultOld cxScheduleResult) {
+        List<CxScheduleResultOld> list = cxScheduleResultService.checkScheduleResultUnique(cxScheduleResult);
         return list;
     }
 
@@ -245,9 +245,9 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
         Date beginTime = DateUtils.getNowDate();
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
-        ExcelUtil<CxScheduleResult> util = new ExcelUtil<>(this.getTClass());
+        ExcelUtil<CxScheduleResultOld> util = new ExcelUtil<>(this.getTClass());
         InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
-        List<CxScheduleResult> list = util.importExcel(is);
+        List<CxScheduleResultOld> list = util.importExcel(is);
         AjaxResult ajaxResult = cxScheduleResultService.importData2(list, importLog.getId(), scheduleDate);
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
@@ -291,7 +291,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody CxScheduleResultOld queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
@@ -300,7 +300,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
     @Log(title = "导出数据收汇报表", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据收汇报表")
     @PostMapping("/exportData2/{fileName}")
-    public byte[] exportData2(@RequestBody CxScheduleResult obj, @PathVariable("fileName")String fileName, HttpServletResponse response) throws IOException {
+    public byte[] exportData2(@RequestBody CxScheduleResultOld obj, @PathVariable("fileName")String fileName, HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<CxOnlineImport> list = cxScheduleResultService.genXcScheduleResult(obj);
         if (list == null || list.size() == 0){
@@ -332,9 +332,9 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
 
 
     @Override
-    public List<CxScheduleResult> listExportData(CxScheduleResult port) {
+    public List<CxScheduleResultOld> listExportData(CxScheduleResultOld port) {
         startPage("create_time desc");
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         this.builderCondition(queryWrapper, port);
         return cxScheduleResultService.selectListExportData(queryWrapper);
     }
@@ -344,7 +344,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
     @ResponseBody
     public void downloadTemplate(HttpServletResponse response) throws IOException {
         String fileName = I18nUtil.getMessage("ui.data.column.port.modelName");
-        ExcelUtil<CxScheduleResult> util = new ExcelUtil<>(CxScheduleResult.class);
+        ExcelUtil<CxScheduleResultOld> util = new ExcelUtil<>(CxScheduleResultOld.class);
         util.exportExcel(response, null, fileName, fileName);
     }
 
@@ -353,7 +353,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 转机台校验校验
      */
     @PostMapping("/validateChangeMachine")
-    public AjaxResult validateChangeMachine(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult validateChangeMachine(@RequestBody CxScheduleResultOld cxScheduleResult) {
         long releasingOrTimeoutByIds = cxScheduleResultService.isReleasingOrTimeoutByIds(new Long[]{cxScheduleResult.getId()});
         if (releasingOrTimeoutByIds > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
@@ -395,7 +395,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * @param queryVO
      */
     @Override
-    protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
+    protected void builderCondition(QueryWrapper<CxScheduleResultOld> queryWrapper, CxScheduleResultOld queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleDate")), "SCHEDULE_DATE", queryVO.getFieldValueByFieldName("scheduleDate"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("embryoCode")), "EMBRYO_CODE", queryVO.getFieldValueByFieldName("embryoCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("sapCode")), "SAP_CODE", queryVO.getFieldValueByFieldName("sapCode"));
@@ -425,7 +425,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 排程发布校验
      */
     @PostMapping("/publishValidate")
-    public AjaxResult publishValidate(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult publishValidate(@RequestBody CxScheduleResultOld cxScheduleResult) {
         //Joran 2022-03-16添加发布选中记录施工校验
         Long[] ids = cxScheduleResult.getIds();
         String msg = cxScheduleResultService.validateConstructionByIds(ids);
@@ -437,9 +437,9 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
         }
         //查询排程发布list,过滤出未发布及发布失败的记录
-        QueryWrapper<CxScheduleResult> wrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, cxScheduleResult);
-        List<CxScheduleResult> list = cxScheduleResultEntityMapper.selectList(wrapper).stream()
+        List<CxScheduleResultOld> list = cxScheduleResultEntityMapper.selectList(wrapper).stream()
                 .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease())).collect(Collectors.toList());
 
         if (CollectionUtils.isEmpty(list)) {
@@ -451,13 +451,13 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
         if (StringUtils.isNotEmpty(msg)) {
             return AjaxResult.error(msg);
         }
-        List<CxScheduleResult> filterPlanList = list.stream().filter(item -> Optional.of(item.getClass2PlanQty()).orElse(0) > 0
+        List<CxScheduleResultOld> filterPlanList = list.stream().filter(item -> Optional.of(item.getClass2PlanQty()).orElse(0) > 0
                 && Optional.of(item.getClass3PlanQty()).orElse(0) > 0).collect(Collectors.toList());
         if (!filterPlanList.isEmpty()) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.publish.qtyNull"));
         }
         //校验硫化机台
-        List<CxScheduleResult> collect = list.stream().filter(item -> StringUtil.isBlank(item.getLhMachineCode())).collect(Collectors.toList());
+        List<CxScheduleResultOld> collect = list.stream().filter(item -> StringUtil.isBlank(item.getLhMachineCode())).collect(Collectors.toList());
         if (collect.size() > 0) {
             return AjaxResult.success("0");
         }
@@ -474,7 +474,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
         if (cxScheduleResultService.isPublishByIds(ids) != ids.length) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isPublishById"));
         }
-        List<CxScheduleResult> removeList= new ArrayList<>();
+        List<CxScheduleResultOld> removeList= new ArrayList<>();
         String validateMsg=cxScheduleResultService.removeResultCheck(ids,removeList);
         if(StringUtils.isNotEmpty(validateMsg)){
             return AjaxResult.error(validateMsg);
@@ -490,7 +490,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      */
     @Log(title = "ui.data.column.tmScheduleResult.modalName")
     @PostMapping("/changeReleaseStatus")
-    public AjaxResult changeReleaseStatus(@RequestBody CxScheduleResult entity){
+    public AjaxResult changeReleaseStatus(@RequestBody CxScheduleResultOld entity){
         cxScheduleResultService.changeReleaseStatus(entity);
         return AjaxResult.success();
     }
@@ -501,7 +501,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      */
     @Log(title = "ui.cx.cxScheduleResult.export.fileName", businessType = BusinessType.PUBLISH)
     @PostMapping("/publish")
-    public AjaxResult publish(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult publish(@RequestBody CxScheduleResultOld cxScheduleResult) {
         // 发布前需要先获得同步锁，防止在集群环境下出现一个前端命令发送两次mes请求，modify by hak 20220708
         if (syncDataLogsService.checkPublishLocking("cx:publish:lock", cxScheduleResult.getIds())) {
             return AjaxResult.success(); // 如果已经被锁定了，则直接返回
@@ -520,10 +520,10 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
         cxScheduleResult.setHasVersion(0);
         cxScheduleResult.setToProduct(CxEngineConstants.TO_PRODUCT_YES);
 
-        QueryWrapper<CxScheduleResult> wrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, cxScheduleResult);
         wrapper.in(PubUtil.isNotEmpty(cxScheduleResult.getIds()), "id", Arrays.asList(cxScheduleResult.getIds()));
-        List<CxScheduleResult> list = cxScheduleResultEntityMapper.selectList(wrapper).stream()
+        List<CxScheduleResultOld> list = cxScheduleResultEntityMapper.selectList(wrapper).stream()
                 .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasNotVersionOrNotToProduct"));
@@ -571,7 +571,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 将成型排程解析成月度剩余量，胎胚库存，月度完成量
      */
     @PostMapping("/parseCxScheduleResult")
-    public AjaxResult parseCxScheduleResult(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult parseCxScheduleResult(@RequestBody CxScheduleResultOld cxScheduleResult) {
         return cxScheduleResultService.parseCxScheduleResult(cxScheduleResult);
     }
 
@@ -582,7 +582,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
     @ApiOperation("导出现场计划")
     @GetMapping({"/export3"})
     @ResponseBody
-    public void export3(HttpServletResponse response, CxScheduleResult entity) throws IOException {
+    public void export3(HttpServletResponse response, CxScheduleResultOld entity) throws IOException {
         String fileName ="现场计划"+ DateUtils.parseDateToStr("yyyyMMddHHmmss",new Date())+".xlsx";
         byte[] excelBytes = this.exportData2(entity, fileName,response);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
@@ -608,7 +608,7 @@ public class CxScheduleResultController extends AbstractDocBizController<CxSched
      * 成型调整硫化
      */
     @PostMapping("/updateLhScheduleResult")
-    public AjaxResult updateCxScheduleResult(@RequestBody CxScheduleResult cxScheduleResult) {
+    public AjaxResult updateCxScheduleResult(@RequestBody CxScheduleResultOld cxScheduleResult) {
         return cxScheduleResultService.updateLhScheduleResult(cxScheduleResult);
     }
 

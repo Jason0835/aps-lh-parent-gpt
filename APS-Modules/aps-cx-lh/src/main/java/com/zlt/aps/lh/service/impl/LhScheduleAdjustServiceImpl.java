@@ -13,7 +13,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.cx.mapper.entity.CxScheduleResultEntityMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
-import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResult;
+import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
 import com.zlt.aps.lh.api.domain.entity.LhCxLinkageConfirm;
 import com.zlt.aps.lh.api.domain.entity.LhDispatcherLog;
@@ -237,11 +237,11 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
      */
     private List<LhCxLinkageConfirm> changeCxResult(Long lhResultId, double adjustQty, boolean isResorted) {
         // 根据硫化id，查询成型的记录
-        List<CxScheduleResult> cxResultList = cxScheduleResultEntityMapper.selectList(Wrappers.lambdaQuery(CxScheduleResult.class).and(
-                v -> v.eq(CxScheduleResult::getLhScheduleIds, lhResultId)
-                        .or().likeRight(CxScheduleResult::getLhScheduleIds, lhResultId + "/")
-                        .or().likeLeft(CxScheduleResult::getLhScheduleIds, "/" + lhResultId)
-                        .or().like(CxScheduleResult::getLhScheduleIds, "/" + lhResultId + "/")
+        List<CxScheduleResultOld> cxResultList = cxScheduleResultEntityMapper.selectList(Wrappers.lambdaQuery(CxScheduleResultOld.class).and(
+                v -> v.eq(CxScheduleResultOld::getLhScheduleIds, lhResultId)
+                        .or().likeRight(CxScheduleResultOld::getLhScheduleIds, lhResultId + "/")
+                        .or().likeLeft(CxScheduleResultOld::getLhScheduleIds, "/" + lhResultId)
+                        .or().like(CxScheduleResultOld::getLhScheduleIds, "/" + lhResultId + "/")
         ));
         // 没有成型计划
         if (CollectionUtils.isEmpty(cxResultList)) {
@@ -249,28 +249,28 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
             return null;
         }
 
-        Comparator<CxScheduleResult> cxComparator = Comparator.comparingDouble(CxScheduleResult::getProductNum);
+        Comparator<CxScheduleResultOld> cxComparator = Comparator.comparingDouble(CxScheduleResultOld::getProductNum);
         // 如果调整量小于0，从最大的开始扣减；如果调整量大于0，从最小的开始叠加
         if (adjustQty < 0) {
             cxComparator = cxComparator.reversed();
         }
-        List<CxScheduleResult> cxSortList = cxResultList.stream().sorted(cxComparator).collect(Collectors.toList());
+        List<CxScheduleResultOld> cxSortList = cxResultList.stream().sorted(cxComparator).collect(Collectors.toList());
 
         // 记录需要重拍的记录（成型能够保证，根据硫化id查询出来的记录，不会是同一个机台的记录，可以无需去重再成型重排）
-        List<CxScheduleResult> reScheduleList = new ArrayList<>();
+        List<CxScheduleResultOld> reScheduleList = new ArrayList<>();
         // 记录需要重拍的成型排程记录
         if (adjustQty >= 0) {
             /*
                 如果调整量大于等于0，加到【成型排程计划合计】最小的记录上，进行重排
                 调整等于0（可能是某班增加，其他班减少，总调整量为0）虽然不会触发成型调整，但是联动调整记录需要显示这条变更记录
              */
-            CxScheduleResult firstCxResult = cxSortList.get(0);
+            CxScheduleResultOld firstCxResult = cxSortList.get(0);
             firstCxResult.setProductNum(BigDecimalUtil.add(firstCxResult.getProductNum(), adjustQty));
             reScheduleList.add(firstCxResult);
             adjustQty = 0;
         } else {
             // 扣减对应调整量，如果不够扣减，扣减下一条
-            for (CxScheduleResult cxResult : cxSortList) {
+            for (CxScheduleResultOld cxResult : cxSortList) {
                 if (cxResult.getProductNum() != null && cxResult.getProductNum() > 0) {
                     double productNum = BigDecimalUtil.add(adjustQty, cxResult.getProductNum());
                     if (productNum >= 0) {
@@ -293,22 +293,22 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
 
         // 记录对应成型ID-调整记录的Map
         Map<Long, LhCxLinkageConfirm> confirmMap = new HashMap<>();
-        for (CxScheduleResult cxScheduleResult : reScheduleList) {
-            List<CxScheduleResult> allTasks = cxScheduleResultService.loadRelatedTasks(cxScheduleResult);
+        for (CxScheduleResultOld cxScheduleResult : reScheduleList) {
+            List<CxScheduleResultOld> allTasks = cxScheduleResultService.loadRelatedTasks(cxScheduleResult);
             // 构建调整前记录
-            for (CxScheduleResult cxResult : allTasks) {
+            for (CxScheduleResultOld cxResult : allTasks) {
                 LhCxLinkageConfirm confirm = new LhCxLinkageConfirm();
                 setCxBeforeConfirm(confirm, cxResult);
                 confirmMap.put(cxResult.getId(), confirm);
             }
 
             // 执行重排
-            List<CxScheduleResult> resortedTasks = cxScheduleResultService.cxScheduleResultListReSort(allTasks, cxScheduleResult.getScheduleDate());
+            List<CxScheduleResultOld> resortedTasks = cxScheduleResultService.cxScheduleResultListReSort(allTasks, cxScheduleResult.getScheduleDate());
             if (isResorted) {
                 cxScheduleResultService.updateTasksStatus(resortedTasks);
             }
             
-            for (CxScheduleResult resortedTask : resortedTasks) {
+            for (CxScheduleResultOld resortedTask : resortedTasks) {
                 // 记录重拍后的字段
                 LhCxLinkageConfirm confirm = confirmMap.get(resortedTask.getId());
                 if (confirm == null) {
@@ -327,7 +327,7 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
      * @param confirm       联动确认记录
      * @param cxAfterResult 成型排程
      */
-    private void setCxAfterConfirm(LhCxLinkageConfirm confirm, CxScheduleResult cxAfterResult) {
+    private void setCxAfterConfirm(LhCxLinkageConfirm confirm, CxScheduleResultOld cxAfterResult) {
         // 复制成型修改后的字段
         confirm.setNewCxMachineCode(cxAfterResult.getCxMachineCode());
         confirm.setNewCxSpecCode(cxAfterResult.getSpecCode());
@@ -346,7 +346,7 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
      * @param confirm        联动确认记录
      * @param cxBeforeResult 成型排程
      */
-    private void setCxBeforeConfirm(LhCxLinkageConfirm confirm, CxScheduleResult cxBeforeResult) {
+    private void setCxBeforeConfirm(LhCxLinkageConfirm confirm, CxScheduleResultOld cxBeforeResult) {
         // 复制成型修改前的字段
         confirm.setCxScheduleId(cxBeforeResult.getId());
         confirm.setOriCxMachineCode(cxBeforeResult.getCxMachineCode());
@@ -459,21 +459,21 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
         }
         //4.更新成型计划的联动计划量
         //4.1 获取硫化计划对应的成型计划
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("FACTORY_CODE", lhScheduleResult.getFactoryCode());
         queryWrapper.eq("SCHEDULE_DATE", lhScheduleResult.getScheduleDate());
         queryWrapper.in("LH_MACHINE_CODE", lhScheduleResult.getLhMachineCode());
         queryWrapper.eq("IS_DELETE", Constant.FALSE);
-        CxScheduleResult linkCxScheduleResult = cxScheduleResultEntityMapper.selectOne(queryWrapper);
+        CxScheduleResultOld linkCxScheduleResult = cxScheduleResultEntityMapper.selectOne(queryWrapper);
         //4.2 根据成型机台信息，获取成型计划
-        QueryWrapper<CxScheduleResult> mQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> mQueryWrapper = new QueryWrapper<>();
         mQueryWrapper.eq("FACTORY_CODE", linkCxScheduleResult.getFactoryCode());
         mQueryWrapper.eq("SCHEDULE_DATE", linkCxScheduleResult.getScheduleDate());
         mQueryWrapper.eq("CX_MACHINE_CODE", linkCxScheduleResult.getCxMachineCode());
         mQueryWrapper.eq("IS_DELETE", Constant.FALSE);
-        List<CxScheduleResult> cxScheduleResultList = cxScheduleResultEntityMapper.selectList(mQueryWrapper);
+        List<CxScheduleResultOld> cxScheduleResultList = cxScheduleResultEntityMapper.selectList(mQueryWrapper);
         if (PubUtil.isNotEmpty(cxScheduleResultList)){
-            Optional<CxScheduleResult> cxScheduleResultOpt = cxScheduleResultList.stream().filter(x->x.getEmbryoCode().equals(lhScheduleResult.getEmbryoCode())).findFirst();
+            Optional<CxScheduleResultOld> cxScheduleResultOpt = cxScheduleResultList.stream().filter(x->x.getEmbryoCode().equals(lhScheduleResult.getEmbryoCode())).findFirst();
             if (cxScheduleResultOpt.isPresent()){
                 //剩余量=一次投产量-总调整量
                 int remainQty = cxScheduleResultOpt.get().getProductNum().intValue() - totalAdjustQty;
@@ -489,7 +489,7 @@ public class LhScheduleAdjustServiceImpl extends AbstractDocService<LhCxLinkageC
                 cxScheduleResultOpt.get().setFieldValueByFieldName("class"+adjustClass+"PlanQty",curAdjustQty);
 
                 //调整班次根据排产顺序排序
-                cxScheduleResultList = cxScheduleResultList.stream().sorted(Comparator.nullsLast(Comparator.comparing(CxScheduleResult::getClass1Sort))).collect(Collectors.toList());
+                cxScheduleResultList = cxScheduleResultList.stream().sorted(Comparator.nullsLast(Comparator.comparing(CxScheduleResultOld::getClass1Sort))).collect(Collectors.toList());
             }
 
         }

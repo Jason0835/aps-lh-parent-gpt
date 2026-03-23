@@ -83,7 +83,7 @@ import static com.zlt.aps.common.core.utils.ApsCommonUtil.logSplit;
 @Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleResult> implements CxScheduleResultService {
+public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleResultOld> implements CxScheduleResultService {
     @Autowired
     private CxScheduleResultEntityMapper cxScheduleResultEntityMapper;
     @Autowired
@@ -140,7 +140,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return
      */
     @Override
-    public List<CxScheduleResult> selectListExportData(QueryWrapper<CxScheduleResult> cxScheduleResult) {
+    public List<CxScheduleResultOld> selectListExportData(QueryWrapper<CxScheduleResultOld> cxScheduleResult) {
         return cxScheduleResultEntityMapper.selectList(cxScheduleResult);
     }
 
@@ -151,8 +151,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return List<CxScheduleResult> 成型排程度结果
      */
     @Override
-    public List<CxScheduleResult> selectListByDate(Date scheduleDate) {
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+    public List<CxScheduleResultOld> selectListByDate(Date scheduleDate) {
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("SCHEDULE_DATE", scheduleDate);
         return cxScheduleResultEntityMapper.selectList(queryWrapper);
     }
@@ -250,20 +250,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 导入结果
      */
     @Override
-    public AjaxResult importData2(List<CxScheduleResult> list, Long importLogId, String scheduleDate) {
+    public AjaxResult importData2(List<CxScheduleResultOld> list, Long importLogId, String scheduleDate) {
         //Step1-初始化成功失败计数器
         int successNum = 0;
         int failureNum = 0;
 
 
         //Step1-初始化导入列表/导入错误列表
-        List<CxScheduleResult> importList = new ArrayList<>();
+        List<CxScheduleResultOld> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
 
         //Step3-进行数据必填数据校验/字典/格式校验
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxScheduleResultOld docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
             if (CollectionUtils.isNotEmpty(validated)) {
@@ -285,7 +285,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         //Step3-进行数据必填数据校验/字典/格式校验
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxScheduleResultOld docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
             if (CollectionUtils.isNotEmpty(validated)) {
@@ -309,7 +309,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Date importScheduleDate = DateUtils.parseDate(scheduleDate);
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxScheduleResultOld docEntity = list.get(i);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
@@ -378,7 +378,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxScheduleResultOld docEntity = list.get(i);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
@@ -408,7 +408,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         String cxBatchNo = commonRedisService.getSequence(CxPrefixConstants.SCHEDULE_BATCH_NO_PREFIX + scheduleDateStr, CxPrefixConstants.CX_BATCH_NO_PREFIX + scheduleDateStr);
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxScheduleResultOld docEntity = list.get(i);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
@@ -428,7 +428,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         //2.进行数据库唯一性校验
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxScheduleResultOld docEntity = list.get(i);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
@@ -449,13 +449,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         //更新半部件删除字段
-        LambdaUpdateWrapper<CxScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(CxScheduleResult::getScheduleDate, importScheduleDate)
-                .set(CxScheduleResult::getDelFlag, 1);
+        LambdaUpdateWrapper<CxScheduleResultOld> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(CxScheduleResultOld::getScheduleDate, importScheduleDate)
+                .set(CxScheduleResultOld::getDelFlag, 1);
         cxScheduleResultEntityMapper.update(null, updateWrapper);
 
         //删除排程日期对应的数据
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("SCHEDULE_DATE", importScheduleDate);
         cxScheduleResultEntityMapper.delete(queryWrapper);
         //先删除后插入
@@ -479,7 +479,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 返回导入结果
      */
     @Override
-    public AjaxResult importData(List<CxScheduleResult> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<CxScheduleResultOld> list, boolean updateSupport, Long importLogId) {
         return new AjaxResult();
     }
 
@@ -491,7 +491,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return
      */
     @Override
-    public String checkUnique(CxScheduleResult docEntityVO) {
+    public String checkUnique(CxScheduleResultOld docEntityVO) {
         // 唯一性判断依据: 根据业务修改
         return UserConstants.UNIQUE;
     }
@@ -506,13 +506,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return List<CxScheduleResult> 排程结果
      */
     @Override
-    public List<CxScheduleResult> getScheduleCxScheduleResults(Date scheduleDate, StringBuilder scheduleLog, Collection<CxScheduleResult> values) {
+    public List<CxScheduleResultOld> getScheduleCxScheduleResults(Date scheduleDate, StringBuilder scheduleLog, Collection<CxScheduleResultOld> values) {
         // 记录开始查询日志
         scheduleLog.append("开始获取成型排程计划，排程日期：").append(scheduleDate).append("\n");
 
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("schedule_date", scheduleDate);
-        List<CxScheduleResult> cxScheduleResults = cxScheduleResultEntityMapper.selectList(queryWrapper);
+        List<CxScheduleResultOld> cxScheduleResults = cxScheduleResultEntityMapper.selectList(queryWrapper);
 
         if (CollectionUtils.isEmpty(cxScheduleResults) && CollectionUtils.isNotEmpty(values)){
             cxScheduleResults = new ArrayList<>(values);
@@ -522,7 +522,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         scheduleLog.append("根据排程日期查询到 ").append(cxScheduleResults.size()).append(" 条排程结果\n");
 
         if (CollectionUtils.isNotEmpty(cxScheduleResults)) {
-            for (CxScheduleResult cxScheduleResult : cxScheduleResults) {
+            for (CxScheduleResultOld cxScheduleResult : cxScheduleResults) {
                 // 处理 class2ModifyQty
                 if (cxScheduleResult.getClass2ModifyQty() == null) {
                     cxScheduleResult.setClass2ModifyQty(cxScheduleResult.getClass2PlanQty() == null ? 0 : cxScheduleResult.getClass2PlanQty());
@@ -565,9 +565,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
 
     @Override
-    public void generateFinalSchedule(Map<String, CxScheduleResult> cxScheduleResultContextMap) {
-        List<CxScheduleResult> cxScheduleResults = new ArrayList<>(cxScheduleResultContextMap.values());
-        for (CxScheduleResult cxScheduleResult : cxScheduleResults) {
+    public void generateFinalSchedule(Map<String, CxScheduleResultOld> cxScheduleResultContextMap) {
+        List<CxScheduleResultOld> cxScheduleResults = new ArrayList<>(cxScheduleResultContextMap.values());
+        for (CxScheduleResultOld cxScheduleResult : cxScheduleResults) {
             cxScheduleResultEntityMapper.insert(cxScheduleResult);
         }
     }
@@ -610,7 +610,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return
      */
     @Override
-    public CxScheduleResult selectById(Long id) {
+    public CxScheduleResultOld selectById(Long id) {
         return cxScheduleResultEntityMapper.selectById(id);
     }
 
@@ -621,7 +621,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 校验结果（包含通过/失败状态和提示信息）
      */
     @Override
-    public ValidateResult changePlanQtyPreCheck(CxScheduleResult cxScheduleResult) {
+    public ValidateResult changePlanQtyPreCheck(CxScheduleResultOld cxScheduleResult) {
         // region 1. 参数基础校验
         logger.debug("开始执行计划量变更前置校验，参数：{}", cxScheduleResult);
 
@@ -655,7 +655,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         StringBuilder tipMsg = new StringBuilder();
 
         // 深拷贝参数对象（防止污染原始数据）
-        CxScheduleResult context = new CxScheduleResult();
+        CxScheduleResultOld context = new CxScheduleResultOld();
         BeanUtils.copyProperties(cxScheduleResult, context);
         logger.debug("创建校验上下文副本完成");
         // endregion
@@ -713,14 +713,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     @Override
-    public List<CxScheduleResult> checkScheduleResultUnique(CxScheduleResult cxScheduleResult) {
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+    public List<CxScheduleResultOld> checkScheduleResultUnique(CxScheduleResultOld cxScheduleResult) {
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne("id", cxScheduleResult.getId());
         queryWrapper.eq("schedule_date", cxScheduleResult.getScheduleDate());
         queryWrapper.eq("embryo_code", cxScheduleResult.getEmbryoCode());
         queryWrapper.eq("spec_code", cxScheduleResult.getSpecCode());
         queryWrapper.eq("bom_data_version", cxScheduleResult.getBomDataVersion());
-        List<CxScheduleResult> cxScheduleResults = cxScheduleResultEntityMapper.selectList(queryWrapper);
+        List<CxScheduleResultOld> cxScheduleResults = cxScheduleResultEntityMapper.selectList(queryWrapper);
         if (CollectionUtils.isNotEmpty(cxScheduleResults)) {
             return cxScheduleResults;
         }
@@ -736,12 +736,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return
      */
     @Override
-    public CxScheduleResult getScheduleResultByMachineCodeAndScheduleDate(String factoryCode, String machineCode, Date scheduleDate) {
-        LambdaQueryWrapper<CxScheduleResult> query = new LambdaQueryWrapper<>();
-        query.eq(CxScheduleResult::getFactoryCode, factoryCode)
-                .eq(CxScheduleResult::getLhMachineCode, machineCode)
-                .eq(CxScheduleResult::getScheduleDate, scheduleDate)
-                .eq(CxScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+    public CxScheduleResultOld getScheduleResultByMachineCodeAndScheduleDate(String factoryCode, String machineCode, Date scheduleDate) {
+        LambdaQueryWrapper<CxScheduleResultOld> query = new LambdaQueryWrapper<>();
+        query.eq(CxScheduleResultOld::getFactoryCode, factoryCode)
+                .eq(CxScheduleResultOld::getLhMachineCode, machineCode)
+                .eq(CxScheduleResultOld::getScheduleDate, scheduleDate)
+                .eq(CxScheduleResultOld::getIsDelete, ApsConstant.APS_YES_NO_0);
         return cxScheduleResultEntityMapper.selectOne(query);
     }
 
@@ -752,7 +752,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     @Override
     public void changeMachine(CxTransferDeskDTO dto) {
-        CxScheduleResult cxScheduleResult = this.selectById(dto.getId());
+        CxScheduleResultOld cxScheduleResult = this.selectById(dto.getId());
         //进行转机台赋值
         cxScheduleResult.setIsRelease(cxScheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
         cxScheduleResult.setRemark("原始机台：" + cxScheduleResult.getCxMachineCode() + ",转入机台：" + dto.getCxMachineCode());
@@ -761,7 +761,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         autoScheduleLogService.insertLhScheduleLog(ApsConstant.APS_STRING_1, cxScheduleResult.getCxBatchNo(), cxScheduleResult.getOrderNo(), "转机台日志",
                 logSplit("原始机台：" + cxScheduleResult.getLhMachineCode(), ",转入机台：" + dto.getCxMachineCode(), "操作人员：" + SecurityUtils.getUsername(), "操作时间：" + DateUtils.getTime())); //添加日志
         //排程操作日志
-        CxScheduleResult oldSchedule = this.selectById(dto.getId());
+        CxScheduleResultOld oldSchedule = this.selectById(dto.getId());
         insetDispatcherLog(ApsConstant.DISPATCHER_OPER_MACHINE, oldSchedule, cxScheduleResult);
 
         //更新排程
@@ -860,7 +860,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     @Override
     public Long isReleasingOrTimeoutByIds(Long[] ids) {
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("IS_RELEASE", new Object[]{CxEngineConstants.RELEASING, CxEngineConstants.TIMEOUT_FAILURE});
         queryWrapper.in("ID", ids);
         return cxScheduleResultEntityMapper.selectCount(queryWrapper);
@@ -873,9 +873,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 调量结果
      */
     @Override
-    public AjaxResult changeQty(CxScheduleResult cxScheduleResult) {
+    public AjaxResult changeQty(CxScheduleResultOld cxScheduleResult) {
         //唯一性校验
-        List<CxScheduleResult> list = checkScheduleResultUnique(cxScheduleResult);
+        List<CxScheduleResultOld> list = checkScheduleResultUnique(cxScheduleResult);
         if (CollectionUtils.isNotEmpty(list)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.uniqueValidate"));
         } else {
@@ -890,13 +890,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 操作结果（成功/失败及提示信息）
      * @throws BusinessException 当任务不存在或数据异常时抛出
      */
-    public AjaxResult updateCxScheduleResultForQty(CxScheduleResult cxScheduleResult) {
+    public AjaxResult updateCxScheduleResultForQty(CxScheduleResultOld cxScheduleResult) {
         // ==================== 1. 初始化校验阶段 ====================
         final long taskId = cxScheduleResult.getId();
         log.info("开始更新排程计划量，任务ID：{}", taskId);
 
         // 1.2 查询数据库记录
-        CxScheduleResult dbRecord = cxScheduleResultEntityMapper.selectById(taskId);
+        CxScheduleResultOld dbRecord = cxScheduleResultEntityMapper.selectById(taskId);
         if (dbRecord == null) {
             log.error("排程任务不存在，ID：{}", taskId);
             return AjaxResult.error(I18nUtil.getMessage("cx.engine.record.not.exist"));
@@ -921,8 +921,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             }
 
             // 2.1.2 执行重排操作
-            List<CxScheduleResult> allTasks = loadRelatedTasks(cxScheduleResult);
-            List<CxScheduleResult> resortedTasks = cxScheduleResultListReSort(allTasks, cxScheduleResult.getScheduleDate());
+            List<CxScheduleResultOld> allTasks = loadRelatedTasks(cxScheduleResult);
+            List<CxScheduleResultOld> resortedTasks = cxScheduleResultListReSort(allTasks, cxScheduleResult.getScheduleDate());
 
             // 2.1.3 批量更新任务状态
             updateTasksStatus(resortedTasks);
@@ -944,7 +944,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param operType 操作类型：0--转机台、1--调量
      * @param newSchedule
      */
-    public void insetDispatcherLog(String operType, CxScheduleResult oldSchedule, CxScheduleResult newSchedule) {
+    public void insetDispatcherLog(String operType, CxScheduleResultOld oldSchedule, CxScheduleResultOld newSchedule) {
 
         if(oldSchedule == null) {
             //操作前的排程数据
@@ -988,7 +988,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 检查时间窗口是否过期
      */
-    private boolean isTimeWindowExpired(CxScheduleResult task) {
+    private boolean isTimeWindowExpired(CxScheduleResultOld task) {
         // 获取班次配置
         Map<String, CxParams> paramsConfig = loadCxParamsConfig();
         CxShiftConfig shiftConfig = initShiftConfig(paramsConfig, task.getScheduleDate());
@@ -1016,7 +1016,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建时间窗口提示消息
      */
-    private String buildTimeWindowMessage(CxScheduleResult task) {
+    private String buildTimeWindowMessage(CxScheduleResultOld task) {
         Map<String, CxParams> paramsConfig = loadCxParamsConfig();
         CxShiftConfig shiftConfig = initShiftConfig(paramsConfig, task.getScheduleDate());
 
@@ -1047,13 +1047,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 加载关联任务列表
      */
     @Override
-    public List<CxScheduleResult> loadRelatedTasks(CxScheduleResult task) {
-        QueryWrapper<CxScheduleResult> query = new QueryWrapper<>();
+    public List<CxScheduleResultOld> loadRelatedTasks(CxScheduleResultOld task) {
+        QueryWrapper<CxScheduleResultOld> query = new QueryWrapper<>();
         query.ne("id", task.getId());
         query.eq("schedule_date", task.getScheduleDate());
         query.eq("cx_machine_code", task.getCxMachineCode());
 
-        List<CxScheduleResult> relatedTasks = cxScheduleResultEntityMapper.selectList(query);
+        List<CxScheduleResultOld> relatedTasks = cxScheduleResultEntityMapper.selectList(query);
         // 加入当前任务
         relatedTasks.add(task);
         return relatedTasks;
@@ -1063,9 +1063,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 批量更新任务状态
      */
     @Override
-    public void updateTasksStatus(List<CxScheduleResult> tasks) {
+    public void updateTasksStatus(List<CxScheduleResultOld> tasks) {
         for (int i = 0; i < tasks.size(); i++) {
-            CxScheduleResult task = tasks.get(i);
+            CxScheduleResultOld task = tasks.get(i);
             task.setPublishSuccessCount(i + 1);
             task.setIsRelease(ApsConstant.NO_RELEASE);
             //如果是调度员操作，则需要增加操作日志
@@ -1107,7 +1107,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @throws BusinessException 当施工信息缺失时抛出带国际化信息的业务异常
      */
     @Override
-    public List<CxScheduleResult> cxScheduleResultListReSort(List<CxScheduleResult> cxScheduleResultList, Date scheduleDate) {
+    public List<CxScheduleResultOld> cxScheduleResultListReSort(List<CxScheduleResultOld> cxScheduleResultList, Date scheduleDate) {
         // ==================== 1. 初始化阶段 ====================
         log.info("开始任务重排处理，原始任务数：{}，排程日期：{}",
                 cxScheduleResultList.size(), scheduleDate);
@@ -1128,16 +1128,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // ==================== 2. 数据准备阶段 ====================
         // 2.1 过滤并排序任务（按欠胎时间升序）
-        List<CxScheduleResult> sortedTasks = cxScheduleResultList.stream()
+        List<CxScheduleResultOld> sortedTasks = cxScheduleResultList.stream()
                 .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(CxScheduleResult::getPreviousTireTime))
+                .sorted(Comparator.comparing(CxScheduleResultOld::getPreviousTireTime))
                 .peek(task -> log.debug("待处理任务：ID={}, 规格={}, 欠胎时间={}",
                         task.getId(), task.getEmbryoCode(), task.getPreviousTireTime()))
                 .collect(Collectors.toList());
 
         // 2.2 准备施工信息查询参数
         List<LhAlgorithmScheduleResultDto> constructionQueries = new ArrayList<>();
-        for (CxScheduleResult item : sortedTasks) {
+        for (CxScheduleResultOld item : sortedTasks) {
             LhAlgorithmScheduleResultDto queryDto = new LhAlgorithmScheduleResultDto();
             LhScheduleResult lhScheduleResult = new LhScheduleResult();
             lhScheduleResult.setEmbryoCode(item.getEmbryoCode());
@@ -1157,7 +1157,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .collect(Collectors.groupingBy(c -> c.getEmbryoCode() + c.getEmbryoVersion()));
 
         // ==================== 3. 核心重排逻辑 ====================
-        List<CxScheduleResult> resultList = new ArrayList<>();
+        List<CxScheduleResultOld> resultList = new ArrayList<>();
         LocalDateTime currentTime = shiftConfig.parseToDayFirstShiftStartTime();
         CxProductConstructionInfoDto lastConstruction = null;
         // 当前处理班次编号
@@ -1166,9 +1166,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         int shiftSequence = 0;
 
         // 3.1 遍历处理每个任务
-        for (CxScheduleResult originTask : sortedTasks) {
+        for (CxScheduleResultOld originTask : sortedTasks) {
             // 深拷贝任务对象
-            CxScheduleResult task = new CxScheduleResult();
+            CxScheduleResultOld task = new CxScheduleResultOld();
             BeanUtils.copyProperties(originTask, task);
             resultList.add(task);
 
@@ -1263,7 +1263,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
 
-    private boolean isChange(CxScheduleResult cxScheduleResult, CxScheduleResult scheduleResult) {
+    private boolean isChange(CxScheduleResultOld cxScheduleResult, CxScheduleResultOld scheduleResult) {
         boolean flag = compare(scheduleResult.getClass1PlanQty(), cxScheduleResult.getClass1PlanQty());
         flag = flag && compare(scheduleResult.getClass2PlanQty(), cxScheduleResult.getClass2PlanQty());
         flag = flag && compare(scheduleResult.getClass3PlanQty(), cxScheduleResult.getClass3PlanQty());
@@ -1288,7 +1288,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 修改结果
      */
     @Override
-    public AjaxResult edit(CxScheduleResult cxScheduleResult) {
+    public AjaxResult edit(CxScheduleResultOld cxScheduleResult) {
         int result = cxScheduleResultEntityMapper.updateById(cxScheduleResult);
         if (result > 0) {
             return AjaxResult.success();
@@ -1305,7 +1305,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     @Override
     public Long isReleasingOrTimeoutByDate(Date scheduleDate) {
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("IS_RELEASE", new Object[]{CxEngineConstants.RELEASING, CxEngineConstants.TIMEOUT_FAILURE});
         queryWrapper.in("SCHEDULE_DATE", scheduleDate);
         return cxScheduleResultEntityMapper.selectCount(queryWrapper);
@@ -1318,7 +1318,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 排程结果
      */
     @Override
-    public AjaxResult add(CxScheduleResult cxScheduleResult) {
+    public AjaxResult add(CxScheduleResultOld cxScheduleResult) {
         cxScheduleResult.setCxBatchNo(cxSchedulingAlgorithmResultService.generateBatchNumber(cxScheduleResult.getScheduleDate()));
         cxScheduleResult.setDelFlag(0);
         String scheduleStr = DateUtils.parseDateToStr("yyyyMMdd", cxScheduleResult.getScheduleDate());
@@ -1353,7 +1353,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 检查结果（包含错误信息或提示信息）
      */
     @Override
-    public ValidateResult insertPreCheck(CxScheduleResult cxScheduleResult) {
+    public ValidateResult insertPreCheck(CxScheduleResultOld cxScheduleResult) {
         // 日志记录入参
         log.info("[插单预检] 开始处理插单预检请求，参数: {}", JSON.toJSONString(cxScheduleResult));
 
@@ -1555,14 +1555,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
     }
 
-    private void validateClassShiftPlanQty(CxMachineInfoVo machineInfo, CxScheduleResult cxScheduleResult, StringBuilder tipMsg, CxProductConstructionInfoDto constructionInfo) {
+    private void validateClassShiftPlanQty(CxMachineInfoVo machineInfo, CxScheduleResultOld cxScheduleResult, StringBuilder tipMsg, CxProductConstructionInfoDto constructionInfo) {
         logger.debug("开始验证班次计划量，机台编码：{}，排程日期：{}", machineInfo.getCxMachineCode(), cxScheduleResult.getScheduleDate());
 
         // 1. 查询当前机台当天的所有成型排程任务
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("schedule_date", cxScheduleResult.getScheduleDate());
         queryWrapper.eq("cx_machine_code", cxScheduleResult.getCxMachineCode());
-        List<CxScheduleResult> machineTaskList = cxScheduleResultEntityMapper.selectList(queryWrapper);
+        List<CxScheduleResultOld> machineTaskList = cxScheduleResultEntityMapper.selectList(queryWrapper);
 
         if (CollectionUtils.isEmpty(machineTaskList)) {
             logger.info("机台{}在{}当天无排程任务，跳过校验", cxScheduleResult.getCxMachineCode(), cxScheduleResult.getScheduleDate());
@@ -1574,8 +1574,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         setClassShiftTip(machineInfo, cxScheduleResult, machineTaskList, tipMsg, constructionInfo);
     }
 
-    private void setClassShiftTip(CxMachineInfoVo machineInfo, CxScheduleResult cxScheduleResult,
-                                  List<CxScheduleResult> machineTaskList, StringBuilder tipMsg,
+    private void setClassShiftTip(CxMachineInfoVo machineInfo, CxScheduleResultOld cxScheduleResult,
+                                  List<CxScheduleResultOld> machineTaskList, StringBuilder tipMsg,
                                   CxProductConstructionInfoDto constructionInfo) {
         logger.debug("初始化班次配置参数");
 
@@ -1599,7 +1599,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
     }
 
-    private void setShiftPlanQtyTip(CxMachineInfoVo machineInfo, CxScheduleResult cxScheduleResult, List<CxScheduleResult> machineTaskList, int classCode, StringBuilder tipMsg, CxShiftConfig cxShiftConfig, CxProductConstructionInfoDto constructionInfo) {
+    private void setShiftPlanQtyTip(CxMachineInfoVo machineInfo, CxScheduleResultOld cxScheduleResult, List<CxScheduleResultOld> machineTaskList, int classCode, StringBuilder tipMsg, CxShiftConfig cxShiftConfig, CxProductConstructionInfoDto constructionInfo) {
         // 0. 初始化班次相关字段键名
         final String planQtyKey = String.format("class%dPlanQty", classCode);
         final String machineQuotaKey = String.format("class%dMachineQuota", classCode);
@@ -1607,14 +1607,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         final String classStartTimeKey = String.format("class%dStartTime", classCode);
         final String classEndTimeKey = String.format("class%dEndTime", classCode);
         // 1. 获取当前班次的最大排序任务
-        Optional<CxScheduleResult> lastTaskOpt = machineTaskList.stream()
+        Optional<CxScheduleResultOld> lastTaskOpt = machineTaskList.stream()
                 .filter(task -> task.getFieldValueByFieldName(planQtyKey) != null && (int) task.getFieldValueByFieldName(planQtyKey) > 0)
                 .filter(task -> task.getFieldValueByFieldName(sortKey) != null)
                 .max(Comparator.comparing(task -> (int) task.getFieldValueByFieldName(sortKey)));
 
         if (lastTaskOpt.isPresent()) {
             // 获取最后一个规格的生产结束时间
-            CxScheduleResult lastTask = lastTaskOpt.orElseGet(CxScheduleResult::new);
+            CxScheduleResultOld lastTask = lastTaskOpt.orElseGet(CxScheduleResultOld::new);
             Date lastEndTime = convertToDate(lastTask.getFieldValueByFieldName(classEndTimeKey));
             logger.debug("班次{}最后一个任务[{}]结束时间：{}", classCode, lastTask.getId(), lastEndTime);
             // 3. 获取机台班次定额参数
@@ -1701,7 +1701,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 计算换工装时间（小时）
      */
-    private double calculateChangeSpecTime(CxScheduleResult lastTask, CxProductConstructionInfoDto newConstruction) {
+    private double calculateChangeSpecTime(CxScheduleResultOld lastTask, CxProductConstructionInfoDto newConstruction) {
         LhAlgorithmScheduleResultDto queryDto = new LhAlgorithmScheduleResultDto();
         LhScheduleResult lhResult = new LhScheduleResult();
         lhResult.setEmbryoCode(lastTask.getEmbryoCode());
@@ -1734,7 +1734,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param result 插单排程结果
      * @return 月度余量
      */
-    private CxEmbryoMonthPlanSurplus findMonthSurplus(List<CxEmbryoMonthPlanSurplus> list, CxScheduleResult result) {
+    private CxEmbryoMonthPlanSurplus findMonthSurplus(List<CxEmbryoMonthPlanSurplus> list, CxScheduleResultOld result) {
         if (CollectionUtils.isEmpty(list)) {
             return null;
         }
@@ -1752,8 +1752,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param result 插单排程结果
      * @return 已排程总量
      */
-    private int calculateScheduledQty(CxScheduleResult result) {
-        List<CxScheduleResult> existResults = cxScheduleResultEntityMapper.selectList(new QueryWrapper<CxScheduleResult>()
+    private int calculateScheduledQty(CxScheduleResultOld result) {
+        List<CxScheduleResultOld> existResults = cxScheduleResultEntityMapper.selectList(new QueryWrapper<CxScheduleResultOld>()
                 .eq("schedule_date", result.getScheduleDate())
                 .eq("embryo_code", result.getEmbryoCode())
                 .eq("bom_data_version", result.getBomDataVersion()));
@@ -1786,7 +1786,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param cxScheduleResult 排程计划
      * @return 计划总量
      */
-    public Integer insertTotalPlanQty(CxScheduleResult cxScheduleResult) {
+    public Integer insertTotalPlanQty(CxScheduleResultOld cxScheduleResult) {
         Integer totalPlanQty = 0;
         if (cxScheduleResult.getClass1PlanQty() == null) {
             cxScheduleResult.setClass1PlanQty(0);
@@ -1821,8 +1821,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param operType        操作类型：0--转机台、1--调量、2--插单
      */
     @Override
-    public void insetDispatcherLogInsertOrder(String operType, List<CxScheduleResult> scheduleResults, CxScheduleResult newSchedule) {
-        List<CxScheduleResult> scheduleResultList = this.checkScheduleResultUnique(newSchedule);
+    public void insetDispatcherLogInsertOrder(String operType, List<CxScheduleResultOld> scheduleResults, CxScheduleResultOld newSchedule) {
+        List<CxScheduleResultOld> scheduleResultList = this.checkScheduleResultUnique(newSchedule);
         CxDispatcherLog log = new CxDispatcherLog();
         //基础信息赋值
         //log.setScheduleId(scheduleResultList.get(0).getId());
@@ -1837,9 +1837,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         log.setEmbryoVersion(newSchedule.getBomDataVersion());
         // 操作前的信息赋值，取创建时间最大的记录为操作前信息
         if (com.alibaba.nacos.common.utils.CollectionUtils.isNotEmpty(scheduleResults)) {
-            Optional<CxScheduleResult> max = scheduleResults.stream().max(Comparator.comparing(CxScheduleResult::getCreateTime));
+            Optional<CxScheduleResultOld> max = scheduleResults.stream().max(Comparator.comparing(CxScheduleResultOld::getCreateTime));
             if (max.isPresent()) {
-                CxScheduleResult scheduleResult = max.get();
+                CxScheduleResultOld scheduleResult = max.get();
                 log.setBeforeCxMachineCode(scheduleResult.getCxMachineCode());
                 log.setBeforeLhMachineCode(scheduleResult.getLhMachineCode());
                 log.setBeforeClass1Plan(scheduleResult.getClass1PlanQty());
@@ -1863,31 +1863,31 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     @Override
-    public MdmProductConstructionVO getBomData(CxScheduleResult cxScheduleResult) {
+    public MdmProductConstructionVO getBomData(CxScheduleResultOld cxScheduleResult) {
         return this.getProductConstruction(cxScheduleResult.getSapCode()+"_"+cxScheduleResult.getSpecCode());
     }
 
     @Override
     public Long isPublishByIds(Long[] ids) {
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("IS_RELEASE", ApsConstant.NO_RELEASE);
         queryWrapper.in("id", ids);
         return cxScheduleResultEntityMapper.selectCount(queryWrapper);
     }
 
     @Override
-    public String removeResultCheck(Long[] ids, List<CxScheduleResult> finalList) {
+    public String removeResultCheck(Long[] ids, List<CxScheduleResultOld> finalList) {
         if(StringUtils.isEmpty(ids)){
             throw new IllegalArgumentException(I18nUtil.getMessage("cx.schedule.result.remove.error.params"));
         }
-        List<CxScheduleResult> removeList=cxScheduleResultEntityMapper.selectBatchIds(Arrays.asList(ids));
+        List<CxScheduleResultOld> removeList=cxScheduleResultEntityMapper.selectBatchIds(Arrays.asList(ids));
         if(StringUtils.isEmpty(removeList)){
             throw new IllegalArgumentException(I18nUtil.getMessage("cx.schedule.result.remove.error.params"));
         }
         StringBuilder errorLog=new StringBuilder();
 
         //遍历进行校验提醒
-        for(CxScheduleResult cxScheduleResult:removeList){
+        for(CxScheduleResultOld cxScheduleResult:removeList){
             //发布状态
             String isRelease=cxScheduleResult.getIsRelease();
             if(CxEngineConstants.IS_PUBLISH_YES.equals(isRelease)&&StringUtils.isNotEmpty(isRelease)){
@@ -1900,7 +1900,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     @Override
-    public int removeCxSecheduleResultByList(Long[] ids, List<CxScheduleResult> removeList) {
+    public int removeCxSecheduleResultByList(Long[] ids, List<CxScheduleResultOld> removeList) {
         //删除成型排程结果表
         return cxScheduleResultEntityMapper.deleteBatchIds(Arrays.asList(ids));
     }
@@ -1912,11 +1912,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 结果
      */
     @Override
-    public int changeReleaseStatus(CxScheduleResult entity) {
+    public int changeReleaseStatus(CxScheduleResultOld entity) {
         //更新半部件删除字段
-        LambdaUpdateWrapper<CxScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(CxScheduleResult::getScheduleDate, entity.getScheduleDate())
-                .set(CxScheduleResult::getIsRelease, entity.getIsRelease());
+        LambdaUpdateWrapper<CxScheduleResultOld> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(CxScheduleResultOld::getScheduleDate, entity.getScheduleDate())
+                .set(CxScheduleResultOld::getIsRelease, entity.getIsRelease());
         return cxScheduleResultEntityMapper.update(null, updateWrapper);
     }
 
@@ -1955,9 +1955,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         //用于存储已经校验过的数据防止重复校验
         Set<String> existsKey = new TreeSet<>();
         if (CxEngineConstants.YES.equals(switchConfig)) {
-            List<CxScheduleResult> validateResultList = cxScheduleResultEntityMapper.selectRemoveList(ids);
+            List<CxScheduleResultOld> validateResultList = cxScheduleResultEntityMapper.selectRemoveList(ids);
             if (StringUtils.isNotEmpty(validateResultList)) {
-                for (CxScheduleResult cxScheduleResult : validateResultList) {
+                for (CxScheduleResultOld cxScheduleResult : validateResultList) {
                     String embryoCode = cxScheduleResult.getEmbryoCode();
                     String bomDataVersion = cxScheduleResult.getBomDataVersion();
                     String key = GenerageMapKeyUtils.createMapKey(embryoCode, bomDataVersion);
@@ -2155,10 +2155,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return
      */
     @Override
-    public String checkBomDataVersion(List<CxScheduleResult> cxScheduleResultList) {
+    public String checkBomDataVersion(List<CxScheduleResultOld> cxScheduleResultList) {
         StringBuilder errorMsg = new StringBuilder();
         if (StringUtils.isNotEmpty(cxScheduleResultList)) {
-            for (CxScheduleResult cxScheduleResult : cxScheduleResultList) {
+            for (CxScheduleResultOld cxScheduleResult : cxScheduleResultList) {
                 if (StringUtils.isEmpty(cxScheduleResult.getBomDataVersion())) {
                     errorMsg.append(StringUtils.format(I18nUtil.getMessage("cx.publish.bomDataVersion.empty.error"), cxScheduleResult.getSapCode(), cxScheduleResult.getEmbryoCode(), cxScheduleResult.getCxMachineName())).append("<br/>");
                     break;
@@ -2193,7 +2193,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
 
-    public AjaxResult parseCxScheduleResult2(CxScheduleResult cxScheduleResult) {
+    public AjaxResult parseCxScheduleResult2(CxScheduleResultOld cxScheduleResult) {
         // 获取传入日期和前一天的日期
         Date scheduleDate = cxScheduleResult.getScheduleDate();
         LocalDate localDate = scheduleDate.toInstant()
@@ -2253,7 +2253,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // 生成计划
         for (CxOnlineImport cxOnlineImport : cxOnlineImportList) {
-            CxScheduleResult scheduleResult = new CxScheduleResult();
+            CxScheduleResultOld scheduleResult = new CxScheduleResultOld();
             // 设置基本属性（去掉空格）
             scheduleResult.setScheduleDate(cxOnlineImport.getRq());
             scheduleResult.setCxMachineCode(StringUtils.trimToEmpty(cxOnlineImport.getJt()));
@@ -2309,7 +2309,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
 
     @Override
-    public AjaxResult parseCxScheduleResult(CxScheduleResult cxScheduleResult) {
+    public AjaxResult parseCxScheduleResult(CxScheduleResultOld cxScheduleResult) {
         // 获取传入日期和前一天的日期
         Date scheduleDate = cxScheduleResult.getScheduleDate();
         // 转换为 LocalDate
@@ -2355,7 +2355,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         //先删除后插入
-        QueryWrapper<CxScheduleResult> operation = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> operation = new QueryWrapper<>();
         operation.eq("schedule_date",cxScheduleResult.getScheduleDate());
         cxScheduleResultEntityMapper.delete(operation);
 
@@ -2374,7 +2374,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         //1.生成指定日期的成型计划
         for (CxOnlineImport cxOnlineImport : cxOnlineImportList) {
-            CxScheduleResult scheduleResult = new CxScheduleResult();
+            CxScheduleResultOld scheduleResult = new CxScheduleResultOld();
             scheduleResult.setScheduleDate(cxOnlineImport.getRq());
             //将时间格式化为yyyyMMdd
             // 不足3位前面补0
@@ -2472,7 +2472,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
 
-    public List<CxOnlineImport> genXcScheduleResult(CxScheduleResult cxScheduleResult) {
+    public List<CxOnlineImport> genXcScheduleResult(CxScheduleResultOld cxScheduleResult) {
         // 获取传入日期和前一天的日期
         Date scheduleDate = cxScheduleResult.getScheduleDate();
 
@@ -2503,16 +2503,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
 
         // 获取全部成型排程,按机台分组
-        QueryWrapper<CxScheduleResult> queryWrapper2 = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper2 = new QueryWrapper<>();
         queryWrapper2.eq("schedule_date", cxScheduleResult.getScheduleDate());
-        List<CxScheduleResult> cxScheduleResultList = cxScheduleResultEntityMapper.selectList(queryWrapper2);
+        List<CxScheduleResultOld> cxScheduleResultList = cxScheduleResultEntityMapper.selectList(queryWrapper2);
 
         //按照机台+胎胚分组
-        Map<String, List<CxScheduleResult>> cxScheduleResultMap = cxScheduleResultList.stream()
-                .collect(Collectors.groupingBy(CxScheduleResult::getCxMachineCode));
+        Map<String, List<CxScheduleResultOld>> cxScheduleResultMap = cxScheduleResultList.stream()
+                .collect(Collectors.groupingBy(CxScheduleResultOld::getCxMachineCode));
 
         //按照机台+胎胚分组
-        Map<String, List<CxScheduleResult>> cxScheduleResult2Map = cxScheduleResultList.stream()
+        Map<String, List<CxScheduleResultOld>> cxScheduleResult2Map = cxScheduleResultList.stream()
                 .collect(Collectors.groupingBy(item -> item.getCxMachineCode() + "_" + item.getEmbryoCode()));
 
 
@@ -2527,9 +2527,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         for (CxOnlineImport cxOnlineImport : cxOnlineImportList) {
             if (StringUtils.isNotEmpty(cxOnlineImport.getJt())) {
                 if (StringUtils.isNotEmpty(lastjt) && !lastjt.equals(cxOnlineImport.getJt())) {
-                    List<CxScheduleResult> lastList = cxScheduleResultMap.get(lastjt);
+                    List<CxScheduleResultOld> lastList = cxScheduleResultMap.get(lastjt);
                     if (lastList != null) {
-                        for (CxScheduleResult item : lastList) {
+                        for (CxScheduleResultOld item : lastList) {
                             String key = item.getCxMachineCode() + "_" + item.getEmbryoCode();
                             if (!CxOnlineImportMap.containsKey(key)) {
                                 CxOnlineImport insert = new CxOnlineImport();
@@ -2556,9 +2556,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
             String key = cxOnlineImport.getJt() + "_" + cxOnlineImport.getSt();
             if (cxScheduleResult2Map.containsKey(key)) {
-                List<CxScheduleResult> cxScheduleResultList2 = cxScheduleResult2Map.get(key);
+                List<CxScheduleResultOld> cxScheduleResultList2 = cxScheduleResult2Map.get(key);
                 if (cxScheduleResultList2 != null) {
-                    CxScheduleResult item = cxScheduleResultList2.get(0);
+                    CxScheduleResultOld item = cxScheduleResultList2.get(0);
                     cxOnlineImport.setSuwei1(item.getClass1Sort());
                     cxOnlineImport.setWbsw(item.getClass2Sort());
                     cxOnlineImport.setWbjh(item.getClass2PlanQty());
@@ -2704,16 +2704,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 结果
      */
     @Override
-    public AjaxResult updateLhScheduleResult(CxScheduleResult cxScheduleResult) {
+    public AjaxResult updateLhScheduleResult(CxScheduleResultOld cxScheduleResult) {
         StringBuilder msg = new StringBuilder();
         //1.根据id查成型排查
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<CxScheduleResultOld> queryWrapper = new QueryWrapper<>();
         if (cxScheduleResult.getIds() != null) {
             queryWrapper.in("id", cxScheduleResult.getIds());
         }
-        List<CxScheduleResult> list = cxScheduleResultEntityMapper.selectList(queryWrapper);
+        List<CxScheduleResultOld> list = cxScheduleResultEntityMapper.selectList(queryWrapper);
 
-        for (CxScheduleResult item : list) {
+        for (CxScheduleResultOld item : list) {
             //获取成型今日计划量
             int todayPlanQty = (item.getClass1PlanQty() == null ? 0 :  item.getClass1PlanQty()) + (item.getTotalStock() == null ? 0 : item.getTotalStock()) ;
             // 汇总成型计划想关联的硫化ids
@@ -2808,7 +2808,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         String msg = "";
         if (!oldFieldValue.equals(newFieldValue)) {
             // 2.如果当天成型是否有其他胎胚共用旧版本的半部件，如果没有给予提示，有则直接返回
-            List<CxScheduleResult> existSameEmbryoCodeCxList = cxScheduleResultEntityMapper.selectByEmbryoCodeAndScheduleDate(oldFieldValue, scheduleDate, partFieldName);
+            List<CxScheduleResultOld> existSameEmbryoCodeCxList = cxScheduleResultEntityMapper.selectByEmbryoCodeAndScheduleDate(oldFieldValue, scheduleDate, partFieldName);
             if (CollectionUtils.isNotEmpty(existSameEmbryoCodeCxList)) {
                 // 有共用胎胚，不提示
                 return msg;
