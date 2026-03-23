@@ -1,12 +1,12 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
-import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
@@ -16,6 +16,7 @@ import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -220,24 +221,21 @@ public class GroupPlanBeforeConclusionHandler {
         Integer minAllocationDays = groupPlanInfo.getMinAllocationDays(productionContext);
         //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
         if (realAllocationDayBeforeConclusion < minAllocationDays) {
-            if (!hasOtherProductionCxMachine(productionContext, groupPlanInfo, cxMachineInfo, allocationInfo)) {
-                //分组计划不排产-单台
-                groupPlanInfo.setNoProductionLowMinLhMachineNoReachMinProductionDays(minLhMachineCount, realAllocationDayBeforeConclusion, minAllocationDays);
-            }
-            //更新提前收尾信息
+            //20260323 更新提前收尾信息 因还有可能后续持续分配到不同时间段，导致此次收尾不能直接标记不排产
             updateBeforeConclusionForAllocation(beforeConclusionInfo, cxMachineInfo, allocationInfo);
             beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
             deductionDay = beforeConclusionInfo.getDeductionDay();
             deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
         }
-        //20260322 还不可以标记结构分配完成，可能等下一轮分配
-//        groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
         //更新分配信息
         allocationInfo.beforeConclusion(beforeConclusionDay, deductionDay);
         if (CollectionUtils.isEmpty(deductionDaySet)) {
             return;
         }
+        Integer deductionDayCount = deductionDaySet.size();
+        //20260322 还不可以标记结构分配完成，可能等下一轮分配--调整为更新分配的天数
+        groupPlanInfo.deductionAllocationDays(deductionDayCount);
         //20260119 释放，成型工装使用量，切换结构使用量、分配日产能、特殊材料分配量
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
         DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
@@ -278,6 +276,7 @@ public class GroupPlanBeforeConclusionHandler {
                         if (!materialDesc.equals(singleProduction.getMaterialDesc())) {
                             reserveList.add(singleProduction);
                         }
+                        returnMonthPlanProductionQty(productionContext, materialDesc, singleProduction);
                     });
                     mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
                 });
@@ -290,6 +289,34 @@ public class GroupPlanBeforeConclusionHandler {
                 }
             });
         });
+    }
+
+    /**
+     * 按计划更新计划的排产量
+     *
+     * @param productionContext 排产上下文
+     * @param materialDesc      排产物料
+     * @param singleProduction  排产信息
+     */
+    private void returnMonthPlanProductionQty(TbrProductionContext productionContext, String materialDesc, CxMouldDayProductionHelper singleProduction) {
+        if (null == singleProduction || StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        Long monthPlanId = singleProduction.getMonthPlanId();
+        if (null == monthPlanId) {
+            return;
+        }
+        Map<Long, MonthPlanProductionRequirePlanVo> allProductionPlan = productionContext.getAllProductionPlan();
+        if (CollectionUtils.isEmpty(allProductionPlan)) {
+            return;
+        }
+        MonthPlanProductionRequirePlanVo requirePlan = allProductionPlan.get(monthPlanId);
+        if (null == requirePlan) {
+            return;
+        }
+        //排产量，先低优先级，再高优先级
+        Integer productionQty = singleProduction.getProductionQty();
+        requirePlan.withdrawProductionQty(productionQty);
     }
 
     /**

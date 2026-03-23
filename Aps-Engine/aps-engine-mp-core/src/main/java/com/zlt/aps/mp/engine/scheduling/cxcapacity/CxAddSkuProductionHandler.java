@@ -171,7 +171,7 @@ public class CxAddSkuProductionHandler {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoProductionQtyLog(context, groupName, cxMachineCode, materialDesc));
             return;
         }
-        //选择模具 productionContext.selectedDoubleMouldByRange(materialDesc, startDay, endDay);
+        //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
@@ -389,7 +389,6 @@ public class CxAddSkuProductionHandler {
         //递归：重新下一轮
         productionAddSkuByContinueCxMachine(context, groupPlanInfo, excludeDays);
         return;
-
     }
 
     /**

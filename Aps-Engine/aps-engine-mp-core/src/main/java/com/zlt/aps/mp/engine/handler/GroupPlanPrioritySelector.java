@@ -45,18 +45,22 @@ public class GroupPlanPrioritySelector {
      * 7.2、使用SKu个数多的优先
      * 7.3、需求量大的优先
      *
-     * @param context 排产上下文
+     * @param context          排产上下文
+     * @param excludeGroupPlan 需要排除的分组
      * @return
      */
-    public ProductionPlanGroupInfo getHeightPriorityGroup(Context context) {
+    public ProductionPlanGroupInfo getHeightPriorityGroup(Context context, Set<String> excludeGroupPlan) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, ProductionPlanGroupInfo> allGroupPlan = productionContext.getGroupProductionInfo();
         if (CollectionUtils.isEmpty(allGroupPlan)) {
             return null;
         }
-        List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlan.values().stream().filter(singleGroup ->
-                singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue()
-        ).collect(Collectors.toList());
+        List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlan.values().stream().filter(singleGroup -> {
+            if (excludeGroupPlan.contains(singleGroup.getGroupName())) {
+                return false;
+            }
+            return singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue();
+        }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(needProductionGroupList)) {
             return null;
         }
@@ -72,7 +76,7 @@ public class GroupPlanPrioritySelector {
         //如果选上的是特殊原材料结构，则从所有特殊原材料结构中重新获取
         if (selected.isSpecialMaterial()) {
             TbrSpecialMaterialProductionLogRecorder.addProductionSpecialMaterialInfoLog(productionContext, "新结构挑选到");
-            return getHeightPriorityGroupBySpecialMaterial(productionContext);
+            return getHeightPriorityGroupBySpecialMaterial(productionContext, excludeGroupPlan);
         }
         return selected;
     }
@@ -170,10 +174,11 @@ public class GroupPlanPrioritySelector {
      * 3、使用特殊原材料Sku个数多的优先
      * 4、剩余可分配天数多的优先
      *
-     * @param context 排产上下文
+     * @param context          排产上下文
+     * @param excludeGroupPlan 需要排除的分组
      * @return
      */
-    public ProductionPlanGroupInfo getHeightPriorityGroupBySpecialMaterial(Context context) {
+    public ProductionPlanGroupInfo getHeightPriorityGroupBySpecialMaterial(Context context, Set<String> excludeGroupPlan) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, ProductionPlanGroupInfo> allGroupPlan = productionContext.getGroupProductionInfo();
         if (CollectionUtils.isEmpty(allGroupPlan)) {
@@ -182,6 +187,9 @@ public class GroupPlanPrioritySelector {
         List<ProductionPlanGroupInfo> hasLeftOverAndSpecialMaterialList = allGroupPlan.values().stream().filter(singleGroup -> {
             //不含特殊原材料的结构过滤
             if (!singleGroup.isSpecialMaterial()) {
+                return false;
+            }
+            if (excludeGroupPlan.contains(singleGroup.getGroupName())) {
                 return false;
             }
             return singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue();

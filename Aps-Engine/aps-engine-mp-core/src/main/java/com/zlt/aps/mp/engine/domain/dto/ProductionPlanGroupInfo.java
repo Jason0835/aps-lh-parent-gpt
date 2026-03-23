@@ -538,6 +538,21 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 20260323 结构收尾需要将以分配天数扣减
+     *
+     * @param deductionDays 收尾的天数
+     */
+    public void deductionAllocationDays(Integer deductionDays) {
+        if (null == deductionDays || deductionDays <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        if (null == leftOverNeedAllocationDays) {
+            return;
+        }
+        leftOverNeedAllocationDays = leftOverNeedAllocationDays + deductionDays;
+    }
+
+    /**
      * 获取结构下，最早收尾的硫化机台组
      *
      * @return

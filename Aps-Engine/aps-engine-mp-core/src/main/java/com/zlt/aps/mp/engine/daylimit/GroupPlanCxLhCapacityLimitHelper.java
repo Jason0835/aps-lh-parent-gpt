@@ -649,7 +649,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 lhMachineQty = BigDecimal.ZERO.intValue();
             }
             //20260323 满台释放，则不减
-            if (nextDayLhMachineQty == BigDecimal.ZERO.intValue() && lhMachineQty.equals(fullLhMachineQty)) {
+            if (lhMachineQty > nextDayLhMachineQty && lhMachineQty.equals(fullLhMachineQty)) {
                 return;
             }
             if (lhMachineQty > nextDayLhMachineQty) {
