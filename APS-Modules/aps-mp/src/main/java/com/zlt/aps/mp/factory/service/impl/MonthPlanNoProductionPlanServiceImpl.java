@@ -203,7 +203,10 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty",
                 "sum(UN_PRODUCTION_QTY) as unProductionQty", "GROUP_CONCAT(distinct reason SEPARATOR '|') as reason",
                 "max(UPDATE_TIME) as UPDATE_TIME");
-        wrapper.groupBy("MATERIAL_CODE");
+        wrapper.groupBy("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
+                "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
+                "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
+                "PATTERN", "IS_PRODUCTION");
         wrapper.orderBy(true, true, "STRUCTURE_NAME", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC", "PRO_SIZE");
         wrapper.orderBy(true, false, "UPDATE_TIME");
         List<MonthPlanNoProductionPlan> dataList = monthPlanNoProductionPlanMapper.selectList(wrapper);
