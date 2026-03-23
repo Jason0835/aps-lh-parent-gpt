@@ -478,6 +478,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
         //降膜排产相关
         paramCodeList.add(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode());
@@ -511,6 +514,18 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         } else {
             configuration.setBoostProductionType(Stream.of(boostProductionTypeValue.split(StringConstant.COMMA)).collect(Collectors.toSet()));
         }
+        //外销贴牌-品牌配置
+        String oemBrandConfig = (String) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        if (StringUtils.isBlank(oemBrandConfig)) {
+            configuration.setOemBrandConfig(Collections.emptySet());
+        } else {
+            configuration.setOemBrandConfig(Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        //外销贴牌-总产量配置，单位条
+        configuration.setOemBrandCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+        //周期储备量占实单的比例(%)
+        configuration.setReservePercent((Integer) paramConfigurationMap.get(MonthPlanEnums.RESERVE_PERCENT.getCode()));
+
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
         configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));

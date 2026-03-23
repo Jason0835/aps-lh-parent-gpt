@@ -100,6 +100,19 @@ public enum MonthPlanEnums {
      */
     DAY_MIN_CAPACITY("SYS0203009", "每日最小产能"),
     /**
+     * SYS0203011 外销贴牌-品牌配置
+     */
+    OEM_BRAND_CONFIG("SYS0203011", "外销贴牌-品牌配置"),
+    /**
+     * SYS0203012 外销贴牌-总产量配置，单位条
+     */
+    OEM_BRAND_CAPACITY("SYS0203012", "外销贴牌-总产量配置，单位条"),
+    /**
+     * SYS0203013 周期储备量占实单的比例(%)
+     */
+    RESERVE_PERCENT("SYS0203013", "周期储备量占实单的比例(%)"),
+
+    /**
      * SYS0204001 SKU总净需求量<=该值，SKU一次性排产
      */
     SUM_PRODUCTION_QTY("SYS0204001", "SKU总净需求量<=该值，SKU一次性排产"),
