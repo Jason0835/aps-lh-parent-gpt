@@ -50,6 +50,10 @@ public interface BusiConstant {
          * 分隔符：分组
          */
         String SPLIT_GROUP_KEY = "|*|";
+        /**
+         * 分隔符：分号
+         */
+        String SPLIT_SEMICOLON = ";";
     }
 
 
