@@ -213,7 +213,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     .orElse(Collections.emptyList())
                     .stream()
                     .distinct()
-                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_SEMICOLON));
             sendMessage(MsgTemplateEnums.MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME.getCode(),
                     MsgTypeEnums.NOTICE.getCode(), msg);
         }
