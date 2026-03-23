@@ -237,6 +237,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(localProductionInfo)) {
             return Collections.emptySet();
         }
+        String cxMachineDaysInfo = localProductionInfo.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        DayLimitLogRecorder.addCxMachineCanProductionDayLog(productionContext, cxMachineCode, cxMachineDaysInfo);
         //取得交集
         Set<Integer> intersectionSet = localProductionInfo.stream().filter(productionDayInfo::contains).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(intersectionSet)) {
@@ -555,29 +557,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         allocationList.add(addAllocationPlan);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         handlerLimitInfo(productionContext, addAllocationPlan, productionPlanInfo);
-//        //20260119 处理成型工装的日使用量
-//        Integer endDay = addAllocationPlan.getEndDay();
-//        String proSize = productionPlanInfo.getProSizeInfo();
-//        baseDataContainer.getCxMachineBaseInfo().get(cxMachineCode);
-//        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
-//        for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
-//            if (stopDayInfo.contains(productionDay)) {
-//                continue;
-//            }
-//            //20260123 成型已分配日
-//            allocationDaySet.add(productionDay);
-//            //20260120 成型工装占用量
-//            baseDataContainer.addUsedCount(productionDay, proSize, cxMachineCode);
-//            //20260125 分组占用每日产能
-//            dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, productionDay, addAllocationPlan);
-//        }
-//        //todo 20260211 特殊材料分配库存更新
-//        Integer allocationDay = addAllocationPlan.getAllocationDay();
-//        productionContext.updateSpecialMaterialInfoMap(productionPlanInfo, allocationDay);
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Integer startDay = addAllocationPlan.getStartDay();
         //20260121 切换结构
-        if (isChangeGroup(lastAllocation, addAllocationPlan)) {
+        if (isChangeGroup(context, lastAllocation, addAllocationPlan)) {
             String groupName = addAllocationPlan.getAllocationGroup();
             log.info(TbrProductionGroupLogRecorder.addCxMachineChangeGroupLog(productionContext, cxMachineCode, startDay, groupName));
             baseDataContainer.getDayCapacityLimit().addChangeGroupNameUsedQty(productionContext, startDay, cxMachineCode, groupName);
@@ -611,13 +594,14 @@ public class CxMachineBaseInfoVo implements Serializable {
     /**
      * 判断是否切换分组(TBR-结构)
      *
+     * @param context         排产上下文
      * @param changeDay       切换日
      * @param changeGroupName 切换分组名
      * @return
      */
-    public boolean isChangeGroup(Integer changeDay, String changeGroupName) {
+    public boolean isChangeGroup(Context context, Integer changeDay, String changeGroupName) {
         CxMachineAllocationPlanHelper lastAllocation = getLastAllocationInfo();
-        return isChangeGroup(lastAllocation, changeDay, changeGroupName);
+        return isChangeGroup(context, lastAllocation, changeDay, changeGroupName);
     }
 
     /**
@@ -693,7 +677,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      *
      * @return
      */
-    public CxLhProductionHelper getEarliestConclusionLhGroup() {
+    public CxLhProductionHelper getEarliestConclusionLhGroup(Set<Integer> excludeDays) {
         //获取成型硫化组
         if (CollectionUtils.isEmpty(cxLhRatioMap)) {
             return null;
@@ -703,10 +687,18 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(hasProductionList)) {
             return null;
         }
+        if (!CollectionUtils.isEmpty(excludeDays)) {
+            //20260113 剔除需要排除的收尾时间点
+            hasProductionList = hasProductionList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getProductionDay())).collect(Collectors.toList());
+        }
+        if (CollectionUtils.isEmpty(hasProductionList)) {
+            return null;
+        }
         //按最后排产日，进行升序排序
         hasProductionList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
         //取得第一条：即最早收尾的硫化组
-        return hasProductionList.get(BigDecimal.ZERO.intValue());
+        CxLhProductionHelper earliestConclusionLhMachine = hasProductionList.get(BigDecimal.ZERO.intValue());
+        return earliestConclusionLhMachine;
     }
 
     /**
@@ -723,13 +715,17 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
             return null;
         }
-        //todo 修正当前的排产Sku
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Integer preClosingDay = selectedLhGroup.getProductionDay();
         Integer preEndDay = endDay;
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        boolean isChangeMould = selectedLhGroup.isChangeMould(addSkuInfo);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku(), selectedLhGroup.getBeforeSku());
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
         MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
@@ -742,16 +738,16 @@ public class CxMachineBaseInfoVo implements Serializable {
         List<Integer> sortList = new ArrayList<>(effectiveRangeSet);
         Collections.sort(sortList);
         int size = sortList.size();
-        newLhGroup.updateProductionDateRange(sortList.get(BigDecimal.ZERO.intValue()), sortList.get(size - BigDecimal.ONE.intValue()));
-        //20260122 换模判断
+        Integer newStartDay = sortList.get(BigDecimal.ZERO.intValue());
+        newLhGroup.updateProductionDateRange(newStartDay, sortList.get(size - BigDecimal.ONE.intValue()));
+        //20260122 换模次数判断
         if (!isChangeMould) {
             return newLhGroup;
         }
         //需要换模-换模次数处理
         DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer changeMouldDay = newLhGroup.getProductionDay();
         Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, newStartDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
         return newLhGroup;
     }
 
@@ -1014,10 +1010,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         Integer changeDay = allocationInfo.getStartDay();
         CxMachineAllocationPlanHelper lastInfo = getLastAllocationInfo();
-        if (isChangeGroup(lastInfo, allocationInfo)) {
+        if (isChangeGroup(context, lastInfo, allocationInfo)) {
             TbrProductionContext productionContext = (TbrProductionContext) context;
             String groupName = allocationInfo.getAllocationGroup();
-            log.info(TbrProductionGroupLogRecorder.addReleaseCxMachineChangeGroupLog(productionContext, cxMachineCode, changeDay, groupName));
+            TbrProductionGroupLogRecorder.addReleaseCxMachineChangeGroupLog(productionContext, cxMachineCode, changeDay, groupName);
             productionContext.getBaseDataContainer().getDayCapacityLimit().deductionChangeGroupNameUsedQty(productionContext, changeDay, cxMachineCode, groupName);
         }
     }
@@ -1065,34 +1061,41 @@ public class CxMachineBaseInfoVo implements Serializable {
      * @param afterAllocation  后一个配置
      * @return
      */
-    private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, CxMachineAllocationPlanHelper afterAllocation) {
+    private boolean isChangeGroup(Context context, CxMachineAllocationPlanHelper beforeAllocation, CxMachineAllocationPlanHelper afterAllocation) {
         if (null == afterAllocation) {
             return false;
         }
         Integer startDay = afterAllocation.getStartDay();
         String groupName = afterAllocation.getAllocationGroup();
-        return isChangeGroup(beforeAllocation, startDay, groupName);
+        return isChangeGroup(context, beforeAllocation, startDay, groupName);
     }
 
     /**
      * 判断是否切换分组(TBR为结构)
      *
+     * @param context          排产上下文
      * @param beforeAllocation 前一配置
      * @param changeStartDay   切换日
      * @param changeGroupName  切换的分组名
      * @return
      */
-    private boolean isChangeGroup(CxMachineAllocationPlanHelper beforeAllocation, Integer changeStartDay, String changeGroupName) {
+    private boolean isChangeGroup(Context context, CxMachineAllocationPlanHelper beforeAllocation, Integer changeStartDay, String changeGroupName) {
         if (null == changeStartDay || StringUtils.isBlank(changeGroupName)) {
             return false;
         }
-        //第一天先不判断
-        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
-            return false;
-        }
-        //前面没有，不算切换
+//        //第一天先不判断
+//        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
+//            return false;
+//        }
+        //没有分配信息，看续作
         if (null == beforeAllocation) {
-            return false;
+            TbrProductionContext productionContext = (TbrProductionContext) context;
+            Map<String, String> continueGroupInfoMap = productionContext.getContinueStructureMap();
+            if (CollectionUtils.isEmpty(continueGroupInfoMap)) {
+                return false;
+            }
+            String continueGroupName = continueGroupInfoMap.get(cxMachineCode);
+            return !changeGroupName.equals(continueGroupName);
         }
         //分组名是否相同
         return !beforeAllocation.getAllocationGroup().equals(changeGroupName);

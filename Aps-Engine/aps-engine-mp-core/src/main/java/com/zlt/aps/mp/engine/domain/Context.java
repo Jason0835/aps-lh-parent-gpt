@@ -2,8 +2,8 @@ package com.zlt.aps.mp.engine.domain;
 
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.enums.ProductTypeEnum;
-import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -117,11 +117,12 @@ public class Context {
      *
      * @return
      */
-    public Integer getFullYearAndMonth(){
+    public Integer getFullYearAndMonth() {
         //设置年月值
         String yearAndMonth = String.format("%s%02d", year, month);
         return Integer.valueOf(yearAndMonth);
     }
+
     /**
      * 判断排产日是否为排产周期的第一天
      *
@@ -211,6 +212,26 @@ public class Context {
         }
         return newProductionDay;
     }
+
+    /**
+     * 获取从startDay~endDay排产范围内，实际可排产天数
+     *
+     * @param startDay
+     * @param endDay
+     * @return
+     */
+    public Integer getRealProductionDaysByRange(Integer startDay, Integer endDay) {
+        Set<Integer> stopInfo = Optional.ofNullable(stopDays).orElse(Collections.emptySet());
+        Integer count = BigDecimal.ZERO.intValue();
+        for (Integer day = startDay; day <= endDay; day++) {
+            if (stopInfo.contains(day)) {
+                continue;
+            }
+            count = count + BigDecimal.ONE.intValue();
+        }
+        return count;
+    }
+
     /**
      * 创建新的版本号，如果排产版本号已经有值，则不进行创建
      * 否则创建新的排产版本号：规则 前缀 + yyyyMMddHHMMSS

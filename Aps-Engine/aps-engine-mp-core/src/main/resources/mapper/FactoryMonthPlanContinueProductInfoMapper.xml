@@ -32,6 +32,8 @@
            AND msa.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND msa.YEAR = #{year,jdbcType=DECIMAL}
            AND msa.MONTH = #{month,jdbcType=DECIMAL}
+           AND msa.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND msa.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
            AND msa.END_DAY = #{lastDay,jdbcType=DECIMAL}
     </select>
 </mapper>

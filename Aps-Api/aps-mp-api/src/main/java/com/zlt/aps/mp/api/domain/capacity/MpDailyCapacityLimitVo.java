@@ -2,7 +2,9 @@ package com.zlt.aps.mp.api.domain.capacity;
 
 import lombok.Data;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**

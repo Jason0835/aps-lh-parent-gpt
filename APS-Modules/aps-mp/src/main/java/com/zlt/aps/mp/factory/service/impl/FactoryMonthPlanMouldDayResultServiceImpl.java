@@ -8,15 +8,13 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
-import com.zlt.aps.common.core.domain.ExcelStyleVo;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.domain.vo.MonthFinishRateRangeVo;
-import com.zlt.aps.mp.api.domain.vo.MonthFinishRateVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -34,6 +32,7 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -127,15 +126,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
         // 1.3、加载结构排产数据
-        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<MpStructureAllocation>();
-        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion,
-                factoryMonthPlanMouldDayResult.getProductionVersion());
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode,
-                factoryMonthPlanMouldDayResult.getFactoryCode());
+        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
+        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, factoryMonthPlanMouldDayResult.getProductionVersion());
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
         Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
-
+        
         // 2、构建导出总表
         List<FactoryMonthPlanMouldDayResultExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
         List<FactoryMonthPlanMouldDayResultExportVo> subtotalList = new ArrayList<>(); // 小计列表
@@ -143,6 +141,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         String structureName = null; // 当前结构名称
         List<FactoryMonthPlanMouldDayResultExportVo> structureList = new ArrayList<>(); // 同结构排产记录列表
         Map<Integer, Integer> changeMouldMap = new HashMap<>();
+        for (int day = 1; day <= MAX_MONTH_DAY; day ++) {  // 初始化汇总map
+            changeMouldMap.put(day, 0);
+        }
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
             // 2.1.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
             FactoryMonthPlanMouldDayResultExportVo record = recordList.get(i);
@@ -160,6 +161,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
                 if (result.getDayVulcanizationQty() != null) {
                     result.setDayVulcanizationQty(result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 日硫化量调整为双模
+                    Integer differenceQty = Optional.ofNullable(result.getDifferenceQty()).orElse(0); // 未排量负数处理
+                    result.setDifferenceQty(differenceQty >= 0? differenceQty: 0);
                 }
             }
             totalRecordList.addAll(structureList);
@@ -168,11 +171,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
             embryoCountStatisticsRecord.setStructureName(structureName);
             embryoCountStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getCode());
-            embryoCountStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getName()));
+            embryoCountStatisticsRecord.setProductCategory(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.EMBRYO_TYPE_COUNT.getName()));
             FactoryMonthPlanMouldDayResultExportVo lhMachinesStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
             lhMachinesStatisticsRecord.setStructureName(structureName);
             lhMachinesStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.LH_MACHINES.getCode());
-            lhMachinesStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.LH_MACHINES.getName()));
+            lhMachinesStatisticsRecord.setProductCategory(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.LH_MACHINES.getName()));
             MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
             if (statistics != null) {
                 for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
@@ -210,7 +213,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 4、构建换模次数列
         FactoryMonthPlanMouldDayResultExportVo changeMouldStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
         changeMouldStatisticsRecord.setDataType(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode());
-        changeMouldStatisticsRecord.setPlanType(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getName()));
+        changeMouldStatisticsRecord.setProductCategory(I18nUtil.getMessage(MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getName()));
         for (Entry<Integer, Integer> entry: changeMouldMap.entrySet()) {
             Integer day = entry.getKey();
             Integer mould = entry.getValue();
@@ -236,9 +239,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 工厂名称字典
         List<SysDictData> factoryDatas = sysDictDataCacheService.getType("biz_factory_name");
         Map<String, String> factoryMap = factoryDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
-        // 计划类型字典
-        List<SysDictData> planTypeDatas = sysDictDataCacheService.getType("biz_plan_type");
-        Map<String, String> planTypeMap = planTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        // 内外销类型字典
+        List<SysDictData> storTypeDatas = sysDictDataCacheService.getType("biz_stor_type");
+        Map<String, String> storTypeMap = storTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
         // 产品品类字典
         List<SysDictData> productTypeDatas = sysDictDataCacheService.getType("biz_product_type");
         Map<String, String> productTypeMap = productTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
@@ -263,117 +266,23 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 列表数据
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         List<CellStyle> cellStyleList = new ArrayList<>();
-        //需要增加的第二部分
+        int beginIndex = 2; // 起始行
+        //需要增加的第二部分表头统计
+        Map<String, Object> totalMap = new HashMap<>();
         if (PubUtil.isNotEmpty(list)) {
-            
-            
             List<Map<String, Object>> listData = new ArrayList<>();
             list.stream()
             .filter(r -> MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode().equals(r.getDataType())
                     || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(r.getDataType()))
             .forEach(exportVo -> {
-                Map<String, Object> listDataMap = new HashMap<>(16);
-                listDataMap.put("planTypeA", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
-                listDataMap.put("materialCodeA", exportVo.getMaterialCode());
-                listDataMap.put("mesMaterialCodeA", exportVo.getMesMaterialCode());
-                listDataMap.put("materialDescA", exportVo.getMaterialDesc());
-                listDataMap.put("structureNameA", exportVo.getStructureName());
-                listDataMap.put("productStatusA", productStatusMap.getOrDefault(exportVo.getProductStatus(), exportVo.getProductStatus()));
-                listDataMap.put("embryoCodeA", exportVo.getEmbryoCode());
-                listDataMap.put("structureTypeA", structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
-                listDataMap.put("mainMaterialDescA", exportVo.getMainMaterialDesc());
-                listDataMap.put("constructionStageA", constructionStageMap.getOrDefault(exportVo.getConstructionStage(), exportVo.getConstructionStage()));
-                listDataMap.put("brandA", brandMap.getOrDefault(exportVo.getBrand(), exportVo.getBrand()));
-                listDataMap.put("specificationsA", exportVo.getSpecifications());
-                listDataMap.put("mainPatternA", exportVo.getMainPattern());
-                listDataMap.put("patternA", exportVo.getPattern());
-                listDataMap.put("proSizeA", exportVo.getProSize());
-                listDataMap.put("productCategoryA", productCategoryMap.getOrDefault(exportVo.getProductCategory(), exportVo.getProductCategory()));
-                listDataMap.put("mouldCavityQtyA", exportVo.getMouldCavityQty());
-                listDataMap.put("typeBlockQtyA", exportVo.getTypeBlockQty());
-                listDataMap.put("averageSaleQtyA", exportVo.getAverageSaleQty());
-                listDataMap.put("inventorySalesRatioA", exportVo.getInventorySalesRatio());
-                listDataMap.put("dayVulcanizationQtyA", exportVo.getDayVulcanizationQty());
-                listDataMap.put("prodReqPlanA", exportVo.getProdReqPlan());
-                listDataMap.put("heightQtyA", exportVo.getHeightQty());
-                listDataMap.put("midQtyA", exportVo.getMidQty());
-                listDataMap.put("cycleReserveQtyA", exportVo.getCycleReserveQty());
-                listDataMap.put("totalQtyA", exportVo.getTotalQty());
-                listDataMap.put("heightProductionQtyA", exportVo.getHeightProductionQty());
-                listDataMap.put("midProductionQtyA", exportVo.getMidProductionQty());
-                listDataMap.put("cycleProductionQtyA", exportVo.getCycleProductionQty());
-                listDataMap.put("conventionProductionQtyA", exportVo.getConventionProductionQty());
-                listDataMap.put("postponeProductionQtyA", exportVo.getPostponeProductionQty());
-                listDataMap.put("differenceQtyA", exportVo.getDifferenceQty());
-                listDataMap.put("beginDayA", exportVo.getBeginDay());
-                listDataMap.put("endDayA", exportVo.getEndDay());
-                listDataMap.put("day1A", exportVo.getDay1());
-                listDataMap.put("day2A", exportVo.getDay2());
-                listDataMap.put("day3A", exportVo.getDay3());
-                listDataMap.put("day4A", exportVo.getDay4());
-                listDataMap.put("day5A", exportVo.getDay5());
-                listDataMap.put("day6A", exportVo.getDay6());
-                listDataMap.put("day7A", exportVo.getDay7());
-                listDataMap.put("day8A", exportVo.getDay8());
-                listDataMap.put("day9A", exportVo.getDay9());
-                listDataMap.put("day10A", exportVo.getDay10());
-                listDataMap.put("day11A", exportVo.getDay11());
-                listDataMap.put("day12A", exportVo.getDay12());
-                listDataMap.put("day13A", exportVo.getDay13());
-                listDataMap.put("day14A", exportVo.getDay14());
-                listDataMap.put("day15A", exportVo.getDay15());
-                listDataMap.put("day16A", exportVo.getDay16());
-                listDataMap.put("day17A", exportVo.getDay17());
-                listDataMap.put("day18A", exportVo.getDay18());
-                listDataMap.put("day19A", exportVo.getDay19());
-                listDataMap.put("day20A", exportVo.getDay20());
-                listDataMap.put("day21A", exportVo.getDay21());
-                listDataMap.put("day22A", exportVo.getDay22());
-                listDataMap.put("day23A", exportVo.getDay23());
-                listDataMap.put("day24A", exportVo.getDay24());
-                listDataMap.put("day25A", exportVo.getDay25());
-                listDataMap.put("day26A", exportVo.getDay26());
-                listDataMap.put("day27A", exportVo.getDay27());
-                listDataMap.put("day28A", exportVo.getDay28());
-                listDataMap.put("day29A", exportVo.getDay29());
-                listDataMap.put("day30A", exportVo.getDay30());
-                listDataMap.put("day31A", exportVo.getDay31());
-
-                // 计算day1到day31的数量合计
-                Integer totolAll = 0;
-                totolAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
-                totolAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
-                totolAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
-                totolAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
-                totolAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
-                totolAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
-                totolAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
-                totolAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
-                totolAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
-                totolAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
-                totolAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
-                totolAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
-                totolAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
-                totolAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
-                totolAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
-                totolAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
-                totolAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
-                totolAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
-                totolAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
-                totolAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
-                totolAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
-                totolAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
-                totolAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
-                totolAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
-                totolAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
-                totolAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
-                totolAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
-                totolAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
-                totolAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
-                totolAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
-                totolAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
+                Map<String, Object> listDataMap = this.buildListDataMap(exportVo, storTypeMap, productCategoryMap,
+                        productStatusMap, constructionStageMap, brandMap, structureTypeMap, "A");
                 listData.add(listDataMap);
+                if (MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) {
+                    totalMap.putAll(listDataMap);
+                }
             });
+            beginIndex += listData.size();
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
         }
@@ -388,136 +297,25 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
             tableMap.put("productionVersion", firstItem.getProductionVersion());
             List<Map<String, Object>> listData = new ArrayList<>();
-            int beginIndex =4;
-
+            
             for (int i = 0; i < list.size(); i++) {
-                Map<String, Object> listDataMap = new HashMap<>(16);
                 FactoryMonthPlanMouldDayResultExportVo exportVo = list.get(i);
-                listDataMap.put("planType", planTypeMap.getOrDefault(exportVo.getPlanType(), exportVo.getPlanType()));
-                listDataMap.put("materialCode", exportVo.getMaterialCode());
-                listDataMap.put("mesMaterialCode", exportVo.getMesMaterialCode());
-                listDataMap.put("materialDesc", exportVo.getMaterialDesc());
-                listDataMap.put("structureName", exportVo.getStructureName());
-                listDataMap.put("productStatus", productStatusMap.getOrDefault(exportVo.getProductStatus(), exportVo.getProductStatus()));
-                listDataMap.put("embryoCode", exportVo.getEmbryoCode());
-                listDataMap.put("structureType", structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
-                listDataMap.put("mainMaterialDesc", exportVo.getMainMaterialDesc());
-                listDataMap.put("constructionStage", constructionStageMap.getOrDefault(exportVo.getConstructionStage(), exportVo.getConstructionStage()));
-                listDataMap.put("brand", brandMap.getOrDefault(exportVo.getBrand(), exportVo.getBrand()));
-                listDataMap.put("specifications", exportVo.getSpecifications());
-                listDataMap.put("mainPattern", exportVo.getMainPattern());
-                listDataMap.put("pattern", exportVo.getPattern());
-                listDataMap.put("proSize", exportVo.getProSize());
-                listDataMap.put("productCategory", productCategoryMap.getOrDefault(exportVo.getProductCategory(), exportVo.getProductCategory()));
-                listDataMap.put("mouldCavityQty", exportVo.getMouldCavityQty());
-                listDataMap.put("typeBlockQty", exportVo.getTypeBlockQty());
-                listDataMap.put("averageSaleQty", exportVo.getAverageSaleQty());
-                listDataMap.put("inventorySalesRatio", exportVo.getInventorySalesRatio());
-                listDataMap.put("dayVulcanizationQty", exportVo.getDayVulcanizationQty());
-                listDataMap.put("prodReqPlan", exportVo.getProdReqPlan());
-                listDataMap.put("heightQty", exportVo.getHeightQty());
-                listDataMap.put("midQty", exportVo.getMidQty());
-                listDataMap.put("cycleReserveQty", exportVo.getCycleReserveQty());
-                listDataMap.put("totalQty", exportVo.getTotalQty());
-                listDataMap.put("heightProductionQty", exportVo.getHeightProductionQty());
-                listDataMap.put("midProductionQty", exportVo.getMidProductionQty());
-                listDataMap.put("cycleProductionQty", exportVo.getCycleProductionQty());
-                listDataMap.put("conventionProductionQty", exportVo.getConventionProductionQty());
-                listDataMap.put("postponeProductionQty", exportVo.getPostponeProductionQty());
-                listDataMap.put("differenceQty", exportVo.getDifferenceQty());
-                listDataMap.put("beginDay", exportVo.getBeginDay());
-                listDataMap.put("endDay", exportVo.getEndDay());
-                listDataMap.put("day1", exportVo.getDay1());
-                listDataMap.put("day2", exportVo.getDay2());
-                listDataMap.put("day3", exportVo.getDay3());
-                listDataMap.put("day4", exportVo.getDay4());
-                listDataMap.put("day5", exportVo.getDay5());
-                listDataMap.put("day6", exportVo.getDay6());
-                listDataMap.put("day7", exportVo.getDay7());
-                listDataMap.put("day8", exportVo.getDay8());
-                listDataMap.put("day9", exportVo.getDay9());
-                listDataMap.put("day10", exportVo.getDay10());
-                listDataMap.put("day11", exportVo.getDay11());
-                listDataMap.put("day12", exportVo.getDay12());
-                listDataMap.put("day13", exportVo.getDay13());
-                listDataMap.put("day14", exportVo.getDay14());
-                listDataMap.put("day15", exportVo.getDay15());
-                listDataMap.put("day16", exportVo.getDay16());
-                listDataMap.put("day17", exportVo.getDay17());
-                listDataMap.put("day18", exportVo.getDay18());
-                listDataMap.put("day19", exportVo.getDay19());
-                listDataMap.put("day20", exportVo.getDay20());
-                listDataMap.put("day21", exportVo.getDay21());
-                listDataMap.put("day22", exportVo.getDay22());
-                listDataMap.put("day23", exportVo.getDay23());
-                listDataMap.put("day24", exportVo.getDay24());
-                listDataMap.put("day25", exportVo.getDay25());
-                listDataMap.put("day26", exportVo.getDay26());
-                listDataMap.put("day27", exportVo.getDay27());
-                listDataMap.put("day28", exportVo.getDay28());
-                listDataMap.put("day29", exportVo.getDay29());
-                listDataMap.put("day30", exportVo.getDay30());
-                listDataMap.put("day31", exportVo.getDay31());
-
-                // 计算day1到day31的数量合计
-                Integer totolAll = 0;
-                totolAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
-                totolAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
-                totolAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
-                totolAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
-                totolAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
-                totolAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
-                totolAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
-                totolAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
-                totolAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
-                totolAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
-                totolAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
-                totolAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
-                totolAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
-                totolAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
-                totolAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
-                totolAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
-                totolAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
-                totolAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
-                totolAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
-                totolAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
-                totolAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
-                totolAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
-                totolAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
-                totolAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
-                totolAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
-                totolAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
-                totolAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
-                totolAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
-                totolAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
-                totolAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
-                totolAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
-
-
+                Map<String, Object> listDataMap = this.buildListDataMap(exportVo, storTypeMap, productCategoryMap,
+                        productStatusMap, constructionStageMap, brandMap, structureTypeMap, null);
+                // Excel行号从2开始（第1行是表头）
+                int rowNum = beginIndex + i;
                 if(!MonthPlanExportDataTypeEnum.RECORD.getCode().equals(exportVo.getDataType())){
                     String color = "#DAEEF3";
-                    // Excel行号从2开始（第1行是表头）
-                    int rowNum = beginIndex + i;
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 65, color, false, true, ""));
-                    if (MonthPlanExportDataTypeEnum.SUBTOTAL.getCode().equals(exportVo.getDataType())
-                            || MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) { // 小计、合计行也要加上合计排产
-                        listDataMap.put("totalAll", totolAll);
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, listDataMap.size() - 1, color, true, true, ""));
+                    if (MonthPlanExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())) {
+                        tableMap.put("summary", this.buildSummary(list, exportVo)); // 如果是汇总行，需要构建汇总消息
                     }
-                }else {
-//                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-//                    excelStyleVo.setFontName("Arial");
-//                    excelStyleVo.setBorder( true);
-//                    listDataMap.put("style", excelStyleVo);
-                    listDataMap.put("totalAll", totolAll);
                 }
-
                 listData.add(listDataMap);
             }
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
         }
-
-
 
         // 将单元格样式放入context
         if(PubUtil.isNotEmpty(cellStyleList)){
@@ -526,6 +324,176 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 写到文件
         return ExcelUtils.writeMultiList(inputStream
                 , 0, tableMap, excelDataList);
+    }
+
+    /**
+     * 构建统计信息
+     * 
+     * @param list        导出列表
+     * @param totalRecord 合计行记录
+     * @return
+     */
+    private String buildSummary(List<FactoryMonthPlanMouldDayResultExportVo> list,
+                                FactoryMonthPlanMouldDayResultExportVo totalRecord) {
+        String summaryFormat = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportSummary");
+        // 1、产量合计
+        Integer totalQty = 0;
+        // 2、开工天数
+        int workDays = 0;
+        for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+            String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+            Integer dayQty = Optional.ofNullable((Integer) totalRecord.getFieldValueByFieldName(dayFieldName)).orElse(0);
+            if (dayQty > 0) {
+                workDays ++;
+                totalQty += dayQty;
+            }
+        }
+        // 3、平均日产
+        BigDecimal averageQty = BigDecimal.ZERO;
+        if (workDays > 0) {
+            averageQty = BigDecimalUtils.div(totalQty, workDays);
+        }
+        // 4、平均单胎重
+        BigDecimal totalWeight = list.stream().filter(r -> MonthPlanExportDataTypeEnum.RECORD.getCode().equals(r.getDataType()))
+                .map(r -> BigDecimalUtils.multiply(r.getSingleTireWeight(), r.getTotalQty())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal averageWeight = BigDecimalUtils.div(totalWeight, totalQty);
+        return String.format(summaryFormat, totalQty, workDays, averageQty, averageWeight);
+    }
+
+    /**
+     * 构建导出行
+     * @param exportVo
+     * @param storTypeMap
+     * @param productCategoryMap
+     * @param productStatusMap
+     * @param constructionStageMap
+     * @param brandMap
+     * @param structureTypeMap
+     * @param suffix    后缀，用于复制合计行
+     * @return
+     */
+    private Map<String, Object> buildListDataMap(FactoryMonthPlanMouldDayResultExportVo exportVo,
+                                                 Map<String, String> storTypeMap,
+                                                 Map<String, String> productCategoryMap,
+                                                 Map<String, String> productStatusMap,
+                                                 Map<String, String> constructionStageMap, Map<String, String> brandMap,
+                                                 Map<String, String> structureTypeMap, String suffix) {
+        Map<String, Object> listDataMap = new HashMap<>(16);
+        listDataMap.put(this.getRealFieldName("locationType", suffix), storTypeMap.getOrDefault(exportVo.getLocationType(), exportVo.getLocationType()));
+        listDataMap.put(this.getRealFieldName("materialCode", suffix), exportVo.getMaterialCode());
+        listDataMap.put(this.getRealFieldName("mesMaterialCode", suffix), exportVo.getMesMaterialCode());
+        listDataMap.put(this.getRealFieldName("materialDesc", suffix), exportVo.getMaterialDesc());
+        listDataMap.put(this.getRealFieldName("structureName", suffix), exportVo.getStructureName());
+        listDataMap.put(this.getRealFieldName("productStatus", suffix), productStatusMap.getOrDefault(exportVo.getProductStatus(), exportVo.getProductStatus()));
+        listDataMap.put(this.getRealFieldName("embryoCode", suffix), exportVo.getEmbryoCode());
+        listDataMap.put(this.getRealFieldName("structureType", suffix), structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
+        listDataMap.put(this.getRealFieldName("mainMaterialDesc", suffix), exportVo.getMainMaterialDesc());
+        listDataMap.put(this.getRealFieldName("constructionStage", suffix), constructionStageMap.getOrDefault(exportVo.getConstructionStage(), exportVo.getConstructionStage()));
+        listDataMap.put(this.getRealFieldName("brand", suffix), brandMap.getOrDefault(exportVo.getBrand(), exportVo.getBrand()));
+        listDataMap.put(this.getRealFieldName("specifications", suffix), exportVo.getSpecifications());
+        listDataMap.put(this.getRealFieldName("mainPattern", suffix), exportVo.getMainPattern());
+        listDataMap.put(this.getRealFieldName("pattern", suffix), exportVo.getPattern());
+        listDataMap.put(this.getRealFieldName("proSize", suffix), exportVo.getProSize());
+        listDataMap.put(this.getRealFieldName("singleTireWeight", suffix), exportVo.getSingleTireWeight());
+        listDataMap.put(this.getRealFieldName("productCategory", suffix), productCategoryMap.getOrDefault(exportVo.getProductCategory(), exportVo.getProductCategory()));
+        listDataMap.put(this.getRealFieldName("mouldCavityQty", suffix), exportVo.getMouldCavityQty());
+        listDataMap.put(this.getRealFieldName("typeBlockQty", suffix), exportVo.getTypeBlockQty());
+        listDataMap.put(this.getRealFieldName("averageSaleQty", suffix), exportVo.getAverageSaleQty());
+        listDataMap.put(this.getRealFieldName("inventorySalesRatio", suffix), exportVo.getInventorySalesRatio());
+        listDataMap.put(this.getRealFieldName("dayVulcanizationQty", suffix), exportVo.getDayVulcanizationQty());
+        listDataMap.put(this.getRealFieldName("prodReqPlan", suffix), exportVo.getProdReqPlan());
+        listDataMap.put(this.getRealFieldName("heightQty", suffix), exportVo.getHeightQty());
+        listDataMap.put(this.getRealFieldName("midQty", suffix), exportVo.getMidQty());
+        listDataMap.put(this.getRealFieldName("cycleReserveQty", suffix), exportVo.getCycleReserveQty());
+        listDataMap.put(this.getRealFieldName("totalQty", suffix), exportVo.getTotalQty());
+        listDataMap.put(this.getRealFieldName("heightProductionQty", suffix), exportVo.getHeightProductionQty());
+        listDataMap.put(this.getRealFieldName("midProductionQty", suffix), exportVo.getMidProductionQty());
+        listDataMap.put(this.getRealFieldName("cycleProductionQty", suffix), exportVo.getCycleProductionQty());
+        listDataMap.put(this.getRealFieldName("conventionProductionQty", suffix), exportVo.getConventionProductionQty());
+        listDataMap.put(this.getRealFieldName("postponeProductionQty", suffix), exportVo.getPostponeProductionQty());
+        listDataMap.put(this.getRealFieldName("differenceQty", suffix), exportVo.getDifferenceQty());
+        listDataMap.put(this.getRealFieldName("beginDay", suffix), exportVo.getBeginDay());
+        listDataMap.put(this.getRealFieldName("endDay", suffix), exportVo.getEndDay());
+        listDataMap.put(this.getRealFieldName("day1", suffix), exportVo.getDay1());
+        listDataMap.put(this.getRealFieldName("day2", suffix), exportVo.getDay2());
+        listDataMap.put(this.getRealFieldName("day3", suffix), exportVo.getDay3());
+        listDataMap.put(this.getRealFieldName("day4", suffix), exportVo.getDay4());
+        listDataMap.put(this.getRealFieldName("day5", suffix), exportVo.getDay5());
+        listDataMap.put(this.getRealFieldName("day6", suffix), exportVo.getDay6());
+        listDataMap.put(this.getRealFieldName("day7", suffix), exportVo.getDay7());
+        listDataMap.put(this.getRealFieldName("day8", suffix), exportVo.getDay8());
+        listDataMap.put(this.getRealFieldName("day9", suffix), exportVo.getDay9());
+        listDataMap.put(this.getRealFieldName("day10", suffix), exportVo.getDay10());
+        listDataMap.put(this.getRealFieldName("day11", suffix), exportVo.getDay11());
+        listDataMap.put(this.getRealFieldName("day12", suffix), exportVo.getDay12());
+        listDataMap.put(this.getRealFieldName("day13", suffix), exportVo.getDay13());
+        listDataMap.put(this.getRealFieldName("day14", suffix), exportVo.getDay14());
+        listDataMap.put(this.getRealFieldName("day15", suffix), exportVo.getDay15());
+        listDataMap.put(this.getRealFieldName("day16", suffix), exportVo.getDay16());
+        listDataMap.put(this.getRealFieldName("day17", suffix), exportVo.getDay17());
+        listDataMap.put(this.getRealFieldName("day18", suffix), exportVo.getDay18());
+        listDataMap.put(this.getRealFieldName("day19", suffix), exportVo.getDay19());
+        listDataMap.put(this.getRealFieldName("day20", suffix), exportVo.getDay20());
+        listDataMap.put(this.getRealFieldName("day21", suffix), exportVo.getDay21());
+        listDataMap.put(this.getRealFieldName("day22", suffix), exportVo.getDay22());
+        listDataMap.put(this.getRealFieldName("day23", suffix), exportVo.getDay23());
+        listDataMap.put(this.getRealFieldName("day24", suffix), exportVo.getDay24());
+        listDataMap.put(this.getRealFieldName("day25", suffix), exportVo.getDay25());
+        listDataMap.put(this.getRealFieldName("day26", suffix), exportVo.getDay26());
+        listDataMap.put(this.getRealFieldName("day27", suffix), exportVo.getDay27());
+        listDataMap.put(this.getRealFieldName("day28", suffix), exportVo.getDay28());
+        listDataMap.put(this.getRealFieldName("day29", suffix), exportVo.getDay29());
+        listDataMap.put(this.getRealFieldName("day30", suffix), exportVo.getDay30());
+        listDataMap.put(this.getRealFieldName("day31", suffix), exportVo.getDay31());
+
+        // 计算day1到day31的数量合计
+        Integer totolAll = 0;
+        totolAll += exportVo.getDay1() != null ? exportVo.getDay1() : 0;
+        totolAll += exportVo.getDay2() != null ? exportVo.getDay2() : 0;
+        totolAll += exportVo.getDay3() != null ? exportVo.getDay3() : 0;
+        totolAll += exportVo.getDay4() != null ? exportVo.getDay4() : 0;
+        totolAll += exportVo.getDay5() != null ? exportVo.getDay5() : 0;
+        totolAll += exportVo.getDay6() != null ? exportVo.getDay6() : 0;
+        totolAll += exportVo.getDay7() != null ? exportVo.getDay7() : 0;
+        totolAll += exportVo.getDay8() != null ? exportVo.getDay8() : 0;
+        totolAll += exportVo.getDay9() != null ? exportVo.getDay9() : 0;
+        totolAll += exportVo.getDay10() != null ? exportVo.getDay10() : 0;
+        totolAll += exportVo.getDay11() != null ? exportVo.getDay11() : 0;
+        totolAll += exportVo.getDay12() != null ? exportVo.getDay12() : 0;
+        totolAll += exportVo.getDay13() != null ? exportVo.getDay13() : 0;
+        totolAll += exportVo.getDay14() != null ? exportVo.getDay14() : 0;
+        totolAll += exportVo.getDay15() != null ? exportVo.getDay15() : 0;
+        totolAll += exportVo.getDay16() != null ? exportVo.getDay16() : 0;
+        totolAll += exportVo.getDay17() != null ? exportVo.getDay17() : 0;
+        totolAll += exportVo.getDay18() != null ? exportVo.getDay18() : 0;
+        totolAll += exportVo.getDay19() != null ? exportVo.getDay19() : 0;
+        totolAll += exportVo.getDay20() != null ? exportVo.getDay20() : 0;
+        totolAll += exportVo.getDay21() != null ? exportVo.getDay21() : 0;
+        totolAll += exportVo.getDay22() != null ? exportVo.getDay22() : 0;
+        totolAll += exportVo.getDay23() != null ? exportVo.getDay23() : 0;
+        totolAll += exportVo.getDay24() != null ? exportVo.getDay24() : 0;
+        totolAll += exportVo.getDay25() != null ? exportVo.getDay25() : 0;
+        totolAll += exportVo.getDay26() != null ? exportVo.getDay26() : 0;
+        totolAll += exportVo.getDay27() != null ? exportVo.getDay27() : 0;
+        totolAll += exportVo.getDay28() != null ? exportVo.getDay28() : 0;
+        totolAll += exportVo.getDay29() != null ? exportVo.getDay29() : 0;
+        totolAll += exportVo.getDay30() != null ? exportVo.getDay30() : 0;
+        totolAll += exportVo.getDay31() != null ? exportVo.getDay31() : 0;
+        listDataMap.put(this.getRealFieldName("totalAll", suffix), totolAll);
+        return listDataMap;
+    }
+
+    /**
+     * 获取实际字段名，后缀有值需要拼接上后缀
+     * @param fieldName
+     * @param suffix
+     * @return
+     */
+    private String getRealFieldName(String fieldName, String suffix) {
+        if (StringUtils.isNotEmpty(suffix)) {
+            return fieldName + suffix;
+        }
+        return fieldName;
     }
 
     /**
@@ -544,7 +512,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 统计行
         FactoryMonthPlanMouldDayResultExportVo subtotal = new FactoryMonthPlanMouldDayResultExportVo();
         subtotal.setStructureName(structureName);
-        subtotal.setPlanType(I18nUtil.getMessage(dataType.getName()));
+        subtotal.setProductCategory(I18nUtil.getMessage(dataType.getName()));
         subtotal.setDataType(dataType.getCode());
         // 结构上机时间
         if (structureAllocationMap != null) {

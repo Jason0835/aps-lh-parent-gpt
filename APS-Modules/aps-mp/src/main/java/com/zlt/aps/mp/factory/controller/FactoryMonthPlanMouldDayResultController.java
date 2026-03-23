@@ -93,7 +93,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
 
     @Override
     protected String getOrderBy() {
-        return "PRO_SIZE,STRUCTURE_NAME,MAIN_PATTERN,MAIN_MATERIAL_DESC,MOULD_CAVITY_QTY DESC";
+        return "PRO_SIZE,STRUCTURE_NAME,MOULD_CAVITY_QTY DESC,TYPE_BLOCK_QTY DESC,MAIN_PATTERN";
     }
 
     /**

@@ -154,16 +154,13 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
         return super.importData(importContext,updateSupport);
     }
 
-    /**
-     * 导出列表
-     */
     @Log(title = "S2-0606.排产结果-未排产计划", businessType = BusinessType.EXPORT)
-    @ApiOperation("导入数据")
+    @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
     public byte[] exportData(@RequestBody MonthPlanNoProductionPlan queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        return monthPlanNoProductionPlanService.exportMonthPlanNoProductionPlan(queryVO);
     }
 
     @Override

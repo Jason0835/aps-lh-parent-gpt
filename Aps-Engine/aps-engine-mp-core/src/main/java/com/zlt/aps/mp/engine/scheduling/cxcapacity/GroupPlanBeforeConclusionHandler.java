@@ -47,13 +47,13 @@ public class GroupPlanBeforeConclusionHandler {
             return;
         }
         String groupName = groupPlanInfo.getGroupName();
-        log.info(addGroupStartBeforeConclusionLog(context, groupName));
+        addGroupStartBeforeConclusionLog(context, groupName);
         //获取当前模拟排产的数据
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = groupPlanInfo.getDayProductionLimitInfo();
         Set<String> allCxMachineCodeSet = groupPlanInfo.getAllocationCxMachineCodeSet();
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || CollectionUtils.isEmpty(allCxMachineCodeSet)) {
             //记录日志
-            log.info(addNoAllocationInfoLog(context, groupName));
+            addNoAllocationInfoLog(context, groupName);
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
@@ -75,7 +75,7 @@ public class GroupPlanBeforeConclusionHandler {
         });
         if (CollectionUtils.isEmpty(effectiveRatioList)) {
             //记录日志
-            log.info(addNoLhRatioInfoLog(context, groupName));
+            addNoLhRatioInfoLog(context, groupName);
             return;
         }
         effectiveRatioList.sort(Comparator.comparing(MonthPlanStructureLhRatioVo::getLhMachineMaxQty));
@@ -88,7 +88,7 @@ public class GroupPlanBeforeConclusionHandler {
         List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = dayLimitList.stream().filter(singleDay -> singleDay.isLowMinMouldNumber(minMouldNumber)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(lowMinMouldNumberList)) {
             //记录日志
-            log.info(addNoBeforeConclusionInfoLog(context, groupName, minLhMachineCount));
+            addNoBeforeConclusionInfoLog(context, groupName, minLhMachineCount);
             return;
         }
         //按日期排序
@@ -104,14 +104,14 @@ public class GroupPlanBeforeConclusionHandler {
         List<CxMachineAllocationPlanHelper> allocationList = selectCxMachineInfo.getAllocationList();
         if (CollectionUtils.isEmpty(allocationList)) {
             //记录日志
-            log.info(addCxMachineNoAllocationInfoLog(context, groupName, selectedCxMachineCode));
+            addCxMachineNoAllocationInfoLog(context, groupName, selectedCxMachineCode);
             return;
         }
         CxMachineAllocationPlanHelper lastInfo = allocationList.get(allocationList.size() - BigDecimal.ONE.intValue());
         BeforeConclusionInfoHelper beforeConclusionInfo = BeforeConclusionInfoHelper.build(beforeConclusionDay, deductionDay, deductionDaySet);
         //更新数据
         updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, selectCxMachineInfo, lastInfo, false);
-        log.info(addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay));
+        addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay);
     }
 
     /**
@@ -230,8 +230,8 @@ public class GroupPlanBeforeConclusionHandler {
             deductionDay = beforeConclusionInfo.getDeductionDay();
             deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
         }
-        //标记结构分配完成
-        groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
+        //20260322 还不可以标记结构分配完成，可能等下一轮分配
+//        groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
         Map<String, ProductionMouldInfoVo> allMouldInfoMap = productionContext.getBaseDataContainer().getMouldInfoMap();
         //更新分配信息
         allocationInfo.beforeConclusion(beforeConclusionDay, deductionDay);
@@ -242,7 +242,7 @@ public class GroupPlanBeforeConclusionHandler {
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
         DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
-        //已排产的模具信息？
+        //已排产的模具信息
         if (isSingleMachine) {
             dayProductionInfoMap = cxMachineInfo.getDayProductionLimitInfo();
         } else {

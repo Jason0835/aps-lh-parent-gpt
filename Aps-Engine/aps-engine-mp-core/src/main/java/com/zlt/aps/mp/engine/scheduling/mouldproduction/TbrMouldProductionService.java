@@ -1,5 +1,8 @@
 package com.zlt.aps.mp.engine.scheduling.mouldproduction;
 
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -34,6 +37,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -52,6 +57,10 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     private final FormalProductionHandler formalProductionHandler;
 
+    private final ISysDictDataCacheService iSysDictDataCacheService;
+
+    private final WarningInformationHandler warningInformationHandler;
+
     private final ClearProductionInfoHandler clearProductionInfoHandler;
 
     private final InitNoProductionRecordHandler initNoProductionRecordHandler;
@@ -68,6 +77,8 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
                                      DpRequireDataService dpRequireDataService,
                                      ProductionHistoryHandler productionHistoryHandler,
                                      FormalProductionHandler formalProductionHandler,
+                                     ISysDictDataCacheService iSysDictDataCacheService,
+                                     WarningInformationHandler warningInformationHandler,
                                      MonthProductionDataService monthProductionDataService,
                                      ClearProductionInfoHandler clearProductionInfoHandler,
                                      InitNoProductionRecordHandler initNoProductionRecordHandler,
@@ -77,6 +88,8 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.formalProductionHandler = formalProductionHandler;
+        this.iSysDictDataCacheService = iSysDictDataCacheService;
+        this.warningInformationHandler = warningInformationHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
         this.dayProductionStatisticsHandler = dayProductionStatisticsHandler;
@@ -151,6 +164,11 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext, estimateGroupCxAllocationMap);
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
+        //13、预警信息发送
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        String userName = SecurityUtils.getUsername();
+        String factoryName = getFactoryName(context);
+        warningInformationHandler.sendWarningInformation(productionContext, requestAttributes, userName, factoryName);
     }
 
     /**
@@ -288,7 +306,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         List<ContinueProductInfo> continueProductionInfoList = getMonthProductionDataService().getContinueProductionInfo(factoryCode, year, month, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueSkuDataLog(context, continueProductionInfoList));
         //获取续作结构--结构转产表
-        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, factoryCode, year, month, lastDay);
+        Map<String, Set<String>> continueGroupInfo = getContinueGroupInfo(context, previousVersion, lastDay);
         //构建续作分组信息(TBR为结构，PCR为英寸)
         BaseDataContainer baseDataContainer = ((TbrProductionContext) context).getBaseDataContainer();
         Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = baseDataContainer.getCxMachineBaseInfo();
@@ -371,6 +389,26 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         List<MpMonthPlanStatistics> productionStatisticsList = dayProductionStatisticsHandler.buildDayProductionStatisticsResult(productionContext);
         getMonthProductionDataService().saveProductionStatisticsResult(productionStatisticsList);
         return sumProductionMap;
+    }
+
+    /**
+     * 获取工厂名称
+     *
+     * @param context
+     * @return
+     */
+    private String getFactoryName(Context context) {
+        //1.获取工厂国际化
+        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+        if (CollectionUtils.isEmpty(dictDataList)) {
+            return "";
+        }
+        String factoryCode = context.getFactoryCode();
+        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(factoryCode)).findFirst().get().getDictLabel();
+        if (StringUtils.isBlank(factoryName)) {
+            return "";
+        }
+        return factoryName;
     }
 
     /**
@@ -465,15 +503,13 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
      * TBR-结构
      * PCR-英寸、寸别、寸口
      *
-     * @param context     排产上下文
-     * @param factoryCode 工厂
-     * @param year        年份
-     * @param month       月份
-     * @param lastDay     最后一天
+     * @param context         排产上下文
+     * @param previousVersion 前一个月的定稿版本信息
+     * @param lastDay         最后一天
      * @return
      */
-    private Map<String, Set<String>> getContinueGroupInfo(Context context, String factoryCode, Integer year, Integer month, Integer lastDay) {
-        List<ContinueGroupInfo> continueGroupInfoList = getMonthProductionDataService().getContinueGroupInfo(factoryCode, year, month, lastDay);
+    private Map<String, Set<String>> getContinueGroupInfo(Context context, MpFactoryProductionVersion previousVersion, Integer lastDay) {
+        List<ContinueGroupInfo> continueGroupInfoList = getMonthProductionDataService().getContinueGroupInfo(previousVersion, lastDay);
         log.info(TbrBeforeProductionGroupLogRecorder.addReadContinueGroupDataLog(context, continueGroupInfoList));
         if (CollectionUtils.isEmpty(continueGroupInfoList)) {
             return Collections.emptyMap();

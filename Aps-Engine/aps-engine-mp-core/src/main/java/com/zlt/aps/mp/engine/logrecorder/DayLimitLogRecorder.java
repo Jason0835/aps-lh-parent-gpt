@@ -58,6 +58,25 @@ public class DayLimitLogRecorder {
     }
 
     /**
+     * 增加 成型机台开排产日信息
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台 %s 可排产日:[%s]====
+     *
+     * @param context       排产上下文
+     * @param cxMachineCode 成型机台
+     * @param daysInfo      剩余可排产日
+     * @return
+     */
+    public static String addCxMachineCanProductionDayLog(Context context, String cxMachineCode, String daysInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台 %s 可排产日:[%s]====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, daysInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
      * 每日换模次数，统计
      *
      * @param context        排产上下文

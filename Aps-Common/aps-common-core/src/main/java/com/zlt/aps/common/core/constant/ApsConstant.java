@@ -438,6 +438,11 @@ public class ApsConstant {
      * SCM发货模式：20-分批发货
      */
     public static final String SCM_DELIVERY_MODE_SPLIT = "20";
+    
+    /**
+     * SCM已计划未发货版本同步状态：03已同步
+     */
+    public static final String SCM_PLANED_NOT_SHIP_SYNC_STATUS_LOCK = "03"; // 已锁定
 
     /**
      * 每日分钟数

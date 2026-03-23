@@ -92,11 +92,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.DAY_31,
 		    r.TOTAL_VULCANIZATION_MINUTES,
 		    r.DISPLAY_SEQ,
+		    m.SINGLE_TIRE_WEIGHT,
 		    '1' DATA_TYPE,
 		    sum( d.MID_QTY ) MID_QTY,
-		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY 
+		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
+		    '2' LOCATION_TYPE /*内外销，目前没有地方取，暂时固定外销*/
 		FROM
 		    T_MP_MOULDING_DAY_RESULT r
+		    INNER JOIN T_MDM_MATERIAL_INFO m ON m.MATERIAL_CODE = r.MATERIAL_CODE
+		    AND m.FACTORY_CODE = r.FACTORY_CODE 
+		    AND m.IS_DELETE = 0
 		    INNER JOIN T_DP_DEMAND_PLAN d ON d.MONTH_PLAN_VERSION = r.MONTH_PLAN_VERSION 
 		    AND d.FACTORY_CODE = r.FACTORY_CODE 
 		    AND d.YEAR = r.YEAR 
@@ -194,12 +199,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.DAY_30,
 		    r.DAY_31,
 		    r.TOTAL_VULCANIZATION_MINUTES,
-		    r.DISPLAY_SEQ 
+		    r.DISPLAY_SEQ,
+            m.SINGLE_TIRE_WEIGHT
 		ORDER BY
 		    r.PRO_SIZE,
 		    r.STRUCTURE_NAME,
-		    r.MAIN_PATTERN,
-		    r.MAIN_MATERIAL_DESC,
-		    r.MOULD_CAVITY_QTY DESC
+		    r.MOULD_CAVITY_QTY DESC,
+		    r.TYPE_BLOCK_QTY DESC,
+		    r.MAIN_PATTERN
     </select>
 </mapper>

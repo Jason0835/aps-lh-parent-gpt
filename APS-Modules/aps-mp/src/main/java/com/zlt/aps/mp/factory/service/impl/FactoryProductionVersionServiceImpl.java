@@ -14,6 +14,8 @@ import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.service.IFactoryProductionVersionService;
+import com.zlt.core.dao.basedao.BaseDao;
+import io.seata.common.util.CollectionUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -22,6 +24,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 分厂排产版本 业务实现
@@ -39,6 +43,8 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
     private final IFactoryParamService factoryParamService;
 
     private final IDpDemandPlanSumService dpDemandPlanSumService;
+
+    private final BaseDao baseDao;
 
     @Override
     public void setProductionVersionCycleDate(MpFactoryProductionVersion factoryProductionVersion) {
@@ -149,11 +155,9 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
         queryWrapper.eq("YEAR", year);
         queryWrapper.eq("MONTH", month);
         queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
-        queryWrapper.isNull("PRODUCTION_INIT_VERSION");
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        MpFactoryProductionVersion find = factoryProductionVersionMapper.selectOne(queryWrapper);
-        //数据不存在
-        if (null == find) {
+        List<MpFactoryProductionVersion> factoryProductionVersions = this.factoryProductionVersionMapper.selectList(queryWrapper);
+        if(CollectionUtils.isEmpty(factoryProductionVersions)) {
             DpDemandPlanSum demandPlanSum =  this.dpDemandPlanSumService.getDpDemandPlanSumByParam(selectedRequireVersion);
             if(null != demandPlanSum) {
                 MpFactoryProductionVersion version = new MpFactoryProductionVersion();
@@ -170,12 +174,26 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
             }
             return AjaxResult.success();
         }
-        //已经加入列表
-        if (YesOrNoEnum.YES.getCode().equals(find.getIsSelectedDemand())) {
+        int size = factoryProductionVersions.size();
+        if(size == 1) {
+            MpFactoryProductionVersion factoryProductionVersion = factoryProductionVersions.get(0);
+            //已经加入列表
+            if (YesOrNoEnum.YES.getCode().equals(factoryProductionVersion.getIsSelectedDemand())) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.param.factoryRequireVersionIsSelected"));
+            }
+            factoryProductionVersion.setIsSelectedDemand(YesOrNoEnum.YES.getCode());
+            factoryProductionVersionMapper.updateById(factoryProductionVersion);
+            return AjaxResult.success();
+        }
+        List<MpFactoryProductionVersion>  selectedDemandProductionVersions  = factoryProductionVersions.stream().filter(item -> StringUtils.isBlank(item.getProductionInitVersion()) && YesOrNoEnum.YES.getCode().equals(item.getIsSelectedDemand())).collect(Collectors.toList());
+        if(!CollectionUtils.isEmpty(selectedDemandProductionVersions)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.param.factoryRequireVersionIsSelected"));
         }
-        find.setIsSelectedDemand(YesOrNoEnum.YES.getCode());
-        factoryProductionVersionMapper.updateById(find);
+        List<MpFactoryProductionVersion>  notSelectedDemandProductionVersions  = factoryProductionVersions.stream().filter(item -> StringUtils.isBlank(item.getProductionInitVersion())).collect(Collectors.toList());
+        if(!CollectionUtils.isEmpty(notSelectedDemandProductionVersions)) {
+            notSelectedDemandProductionVersions.forEach(notSelectedDemandProductionVersion -> notSelectedDemandProductionVersion.setIsSelectedDemand(YesOrNoEnum.YES.getCode()));
+            this.baseDao.updateBatch(notSelectedDemandProductionVersions);
+        }
         return AjaxResult.success();
     }
 

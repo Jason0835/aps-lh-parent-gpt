@@ -226,6 +226,11 @@ public enum MonthPlanEnums {
      * SYS0209004 单位：台，成型机在结构切换时，首日应减少硫化机台数
      */
     CHANGE_STRUCT_DEC_LH_MACHINES("SYS0209004", "单位：台，成型机在结构切换时，首日应减少硫化机台数"),
+
+    /**
+     * SYS0209005 参与排产的特殊原材料编码，多个以,分隔
+     */
+    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔"),
     ;
 
     private final String code;

@@ -214,11 +214,22 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     }
 
     @Override
-    public List<ContinueGroupInfo> getContinueGroupInfo(String factoryCode, Integer year, Integer month, Integer lastDay) {
+    public List<ContinueGroupInfo> getContinueGroupInfo(MpFactoryProductionVersion previousVersion, Integer lastDay) {
+        if (null == previousVersion) {
+            return Collections.emptyList();
+        }
+        String factoryCode = previousVersion.getFactoryCode();
+        Integer year = previousVersion.getYear();
+        Integer month = previousVersion.getMonth();
+        String monthPlanVersion = previousVersion.getMonthPlanVersion();
+        String productionVersion = previousVersion.getProductionVersion();
+        if (StringUtils.isBlank(monthPlanVersion) || StringUtils.isBlank(productionVersion)) {
+            return Collections.emptyList();
+        }
         if (StringUtils.isBlank(factoryCode) || null == year || null == month || null == lastDay) {
             return Collections.emptyList();
         }
-        return factoryMonthPlanContinueProductInfoMapper.getContinueGroupInfo(factoryCode, year, month, lastDay);
+        return factoryMonthPlanContinueProductInfoMapper.getContinueGroupInfo(factoryCode, year, month, monthPlanVersion, productionVersion, lastDay);
     }
 
     @Override

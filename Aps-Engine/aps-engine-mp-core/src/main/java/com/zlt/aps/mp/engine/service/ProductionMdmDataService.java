@@ -7,6 +7,7 @@ import com.zlt.aps.mp.engine.domain.dto.MachineCountDto;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.ProductALevelVo;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import io.swagger.models.auth.In;
 
 import java.util.List;
 import java.util.Map;
@@ -74,6 +75,20 @@ public interface ProductionMdmDataService {
     List<MdmWorkWearInfo> getWorkWearInfo(Context context);
 
     /**
+     * 获取硫化机台数
+     * @param context
+     * @return
+     */
+    List<LhMachineInfo> listLhMachineInfo(Context context);
+
+    /**
+     * 获取工作日历
+     * @param context
+     * @return
+     */
+    Map<Integer, MdmWorkCalendar> getWorkCalendar(Context context);
+
+    /**
      * 获取工厂的胶囊卡盘信息
      *
      * @param context
@@ -128,6 +143,7 @@ public interface ProductionMdmDataService {
      * @return
      */
     List<MdmProductStock> getMdmProductStock(Context context);
+
 
     /**
      * 获取分厂品名物料的折损率配置

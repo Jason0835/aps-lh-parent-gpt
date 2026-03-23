@@ -1,17 +1,22 @@
 package com.zlt.aps.mp.demand.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -20,9 +25,11 @@ import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipParamVo;
 import com.zlt.aps.itf.scm.vo.SyncPlanedNotShipResultVo;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.DpAreaEntityMapper;
+import com.zlt.aps.maindata.mapper.DpNationEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolEntityMapper;
 import com.zlt.aps.mp.demand.mapper.SalesOrderPoolRecordEntityMapper;
 import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
@@ -37,6 +44,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.Map.Entry;
@@ -65,6 +74,9 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	private IMesItfService iMesItfService;
 
 	@Autowired
+	private ISysDictDataCacheService sysDictDataCacheService;
+
+	@Autowired
 	private SalesOrderPoolEntityMapper salesOrderPoolEntityMapper;
 	@Autowired
 	private SalesOrderPoolRecordEntityMapper salesOrderPoolRecordEntityMapper;
@@ -72,6 +84,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	private DpAreaEntityMapper dpAreaEntityMapper;
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+    @Autowired
+    private DpNationEntityMapper dpNationEntityMapper;
 
 	@Override
 	protected String getDocTypeCode() {
@@ -304,12 +318,8 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 		Integer year = salesOrderPool.getYear();
 		Integer month = salesOrderPool.getMonth();
 		String factoryCode = salesOrderPool.getFactoryCode();
-		LambdaQueryWrapper<SalesOrderPoolRecord> recordQueryWrapper = new LambdaQueryWrapper<>();
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getFactoryCode, factoryCode);
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getYear, year);
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getMonth, month);
-		recordQueryWrapper.eq(SalesOrderPoolRecord::getIsDelete, ApsConstant.APS_YES_NO_0);
-		boolean isFirstCatch = !salesOrderPoolRecordEntityMapper.exists(recordQueryWrapper); // 如果抓取不到，是年月首次抓取
+        boolean isFirstCatch = !syncResultList.stream()
+                .anyMatch(r -> ApsConstant.SCM_PLANED_NOT_SHIP_SYNC_STATUS_LOCK.equals(r.getSyncStatus())); // 数据全部都不是锁定的，为首次抓取
 
 		// 排产参数
 		String scmOrderMatralCodePrefix = this.getFactoryParam(factoryCode, ProductTypeEnum.WHOLE_STEEL.getValue(),
@@ -406,7 +416,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 			return newVO;
 		}).collect(Collectors.toList());
 
-		if (isFirstCatch) { // 年月首次抓取
+		if (isFirstCatch) { // 年月首次抓取（20260320，改为锁定前）
 			// 根据发货模式，当发货模式 = 整单发货的订单，对其下所有SKU获取供应链优先级最高的值(即供应链优先级的值最小)，
 			List<String> salCodePoList = newSalesOrderPoolList.stream()
 					.filter(s -> ApsConstant.DELIVERY_MODE_ALL.equals(s.getDeliverGoodsType()))
@@ -455,7 +465,7 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 					}
 				}
 			}
-		} else { // 年月再次抓取数据
+		} else { // 年月再次抓取数据（20260320，改为锁定后）
 			LambdaQueryWrapper<SalesOrderPool> queryWrapper = new LambdaQueryWrapper<>();
 			queryWrapper.eq(SalesOrderPool::getFactoryCode, factoryCode);
 			queryWrapper.eq(SalesOrderPool::getIsDelete, ApsConstant.APS_YES_NO_0);
@@ -595,5 +605,159 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
 	@Override
 	public AjaxResult getMonthLock(SalesOrderPool salesOrderPool) {
 		return iScmItfService.getMonthLock();
+	}
+
+	/**
+	 * 导出销售订单池数据
+	 * @param queryVO 查询条件
+	 * @return 导出的字节数组
+	 * @throws IOException IO异常
+	 */
+	@Override
+	public byte[] exportSalesOrderPool(SalesOrderPool queryVO) throws IOException {
+		// 获取模板
+		ClassLoader classLoader = this.getClass().getClassLoader();
+		InputStream inputStream = classLoader.getResourceAsStream("excelModel/salesOrderPool.xlsx");
+		if (inputStream == null) {
+			throw new IOException("模板文件不存在");
+		}
+
+		// 加载字典数据
+		// 工厂名称字典
+		List<SysDictData> factoryDatas = sysDictDataCacheService.getType("biz_factory_name");
+		Map<String, String> factoryMap = factoryDatas != null ? factoryDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// 产品品类字典
+		List<SysDictData> productTypeDatas = sysDictDataCacheService.getType("biz_product_type");
+		Map<String, String> productTypeMap = productTypeDatas != null ? productTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// 订单优先级字典
+		List<SysDictData> orderPriorityDatas = sysDictDataCacheService.getType("biz_order_type");
+		Map<String, String> orderPriorityMap = orderPriorityDatas != null ? orderPriorityDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// 内外销字典
+		List<SysDictData> locationTypeDatas = sysDictDataCacheService.getType("biz_stor_type");
+		Map<String, String> locationTypeMap = locationTypeDatas != null ? locationTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// 品牌字典
+		List<SysDictData> brandDatas = sysDictDataCacheService.getType("biz_brand_type");
+		Map<String, String> brandMap = brandDatas != null ? brandDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// EUDR字典
+		List<SysDictData> eudrDatas = sysDictDataCacheService.getType("biz_yes_no");
+		Map<String, String> eudrMap = eudrDatas != null ? eudrDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// 发货模式字典
+		List<SysDictData> deliverGoodsTypeDatas = sysDictDataCacheService.getType("biz_deliver_goods_type");
+		Map<String, String> deliverGoodsTypeMap = deliverGoodsTypeDatas != null ? deliverGoodsTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+		// 供应链优先级字典
+		List<SysDictData> scmPriorityDatas = sysDictDataCacheService.getType("biz_scm_type");
+		Map<String, String> scmPriorityMap = scmPriorityDatas != null ? scmPriorityDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
+        // 加载区域
+        List<DpArea> dpAreaList = dpAreaEntityMapper.selectList(new LambdaQueryWrapper<>());
+        JsonI18nConvertUtils.conventJsonI18n(dpAreaList, DpArea.class); // 翻译国际化栏位
+        Map<String, String> areaMap = dpAreaList.stream().collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
+        // 加载国家地区
+        List<DpNation> dpNationList = dpNationEntityMapper.selectList(new LambdaQueryWrapper<>());
+        JsonI18nConvertUtils.conventJsonI18n(dpNationList, DpNation.class);
+        Map<String, String> nationMap = dpNationList.stream()
+                .collect(Collectors.toMap(DpNation::getNationCode, DpNation::getNationNameI18n));
+		
+		// 表头信息
+		Map<String, Object> tableMap = new HashMap<>(16);
+		// 列表数据
+		List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+
+		// 按当前年月取数
+		Calendar calendar = Calendar.getInstance();
+		int currentYear = calendar.get(Calendar.YEAR);
+		int currentMonth = calendar.get(Calendar.MONTH) + 1;
+
+		// 设置年月标题
+		String titleFormat = I18nUtil.getMessage("ui.data.column.SalesOrderPool.export.title");
+        tableMap.put("title", String.format(titleFormat, currentYear, currentMonth));
+		// 查询数据
+		QueryWrapper<SalesOrderPool> wrapper = new QueryWrapper<>();
+		// 构建查询条件
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productType")), "PRODUCT_TYPE", queryVO.getFieldValueByFieldName("productType"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("orderPriority")), "ORDER_PRIORITY", queryVO.getFieldValueByFieldName("orderPriority"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("area")), "AREA", queryVO.getFieldValueByFieldName("area"));
+		wrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCode")), "SAL_CODE", queryVO.getFieldValueByFieldName("salCode"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salNCode")), "SAL_N_CODE", queryVO.getFieldValueByFieldName("salNCode"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("natCode")), "NAT_CODE", queryVO.getFieldValueByFieldName("natCode"));
+		wrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
+		wrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("salCodePo")), "SAL_CODE_PO", queryVO.getFieldValueByFieldName("salCodePo"));
+		wrapper.ge(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("billDateStartTime")), "BILL_DATE", queryVO.getBillDateStartTime());
+		wrapper.le(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("billDateEndTime")), "BILL_DATE", queryVO.getBillDateEndTime());
+		wrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("oriMaterialCode")), "ORI_MATERIAL_CODE", queryVO.getFieldValueByFieldName("oriMaterialCode"));
+		wrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("ordQty")), "ORD_QTY", queryVO.getFieldValueByFieldName("ordQty"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("weekYear")), "WEEK_YEAR", queryVO.getFieldValueByFieldName("weekYear"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isDynamicBalance")), "IS_DYNAMIC_BALANCE", queryVO.getFieldValueByFieldName("isDynamicBalance"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isUniformity")), "IS_UNIFORMITY", queryVO.getFieldValueByFieldName("isUniformity"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isEudr")), "IS_EUDR", queryVO.getFieldValueByFieldName("isEudr"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("deliverGoodsType")), "DELIVER_GOODS_TYPE", queryVO.getFieldValueByFieldName("deliverGoodsType"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmPriority")), "SCM_PRIORITY", queryVO.getFieldValueByFieldName("scmPriority"));
+		wrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scmDetailId")), "SCM_DETAIL_ID", queryVO.getFieldValueByFieldName("scmDetailId"));
+
+		List<SalesOrderPool> dataList = salesOrderPoolEntityMapper.selectList(wrapper);
+		
+		// 设置表头
+        tableMap.put("factoryCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.factoryCode"));
+        tableMap.put("productType", I18nUtil.getMessage("ui.data.column.SalesOrderPool.productType"));
+        tableMap.put("orderPriority", I18nUtil.getMessage("ui.data.column.SalesOrderPool.orderPriority"));
+        tableMap.put("area", I18nUtil.getMessage("ui.data.column.SalesOrderPool.area"));
+        tableMap.put("salCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.salCode"));
+        tableMap.put("locationType", I18nUtil.getMessage("ui.data.column.SalesOrderPool.locationType"));
+        tableMap.put("salNCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.salNCode"));
+        tableMap.put("natCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.natCode"));
+        tableMap.put("brand", I18nUtil.getMessage("ui.data.column.SalesOrderPool.brand"));
+        tableMap.put("salCodePo", I18nUtil.getMessage("ui.data.column.SalesOrderPool.salCodePo"));
+        tableMap.put("billDate", I18nUtil.getMessage("ui.data.column.SalesOrderPool.billDate"));
+        tableMap.put("oriMaterialCode", I18nUtil.getMessage("ui.data.column.SalesOrderPool.oriMaterialCode"));
+        tableMap.put("materialDesc", I18nUtil.getMessage("ui.data.column.SalesOrderPool.materialDesc"));
+        tableMap.put("ordQty", I18nUtil.getMessage("ui.data.column.SalesOrderPool.ordQty"));
+        tableMap.put("weekYear", I18nUtil.getMessage("ui.data.column.SalesOrderPool.weekYear"));
+        tableMap.put("isUniformity", I18nUtil.getMessage("ui.data.column.SalesOrderPool.isUniformity"));
+        tableMap.put("isDynamicBalance", I18nUtil.getMessage("ui.data.column.SalesOrderPool.isDynamicBalance"));
+        tableMap.put("isEudr", I18nUtil.getMessage("ui.data.column.SalesOrderPool.isEudr"));
+        tableMap.put("deliverGoodsType", I18nUtil.getMessage("ui.data.column.SalesOrderPool.deliverGoodsType"));
+        tableMap.put("scmPriority", I18nUtil.getMessage("ui.data.column.SalesOrderPool.scmPriority"));
+        tableMap.put("updateTimeExport", I18nUtil.getMessage("ui.data.column.SalesOrderPool.updateTime"));
+        tableMap.put("total", I18nUtil.getMessage("ui.data.column.SalesOrderPool.export.total"));
+
+		if (dataList != null && !dataList.isEmpty()) {
+			List<Map<String, Object>> list = new ArrayList<>();
+			for (int i = 0; i < dataList.size(); i++) {
+				Map<String, Object> listDataMap = new HashMap<>(16);
+				SalesOrderPool item = dataList.get(i);
+
+				// 转义字典值
+				listDataMap.put("factoryCode", factoryMap.getOrDefault(item.getFactoryCode(), item.getFactoryCode()));
+				listDataMap.put("productType", productTypeMap.getOrDefault(item.getProductType(), item.getProductType()));
+				listDataMap.put("orderPriority", orderPriorityMap.getOrDefault(item.getOrderPriority(), item.getOrderPriority()));
+				listDataMap.put("area", areaMap.getOrDefault(item.getArea(), item.getArea()));
+				listDataMap.put("salCode", item.getSalCode() != null ? item.getSalCode() : "");
+				listDataMap.put("locationType", locationTypeMap.getOrDefault(item.getLocationType(), item.getLocationType()));
+				listDataMap.put("salNCode", nationMap.getOrDefault(item.getSalNCode(), item.getSalNCode()));
+				listDataMap.put("natCode", nationMap.getOrDefault(item.getNatCode(), item.getNatCode()));
+				listDataMap.put("brand", brandMap.getOrDefault(item.getBrand(), item.getBrand()));
+				listDataMap.put("salCodePo", item.getSalCodePo() != null ? item.getSalCodePo() : "");
+                listDataMap.put("billDate", item.getBillDate() != null ? DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, item.getBillDate()): "");
+				listDataMap.put("oriMaterialCode", item.getOriMaterialCode() != null ? item.getOriMaterialCode() : "");
+				listDataMap.put("materialDesc", item.getMaterialDesc() != null ? item.getMaterialDesc() : "");
+				listDataMap.put("ordQty", item.getOrdQty() != null? item.getOrdQty().doubleValue(): 0);
+				listDataMap.put("weekYear", item.getWeekYear() != null ? item.getWeekYear() : "");
+				listDataMap.put("isUniformity", item.getIsUniformity() != null ? item.getIsUniformity() : "");
+				listDataMap.put("isDynamicBalance", item.getIsDynamicBalance() != null ? item.getIsDynamicBalance() : "");
+				listDataMap.put("isEudr", eudrMap.getOrDefault(item.getIsEudr(), item.getIsEudr()));
+				listDataMap.put("deliverGoodsType", deliverGoodsTypeMap.getOrDefault(item.getDeliverGoodsType(), item.getDeliverGoodsType()));
+				listDataMap.put("scmPriority", scmPriorityMap.getOrDefault(item.getScmPriority(), item.getScmPriority()));
+				listDataMap.put("scmDetailId", item.getScmDetailId() != null ? item.getScmDetailId().toString() : "");
+				listDataMap.put("updateTimeExport", item.getUpdateTime() != null ? DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, item.getUpdateTime()) : "");
+				listDataMap.put("orderStatus", item.getOrderStatus() != null ? item.getOrderStatus() : "");
+
+				list.add(listDataMap);
+			}
+			excelDataList.add(list);
+		}
+		log.debug("开始生成excel");
+		// 写到文件
+		return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
 	}
 }

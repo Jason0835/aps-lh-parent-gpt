@@ -4,9 +4,13 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.utils.StringUtil;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -172,6 +176,15 @@ public class MpStructureAllocation extends BaseEntity {
     @TableField(value = "ALLOT_DAYS")
     private Integer allotDays;
 
+
+    /**
+     * 交替类型 
+     */
+    @ApiModelProperty(value = "交替类型", name = "alternatingType")
+    @TableField(value = "ALTERNATING_TYPE")
+    private String alternatingType;
+
+
     /**
      * 备注
      */
@@ -206,5 +219,20 @@ public class MpStructureAllocation extends BaseEntity {
             return false;
         }
         return beginDay <= productionDay && productionDay <= endDay;
+    }
+
+    /**
+     * 从结构信息中解析出英寸
+     * @return 英寸
+     */
+    public String tbrProSize(){
+        if (StringUtil.isEmptyWithTrim(this.structureName)){
+            return "";
+        }
+        // 正则：R后面跟数字（可能带小数点）
+        Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
+        Matcher matcher = pattern.matcher(this.structureName);
+        String proSize = matcher.find() ? matcher.group() : "";
+        return proSize;
     }
 }
