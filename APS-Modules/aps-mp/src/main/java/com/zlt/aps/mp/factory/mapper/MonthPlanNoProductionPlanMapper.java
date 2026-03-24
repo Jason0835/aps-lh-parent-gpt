@@ -30,4 +30,11 @@ public interface MonthPlanNoProductionPlanMapper extends CommBaseMapper<MonthPla
      * @return 导出数据列表
      */
     List<MonthPlanNoProductionPlan> selectExportList(@Param("query") MonthPlanNoProductionPlan query);
+
+    /**
+     * 查询列表（按SKU汇总）
+     * @param query 查询条件
+     * @return 数据列表
+     */
+    List<MonthPlanNoProductionPlan> selectList(@Param("query") MonthPlanNoProductionPlan query);
 }

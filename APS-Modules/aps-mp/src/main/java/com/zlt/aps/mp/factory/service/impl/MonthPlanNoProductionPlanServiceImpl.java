@@ -105,11 +105,31 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
     /**
      * 列表查询
      */
+    /**
+     * 列表查询
+     */
     @Override
     public List<MonthPlanNoProductionPlan> selectList(MonthPlanNoProductionPlan query) {
-        QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
-        builderCondition(wrapper, query);
-        List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(wrapper);
+        List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(query);
+        // 加载月计划排产明细，用于计算实际排产和实单未排产
+        if (CollectionUtils.isNotEmpty(list) && StringUtils.isNotBlank(query.getProductionVersion())) {
+            LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
+            resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, query.getProductionVersion());
+            Map<String, Integer> mouldingDayResultMap = factoryMouldingDayResultMapper
+                    .selectList(resultQueryWrapper).stream().collect(Collectors
+                            .toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, FactoryMonthPlanMouldDayResult::getTotalQty, (r1, r2) -> r1));
+            // 计算实际排产和实单未排产
+            for (MonthPlanNoProductionPlan item : list) {
+                // 实际排产
+                int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
+                item.setTotalQty((long) factProdQty);
+                // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
+                long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0L;
+                long midQty = item.getMidQty() != null ? item.getMidQty() : 0L;
+                long actualOrderUnproduced = heightQty + midQty - factProdQty;
+                item.setActualOrderUnproduced(actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0L);
+            }
+        }
         dealList(list);
         return list;
     }
