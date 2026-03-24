@@ -15,6 +15,7 @@
         <module>Aps-Common</module>
         <module>Aps-Engine</module>
 		<module>Aps-Modules</module>
+        <module>Aps-Api/Aps-cx-api</module>
     </modules>
 
 </project>
