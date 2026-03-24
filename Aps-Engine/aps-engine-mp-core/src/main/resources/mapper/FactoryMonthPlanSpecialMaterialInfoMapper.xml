@@ -60,33 +60,43 @@
     </select>
 
     <select id="getSpecialMaterialStockInfo" resultType="com.zlt.aps.mp.engine.domain.vo.SpecialMaterialStockVo">
-        SELECT sms.MATERIAL_CODE,
-               sms.MATERIAL_DESC,
-               sms.STANDARD_LENGTH,
-               sms.STOCK
-          FROM t_mdm_special_material_stock sms
-         WHERE IFNULL(sms.IS_DELETE, 0) = 0
-           AND sms.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND sms.YEAR = #{year,jdbcType=DECIMAL}
-           AND sms.MONTH = #{month,jdbcType=DECIMAL}
-           AND sms.STANDARD_LENGTH > 0
-           AND sms.STOCK > 0
-           AND EXISTS (SELECT 1
-                         FROM T_MDM_SPECIAL_MATERIAL_RECORD smr
-                        WHERE IFNULL(smr.IS_DELETE, 0) = 0
-                          AND smr.MATERIAL_TYPE = '02'
-                          AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                          AND smr.MATERIAL_CODE = sms.MATERIAL_CODE)
-           AND NOT EXISTS (
-              SELECT 0 
-                FROM t_mdm_special_material_stock ss
-               WHERE ss.YEAR = sms.YEAR
-                 AND ss.MONTH = sms.MONTH
-                 AND ss.FACTORY_CODE = sms.FACTORY_CODE
-                 AND ss.MATERIAL_CODE = sms.MATERIAL_CODE
-                 AND IFNULL(ss.IS_DELETE, 0) = 0
-                 AND ss.stock_date > sms.stock_date
-           )
+	    SELECT
+		    SMS.MATERIAL_CODE,
+		    SMS.MATERIAL_DESC,
+		    SMR.QUOTA * MAX( SMS.STOCK / SMS.PACKAGE_NUM ) STANDARD_LENGTH,
+		    STANDARD_LENGTH ORI_STANDARD_LENGTH,
+		    SUM( SMS.STOCK ) STOCK 
+		FROM
+		    T_MDM_SPECIAL_MATERIAL_STOCK SMS
+		    INNER JOIN T_MDM_SPECIAL_MATERIAL_RECORD SMR ON SMR.FACTORY_CODE = SMS.FACTORY_CODE 
+		    AND IFNULL( SMR.IS_DELETE, 0 ) = 0 
+		    AND SMR.MATERIAL_TYPE = '02' 
+		    AND SMR.MATERIAL_CODE = SMS.MATERIAL_CODE 
+		WHERE
+		    IFNULL( SMS.IS_DELETE, 0 ) = 0 
+		    AND SMS.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+		    AND SMS.YEAR = #{year,jdbcType=DECIMAL} 
+		    AND SMS.MONTH = #{month,jdbcType=DECIMAL} 
+		    AND SMS.STANDARD_LENGTH > 0 
+		    AND SMS.STOCK > 0 
+		    AND NOT EXISTS (
+			    SELECT
+			        0 
+			    FROM
+			        T_MDM_SPECIAL_MATERIAL_STOCK SS 
+			    WHERE
+			        SS.YEAR = SMS.YEAR 
+			        AND SS.MONTH = SMS.MONTH 
+			        AND SS.FACTORY_CODE = SMS.FACTORY_CODE 
+			        AND SS.MATERIAL_CODE = SMS.MATERIAL_CODE 
+			        AND IFNULL( SS.IS_DELETE, 0 ) = 0 
+			        AND SS.STOCK_DATE > SMS.STOCK_DATE 
+		    ) 
+		GROUP BY
+		    sms.MATERIAL_CODE,
+		    sms.MATERIAL_DESC,
+		    smr.quota,
+		    STANDARD_LENGTH
     </select>
 
 </mapper>
