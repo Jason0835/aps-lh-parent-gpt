@@ -70,8 +70,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.DAY_29,
 		    r.DAY_30,
 		    r.DAY_31,
-            F.YEAR LAST_YEAR,
-		    F.MONTH LAST_MONTH,
 		    F.DAY_27 LAST_27,
 		    F.DAY_28 LAST_28,
 		    F.DAY_29 LAST_29,
