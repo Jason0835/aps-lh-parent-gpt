@@ -194,31 +194,31 @@
         IS_DELETE
         FROM T_MP_PROC_NO_PRODUCTION_PLAN
         WHERE IS_DELETE = 0
-        <if test="factoryCode != null and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="year != null"> AND YEAR = #{year}</if>
-        <if test="month != null"> AND MONTH = #{month}</if>
-        <if test="monthPlanVersion != null and monthPlanVersion != ''"> AND MONTH_PLAN_VERSION = #{monthPlanVersion}</if>
-        <if test="productionVersion != null and productionVersion != ''"> AND PRODUCTION_VERSION = #{productionVersion}</if>
-        <if test="monthPlanId != null"> AND MONTH_PLAN_ID = #{monthPlanId}</if>
-        <if test="productTypeCode != null and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
-        <if test="locationType != null and locationType != ''"> AND LOCATION_TYPE = #{locationType}</if>
-        <if test="brand != null and brand != ''"> AND BRAND = #{brand}</if>
-        <if test="proSize != null and proSize != ''"> AND PRO_SIZE LIKE CONCAT('%', #{proSize}, '%')</if>
-        <if test="structureName != null and structureName != ''"> AND STRUCTURE_NAME LIKE CONCAT('%', #{structureName}, '%')</if>
-        <if test="mainMaterialDesc != null and mainMaterialDesc != ''"> AND MAIN_MATERIAL_DESC = #{mainMaterialDesc}</if>
-        <if test="mesMaterialCode != null and mesMaterialCode != ''"> AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
-        <if test="materialCode != null and materialCode != ''"> AND MATERIAL_CODE LIKE CONCAT('%', #{materialCode}, '%')</if>
-        <if test="materialDesc != null and materialDesc != ''"> AND MATERIAL_DESC LIKE CONCAT('%', #{materialDesc}, '%')</if>
-        <if test="specifications != null and specifications != ''"> AND SPECIFICATIONS LIKE CONCAT('%', #{specifications}, '%')</if>
-        <if test="pattern != null and pattern != ''"> AND PATTERN LIKE CONCAT('%', #{pattern}, '%')</if>
-        <if test="productionType != null and productionType != ''"> AND PRODUCTION_TYPE = #{productionType}</if>
-        <if test="constructionStage != null and constructionStage != ''"> AND CONSTRUCTION_STAGE = #{constructionStage}</if>
-        <if test="yearWeek != null and yearWeek != ''"> AND YEAR_WEEK = #{yearWeek}</if>
-        <if test="isDynamicBalance != null and isDynamicBalance != ''"> AND IS_DYNAMIC_BALANCE = #{isDynamicBalance}</if>
-        <if test="isTrialPlan != null and isTrialPlan != ''"> AND IS_TRIAL_PLAN = #{isTrialPlan}</if>
-        <if test="isUniformity != null and isUniformity != ''"> AND IS_UNIFORMITY = #{isUniformity}</if>
-        <if test="isProduction != null and isProduction != ''"> AND IS_PRODUCTION = #{isProduction}</if>
-        <if test="isPrioritize != null and isPrioritize != ''"> AND IS_PRIORITIZE = #{isPrioritize}</if>
+        <if test="query.factoryCode != null and query.factoryCode != ''"> AND FACTORY_CODE = #{query.factoryCode}</if>
+        <if test="query.year != null"> AND YEAR = #{query.year}</if>
+        <if test="query.month != null"> AND MONTH = #{query.month}</if>
+        <if test="query.monthPlanVersion != null and query.monthPlanVersion != ''"> AND MONTH_PLAN_VERSION = #{query.monthPlanVersion}</if>
+        <if test="query.productionVersion != null and query.productionVersion != ''"> AND PRODUCTION_VERSION = #{query.productionVersion}</if>
+        <if test="query.monthPlanId != null"> AND MONTH_PLAN_ID = #{query.monthPlanId}</if>
+        <if test="query.productTypeCode != null and query.productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{query.productTypeCode}</if>
+        <if test="query.locationType != null and query.locationType != ''"> AND LOCATION_TYPE = #{query.locationType}</if>
+        <if test="query.brand != null and query.brand != ''"> AND BRAND = #{query.brand}</if>
+        <if test="query.proSize != null and query.proSize != ''"> AND PRO_SIZE LIKE CONCAT('%', #{query.proSize}, '%')</if>
+        <if test="query.structureName != null and query.structureName != ''"> AND STRUCTURE_NAME LIKE CONCAT('%', #{query.structureName}, '%')</if>
+        <if test="query.mainMaterialDesc != null and query.mainMaterialDesc != ''"> AND MAIN_MATERIAL_DESC = #{query.mainMaterialDesc}</if>
+        <if test="query.mesMaterialCode != null and query.mesMaterialCode != ''"> AND MES_MATERIAL_CODE = #{query.mesMaterialCode}</if>
+        <if test="query.materialCode != null and query.materialCode != ''"> AND MATERIAL_CODE LIKE CONCAT('%', #{query.materialCode}, '%')</if>
+        <if test="query.materialDesc != null and query.materialDesc != ''"> AND MATERIAL_DESC LIKE CONCAT('%', #{query.materialDesc}, '%')</if>
+        <if test="query.specifications != null and query.specifications != ''"> AND SPECIFICATIONS LIKE CONCAT('%', #{query.specifications}, '%')</if>
+        <if test="query.pattern != null and query.pattern != ''"> AND PATTERN LIKE CONCAT('%', #{query.pattern}, '%')</if>
+        <if test="query.productionType != null and query.productionType != ''"> AND PRODUCTION_TYPE = #{query.productionType}</if>
+        <if test="query.constructionStage != null and query.constructionStage != ''"> AND CONSTRUCTION_STAGE = #{query.constructionStage}</if>
+        <if test="query.yearWeek != null and query.yearWeek != ''"> AND YEAR_WEEK = #{query.yearWeek}</if>
+        <if test="query.isDynamicBalance != null and query.isDynamicBalance != ''"> AND IS_DYNAMIC_BALANCE = #{query.isDynamicBalance}</if>
+        <if test="query.isTrialPlan != null and query.isTrialPlan != ''"> AND IS_TRIAL_PLAN = #{query.isTrialPlan}</if>
+        <if test="query.isUniformity != null and query.isUniformity != ''"> AND IS_UNIFORMITY = #{query.isUniformity}</if>
+        <if test="query.isProduction != null and query.isProduction != ''"> AND IS_PRODUCTION = #{query.isProduction}</if>
+        <if test="query.isPrioritize != null and query.isPrioritize != ''"> AND IS_PRIORITIZE = #{query.isPrioritize}</if>
         ORDER BY STRUCTURE_NAME, SPECIFICATIONS, MAIN_PATTERN, PATTERN, MAIN_MATERIAL_DESC, PRO_SIZE, UPDATE_TIME DESC
     </select>
 </mapper>
