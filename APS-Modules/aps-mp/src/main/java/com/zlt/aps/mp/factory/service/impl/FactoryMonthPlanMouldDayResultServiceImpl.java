@@ -35,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -475,7 +476,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         // 3、平均日产
         BigDecimal averageQty = BigDecimal.ZERO;
         if (workDays > 0) {
-            averageQty = BigDecimalUtils.div(totalQty, workDays);
+            averageQty = BigDecimalUtils.div(totalQty, workDays).setScale(0, RoundingMode.DOWN);
         }
         // 4、平均单胎重
         BigDecimal totalWeight = list.stream().filter(r -> MonthPlanExportDataTypeEnum.RECORD.getCode().equals(r.getDataType()))
