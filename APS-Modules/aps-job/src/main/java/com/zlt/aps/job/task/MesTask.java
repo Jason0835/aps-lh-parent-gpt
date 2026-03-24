@@ -1,6 +1,7 @@
 package com.zlt.aps.job.task;
 
 import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.mp.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,5 +57,21 @@ public class MesTask {
     @ApiOperation("同步硫化在机数据")
     public void syncLhMachineOnlineInfo() {
         iMesItfService.syncLhMachineOnlineInfo(new MdmLhMachineOnlineInfo());
+    }
+
+    /**
+     * 同步设备保养计划
+     */
+    @ApiOperation("同步设备保养计划")
+    public void syncDevMaintenancePlan() {
+        iMesItfService.syncDevMaintenancePlan(new AuxReqSyncDataLogs());
+    }
+
+    /**
+     * 同步胶囊已使用次数
+     */
+    @ApiOperation("同步胶囊已使用次数")
+    public void syncLhRepairCapsule() {
+        iMesItfService.syncLhRepairCapsule(new AuxReqSyncDataLogs());
     }
 }

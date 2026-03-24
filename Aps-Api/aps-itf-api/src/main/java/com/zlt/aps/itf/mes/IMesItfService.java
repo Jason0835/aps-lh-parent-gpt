@@ -167,4 +167,22 @@ public interface IMesItfService {
     @ApiOperation("同步硫化在机数据")
     @PostMapping("/mesItf/syncLhMachineOnlineInfo")
     public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+
+    /**
+     * 同步设备保养计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备保养计划")
+    @PostMapping("/mesItf/syncDevMaintenancePlan")
+    public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胶囊已使用次数
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胶囊已使用次数")
+    @PostMapping("/mesItf/syncLhRepairCapsule")
+    public AjaxResult syncLhRepairCapsule(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

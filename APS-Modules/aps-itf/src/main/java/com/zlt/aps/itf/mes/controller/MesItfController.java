@@ -331,4 +331,34 @@ public class MesItfController {
         }
         return mesItfService.syncLhMachineOnlineInfo(mdmLhMachineOnlineInfo);
     }
+
+    /**
+     * 同步设备保养计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备保养计划")
+    @PostMapping("/syncDevMaintenancePlan")
+    public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncDevMaintenancePlan(syncDataLogs);
+    }
+
+    /**
+     * 同步胶囊已使用次数
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胶囊已使用次数")
+    @PostMapping("/syncLhRepairCapsule")
+    public AjaxResult syncLhRepairCapsule(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhRepairCapsule(syncDataLogs);
+    }
 }

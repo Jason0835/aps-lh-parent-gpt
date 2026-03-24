@@ -8,6 +8,8 @@ import com.zlt.aps.mdm.api.domain.entity.MdmProductStock;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.mdm.api.domain.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.mp.api.domain.entity.MdmCxMachineOnlineInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmLhMachineOnlineInfo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -101,4 +103,31 @@ public interface IMesItfService {
     @ApiOperation("同步模壳台账信息")
     @PostMapping("/mesItf/syncMoldShell")
     public AjaxResult syncMoldShell(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型在机数据")
+    @PostMapping("/mesItf/syncMachineOnlineInfo")
+    public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化在机数据")
+    @PostMapping("/mesItf/syncLhMachineOnlineInfo")
+    public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+
+    /**
+     * 同步设备保养计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备保养计划")
+    @PostMapping("/mesItf/syncDevMaintenancePlan")
+    public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

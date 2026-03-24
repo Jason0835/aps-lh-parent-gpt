@@ -15,6 +15,15 @@ public enum ItfSyncKeyEnum {
      * 月计划下发接口
      */
     SYNC_MONTH_PLAN("MONTH_PLAN_ISSUE", "APS", "MES", "月计划下发接口"),
+    /**
+     * 设备保养计划同步
+     */
+    DEV_MAINTENANCE_PLAN("DEV_MAINTENANCE_PLAN", "MES", "APS", "设备保养计划同步"),
+
+    /**
+     * 胶囊已使用次数同步
+     */
+    LH_REPAIR_CAPSULE("LH_REPAIR_CAPSULE", "MES", "APS", "胶囊已使用次数同步"),
 
     ;
 	/**

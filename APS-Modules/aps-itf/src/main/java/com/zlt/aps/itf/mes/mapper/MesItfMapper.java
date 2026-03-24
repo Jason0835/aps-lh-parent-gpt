@@ -3,6 +3,8 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.DevMaintenancePlan;
+import com.zlt.aps.itf.vo.LhRepairCapsule;
 import com.zlt.aps.mp.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -73,4 +75,20 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<MdmLhMachineOnlineInfo> selectLhMachineOnlineSyncList(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+
+    /**
+     * 查询设备保养计划同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<DevMaintenancePlan> selectDevMaintenancePlanList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胶囊已使用次数同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<LhRepairCapsule> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
 }

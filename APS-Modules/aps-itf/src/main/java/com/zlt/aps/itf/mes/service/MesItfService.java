@@ -149,4 +149,18 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncLhMachineOnlineInfo(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+
+    /**
+     * 同步设备保养计划
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胶囊已使用次数
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncLhRepairCapsule(AuxReqSyncDataLogs syncDataLogs);
 }
