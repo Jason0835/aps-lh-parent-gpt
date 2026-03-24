@@ -290,14 +290,22 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         }
 
         // 设置年月标题和工厂、产品品类（第一行）
-        tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
-        // 第一行的工厂和产品品类需要字典转义，从查询结果第一条获取
+        // 从查询结果中获取年月，如果没有数据则使用查询条件中的年月
         if (dataList != null && !dataList.isEmpty()) {
             MonthPlanNoProductionPlan firstItem = dataList.get(0);
+            Integer dataYear = firstItem.getYear();
+            Integer dataMonth = firstItem.getMonth();
+            if (dataYear != null && dataMonth != null) {
+                tableMap.put("yearAndMonth", dataYear + "年" + dataMonth + "月份");
+            } else {
+                tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
+            }
             tableMap.put("factoryCode", factoryMap.getOrDefault(firstItem.getFactoryCode(), firstItem.getFactoryCode() != null ? firstItem.getFactoryCode() : ""));
             tableMap.put("productTypeCode", productTypeMap.getOrDefault(firstItem.getProductTypeCode(), firstItem.getProductTypeCode() != null ? firstItem.getProductTypeCode() : ""));
             tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
             tableMap.put("productionVersion", firstItem.getProductionVersion());
+        } else {
+            tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
         }
 
         if (dataList != null && !dataList.isEmpty()) {
