@@ -165,11 +165,11 @@ public class MatchingProductionHandler {
         Map<String, Integer> factProdReqMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
                 cxContinueInfoMap, true);
         // 调用主流程的入口 -> 搭配排程算法（储备）
-        Map<String, Integer> newSkuQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
+        Map<String, Integer> matchingQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
                 cxContinueInfoMap, false);
 
         // 构建排产结果并保存
-        this.saveMouldProductionResult(productionContext, planList, detailLogList, newSkuQtyMap);
+        this.saveMouldProductionResult(productionContext, planList, detailLogList, factProdReqMap, matchingQtyMap);
     }
 
     /**
@@ -2424,32 +2424,36 @@ public class MatchingProductionHandler {
     /**
      * 构建排产结果并保存
      *
-     * @param productionContext
-     * @param resultList
-     * @param detailList
-     * @param newSkuQtyMap
+     * @param productionContext 上下文
+     * @param resultList        原排产结果
+     * @param detailList        原排产明细
+     * @param factProdReqMap    实单补量
+     * @param matchingQtyMap    搭配补量
      */
     @Transactional
     public void saveMouldProductionResult(TbrProductionContext productionContext,
                                           List<FactoryMonthPlanMouldDayResult> resultList,
                                           List<FactoryMonthPlanMouldDayDetail> detailList,
-                                          Map<String, Integer> newSkuQtyMap) {
-        if (CollectionUtils.isEmpty(newSkuQtyMap)) {
+                                          Map<String, Integer> factProdReqMap, Map<String, Integer> matchingQtyMap) {
+        if (CollectionUtils.isEmpty(matchingQtyMap) && CollectionUtils.isEmpty(factProdReqMap)) {
             return;
         }
         // 从上下文取出排产结果
         List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler
                 .getMouldProductionResult(productionContext).stream()
-                .filter(detail -> newSkuQtyMap.containsKey(detail.getMaterialDesc())).collect(Collectors.toList()); // 只过滤出本次排产的规格
+                .filter(detail -> matchingQtyMap.containsKey(detail.getMaterialDesc())
+                        || factProdReqMap.containsKey(detail.getMaterialDesc()))
+                .collect(Collectors.toList()); // 只过滤出本次排产的规格
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler
                 .getSummaryBySkuResult(detailLogList, productionContext);
         if (CollectionUtils.isEmpty(dayResultList)) {
             return;
         }
-        List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(dayResultList, resultList,
-                newSkuQtyMap);
+
+        List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(productionContext,
+                dayResultList, resultList, factProdReqMap, matchingQtyMap);
         List<FactoryMonthPlanMouldDayDetail> detailResultList = this.buildDetailResultList(detailLogList, detailList,
-                productionContext, newSkuQtyMap);
+                productionContext, factProdReqMap, matchingQtyMap);
         List<MpMonthPlanStatistics> productionStatisticsList = this.buildProductionStatisticsList(productionContext,
                 mouldResultList, dayResultList);
 
@@ -2662,23 +2666,26 @@ public class MatchingProductionHandler {
     /**
      * 构建待保存的排程明细记录
      *
-     * @param detailLogList
-     * @param detailList
-     * @param productionContext
-     * @param newSkuQtyMap
+     * @param detailLogList     排产日志列表
+     * @param detailList        原排产日志列表
+     * @param productionContext 上下文
+     * @param factProdReqMap    实单补量
+     * @param matchingQtyMap    搭配补量
      * @return
      */
     private List<FactoryMonthPlanMouldDayDetail> buildDetailResultList(List<FactoryMonthPlanMouldDayDetail> detailLogList,
                                                                        List<FactoryMonthPlanMouldDayDetail> detailList,
                                                                        TbrProductionContext productionContext,
-                                                                       Map<String, Integer> newSkuQtyMap) {
+                                                                       Map<String, Integer> factProdReqMap,
+                                                                       Map<String, Integer> matchingQtyMap) {
         List<FactoryMonthPlanMouldDayDetail> detailResultList = new ArrayList<>();
         LambdaQueryWrapper<FactoryMonthPlanMouldDayDetail> queryWrapper = new LambdaQueryWrapper<FactoryMonthPlanMouldDayDetail>();
         queryWrapper.eq(FactoryMonthPlanMouldDayDetail::getProductionVersion, productionContext.getProductionVersion());
         Map<String, FactoryMonthPlanMouldDayDetail> oldDetailMap = detailList.stream().collect(Collectors
                 .toMap(detail -> this.getMouldKey(detail), Function.identity(), (detail1, detail2) -> detail1));
         for (FactoryMonthPlanMouldDayDetail detail : detailLogList) {
-            if (!newSkuQtyMap.containsKey(detail.getMaterialDesc())) {
+            if (!matchingQtyMap.containsKey(detail.getMaterialDesc())
+                    && !factProdReqMap.containsKey(detail.getMaterialDesc())) {
                 continue;
             }
             detailResultList.add(detail);
@@ -2714,41 +2721,75 @@ public class MatchingProductionHandler {
     /**
      * 构建待保存的排程结果记录
      *
-     * @param dayResultList
-     * @param resultList
-     * @param newSkuQtyMap
+     * @param productionContext 上下文
+     * @param dayResultList     新排产结果
+     * @param resultList        旧排产结果
+     * @param factProdReqMap    实单补量
+     * @param matchingQtyMap    搭配补量
      * @return
      */
-    private List<FactoryMonthPlanMouldDayResult> buildMouldResultList(List<FactoryMonthPlanMouldDayResult> dayResultList,
+    private List<FactoryMonthPlanMouldDayResult> buildMouldResultList(TbrProductionContext productionContext,
+                                                                      List<FactoryMonthPlanMouldDayResult> dayResultList,
                                                                       List<FactoryMonthPlanMouldDayResult> resultList,
-                                                                      Map<String, Integer> newSkuQtyMap) {
+                                                                      Map<String, Integer> factProdReqMap,
+                                                                      Map<String, Integer> matchingQtyMap) {
         List<FactoryMonthPlanMouldDayResult> saveResultList = new ArrayList<>();
         Map<String, FactoryMonthPlanMouldDayResult> oldPlanMap = resultList.stream()
                 .collect(Collectors.toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, Function.identity()));
         Long productionSequence = resultList.stream().map(FactoryMonthPlanMouldDayResult::getProductionSequence)
                 .filter(Objects::nonNull).max(Long::compareTo).orElse(0L);
+        
+        // 合并需求计划
+        Map<String, MonthPlanProductionRequirePlanVo> requireMap = productionContext.getAllProductionPlan().values()
+                .stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMaterialCode,
+                        Function.identity(), (p1, p2) -> {
+                            p1.setHeightLossQty(Optional.ofNullable(p1.getHeightLossQty()).orElse(0)
+                                    + Optional.ofNullable(p2.getHeightLossQty()).orElse(0));
+                            p1.setMidQty(Optional.ofNullable(p1.getMidQty()).orElse(0)
+                                    + Optional.ofNullable(p2.getMidQty()).orElse(0));
+                            p1.setPostponeQty(Optional.ofNullable(p1.getPostponeQty()).orElse(0)
+                                    + Optional.ofNullable(p2.getPostponeQty()).orElse(0));
+                            return p1;
+                        }));
+        
         for (FactoryMonthPlanMouldDayResult plan : dayResultList) {
-            if (!newSkuQtyMap.containsKey(plan.getMaterialDesc())) {
+            Integer factProdQty = factProdReqMap.getOrDefault(plan.getMaterialDesc(), 0); // 实单补量
+            Integer matchingQty = matchingQtyMap.getOrDefault(plan.getMaterialDesc(), 0); // 搭配补量
+            if (factProdQty <= 0 && matchingQty <= 0) { // 非搭配排产涉及的sku，不处理
                 continue;
             }
             FactoryMonthPlanMouldDayResult firstPlan = CollectionUtils.firstElement(resultList);
             // 原有记录有同规格的更新（有ID）；没有的说明是新搭配的规格，需要新增（无ID）
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
             if (oldPlan != null) {
-                plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
-                plan.setTotalQty(oldPlan.getTotalQty() + plan.getConventionProductionQty());
-                plan.setHeightProductionQty(oldPlan.getHeightProductionQty());
-                plan.setMidProductionQty(oldPlan.getMidProductionQty());
+                MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(oldPlan.getMaterialCode());
+                if (requirePlan != null) {
+                    oldPlan.setHeightQty(requirePlan.getHeightQty());
+                    oldPlan.setMidLossQty(requirePlan.getMidQty());
+                    oldPlan.setPostponeQty(requirePlan.getPostponeQty());
+                }
+                plan.setConventionProductionQty(matchingQty);
+                plan.setTotalQty(oldPlan.getTotalQty() + matchingQty + factProdQty);
+                Integer temFactProdQty = factProdQty + oldPlan.getTotalQty();
+                // 高优先级
+                Integer diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "heightQty", "heightProductionQty");
+                temFactProdQty -= diffQty;
+                // 中优先级
+                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "midLossQty", "midProductionQty");
+                temFactProdQty -= diffQty;
+                // 暂缓
+                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "postponeQty", "postponeProductionQty");
+                temFactProdQty -= diffQty;
+                // 差异
+                plan.setDifferenceQty(oldPlan.getDifferenceQty() - factProdQty);
                 plan.setCycleProductionQty(oldPlan.getCycleProductionQty());
-                plan.setPostponeProductionQty(oldPlan.getPostponeProductionQty());
-                plan.setDifferenceQty(oldPlan.getDifferenceQty());
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
                 plan.setTypeBlockQty(oldPlan.getTypeBlockQty());
                 plan.setFactProdReqQty(oldPlan.getFactProdReqQty());
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
             } else {
-                plan.setConventionProductionQty(newSkuQtyMap.get(plan.getMaterialDesc()));
+                plan.setConventionProductionQty(matchingQty);
                 plan.setTotalQty(plan.getConventionProductionQty());
                 plan.setHeightProductionQty(0);
                 plan.setMidProductionQty(0);
@@ -2774,6 +2815,33 @@ public class MatchingProductionHandler {
             saveResultList.add(plan);
         }
         return saveResultList;
+    }
+
+    /**
+     * 分配排产数量
+     * 
+     * @param plan             新排产记录
+     * @param oldPlan          旧排产记录
+     * @param newProductQty    排产量
+     * @param reqFieldName     需求量字段名
+     * @param productFieldName 排产量字段名
+     * @return
+     */
+    private Integer allocationProductionQty(FactoryMonthPlanMouldDayResult plan, FactoryMonthPlanMouldDayResult oldPlan,
+                                            Integer factProdQty, Integer newProductQty, String reqFieldName, String productFieldName) {
+        Integer diffQty = 0; // 未分配量
+        Integer productQty = Optional.ofNullable((Integer) oldPlan.getFieldValueByFieldName(productFieldName))
+                .orElse(0);
+        if (factProdQty > 0) {
+            Integer reqQty = Optional.ofNullable((Integer) oldPlan.getFieldValueByFieldName(reqFieldName)).orElse(0);
+            if (newProductQty > 0 && reqQty > productQty) {
+                diffQty = Math.min(reqQty - productQty, newProductQty);
+                plan.setFieldValueByFieldName(productFieldName, productQty + diffQty);
+            }
+        } else {
+            plan.setFieldValueByFieldName(productFieldName, productQty);
+        }
+        return diffQty;
     }
 
     /**
@@ -2872,8 +2940,11 @@ public class MatchingProductionHandler {
             if (requirePlan == null) {// 不存在直接转换
                 requirePlan = MonthPlanProductionRequirePlanVo.buildInitProductionPlan(null, productionVersion,
                         demandPlan);
-                requirePlan.setHeightLossQty(demandPlan.getHeightQty());
                 requirePlan.setFactProdReqQty(demandPlan.getNetQty());
+                requirePlan.setHeightLossQty(demandPlan.getHeightQty());
+                requirePlan.setHeightQty(demandPlan.getHeightQty());
+                requirePlan.setMidQty(demandPlan.getMidQty());
+                requirePlan.setPostponeQty(demandPlan.getPostponeQty());
                 requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
                 requirePlan.setInventorySalesRatio(0D);// 默认0
                 requirePlan.setConstructionInfo(constructionInfoMap.get(materialCode)); //加载施工

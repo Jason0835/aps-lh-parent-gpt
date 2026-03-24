@@ -3,6 +3,9 @@ package com.zlt.aps.mp.factory.mapper;
 import com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -21,4 +24,10 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface MonthPlanNoProductionPlanMapper extends CommBaseMapper<MonthPlanNoProductionPlan> {
 
+    /**
+     * 查询导出列表
+     * @param query 查询条件
+     * @return 导出数据列表
+     */
+    List<MonthPlanNoProductionPlan> selectExportList(@Param("query") MonthPlanNoProductionPlan query);
 }
