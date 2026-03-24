@@ -43,18 +43,6 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
     private BigDecimal singleTireWeight;
 
     /**
-     * 上个月年份
-     */
-    @ApiModelProperty(value = "上个月年份", name = "lastYear")
-    private Integer lastYear;
-
-    /**
-     * 上个月月份
-     */
-    @ApiModelProperty(value = "上个月月份", name = "lastMonth")
-    private Integer lastMonth;
-
-    /**
      * 上个月定稿版本
      */
     @ApiModelProperty(value = "上个月定稿版本", name = "lastProductionVersion")
