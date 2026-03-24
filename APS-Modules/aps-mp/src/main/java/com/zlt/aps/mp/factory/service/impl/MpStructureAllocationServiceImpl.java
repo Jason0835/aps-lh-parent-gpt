@@ -1267,17 +1267,19 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         List<Map<String, Object>> listData = new ArrayList<>();
         // 设置表头名称
-        tableMap.put("cxMachineCode", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.cxMachineCode"));
-        tableMap.put("cxMachineTypeCode", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.cxMachineTypeCode"));
-        tableMap.put("structureName", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureName"));
-        tableMap.put("structureType", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureType"));
-        tableMap.put("lossQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.lossQty"));
-        tableMap.put("unPostponeNetQty", I18nUtil.getMessage("ui.data.column.demandPlanSum.unPostponeNetQty"));
-        tableMap.put("totalQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.totalQty"));
-        tableMap.put("differenceQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.differenceQty"));
-        tableMap.put("allotDays", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.allotDays"));
-        tableMap.put("maxLhMachineCount", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.maxLhMachineCount"));
-        tableMap.put("dailyproductionQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.dailyproductionQty"));
+        Map<String, Object> headMap = new HashMap<>();
+        headMap.put("cxMachineCode", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.cxMachineCode"));
+        headMap.put("cxMachineTypeCode", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.cxMachineTypeCode"));
+        headMap.put("structureName", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureName"));
+        headMap.put("structureType", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureType"));
+        headMap.put("lossQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.lossQty"));
+        headMap.put("unPostponeNetQty", I18nUtil.getMessage("ui.data.column.demandPlanSum.unPostponeNetQty"));
+        headMap.put("totalQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.totalQty"));
+        headMap.put("differenceQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.differenceQty"));
+        headMap.put("allotDays", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.allotDays"));
+        headMap.put("maxLhMachineCount", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.maxLhMachineCount"));
+        headMap.put("dailyproductionQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.dailyproductionQty"));
+        tableMap.putAll(headMap);
 
         // 构建表头汇总行
         if (!CollectionUtils.isEmpty(statisticsVo.getHeadList())) {
@@ -1324,7 +1326,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     // 交替使用两种颜色
                     String color = toggleColor ? "#e2efda" : "#d9d9d9";
 
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 8, color, true, false, ""));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, headMap.size() - 2, color, true, false, ""));
 
                     // 根据changeRank设置渐变颜色
                     Integer changeRank = exportVo.getChangeRank();
@@ -1356,8 +1358,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             int colorIndex = Math.min(changeRank - 2, gradientColors.length - 1);
                             String colorSelect = gradientColors[colorIndex];
                             // 列从day1开始是第8列（索引从0开始：0~6是前面固定列，day1从第9列开始
-                            int startCol = 9 + firstDayWithValue;
-                            int endCol = 9 + lastDayWithValue;
+                            int startCol = headMap.size() - 1 + firstDayWithValue;
+                            int endCol = headMap.size() - 1 + lastDayWithValue;
                             cellStyleList.add(new CellStyle(rowNum, rowNum, startCol, endCol, colorSelect, true, false, ""));
 
                         }
@@ -1366,7 +1368,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if (StructureAllocationExportDataTypeEnum.TOTAL.getCode().equals(exportVo.getDataType())
                         || StructureAllocationExportDataTypeEnum.MAX_PRODUCT_QTY.getCode().equals(exportVo.getDataType())
                         || StructureAllocationExportDataTypeEnum.ENABLE_COUNT.getCode().equals(exportVo.getDataType())) {
-                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, 39, "#DAEEF3", true, true, ""));
+                    cellStyleList.add(new CellStyle(rowNum, rowNum, 0, headMap.size() + 29, "#DAEEF3", true, true, ""));
                 }
 
                 listData.add(listDataMap);
