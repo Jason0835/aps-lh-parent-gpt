@@ -105,6 +105,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 本轮次是否参与排产 1 是 0 否
      */
     private Integer isThisRound;
+    /**
+     * 已排产量
+     */
+    private Integer producedQty;
 
     /**
      * 初始的排产数据设置
