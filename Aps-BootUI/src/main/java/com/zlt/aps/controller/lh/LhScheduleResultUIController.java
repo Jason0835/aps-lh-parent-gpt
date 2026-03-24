@@ -140,14 +140,14 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         return AjaxResult.success(resultList);
     }
 
-    @ApiOperation("根据规格号查询物料号List")
-    //@RequiresPermissions("lh:lhScheduleResult:selectListMdmProductConstruction") Nick+ 前端是没有按钮的去掉权限
-    @PostMapping("/selectListMdmProductConstruction")
-    @ResponseBody
-    public AjaxResult selectListMdmProductConstruction(@RequestBody LhSpecCodeParamDTO dto){
-        List<MdmProductConstruction> resultList = iLhScheduleResultRemoteService.selectListMdmProductConstruction(dto);
-        return AjaxResult.success(resultList);
-    }
+//    @ApiOperation("根据规格号查询物料号List")
+//    //@RequiresPermissions("lh:lhScheduleResult:selectListMdmProductConstruction") Nick+ 前端是没有按钮的去掉权限
+//    @PostMapping("/selectListMdmProductConstruction")
+//    @ResponseBody
+//    public AjaxResult selectListMdmProductConstruction(@RequestBody LhSpecCodeParamDTO dto){
+//        List<MdmProductConstruction> resultList = iLhScheduleResultRemoteService.selectListMdmProductConstruction(dto);
+//        return AjaxResult.success(resultList);
+//    }
 
     @ApiOperation("插单")
     @RequiresPermissions("lh:lhScheduleResult:insertOrder")
@@ -364,23 +364,23 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
 
-    /**
-     * 根据条件查询主表数据
-     */
-    @ApiOperation("查询月硫化信息计划列表")
-    @PostMapping("/monthFinishQtyList")
-    @ResponseBody
-    public TableDataInfo monthFinishQtyList(LhMonthPlanSurplusDetail queryVO) {
-        return iLhScheduleResultRemoteService.monthFinishQtyList(queryVO);
-    }
-
-    /**
-     * 根据条件查询主表数据
-     */
-    @ApiOperation("查询月硫化信息统计")
-    @PostMapping("/statisticsDay")
-    @ResponseBody
-    public AjaxResult statisticsDay(LhMonthPlanSurplusDetail queryVO) {
-        return iLhScheduleResultRemoteService.statisticsDay(queryVO);
-    }
+//    /**
+//     * 根据条件查询主表数据
+//     */
+//    @ApiOperation("查询月硫化信息计划列表")
+//    @PostMapping("/monthFinishQtyList")
+//    @ResponseBody
+//    public TableDataInfo monthFinishQtyList(LhMonthPlanSurplusDetail queryVO) {
+//        return iLhScheduleResultRemoteService.monthFinishQtyList(queryVO);
+//    }
+//
+//    /**
+//     * 根据条件查询主表数据
+//     */
+//    @ApiOperation("查询月硫化信息统计")
+//    @PostMapping("/statisticsDay")
+//    @ResponseBody
+//    public AjaxResult statisticsDay(LhMonthPlanSurplusDetail queryVO) {
+//        return iLhScheduleResultRemoteService.statisticsDay(queryVO);
+//    }
 }
