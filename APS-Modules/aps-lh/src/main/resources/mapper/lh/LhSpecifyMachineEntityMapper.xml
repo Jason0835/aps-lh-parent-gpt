@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhSpecifyMachineEntityMapper">
+
+
+    <select id="queryByFactoryCodeAndSpecCodes"  resultType="com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine">
+        SELECT
+        ID,
+        FACTORY_CODE    AS factoryCode,
+        SPEC_CODE       AS specCode,
+        MACHINE_CODE    AS machineCode,
+        LINE_TYPE       AS lineType,
+        JOB_TYPE        AS jobType
+        FROM T_LH_SPECIFY_MACHINE
+        WHERE FACTORY_CODE = #{factoryCode}
+        AND SPEC_CODE IN
+        <foreach item="specCode" collection="specCodes" open="(" separator="," close=")">
+            #{specCode}
+        </foreach>
+    </select>
+
+</mapper>

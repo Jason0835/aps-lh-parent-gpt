@@ -33,6 +33,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.zlt.aps.lh</groupId>
+            <artifactId>aps-lh-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.zlt.aps.cx</groupId>
             <artifactId>aps-cx-api</artifactId>
             <version>${aps-api.version}</version>

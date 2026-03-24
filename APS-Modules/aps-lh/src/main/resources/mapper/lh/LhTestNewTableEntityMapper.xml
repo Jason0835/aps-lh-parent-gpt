@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhTestNewTableEntityMapper">
+    <update id="updateEmbryoCode1" parameterType="com.zlt.aps.lh.api.domain.entity.LhTestNewTable">
+        update t_mdm_product_construction t1 set t1.embryo_code =
+        ( select t2.embryo_code  from newtable2 t2 where t1.spec_code = t2.col2 and col6= 'new')
+    </update>
+</mapper>
