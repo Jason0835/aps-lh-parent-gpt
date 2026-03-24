@@ -110,7 +110,9 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
      */
     @Override
     public List<MonthPlanNoProductionPlan> selectList(MonthPlanNoProductionPlan query) {
-        List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(query);
+        QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
+        builderCondition(wrapper, query);
+        List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(wrapper);
         // 加载月计划排产明细，用于计算实际排产和实单未排产
         if (CollectionUtils.isNotEmpty(list) && StringUtils.isNotBlank(query.getProductionVersion())) {
             LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
