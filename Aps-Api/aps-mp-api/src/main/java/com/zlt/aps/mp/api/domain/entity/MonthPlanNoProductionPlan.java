@@ -355,4 +355,10 @@ public class MonthPlanNoProductionPlan extends BaseEntity {
     @TableField(exist = false)
     private Long totalQty;
 
+    /**
+     * 实单未排产
+     */
+    @ApiModelProperty(value = "实单未排产", name = "actualOrderUnproduced")
+    @TableField(exist = false)
+    private Long actualOrderUnproduced;
 }
