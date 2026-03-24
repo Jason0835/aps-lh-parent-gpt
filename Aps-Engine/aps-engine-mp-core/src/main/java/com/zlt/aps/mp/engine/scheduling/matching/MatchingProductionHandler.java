@@ -489,7 +489,8 @@ public class MatchingProductionHandler {
             }
             Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = checkDay - i - 1 >= skuSecondProduction;
+                int diff = checkDay - i;
+                isSecOnLine = diff == 1 || diff >= skuSecondProduction;
                 break;
             }
         }
@@ -501,7 +502,8 @@ public class MatchingProductionHandler {
         for (Integer i = checkDay + 1; i <= skuEndDay; i++) {
             Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = i - checkDay - 1 >= skuSecondProduction;
+                int diff = i - checkDay;
+                isSecOnLine = diff == 1 || diff >= skuSecondProduction;
                 break;
             }
         }
@@ -1428,14 +1430,14 @@ public class MatchingProductionHandler {
                         : plan.getConventionReserveQty();
                 remainMatchingQty = remainMatchingQty > 0? remainMatchingQty: 0;
                 // 因搭配量只有一条计划，故而可以直接处理奇数，遇到奇数直接+1
-                remainMatchingQty = (remainMatchingQty & 1) == 0 ? remainMatchingQty : remainMatchingQty + 1;
+                if (!isActualOrder) {
+                    remainMatchingQty = (remainMatchingQty & 1) == 0 ? remainMatchingQty : remainMatchingQty + 1;
+                }
                 if (remainMatchingQty > 0) {
                     plan.setProductionFlag(YesOrNoEnum.YES.getCode()); // 设置成应生产
                 }
                 plan.setProductionQty(remainMatchingQty);
-                if (!isActualOrder) { // 非实单待排产量要加上常规储备
-                    plan.setHeightProductionQty(0); // 高优先级
-                }
+                plan.setHeightProductionQty(0); // 高优先级
                 if (plan.getDayVulcanizationQty() == null) { // 硫化日产能空的赋值为0，防止报错
                     plan.setDayVulcanizationQty(0);
                 }
@@ -1486,7 +1488,7 @@ public class MatchingProductionHandler {
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
         do {
             List<MonthPlanProductionRequirePlanVo> productionPlanList = this.getMatchStartDayPlan(productionContext,
-                    groupInfo, copyLimitMap, scheduleMaterialDesc); // 获取符合开始日期的规格，包括校验二次上机和换模能力，同时删减不符合条件的产能限制列表
+                    groupInfo, copyLimitMap, scheduleMaterialDesc, isActualOrder); // 获取符合开始日期的规格，包括校验二次上机和换模能力，同时删减不符合条件的产能限制列表
             if (productionPlanList.isEmpty()) { // 没有符合条件的SKU，直接结束
                 break;
             }
@@ -1544,7 +1546,8 @@ public class MatchingProductionHandler {
     private List<MonthPlanProductionRequirePlanVo> getMatchStartDayPlan(TbrProductionContext productionContext,
                                                                         ProductionPlanGroupInfo groupInfo,
                                                                         TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
-                                                                        Set<String> scheduleMaterialDesc) {
+                                                                        Set<String> scheduleMaterialDesc,
+                                                                        boolean isActualOrder) {
         // 取出还未轮询过的列表
         List<MonthPlanProductionRequirePlanVo> productionPlanList = groupInfo.getGroupPlanData().stream()
                 .filter(plan -> !scheduleMaterialDesc.contains(plan.getMaterialDesc())).collect(Collectors.toList());
@@ -1557,6 +1560,10 @@ public class MatchingProductionHandler {
         for (int day = startDay; day <= endDay; day++) {
             startDay = day; // 开始时间等于当前校验时间，如果以下校验不通过，则开始日期推后一天
             for (MonthPlanProductionRequirePlanVo plan : productionPlanList) {
+                // 如果是实单补量，不能补未排产的sku
+                if (isActualOrder && !productionContext.getAllSkuProductionPlan().containsKey(plan.getMaterialDesc())) {
+                    continue;
+                }
                 String materialDesc = plan.getMaterialDesc();
                 if (scheduleMaterialDesc.contains(materialDesc)) {
                     continue;
@@ -1953,7 +1960,7 @@ public class MatchingProductionHandler {
                 continue;
             }
             // 3、次日是否满足排产参数检查
-            Integer nextDay = this.getNextDay(productionContext, startDay, endDay);
+            Integer nextDay = this.getNextDay(productionContext, usedBeginDate, endDay);
             if (nextDay <= 0 || !this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, nextDay, startDay, endDay)) {
                 continue;
             }
@@ -2028,7 +2035,7 @@ public class MatchingProductionHandler {
                 if (realProductionQty > 0) {
                     Set<String> useMouldSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
                     String scheduleLogName = isActualOrder? "实单补量": "搭配排产";
-                    log.info(String.format("结构:%s,【%s】,%s日,规格:%s,新增模具%s,搭配量:%s", structureName, scheduleLogName, usedBeginDate, materialDesc, useMouldSet, realProductionQty));
+                    log.info(String.format("结构:%s,【%s】,%s日,规格:%s,新增模具%s,排产量:%s", structureName, scheduleLogName, usedBeginDate, materialDesc, useMouldSet, realProductionQty));
                     // 更新换模数
                     Set<String> mouldCodeSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
                     productionContext.getBaseDataContainer().getDayCapacityLimit().addChangeMouldUsedQty(productionContext, usedBeginDate, materialDesc, mouldCodeSet);
@@ -2059,14 +2066,6 @@ public class MatchingProductionHandler {
     private boolean checkLhMachineCount(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo,
                                         Integer day) {
         // 检查是否超结构最大硫化机数
-//        GroupPlanCxLhCapacityLimitHelper limist = groupInfo.getDayProductionLimitInfo().get(day);
-//        if (limist != null && limist.getMaxLhMachineCount() != null) {
-//            Set<String> productionList = limist.getProductionMouldSet();
-//            if (productionList != null && limist.getMaxLhMachineCount() <= productionList.size()
-//                    / ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
-//                return false;
-//            }
-//        }
         MpDailyCapacityLimitVo dayLimitVo = groupInfo.getDailyCapacityLimitVoMap().get(day);
         if (dayLimitVo != null) {
             Integer usedLhMachines = Optional.ofNullable(dayLimitVo.getUsedLhMachines()).orElse(0);
@@ -2076,10 +2075,10 @@ public class MatchingProductionHandler {
             }
         }
         // 检查是否超总硫化机数量
-        Integer maxLhMachines = productionContext.getGroupProductionInfo().values().stream()
+        Integer usedLhMachines = productionContext.getGroupProductionInfo().values().stream()
                 .map(g -> g.getDailyCapacityLimitVoMap().get(day)).filter(Objects::nonNull)
                 .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
-        Integer usedLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+        Integer maxLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
         return usedLhMachines < maxLhMachines;
     }
 
@@ -2100,7 +2099,10 @@ public class MatchingProductionHandler {
         }
         Integer canUseMouldCount = 0;
         for (ProductionMouldInfoVo mouldInfo : doubleMouldList) {
-            if (this.checkMouldHasProduct(mouldInfo, day, materialDesc)) { // 满足生成条件，模具数+1
+            List<CxMouldDayProductionHelper> dayProduction = mouldInfo.getDayProductionInfo().get(day);
+            if (dayProduction == null) {
+                canUseMouldCount ++;
+            } else if (this.checkMouldHasProduct(mouldInfo, day, materialDesc)) { // 满足生成条件，模具数+1
                 canUseMouldCount ++;
             }
             if (canUseMouldCount >= ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 只要满足双模，则说明可
@@ -2165,25 +2167,35 @@ public class MatchingProductionHandler {
         boolean isSecOnLine = true;
         int skuSecondProduction = productionContext.getBaseDataContainer().getParamConfiguration()
                 .getSkuSecondProduction();
-        // 2、向前看是否有超出二次上机限制
+        // 2、先向前看是否有超出二次上机限制
+        Integer dayCount = 0;
         for (Integer i = day - 1; i >= beginDay; i--) {
             if (i == 0) {
                 break;
             }
+            if (productionContext.getStopDays().contains(i)) {
+                continue;
+            }
+            dayCount ++;
             Integer checkDayProductQty = this.sumMaterialProductQty(productionContext, materialDesc, i);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = day - i <= skuSecondProduction;
+                isSecOnLine = dayCount == 1 || dayCount >= skuSecondProduction || i == beginDay;
                 break;
             }
         }
         if (!isSecOnLine) { // 校验不通过，则直接结束
             return isSecOnLine;
         }
-        // 3、先向后看是否有超出二次上机限制
+        // 3、再向后看是否有超出二次上机限制
+        dayCount = 0;
         for (Integer i = day + 1; i <= endDay; i++) {
+            if (productionContext.getStopDays().contains(i)) {
+                continue;
+            }
+            dayCount ++;
             Integer checkDayProductQty = this.sumMaterialProductQty(productionContext, materialDesc, i);
             if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = i - day <= skuSecondProduction;
+                isSecOnLine = dayCount == 1 || dayCount >= skuSecondProduction || i == endDay;
                 break;
             }
         }
@@ -2935,38 +2947,32 @@ public class MatchingProductionHandler {
         // 需求计划需要按物料号合并各需求量
         for (DpDemandPlan demandPlan : demandPlanList) {
             String materialCode = demandPlan.getMaterialCode();
-//            MonthPlanProductionRequirePlanVo requirePlan = requirePlanMap.get(materialCode);
-            MonthPlanProductionRequirePlanVo requirePlan = null;
-            if (requirePlan == null) {// 不存在直接转换
-                requirePlan = MonthPlanProductionRequirePlanVo.buildInitProductionPlan(null, productionVersion,
+            MonthPlanProductionRequirePlanVo requirePlan = MonthPlanProductionRequirePlanVo.buildInitProductionPlan(null, productionVersion,
                         demandPlan);
-                requirePlan.setFactProdReqQty(demandPlan.getNetQty());
-                requirePlan.setHeightLossQty(demandPlan.getHeightQty());
-                requirePlan.setHeightQty(demandPlan.getHeightQty());
-                requirePlan.setMidQty(demandPlan.getMidQty());
-                requirePlan.setPostponeQty(demandPlan.getPostponeQty());
-                requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
-                requirePlan.setInventorySalesRatio(0D);// 默认0
-                requirePlan.setConstructionInfo(constructionInfoMap.get(materialCode)); //加载施工
-                requirePlan.setMonthPlanId(demandPlan.getId());
-                List<FactoryMonthPlanMouldDayDetail> detailLogs = detailLogMap.get(demandPlan.getId());
-                List<FactoryMonthPlanMouldDayResult> plans = planMap.get(materialCode);
-                int productionQty = 0;
-                if (!CollectionUtils.isEmpty(detailLogs)) {
-                    productionQty = detailLogs.stream().filter(d -> d.getTotalQty() != null)
-                            .mapToInt(FactoryMonthPlanMouldDayDetail::getTotalQty).sum();
-                } else if (!CollectionUtils.isEmpty(plans)) {
-                    FactoryMonthPlanMouldDayResult tempPlan = CollectionUtils.firstElement(plans);
-                    productionQty = tempPlan.getTotalQty();
-                }
-                requirePlan.setOriginProductionQty(productionQty);
-                requirePlan.setProducedQty(productionQty);
-                requirePlan.resetProductionDataInfo();
-//                requirePlan.setHeightProductionQty(demandPlan.getHeightQty());
-//                requirePlanMap.put(materialCode, requirePlan);
-                requirePlanList.add(requirePlan);
-                continue;
+            requirePlan.setFactProdReqQty(demandPlan.getNetQty());
+            requirePlan.setHeightLossQty(demandPlan.getHeightQty());
+            requirePlan.setHeightQty(demandPlan.getHeightQty());
+            requirePlan.setMidQty(demandPlan.getMidQty());
+            requirePlan.setPostponeQty(demandPlan.getPostponeQty());
+            requirePlan.setVulcanizationInfo(lhCapacityMap.get(demandPlan.getMaterialDesc())); // 设置硫化信息
+            requirePlan.setInventorySalesRatio(0D);// 默认0
+            requirePlan.setConstructionInfo(constructionInfoMap.get(materialCode)); //加载施工
+            requirePlan.setMonthPlanId(demandPlan.getId());
+            List<FactoryMonthPlanMouldDayDetail> detailLogs = detailLogMap.get(demandPlan.getId());
+            int productionQty = 0;
+//            int HeightProductionQty = 0;
+            if (!CollectionUtils.isEmpty(detailLogs)) {
+                productionQty = detailLogs.stream().filter(d -> d.getTotalQty() != null)
+                        .mapToInt(FactoryMonthPlanMouldDayDetail::getTotalQty).sum();
+//                HeightProductionQty = detailLogs.stream().filter(d -> d.getTotalQty() != null)
+//                        .mapToInt(FactoryMonthPlanMouldDayDetail::getHeightQty).sum();
             }
+            requirePlan.setOriginProductionQty(productionQty);
+            requirePlan.setProductionQty(0);
+            requirePlan.setProducedQty(productionQty);
+//            requirePlan.setHeightProductionQty(HeightProductionQty);
+            requirePlan.resetProductionDataInfo();
+            requirePlanList.add(requirePlan);
         }
         return requirePlanList;
     }
@@ -3788,17 +3794,17 @@ public class MatchingProductionHandler {
                     }
                 }
                 // 如果上一天排满了其他sku，当天不可用
-                List<CxMouldDayProductionHelper> latestProductionList = dayProductionInfo.get(this.getLastDay(productionContext, day, 1));
-                if (!CollectionUtils.isEmpty(latestProductionList)) {
-                    Integer productionQty = latestProductionList.stream()
-                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 合计当天的已排量
-                    boolean isMaxProduct = productionQty >= dayMoldQty;
-                    boolean hasOtherSku = latestProductionList.stream().anyMatch(p -> StringUtils.isNotEmpty(p.getMaterialDesc())
-                            && !p.getMaterialDesc().equals(materialDesc));
-                    if (isMaxProduct && hasOtherSku) {
-                        return;
-                    }
-                }
+//                List<CxMouldDayProductionHelper> latestProductionList = dayProductionInfo.get(this.getLastDay(productionContext, day, 1));
+//                if (!CollectionUtils.isEmpty(latestProductionList)) {
+//                    Integer productionQty = latestProductionList.stream()
+//                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 合计当天的已排量
+//                    boolean isMaxProduct = productionQty >= dayMoldQty;
+//                    boolean hasOtherSku = latestProductionList.stream().anyMatch(p -> StringUtils.isNotEmpty(p.getMaterialDesc())
+//                            && !p.getMaterialDesc().equals(materialDesc));
+//                    if (isMaxProduct && hasOtherSku) {
+//                        return;
+//                    }
+//                }
             }
             effectiveList.add(mouldInfo);
         });
