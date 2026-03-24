@@ -357,22 +357,26 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 3.1、根据上个月所在年份月计算最后两天日期
             String dayFieldName1 = null;
             String dayFieldName2 = null;
-            Integer lastYear = list.stream().map(FactoryMonthPlanMouldDayResultExportVo::getLastYear).filter(Objects::nonNull).findAny().orElse(null);
-            Integer lastMonth = list.stream().map(FactoryMonthPlanMouldDayResultExportVo::getLastMonth).filter(Objects::nonNull).findAny().orElse(null);
-            if (lastYear != null && lastMonth != null) {
+            if (queryResult.getYear() != null && queryResult.getMonth() != null) {
                 Integer lastDay1 = null; // 月末第1天
                 Integer lastDay2 = null; // 月末第2天
                 Calendar calendar = Calendar.getInstance();
-                calendar.set(lastYear, lastMonth - 1, 1); // 通过日历获取上个月的日历
+                calendar.set(queryResult.getYear(), queryResult.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
+                calendar.add(Calendar.MONTH, -1); // 切换到上个月
+                Integer lastMonth = calendar.get(Calendar.MONTH) + 1;
                 lastDay1 = calendar.getActualMaximum(Calendar.DAY_OF_MONTH); // 最后一天
                 lastDay2 = lastDay1 - 1; // 倒数第二天
                 dayFieldName1 = String.format(LAST_FIELD_NAME_FORMAT, lastDay1);
                 dayFieldName2 = String.format(LAST_FIELD_NAME_FORMAT, lastDay2);
-                tableMap.put("lastDay1", lastDay1 + "号");
-                tableMap.put("lastDay2", lastDay2 + "号");
+                String lastDayFormat = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.lastMonth");
+                tableMap.put("lastDay1", String.format(lastDayFormat, lastMonth, lastDay1));
+                tableMap.put("lastDay2", String.format(lastDayFormat, lastMonth, lastDay2));
             }
             
-            // 3.2、需要增加的第二部分表头统计
+            // 3.2、加载表头国际化标签
+            this.loadExportI18nTableName(tableMap);
+            
+            // 3.3、需要增加的第二部分表头统计
             List<Map<String, Object>> headSummaryData = new ArrayList<>();
             List<FactoryMonthPlanMouldDayResultExportVo> headList = list.stream()
                     .filter(r -> MonthPlanExportDataTypeEnum.CHANGE_MOULDS.getCode().equals(r.getDataType()) // 换模统计
@@ -391,13 +395,15 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 将处理好的数据添加到excelDataList
             excelDataList.add(headSummaryData);
             
-            // 3.3、构建主题导出表数据
+            // 3.4、构建主题导出表数据
             String factoryName = factoryMap.getOrDefault(queryResult.getFactoryCode(), "");
             String productTypeName = productTypeMap.getOrDefault(queryResult.getProductTypeCode(), queryResult.getProductTypeCode());
             String titleFormat = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
+            String monthPlanVersionFormat = I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.monthPlanVersion");
+            String productionVersionFormat = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.productionVersion");
             tableMap.put("factoryName",String.format(titleFormat, factoryName, queryResult.getYear(), queryResult.getMonth(), productTypeName));
-            tableMap.put("monthPlanVersion", queryResult.getMonthPlanVersion());
-            tableMap.put("productionVersion", queryResult.getProductionVersion());
+            tableMap.put("monthPlanVersion", monthPlanVersionFormat + ":" + queryResult.getMonthPlanVersion());
+            tableMap.put("productionVersion", productionVersionFormat + ":" + queryResult.getProductionVersion());
             List<Map<String, Object>> listData = new ArrayList<>();
             for (int i = 0; i < list.size(); i++) {
                 FactoryMonthPlanMouldDayResultExportVo exportVo = list.get(i);
@@ -420,12 +426,86 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
 
         // 将单元格样式放入context
-        if(PubUtil.isNotEmpty(cellStyleList)){
+        if (PubUtil.isNotEmpty(cellStyleList)) {
             tableMap.put("CELL_STYLE", cellStyleList);
         }
-        // 写到文件
-        return ExcelUtils.writeMultiList(inputStream
-                , 0, tableMap, excelDataList);
+        // 3.5、写到文件
+        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+    }
+
+    /**
+     * 加载表头国际化标签 
+     * @param tableMap
+     */
+    private void loadExportI18nTableName(Map<String, Object> tableMap) {
+        tableMap.put("locationType", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.locationType"));
+        tableMap.put("materialCode", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.materialCode"));
+        tableMap.put("mesMaterialCode", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.mesMaterialCode"));
+        tableMap.put("materialDesc", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.materialDesc"));
+        tableMap.put("structureName", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.structureName"));
+        tableMap.put("productStatus", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.productStatus"));
+        tableMap.put("embryoCode", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.embryoCode"));
+        tableMap.put("structureType", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.structureType"));
+        tableMap.put("mainMaterialDesc", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.mainMaterialDesc"));
+        tableMap.put("constructionStage", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.schedulingType"));
+        tableMap.put("brand", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.brand"));
+        tableMap.put("specifications", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.specifications"));
+        tableMap.put("mainPattern", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.mainPattern"));
+        tableMap.put("pattern", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.pattern"));
+        tableMap.put("proSize", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.proSize"));
+        tableMap.put("singleTireWeight", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.singleTireWeight"));
+        tableMap.put("productCategory", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.productCategory"));
+        tableMap.put("mouldCavityQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.mouldCavityQty"));
+        tableMap.put("typeBlockQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.typeBlockQty"));
+        tableMap.put("averageSaleQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.averageSaleQty"));
+        tableMap.put("inventorySalesRatio", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.inventorySalesRatio"));
+        tableMap.put("dayVulcanizationQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.dayVulcanizationQty"));
+        tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan"));
+        tableMap.put("heightQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightQty"));
+        tableMap.put("midQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.midQty"));
+        tableMap.put("cycleReserveQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.cycleReserveQty"));
+        tableMap.put("totalQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.totalQty"));
+        tableMap.put("heightProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightProductionQty"));
+        tableMap.put("midProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.midProductionQty"));
+        tableMap.put("cycleProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.cycleProductionQty"));
+        tableMap.put("conventionProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.conventionProductionQty"));
+        tableMap.put("postponeProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.postponeProductionQty"));
+        tableMap.put("actualOrderUnproduced", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.actualOrderUnproduced"));
+        tableMap.put("differenceQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.differenceQty"));
+        tableMap.put("beginDay", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.beginDay"));
+        tableMap.put("endDay", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.endDay"));
+        tableMap.put("day1", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day1"));
+        tableMap.put("day2", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day2"));
+        tableMap.put("day3", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day3"));
+        tableMap.put("day4", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day4"));
+        tableMap.put("day5", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day5"));
+        tableMap.put("day6", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day6"));
+        tableMap.put("day7", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day7"));
+        tableMap.put("day8", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day8"));
+        tableMap.put("day9", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day9"));
+        tableMap.put("day10", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day10"));
+        tableMap.put("day11", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day11"));
+        tableMap.put("day12", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day12"));
+        tableMap.put("day13", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day13"));
+        tableMap.put("day14", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day14"));
+        tableMap.put("day15", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day15"));
+        tableMap.put("day16", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day16"));
+        tableMap.put("day17", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day17"));
+        tableMap.put("day18", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day18"));
+        tableMap.put("day19", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day19"));
+        tableMap.put("day20", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day20"));
+        tableMap.put("day21", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day21"));
+        tableMap.put("day22", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day22"));
+        tableMap.put("day23", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day23"));
+        tableMap.put("day24", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day24"));
+        tableMap.put("day25", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day25"));
+        tableMap.put("day26", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day26"));
+        tableMap.put("day27", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day27"));
+        tableMap.put("day28", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day28"));
+        tableMap.put("day29", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day29"));
+        tableMap.put("day30", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day30"));
+        tableMap.put("day31", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.day31"));
+        tableMap.put("totalAll", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.totalAll"));
     }
 
     /**
