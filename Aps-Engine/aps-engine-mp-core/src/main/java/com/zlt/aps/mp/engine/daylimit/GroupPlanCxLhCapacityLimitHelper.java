@@ -298,7 +298,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @return
      */
     public boolean isReachLimitByMouldNumber(Context context, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
-        Integer currentEmbryoCodeCount = productionEmbryoCodeSet.size();
         //实际的最大硫化机台数 = min(初始的最大硫化机台数,结构剩余可用的最大硫化机台数 sandy+ 2026.03.22
         Integer realMaxLhMachineCount = maxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : maxLhMachineCount;
         //按模具数

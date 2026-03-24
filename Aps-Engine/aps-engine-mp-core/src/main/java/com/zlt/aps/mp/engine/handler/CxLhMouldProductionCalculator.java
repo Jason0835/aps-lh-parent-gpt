@@ -267,7 +267,7 @@ public class CxLhMouldProductionCalculator {
             UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty, isDayFinish, cxMachineInfoSet, lossQty);
             updateMouldDayProductionInfo(productionContext, lhProductionQtyHelper.getProductionPlanInfo(), doubleMouldList, skuProductionPlanList, updateInfo);
             //更新硫化组日期和日排产量
-            updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, dayMaxProductionQty, updateInfo);
+            updateCxMachineLhInfo(context,cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, dayMaxProductionQty, updateInfo);
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
             //月底补量
@@ -550,7 +550,7 @@ public class CxLhMouldProductionCalculator {
         String skuMaterialDesc = productionPlan.getMaterialDesc();
         //分组-日排产信息
         SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionPlan, realDayProductionQty, lossQty, usedMouldSet);
-        groupPlanInfo.addDayProductionInfo(skuDayProductionInfo);
+        groupPlanInfo.addDayProductionInfo(productionContext,skuDayProductionInfo);
         //模具排产信息-计划分配
         updateMouldDayProductionInfo(productionContext, groupPlanInfo, doubleMouldList, skuProductionPlanList, updateInfo);
         //记录已排产量及损耗量
@@ -628,14 +628,14 @@ public class CxLhMouldProductionCalculator {
             if (!isSingleCxMachine && null != productionPlanInfo) {
                 //分组-日排产信息
                 SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(singleReplenishmentDay, productionSkuInfo, boostDayQty, BigDecimal.ZERO.intValue(), usedMouldSet);
-                productionPlanInfo.addDayProductionInfo(skuDayProductionInfo);
+                productionPlanInfo.addDayProductionInfo(productionContext,skuDayProductionInfo);
             }
             //更新模具日产信息
             UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(singleReplenishmentDay, boostDayQty, true, cxMachineInfoSet, BigDecimal.ZERO.intValue());
             updateMouldDayProductionInfo(productionContext, productionPlanInfo, doubleMouldList, productionSkuInfo, updateInfo);
             if (isSingleCxMachine && null != cxMachineInfo && null != cxLhGroup) {
                 //更新硫化组日期和日排产量
-                updateCxMachineLhInfo(cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, maxLhQty, updateInfo);
+                updateCxMachineLhInfo(productionContext,cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, maxLhQty, updateInfo);
             }
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, boostDayQty, BigDecimal.ZERO.intValue());
@@ -885,7 +885,7 @@ public class CxLhMouldProductionCalculator {
      * @param usedMouldSet        使用模具
      * @param dayMaxProductionQty 日最大硫化值
      */
-    private static void updateCxMachineLhInfo(CxLhProductionHelper cxLhGroup, MonthPlanProductionRequirePlanVo productionSkuInfo, CxMachineBaseInfoVo cxMachineInfo, Set<String> usedMouldSet, Integer dayMaxProductionQty, UpdateDayProductionInfoHelper updateInfo) {
+    private static void updateCxMachineLhInfo(Context context,CxLhProductionHelper cxLhGroup, MonthPlanProductionRequirePlanVo productionSkuInfo, CxMachineBaseInfoVo cxMachineInfo, Set<String> usedMouldSet, Integer dayMaxProductionQty, UpdateDayProductionInfoHelper updateInfo) {
         Integer productionDay = updateInfo.getProductionDay();
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         //排产信息更新
@@ -903,7 +903,7 @@ public class CxLhMouldProductionCalculator {
         //成型机台-日排产信息
         Integer lossQty = updateInfo.getLossQty();
         SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionSkuInfo, realDayProductionQty, lossQty, usedMouldSet);
-        cxMachineInfo.addDayProductionInfo(skuDayProductionInfo);
+        cxMachineInfo.addDayProductionInfo(context,skuDayProductionInfo);
     }
 
     /**

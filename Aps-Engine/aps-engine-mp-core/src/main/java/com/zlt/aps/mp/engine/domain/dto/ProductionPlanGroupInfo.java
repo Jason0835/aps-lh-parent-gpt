@@ -1320,7 +1320,7 @@ public class ProductionPlanGroupInfo {
      *
      * @param skuDayProductionInfo 排产SKu信息
      */
-    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo) {
+    public void addDayProductionInfo(TbrProductionContext productionContext,SkuDayProductionInfoHelper skuDayProductionInfo) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo) {
             return;
         }
@@ -1335,7 +1335,10 @@ public class ProductionPlanGroupInfo {
         }
         Set<String> currentUsedMouldSet = skuDayProductionInfo.getUsedMouldSet();
         //更新日限制对象-生胎、Sku排产模具等信息
-        limitInfo.getProductionEmbryoCodeSet().add(skuDayProductionInfo.getEmbryoCode());
+        if (checkCanAddEmbryoCode(productionContext,skuDayProductionInfo)){
+            //增加日排产量<日换模数量时，不计算胎胚种类数 sandy+ 2026.3.24
+            limitInfo.getProductionEmbryoCodeSet().add(skuDayProductionInfo.getEmbryoCode());
+        }
         limitInfo.getProductionMouldSet().addAll(currentUsedMouldSet);
         Set<String> skuProductionMouldSet = limitInfo.getSkuProductionMouldMap().get(materialDesc);
         if (null == skuProductionMouldSet) {
@@ -1356,6 +1359,17 @@ public class ProductionPlanGroupInfo {
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
         //加入Sku排产明细信息
         addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
+    }
+
+    /**
+     * 检查能否加胎胚种类数
+     * @param productionContext
+     * @param skuDayProductionInfo
+     * @return
+     */
+    private boolean checkCanAddEmbryoCode(TbrProductionContext productionContext,SkuDayProductionInfoHelper skuDayProductionInfo){
+        Integer changeMouldFirstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        return skuDayProductionInfo.getSumProductionQty() >= changeMouldFirstQty;
     }
 
     /**
