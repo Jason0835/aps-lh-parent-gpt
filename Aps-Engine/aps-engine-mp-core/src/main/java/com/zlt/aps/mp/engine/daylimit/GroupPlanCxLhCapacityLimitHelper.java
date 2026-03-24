@@ -326,6 +326,15 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 获取最大限定硫化组数量
+     *
+     * @return
+     */
+    public Integer getMaxLimitLhMachine() {
+        return maxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : maxLhMachineCount;
+    }
+
+    /**
      * 根据后一天的排产信息，获取可释放的机台信息
      *
      * @param context     排产上下文
@@ -468,9 +477,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
             } else {
                 usedMachineCount = usedMouldSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             }
-//            Integer productionQty = skuProductionInfo.getSumProductionQty();
-//            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-//            int upMachineCount = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(lhMachineQty), 0, RoundingMode.UP).intValue();
             skuUsedLhMachine.put(materialDesc, usedMachineCount);
         });
         return skuUsedLhMachine;
@@ -733,21 +739,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
             SkuUsedLhMachineInfo usedDetail = SkuUsedLhMachineInfo.buildLhCount(materialDesc, wholeNumber, remainder);
             skuUsedLhMachineDetailMap.put(materialDesc, usedDetail);
         });
-//        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
-//            return Collections.emptyMap();
-//        }
-//        Map<String, SkuUsedLhMachineInfo> skuUsedLhMachineDetailMap = new HashMap<>();
-//        productionSkuQtyInfo.forEach((materialDesc, skuProductionInfo) -> {
-//            Integer productionQty = skuProductionInfo.getSumProductionQty();
-//            Integer lhMachineQty = skuProductionInfo.getDayLhMachineQty();
-//            int remainder = productionQty % lhMachineQty;
-//            int wholeNumber = productionQty / lhMachineQty;
-//            SkuUsedLhMachineInfo usedDetail = SkuUsedLhMachineInfo.build(materialDesc, wholeNumber, remainder);
-//            skuUsedLhMachineDetailMap.put(materialDesc, usedDetail);
-//        });
-//        if (CollectionUtils.isEmpty(skuUsedLhMachineDetailMap)) {
-//            return Collections.emptyMap();
-//        }
         return skuUsedLhMachineDetailMap;
     }
 

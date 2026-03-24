@@ -385,6 +385,45 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加 结构从固定机台中选择
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s ->指定排产机台：%s ====
+     *
+     * @param context          排产上下文
+     * @param structureName    分组名
+     * @param fixedMachineInfo 指定机台
+     * @return
+     */
+    public static String addGroupSelectedFixedCxMachineLog(Context context, String structureName, String fixedMachineInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s ->指定排产机台：%s ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                structureName, fixedMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 机台指定不匹配：
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台 %s 不在 %s 分组指定列表中：->指定机台列表：%s ====
+     *
+     * @param context          排产上下文
+     * @param structureName    分组
+     * @param cxMachineCode    机台
+     * @param fixedMachineInfo 指定机台列表
+     * @return
+     */
+    public static String addGroupNoSelectedForFixedCxMachineLog(Context context, String structureName, String cxMachineCode, String fixedMachineInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台 %s 不在 %s 分组指定列表中：->指定机台列表：%s ====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                cxMachineCode, structureName, fixedMachineInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加收尾机台计划产能匹配的分组计划日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，收尾机台：%s 产能 %s 天 分组计划 %s 需 %s 天 ====
      *
@@ -599,7 +638,7 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
-     * 增加结构匹配到成型机-初步被选中日志信息记录
+     * 增加 结构匹配到成型机-初步被选中日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 初步被选中====
      *
      * @param context         排程上下文

@@ -154,6 +154,10 @@ public enum TbrMouldProductionLogType {
      */
     CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE("20-14-01-05", "在机分组使用在产机台排产硫化组"),
     /**
+     * 20-14-99 分组查找硫化组
+     */
+    GROUP_FIND_LH_MACHINE_RANGE("20-14-01-05", "分组查找硫化组"),
+    /**
      * 20-14-01-06 在机结构模具排产硫化组找到排产Sku
      */
     CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP("20-14-01-06", "在机结构模具排产硫化组找到排产Sku"),
