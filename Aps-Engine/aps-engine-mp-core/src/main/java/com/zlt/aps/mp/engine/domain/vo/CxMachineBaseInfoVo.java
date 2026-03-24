@@ -285,7 +285,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 在模拟排产阶段，且机台选结构，结构反选机台场景使用
      * 20260304 补充Sku排产信息及排产模具
      */
-    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo) {
+    public void addDayProductionInfo(Context context,SkuDayProductionInfoHelper skuDayProductionInfo) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo) {
             return;
         }
@@ -298,7 +298,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         String embryoCode = skuDayProductionInfo.getEmbryoCode();
         Set<String> currentUsedMouldSet = skuDayProductionInfo.getUsedMouldSet();
         //更新生胎及模具
-        dayLimit.getProductionEmbryoCodeSet().add(embryoCode);
+        if (checkCanAddEmbryoCode(context,skuDayProductionInfo)){
+            //增加日排产量<日换模数量时，不计算胎胚种类数 sandy+ 2026.3.24
+            dayLimit.getProductionEmbryoCodeSet().add(embryoCode);
+        }
         dayLimit.getProductionMouldSet().addAll(currentUsedMouldSet);
         //Sku排产模具信息
         Set<String> skuProductionMouldSet = dayLimit.getSkuProductionMouldMap().get(materialDesc);
@@ -315,6 +318,18 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         //更新数量
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+    }
+
+    /**
+     * 检查能否加胎胚种类数
+     * @param context
+     * @param skuDayProductionInfo
+     * @return
+     */
+    private boolean checkCanAddEmbryoCode(Context context,SkuDayProductionInfoHelper skuDayProductionInfo){
+        TbrProductionContext productionContext = (TbrProductionContext)context;
+        Integer changeMouldFirstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        return skuDayProductionInfo.getSumProductionQty() >= changeMouldFirstQty;
     }
 
     /**
