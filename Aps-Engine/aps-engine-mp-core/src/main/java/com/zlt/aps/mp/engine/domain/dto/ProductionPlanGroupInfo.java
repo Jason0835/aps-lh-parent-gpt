@@ -15,6 +15,7 @@ import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
@@ -674,17 +675,13 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
         }
-        //20260113 剔除需要排除的收尾时间点
-        if (!CollectionUtils.isEmpty(excludeDays)) {
-            hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
-        }
-        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+        //得到最早的收尾点
+        SelectRangeLhMachineInfo selectedRange = getRangeInfo(context, hasAddSkuList, excludeDays);
+        if (null == selectedRange) {
             return null;
         }
-        //得到最早的收尾点
-        hasAddSkuList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
-        GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
-        GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
+        GroupPlanCxLhCapacityLimitHelper selectedDayLimit = selectedRange.getStartDayLimit();
+        GroupPlanCxLhCapacityLimitHelper endDayLimit = selectedRange.getEndDayLimit();
         Integer conclusionDay = selectedDayLimit.getDay();
         Integer endDay = endDayLimit.getDay();
         if (isGroupStartDayByFormalProduction(conclusionDay)) {
@@ -1318,9 +1315,10 @@ public class ProductionPlanGroupInfo {
     /**
      * 增加结构的Sku日排产信息
      *
+     * @param productionContext    排产上下文
      * @param skuDayProductionInfo 排产SKu信息
      */
-    public void addDayProductionInfo(TbrProductionContext productionContext,SkuDayProductionInfoHelper skuDayProductionInfo) {
+    public void addDayProductionInfo(TbrProductionContext productionContext, SkuDayProductionInfoHelper skuDayProductionInfo) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo) {
             return;
         }
@@ -1335,7 +1333,7 @@ public class ProductionPlanGroupInfo {
         }
         Set<String> currentUsedMouldSet = skuDayProductionInfo.getUsedMouldSet();
         //更新日限制对象-生胎、Sku排产模具等信息
-        if (checkCanAddEmbryoCode(productionContext,skuDayProductionInfo)){
+        if (checkCanAddEmbryoCode(productionContext, skuDayProductionInfo)) {
             //增加日排产量<日换模数量时，不计算胎胚种类数 sandy+ 2026.3.24
             limitInfo.getProductionEmbryoCodeSet().add(skuDayProductionInfo.getEmbryoCode());
         }
@@ -1363,11 +1361,12 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 检查能否加胎胚种类数
+     *
      * @param productionContext
      * @param skuDayProductionInfo
      * @return
      */
-    private boolean checkCanAddEmbryoCode(TbrProductionContext productionContext,SkuDayProductionInfoHelper skuDayProductionInfo){
+    private boolean checkCanAddEmbryoCode(TbrProductionContext productionContext, SkuDayProductionInfoHelper skuDayProductionInfo) {
         Integer changeMouldFirstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
         return skuDayProductionInfo.getSumProductionQty() >= changeMouldFirstQty;
     }
@@ -2171,5 +2170,126 @@ public class ProductionPlanGroupInfo {
             });
         }
         return mpProdFinalMap.values().stream().collect(Collectors.toList());
+    }
+
+    /**
+     * 获取可排产的连续时间点
+     *
+     * @param context       排产上下文
+     * @param hasAddSkuList 可排产日信息
+     * @param excludeDays   需要剔除的收尾时间点
+     * @return
+     */
+    private SelectRangeLhMachineInfo getRangeInfo(Context context, List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList, Set<Integer> excludeDays) {
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayMap = hasAddSkuList.stream().collect(Collectors.toMap(GroupPlanCxLhCapacityLimitHelper::getDay, Function.identity()));
+        //20260113 剔除需要排除的收尾时间点
+        if (!CollectionUtils.isEmpty(excludeDays)) {
+            hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
+        }
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        Set<Integer> canProductionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Set<Integer> rangeSet = getEffectiveRange(context, canProductionDaySet);
+//        Set<Integer> rangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, canProductionDaySet, stopDaySet);
+        if (CollectionUtils.isEmpty(rangeSet)) {
+            return null;
+        }
+        List<Integer> rangeList = new ArrayList<>(rangeSet);
+        rangeList.sort(Comparator.comparing(Integer::intValue));
+        Integer conclusionDay = rangeList.get(BigDecimal.ZERO.intValue());
+        Integer endDay = rangeList.get(rangeList.size() - BigDecimal.ONE.intValue());
+        GroupPlanCxLhCapacityLimitHelper selectedDayLimit = dayMap.get(conclusionDay);
+        GroupPlanCxLhCapacityLimitHelper endDayLimit = dayMap.get(endDay);
+        return new SelectRangeLhMachineInfo(selectedDayLimit, endDayLimit);
+    }
+
+    /**
+     * 获取可排产的时间范围
+     * 与全局最大硫化机台数限制取得交集
+     *
+     * @param context  排产上下文
+     * @param rangeSet 初始的可排产日
+     * @return
+     */
+    private Set<Integer> getEffectiveRange(Context context, Set<Integer> rangeSet) {
+        //计算每日的使用硫化机台数
+        reCalcMpDailyCapacityLimit(context);
+        Set<Integer> effectiveDaySet = new HashSet<>();
+        Set<Integer> stopDaySet = Optional.ofNullable(context.getStopDays()).orElse(Collections.emptySet());
+        rangeSet.forEach(productionDay -> {
+            //1、取得使用硫化组数
+            MpDailyCapacityLimitVo dayUsedDetail = dailyCapacityLimitVoMap.get(productionDay);
+            if (null == dayUsedDetail) {
+                effectiveDaySet.add(productionDay);
+                return;
+            }
+            //2、获取全局最大可剩余的硫化组数
+            GroupPlanCxLhCapacityLimitHelper dayLimit = dayProductionLimitInfo.get(productionDay);
+            if (null == dayLimit) {
+                return;
+            }
+            Integer realUsedLhMachines = Optional.ofNullable(dayUsedDetail.getUsedLhMachines()).orElse(BigDecimal.ZERO.intValue());
+            Integer maxLhMachines = dayLimit.getMaxLimitLhMachine();
+            //3、不能超
+            if (realUsedLhMachines < maxLhMachines) {
+                effectiveDaySet.add(productionDay);
+            }
+        });
+        if (CollectionUtils.isEmpty(effectiveDaySet)) {
+            return Collections.emptySet();
+        }
+        //得到间断日
+        Set<Integer> diffSet = rangeSet.stream().filter(single -> !effectiveDaySet.contains(single)).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(diffSet)) {
+            return rangeSet;
+        }
+        List<Integer> diffList = new ArrayList<>(diffSet);
+        //从早到晚
+        diffList.sort(Comparator.comparing(Integer::intValue));
+        for (Integer diffDay : diffList) {
+            //看前面是否有连续时间段
+            Set<Integer> beforeSet = rangeSet.stream().filter(single -> single < diffDay && effectiveDaySet.contains(single)).collect(Collectors.toSet());
+            Set<Integer> findRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, beforeSet, stopDaySet);
+            if (!CollectionUtils.isEmpty(findRangeSet)) {
+                return findRangeSet;
+            }
+            //看后面是否有连续时间段
+            Set<Integer> afterSet = rangeSet.stream().filter(single -> single >= diffDay && effectiveDaySet.contains(single)).collect(Collectors.toSet());
+            findRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, afterSet, stopDaySet);
+            if (!CollectionUtils.isEmpty(findRangeSet)) {
+                return findRangeSet;
+            }
+        }
+        return Collections.emptySet();
+    }
+
+    /**
+     * 获取一段排产范围
+     *
+     * @param hasAddSkuList 有空出硫化组的排产天集合信息
+     * @param excludeDays   需要剔除的收尾时间点
+     * @return
+     */
+    private SelectRangeLhMachineInfo getRangeInfo(List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList, Set<Integer> excludeDays) {
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        //20260113 剔除需要排除的收尾时间点
+        if (!CollectionUtils.isEmpty(excludeDays)) {
+            hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
+        }
+        if (CollectionUtils.isEmpty(hasAddSkuList)) {
+            return null;
+        }
+        GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
+        GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
+        return new SelectRangeLhMachineInfo(selectedDayLimit, endDayLimit);
     }
 }

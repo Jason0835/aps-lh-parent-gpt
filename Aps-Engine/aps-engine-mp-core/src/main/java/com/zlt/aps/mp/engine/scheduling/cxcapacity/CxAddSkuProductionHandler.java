@@ -54,14 +54,16 @@ public class CxAddSkuProductionHandler {
         if (null == lhGroup) {
             return;
         }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = groupPlanInfo.getGroupName();
         String onLineMachineInfo = String.join(StringConstant.COMMA, groupPlanInfo.getAllocationCxMachineCodeSet());
+        //成型分配的排产范围起始日~分组收尾日
+        Integer startDay = lhGroup.getClosingDay();
+        Integer endDay = lhGroup.getEndDay();
+        TbrMouldProductionLogRecorder.addGroupFindLhMachineRangeLog(context, groupName, onLineMachineInfo, startDay, endDay);
+        //提取结构内可排产的Sku信息
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
-        Integer startDay = lhGroup.getClosingDay();
-        //成型分配的排产范围起始日~分组收尾日
-        Integer endDay = lhGroup.getEndDay();
         BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         //获取优先级最高的Sku信息
         String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
@@ -498,11 +500,12 @@ public class CxAddSkuProductionHandler {
 
     /**
      * 设置剩余的每日硫化机台数
+     *
      * @param context
      * @param allGroupPlanInfo
      * @param currentStructName
      */
-    public void setRemainLhMachineCount(Context context,Map<String, ProductionPlanGroupInfo> allGroupPlanInfo ,String currentStructName){
+    public void setRemainLhMachineCount(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String currentStructName) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer endDay = productionContext.getMonthDays();
         GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
@@ -511,21 +514,21 @@ public class CxAddSkuProductionHandler {
         // 1. 获取总的硫化机台数
         Integer totalLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
         // 2. 按日更新 结构下每日剩余可用的硫化机台数
-        for (int i = ProductionConstant.MONTH_START_DAY; i<= endDay; i++) {
+        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
             // 更新当前结构的 剩余可使用的硫化机台
             groupPlan = allGroupPlanInfo.get(currentStructName);
-            if (groupPlan == null){
+            if (groupPlan == null) {
                 continue;
             }
 
             // 获取其他结构已使用的硫化机台数
             accUsedLhMachines = getOtherStructUsedLhMachines(allGroupPlanInfo, currentStructName, i);
             // 是更新每日剩余可用的硫化机台数
-            if (PubUtil.isEmpty(groupPlan.getDayProductionLimitInfo())){
+            if (PubUtil.isEmpty(groupPlan.getDayProductionLimitInfo())) {
                 continue;
             }
             capacityLimitHelper = groupPlan.getDayProductionLimitInfo().get(i);
-            if (capacityLimitHelper == null){
+            if (capacityLimitHelper == null) {
                 continue;
             }
             capacityLimitHelper.updateRemainMaxLhMachines(totalLhMachines - accUsedLhMachines);
@@ -534,27 +537,28 @@ public class CxAddSkuProductionHandler {
 
     /**
      * 获取其他结构已使用的硫化机台数
-     * @param allGroupPlanInfo 所有结构计划
+     *
+     * @param allGroupPlanInfo  所有结构计划
      * @param currentStructName 当前结构名称
-     * @param iDay 当前日
+     * @param iDay              当前日
      * @return 其他结构已使用的硫化机台数
      */
     private Integer getOtherStructUsedLhMachines(Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String currentStructName, int iDay) {
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
         ProductionPlanGroupInfo groupPlan;
         int accUsedLhMachines = 0;
-        for (Map.Entry<String, ProductionPlanGroupInfo> entry: allGroupPlanInfo.entrySet()) {
+        for (Map.Entry<String, ProductionPlanGroupInfo> entry : allGroupPlanInfo.entrySet()) {
             if (entry.getKey().equals(currentStructName)) {
                 //排除当前结构
                 continue;
             }
             groupPlan = entry.getValue();
             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = groupPlan.getDailyCapacityLimitVoMap();
-            if (PubUtil.isEmpty(dailyCapacityLimitVoMap)){
+            if (PubUtil.isEmpty(dailyCapacityLimitVoMap)) {
                 continue;
             }
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(iDay);
-            if (dailyCapacityLimitVo == null){
+            if (dailyCapacityLimitVo == null) {
                 continue;
             }
             accUsedLhMachines += dailyCapacityLimitVo.getUsedLhMachines();

@@ -5,10 +5,10 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
@@ -53,6 +53,8 @@ import java.util.stream.Collectors;
 @Service(value = "tbrCapacityAllocationService")
 public class TbrStructureNameCapacityProductionService extends AbstractDataLoaderService {
 
+    private final GroupFixedInfoHandler groupFixedInfoHandler;
+
     private final SimulateProductionHandler simulateProductionHandler;
 
     private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
@@ -63,6 +65,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
 
     public TbrStructureNameCapacityProductionService(ProductionMdmDataService dataService,
                                                      DpRequireDataService dpRequireDataService,
+                                                     GroupFixedInfoHandler groupFixedInfoHandler,
                                                      ProductionHistoryHandler productionHistoryHandler,
                                                      SimulateProductionHandler simulateProductionHandler,
                                                      MonthProductionDataService monthProductionDataService,
@@ -70,6 +73,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
                                                      ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+        this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
@@ -107,8 +111,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList);
-        setGroupFixedCxMachineInfo(productionContext, estimateGroupCxAllocationMap);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
+        groupFixedInfoHandler.setGroupPlanFixedCxMachineInfo(productionContext);
         /**
          * 5、构建续作信息
          * 5.1、获取上个月度的月度定稿排产计划，得到在产Sku
@@ -210,30 +214,6 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
             return;
         }
         getMonthProductionDataService().saveMouldUsedLog(usedLogList);
-    }
-
-    /**
-     * 3：设置结构的指定机台信息
-     *
-     * @param productionContext 排产上下文
-     * @param allGroupMap       所有分组信息
-     */
-    private void setGroupFixedCxMachineInfo(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupMap) {
-        if (CollectionUtils.isEmpty(allGroupMap)) {
-            return;
-        }
-        Map<String, CxMachineBaseInfoVo> allCxMachineInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        if (CollectionUtils.isEmpty(allCxMachineInfoMap)) {
-            return;
-        }
-        List<CxMachineBaseInfoVo> allCxMachineInfo = allCxMachineInfoMap.values().stream().collect(Collectors.toList());
-        allGroupMap.forEach((structureName, groupInfo) -> {
-            List<CxMachineBaseInfoVo> hasFixedList = allCxMachineInfo.stream().filter(singleMachineInfo -> singleMachineInfo.hasFixedMachine(groupInfo)).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(hasFixedList)) {
-                return;
-            }
-            groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
-        });
     }
 
     /**

@@ -153,6 +153,27 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加获取结构排产硫化组排产日访问日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param startDay          开始日
+     * @param endDay            结束日
+     * @return
+     */
+    public static String addGroupFindLhMachineRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, startDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_FIND_LH_MACHINE_RANGE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加在机结构对在产机台可排产硫化组日期范围修正日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 排产硫化组修正后排产日范围：%s~%s====
      *
