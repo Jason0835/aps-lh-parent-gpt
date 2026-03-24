@@ -87,7 +87,16 @@ public enum MouldProductionLimitTypeEnum {
     /**
      * 20 可连续生产天数限制
      */
-    CHANGE_MOULD_CONTINUE_DAY_DOUBLE_LIMIT("20", "连续生产天数、换模能力受限", "alg.data.mouldProduction.changeMouldContinueProductionDayDoubleLimit");
+    CHANGE_MOULD_CONTINUE_DAY_DOUBLE_LIMIT("20", "连续生产天数、换模能力受限", "alg.data.mouldProduction.changeMouldContinueProductionDayDoubleLimit"),
+    /**
+     * 21 贴牌产能限制
+     */
+    OEM_BRAND_CAPACITY_LIMIT("21", "贴牌产能受限", "alg.data.mouldProduction.oemBrandCapacityLimit"),
+
+    /**
+     * 22 胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数、日产能上限、贴牌产能上限多重限制
+     */
+    OEM_BRAND_CAPACITY_DOUBLE_LIMIT("16", "胎胚种类数、模具排产日、模壳总数、模具分配比例、胶囊卡盘总数、日产能上限、贴牌产能上限多重限制", "alg.data.mouldProduction.oemBrandCapacityDoubleLimit");
     /**
      * 限制类型
      */

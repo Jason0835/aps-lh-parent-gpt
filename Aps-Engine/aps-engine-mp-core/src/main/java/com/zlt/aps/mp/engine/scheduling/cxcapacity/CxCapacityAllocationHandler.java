@@ -134,7 +134,7 @@ public class CxCapacityAllocationHandler {
             return;
         }
         String reverseAllCxMachineInfo = endingCxMachineList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.joining(StringConstant.COMMA));
-        TbrProductionGroupLogRecorder.addInProductionMachinesInfoLog(productionContext, reverseAllCxMachineInfo);
+        log.info(TbrProductionGroupLogRecorder.addInProductionMachinesInfoLog(productionContext, reverseAllCxMachineInfo));
         // 对收尾机台排序
         cxMachinePrioritySelector.sortReverseCxMachineList(productionContext, endingCxMachineList);
         //一台一台反向挑选合适的结构分组计划
@@ -159,7 +159,7 @@ public class CxCapacityAllocationHandler {
      * @param context                      排产上下文
      * @param estimateGroupCxAllocationMap 分组计划
      * @param cxMachineInfo                成型产能信息
-     * @param excludeGroupPlan             不再参与的分组计划
+     * @param excludeGroupPlan             不再参与的分组
      */
     public void selectedGroupPlanByCxMachine(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo, Set<String> excludeGroupPlan) {
         //获取合适优先级的一个结构
@@ -173,7 +173,6 @@ public class CxCapacityAllocationHandler {
         String groupName = allocationGroupPlan.getGroupName();
         Integer startDay = cxMachineInfo.getNextStartDay();
         Integer leftOverDays = allocationGroupPlan.getLeftOverNeedAllocationDays();
-//        Integer remainingDays = cxMachineInfo.getRemainingDays();
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
         //20260209 特殊材料是否需要拉量或是舍弃
         CxMachineAllocationPlanHelper calculationAllocation = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, leftOverDays, startDay, context.getMonthDays());
@@ -213,9 +212,7 @@ public class CxCapacityAllocationHandler {
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
-        //20260109 标记分配完成--不能标记分配完成，有可能因提前收尾导致需要在其它机台进行分配
-//        allocationGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-        //对成型机台进行模拟模具排产
+        //20260109 标记分配完成--不能标记分配完成，有可能因提前收尾导致需要在其它机台进行分配 对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
         //20260322 剩余时间-有可能因提前收尾，导致时间变化
         Integer leftOver = cxMachineInfo.getRemainCapacity();
@@ -235,9 +232,10 @@ public class CxCapacityAllocationHandler {
      *
      * @param context                      排产上下文
      * @param estimateGroupCxAllocationMap 分组计划集合
+     * @param excludeGroupPlan             需要排除的分组计划
      * @return
      */
-    public ProductionPlanGroupInfo getInsertNewGroupPlan(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
+    public ProductionPlanGroupInfo getInsertNewGroupPlan(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Set<String> excludeGroupPlan) {
         if (CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
             return null;
         }
@@ -245,7 +243,11 @@ public class CxCapacityAllocationHandler {
         if (CollectionUtils.isEmpty(allGroupPlanList)) {
             return null;
         }
-        List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlanList.stream().filter(groupPlan -> groupPlan.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
+        List<ProductionPlanGroupInfo> leftOverGroupList = allGroupPlanList.stream().filter(singleGroup -> !excludeGroupPlan.contains(singleGroup.getGroupName())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(leftOverGroupList)) {
+            return null;
+        }
+        List<ProductionPlanGroupInfo> needProductionGroupList = leftOverGroupList.stream().filter(groupPlan -> groupPlan.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(needProductionGroupList)) {
             return null;
         }
@@ -254,42 +256,13 @@ public class CxCapacityAllocationHandler {
         boolean onLineCxMachineProductionSpecialStructure = productionContext.getBaseDataContainer().getCxMachineBaseInfo().values().stream().anyMatch(machine -> this.hasSpecialStructure(machine));
         ProductionPlanGroupInfo selected = null;
         if (onLineCxMachineProductionSpecialStructure) {
-//            List<ProductionPlanGroupInfo> specialMaterialList = needProductionGroupList.stream().filter(ProductionPlanGroupInfo::isSpecialMaterial).collect(Collectors.toList());
-//            if (!CollectionUtils.isEmpty(specialMaterialList)) {
-//                needProductionGroupList = specialMaterialList;
-//            }
             TbrSpecialMaterialProductionLogRecorder.addProductionSpecialMaterialInfoLog(productionContext, "在产机台中有排产");
-            selected = groupPlanPrioritySelector.getHeightPriorityGroupBySpecialMaterial(productionContext);
+            selected = groupPlanPrioritySelector.getHeightPriorityGroupBySpecialMaterial(productionContext, excludeGroupPlan);
         }
         if (null != selected) {
             return selected;
         }
-        return groupPlanPrioritySelector.getHeightPriorityGroup(productionContext);
-//        //高优先级需求SKU个数多的优先
-//        Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
-//        List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
-//        if (heightList.size() == BigDecimal.ONE.intValue()) {
-//            return heightList.get(BigDecimal.ZERO.intValue());
-//        }
-//        Integer maxSpecialMaterial = heightList.stream().mapToInt(ProductionPlanGroupInfo::getSpecialMaterialsCount).max().getAsInt();
-//        List<ProductionPlanGroupInfo> specialMaterialList = heightList.stream().filter(groupPlan -> maxSpecialMaterial.equals(groupPlan.getSpecialMaterialsCount())).collect(Collectors.toList());
-//        if (specialMaterialList.size() == BigDecimal.ONE.intValue()) {
-//            return specialMaterialList.get(BigDecimal.ZERO.intValue());
-//        }
-//        specialMaterialList.sort((groupInfo1, groupInfo2) -> {
-//            // 判断如果都是特殊材料，同时包含专用与共用特殊材料的结构优先
-//            Boolean hasDedicatedSpecialMaterials1 = groupInfo1.hasDedicatedSpecialMaterials(productionContext);
-//            Boolean hasDedicatedSpecialMaterials2 = groupInfo2.hasDedicatedSpecialMaterials(productionContext);
-//            int result = hasDedicatedSpecialMaterials2.compareTo(hasDedicatedSpecialMaterials1); // 倒序
-//            if (result != 0) {
-//                return result;
-//            }
-//            Integer remainingNeedAllocationDays1 = Optional.ofNullable(groupInfo1.getRemainingNeedAllocationDays()).orElse(0);
-//            Integer remainingNeedAllocationDays2 = Optional.ofNullable(groupInfo2.getRemainingNeedAllocationDays()).orElse(0);
-//            result = remainingNeedAllocationDays1.compareTo(remainingNeedAllocationDays2);
-//            return result;
-//        });
-//        return specialMaterialList.get(BigDecimal.ZERO.intValue());
+        return groupPlanPrioritySelector.getHeightPriorityGroup(productionContext, excludeGroupPlan);
     }
 
     /**
@@ -562,7 +535,7 @@ public class CxCapacityAllocationHandler {
         }
         //记录配比-需要传递
         cxMachineInfo.setRatio(ratio);
-        //20260109--先采用天数来判断，因剩余未排产量存在模具受限的干扰 groupPlan.getRemainingProductionQty
+        //20260109--先采用天数来判断，因剩余未排产量存在模具受限的干扰
         Integer remainingNeedDays = groupPlan.getRemainingNeedAllocationDays();
         if (remainingNeedDays <= BigDecimal.ZERO.intValue()) {
             //todo 记录日志

@@ -155,7 +155,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false);
-        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(list);
+        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");
@@ -182,7 +182,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true);
-        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(list);
+        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");

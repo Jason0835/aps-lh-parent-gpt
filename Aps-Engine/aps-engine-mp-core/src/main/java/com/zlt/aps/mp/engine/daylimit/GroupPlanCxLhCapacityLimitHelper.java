@@ -649,7 +649,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 lhMachineQty = BigDecimal.ZERO.intValue();
             }
             //20260323 满台释放，则不减
-            if (nextDayLhMachineQty == BigDecimal.ZERO.intValue() && lhMachineQty.equals(fullLhMachineQty)) {
+            if (lhMachineQty > nextDayLhMachineQty && lhMachineQty.equals(fullLhMachineQty)) {
                 return;
             }
             if (lhMachineQty > nextDayLhMachineQty) {
@@ -857,6 +857,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
     private Integer getInitChangeLhMachineCount() {
         Integer realMaxLhMachineCount = Optional.ofNullable(maxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
         Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(realMaxLhMachineCount);
+        //Integer realRemainMaxLhMachineCount = Optional.ofNullable(remainMaxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
+        //theoryMaxLhMachineCount = theoryMaxLhMachineCount > realRemainMaxLhMachineCount ? realRemainMaxLhMachineCount : theoryMaxLhMachineCount;
         return realMaxLhMachineCount - theoryMaxLhMachineCount;
     }
 }

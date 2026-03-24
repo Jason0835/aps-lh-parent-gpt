@@ -40,6 +40,11 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 设备类型，数据字典：cx_machine_type_code
      */
     private String cxMachineTypeCode;
+    
+    /**
+     * 净需求(不含暂缓)
+     */
+    private Integer unPostponeNetQty;
 
     /**
      * 实际排产

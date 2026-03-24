@@ -52,11 +52,11 @@ public class CxPrecisionPlan extends BaseEntity {
     @TableField(value = "REMARK")
     private String remark;
 
-    /** 创建时间 */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "创建时间", name = "createTime")
-    @TableField(value = "CREATE_TIME")
-    private LocalDateTime createTime;
+//    /** 创建时间 */
+//    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+//    @ApiModelProperty(value = "创建时间", name = "createTime")
+//    @TableField(value = "CREATE_TIME")
+//    private LocalDateTime createTime;
 
     /** 创建人 */
     @ApiModelProperty(value = "创建人", name = "createBy")

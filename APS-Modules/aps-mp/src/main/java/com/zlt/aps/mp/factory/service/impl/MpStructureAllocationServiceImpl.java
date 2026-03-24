@@ -48,6 +48,7 @@ import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
 import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
@@ -118,6 +119,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
     private final FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
     private final LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+    private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
     /**
      * 月份天数上限
@@ -911,6 +913,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        // 1.3.1、按结构 + 日期 统计硫化机台数
         Map<String, Map<Integer, Integer>> lhMachineStatisticsMap = new HashMap<>();
         for (Entry<String, MpMonthPlanStatistics> entry: statisticsMap.entrySet()) {
             Map<Integer, Integer> dayLhMachinesMap = new HashMap<>();
@@ -960,6 +963,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             structureDayResultMap.put(structureName, mouldingDayResultAggregated);
         }
+        // 1.5、加载需求计划
+        QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
+        dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "SUM(UN_POSTPONE_NET_QTY) UN_POSTPONE_NET_QTY");
+        dpDemandPlanQueryWrapper.groupBy("STRUCTURE_NAME");
+        dpDemandPlanQueryWrapper.eq("FACTORY_CODE", param.getFactoryCode());
+        dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", param.getMonthPlanVersion());
+        Map<String, Integer> unPostponeNetQtyMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
+                .stream().filter(p -> p.getUnPostponeNetQty() != null)
+                .collect(Collectors.toMap(DpDemandPlan::getStructureName, DpDemandPlan::getUnPostponeNetQty));
 
         // 2、构建报表头
         MpStructureAllocationExportStatisticsVo exportVo = new MpStructureAllocationExportStatisticsVo();
@@ -982,7 +994,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 3.1.3、可用台数
         MpStructureAllocationExportVo enableCountRecord = this.createExportRecord(StructureAllocationExportDataTypeEnum.ENABLE_COUNT);
         
-        // 3.2、构建主题表格
+        // 3.2、构建主体表格
         String cxMachineCode = null; // 当前机台
         List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
@@ -1002,7 +1014,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 }
             }
             // 3.2.3、处理列表明细的数据
-            Integer changeRank = 1;
+            Integer changeRank = 1; // 切换序号，用于导出的切换颜色渲染
             for (MpStructureAllocationExportVo machineRecord: machineStructureList) {
                 Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(machineRecord.getStructureName());
                 if (dayLhMachinesMap == null) {
@@ -1040,6 +1052,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 machineRecord.setChangeRank(changeRank ++); // 设置序号
                 machineRecord.setBeginDay(beginDay);
                 machineRecord.setEndDay(endDay);
+                machineRecord.setUnPostponeNetQty(unPostponeNetQtyMap.getOrDefault(machineRecord.getStructureName(), 0));
                 if (beginDay != null && endDay != null) {
                     machineRecord.setAllotDays(endDay - beginDay + 1);
                 }
@@ -1258,7 +1271,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         tableMap.put("cxMachineTypeCode", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.cxMachineTypeCode"));
         tableMap.put("structureName", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureName"));
         tableMap.put("structureType", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureType"));
-        tableMap.put("netQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.netQty"));
+        tableMap.put("lossQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.lossQty"));
+        tableMap.put("unPostponeNetQty", I18nUtil.getMessage("ui.data.column.demandPlanSum.unPostponeNetQty"));
         tableMap.put("totalQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.totalQty"));
         tableMap.put("differenceQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.differenceQty"));
         tableMap.put("allotDays", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.allotDays"));
@@ -1421,7 +1435,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         listDataMap.put(this.getRealFieldName("cxMachineTypeCode", suffix), machineBrandMap.getOrDefault(exportVo.getCxMachineTypeCode(), exportVo.getCxMachineTypeCode()));
         listDataMap.put(this.getRealFieldName("structureName", suffix), exportVo.getStructureName());
         listDataMap.put(this.getRealFieldName("structureType", suffix), structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
-        listDataMap.put(this.getRealFieldName("netQty", suffix), exportVo.getNetQty());
+        listDataMap.put(this.getRealFieldName("lossQty", suffix), exportVo.getLossQty());
+        listDataMap.put(this.getRealFieldName("unPostponeNetQty", suffix), exportVo.getUnPostponeNetQty());
         listDataMap.put(this.getRealFieldName("totalQty", suffix), exportVo.getTotalQty());
         listDataMap.put(this.getRealFieldName("differenceQty", suffix), exportVo.getDifferenceQty());
         listDataMap.put(this.getRealFieldName("allotDays", suffix), exportVo.getAllotDays());

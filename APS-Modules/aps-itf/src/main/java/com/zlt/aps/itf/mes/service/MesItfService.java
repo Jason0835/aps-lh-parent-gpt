@@ -135,4 +135,18 @@ public interface MesItfService {
      * @return 结果
      */
     List<MesBrandDict> selectMesBrandDict();
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    AjaxResult syncMachineOnlineInfo(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    AjaxResult syncLhMachineOnlineInfo(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
 }

@@ -51,6 +51,11 @@ public class SkuDayProductionInfoHelper implements Serializable {
     private String mainPattern;
 
     /**
+     * 品牌
+     */
+    private String brand;
+
+    /**
      * 使用的模具编号
      */
     private Set<String> usedMouldSet;
@@ -94,6 +99,7 @@ public class SkuDayProductionInfoHelper implements Serializable {
         helper.lossQty = lossQty;
         helper.mainMaterialDesc = productionPlan.getMainMaterialDesc();
         helper.mainPattern = productionPlan.getMainPattern();
+        helper.brand = productionPlan.getBrand();
         return helper;
     }
 
@@ -119,6 +125,9 @@ public class SkuDayProductionInfoHelper implements Serializable {
         result.sumProductionQty = origin.getSumProductionQty();
         result.dayVulcanizationQty = origin.getDayVulcanizationQty();
         result.lossQty = origin.getLossQty();
+        result.mainMaterialDesc = origin.getMainMaterialDesc();
+        result.mainPattern = origin.getMainPattern();
+        result.brand = origin.getBrand();
         return result;
     }
 

@@ -57,4 +57,20 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询成型在机同步数据
+     *
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 列表
+     */
+    List<MdmCxMachineOnlineInfo> selectCxMachineOnlineSyncList(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+
+    /**
+     * 查询硫化在机同步数据
+     *
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 列表
+     */
+    List<MdmLhMachineOnlineInfo> selectLhMachineOnlineSyncList(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
 }

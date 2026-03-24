@@ -138,6 +138,39 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 结构提前收尾，返回计划排产量
+     *
+     * @param addProductionQty 收尾需撤回的排产量
+     */
+    public void withdrawProductionQty(Integer addProductionQty) {
+        Integer currentNeedProductionQty = this.productionQty;
+        //净需求-先撤回
+        this.productionQty = currentNeedProductionQty + addProductionQty;
+        if (this.originHeightProductionQty <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        Integer originHeightQty = this.originHeightProductionQty;
+        //如果高优先级还有量，则表示排产的是高优先级量
+        Integer currentHeightNeedQty = this.heightProductionQty;
+        if (currentHeightNeedQty > BigDecimal.ZERO.intValue()) {
+            currentHeightNeedQty = currentHeightNeedQty + addProductionQty;
+            if (currentHeightNeedQty >= originHeightQty) {
+                currentHeightNeedQty = originHeightQty;
+            }
+            this.heightProductionQty = currentHeightNeedQty;
+            return;
+        }
+        //非高优先级排产量
+        Integer noHeightProductionQty = originProductionQty - currentNeedProductionQty - originHeightQty;
+        //得到高优先级还需排产量
+        Integer addHeightQty = addProductionQty - noHeightProductionQty;
+        if (addHeightQty < BigDecimal.ZERO.intValue()) {
+            addHeightQty = BigDecimal.ZERO.intValue();
+        }
+        this.heightProductionQty = addHeightQty;
+    }
+
+    /**
      * 计划是否可进行最小批量排产
      * 如果计划不排产则不排
      * 如果净需求计划为零，则不排

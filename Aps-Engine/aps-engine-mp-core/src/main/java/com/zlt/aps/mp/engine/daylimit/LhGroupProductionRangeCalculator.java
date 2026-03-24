@@ -128,6 +128,17 @@ public class LhGroupProductionRangeCalculator {
             productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.DAY_CAPACITY_DOUBLE_LIMIT);
             return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.DAY_CAPACITY_DOUBLE_LIMIT);
         }
+        //7、取得与贴牌产能上限的排产范围的交集 sandy+ 2026.3.23
+        Set<Integer> oemBrandCapacityLimitSet = productionContext.getOemBrandCapacityLimitRange(productionContext,addSkuInfo);
+        if (CollectionUtils.isEmpty(oemBrandCapacityLimitSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.OEM_BRAND_CAPACITY_LIMIT);
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.OEM_BRAND_CAPACITY_LIMIT);
+        }
+        intersectionSet = intersectionSet.stream().filter(oemBrandCapacityLimitSet::contains).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(intersectionSet)) {
+            productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.OEM_BRAND_CAPACITY_DOUBLE_LIMIT);
+            return new MouldProductionDayLimitHelper(Collections.emptySet(), MouldProductionLimitTypeEnum.OEM_BRAND_CAPACITY_DOUBLE_LIMIT);
+        }
         Integer continueDays = 2;
         return handlerChangeMouldContinueControl(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould, continueDays);
 //        return handlerChangeMouldNoContinue(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould);

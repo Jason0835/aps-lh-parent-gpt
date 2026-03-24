@@ -69,7 +69,7 @@ public class SupplementCxMachineDistributionLogRecorder {
      * @return
      */
     public static String addNeedSupplementAllocationInfoLog(Context context, String cxMachineInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：[]需要进行月尾补充分配 ====";
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，机台：[%s]需要进行月尾补充分配 ====";
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion()
                 , cxMachineInfo);

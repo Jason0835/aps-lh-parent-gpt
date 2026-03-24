@@ -88,7 +88,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("create_time desc");
+        startPage("create_time desc, id desc");
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
