@@ -32,6 +32,7 @@
         <module>aps-mdm</module>
         <module>aps-dp</module>
         <module>aps-cx</module>
+        <module>aps-lh</module>
     </modules>
     <properties>
         <aps.version>1.0.3-SNAPSHOT</aps.version>
@@ -86,6 +87,11 @@
             <dependency>
                 <groupId>com.zlt.aps.cx</groupId>
                 <artifactId>aps-cx-api</artifactId>
+                <version>1.0.3-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zlt.aps.lh</groupId>
+                <artifactId>aps-lh-api</artifactId>
                 <version>1.0.3-SNAPSHOT</version>
             </dependency>
             <dependency>

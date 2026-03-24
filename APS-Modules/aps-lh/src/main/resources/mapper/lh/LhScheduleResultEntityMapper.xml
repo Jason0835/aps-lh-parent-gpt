@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhScheduleResultEntityMapper">
+
+    <select id="selectLhSpecCodeList" resultType="java.lang.String">
+        select distinct spec_code from T_LH_SCHEDULE_RESULT
+        where FACTORY_CODE = #{factoryCode}
+        <if test="beginDate != null">
+            AND DATE_FORMAT(schedule_date, '%Y-%m-%d' ) >= #{beginDate}
+        </if>
+        <if test="endDate != null">
+            AND DATE_FORMAT(schedule_date, '%Y-%m-%d' ) &lt; #{endDate}
+        </if>
+        <if test="checkSpecCodeList != null and checkSpecCodeList.size() > 0">
+            AND spec_code IN
+            <foreach collection="checkSpecCodeList" open="(" close=")" separator="," item="item">
+                #{item}
+            </foreach>
+        </if>
+        AND IS_DELETE = '0'
+    </select>
+
+    <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
+        select count(1) from t_lh_schedule_result
+        where is_delete = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        and id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectLastScheduleTime" resultType="java.util.Date">
+        SELECT MAX(schedule_date)
+        FROM t_lh_schedule_result
+        WHERE factory_code = #{factoryCode}
+        <if test="lastScheduleTime != null">
+            AND schedule_date &lt; #{lastScheduleTime}
+        </if>
+    </select>
+
+    <select id="selectBatchNoByScheduleDateAndFactoryCode" resultType="java.lang.String" >
+        SELECT batch_no
+        FROM t_lh_schedule_result
+        WHERE schedule_date = #{scheduleDate}
+          AND factory_code = #{factoryCode}
+          AND is_delete = 0
+        GROUP BY batch_no
+    </select>
+
+    <!-- 根据分厂编码和排程时间进行真删除 -->
+    <delete id="deleteByFactoryCodeAndScheduleDate">
+        DELETE FROM t_lh_schedule_result
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE = #{scheduleDate}
+    </delete>
+
+    <insert id="insertPublishRecord" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord">
+        insert into t_schedule_publish_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">id,</if>
+            <if test="procedureCode != null">procedure_code,</if>
+            <if test="publishStatus != null">publish_status,</if>
+            <if test="scheduleDate != null">schedule_date,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+            <if test="dataVersion != null">data_version,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">#{id},</if>
+            <if test="procedureCode != null">#{procedureCode},</if>
+            <if test="publishStatus != null">#{publishStatus},</if>
+            <if test="scheduleDate != null">#{scheduleDate},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="dataVersion != null">#{dataVersion},</if>
+        </trim>
+    </insert>
+
+    <select id="isPublish" parameterType="com.zlt.aps.common.core.domain.SchedulePublishRecord" resultType="int">
+        select count(1)
+        from t_schedule_publish_record
+        where procedure_code = #{procedureCode,jdbcType=VARCHAR}
+          and schedule_date = #{scheduleDate,jdbcType=DATE}
+          and publish_status = '1'
+          and del_flag = '0'
+    </select>
+
+    <update id="batchUpdate" parameterType="String">
+        update t_lh_schedule_result set IS_RELEASE = #{status}
+        <if test="status == 1">, PUBLISH_SUCCESS_COUNT = PUBLISH_SUCCESS_COUNT + 1, NEWEST_PUBLISH_TIME = now()</if>
+        where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 根据版本更新发布日志状态 -->
+    <update id="updatePublishRecordVersion">
+        UPDATE t_schedule_publish_record
+        SET PUBLISH_STATUS = #{status}
+        WHERE data_version = #{dataVersion}
+    </update>
+
+    <insert id="deployScheduleToMes">
+        INSERT INTO MES_LH_SCHEDULE_RESULT(
+        LH_BATCH_NO ,
+        ORDER_NO ,
+        LH_MACHINE_CODE ,
+        LH_MACHINE_NAME ,
+        LEFT_RIGHT_MOLD ,
+        SPEC_CODE ,
+        SPEC_DESC ,
+        DAILY_PLAN_QTY ,
+        SCHEDULE_DATE ,
+        PRODUCTION_STATUS ,
+        CLASS1_PLAN_QTY ,
+        CLASS1_PLAN_QTY_SEQ,
+        CLASS1_ANALYSIS ,
+        CLASS2_PLAN_QTY ,
+        CLASS2_PLAN_QTY_SEQ,
+        CLASS2_ANALYSIS ,
+        CLASS3_PLAN_QTY ,
+        CLASS3_ANALYSIS ,
+        IS_RELEASE ,
+        REMARK ,
+        DATA_VERSION ,
+        CREATE_DATE ,
+        UPDATE_DATE ,
+        IS_DELETE ,
+        FACTORY_CODE,
+        COMPANY_CODE)
+        SELECT
+        BATCH_NO ,
+        ORDER_NO ,
+        LH_MACHINE_CODE ,
+        LH_MACHINE_NAME ,
+        LEFT_RIGHT_MOLD ,
+        SPEC_CODE ,
+        SPEC_DESC ,
+        DAILY_PLAN_QTY ,
+        SCHEDULE_DATE ,
+        PRODUCTION_STATUS ,
+        CLASS1_PLAN_QTY ,
+        CASE WHEN IFNULL(CLASS1_PLAN_QTY,0) > 0 THEN 1 END CLASS1_PLAN_QTY_SEQ,
+        CLASS1_ANALYSIS ,
+        CLASS2_PLAN_QTY ,
+        CASE WHEN IFNULL(CLASS2_PLAN_QTY,0) > 0 THEN 1 END CLASS2_PLAN_QTY_SEQ,
+        CLASS2_ANALYSIS ,
+        CLASS3_PLAN_QTY ,
+        CLASS3_ANALYSIS ,
+        '1' ,
+        REMARK ,
+        #{dataVersion} DATA_VERSION,
+        NOW() CREATE_DATE ,
+        UPDATE_TIME UPDATE_DATE ,
+        IS_DELETE,
+        #{factoryCode},
+        #{companyCode}
+        FROM T_LH_SCHEDULE_RESULT
+        WHERE id in
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    </insert>
+
+    <select id="getLhGanttData" resultType="com.zlt.aps.lh.api.domain.vo.LhGanttVo">
+        select *
+        from (select c.id,
+                     c.schedule_Date,
+                     c.lh_machine_code,
+                     c.spec_desc,
+                     c.spec_code,
+                     c.embryo_code,
+                     (
+                         case
+                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (
+                                 case
+                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (
+                                         case
+                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (
+                                                 case
+                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then null
+                                                     else CLASS4_START_TIME end
+                                                 )
+                                             else CLASS3_START_TIME end
+                                         )
+                                     else CLASS2_START_TIME end
+                                 )
+                             else CLASS1_START_TIME end
+                         )
+                                                                                                                as startDate,
+                     (
+                         case
+                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (
+                                 case
+                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (
+                                         case
+                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (
+                                                 case
+                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then null
+                                                     else CLASS4_END_TIME end
+                                                 )
+                                             else CLASS3_END_TIME end
+                                         )
+                                     else CLASS2_END_TIME end
+                                 )
+                             else CLASS1_END_TIME end
+                         )                                                                                      as endDate,
+                     IFNULL(class1_plan_qty, 0) + IFNULL(class2_plan_qty, 0) + IFNULL(class3_plan_qty, 0) +
+                     IFNULL(class4_plan_qty, 0) + IFNULL(class5_plan_qty, 0) +
+                     IFNULL(class6_plan_qty, 0)                                                                 as planQty,
+                     IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
+                     IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
+                     IFNULL(CLASS6_FINISH_QTY, 0)                                                               as finishQty
+              from T_LH_SCHEDULE_RESULT c
+              where 1 = 1
+                and c.IS_DELETE = '0'
+                and c.spec_desc is not null
+                and c.embryo_code is not null
+                and c.schedule_date = #{scheduleDate}) t
+        where planQty > 0
+          AND startDate is not null
+          AND endDate is not null
+        order by lh_machine_code, startDate
+    </select>
+    <select id="selectLhScheduleResultTotal"
+            resultType="com.zlt.aps.mp.api.domain.vo.LhScheduleResultTotalVo">
+        select SPEC_CODE,
+               PRODUCT_CODE,
+               REAL_SCHEDULE_DATE,
+               FACTORY_CODE,
+               IFNULL(sum(CLASS1_FINISH_QTY),0)+IFNULL(sum(CLASS2_FINISH_QTY),0)+IFNULL(sum(CLASS3_FINISH_QTY),0)+IFNULL(sum(CLASS4_FINISH_QTY),0)+IFNULL(sum(CLASS5_FINISH_QTY),0)+IFNULL(sum(CLASS6_FINISH_QTY),0) as totalFinishQty,
+        IFNULL(sum(DAILY_PLAN_QTY),0) as totalPlanQty
+        from t_lh_schedule_result where REAL_SCHEDULE_DATE &gt;= #{vo.productionStartDate} and REAL_SCHEDULE_DATE &lt;= #{vo.productionEndDate} and  FACTORY_CODE = #{vo.factoryCode}
+        and IS_DELETE = '0'  GROUP BY SPEC_CODE,PRODUCT_CODE,REAL_SCHEDULE_DATE,FACTORY_CODE ORDER BY REAL_SCHEDULE_DATE ASC
+    </select>
+</mapper>

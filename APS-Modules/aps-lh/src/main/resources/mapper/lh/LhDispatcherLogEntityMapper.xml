@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhDispatcherLogEntityMapper">
+
+    <select id="selectIsChangeList" resultType="com.zlt.aps.lh.api.domain.vo.LhDispatcherLogVo">
+        /*调度员操作日志，判断调度员是否有做“转机台”或“调量”操作*/
+        SELECT schedule_id,
+        max(IF(BEFORE_MACHINE_CODE = AFTER_MACHINE_CODE,0,1)) change_machine,
+        max(IF(IFNULL(BEFORE_CLASS1_PLAN, 0) = IFNULL(AFTER_CLASS1_PLAN, 0),0,1)) changeClass1Plan,
+        max(IF(IFNULL(BEFORE_CLASS2_PLAN, 0) = IFNULL(AFTER_CLASS2_PLAN, 0),0,1)) changeClass2Plan,
+        max(IF(IFNULL(BEFORE_CLASS3_PLAN, 0) = IFNULL(AFTER_CLASS3_PLAN, 0),0,1)) changeClass3Plan,
+        max(IF(IFNULL(BEFORE_CLASS4_PLAN, 0) = IFNULL(AFTER_CLASS4_PLAN, 0),0,1)) changeClass4Plan,
+        max(IF(IFNULL(BEFORE_CLASS5_PLAN, 0) = IFNULL(AFTER_CLASS5_PLAN, 0),0,1)) changeClass5Plan,
+        max(IF(IFNULL(BEFORE_CLASS6_PLAN, 0) = IFNULL(AFTER_CLASS6_PLAN, 0),0,1)) changeClass6Plan
+        FROM T_LH_DISPATCHER_LOG
+        where schedule_date = #{queryVo.scheduleDate}
+        <if test="scheduleIdList != null and scheduleIdList.size() > 0">
+            AND schedule_id IN
+            <foreach collection="scheduleIdList" open="(" close=")" separator="," item="item">
+                #{item}
+            </foreach>
+        </if>
+        group by schedule_id
+    </select>
+</mapper>
