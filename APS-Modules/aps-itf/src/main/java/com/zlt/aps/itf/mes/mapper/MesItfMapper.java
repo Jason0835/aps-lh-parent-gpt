@@ -5,6 +5,7 @@ import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.DevMaintenancePlan;
 import com.zlt.aps.itf.vo.LhRepairCapsule;
+import com.zlt.aps.itf.vo.MouldCleanPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -91,4 +92,12 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<LhRepairCapsule> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询模具清洗预警计划同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MouldCleanPlan> selectMouldCleanPlanList(AuxReqSyncDataLogs syncDataLogs);
 }

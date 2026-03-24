@@ -61,8 +61,12 @@ public class MesItfServiceImpl implements MesItfService {
     private BaseDao baseDao;
     @Autowired
     private IFactoryParamService iFactoryParamService;
+
     @Autowired
     private MdmCycleSchStruConfEntityMapper cycleSchStruConfEntityMapper;
+
+    @Autowired
+    private MdmMouldCleanPlanEntityMapper mouldCleanPlanEntityMapper;
 
     @Autowired
     private MdmDevMaintenancePlanEntityMapper devMaintenancePlanEntityMapper;
@@ -965,8 +969,82 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success();
     }
 
-    @Autowired
-    private MdmLhRepairCapsuleEntityMapper lhRepairCapsuleEntityMapper;
+    /**
+     * 同步模具清洗预警计划
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MouldCleanPlan> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
+
+        // 唯一键重复随机取一条（硫化机台+厂别）
+        Map<String, MouldCleanPlan> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getLhCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MouldCleanPlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MouldCleanPlan> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmMouldCleanPlan> existsList = mouldCleanPlanEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmMouldCleanPlan plan = new MdmMouldCleanPlan();
+                            plan.setLhCode(item.getLhCode());
+                            plan.setFactoryCode(item.getFactoryCode());
+                            return plan;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmMouldCleanPlan> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmMouldCleanPlan> insertOrUpdateList = new ArrayList<>();
+                for (MouldCleanPlan item : saveList) {
+                    MdmMouldCleanPlan entity = new MdmMouldCleanPlan();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getDelFlag() == null) {
+                        entity.setDelFlag(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmMouldCleanPlan existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
 
     /**
      * 同步胶囊已使用次数

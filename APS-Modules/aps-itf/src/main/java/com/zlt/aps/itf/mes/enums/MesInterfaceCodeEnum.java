@@ -76,6 +76,11 @@ public enum MesInterfaceCodeEnum {
      */
     LH_REPAIR_CAPSULE("LH_REPAIR_CAPSULE", "mesItfService", "syncLhRepairCapsule", "胶囊已使用次数同步"),
 
+    /**
+     * 模具清洗预警计划同步
+     */
+    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanPlan", "模具清洗预警计划同步"),
+
     ;
 
     private final String code;

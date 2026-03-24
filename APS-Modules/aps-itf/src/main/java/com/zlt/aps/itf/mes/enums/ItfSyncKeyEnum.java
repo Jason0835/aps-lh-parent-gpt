@@ -25,6 +25,11 @@ public enum ItfSyncKeyEnum {
      */
     LH_REPAIR_CAPSULE("LH_REPAIR_CAPSULE", "MES", "APS", "胶囊已使用次数同步"),
 
+    /**
+     * 模具清洗预警计划同步
+     */
+    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "MES", "APS", "模具清洗预警计划同步"),
+
     ;
 	/**
 	 * 接口码

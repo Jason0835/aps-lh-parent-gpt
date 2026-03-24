@@ -163,4 +163,11 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncLhRepairCapsule(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步模具清洗预警计划
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs);
 }

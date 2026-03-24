@@ -185,4 +185,13 @@ public interface IMesItfService {
     @ApiOperation("同步胶囊已使用次数")
     @PostMapping("/mesItf/syncLhRepairCapsule")
     public AjaxResult syncLhRepairCapsule(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步模具清洗预警计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具清洗预警计划")
+    @PostMapping("/mesItf/syncMouldCleanPlan")
+    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

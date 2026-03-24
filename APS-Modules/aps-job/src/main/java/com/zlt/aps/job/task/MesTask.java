@@ -68,10 +68,10 @@ public class MesTask {
     }
 
     /**
-     * 同步胶囊已使用次数
+     * 同步模具清洗预警计划
      */
-    @ApiOperation("同步胶囊已使用次数")
-    public void syncLhRepairCapsule() {
-        iMesItfService.syncLhRepairCapsule(new AuxReqSyncDataLogs());
+    @ApiOperation("同步模具清洗预警计划")
+    public void syncMouldCleanPlan() {
+        iMesItfService.syncMouldCleanPlan(new AuxReqSyncDataLogs());
     }
 }

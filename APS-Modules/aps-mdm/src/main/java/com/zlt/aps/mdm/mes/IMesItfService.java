@@ -130,4 +130,13 @@ public interface IMesItfService {
     @ApiOperation("同步设备保养计划")
     @PostMapping("/mesItf/syncDevMaintenancePlan")
     public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步模具清洗预警计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具清洗预警计划")
+    @PostMapping("/mesItf/syncMouldCleanPlan")
+    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

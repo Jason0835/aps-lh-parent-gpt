@@ -361,4 +361,19 @@ public class MesItfController {
         }
         return mesItfService.syncLhRepairCapsule(syncDataLogs);
     }
+
+    /**
+     * 同步模具清洗预警计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具清洗预警计划")
+    @PostMapping("/syncMouldCleanPlan")
+    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMouldCleanPlan(syncDataLogs);
+    }
 }
