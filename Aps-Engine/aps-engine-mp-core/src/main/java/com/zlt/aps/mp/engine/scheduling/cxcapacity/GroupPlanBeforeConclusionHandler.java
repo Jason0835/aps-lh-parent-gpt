@@ -119,12 +119,13 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context       排产上下文
-     * @param groupPlanInfo 排产分组计划
-     * @param cxMachineInfo 排产机台
-     * @param cxLhRatio     对应的硫化配比信息
+     * @param context         排产上下文
+     * @param groupPlanInfo   排产分组计划
+     * @param cxMachineInfo   排产机台
+     * @param cxLhRatio       对应的硫化配比信息
+     * @param conclusionRange 当前排产分配段信息
      */
-    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio) {
+    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo cxLhRatio, CxMachineAllocationPlanHelper conclusionRange) {
         //20260211 需要拉量的特殊结构，不能进行提前收尾处理
         if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
             return;
@@ -145,19 +146,19 @@ public class GroupPlanBeforeConclusionHandler {
             log.info(addCxMachineNoAllocationInfoLog(context, groupName, cxMachineCode));
             return;
         }
-        Integer lastIndex = allocationList.size() - BigDecimal.ONE.intValue();
-        CxMachineAllocationPlanHelper lastInfo = allocationList.get(lastIndex);
-        Integer startDay = lastInfo.getStartDay();
-        Integer endDay = lastInfo.getEndDay();
+//        Integer lastIndex = allocationList.size() - BigDecimal.ONE.intValue();
+//        CxMachineAllocationPlanHelper lastInfo = allocationList.get(lastIndex);
+        Integer startDay = conclusionRange.getStartDay();
+        Integer endDay = conclusionRange.getEndDay();
         Integer minLhMachineCount = cxLhRatio.getLhMachineMinQty();
         List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
         List<CxLhProductionHelper> hasProductionList = cxLhGroupList.stream().filter(singleGroup -> !CollectionUtils.isEmpty(singleGroup.getProductionMouldSet())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionList)) {
             Set<Integer> deductionDaySet = cxMachineInfo.getLastProductionDayInfo();
-            Integer beforeConclusionDay = lastInfo.getStartDay();
-            Integer deductionDay = lastInfo.getAllocationDay();
+            Integer beforeConclusionDay = conclusionRange.getStartDay();
+            Integer deductionDay = conclusionRange.getAllocationDay();
             BeforeConclusionInfoHelper beforeConclusionInfo = BeforeConclusionInfoHelper.build(beforeConclusionDay, deductionDay, deductionDaySet);
-            updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, cxMachineInfo, lastInfo, true);
+            updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, cxMachineInfo, conclusionRange, true);
             log.info(addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay));
             return;
         }
@@ -185,7 +186,7 @@ public class GroupPlanBeforeConclusionHandler {
         Set<Integer> deductionDaySet = lowMinLhMachineCountList.stream().map(CxMachineUsedLhInfo::getProductionDay).collect(Collectors.toSet());
         BeforeConclusionInfoHelper beforeConclusionInfo = BeforeConclusionInfoHelper.build(beforeConclusionDay, deductionDay, deductionDaySet);
         //更新数据
-        updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, cxMachineInfo, lastInfo, true);
+        updateInfoByBeforeConclusion(productionContext, minLhMachineCount, beforeConclusionInfo, groupPlanInfo, cxMachineInfo, conclusionRange, true);
         log.info(addBeforeConclusionResultLog(context, groupName, minLhMachineCount, beforeConclusionDay, deductionDay));
     }
 

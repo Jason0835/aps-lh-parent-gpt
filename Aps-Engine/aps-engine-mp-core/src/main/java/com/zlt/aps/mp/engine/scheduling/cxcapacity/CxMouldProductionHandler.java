@@ -81,7 +81,7 @@ public class CxMouldProductionHandler {
         productionPlanInfo.setThisRoundCanProduction();
         cxAddSkuProductionHandler.productionAddSku(context, cxMachineCode, hasProductionPlanList, productionPlan, productionContext.getBaseDataContainer().getMouldShellMap(), new HashSet<>());
         //处理结构提前收尾
-        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio);
+        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, productionPlanInfo, cxMachineInfo, cxLhRatio, productionPlan);
     }
 
     /**
@@ -98,7 +98,7 @@ public class CxMouldProductionHandler {
         Integer maxLhCount = ratio.getLhMachineMaxQty();
         Set<Integer> newCxLhGroupNo = new HashSet<>();
         //切换结构首日需要扣减的硫化机台数
-        TbrProductionContext productionContext = ((TbrProductionContext)context);
+        TbrProductionContext productionContext = ((TbrProductionContext) context);
         Integer deductionLhMachineCount = productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = cxMachineInfo.getCxLhRatioMap();
         Integer newStartDay = 0;
@@ -107,7 +107,7 @@ public class CxMouldProductionHandler {
                 productionPlanInfo.getGroupName().equals(productionContext.getContinueStructureMap().get(cxMachineInfo.getCxMachineCode()))));
         for (Integer cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= maxLhCount; cxLhGroupNo++) {
             newStartDay = startDay;
-            if (noContinueStruct && cxLhGroupNo <= deductionLhMachineCount){
+            if (noContinueStruct && cxLhGroupNo <= deductionLhMachineCount) {
                 //模拟排产，成型机只会有1台；将小于扣减的硫化机台数的起始日+1，即首日不上机; sandy+ 2026.3.19
                 newStartDay = startDay + 1;
             }
