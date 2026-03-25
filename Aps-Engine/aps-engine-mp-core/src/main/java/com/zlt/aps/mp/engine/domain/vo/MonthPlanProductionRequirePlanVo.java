@@ -209,6 +209,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 获取Sku的实单量
+     * 高优先级的量 + 中优先级的量
+     *
+     * @return
+     */
+    public Integer getActualQuantity() {
+        Integer sum = Optional.ofNullable(getHeightQty()).orElse(BigDecimal.ZERO.intValue());
+        sum = sum + Optional.ofNullable(getMidQty()).orElse(BigDecimal.ZERO.intValue());
+        return sum;
+    }
+
+    /**
      * 是否为正常类型的计划
      *
      * @return
