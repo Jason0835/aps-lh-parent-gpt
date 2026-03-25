@@ -45,11 +45,11 @@
           LEFT JOIN t_dp_month_cycle_struct_config msc
             ON msc.FACTORY_CODE = csc.FACTORY_CODE
            AND msc.STRUCTURE_NAME = csc.STRUCTURE_NAME
+           AND msc.YEAR = #{year,jdbcType=DECIMAL}
+           AND msc.MONTH = #{month,jdbcType=DECIMAL}
            AND IFNULL(msc.IS_DELETE, 0) = 0
          WHERE IFNULL(csc.IS_DELETE, 0) = 0
            AND csc.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-           AND msc.YEAR = #{year,jdbcType=DECIMAL}
-           AND msc.MONTH = #{month,jdbcType=DECIMAL}
     </select>
 
 </mapper>
