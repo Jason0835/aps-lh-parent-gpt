@@ -2883,6 +2883,7 @@ public class MatchingProductionHandler {
         Integer diffQty = 0; // 未分配量
         if (oldPlan == null) {
             plan.setFieldValueByFieldName(productFieldName, 0);
+            return diffQty;
         }
         Integer productQty = Optional.ofNullable((Integer) oldPlan.getFieldValueByFieldName(productFieldName))
                 .orElse(0);
