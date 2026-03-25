@@ -278,8 +278,13 @@ export default {
 
         {
           label: this.$t("实际排产"),
-          prop: "factProdReqQty",
+          prop: "totalQty",
           minWidth: 120,
+          render: ({ row }) => {
+            return (
+              <div>{row.totalQty==null?0:row.totalQty}</div>
+            )
+          }
         },
         {
           label: this.$t("common.remark"),
