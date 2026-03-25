@@ -34,7 +34,7 @@ public class MatchingProductionController extends BaseController {
 	@ApiOperation("搭配排产测试入口")
 	@PostMapping("/matchingProduction/{productionVersion}")
 	public AjaxResult matchingProduction(@PathVariable("productionVersion") String productionVersion) {
-		matchingProductionHandler.matchingProduction(productionVersion);
+		matchingProductionHandler.matchingProduction(productionVersion, null);
 		return AjaxResult.success();
 	}
 }

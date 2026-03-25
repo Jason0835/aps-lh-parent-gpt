@@ -99,6 +99,10 @@ public class TbrProductionContext extends Context {
      */
     private Boolean reachMinSpecialMaterialStandard;
     /**
+     * 临时日志存储器
+     */
+    private StringBuilder tempLogBuilder;
+    /**
      * 加入收尾，方向匹配结构集合
      *
      * @param cxMachineCode

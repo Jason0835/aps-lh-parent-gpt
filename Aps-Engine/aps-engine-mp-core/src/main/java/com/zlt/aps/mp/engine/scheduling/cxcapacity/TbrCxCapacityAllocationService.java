@@ -209,7 +209,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
         //12、最后搭配排产
-        matchingProductionHandler.matchingProduction(productionContext.getProductionVersion());
+        matchingProductionHandler.matchingProduction(productionContext.getProductionVersion(), productionContext);
         //13、预警信息发送
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         String userName = SecurityUtils.getUsername();
