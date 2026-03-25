@@ -9,10 +9,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MES_MATERIAL_CODE,
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
-		    d.STRUCTURE_TYPE,
+            IF(C.ID IS NULL, '02', '01') STRUCTURE_TYPE,
 		    r.PRODUCT_STATUS,
-		    r.EMBRYO_CODE,
-		    r.MAIN_MATERIAL_DESC,
+            m.EMBRYO_CODE,
+            m.EMBRYO_DESC MAIN_MATERIAL_DESC,
 		    r.CONSTRUCTION_STAGE,
 		    m.BRAND,
 		    m.SPECIFICATIONS,
@@ -24,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
 		    max( d.AVERAGE_SALE_QTY ) AVERAGE_SALE_QTY,
-		    r.INVENTORY_SALES_RATIO,
+            IFNULL(r.INVENTORY_SALES_RATIO, if(max(d.AVERAGE_SALE_QTY) > 0, round(max(d.STOCK_QTY) / max(d.AVERAGE_SALE_QTY), 1), 0)) INVENTORY_SALES_RATIO,
 		    r.DAY_VULCANIZATION_QTY,
 		    sum( d.NET_QTY ) PROD_REQ_PLAN,
 		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
@@ -91,6 +91,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
 		    AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
+            LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
+            AND C.IS_DELETE = 0
 		WHERE
 		    m.FACTORY_CODE = #{dayResult.factoryCode}
 		    AND m.IS_DELETE = 0 
