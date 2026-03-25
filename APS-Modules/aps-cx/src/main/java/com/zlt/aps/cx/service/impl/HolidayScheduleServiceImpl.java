@@ -3,14 +3,15 @@
 //import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 //import com.zlt.aps.cx.dto.ScheduleContextDTO;
 //import com.zlt.aps.cx.entity.CxStock;
-//import com.zlt.aps.cx.entity.mdm.MdmWorkCalendar;
+//
 //import com.zlt.aps.cx.entity.config.CxKeyProduct;
 //import com.zlt.aps.cx.entity.config.CxParamConfig;
-//import com.zlt.aps.cx.entity.mdm.MdmMoldingMachine;
+//
 //import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 //import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 //import com.zlt.aps.cx.mapper.*;
 //import com.zlt.aps.cx.service.HolidayScheduleService;
+//import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 //import lombok.extern.slf4j.Slf4j;
 //import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.stereotype.Service;
@@ -373,7 +374,7 @@
 //                if (predictedParkingHours.compareTo(BigDecimal.valueOf(maxParkingHours)) > 0) {
 //                    EmbryoConsumptionSuggestion suggestion = new EmbryoConsumptionSuggestion();
 //                    suggestion.setEmbryoCode(stock.getMaterialCode());
-//                    suggestion.setEmbryoName(stock.getMaterialName());
+//                    suggestion.setEmbryoName(stock.get());
 //                    suggestion.setCurrentStock(stock.getCurrentStock());
 //                    suggestion.setParkingHours(parkingHours);
 //                    suggestion.setSuggestedConsumption(stock.getCurrentStock());
