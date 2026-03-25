@@ -18,27 +18,27 @@ public enum ItfSyncKeyEnum {
     /**
      * 设备保养计划同步
      */
-    DEV_MAINTENANCE_PLAN("DEV_MAINTENANCE_PLAN", "MES", "APS", "设备保养计划同步"),
+    DEV_MAINTENANCE_PLAN("DEV_MAINTENANCE_PLAN", "mesItfService", "syncDevMaintenancePlan", "设备保养计划同步"),
 
     /**
      * 胶囊已使用次数同步
      */
-    LH_REPAIR_CAPSULE("LH_REPAIR_CAPSULE", "MES", "APS", "胶囊已使用次数同步"),
+    LH_USED_CAPSULE("LH_REPAIR_CAPSULE", "mesItfService", "syncLhRepairCapsule", "胶囊已使用次数同步"),
 
     /**
      * 模具清洗预警计划同步
      */
-    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "MES", "APS", "模具清洗预警计划同步"),
+    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanPlan", "模具清洗预警计划同步"),
 
     /**
      * 结构整车胎面配置同步
      */
-    STRUCTURE_TREAD_CONFIG("STRUCTURE_TREAD_CONFIG", "MES", "APS", "结构整车胎面配置同步"),
+    STRUCTURE_TREAD_CONFIG("STRUCTURE_TREAD_CONFIG", "mesItfService", "syncStructureTreadConfig", "结构整车胎面配置同步"),
 
     /**
      * 生胎库存同步
      */
-    MES_CX_STOCK("MES_CX_STOCK", "MES", "APS", "生胎库存同步"),
+    EMBRYO_STOCK_SYNC("MES_CX_STOCK", "mesItfService", "syncMesCxStock", "生胎库存同步"),
 
     ;
 	/**
