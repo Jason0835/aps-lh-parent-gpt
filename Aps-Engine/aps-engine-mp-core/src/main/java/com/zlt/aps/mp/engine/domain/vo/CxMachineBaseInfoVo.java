@@ -16,6 +16,7 @@ import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.CollectValueUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -377,13 +378,13 @@ public class CxMachineBaseInfoVo implements Serializable {
         //判定结构
         Set<String> fixedStructureSet = new HashSet<>();
         if (StringUtils.isNotBlank(fixedStructure1)) {
-            fixedStructureSet.addAll(Stream.of(fixedStructure1.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure1, StringConstant.COMMA);
         }
         if (StringUtils.isNotBlank(fixedStructure2)) {
-            fixedStructureSet.addAll(Stream.of(fixedStructure2.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure2, StringConstant.COMMA);
         }
         if (StringUtils.isNotBlank(fixedStructure3)) {
-            fixedStructureSet.addAll(Stream.of(fixedStructure3.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure3, StringConstant.COMMA);
         }
         if (fixedStructureSet.contains(groupPlanInfo.getGroupName())) {
             return true;
@@ -391,7 +392,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         //判定Sku
         Set<String> fixedMaterialCodeSet = new HashSet<>();
         if (StringUtils.isNotBlank(fixedMaterialCode)) {
-            fixedMaterialCodeSet.addAll(Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedMaterialCodeSet, fixedMaterialCode, StringConstant.COMMA);
         }
         if (CollectionUtils.isEmpty(fixedMaterialCodeSet)) {
             return false;
@@ -949,7 +950,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (StringUtils.isBlank(fixedStructure) || StringUtils.isBlank(structureName)) {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
-        Set<String> fixedStructureSet = Stream.of(fixedStructure.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        Set<String> fixedStructureSet = new HashSet<>();
+        CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure, StringConstant.COMMA);
         if (fixedStructureSet.contains(structureName)) {
             return fixedPriority;
         }
@@ -971,7 +973,8 @@ public class CxMachineBaseInfoVo implements Serializable {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
         Set<String> materialCodePlanSet = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
-        Set<String> fixedMaterialCodeSet = Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        Set<String> fixedMaterialCodeSet = new HashSet<>();
+        CollectValueUtils.addSingleValueToCollect(fixedMaterialCodeSet, fixedMaterialCode, StringConstant.COMMA);
         for (String materialCode : materialCodePlanSet) {
             if (fixedMaterialCodeSet.contains(materialCode)) {
                 return CxMachineFixedPriorityEnum.FIXED_SKU;
@@ -1100,10 +1103,6 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (null == changeStartDay || StringUtils.isBlank(changeGroupName)) {
             return false;
         }
-//        //第一天先不判断
-//        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
-//            return false;
-//        }
         //没有分配信息，看续作
         if (null == beforeAllocation) {
             TbrProductionContext productionContext = (TbrProductionContext) context;
