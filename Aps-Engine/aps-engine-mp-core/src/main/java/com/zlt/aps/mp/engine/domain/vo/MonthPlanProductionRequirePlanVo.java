@@ -109,6 +109,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 已排产量
      */
     private Integer producedQty;
+    /**
+     * 是否补实单
+     */
+    private Boolean isSkuProduced;
 
     /**
      * 初始的排产数据设置
