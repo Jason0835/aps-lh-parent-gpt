@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
@@ -13,10 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -56,18 +54,6 @@ public class GroupPlanCxMachineSelector {
         }
         //成型机台基础条件匹配
         return getEnableCxMachineListByAppoint(context, addNewGroupPlan, leftOverCxMachineList);
-//        //如果结构有固定机台，则只能从固定中选择
-//        Set<String> fixedCxMachineSet = addNewGroupPlan.getFixedCxMachineSet();
-//        if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
-//            return enableCxMachineList;
-//        }
-//        String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
-//        log.info(TbrProductionGroupLogRecorder.addGroupSelectedFixedCxMachineLog(context, structureName, fixedMachineInfo));
-//        List<CxMachineBaseInfoVo> finalResult = enableCxMachineList.stream().filter(baseSelectedMachine -> fixedCxMachineSet.contains(baseSelectedMachine.getCxMachineCode())).collect(Collectors.toList());
-//        if (CollectionUtils.isEmpty(finalResult)) {
-//            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, fixedMachineInfo));
-//        }
-//        return finalResult;
     }
 
     /**
@@ -122,25 +108,37 @@ public class GroupPlanCxMachineSelector {
         String machineIsZeroRack = cxMachineInfo.getIsZeroRack();
         if (YesOrNoEnum.YES.getCode().equals(isZeroRack) && !isZeroRack.equals(machineIsZeroRack)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedZeroMatchLog(context, structureName, isZeroRack, cxMachineCode, machineIsZeroRack));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedZeroMatchLog(context, structureName, isZeroRack, cxMachineCode, machineIsZeroRack);
             return false;
         }
         if (cxMachineInfo.isNoProductionStructure(structureName)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, isZeroRack, cxMachineCode);
             return false;
         }
-        //20260318 选成型机阶段，不控到Sku
+        //20260318 选成型机阶段，不控到Sku Sku循环调用判断去除(isMatchSku)
         String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         MonthPlanStructureLhRatioVo lhRatioInfo = groupPlanInfo.getLhRatio(cxMachineInfo);
         if (null == lhRatioInfo) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedNoRatioLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode);
             return false;
         }
         cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
-        log.info(TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
-        return true;
+        Set<String> fixedCxMachineSet = Optional.ofNullable(groupPlanInfo.getFixedCxMachineSet()).orElse(Collections.emptySet());
+        if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
+            log.info(TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
+            return true;
+        }
+        //如果结构有固定机台，则只能从固定中选择
+        String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
+        TbrProductionGroupLogRecorder.addGroupSelectedFixedCxMachineLog(context, structureName, fixedMachineInfo);
+        if (fixedCxMachineSet.contains(cxMachineCode)) {
+            TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode);
+            return true;
+        }
+        TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, cxMachineCode, fixedMachineInfo);
+        return false;
     }
 
     /**
