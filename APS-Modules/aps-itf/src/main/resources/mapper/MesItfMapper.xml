@@ -168,7 +168,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
+    <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan">
         SELECT
         ID,
         DEV_CODE,
@@ -186,7 +186,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.itf.vo.LhRepairCapsule">
+    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhRepairCapsule">
         SELECT
         ID,
         OBTAIN_TIME,
@@ -206,7 +206,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.itf.vo.MouldCleanPlan">
+    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMouldCleanPlan">
         SELECT
         ID,
         LH_CODE,
@@ -219,6 +219,45 @@
         COMPANY_CODE,
         FACTORY_CODE
         FROM MOULD_CLEAN_PLAN
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig">
+        SELECT
+        ID,
+        STRUCTURE_CODE,
+        TREAD_COUNT,
+        DEL_FLAG,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM STRUCTURE_TREAD_CONFIG
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectMesCxStockList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMesCxStock">
+        SELECT
+        ID,
+        STOCK_DATE,
+        EMBRYO_CODE,
+        STOCK_NUM,
+        LITI_STOCK,
+        EMBRYO_CAR,
+        LH_STOCK,
+        AVAILABLE_STOCK,
+        BOM_DATA_VERSION,
+        EXAMPLE_TYPE,
+        UNAVAILABLE_STOCK,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_CX_STOCK
         WHERE 1 = 1
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>

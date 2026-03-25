@@ -74,4 +74,12 @@ public class MesTask {
     public void syncMouldCleanPlan() {
         iMesItfService.syncMouldCleanPlan(new AuxReqSyncDataLogs());
     }
+
+    /**
+     * 同步结构整车胎面配置
+     */
+    @ApiOperation("同步结构整车胎面配置")
+    public void syncStructureTreadConfig() {
+        iMesItfService.syncStructureTreadConfig(new AuxReqSyncDataLogs());
+    }
 }

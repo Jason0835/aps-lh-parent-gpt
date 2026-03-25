@@ -170,4 +170,18 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步结构整车胎面配置
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncStructureTreadConfig(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步生胎库存
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs);
 }

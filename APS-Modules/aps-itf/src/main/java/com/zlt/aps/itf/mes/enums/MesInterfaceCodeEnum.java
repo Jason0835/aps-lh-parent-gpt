@@ -81,6 +81,15 @@ public enum MesInterfaceCodeEnum {
      */
     MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanPlan", "模具清洗预警计划同步"),
 
+    /**
+     * 结构整车胎面配置同步
+     */
+    STRUCTURE_TREAD_CONFIG("STRUCTURE_TREAD_CONFIG", "mesItfService", "syncStructureTreadConfig", "结构整车胎面配置同步"),
+
+    /**
+     * 生胎库存同步
+     */
+    MES_CX_STOCK("MES_CX_STOCK", "mesItfService", "syncMesCxStock", "生胎库存同步"),
     ;
 
     private final String code;
