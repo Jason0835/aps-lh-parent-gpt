@@ -1089,26 +1089,31 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 changeStructureCountMap.put(changeStructureCount, oldCount + 1);
             }
         }
-        // 4.2、统计的规格切换次数转换成表格
+        // 4.2、统计英寸交替次数
+        Integer proSizeChangeCount = (int) recordList.stream()
+                .filter(sa -> AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode().equals(sa.getAlternatingType()))
+                .count();
+        exportVo.setProSizeChangeCount(proSizeChangeCount);
+        // 4.3、统计规格交替次数
+        Integer structureChangeCount = (int) recordList.stream()
+                .filter(sa -> AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode().equals(sa.getAlternatingType()))
+                .count();
+        // 4.4、构建切换次数子表
         List<MpStructureAllocationExportChangeCountVo> changeCountList = new LinkedList<>();
+        // 4.4.1、统计的规格切换次数表格
         changeStructureCountMap.keySet().stream().sorted(Integer::compareTo).forEach(changeCount -> {
             Integer machineCount = changeStructureCountMap.get(changeCount);
             MpStructureAllocationExportChangeCountVo changeCountRecord = new MpStructureAllocationExportChangeCountVo(
                     changeCount, machineCount, StructureAllocationExportDataTypeEnum.RECORD.getCode());
             changeCountList.add(changeCountRecord);
         });
-        // 4.3、构建切换次数统计行
-        Integer totalChangeCount = changeCountList.stream().mapToInt(r -> r.getChangeCount() * r.getMachineCount()).sum();
+        exportVo.setStructureChangeCount(structureChangeCount); // 更新结构切换 = 总结构切换数 - 换英寸数
+        // 4.4.2、构建切换次数统计行
+        Integer totalChangeCount = proSizeChangeCount + structureChangeCount;
         MpStructureAllocationExportChangeCountVo totalChangeCountRecord = new MpStructureAllocationExportChangeCountVo(
                 0, totalChangeCount, StructureAllocationExportDataTypeEnum.TOTAL_CHANGE_COUNT.getCode());
         changeCountList.add(totalChangeCountRecord);
         exportVo.setChangeCountList(changeCountList);
-        exportVo.setStructureChangeCount(totalChangeCount - exportVo.getProSizeChangeCount()); // 更新结构切换 = 总结构切换数 - 换英寸数
-        // 4.4、统计英寸交替次数
-        Integer changeProSize = (int) recordList.stream()
-                .filter(sa -> AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode().equals(sa.getAlternatingType()))
-                .count();
-        exportVo.setProSizeChangeCount(changeProSize);
 
         // 5、构建头部合计行
         MpStructureAllocationExportVo totalProductRecord = this.createExportRecord(StructureAllocationExportDataTypeEnum.TOTAL_PRODUCT_QTY);
