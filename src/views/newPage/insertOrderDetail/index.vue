@@ -159,10 +159,10 @@ export default {
           },
           {
             prop: "scmPriority",
-            label: this.$t("ui.data.column.monthplan.scmPriority"),
+            label: this.$t("物料优先"),
             width: 120,
             formatter: (row, column, value) => {
-              return this.selectDictLabel(this.dict.type.biz_order_type, value);
+              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
           },
           {
