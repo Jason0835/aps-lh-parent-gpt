@@ -1698,7 +1698,7 @@ public class MatchingProductionHandler {
                 Integer usedEndDate = mouldDayUsed.getEndDate();
                 // 最大硫化机数校验
                 if (!this.checkLhMachineCount(productionContext, groupInfo, usedBeginDate)) {
-                    break;
+                    continue;
                 }
 
                 MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
