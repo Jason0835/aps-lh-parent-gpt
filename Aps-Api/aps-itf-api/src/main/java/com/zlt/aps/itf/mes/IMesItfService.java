@@ -212,4 +212,18 @@ public interface IMesItfService {
     @ApiOperation("同步生胎库存")
     @PostMapping("/mesItf/syncMesCxStock")
     public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 成型排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班，即二班和三班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班，即一班、二班和三班）
+     * 3. 下发后天的3班（早中晚班，即一班、二班和三班）
+     *
+     * @param cxScheduleResultIssueList 成型排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("成型排程结果下发到MES")
+    @PostMapping("/mesItf/issueCxScheduleResult")
+    public AjaxResult issueCxScheduleResult(@RequestBody List<CxScheduleResultIssue> cxScheduleResultIssueList);
 }

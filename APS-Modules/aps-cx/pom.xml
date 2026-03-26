@@ -63,6 +63,16 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- APS接口模块 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-itf-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-mp-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

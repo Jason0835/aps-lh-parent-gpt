@@ -4,6 +4,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.itf.mes.service.ICxScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
@@ -50,6 +51,9 @@ public class MesItfController {
 
     @Autowired
     private MesBomItfService mesBomItfService;
+
+    @Autowired
+    private ICxScheduleResultIssueService cxScheduleResultIssueService;
 
     /**
      * 同步SKU与模具关系
@@ -405,5 +409,26 @@ public class MesItfController {
             syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         return mesItfService.syncMesCxStock(syncDataLogs);
+    }
+
+
+
+    /**
+     * 成型排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班，即二班和三班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班，即一班、二班和三班）
+     * 3. 下发后天的3班（早中晚班，即一班、二班和三班）
+     *
+     * @param cxScheduleResultIssueList 成型排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("成型排程结果下发到MES")
+    @PostMapping("/issueCxScheduleResult")
+    public AjaxResult issueCxScheduleResult(@RequestBody List<CxScheduleResultIssue> cxScheduleResultIssueList) {
+        // 从上下文中获取厂别和分公司编码
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
+        return cxScheduleResultIssueService.issueCxScheduleResult(cxScheduleResultIssueList, factoryCode, companyCode);
     }
 }
