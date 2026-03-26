@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 试制排程服务接口
- * 
+ *
  * 实现试制任务的排程逻辑：
  * - 试制任务创建与管理
  * - 试制排程约束检查
@@ -107,7 +107,7 @@ public interface TrialScheduleService {
      * @param scheduleDate 排程日期
      * @return 已安排的试制任务数量
      */
-    long getTodayTrialTaskCount(LocalDate scheduleDate);
+    int getTodayTrialTaskCount(LocalDate scheduleDate);
 
     /**
      * 获取待排程的试制计划列表

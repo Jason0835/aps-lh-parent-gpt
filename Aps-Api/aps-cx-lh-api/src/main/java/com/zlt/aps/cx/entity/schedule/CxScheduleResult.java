@@ -10,6 +10,7 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 成型排程结果表
@@ -259,4 +260,15 @@ public class CxScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "特殊要求")
     @TableField("SPECIAL_REQUIREMENTS")
     private String specialRequirements;
+
+
+    // ========== 非数据库字段 ==========
+
+    @ApiModelProperty(value = "排程明细列表")
+    @TableField(exist = false)
+    private List<CxScheduleDetail> details;
+
+    @ApiModelProperty(value = "是否试制")
+    @TableField(exist = false)
+    private Integer isTrial;
 }

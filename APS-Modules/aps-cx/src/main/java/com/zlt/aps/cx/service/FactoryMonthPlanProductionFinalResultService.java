@@ -1,5 +1,7 @@
 package com.zlt.aps.cx.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 
@@ -8,7 +10,7 @@ import java.util.List;
 
 /**
  * 工厂月生产计划服务接口
- * 
+ *
  * 功能：
  * 1. 月计划查询与管理
  * 2. 月计划拆分为日计划
@@ -47,6 +49,16 @@ public interface FactoryMonthPlanProductionFinalResultService {
      * @return 月计划
      */
     FactoryMonthPlanProductionFinalResult getByProductionNo(String productionNo);
+
+    /**
+     * 分页查询月计划
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @param yearMonth 年月
+     * @param factoryCode 工厂编码(可选)
+     * @return 分页结果
+     */
+    Page<FactoryMonthPlanProductionFinalResult> getPage(int pageNum, int pageSize, Integer yearMonth, String factoryCode);
 
     /**
      * 保存月计划
@@ -89,12 +101,12 @@ public interface FactoryMonthPlanProductionFinalResultService {
 
     /**
      * 将月计划拆分为日硫化排程
-     * 
+     *
      * 流程：
      * 1. 查询月计划中指定日期有排产的物料
      * 2. 根据DAY_X字段值创建日硫化排程记录
      * 3. 设置优先级(根据productionType)
-     * 
+     *
      * @param scheduleDate 计划日期
      * @return 日硫化排程列表
      */
@@ -110,12 +122,12 @@ public interface FactoryMonthPlanProductionFinalResultService {
 
     /**
      * 根据月计划生成APS排程
-     * 
+     *
      * 完整流程：
      * 1. 从月计划拆分日计划
      * 2. 调用APS核心算法生成排程
      * 3. 同步排程结果回月计划
-     * 
+     *
      * @param scheduleDate 计划日期
      * @return 排程生成结果
      */
@@ -123,12 +135,12 @@ public interface FactoryMonthPlanProductionFinalResultService {
 
     /**
      * 同步排程结果到月计划
-     * 
+     *
      * 功能：
      * 1. 更新TOTAL_QTY(实际排产量)
      * 2. 更新DIFFERENCE_QTY(差异量)
      * 3. 更新CX_MACHINE_CODE(分配的机台)
-     * 
+     *
      * @param scheduleDate 计划日期
      * @return 是否成功
      */

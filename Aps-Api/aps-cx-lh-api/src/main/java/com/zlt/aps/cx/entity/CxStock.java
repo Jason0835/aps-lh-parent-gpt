@@ -1,96 +1,153 @@
 package com.zlt.aps.cx.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
- * 胎胚库存实体类
- * 对应数据库表：T_CX_STOCK
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：CxStock.java
+ * 描    述：成型库存信息对象 t_cx_stock
+ *@author zlt
+ *@date 2025-02-17
+ *@version 1.0
  *
- * @author APS Team
+ *  修改记录：
+ *     修改时间：...
+ *     修 改 人：zlt
+ *     修改内容：...
  */
+
+@ApiModel(value = "成型库存信息对象", description = "成型库存信息对象 ")
 @Data
-@TableName(value = "T_CX_STOCK", keepGlobalPrefix = false)
-@ApiModel(value = "胎胚库存")
-public class CxStock implements Serializable {
+@TableName(value = "T_CX_STOCK")
+public class CxStock extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
+    /** 库存日期，格式：yyyy-MM-dd */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.cxStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty(value = "库存日期，格式：yyyy-MM-dd", name = "stockDate")
+    @TableField(value = "STOCK_DATE")
+    private Date stockDate;
 
-    @ApiModelProperty(value = "胎胚物料编码")
-    @TableField("MATERIAL_CODE")
-    private String materialCode;
+    /** 胎胚代码 */
+    @Excel(name = "ui.data.column.cxStock.embryoCode")
+    @ApiModelProperty(value = "胎胚代码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
 
-    @ApiModelProperty(value = "实时库存数量")
-    @TableField("CURRENT_STOCK")
-    private Integer currentStock;
+    /** 库存量 */
+    @Excel(name = "ui.data.column.cxStock.stockNum")
+    @ApiModelProperty(value = "库存量", name = "stockNum")
+    @TableField(value = "STOCK_NUM")
+    private Integer stockNum;
 
-    @ApiModelProperty(value = "计划入库量")
-    @TableField("PLANNED_IN_QTY")
-    private Integer plannedInQty;
+    /** 超期库存 */
+    @Excel(name = "ui.data.column.cxStock.overTimeStock")
+    @ApiModelProperty(value = "超期库存", name = "overTimeStock")
+    @TableField(value = "OVER_TIME_STOCK")
+    private Integer overTimeStock;
 
-    @ApiModelProperty(value = "计划出库量")
-    @TableField("PLANNED_OUT_QTY")
-    private Integer plannedOutQty;
+    /** 修正数量 */
+    @Excel(name = "ui.data.column.cxStock.modifyNum")
+    @ApiModelProperty(value = "修正数量", name = "modifyNum")
+    @TableField(value = "MODIFY_NUM")
+    private Integer modifyNum;
 
-    @ApiModelProperty(value = "可用库存")
-    @TableField("AVAILABLE_STOCK")
-    private Integer availableStock;
+    /** 不良数量 */
+    @Excel(name = "ui.data.column.cxStock.badNum")
+    @ApiModelProperty(value = "不良数量", name = "badNum")
+    @TableField(value = "BAD_NUM")
+    private Integer badNum;
 
-    @ApiModelProperty(value = "可用硫化机台数")
-    @TableField("VULCANIZE_MACHINE_COUNT")
-    private Integer vulcanizeMachineCount;
+    // ============== 非数据库字段（用于业务计算） ==============
 
-    @ApiModelProperty(value = "总模数")
-    @TableField("VULCANIZE_MOLD_COUNT")
-    private Integer vulcanizeMoldCount;
+    /** 排程使用库存 */
+    @Excel(name = "ui.data.column.stock.scheduleUseStock")
+    @TableField(exist = false)
+    private Long scheduleUseStock;
 
-    @ApiModelProperty(value = "库存可供硫化时长(小时)")
-    @TableField("STOCK_HOURS")
+    /** 胎胚名称（关联查询） */
+    @TableField(exist = false)
+    private String materialName;
+
+    /** 库存可供硫化时长(小时) */
+    @TableField(exist = false)
     private BigDecimal stockHours;
 
-    @ApiModelProperty(value = "计算公式记录")
-    @TableField("STOCK_HOURS_FORMULA")
-    private String stockHoursFormula;
-
-    @ApiModelProperty(value = "交班剩余可供硫化时长")
-    @TableField("SHIFT_END_AVAILABLE_HOURS")
-    private BigDecimal shiftEndAvailableHours;
-
-    @ApiModelProperty(value = "预警状态")
-    @TableField("ALERT_STATUS")
+    /** 预警状态：NORMAL-正常，LOW-低库存，HIGH-高库存 */
+    @TableField(exist = false)
     private String alertStatus;
 
-    @ApiModelProperty(value = "预警触发时间")
-    @TableField("ALERT_TIME")
-    private LocalDateTime alertTime;
+    /** 预警时间 */
+    @TableField(exist = false)
+    private Date alertTime;
 
-    @ApiModelProperty(value = "是否收尾SKU")
-    @TableField("IS_ENDING_SKU")
+    /** 是否收尾SKU：0-否，1-是 */
+    @TableField(value = "IS_ENDING_SKU")
     private Integer isEndingSku;
 
-    @ApiModelProperty(value = "预计收尾日期")
-    @TableField("ENDING_DATE")
-    private LocalDateTime endingDate;
+    /** 可用硫化机台数（业务计算字段） */
+    @TableField(exist = false)
+    private Integer vulcanizeMachineCount;
 
-    @ApiModelProperty(value = "计算时间")
-    @TableField("CALC_TIME")
-    private LocalDateTime calcTime;
+    /** 可用硫化模数（业务计算字段） */
+    @TableField(exist = false)
+    private Integer vulcanizeMoldCount;
 
-    @ApiModelProperty(value = "创建时间")
-    @TableField(value = "CREATE_TIME", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    // ============== 业务计算方法 ==============
 
-    @ApiModelProperty(value = "更新时间")
-    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    /**
+     * 计算有效库存
+     * 有效库存 = 库存量 - 超期库存 - 不良数量 + 修正数量
+     *
+     * @return 有效库存量
+     */
+    public Integer getEffectiveStock() {
+        int effective = stockNum != null ? stockNum : 0;
+        if (overTimeStock != null) {
+            effective -= overTimeStock;
+        }
+        if (badNum != null) {
+            effective -= badNum;
+        }
+        if (modifyNum != null) {
+            effective += modifyNum;
+        }
+        return Math.max(0, effective);
+    }
+
+    /**
+     * 计算可用库存
+     * 可用库存 = 有效库存 - 排程使用库存
+     *
+     * @return 可用库存量
+     */
+    public Long getAvailableStock() {
+        long available = getEffectiveStock();
+        if (scheduleUseStock != null) {
+            available -= scheduleUseStock;
+        }
+        return Math.max(0L, available);
+    }
+
+    /**
+     * 获取可用小时数（用于排程计算）
+     *
+     * @return 可用小时数
+     */
+    public BigDecimal getAvailableHours() {
+        return stockHours != null ? stockHours : BigDecimal.ZERO;
+    }
 }

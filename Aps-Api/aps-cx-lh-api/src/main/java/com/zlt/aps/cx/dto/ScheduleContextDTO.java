@@ -3,11 +3,12 @@ package com.zlt.aps.cx.dto;
 import com.zlt.aps.cx.entity.*;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
 import com.zlt.aps.cx.entity.config.CxStructureShiftCapacity;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
-import com.zlt.aps.mp.api.domain.entity.*;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -31,9 +32,27 @@ public class ScheduleContextDTO {
     private LocalDate scheduleDate;
 
     /**
+     * 排程模式：NORMAL-正常排程，RE_SCHEDULE-重排程，STRUCTURE_RE_SCHEDULE-结构重排
+     */
+    private String scheduleMode;
+
+    /**
      * 可用成型机台列表
      */
     private List<MdmMoldingMachine> availableMachines;
+
+    /**
+     * 机台结构产能配置列表
+     * 用于获取机台-结构维度的小时产能、班次产能
+     */
+    private List<CxMachineStructureCapacity> machineStructureCapacities;
+
+    /**
+     * 机台结构产能映射（快速查询用）
+     * Key: 机台编码_结构编码
+     * Value: 产能配置
+     */
+    private Map<String, CxMachineStructureCapacity> machineCapacityMap;
 
     // ==================== 任务来源数据 ====================
 
@@ -154,9 +173,64 @@ public class ScheduleContextDTO {
     private Map<String, ShiftInfo> shiftConfigs;
 
     /**
+     * 班次配置列表（从T_CX_SHIFT_CONFIG加载）
+     * 用于排程时获取班次顺序、产能比例等信息
+     */
+    private List<CxShiftConfig> shiftConfigList;
+
+    /**
+     * 排产天数
+     * 默认3天
+     * 班次数量 = 天数 * 3 - 1（第一天的夜班跳过）
+     * 例如：3天 → 早中 + 夜早中 + 夜早中 = 8个班次
+     */
+    private Integer scheduleDays;
+
+    /**
+     * 班次编码数组（按排产顺序排列）
+     * 例如3天排产：[早班, 中班, 夜班, 早班, 中班, 夜班, 早班, 中班]
+     * 即：早中、夜早中、夜早中
+     */
+    private String[] shiftCodes;
+
+    /**
+     * 每个班次对应的日期（与shiftCodes一一对应）
+     * 用于确定每个班次属于哪一天
+     */
+    private LocalDate[] shiftDates;
+
+    // ==================== 算法可配置参数 ====================
+
+    /**
+     * 波浪比例（班次分配比例）
+     * 按夜班:早班:中班顺序配置
+     * 默认 {1, 2, 1} 表示夜班:早班:中班 = 1:2:1
+     * 实际使用时会根据班次顺序重新映射
+     */
+    private int[] waveRatio;
+
+    /**
+     * 机台种类上限
+     * 默认4种
+     */
+    private Integer maxTypesPerMachine;
+
+    /**
+     * 默认整车容量（条）
+     * 当结构班产配置中没有该结构时使用
+     */
+    private Integer defaultTripCapacity;
+
+    /**
      * 损耗率
      */
     private java.math.BigDecimal lossRate;
+
+    /**
+     * 预留消化时间（小时）
+     * 默认1小时
+     */
+    private Integer reservedDigestHours;
 
     /**
      * 胎胚最长停放时间（小时）
@@ -215,12 +289,6 @@ public class ScheduleContextDTO {
     private LocalDateTime formingStopTime;
 
     /**
-     * 预留消化时间（小时）
-     * 成型停机时间 = 硫化停机时间 - 预留消化时间
-     */
-    private Integer reservedDigestHours;
-
-    /**
      * 成型可排产时长（小时，停产前一天）
      */
     private Integer formingAvailableHours;
@@ -237,19 +305,19 @@ public class ScheduleContextDTO {
      * 硫化余量(PLAN_SURPLUS_QTY)已由系统计算好（总计划量 - 硫化真实完成量）
      * 用于计算收尾余量：收尾余量 = 硫化余量 - 胎胚库存
      */
-    private List<MdmMonthSurplus> monthSurplusList;
+    private List<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusList;
 
     /**
      * 月度计划余量映射（物料编码 -> 余量信息）
      * 快速查询用
      */
-    private Map<String, MdmMonthSurplus> monthSurplusMap;
+    private Map<String, com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusMap;
 
     /**
      * SKU排产分类列表
      * 用于判断是否为主销产品（SCHEDULE_TYPE='01'表示主销产品，月均销量>=500条）
      */
-    private List<MdmSkuScheduleCategory> skuScheduleCategories;
+    private List<com.zlt.aps.mp.api.domain.entity.MdmSkuScheduleCategory> skuScheduleCategories;
 
     /**
      * 主销产品编码集合

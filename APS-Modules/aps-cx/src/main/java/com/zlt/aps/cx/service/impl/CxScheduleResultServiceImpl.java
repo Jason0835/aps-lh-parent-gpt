@@ -63,9 +63,9 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
     @Override
     public Page<ScheduleResultDTO> pageList(ScheduleQueryDTO queryDTO) {
         Page<CxScheduleResult> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
-        
+
         LambdaQueryWrapper<CxScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        
+
         // 日期范围
         if (queryDTO.getStartDate() != null) {
             wrapper.ge(CxScheduleResult::getScheduleDate, queryDTO.getStartDate().atStartOfDay());
@@ -73,7 +73,7 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
         if (queryDTO.getEndDate() != null) {
             wrapper.le(CxScheduleResult::getScheduleDate, queryDTO.getEndDate().atStartOfDay());
         }
-        
+
         // 其他条件
         if (StringUtils.hasText(queryDTO.getCxMachineCode())) {
             wrapper.eq(CxScheduleResult::getCxMachineCode, queryDTO.getCxMachineCode());
@@ -90,18 +90,18 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
         if (StringUtils.hasText(queryDTO.getIsRelease())) {
             wrapper.eq(CxScheduleResult::getIsRelease, queryDTO.getIsRelease());
         }
-        
+
         wrapper.orderByDesc(CxScheduleResult::getScheduleDate)
-               .orderByAsc(CxScheduleResult::getCxMachineCode);
-        
+                .orderByAsc(CxScheduleResult::getCxMachineCode);
+
         Page<CxScheduleResult> resultPage = page(page, wrapper);
-        
+
         // 转换为DTO
         Page<ScheduleResultDTO> dtoPage = new Page<>(resultPage.getCurrent(), resultPage.getSize(), resultPage.getTotal());
         dtoPage.setRecords(resultPage.getRecords().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList()));
-        
+
         return dtoPage;
     }
 
@@ -111,13 +111,13 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
         if (result == null) {
             return null;
         }
-        
+
         ScheduleResultDTO dto = convertToDTO(result);
-        
+
         // 查询明细
         List<CxScheduleDetail> details = cxScheduleDetailService.listByMainId(id);
         dto.setDetails(details.stream().map(this::convertDetailToDTO).collect(Collectors.toList()));
-        
+
         return dto;
     }
 
@@ -153,7 +153,7 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
     public boolean updateShiftPlanQty(Long id, String shiftCode, BigDecimal planQty) {
         LambdaUpdateWrapper<CxScheduleResult> wrapper = new LambdaUpdateWrapper<CxScheduleResult>()
                 .eq(CxScheduleResult::getId, id);
-        
+
         switch (shiftCode) {
             case "SHIFT1":
                 wrapper.set(CxScheduleResult::getClass1PlanQty, planQty);
@@ -182,7 +182,7 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
             default:
                 return false;
         }
-        
+
         return update(wrapper);
     }
 
@@ -191,7 +191,7 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
     public boolean updateShiftFinishQty(Long id, String shiftCode, BigDecimal finishQty) {
         LambdaUpdateWrapper<CxScheduleResult> wrapper = new LambdaUpdateWrapper<CxScheduleResult>()
                 .eq(CxScheduleResult::getId, id);
-        
+
         switch (shiftCode) {
             case "SHIFT1":
                 wrapper.set(CxScheduleResult::getClass1FinishQty, finishQty);
@@ -220,7 +220,7 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
             default:
                 return false;
         }
-        
+
         return update(wrapper);
     }
 
@@ -232,7 +232,7 @@ public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMap
         for (CxScheduleResult result : results) {
             cxScheduleDetailService.deleteByMainId(result.getId());
         }
-        
+
         // 删除主表
         return remove(new LambdaQueryWrapper<CxScheduleResult>()
                 .eq(CxScheduleResult::getScheduleDate, scheduleDate.atStartOfDay()));

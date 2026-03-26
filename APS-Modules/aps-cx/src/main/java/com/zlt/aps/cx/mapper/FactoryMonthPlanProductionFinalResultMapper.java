@@ -1,7 +1,8 @@
 package com.zlt.aps.cx.mapper;
 
-
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -12,7 +13,7 @@ import java.util.List;
 
 /**
  * 工厂月生产计划-最终排产计划定稿 Mapper接口
- * 
+ *
  * @author APS Team
  */
 @Mapper
@@ -86,6 +87,25 @@ public interface FactoryMonthPlanProductionFinalResultMapper extends BaseMapper<
      */
     @Select("SELECT * FROM T_FACTORY_MONTH_PLAN_PRODUCTION_FINAL_RESULT WHERE YEAR_MONTH = #{yearMonth} AND PRODUCTION_VERSION = #{productionVersion} ORDER BY PRODUCTION_SEQUENCE, ID")
     List<FactoryMonthPlanProductionFinalResult> selectByVersion(@Param("yearMonth") Integer yearMonth, @Param("productionVersion") String productionVersion);
+
+    /**
+     * 分页查询月计划
+     * @param page 分页参数
+     * @param yearMonth 年月
+     * @param factoryCode 工厂编码(可选)
+     * @return 分页结果
+     */
+    @Select("<script>" +
+            "SELECT * FROM T_FACTORY_MONTH_PLAN_PRODUCTION_FINAL_RESULT " +
+            "WHERE YEAR_MONTH = #{yearMonth} " +
+            "<if test='factoryCode != null and factoryCode != \"\"'>" +
+            "AND FACTORY_CODE = #{factoryCode} " +
+            "</if>" +
+            "ORDER BY PRODUCTION_SEQUENCE, ID" +
+            "</script>")
+    IPage<FactoryMonthPlanProductionFinalResult> selectPageByYearMonth(Page<FactoryMonthPlanProductionFinalResult> page,
+                                                                       @Param("yearMonth") Integer yearMonth,
+                                                                       @Param("factoryCode") String factoryCode);
 
     /**
      * 查询所有物料编码(去重)

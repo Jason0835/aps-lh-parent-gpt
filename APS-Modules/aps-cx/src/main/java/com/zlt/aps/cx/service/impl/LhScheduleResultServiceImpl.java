@@ -51,20 +51,20 @@ public class LhScheduleResultServiceImpl extends ServiceImpl<LhScheduleResultMap
     @Override
     public Page<LhScheduleResult> pageList(LocalDate scheduleDate, String lhMachineCode, Integer pageNum, Integer pageSize) {
         Page<LhScheduleResult> page = new Page<>(pageNum, pageSize);
-        
+
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        
+
         if (scheduleDate != null) {
             wrapper.eq(LhScheduleResult::getScheduleDate, scheduleDate);
         }
         if (StringUtils.hasText(lhMachineCode)) {
             wrapper.eq(LhScheduleResult::getLhMachineCode, lhMachineCode);
         }
-        
+
         wrapper.orderByDesc(LhScheduleResult::getScheduleDate)
-               .orderByAsc(LhScheduleResult::getLhMachineCode)
-               .orderByAsc(LhScheduleResult::getMachineOrder);
-        
+                .orderByAsc(LhScheduleResult::getLhMachineCode)
+                .orderByAsc(LhScheduleResult::getMachineOrder);
+
         return page(page, wrapper);
     }
 
@@ -100,7 +100,7 @@ public class LhScheduleResultServiceImpl extends ServiceImpl<LhScheduleResultMap
     public boolean updateShiftPlanQty(Long id, Integer shiftNo, Integer planQty) {
         LambdaUpdateWrapper<LhScheduleResult> wrapper = new LambdaUpdateWrapper<LhScheduleResult>()
                 .eq(LhScheduleResult::getId, id);
-        
+
         switch (shiftNo) {
             case 1:
                 wrapper.set(LhScheduleResult::getClass1PlanQty, planQty);
@@ -117,7 +117,7 @@ public class LhScheduleResultServiceImpl extends ServiceImpl<LhScheduleResultMap
             default:
                 return false;
         }
-        
+
         return update(wrapper);
     }
 
@@ -126,7 +126,7 @@ public class LhScheduleResultServiceImpl extends ServiceImpl<LhScheduleResultMap
     public boolean updateShiftFinishQty(Long id, Integer shiftNo, Integer finishQty) {
         LambdaUpdateWrapper<LhScheduleResult> wrapper = new LambdaUpdateWrapper<LhScheduleResult>()
                 .eq(LhScheduleResult::getId, id);
-        
+
         switch (shiftNo) {
             case 1:
                 wrapper.set(LhScheduleResult::getClass1FinishQty, finishQty);
@@ -143,7 +143,7 @@ public class LhScheduleResultServiceImpl extends ServiceImpl<LhScheduleResultMap
             default:
                 return false;
         }
-        
+
         return update(wrapper);
     }
 
@@ -168,21 +168,21 @@ public class LhScheduleResultServiceImpl extends ServiceImpl<LhScheduleResultMap
         if (mouldQty == null || mouldQty == 0 || lhTime == null || lhTime == 0) {
             return 0;
         }
-        
+
         // 假设每班工作8小时
         int shiftMinutes = 8 * 60;
-        
+
         // 单班产能 = (班次分钟数 / 硫化时长分钟数) * 模数
         // 硫化时长从秒转换为分钟
         double lhTimeMinutes = lhTime / 60.0;
-        
+
         if (lhTimeMinutes <= 0) {
             return 0;
         }
-        
+
         // 计算每班可以硫化多少次
         int cyclesPerShift = (int) (shiftMinutes / lhTimeMinutes);
-        
+
         // 单班产能 = 硫化次数 * 模数
         return cyclesPerShift * mouldQty;
     }

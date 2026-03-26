@@ -2,14 +2,13 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxTrialPlan;
 import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.cx.service.ConstraintCheckService;
 import com.zlt.aps.cx.service.TrialScheduleService;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -78,7 +78,7 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
             result.setTrialPlanId(trialPlan.getId());
             result.setMessage("试制计划创建成功");
 
-            log.info("创建试制计划成功，物料：{}，计划日期：{}", 
+            log.info("创建试制计划成功，物料：{}，计划日期：{}",
                     trialPlan.getMaterialCode(), trialPlan.getPlanDate());
 
         } catch (Exception e) {
@@ -111,11 +111,12 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
         }
 
         // 获取当天已安排的试制任务数量
-        long todayTrialCount = getTodayTrialTaskCount(scheduleDate);
+        int todayTrialCount = getTodayTrialTaskCount(scheduleDate);
 
         // 获取可用机台
         List<MdmMoldingMachine> availableMachines = moldingMachineMapper.selectList(
-                new LambdaQueryWrapper<MdmMoldingMachine>());
+                new LambdaQueryWrapper<MdmMoldingMachine>()
+                        .eq(MdmMoldingMachine::getIsActive, 1));
 
         List<String> machineCodes = availableMachines.stream()
                 .map(MdmMoldingMachine::getCxMachineCode)
@@ -156,7 +157,7 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
 
             // 创建排程明细
             CxScheduleDetail detail = createTrialScheduleDetail(
-                    trialPlan, scheduleDate, machineCode, 
+                    trialPlan, scheduleDate, machineCode,
                     availableShifts.get(0), trialQuantity);
 
             if (detail != null) {
@@ -167,7 +168,7 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
                 updateTrialPlanStatus(trialPlan.getId(), "SCHEDULED");
 
                 log.info("试制排程成功，物料：{}，机台：{}，班次：{}，数量：{}",
-                        trialPlan.getMaterialCode(), machineCode, 
+                        trialPlan.getMaterialCode(), machineCode,
                         availableShifts.get(0), trialQuantity);
             }
         }
@@ -190,7 +191,7 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
         }
 
         // 2. 检查当天是否已达到上限
-        long todayTrialCount = getTodayTrialTaskCount(scheduleDate);
+        int todayTrialCount = getTodayTrialTaskCount(scheduleDate);
         if (todayTrialCount >= 2) {
             result.getViolations().add("当天已安排2个试制任务");
         }
@@ -201,10 +202,10 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
         }
 
         // 4. 使用约束校验服务检查
-        ConstraintCheckService.ConstraintCheckResult constraintResult = 
+        ConstraintCheckService.ConstraintCheckResult constraintResult =
                 constraintCheckService.checkTrialConstraint(
                         scheduleDate.atStartOfDay(),
-                        (int) todayTrialCount,
+                        todayTrialCount,
                         null,
                         trialPlan.getPlanQuantity() != null ? trialPlan.getPlanQuantity() : 0);
 
@@ -213,7 +214,7 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
         }
 
         result.setPassed(result.getViolations().isEmpty());
-        result.setMessage(result.isPassed() ? "约束检查通过" : 
+        result.setMessage(result.isPassed() ? "约束检查通过" :
                 String.join("；", result.getViolations()));
 
         return result;
@@ -246,13 +247,13 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
         List<String> shiftsToRemove = new ArrayList<>();
         for (String shift : availableShifts) {
             // 检查该班次是否已有其他任务
-            long taskCount = scheduleDetailMapper.selectCount(
+            Long taskCount = scheduleDetailMapper.selectCount(
                     new LambdaQueryWrapper<CxScheduleDetail>()
                             .eq(CxScheduleDetail::getScheduleDate, scheduleDate)
                             .eq(CxScheduleDetail::getCxMachineCode, machineCode)
                             .eq(CxScheduleDetail::getShiftCode, shift));
 
-            if (taskCount > 0) {
+            if (taskCount != null && taskCount > 0) {
                 shiftsToRemove.add(shift);
             }
         }
@@ -299,9 +300,9 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
 
         // 计算完成率
         BigDecimal completionRate = BigDecimal.ZERO;
-        if (detail.getTripActualQty() != null && detail.getTripActualQty() > 0) {
+        if (detail.getPlanQty() != null && detail.getPlanQty() > 0) {
             completionRate = BigDecimal.valueOf(actualQuantity)
-                    .divide(BigDecimal.valueOf(detail.getTripActualQty()), 4, RoundingMode.HALF_UP)
+                    .divide(BigDecimal.valueOf(detail.getPlanQty()), 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100));
         }
 
@@ -331,9 +332,9 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
         result.setScore(score);
 
         // 更新排程明细
-//        detail.setActualQty(actualQuantity);
-//        detail.setCompletionRate(completionRate);
-//        detail.setStatus("COMPLETED");
+        detail.setActualQty(actualQuantity);
+        detail.setCompletionRate(completionRate);
+        detail.setStatus("COMPLETED");
         scheduleDetailMapper.updateById(detail);
 
         log.info("试制评价完成，明细ID：{}，完成率：{}%，合格率：{}%，得分：{}，评价：{}",
@@ -354,12 +355,13 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
     }
 
     @Override
-    public long getTodayTrialTaskCount(LocalDate scheduleDate) {
+    public int getTodayTrialTaskCount(LocalDate scheduleDate) {
         // 查询当天已安排的试制任务数量
-        return trialPlanMapper.selectCount(
+        Long count = trialPlanMapper.selectCount(
                 new LambdaQueryWrapper<CxTrialPlan>()
                         .eq(CxTrialPlan::getPlanDate, scheduleDate)
                         .in(CxTrialPlan::getStatus, Arrays.asList("SCHEDULED", "IN_PROGRESS")));
+        return count != null ? count.intValue() : 0;
     }
 
     @Override
@@ -393,16 +395,20 @@ public class TrialScheduleServiceImpl implements TrialScheduleService {
      * 创建试制排程明细
      */
     private CxScheduleDetail createTrialScheduleDetail(CxTrialPlan trialPlan, LocalDate scheduleDate,
-                                                        String machineCode, String shiftCode, int quantity) {
+                                                       String machineCode, String shiftCode, int quantity) {
         try {
             CxScheduleDetail detail = new CxScheduleDetail();
             detail.setScheduleDate(scheduleDate);
-            detail.setCxMachineCode(machineCode);
-            detail.setEmbryoCode(trialPlan.getMaterialCode());
+            detail.setMachineCode(machineCode);
+            detail.setMaterialCode(trialPlan.getMaterialCode());
             detail.setShiftCode(shiftCode);
-            detail.setTripCapacity(quantity);
+            detail.setPlanQty(quantity);
+            detail.setStatus("PLANNED");
             detail.setIsTrial(1);
-            detail.setSequence(1);
+            detail.setTrialPlanId(trialPlan.getId());
+            detail.setSequence(1); // 试制任务优先
+            detail.setCreateTime(new Date());
+
             scheduleDetailMapper.insert(detail);
             return detail;
 

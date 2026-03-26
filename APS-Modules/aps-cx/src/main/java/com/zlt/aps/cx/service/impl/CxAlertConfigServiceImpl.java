@@ -18,10 +18,10 @@ public class CxAlertConfigServiceImpl extends ServiceImpl<CxAlertConfigMapper, C
     @Override
     public String getConfigValue(String configCode) {
         LambdaQueryWrapper<CxAlertConfig> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CxAlertConfig::getAlertType, configCode)
-                .eq(CxAlertConfig::getIsEnabled, 1);
+        wrapper.eq(CxAlertConfig::getConfigCode, configCode)
+                .eq(CxAlertConfig::getIsActive, 1);
         CxAlertConfig config = getOne(wrapper);
-        return config != null ? config.getAlertName() : null;
+        return config != null ? config.getConfigValue() : null;
     }
 
     @Override

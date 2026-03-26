@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * 动态调整服务接口
- * 
+ *
  * 实现排程执行过程中的动态调整：
  * - 交班库存检查
  * - 计划量微调
@@ -75,7 +75,7 @@ public interface DynamicAdjustService {
      * @param nextShiftCode     下个班次编码
      * @return 是否调整成功
      */
-    boolean adjustPlanQuantity(String lowStockMaterial, String highStockMaterial, 
+    boolean adjustPlanQuantity(String lowStockMaterial, String highStockMaterial,
                                LocalDateTime scheduleDate, String nextShiftCode);
 
     /**
@@ -147,12 +147,47 @@ public interface DynamicAdjustService {
     /**
      * 班次调整结果
      */
-    @lombok.Data
     class ShiftAdjustResult {
         private boolean adjusted;
         private List<String> adjustedMaterials;
         private List<String> warningMaterials;
         private String message;
+
+        public boolean isAdjusted() {
+            return adjusted;
+        }
+
+        public boolean getAdjusted() {
+            return adjusted;
+        }
+
+        public void setAdjusted(boolean adjusted) {
+            this.adjusted = adjusted;
+        }
+
+        public List<String> getAdjustedMaterials() {
+            return adjustedMaterials;
+        }
+
+        public void setAdjustedMaterials(List<String> adjustedMaterials) {
+            this.adjustedMaterials = adjustedMaterials;
+        }
+
+        public List<String> getWarningMaterials() {
+            return warningMaterials;
+        }
+
+        public void setWarningMaterials(List<String> warningMaterials) {
+            this.warningMaterials = warningMaterials;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
     }
 
     /**

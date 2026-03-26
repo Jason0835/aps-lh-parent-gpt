@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service;
 
 import com.zlt.aps.cx.dto.ScheduleContextDTO;
+import com.zlt.aps.cx.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -236,7 +237,6 @@ public interface CoreScheduleAlgorithmService {
     @lombok.Data
     class MachineAllocationResult {
         private String machineCode;
-        private String machineName;
         private String machineType;
         private Integer dailyCapacity;
         private Integer usedCapacity;
@@ -244,6 +244,8 @@ public interface CoreScheduleAlgorithmService {
         private Integer assignedTypes;
         private List<TaskAllocation> taskAllocations;
         private String currentStructure;
+        /** 精度计划（如果该机台当天有精度计划） */
+        private CxPrecisionPlan precisionPlan;
     }
 
     /**
