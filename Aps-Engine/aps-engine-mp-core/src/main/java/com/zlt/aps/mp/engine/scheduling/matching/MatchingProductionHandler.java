@@ -2554,7 +2554,8 @@ public class MatchingProductionHandler {
         Map<String, MpMonthPlanStatistics> oldProductionStatisticsMap = oldProductionStatisticsList.stream()
                 .filter(s -> StringUtils.isNoneEmpty(s.getStructureName())).collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
-        
+
+        Map<String, SkuDayProductionInfoHelper> skuDayProductionInfoHelperMap;
         // 2、根据结构取出本次需要保存的统计信息
         List<MpMonthPlanStatistics> productionStatisticsList = new ArrayList<>();
         // 2.1、遍历所有结构
@@ -2585,6 +2586,7 @@ public class MatchingProductionHandler {
                 oldProductionStatisticsMap.put(structureName, statistics);
             }
             statistics.setBaseVale(statistics.getId());
+            int totalQty,totalOemQty;
             // 2.1.2、遍历日排产限制
             for (Integer day: daylyCapacityLimitMap.keySet()) {
                 MpDailyCapacityLimitVo daylyCapacityLimit = daylyCapacityLimitMap.get(day);
@@ -2596,6 +2598,17 @@ public class MatchingProductionHandler {
                 statisticsDetailVo.setEmbryoCount(daylyCapacityLimit.getEmbryoCodes().size());
                 statisticsDetailVo.setLhMachines(daylyCapacityLimit.getUsedLhMachines());
                 statisticsDetailVo.setChangeMould(daylyCapacityLimit.getUsedChangeMould());
+                skuDayProductionInfoHelperMap = groupPlanInfo.getDayProductionLimitInfo().get(day).getProductionSkuQtyInfo();
+                totalQty = 0;
+                totalOemQty = 0;
+                for (Entry<String, SkuDayProductionInfoHelper> entrySku : skuDayProductionInfoHelperMap.entrySet()){
+                    totalQty += entrySku.getValue().getSumProductionQty();
+                    if (DayCapacityLimitHelper.checkIsOemBrand(productionContext, entrySku.getValue().getBrand())){
+                        totalOemQty += entrySku.getValue().getSumProductionQty();
+                    }
+                }
+                statisticsDetailVo.setTotalQty(totalQty);
+                statisticsDetailVo.setOemQty(totalOemQty);
                 statistics.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, JSON.toJSONString(statisticsDetailVo));
             }
             productionStatisticsList.add(statistics);

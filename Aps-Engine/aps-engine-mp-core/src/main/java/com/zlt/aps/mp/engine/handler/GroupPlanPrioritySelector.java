@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -16,7 +17,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -65,6 +71,14 @@ public class GroupPlanPrioritySelector {
             return null;
         }
         ProductionPlanGroupInfo selected;
+        //结构优先列表 sandy+ 2026.3.26
+        List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x -> {
+            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
+        }).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(structurePriorityList)){
+            needProductionGroupList = structurePriorityList;
+        }
+
         //高优先级需求SKU个数多的优先
         Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
         List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
@@ -144,14 +158,28 @@ public class GroupPlanPrioritySelector {
             TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_PRO_SIZE_PRIORITY);
             return selected;
         }
+        //==============================================================
+        //3、含有结构优先的 sandy+ 2026.3.26
+        List<ProductionPlanGroupInfo> structurePriorityList = sameProSizeList.stream().filter(x -> {
+            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(structurePriorityList)) {
+            structurePriorityList = sameProSizeList;
+        }
+        if (structurePriorityList.size() == BigDecimal.ONE.intValue()) {
+            ProductionPlanGroupInfo selected = structurePriorityList.get(BigDecimal.ZERO.intValue());
+            TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_STRUCTURE_PRIORITY);
+            return selected;
+        }
+        //==============================================================
         //4、断面宽差值±10 参数
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
-        List<ProductionPlanGroupInfo> sectionWidthList = sameProSizeList.stream().filter(sectionWidthPlan -> sectionWidthPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)).collect(Collectors.toList());
+        List<ProductionPlanGroupInfo> sectionWidthList = structurePriorityList.stream().filter(sectionWidthPlan -> sectionWidthPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(sectionWidthList)) {
-            sectionWidthList = sameProSizeList;
+            sectionWidthList = structurePriorityList;
         }
         if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
-            ProductionPlanGroupInfo selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
+            ProductionPlanGroupInfo selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
             TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY);
             return selected;
         }

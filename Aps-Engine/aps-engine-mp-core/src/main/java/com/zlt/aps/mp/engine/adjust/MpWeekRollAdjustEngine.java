@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.adjust;
 
+import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.JSONValidator;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -20,8 +22,10 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
@@ -174,9 +178,12 @@ public class MpWeekRollAdjustEngine {
         if (PubUtil.isEmpty(dailyCapacityLimitVoMap) || PubUtil.isEmpty(workCalendarMap)){
             return;
         }
+        Map<String, MpMonthPlanStatistics> structureStatisticMap = contextDTO.getStructureStatisticMap();
         Integer dayMaxCapacity = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
         MdmWorkCalendar workCalendar;
+        //0-日计划量,1-硫化机台数,2-贴牌日计划量
+        int[] capacityArr;
         for (Map.Entry<Integer, MpDailyCapacityLimitVo> entry : dailyCapacityLimitVoMap.entrySet()) {
             dailyCapacityLimitVo = entry.getValue();
             workCalendar = workCalendarMap.get(entry.getKey());
@@ -192,7 +199,37 @@ public class MpWeekRollAdjustEngine {
             if (dailyCapacityLimitVo.isOpenProductionFirstDay()){
                 dailyCapacityLimitVo.setMaxDayProductionQty(dayMaxCapacity);
             }
+
+            capacityArr = calcOtherStructureCapacity(contextDTO, structureStatisticMap, entry.getKey());
         }
+    }
+
+    private int[] calcOtherStructureCapacity(MpRollAdjustContextDTO contextDTO, Map<String, MpMonthPlanStatistics> structureStatisticMap, int iDay) {
+        String dayFieldName;
+        String dayStatisticsStr;
+        MpMonthPlanStatistics statistics;
+        MpDayProductionStatisticsDetailVo dayStatistics;
+        //0-日计划量,1-硫化机台数,2-贴牌日计划量
+        int[] resultArr = {0,0,0};
+        for (Map.Entry<String, MpMonthPlanStatistics> entry1 : structureStatisticMap.entrySet()){
+            if (contextDTO.getStructureName().equals(entry1.getKey())){
+                //排除当前结构
+                continue;
+            }
+            dayFieldName = FactoryConstant.DAY_FIELD + iDay;
+            statistics = entry1.getValue();
+            if (statistics == null){
+                continue;
+            }
+            dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldName);
+            if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
+                dayStatistics = JSONObject.parseObject(dayStatisticsStr,MpDayProductionStatisticsDetailVo.class);
+                resultArr[0] += dayStatistics.getTotalQty();
+                resultArr[1] += dayStatistics.getLhMachines();
+                resultArr[2] += dayStatistics.getOemQty();
+            }
+        }
+        return resultArr;
     }
 
     /**
@@ -1313,7 +1350,6 @@ public class MpWeekRollAdjustEngine {
      * @return true-符合总产能，false-不符合总产能
      */
     private boolean checkTotalCapacityLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,String materialCode,MpDailyCapacityLimitVo limitVo){
-        //Integer dayMaxCapacity = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(contextDTO.getFactoryMonthPlanProdFinalList(),limitVo.getMaxDayProductionQty(),checkDay);
         boolean bCheck = dayTotalCapacityChecker.doCheck();
         String hint = bCheck ? "满足":"不满足,退出！";

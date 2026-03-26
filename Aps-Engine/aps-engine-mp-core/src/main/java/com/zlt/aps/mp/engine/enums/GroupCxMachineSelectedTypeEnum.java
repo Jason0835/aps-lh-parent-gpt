@@ -36,7 +36,12 @@ public enum GroupCxMachineSelectedTypeEnum {
     /**
      * 06 历史生产质量优先
      */
-    HISTORY_QUALITY_PRIORITY("06", "历史生产质量优先");
+    HISTORY_QUALITY_PRIORITY("06", "历史生产质量优先"),
+
+    /**
+     * 07 含有结构优先
+     */
+    SAME_STRUCTURE_PRIORITY("07", "含有结构优先");
 
     private String selectedType;
 

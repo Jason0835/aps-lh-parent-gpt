@@ -315,6 +315,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //默认可生产
         plan.setCantProduce(YesOrNoEnum.NO.getCode());
         plan.setIsPrioritize(require.getScmPriority());
+        plan.setStructurePriority(require.getStructurePriority());
         //排产为空，则默认可排产
         if (StringUtils.isBlank(require.getIsProduction())) {
             plan.setIsProduction(YesOrNoEnum.YES.getCode());

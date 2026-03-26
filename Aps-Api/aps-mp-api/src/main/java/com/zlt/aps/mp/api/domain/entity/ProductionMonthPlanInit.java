@@ -337,12 +337,20 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private String isUniformity;
 
     /**
-     * 供应链优先级 1 优先 0 不优先
+     * 物料优先 1 优先 0 不优先
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.isPrioritize", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "供应链优先级", name = "isPrioritize")
+    @ApiModelProperty(value = "物料优先", name = "isPrioritize")
     @TableField(value = "IS_PRIORITIZE")
     private String isPrioritize;
+
+    /**
+     * 结构优先 1 优先 0 不优先
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.structurePriority", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "结构优先", name = "structurePriority")
+    @TableField(value = "STRUCTURE_PRIORITY")
+    private String structurePriority;
 
     /**
      * 最小投产量值
