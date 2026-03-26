@@ -272,7 +272,7 @@ public abstract class AbstractDailyCapacityLimit {
                 dailyLhQty = getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
             }
             int tmpCount;
-            if (isDecMould(mpFinalVo,dayField,day1Field)){
+            if (isDecMould(mpFinalVo,dayField,day1Field,day2Field,iDay)){
                 //减模处理：
                 // 取整(日计划量/日单台硫化量)
                 fullMachinesDecMould += dayPlanQty / dailyLhQty;
@@ -574,7 +574,7 @@ public abstract class AbstractDailyCapacityLimit {
                 //40（32+8） 104(每日52)
                 if (remainQty != changeMouldBlockQty || remainQty != changeMouldXBlockQty){
                     int mouldCount = remainQty / changeMouldFirstQty;
-                    //3是换活块32与换模8的倍差
+                    //3是换活块32/8与换模8/8的倍差
                     if (mouldCount > afterMachines && (mouldCount - afterMachines)<3){
                         resultArr[0] = mouldCount;
                         resultArr[3] = mouldCount;
@@ -599,9 +599,10 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mpFinalVo 定稿对象Vo
      * @param dayField 当日计划量字段
      * @param day1Field 昨日计划量字段
+     * @param day2Field 明天计划量字段
      * @return
      */
-    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field){
+    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field,String day2Field, int iDay){
         if (mpFinalVo.getFieldValueByFieldName(dayField) == null){
             return false;
         }
@@ -609,11 +610,13 @@ public abstract class AbstractDailyCapacityLimit {
         // 日计划量
         Integer dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
 
-        //1. 若次日计划量 < 当日计划量
-      /*  if (mpFinalVo.getFieldValueByFieldName(day2Field) != null &&
-                (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) < dayPlanQty) {
-            return true;
-        }*/
+        if (iDay == FactoryConstant.MONTH_START_DAY){
+            //1. 若是1号，采用后置判断 次日计划量 为空时，表示减量
+            if (mpFinalVo.getFieldValueByFieldName(day2Field) == null ||
+                    dayPlanQty > (Integer)mpFinalVo.getFieldValueByFieldName(day2Field)) {
+                return true;
+            }
+        }
 
         //2. 若昨日计划量 > 当日计划量
         if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&

@@ -25,4 +25,14 @@ public class MpDayProductionStatisticsDetailVo implements Serializable {
      * 换模次数
      */
     private Integer changeMould;
+
+    /**
+     * 总计划量
+     */
+    private Integer totalQty;
+
+    /**
+     * 贴牌计划量
+     */
+    private Integer oemQty;
 }

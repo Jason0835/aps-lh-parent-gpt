@@ -132,13 +132,12 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         }
 
         //2.按结构序列化分组
-        //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
         Map<String, List<MpAdjustStructureIn>> adjustStructInMap = contextDTO.getMpAdjustStructureInList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         List<FactoryMonthPlanFinalAdjustVo> newMpFinalList = Collections.synchronizedList(new ArrayList<>());
         List<FactoryMonthPlanFinalAdjustVo> newMpLogList = Collections.synchronizedList(new ArrayList<>());
         List<MpMonthPlanStatistics> monthPlanStatisticsResultList = Collections.synchronizedList(new ArrayList<>());
-        List<Future> futureList = new ArrayList<>();
+        ///List<Future> futureList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         String structureCondi = contextDTO.getStructureName();
         for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
@@ -151,7 +150,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
             final String currentStructureName = entry.getKey();
             final List<MpAdjustStructureIn> currentAdjustList = new ArrayList<>(entry.getValue());
-            Future future = ThreadPoolManager.getInstance().submit(() -> {
+            //Future future = ThreadPoolManager.getInstance().submit(() -> {
                 //2.1 初始结构上下文
                 MpRollAdjustContextDTO copyContextDTO = copyContext(contextDTO,currentStructureName);
                 List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = new ArrayList<>(mpProdFinalMap.get(copyContextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(currentStructureName));
@@ -188,18 +187,18 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 newMpLogList.addAll(copyContextDTO.getAdjustProcLogList());
 
                 //2.7 构建月计划统计结果
-                List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(copyContextDTO.getDailyCapacityLimitVoMap(), oneStructMpFinalList, copyContextDTO.getOneStructureAllocationList());
-                monthPlanStatisticsResultList.addAll(monthPlanStatisticsList);
+                MpMonthPlanStatistics monthPlanStatisticsVo = buildMonthPlanStatistics(copyContextDTO, oneStructMpFinalList);
+                monthPlanStatisticsResultList.add(monthPlanStatisticsVo);
 
                 //2.8 保存调整日志
                 saveMpAdjustLog(copyContextDTO);
 
-                return currentStructureName;
-            });
-            futureList.add(future);
+                //return currentStructureName;
+            //});
+            //futureList.add(future);
         }
 
-        futureList.forEach(f -> {
+        /*futureList.forEach(f -> {
             try {
                 f.get();
             } catch (Exception e) {
@@ -210,7 +209,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 // 只抛出消息，不带类名
                 throw new BusinessException(errorMsg);
             }
-        });
+        });*/
         contextDTO.setSaveMpProdFinalList(newMpFinalList);
         contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);

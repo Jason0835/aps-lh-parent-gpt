@@ -10,6 +10,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.impl.MpWeekAdjustFactory;
@@ -34,9 +35,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -219,9 +224,34 @@ public class MpWeekRollAdjustController extends BaseController {
         List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
         String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode())).findFirst().get().getDictLabel();
         contextDTO.setFactoryName(factoryName);
+        //初始总的硫化机台数
+        contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
+        //设置OEM配置集合
+        initOemParam(contextDTO);
+        //设置结构统计
+        contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO));
+
         // 加载搭配排产的必要基础数据
         matchingProductionHandler.initAdjustContextDTO(contextDTO);
         return contextDTO;
+    }
+
+    /**
+     * 初始OEM相关参数
+     * @param contextDTO
+     */
+    private void initOemParam(MpRollAdjustContextDTO contextDTO) {
+        String oemBrandConfig = (String) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        Set<String> oemBrandConfigSet = Collections.emptySet();
+        if (!StringUtil.isEmptyWithTrim(oemBrandConfig)){
+            oemBrandConfigSet = Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        }
+        contextDTO.setOemBrandConfigSet(oemBrandConfigSet);
+        if (contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()) == null){
+            contextDTO.setTotalOemQtY(0);
+        }else{
+            contextDTO.setTotalOemQtY((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+        }
     }
 
     /**

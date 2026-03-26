@@ -2,9 +2,11 @@ package com.zlt.aps.mp.adjust.service;
 
 
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -56,6 +58,13 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
     List<MpStructureAllocation> selectMpStructureAllocationList(MpRollAdjustContextDTO contextDTO);
 
     /**
+     * 加载结构统计
+     * @param contextDTO
+     * @return
+     */
+    Map<String, MpMonthPlanStatistics> loadMpMonthPlanStatistics(MpRollAdjustContextDTO contextDTO);
+
+    /**
      * 初始锁定日
      * @param contextDTO 周程滚动调整上下文对象
      */
@@ -85,4 +94,11 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
      * @return
      */
     List<MdmStructureLhRatio> getStructureLhRatio(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 获取硫化机台数
+     * @param contextDTO
+     * @return
+     */
+    Integer getLhMachineCount(MpRollAdjustContextDTO contextDTO);
 }

@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.api.domain.dto;
 
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.capacity.MpStructureUsedCapacityVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
@@ -11,6 +12,7 @@ import lombok.Data;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Sandy
@@ -90,6 +92,15 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "结构收尾日")
     private Integer structureDeadLine;
+
+    @ApiModelProperty(value = "硫化机台数")
+    private Integer totalLhMachines;
+
+    @ApiModelProperty(value = "贴牌配置")
+    private Set<String> oemBrandConfigSet;
+
+    @ApiModelProperty(value = "OEM总数")
+    private Integer totalOemQtY;
 
     @ApiModelProperty(value = "SKU原余量未满的消息模板")
     private String msgTemplateWithRemainQtyNoFull;
@@ -198,4 +209,8 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "结构硫化配比")
     private List<MdmStructureLhRatio> structureLhRatio;
+
+    @ApiModelProperty(value = "结构统计")
+    private Map<String,MpMonthPlanStatistics> structureStatisticMap;
+
 }

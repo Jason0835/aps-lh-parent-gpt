@@ -2087,7 +2087,7 @@ public class MpWeekRollAdjustEngine {
         int dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
         int fullMachines = dayPlanQty / dailyLhQty;
         int otherMachines;
-        if (adjustDailyCapacityLimitObj.isDecMould(mpFinalVo,dayField,day1Field)){
+        if (adjustDailyCapacityLimitObj.isDecMould(mpFinalVo,dayField,day1Field,day2Field,iDay)){
             // 统计有余数的SKU个数
             otherMachines = dayPlanQty % dailyLhQty > 0 ? 1:0;
         }else{

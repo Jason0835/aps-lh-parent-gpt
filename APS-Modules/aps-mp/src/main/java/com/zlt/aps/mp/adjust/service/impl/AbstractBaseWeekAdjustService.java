@@ -513,34 +513,48 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     /**
      * 构建月计划统计结果
-     * @param dailyCapacityMap 日产能限制Map（key=1-31日期，value=日产能限制实体）
      * @param mpProdFinalList  月计划定稿列表
-     * @param oneStructureAllocationList 月计划结构转产表-单结构列表
      * @return 统计结果列表
      */
-    protected List<MpMonthPlanStatistics> buildMonthPlanStatistics(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                                   List<MpStructureAllocation> oneStructureAllocationList) {
-        List<MpMonthPlanStatistics> resultList = new ArrayList<>();
+    protected MpMonthPlanStatistics buildMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = contextDTO.getDailyCapacityLimitVoMap();
+        List<MpStructureAllocation> oneStructureAllocationList = contextDTO.getOneStructureAllocationList();
         if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList)) {
             log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划结构转产表-单结构列表为空，跳过不处理");
-            return resultList;
+            return null;
         }
+
         FactoryMonthPlanFinalAdjustVo monthPlan = new FactoryMonthPlanFinalAdjustVo();
         if (PubUtil.isNotEmpty(mpProdFinalList)) {
             monthPlan = mpProdFinalList.get(0);
         }
-        for (MpStructureAllocation structureAllocation : oneStructureAllocationList) {
-            MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
-            // 设置月计划统计相关字段
-            setMonthPlanStatisticsField(monthPlan, structureAllocation, statistics);
-            // 遍历日期，设置每个dayN字段
-            for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
-                setDayField(statistics, day, dailyCapacityMap);
+        MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
+        // 设置月计划统计相关字段
+        setMonthPlanStatisticsField(monthPlan, oneStructureAllocationList.get(0), statistics);
+        // 遍历日期，设置每个dayN字段
+        String dayField;
+        int totalQty,oemQty;
+        for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+            totalQty = 0;
+            oemQty = 0;
+            for (FactoryMonthPlanFinalAdjustVo prodFinal : mpProdFinalList){
+                dayField = FactoryConstant.DAY_FIELD + day;
+                if (prodFinal.getFieldValueByFieldName(dayField) == null){
+                    continue;
+                }
+                totalQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
+                if (contextDTO.getOemBrandConfigSet().contains(prodFinal.getBrand())){
+                    //若是贴牌，计划量进行累计
+                    oemQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
+                }
             }
-            // 添加到结果列表
-            resultList.add(statistics);
+
+            setDayField(statistics, day, dailyCapacityMap,totalQty,oemQty);
         }
-        return resultList;
+        //同步更新上下文的结构统计
+        contextDTO.getStructureStatisticMap().put(contextDTO.getStructureName(),statistics);
+        return statistics;
     }
 
     /**
@@ -565,8 +579,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param statistics 月计划统计实体
      * @param day 日期
      * @param capacityMap 日产能限制Map
+     * @param totalQty 日总计划量
+     * @param oemQty OEM日总计划量
      */
-    private void setDayField(MpMonthPlanStatistics statistics, int day, Map<Integer, MpDailyCapacityLimitVo> capacityMap) {
+    private void setDayField(MpMonthPlanStatistics statistics, int day, Map<Integer, MpDailyCapacityLimitVo> capacityMap,int totalQty,int oemQty) {
         MpDailyCapacityLimitVo capacityVo = capacityMap == null ? null : capacityMap.get(day);
         if (capacityVo == null) {
             return;
@@ -575,6 +591,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
         dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
         dayProductionStatisticsDetailVo.setChangeMould(Convert.toInt(capacityVo.getUsedChangeMould(), 0).equals(0) ? null : capacityVo.getUsedChangeMould());
+        dayProductionStatisticsDetailVo.setTotalQty(totalQty);
+        dayProductionStatisticsDetailVo.setOemQty(oemQty);
+
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 
