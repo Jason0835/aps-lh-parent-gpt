@@ -571,9 +571,11 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[3] = afterMachines;
                 //例子：
                 //16 46
+                //40（32+8） 104(每日52)
                 if (remainQty != changeMouldBlockQty || remainQty != changeMouldXBlockQty){
                     int mouldCount = remainQty / changeMouldFirstQty;
-                    if (mouldCount > afterMachines){
+                    //3是换活块32与换模8的倍差
+                    if (mouldCount > afterMachines && (mouldCount - afterMachines)<3){
                         resultArr[0] = mouldCount;
                         resultArr[3] = mouldCount;
                     }
