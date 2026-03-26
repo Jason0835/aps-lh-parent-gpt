@@ -14,7 +14,7 @@
     <modules>
         <module>aps-mp</module>
         <module>aps-tm</module>
-        <module>aps-cx-lh</module>
+<!--        <module>aps-cx-lh</module>-->
         <module>aps-tc</module>
         <module>aps-nc</module>
         <module>aps-cd15</module>
