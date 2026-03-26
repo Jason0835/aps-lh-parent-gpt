@@ -50,6 +50,7 @@ public class SwaggerConfig {
                 .apiInfo(apiInfo())
                 .select()
                 .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.cx"))
-                .build();
+                .build()
+                .groupName("APS-CX-MODULES");
     }
 }

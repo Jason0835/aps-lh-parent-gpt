@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.dto.ScheduleGenerateDTO;
 import com.zlt.aps.cx.dto.ScheduleQueryDTO;
-import com.zlt.aps.cx.dto.ScheduleResultDTO;
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
 import io.swagger.annotations.Api;
