@@ -27,7 +27,6 @@ import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
