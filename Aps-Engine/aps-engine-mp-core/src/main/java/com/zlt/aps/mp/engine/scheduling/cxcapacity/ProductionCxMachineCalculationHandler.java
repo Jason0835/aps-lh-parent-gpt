@@ -424,9 +424,10 @@ public class ProductionCxMachineCalculationHandler {
         if (releaseCount <= BigDecimal.ZERO.intValue()) {
             return cxCapacityInfoList;
         }
-        //根据分配信息，优先释放配比大的，成型编号大的
-        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount)
-                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode));
+        //根据分配信息，优先释放通用性好的（固定结构多的），配比大的，成型编号大的 sandy+ 2026.3.26
+        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getFixStructureCount,Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount,Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode,Comparator.nullsLast(Comparator.naturalOrder())));
         Integer minAllocationDays = initReleaseInfo.getEarliestConclusionDay();
         //月初就可释放，则直接释放对应
         if (ProductionConstant.MONTH_START_DAY.equals(minAllocationDays)) {
