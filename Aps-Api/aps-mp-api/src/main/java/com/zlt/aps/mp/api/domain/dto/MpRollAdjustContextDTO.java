@@ -1,7 +1,6 @@
 package com.zlt.aps.mp.api.domain.dto;
 
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
-import com.zlt.aps.mp.api.domain.capacity.MpStructureUsedCapacityVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;

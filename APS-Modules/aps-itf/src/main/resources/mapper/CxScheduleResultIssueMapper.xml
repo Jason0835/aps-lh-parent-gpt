@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.CxScheduleResultIssueMapper">
+
+    <insert id="batchInsertCxScheduleResult" parameterType="list">
+        INSERT INTO MES_CX_SCHEDULE_RESULT (
+        ID, CX_BATCH_NO, ORDER_NO, SCHEDULE_DATE, MACHINE_CODE, MACHINE_NAME,
+        LH_MACHINE_CODE, LH_MACHINE_NAME, AVAILABLE_MOLD_QTY, MATERIAL_CODE,
+        MES_MATERIAL_CODE, SPEC_DESC, EMBRYO_CODE, EMBRYO_SPEC_DESC,
+        CLASS1_PLAN_QTY_SEQ, CLASS1_ANALYSIS_INPUT, CLASS1_ANALYSIS, CLASS1_PLAN_QTY,
+        CLASS1_EXAMPLE_TYPE, CLASS1_EXAMPLE_NO,
+        CLASS2_PLAN_QTY_SEQ, CLASS2_ANALYSIS_INPUT, CLASS2_ANALYSIS, CLASS2_PLAN_QTY,
+        CLASS2_EXAMPLE_TYPE, CLASS2_EXAMPLE_NO,
+        CLASS3_PLAN_QTY_SEQ, CLASS3_ANALYSIS_INPUT, CLASS3_ANALYSIS, CLASS3_PLAN_QTY,
+        CLASS3_EXAMPLE_TYPE, CLASS3_EXAMPLE_NO,
+        DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.id} AS ID,
+            #{item.cxBatchNo} AS CX_BATCH_NO,
+            #{item.orderNo} AS ORDER_NO,
+            #{item.scheduleDate} AS SCHEDULE_DATE,
+            #{item.machineCode} AS MACHINE_CODE,
+            #{item.machineName} AS MACHINE_NAME,
+            #{item.lhMachineCode} AS LH_MACHINE_CODE,
+            #{item.lhMachineName} AS LH_MACHINE_NAME,
+            #{item.availableMoldQty} AS AVAILABLE_MOLD_QTY,
+            #{item.materialCode} AS MATERIAL_CODE,
+            #{item.mesMaterialCode} AS MES_MATERIAL_CODE,
+            #{item.specDesc} AS SPEC_DESC,
+            #{item.embryoCode} AS EMBRYO_CODE,
+            #{item.embryoSpecDesc} AS EMBRYO_SPEC_DESC,
+            #{item.class1PlanQtySeq} AS CLASS1_PLAN_QTY_SEQ,
+            #{item.class1AnalysisInput} AS CLASS1_ANALYSIS_INPUT,
+            #{item.class1Analysis} AS CLASS1_ANALYSIS,
+            #{item.class1PlanQty} AS CLASS1_PLAN_QTY,
+            #{item.class1ExampleType} AS CLASS1_EXAMPLE_TYPE,
+            #{item.class1ExampleNo} AS CLASS1_EXAMPLE_NO,
+            #{item.class2PlanQtySeq} AS CLASS2_PLAN_QTY_SEQ,
+            #{item.class2AnalysisInput} AS CLASS2_ANALYSIS_INPUT,
+            #{item.class2Analysis} AS CLASS2_ANALYSIS,
+            #{item.class2PlanQty} AS CLASS2_PLAN_QTY,
+            #{item.class2ExampleType} AS CLASS2_EXAMPLE_TYPE,
+            #{item.class2ExampleNo} AS CLASS2_EXAMPLE_NO,
+            #{item.class3PlanQtySeq} AS CLASS3_PLAN_QTY_SEQ,
+            #{item.class3AnalysisInput} AS CLASS3_ANALYSIS_INPUT,
+            #{item.class3Analysis} AS CLASS3_ANALYSIS,
+            #{item.class3PlanQty} AS CLASS3_PLAN_QTY,
+            #{item.class3ExampleType} AS CLASS3_EXAMPLE_TYPE,
+            #{item.class3ExampleNo} AS CLASS3_EXAMPLE_NO,
+            #{item.dataVersion} AS DATA_VERSION,
+            #{item.companyCode} AS COMPANY_CODE,
+            #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+        SELECT 1 FROM MES_CX_SCHEDULE_RESULT
+        WHERE CX_BATCH_NO = t.CX_BATCH_NO AND SCHEDULE_DATE = t.SCHEDULE_DATE AND DATA_VERSION = t.DATA_VERSION
+        )
+    </insert>
+
+    <update id="batchUpdateCxScheduleResult">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE MES_CX_SCHEDULE_RESULT SET
+            ORDER_NO = #{item.orderNo},
+            MACHINE_CODE = #{item.machineCode},
+            MACHINE_NAME = #{item.machineName},
+            LH_MACHINE_CODE = #{item.lhMachineCode},
+            LH_MACHINE_NAME = #{item.lhMachineName},
+            AVAILABLE_MOLD_QTY = #{item.availableMoldQty},
+            MATERIAL_CODE = #{item.materialCode},
+            MES_MATERIAL_CODE = #{item.mesMaterialCode},
+            SPEC_DESC = #{item.specDesc},
+            EMBRYO_CODE = #{item.embryoCode},
+            EMBRYO_SPEC_DESC = #{item.embryoSpecDesc},
+            CLASS1_PLAN_QTY_SEQ = #{item.class1PlanQtySeq},
+            CLASS1_ANALYSIS_INPUT = #{item.class1AnalysisInput},
+            CLASS1_ANALYSIS = #{item.class1Analysis},
+            CLASS1_PLAN_QTY = #{item.class1PlanQty},
+            CLASS1_EXAMPLE_TYPE = #{item.class1ExampleType},
+            CLASS1_EXAMPLE_NO = #{item.class1ExampleNo},
+            CLASS2_PLAN_QTY_SEQ = #{item.class2PlanQtySeq},
+            CLASS2_ANALYSIS_INPUT = #{item.class2AnalysisInput},
+            CLASS2_ANALYSIS = #{item.class2Analysis},
+            CLASS2_PLAN_QTY = #{item.class2PlanQty},
+            CLASS2_EXAMPLE_TYPE = #{item.class2ExampleType},
+            CLASS2_EXAMPLE_NO = #{item.class2ExampleNo},
+            CLASS3_PLAN_QTY_SEQ = #{item.class3PlanQtySeq},
+            CLASS3_ANALYSIS_INPUT = #{item.class3AnalysisInput},
+            CLASS3_ANALYSIS = #{item.class3Analysis},
+            CLASS3_PLAN_QTY = #{item.class3PlanQty},
+            CLASS3_EXAMPLE_TYPE = #{item.class3ExampleType},
+            CLASS3_EXAMPLE_NO = #{item.class3ExampleNo},
+            COMPANY_CODE = #{item.companyCode},
+            FACTORY_CODE = #{item.factoryCode}
+            WHERE CX_BATCH_NO = #{item.cxBatchNo} AND SCHEDULE_DATE = #{item.scheduleDate} AND DATA_VERSION = #{item.dataVersion}
+        </foreach>
+    </update>
+
+    <delete id="deleteByScheduleDateRange">
+        DELETE FROM MES_CX_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE BETWEEN #{startDate} AND #{endDate}
+        AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+    <delete id="deleteByScheduleDate">
+        DELETE FROM MES_CX_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+        AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+    <insert id="insertCxScheduleResult">
+        INSERT INTO MES_CX_SCHEDULE_RESULT (
+            ID, CX_BATCH_NO, ORDER_NO, SCHEDULE_DATE, MACHINE_CODE, MACHINE_NAME,
+            LH_MACHINE_CODE, LH_MACHINE_NAME, AVAILABLE_MOLD_QTY, MATERIAL_CODE,
+            MES_MATERIAL_CODE, SPEC_DESC, EMBRYO_CODE, EMBRYO_SPEC_DESC,
+            CLASS1_PLAN_QTY_SEQ, CLASS1_ANALYSIS_INPUT, CLASS1_ANALYSIS, CLASS1_PLAN_QTY,
+            CLASS1_EXAMPLE_TYPE, CLASS1_EXAMPLE_NO,
+            CLASS2_PLAN_QTY_SEQ, CLASS2_ANALYSIS_INPUT, CLASS2_ANALYSIS, CLASS2_PLAN_QTY,
+            CLASS2_EXAMPLE_TYPE, CLASS2_EXAMPLE_NO,
+            CLASS3_PLAN_QTY_SEQ, CLASS3_ANALYSIS_INPUT, CLASS3_ANALYSIS, CLASS3_PLAN_QTY,
+            CLASS3_EXAMPLE_TYPE, CLASS3_EXAMPLE_NO,
+            DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        ) VALUES (
+            #{item.id}, #{item.cxBatchNo}, #{item.orderNo}, #{item.scheduleDate}, #{item.machineCode}, #{item.machineName},
+            #{item.lhMachineCode}, #{item.lhMachineName}, #{item.availableMoldQty}, #{item.materialCode},
+            #{item.mesMaterialCode}, #{item.specDesc}, #{item.embryoCode}, #{item.embryoSpecDesc},
+            #{item.class1PlanQtySeq}, #{item.class1AnalysisInput}, #{item.class1Analysis}, #{item.class1PlanQty},
+            #{item.class1ExampleType}, #{item.class1ExampleNo},
+            #{item.class2PlanQtySeq}, #{item.class2AnalysisInput}, #{item.class2Analysis}, #{item.class2PlanQty},
+            #{item.class2ExampleType}, #{item.class2ExampleNo},
+            #{item.class3PlanQtySeq}, #{item.class3AnalysisInput}, #{item.class3Analysis}, #{item.class3PlanQty},
+            #{item.class3ExampleType}, #{item.class3ExampleNo},
+            #{item.dataVersion}, #{item.companyCode}, #{item.factoryCode}
+        )
+    </insert>
+
+    <update id="updateByScheduleDateAndMachine">
+        UPDATE MES_CX_SCHEDULE_RESULT SET
+            CX_BATCH_NO = #{item.cxBatchNo},
+            ORDER_NO = #{item.orderNo},
+            MACHINE_NAME = #{item.machineName},
+            LH_MACHINE_CODE = #{item.lhMachineCode},
+            LH_MACHINE_NAME = #{item.lhMachineName},
+            AVAILABLE_MOLD_QTY = #{item.availableMoldQty},
+            MATERIAL_CODE = #{item.materialCode},
+            MES_MATERIAL_CODE = #{item.mesMaterialCode},
+            SPEC_DESC = #{item.specDesc},
+            EMBRYO_CODE = #{item.embryoCode},
+            EMBRYO_SPEC_DESC = #{item.embryoSpecDesc},
+            CLASS1_PLAN_QTY_SEQ = #{item.class1PlanQtySeq},
+            CLASS1_ANALYSIS_INPUT = #{item.class1AnalysisInput},
+            CLASS1_ANALYSIS = #{item.class1Analysis},
+            CLASS1_PLAN_QTY = #{item.class1PlanQty},
+            CLASS1_EXAMPLE_TYPE = #{item.class1ExampleType},
+            CLASS1_EXAMPLE_NO = #{item.class1ExampleNo},
+            CLASS2_PLAN_QTY_SEQ = #{item.class2PlanQtySeq},
+            CLASS2_ANALYSIS_INPUT = #{item.class2AnalysisInput},
+            CLASS2_ANALYSIS = #{item.class2Analysis},
+            CLASS2_PLAN_QTY = #{item.class2PlanQty},
+            CLASS2_EXAMPLE_TYPE = #{item.class2ExampleType},
+            CLASS2_EXAMPLE_NO = #{item.class2ExampleNo},
+            CLASS3_PLAN_QTY_SEQ = #{item.class3PlanQtySeq},
+            CLASS3_ANALYSIS_INPUT = #{item.class3AnalysisInput},
+            CLASS3_ANALYSIS = #{item.class3Analysis},
+            CLASS3_PLAN_QTY = #{item.class3PlanQty},
+            CLASS3_EXAMPLE_TYPE = #{item.class3ExampleType},
+            CLASS3_EXAMPLE_NO = #{item.class3ExampleNo},
+            COMPANY_CODE = #{item.companyCode},
+            FACTORY_CODE = #{item.factoryCode}
+        WHERE SCHEDULE_DATE = #{item.scheduleDate}
+        AND MACHINE_CODE = #{item.machineCode}
+        AND DATA_VERSION = #{item.dataVersion}
+    </update>
+
+</mapper>
