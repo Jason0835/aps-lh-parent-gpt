@@ -17,10 +17,12 @@ import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
@@ -36,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -68,6 +72,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
     @Autowired
     private MpStructureAllocationMapper mpStructureAllocationMapper;
+    @Autowired
+    private MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
@@ -115,48 +121,48 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * 获取导出数据
      */
     @Override
-    public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult,
+    public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult params,
                                                                       boolean isAllMaterial) {
         // 1、加载构建导出列表的各项数据
         // 1.1、加载月计划表头信息
-        QueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new QueryWrapper<>();
-        resultQueryWrapper.select("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
-        resultQueryWrapper.groupBy("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
-        resultQueryWrapper.eq("FACTORY_CODE", factoryMonthPlanMouldDayResult.getFactoryCode());
-        resultQueryWrapper.eq("PRODUCTION_VERSION", factoryMonthPlanMouldDayResult.getProductionVersion());
-        List<FactoryMonthPlanMouldDayResult> headList = factoryMonthPlanMouldDayResultEntityMapper.selectList(resultQueryWrapper);
-        if (!CollectionUtils.isEmpty(headList)) {
-            FactoryMonthPlanMouldDayResult head = headList.get(0);
-            factoryMonthPlanMouldDayResult.setYear(head.getYear());
-            factoryMonthPlanMouldDayResult.setMonth(head.getMonth());
-            factoryMonthPlanMouldDayResult.setYearMonth(head.getYearMonth());
-            factoryMonthPlanMouldDayResult.setProductTypeCode(head.getProductTypeCode());
-            factoryMonthPlanMouldDayResult.setMonthPlanVersion(head.getMonthPlanVersion());
-        }
+        this.loadExportTableData(params);
         // 1.2、加载月计划模具排产明细
         List<FactoryMonthPlanMouldDayResultExportVo> recordList = factoryMonthPlanMouldDayResultEntityMapper
-                .getExportList(factoryMonthPlanMouldDayResult, isAllMaterial);
+                .getExportList(params, isAllMaterial);
         if (CollectionUtils.isEmpty(recordList)) {
             return recordList;
         }
         // 1.3、加载本次版本已生成的统计记录
-        String productionVersion = factoryMonthPlanMouldDayResult.getProductionVersion();
-        Map<String, MpMonthPlanStatistics> statisticsMap = this.loadMpMonthPlanStatistics(factoryMonthPlanMouldDayResult,
+        String productionVersion = params.getProductionVersion();
+        Map<String, MpMonthPlanStatistics> statisticsMap = this.loadMpMonthPlanStatistics(params,
                 productionVersion);
         // 1.4、加载上个月的统计记录
         String lastProductionVersion = recordList.stream().map(FactoryMonthPlanMouldDayResultExportVo::getLastProductionVersion).filter(Objects::nonNull).findAny().orElse(null);
-        Map<String, MpMonthPlanStatistics> lastStatisticsMap = this.loadMpMonthPlanStatistics(factoryMonthPlanMouldDayResult,
+        Map<String, MpMonthPlanStatistics> lastStatisticsMap = this.loadMpMonthPlanStatistics(params,
                 lastProductionVersion);
-        
         // 1.5、加载结构排产数据
         LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
-        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, factoryMonthPlanMouldDayResult.getProductionVersion());
-        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
+        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, params.getProductionVersion());
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
         Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
-        
+        // 1.6、加载型腔数活块数
+//        LocalDate monthStart = LocalDate.of(params.getYear(), params.getMonth(), ProductionConstant.MONTH_START_DAY);
+//        DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth()))
+        Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
+        Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
+        if (isAllMaterial) {
+            List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
+                    .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
+                            null, null);
+            if (CollectionUtils.isNotEmpty(moldResult)) {
+                cavityResults = moldResult.get(0).getCavityResults();
+                insertResults = moldResult.get(0).getInsertResults();
+            }
+        }
+
         // 2、构建导出总表
         List<FactoryMonthPlanMouldDayResultExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
         List<FactoryMonthPlanMouldDayResultExportVo> subtotalList = new ArrayList<>(); // 小计列表
@@ -182,6 +188,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
 
             // 2.1.2、把明细记录添加到总表
+            Map<String, Integer> maxMouldCavityQtyMap = new HashMap<>(); // 主花纹的最大型腔数
+            Map<String, Integer> maxTypeBlockQtyMap = new HashMap<>(); // 物料的最大活块数
             for (FactoryMonthPlanMouldDayResultExportVo result: structureList) { // 部分数据额外处理
                 // 2.1.2.1、日硫化量调整为双模
                 if (result.getDayVulcanizationQty() != null) {
@@ -196,7 +204,31 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 Integer totalQty = Optional.ofNullable(result.getTotalQty()).orElse(0);
                 Integer actualOrderUnproduced = heightQty + midQty - totalQty;
                 result.setActualOrderUnproduced(actualOrderUnproduced > 0? actualOrderUnproduced: 0);
+                // 2.1.2.4、补充型腔数
+                if (result.getMouldCavityQty() == null) {
+                    result.setMouldCavityQty(cavityResults.getOrDefault(result.getStructureName() + result.getMainPattern(), 0));
+                }
+                // 2.1.2.5、记录主花纹的最大型腔数
+                Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(result.getMainPattern(), 0);
+                maxMouldCavityQtyMap.put(result.getMainPattern(), Math.max(maxMouldCavityQty, result.getMouldCavityQty()));
+                // 2.1.2.5 补充活块数
+                if (result.getTypeBlockQty() == null) {
+                    result.setTypeBlockQty(insertResults.getOrDefault(result.getMaterialDesc(), 0));
+                }
+                // 2.1.2.6、记录物料的最大活块数
+                Integer maxTypeBlockQty = maxTypeBlockQtyMap.getOrDefault(result.getMaterialDesc(), 0);
+                maxTypeBlockQtyMap.put(result.getMaterialDesc(), Math.max(maxTypeBlockQty, result.getTypeBlockQty()));
             }
+            // 2.1.2.6、重新对结构内的数据排序：主花纹分组，按型腔数倒序、主花纹、最大活块数倒序，主花纹组内按型腔数倒序、活块数倒序排序
+            structureList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
+                s.setMaxMouldCavityQty(maxMouldCavityQtyMap.getOrDefault(s.getMainPattern(), 0));
+                s.setMaxTypeBlockQty(maxTypeBlockQtyMap.getOrDefault(s.getMaterialDesc(), 0));
+            });
+            structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaxMouldCavityQty, Comparator.reverseOrder()) // 最大型腔数倒序
+                    .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))) // 主花纹
+                    .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaxTypeBlockQty, Comparator.reverseOrder())) // 最大活块数倒序
+                    .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))) // 物料描述
+                    );// 排序
             totalRecordList.addAll(structureList);
 
             // 2.1.3、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
@@ -253,6 +285,27 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
         totalRecordList.add(changeMouldStatisticsRecord);
         return totalRecordList;
+    }
+
+    /**
+     * 加载月计划表头信息
+     * @param params
+     */
+    private void loadExportTableData(FactoryMonthPlanMouldDayResult params) {
+        QueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new QueryWrapper<>();
+        resultQueryWrapper.select("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
+        resultQueryWrapper.groupBy("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
+        resultQueryWrapper.eq("FACTORY_CODE", params.getFactoryCode());
+        resultQueryWrapper.eq("PRODUCTION_VERSION", params.getProductionVersion());
+        List<FactoryMonthPlanMouldDayResult> headList = factoryMonthPlanMouldDayResultEntityMapper.selectList(resultQueryWrapper);
+        if (!CollectionUtils.isEmpty(headList)) {
+            FactoryMonthPlanMouldDayResult head = headList.get(0);
+            params.setYear(head.getYear());
+            params.setMonth(head.getMonth());
+            params.setYearMonth(head.getYearMonth());
+            params.setProductTypeCode(head.getProductTypeCode());
+            params.setMonthPlanVersion(head.getMonthPlanVersion());
+        }
     }
 
     /**
