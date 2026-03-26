@@ -376,4 +376,34 @@ public class MesItfController {
         }
         return mesItfService.syncMouldCleanPlan(syncDataLogs);
     }
+
+    /**
+     * 同步结构整车胎面配置
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步结构整车胎面配置")
+    @PostMapping("/syncStructureTreadConfig")
+    public AjaxResult syncStructureTreadConfig(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncStructureTreadConfig(syncDataLogs);
+    }
+
+    /**
+     * 同步生胎库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步生胎库存")
+    @PostMapping("/syncMesCxStock")
+    public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMesCxStock(syncDataLogs);
+    }
 }

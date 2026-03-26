@@ -518,6 +518,13 @@ public class CxCapacityAllocationHandler {
             //todo 记录日志
             return;
         }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        Set<String> fixedCxMachineSet = Optional.ofNullable(groupPlan.getFixedCxMachineSet()).orElse(Collections.emptySet());
+        if (!CollectionUtils.isEmpty(fixedCxMachineSet) && !fixedCxMachineSet.contains(cxMachineCode)) {
+            String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
+            TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, cxMachineCode, fixedMachineInfo);
+            return;
+        }
         Map<String, MonthPlanStructureLhRatioVo> lhRatioMap = groupPlan.getCxMachineLhRationMap();
         if (CollectionUtils.isEmpty(lhRatioMap)) {
             //todo 记录日志

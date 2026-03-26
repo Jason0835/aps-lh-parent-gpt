@@ -837,6 +837,27 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 判断在productionDay是否可排产productionPlan
+     * 是否达到胎胚种类数限制
+     *
+     * @param productionPlan 排产的计划
+     * @param productionDay  排产日
+     * @return
+     */
+    public boolean isLimitEmbryoCodeCount(MonthPlanProductionRequirePlanVo productionPlan, Integer productionDay) {
+        GroupPlanCxLhCapacityLimitHelper limit = dayProductionLimitInfo.get(productionDay);
+        if (null == limit) {
+            return true;
+        }
+        //20260324 因已经将硫化配比提前计算，故而只需判断胎胚即可
+        Set<String> plannedEmbryoCodeSet = Optional.ofNullable(limit.getProductionEmbryoCodeSet()).orElse(Collections.emptySet());
+        if (plannedEmbryoCodeSet.contains(productionPlan.getEmbryoCode())) {
+            return false;
+        }
+        return plannedEmbryoCodeSet.size() >= limit.getMaxEmbryoCodeCount();
+    }
+
+    /**
      * 一轮排产完毕后，将还有计划的Sku重新标记参与排产
      */
     public void afterProductionResetThisRound() {
@@ -1743,6 +1764,7 @@ public class ProductionPlanGroupInfo {
         if (null == limit) {
             return false;
         }
+        //20260324 因已经将硫化配比提前计算，故而只需判断胎胚即可
         Set<String> plannedEmbryoCodeSet = limit.getProductionEmbryoCodeSet();
         if (plannedEmbryoCodeSet.contains(productionPlan.getEmbryoCode())) {
             if (limit.getUsedLhMachineCount() >= limit.getMaxLhMachineCount()) {
@@ -2219,10 +2241,81 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     private Set<Integer> getEffectiveRange(Context context, Set<Integer> rangeSet) {
+        Set<Integer> stopDaySet = Optional.ofNullable(context.getStopDays()).orElse(Collections.emptySet());
+        //获取当前排产范围本身存在的间断日集合
+        Set<Integer> disContinuitySet = getDisContinuityDayByRange(rangeSet, stopDaySet);
+        //获取与全局硫化机台数可排产日集合
+        Set<Integer> effectiveDaySet = getEffectiveDayByIntersection(context, rangeSet);
+        if (CollectionUtils.isEmpty(effectiveDaySet)) {
+            return Collections.emptySet();
+        }
+        //得到间断日
+        Set<Integer> diffSet = rangeSet.stream().filter(single -> !effectiveDaySet.contains(single)).collect(Collectors.toSet());
+        if (!CollectionUtils.isEmpty(diffSet)) {
+            disContinuitySet.addAll(diffSet);
+        }
+        if (CollectionUtils.isEmpty(disContinuitySet)) {
+            return rangeSet;
+        }
+        List<Integer> diffList = new ArrayList<>(disContinuitySet);
+        //从早到晚
+        diffList.sort(Comparator.comparing(Integer::intValue));
+        for (Integer diffDay : diffList) {
+            //看前面是否有连续时间段
+            Set<Integer> beforeSet = rangeSet.stream().filter(single -> single < diffDay && effectiveDaySet.contains(single)).collect(Collectors.toSet());
+            Set<Integer> findRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, beforeSet, stopDaySet);
+            if (!CollectionUtils.isEmpty(findRangeSet)) {
+                return findRangeSet;
+            }
+            //看后面是否有连续时间段
+            Set<Integer> afterSet = rangeSet.stream().filter(single -> single >= diffDay && effectiveDaySet.contains(single)).collect(Collectors.toSet());
+            findRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, afterSet, stopDaySet);
+            if (!CollectionUtils.isEmpty(findRangeSet)) {
+                return findRangeSet;
+            }
+        }
+        return Collections.emptySet();
+    }
+
+    /**
+     * 获取本身间断的集合
+     *
+     * @param rangeSet   本身的排产日集合
+     * @param stopDaySet 停产日集合
+     * @return
+     */
+    private Set<Integer> getDisContinuityDayByRange(Set<Integer> rangeSet, Set<Integer> stopDaySet) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || CollectionUtils.isEmpty(rangeSet)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> disContinuitySet = new HashSet<>();
+        Set<Integer> realStopDaySet = Optional.ofNullable(stopDaySet).orElse(Collections.emptySet());
+        List<Integer> allProductionDayList = dayProductionLimitInfo.keySet().stream().collect(Collectors.toList());
+        allProductionDayList.sort(Comparator.comparing(Integer::intValue));
+        allProductionDayList.forEach(productionDay -> {
+            if (realStopDaySet.contains(productionDay)) {
+                return;
+            }
+            if (rangeSet.contains(productionDay)) {
+                return;
+            }
+            disContinuitySet.add(productionDay);
+        });
+        return disContinuitySet;
+    }
+
+    /**
+     * 获取与实际使用机台数与全局限制机台数
+     * 不超全局限制机台数的排产日
+     *
+     * @param context  排产上下文
+     * @param rangeSet 分组内可排产日集合
+     * @return
+     */
+    private Set<Integer> getEffectiveDayByIntersection(Context context, Set<Integer> rangeSet) {
         //计算每日的使用硫化机台数
         reCalcMpDailyCapacityLimit(context);
         Set<Integer> effectiveDaySet = new HashSet<>();
-        Set<Integer> stopDaySet = Optional.ofNullable(context.getStopDays()).orElse(Collections.emptySet());
         rangeSet.forEach(productionDay -> {
             //1、取得使用硫化组数
             MpDailyCapacityLimitVo dayUsedDetail = dailyCapacityLimitVoMap.get(productionDay);
@@ -2245,29 +2338,7 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(effectiveDaySet)) {
             return Collections.emptySet();
         }
-        //得到间断日
-        Set<Integer> diffSet = rangeSet.stream().filter(single -> !effectiveDaySet.contains(single)).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(diffSet)) {
-            return rangeSet;
-        }
-        List<Integer> diffList = new ArrayList<>(diffSet);
-        //从早到晚
-        diffList.sort(Comparator.comparing(Integer::intValue));
-        for (Integer diffDay : diffList) {
-            //看前面是否有连续时间段
-            Set<Integer> beforeSet = rangeSet.stream().filter(single -> single < diffDay && effectiveDaySet.contains(single)).collect(Collectors.toSet());
-            Set<Integer> findRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, beforeSet, stopDaySet);
-            if (!CollectionUtils.isEmpty(findRangeSet)) {
-                return findRangeSet;
-            }
-            //看后面是否有连续时间段
-            Set<Integer> afterSet = rangeSet.stream().filter(single -> single >= diffDay && effectiveDaySet.contains(single)).collect(Collectors.toSet());
-            findRangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, afterSet, stopDaySet);
-            if (!CollectionUtils.isEmpty(findRangeSet)) {
-                return findRangeSet;
-            }
-        }
-        return Collections.emptySet();
+        return effectiveDaySet;
     }
 
     /**

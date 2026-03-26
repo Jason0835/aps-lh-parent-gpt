@@ -215,6 +215,26 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加 在排产日最后找到的一个Sku日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到是否[%s]最后一个排产Sku：%s====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param isLast       是否最后一个
+     * @param materialDesc Sku
+     * @return
+     */
+    public static String addIsLastFindSkuLog(Context context, String groupName, boolean isLast, String materialDesc) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到是否[%s]最后一个排产Sku：%s====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isLast, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加在机结构-硫化组排产Sku没有可排产模具日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 没有找到合适的模具====
      *
@@ -231,6 +251,30 @@ public class TbrMouldProductionLogRecorder {
                 groupName, onLineMachineInfo, materialDesc);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构-硫化组排产Sku限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 在[%s]日达到%s限制====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 成型机台编码
+     * @param skuInfo           Sku信息
+     * @param startDay          时间
+     * @param limitType         限制类型
+     * @return
+     */
+    public static String addSkuProductionLimitLog(Context context, String groupName, String onLineMachineInfo, MonthPlanProductionRequirePlanVo skuInfo, Integer startDay, MouldProductionLimitTypeEnum limitType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 在[%s]日达到%s====";
+        String materialDesc = skuInfo.getMaterialDesc();
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, materialDesc,
+                startDay, limitType.getLimitDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_LH_GROUP, logContent);
         return logContent;
     }
 

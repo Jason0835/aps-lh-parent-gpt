@@ -67,7 +67,7 @@ public class CxAddSkuProductionHandler {
         BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         //获取优先级最高的Sku信息
         String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
-        log.info(TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc));
+        TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc);
         if (StringUtils.isBlank(materialDesc)) {
             //20260113 剔除需要排除的收尾时间点
             excludeDays.add(startDay);
@@ -84,11 +84,12 @@ public class CxAddSkuProductionHandler {
         }
         //是否最后一个Sku
         boolean isLastSkuPlan = isLastSkuPlan(leftOverHasProductionList, materialDesc);
+        TbrMouldProductionLogRecorder.addIsLastFindSkuLog(context, groupName, isLastSkuPlan, materialDesc);
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueLhGroupSkuNoFindMouldLog(context, groupName, onLineMachineInfo, materialDesc));
+            TbrMouldProductionLogRecorder.addContinueLhGroupSkuNoFindMouldLog(context, groupName, onLineMachineInfo, materialDesc);
             productionContext.addSkuProductionLimitInfo(materialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
             retrieveNextSku(context, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
             return;
@@ -98,7 +99,7 @@ public class CxAddSkuProductionHandler {
         groupPlanInfo.correctProductionDateRange(context, addSkuInfo, lhGroup, doubleMouldList, onLineMachineInfo);
         Integer newStartDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();
-        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
+        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             retrieveNextSku(context, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
             return;
@@ -230,26 +231,26 @@ public class CxAddSkuProductionHandler {
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanData)) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo));
+            TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoPlanLog(context, groupName, onLineMachineInfo);
             return null;
         }
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(leftOverHasProductionList)) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo));
+            TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoProductionPlanLog(context, groupName, onLineMachineInfo);
             return null;
         }
         //获取最先收尾的硫化组
         EarliestConclusionLhGroupHelper lhGroup = groupPlanInfo.getEarliestConclusionLhInfo(productionContext, excludeDays);
         if (null == lhGroup) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo));
+            TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineNoLhGroupLog(context, groupName, onLineMachineInfo);
             return null;
         }
         Integer startDay = lhGroup.getClosingDay();
         //成型分配的排产范围起始日~分组收尾日
         Integer endDay = lhGroup.getEndDay();
-        log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay));
+        TbrMouldProductionLogRecorder.addContinueGroupContinueCxMachineLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay);
         if (startDay > endDay) {
             return null;
         }

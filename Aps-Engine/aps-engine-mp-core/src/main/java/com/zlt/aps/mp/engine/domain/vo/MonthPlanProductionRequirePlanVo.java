@@ -109,6 +109,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 已排产量
      */
     private Integer producedQty;
+    /**
+     * 是否补实单
+     */
+    private Boolean isSkuProduced;
 
     /**
      * 初始的排产数据设置
@@ -201,6 +205,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return sum;
         }
         sum = sum + Optional.of(getPostponeQty()).orElse(BigDecimal.ZERO.intValue());
+        return sum;
+    }
+
+    /**
+     * 获取Sku的实单量
+     * 高优先级的量 + 中优先级的量
+     *
+     * @return
+     */
+    public Integer getActualQuantity() {
+        Integer sum = Optional.ofNullable(getHeightQty()).orElse(BigDecimal.ZERO.intValue());
+        sum = sum + Optional.ofNullable(getMidQty()).orElse(BigDecimal.ZERO.intValue());
         return sum;
     }
 

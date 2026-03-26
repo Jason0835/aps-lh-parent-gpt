@@ -74,13 +74,22 @@ public enum MesInterfaceCodeEnum {
     /**
      * 胶囊已使用次数同步
      */
-    LH_REPAIR_CAPSULE("LH_REPAIR_CAPSULE", "mesItfService", "syncLhRepairCapsule", "胶囊已使用次数同步"),
+    LH_USED_CAPSULE("LH_REPAIR_CAPSULE", "mesItfService", "syncLhRepairCapsule", "胶囊已使用次数同步"),
 
     /**
      * 模具清洗预警计划同步
      */
     MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanPlan", "模具清洗预警计划同步"),
 
+    /**
+     * 结构整车胎面配置同步
+     */
+    STRUCTURE_TREAD_CONFIG("STRUCTURE_TREAD_CONFIG", "mesItfService", "syncStructureTreadConfig", "结构整车胎面配置同步"),
+
+    /**
+     * 生胎库存同步
+     */
+    EMBRYO_STOCK_SYNC("MES_CX_STOCK", "mesItfService", "syncMesCxStock", "生胎库存同步"),
     ;
 
     private final String code;

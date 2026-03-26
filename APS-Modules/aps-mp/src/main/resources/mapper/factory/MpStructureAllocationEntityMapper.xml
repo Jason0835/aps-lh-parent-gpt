@@ -26,6 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    t.END_DAY,
 		    t.ALLOT_DAYS,
 		    mm.CX_MACHINE_TYPE_CODE,
+		    t.ALTERNATING_TYPE,
 		    1 data_type
 		FROM
 		    T_MP_STRUCTURE_ALLOCATION t

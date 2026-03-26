@@ -194,4 +194,22 @@ public interface IMesItfService {
     @ApiOperation("同步模具清洗预警计划")
     @PostMapping("/mesItf/syncMouldCleanPlan")
     public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步结构整车胎面配置
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步结构整车胎面配置")
+    @PostMapping("/mesItf/syncStructureTreadConfig")
+    public AjaxResult syncStructureTreadConfig(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步生胎库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步生胎库存")
+    @PostMapping("/mesItf/syncMesCxStock")
+    public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

@@ -267,7 +267,7 @@ public class CxLhMouldProductionCalculator {
             UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(day, realDayProductionQty, isDayFinish, cxMachineInfoSet, lossQty);
             updateMouldDayProductionInfo(productionContext, lhProductionQtyHelper.getProductionPlanInfo(), doubleMouldList, skuProductionPlanList, updateInfo);
             //更新硫化组日期和日排产量
-            updateCxMachineLhInfo(context,cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, dayMaxProductionQty, updateInfo);
+            updateCxMachineLhInfo(context, cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, dayMaxProductionQty, updateInfo);
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, realDayProductionQty, BigDecimal.ZERO.intValue());
             //月底补量
@@ -423,20 +423,22 @@ public class CxLhMouldProductionCalculator {
      * @return
      */
     private static boolean isEndHandler(TbrProductionContext productionContext, ContinueTypeEnum continueType, ProductionPlanGroupInfo productionPlanInfo, List<MonthPlanProductionRequirePlanVo> skuProductionPlanList, Integer startDay, Integer endDay) {
-        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
-        //非续作需要重新判断胎胚种类数及配比限制
+        //非续作需要重新判断胎胚种类数
         if (ContinueTypeEnum.NO_CONTINUE != continueType) {
             return false;
         }
+        MonthPlanProductionRequirePlanVo productionPlan = skuProductionPlanList.get(BigDecimal.ZERO.intValue());
         //得到真正上机日
-        Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
-        if (null == realStartDay) {
+//        Integer realStartDay = productionPlanInfo.getRealOnlineMachineDay(productionPlan, startDay, endDay);
+        if (productionPlanInfo.isLimitEmbryoCodeCount(productionPlan, startDay)) {
+            TbrMouldProductionLogRecorder.addSkuProductionLimitLog(productionContext, productionPlanInfo.getGroupName(), "", productionPlan, startDay, MouldProductionLimitTypeEnum.EMBRYO_CODE_COUNT_LIMIT);
             //本轮不再参与排产
             skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
             return true;
         }
         //SKU二次上机检查 sandy+ 20260129
-        if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, realStartDay)) {
+        if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, startDay)) {
+            TbrMouldProductionLogRecorder.addSkuProductionLimitLog(productionContext, productionPlanInfo.getGroupName(), "", productionPlan, startDay, MouldProductionLimitTypeEnum.SECOND_PRODUCTION_LIMIT);
             skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
             return true;
         }
@@ -446,12 +448,12 @@ public class CxLhMouldProductionCalculator {
     /**
      * 计算是否可连续排产
      *
-     * @param sumProductionQty   还需排产量
-     * @param firstDay           首日排产
-     * @param day                当前排产日
-     * @param firstProductionQty 首日量
-     * @param continueType       排产续作类型
-     * @param maxProductionDays  最大排产天数
+     * @param sumProductionQty      还需排产量
+     * @param firstDay              首日排产
+     * @param day                   当前排产日
+     * @param firstProductionQty    首日量
+     * @param continueType          排产续作类型
+     * @param maxProductionDays     最大排产天数
      * @param skuProductionPlanList sku-排产计划
      * @return
      */
@@ -550,7 +552,7 @@ public class CxLhMouldProductionCalculator {
         String skuMaterialDesc = productionPlan.getMaterialDesc();
         //分组-日排产信息
         SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionPlan, realDayProductionQty, lossQty, usedMouldSet);
-        groupPlanInfo.addDayProductionInfo(productionContext,skuDayProductionInfo);
+        groupPlanInfo.addDayProductionInfo(productionContext, skuDayProductionInfo);
         //模具排产信息-计划分配
         updateMouldDayProductionInfo(productionContext, groupPlanInfo, doubleMouldList, skuProductionPlanList, updateInfo);
         //记录已排产量及损耗量
@@ -628,14 +630,14 @@ public class CxLhMouldProductionCalculator {
             if (!isSingleCxMachine && null != productionPlanInfo) {
                 //分组-日排产信息
                 SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(singleReplenishmentDay, productionSkuInfo, boostDayQty, BigDecimal.ZERO.intValue(), usedMouldSet);
-                productionPlanInfo.addDayProductionInfo(productionContext,skuDayProductionInfo);
+                productionPlanInfo.addDayProductionInfo(productionContext, skuDayProductionInfo);
             }
             //更新模具日产信息
             UpdateDayProductionInfoHelper updateInfo = new UpdateDayProductionInfoHelper(singleReplenishmentDay, boostDayQty, true, cxMachineInfoSet, BigDecimal.ZERO.intValue());
             updateMouldDayProductionInfo(productionContext, productionPlanInfo, doubleMouldList, productionSkuInfo, updateInfo);
             if (isSingleCxMachine && null != cxMachineInfo && null != cxLhGroup) {
                 //更新硫化组日期和日排产量
-                updateCxMachineLhInfo(productionContext,cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, maxLhQty, updateInfo);
+                updateCxMachineLhInfo(productionContext, cxLhGroup, productionSkuInfo, cxMachineInfo, usedMouldSet, maxLhQty, updateInfo);
             }
             //记录已排产量及损耗量
             productionContext.addSkuProductionAndWastageQty(skuMaterialDesc, boostDayQty, BigDecimal.ZERO.intValue());
@@ -885,7 +887,7 @@ public class CxLhMouldProductionCalculator {
      * @param usedMouldSet        使用模具
      * @param dayMaxProductionQty 日最大硫化值
      */
-    private static void updateCxMachineLhInfo(Context context,CxLhProductionHelper cxLhGroup, MonthPlanProductionRequirePlanVo productionSkuInfo, CxMachineBaseInfoVo cxMachineInfo, Set<String> usedMouldSet, Integer dayMaxProductionQty, UpdateDayProductionInfoHelper updateInfo) {
+    private static void updateCxMachineLhInfo(Context context, CxLhProductionHelper cxLhGroup, MonthPlanProductionRequirePlanVo productionSkuInfo, CxMachineBaseInfoVo cxMachineInfo, Set<String> usedMouldSet, Integer dayMaxProductionQty, UpdateDayProductionInfoHelper updateInfo) {
         Integer productionDay = updateInfo.getProductionDay();
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         //排产信息更新
@@ -903,7 +905,7 @@ public class CxLhMouldProductionCalculator {
         //成型机台-日排产信息
         Integer lossQty = updateInfo.getLossQty();
         SkuDayProductionInfoHelper skuDayProductionInfo = SkuDayProductionInfoHelper.buildEmpty(productionDay, productionSkuInfo, realDayProductionQty, lossQty, usedMouldSet);
-        cxMachineInfo.addDayProductionInfo(context,skuDayProductionInfo);
+        cxMachineInfo.addDayProductionInfo(context, skuDayProductionInfo);
     }
 
     /**
