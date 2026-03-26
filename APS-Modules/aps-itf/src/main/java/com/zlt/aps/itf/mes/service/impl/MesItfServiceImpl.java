@@ -78,6 +78,9 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmStructureTreadConfigEntityMapper structureTreadConfigEntityMapper;
 
     @Autowired
+    private MdmCxScheFinishQtyEntityMapper cxScheFinishQtyEntityMapper;
+
+    @Autowired
     private IMdmProductModelRelationService iMdmProductModelRelationService;
 
     @Autowired
@@ -1235,6 +1238,85 @@ public class MesItfServiceImpl implements MesItfService {
                 for (List<MdmMesCxStock> importList : splitList) {
                     baseDao.insertBatch(importList);
                 }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步成型排程完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncCxClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmCxScheFinishQty> syncList = mesItfMapper.selectCxClassShiftFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（工单号+排程日期+机台编号+厂别）
+        Map<String, MdmCxScheFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getCxMachineCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmCxScheFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmCxScheFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmCxScheFinishQty> existsList = cxScheFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmCxScheFinishQty qty = new MdmCxScheFinishQty();
+                            qty.setOrderNo(item.getOrderNo());
+                            qty.setScheduleDate(item.getScheduleDate());
+                            qty.setCxMachineCode(item.getCxMachineCode());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmCxScheFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getCxMachineCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmCxScheFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmCxScheFinishQty item : saveList) {
+                    MdmCxScheFinishQty entity = new MdmCxScheFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getCxMachineCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmCxScheFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
             }
         } finally {
             DynamicDataSourceContextHolder.clear();

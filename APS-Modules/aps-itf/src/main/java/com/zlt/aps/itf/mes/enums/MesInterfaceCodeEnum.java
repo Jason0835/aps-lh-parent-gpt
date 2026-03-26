@@ -90,6 +90,11 @@ public enum MesInterfaceCodeEnum {
      * 生胎库存同步
      */
     EMBRYO_STOCK_SYNC("MES_CX_STOCK", "mesItfService", "syncMesCxStock", "生胎库存同步"),
+
+    /**
+     * 成型排程完成量同步
+     */
+    CX_CLASS_SHIFT_FINISH_QTY("CX_CLASS_SHIFT_FINISH_QTY", "mesItfService", "syncCxClassShiftFinishQty", "成型排程完成量同步"),
     ;
 
     private final String code;

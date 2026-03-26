@@ -184,4 +184,11 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步成型排程完成量
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncCxClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
 }

@@ -431,4 +431,19 @@ public class MesItfController {
         String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
         return cxScheduleResultIssueService.issueCxScheduleResult(cxScheduleResultIssueList, factoryCode, companyCode);
     }
+
+    /**
+     * 同步成型排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程完成量")
+    @PostMapping("/syncCxClassShiftFinishQty")
+    public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncCxClassShiftFinishQty(syncDataLogs);
+    }
 }

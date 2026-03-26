@@ -263,4 +263,32 @@
         <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheFinishQty">
+        SELECT
+        ID,
+        ORDER_NO,
+        SCHEDULE_DATE,
+        CX_MACHINE_CODE,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        CLASS1_FINISH_QTY,
+        CLASS2_FINISH_QTY,
+        CLASS3_FINISH_QTY,
+        CLASS1_UN_REASON,
+        CLASS2_UN_REASON,
+        CLASS3_UN_REASON,
+        CLASS1_PERSON,
+        CLASS2_PERSON,
+        CLASS3_PERSON,
+        EMBRYO_CODE,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_CX_CLASS_SHIFT_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
 </mapper>

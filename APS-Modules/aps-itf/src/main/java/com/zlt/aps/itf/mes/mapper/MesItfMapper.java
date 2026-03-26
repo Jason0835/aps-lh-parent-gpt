@@ -113,4 +113,12 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<MdmMesCxStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询成型排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmCxScheFinishQty> selectCxClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 }

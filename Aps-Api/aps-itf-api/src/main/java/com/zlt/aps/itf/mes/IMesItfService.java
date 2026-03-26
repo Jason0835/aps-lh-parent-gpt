@@ -226,4 +226,8 @@ public interface IMesItfService {
     @ApiOperation("成型排程结果下发到MES")
     @PostMapping("/mesItf/issueCxScheduleResult")
     public AjaxResult issueCxScheduleResult(@RequestBody List<CxScheduleResultIssue> cxScheduleResultIssueList);
+
+    @ApiOperation("同步成型排程完成量")
+    @PostMapping("/mesItf/syncCxClassShiftFinishQty")
+    public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

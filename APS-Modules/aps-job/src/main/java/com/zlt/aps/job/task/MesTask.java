@@ -82,4 +82,12 @@ public class MesTask {
     public void syncStructureTreadConfig() {
         iMesItfService.syncStructureTreadConfig(new AuxReqSyncDataLogs());
     }
+
+    /**
+     * 同步成型排程完成量
+     */
+    @ApiOperation("同步成型排程完成量")
+    public void syncCxClassShiftFinishQty() {
+        iMesItfService.syncCxClassShiftFinishQty(new AuxReqSyncDataLogs());
+    }
 }
