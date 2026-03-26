@@ -1654,11 +1654,6 @@ public class MatchingProductionHandler {
                 Integer usedBeginDate = mouldDayUsed.getBeginDate();
                 Integer usedEndDate = mouldDayUsed.getEndDate();
 
-                // 检查是否满足排产条件
-                if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, usedBeginDate, startDay, endDay, isActualOrder)) {
-                    continue;
-                }
-
                 MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
                 if (limitHelper == null || !limitHelper.isProduct()) {
                     continue; // 当天已经无法添加排产，跳过
@@ -1674,18 +1669,21 @@ public class MatchingProductionHandler {
                     // 判断上一天有排产，当天没排产
                     if (this.checkMouldHasProductMaterial(mouldInfo, lastDay, materialDesc)) { // 上一天有排产该物料，说明是续作
                         boolean hasProduct = this.checkMouldHasProductMaterial(mouldInfo, usedBeginDate, materialDesc); // 模具今天是否有生产该规格
-                        // 判断如果今天的模具已经达到最大模具数，则不能加模具，只能补量，则当天没有排产本规格的模具跳过
-                        if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty() && !hasProduct) {
-                            break inner;
+                        // 非补量情况下，需要检查是否满足排产条件
+                        if (!hasProduct) {
+                            // 排产参数校验
+                            if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, usedBeginDate, startDay, endDay, isActualOrder)) {
+                                break inner;
+                            }
+                            // 最大模具数校验
+                            if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty()) {
+                                break inner;
+                            }
+                            // 最大硫化机数校验
+                            if (!this.checkLhMachineCount(productionContext, groupInfo, usedBeginDate)) {
+                                break inner;
+                            }
                         }
-                        // 硫化机数已经达到最大模具数，也不能加模具，只能补量
-                        if (!this.checkLhMachineCount(productionContext, groupInfo, usedBeginDate) && !hasProduct) {
-                            break inner;
-                        }
-                        // 模具今天明天没有排产，如果从n+2 至 n+二次上机天数之间有任意一天有排产，则不允许搭配，防止造成二次排产
-//                        if (this.checkIsSecOnline(productionContext, mouldInfo, usedBeginDate, endDay)) {
-//                            break inner;
-//                        }
                         twoMouldList.add(mouldInfo);
                     }
                     if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加

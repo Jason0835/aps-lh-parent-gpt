@@ -20,6 +20,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
@@ -71,6 +72,7 @@ import org.springframework.util.StopWatch;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -122,10 +124,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
-    /**
-     * 月份天数上限
-     */
-    private final static int MAX_MONTH_DAY = 31;
     /**
      * 日计划字段名称
      */
@@ -914,12 +912,16 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
-        // 1.3.1、按结构 + 日期 统计硫化机台数
+        // 1.3.1、从日历获取月底日期
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(param.getYear(), param.getMonth() - 1, FactoryConstant.MONTH_START_DAY);
+        Integer monthMaxDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
+        // 1.3.2、按结构 + 日期 统计硫化机台数
         Map<String, Map<Integer, Integer>> lhMachineStatisticsMap = new HashMap<>();
         for (Entry<String, MpMonthPlanStatistics> entry: statisticsMap.entrySet()) {
             Map<Integer, Integer> dayLhMachinesMap = new HashMap<>();
             MpMonthPlanStatistics statistics = entry.getValue();
-            for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+            for (int day = 1; day <= monthMaxDay; day ++) {
                 String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
                 String dayStatisticsStr = (String)statistics.getFieldValueByFieldName(dayFieldName);
                 if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
@@ -951,7 +953,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     continue;
                 }
                 // 1.4.1.1、统计结构每日排产量
-                for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+                for (int day = 1; day <= monthMaxDay; day ++) {
                     String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
                     Integer sumValue = Optional.ofNullable((Integer)mouldingDayResultAggregated.getFieldValueByFieldName(dayFieldName)).orElse(0);
                     Integer value = Optional.ofNullable((Integer)result.getFieldValueByFieldName(dayFieldName)).orElse(0);
@@ -999,7 +1001,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String cxMachineCode = null; // 当前机台
         List<MpStructureAllocationExportVo> machineStructureList = new ArrayList<>(); // 机台排产记录列表
         Map<Integer, Integer> totalMap = new HashMap<>(); // 汇总map，用于记录每天的机台合计值
-        for (int day = 1; day <= MAX_MONTH_DAY; day ++) {  // 初始化汇总map
+        for (int day = 1; day <= monthMaxDay; day ++) {  // 初始化汇总map
             totalMap.put(day, 0);
         }
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
@@ -1118,7 +1120,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 5、构建头部合计行
         MpStructureAllocationExportVo totalProductRecord = this.createExportRecord(StructureAllocationExportDataTypeEnum.TOTAL_PRODUCT_QTY);
         for (FactoryMonthPlanMouldDayResult result: structureDayResultMap.values()) {
-            for (int day = 1; day <= MAX_MONTH_DAY; day ++) {
+            for (int day = 1; day <= monthMaxDay; day ++) {
                 String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
                 Integer value = Optional.ofNullable((Integer)result.getFieldValueByFieldName(dayFieldName)).orElse(0);
                 if (value > 0) {

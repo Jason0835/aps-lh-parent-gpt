@@ -95,4 +95,16 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "实单未排产量", name = "actualOrderUnproduced")
     private Integer actualOrderUnproduced;
+    
+    /**
+     * 同主花纹最大型腔数量
+     */
+    @ApiModelProperty(value = "同主花纹最大型腔数量", name = "maxMouldCavityQty")
+    private Integer maxMouldCavityQty;
+
+    /**
+     * 同主花纹最大活块数量
+     */
+    @ApiModelProperty(value = "同主花纹最大活块数量", name = "maxTypeBlockQty")
+    private Integer maxTypeBlockQty;
 }

@@ -80,6 +80,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    '2' LOCATION_TYPE /*内外销，目前没有地方取，暂时固定外销*/
 		FROM
 		    T_MDM_MATERIAL_INFO m
+            INNER JOIN ( SELECT STRUCTURE_NAME, MIN( PRO_SIZE ) MIN_PRO_SIZE 
+                           FROM T_MDM_MATERIAL_INFO M 
+                          WHERE M.FACTORY_CODE = '116' 
+                            AND M.IS_DELETE = 0 
+                          GROUP BY STRUCTURE_NAME ) MM ON MM.STRUCTURE_NAME = M.STRUCTURE_NAME
 		    LEFT JOIN T_DP_DEMAND_PLAN d ON d.MONTH_PLAN_VERSION = #{dayResult.monthPlanVersion}
 		    AND d.FACTORY_CODE = m.FACTORY_CODE 
 		    AND d.MATERIAL_CODE = m.MATERIAL_CODE 
@@ -101,6 +106,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND m.FACTORY_CODE = r.FACTORY_CODE 
         </if>
 		GROUP BY
+		    MM.MIN_PRO_SIZE,
 		    m.MATERIAL_CODE,
 		    m.MES_MATERIAL_CODE,
 		    m.MATERIAL_DESC,
@@ -170,8 +176,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.DAY_31 ,
 		    F.PRODUCTION_VERSION
 		ORDER BY
+            MM.MIN_PRO_SIZE,
+            STRUCTURE_NAME,
 		    PRO_SIZE,
-		    STRUCTURE_NAME,
 		    MOULD_CAVITY_QTY DESC,
 		    TYPE_BLOCK_QTY DESC,
 		    MAIN_PATTERN 
