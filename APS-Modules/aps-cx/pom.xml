@@ -65,7 +65,7 @@
 
         <!-- APS接口模块 -->
         <dependency>
-            <groupId>com.zlt.aps</groupId>
+            <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
         </dependency>
         <dependency>

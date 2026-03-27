@@ -2103,6 +2103,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     public abstract void doAutoAdjust(MpRollAdjustContextDTO contextDTO);
 
+    /**
+     * 检查偶数
+     * @param number
+     * @return
+     */
+    protected boolean isEven(int number) {
+        return (number & 1) == 0;
+    }
 
     /**
      * 生成分布式唯一版本号

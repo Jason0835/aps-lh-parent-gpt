@@ -528,15 +528,12 @@ public class MpWeekRollAdjustEngine {
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
         //物料编码：[%s]，确认调整量非偶数！
-        if (structureIn.getConfirmAdjustQty() != null && !isEven(structureIn.getConfirmAdjustQty())){
+       /* if (structureIn.getConfirmAdjustQty() != null && !isEven(structureIn.getConfirmAdjustQty())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
-        }
+        }*/
     }
 
-    private boolean isEven(int number) {
-        return (number & 1) == 0;
-    }
     /**
      * 检查日硫化量及主花纹是否为空
      * @param sbError
@@ -552,10 +549,10 @@ public class MpWeekRollAdjustEngine {
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
         //物料编码：[%s]，确认调整量非偶数！
-        if (structureOut.getConfirmAdjustQty() != null && !isEven(structureOut.getConfirmAdjustQty())){
+        /*if (structureOut.getConfirmAdjustQty() != null && !isEven(structureOut.getConfirmAdjustQty())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
-        }
+        }*/
     }
 
     /**
@@ -1381,7 +1378,7 @@ public class MpWeekRollAdjustEngine {
         DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,limitVo.getRemainMaxDayProductionQty(),checkDay);
         boolean bCheck = dayTotalCapacityChecker.doCheck();
         String hint = bCheck ? "满足":"不满足,退出！";
-        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,日剩余排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxDayProductionQty(),limitVo.getRemainMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
         return bCheck;
     }
 

@@ -50,6 +50,11 @@ public enum ItfSyncKeyEnum {
      */
     CX_CLASS_SHIFT_FINISH_QTY("CX_CLASS_SHIFT_FINISH_QTY", "MES", "APS", "成型排程完成量同步"),
 
+    /**
+     * 硫化排程结果下发
+     */
+    SYNC_LH_SCHEDULE_RESULT("LH_SCHEDULE_RESULT_ISSUE", "APS", "MES", "硫化排程结果下发接口"),
+
     ;
 	/**
 	 * 接口码

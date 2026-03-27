@@ -5,12 +5,14 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.ICxScheduleResultIssueService;
+import com.zlt.aps.itf.mes.service.ILhScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +56,9 @@ public class MesItfController {
 
     @Autowired
     private ICxScheduleResultIssueService cxScheduleResultIssueService;
+
+    @Autowired
+    private ILhScheduleResultIssueService lhScheduleResultIssueService;
 
     /**
      * 同步SKU与模具关系
@@ -445,5 +450,24 @@ public class MesItfController {
             syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         return mesItfService.syncCxClassShiftFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 硫化排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班）
+     * 3. 下发后天的3班（早中晚班）
+     *
+     * @param lhScheduleResultIssueList 硫化排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("硫化排程结果下发到MES")
+    @PostMapping("/issueLhScheduleResult")
+    public AjaxResult issueLhScheduleResult(@RequestBody List<LhScheduleResultIssue> lhScheduleResultIssueList) {
+        // 从上下文中获取厂别和分公司编码
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
+        return lhScheduleResultIssueService.issueLhScheduleResult(lhScheduleResultIssueList, factoryCode, companyCode);
     }
 }

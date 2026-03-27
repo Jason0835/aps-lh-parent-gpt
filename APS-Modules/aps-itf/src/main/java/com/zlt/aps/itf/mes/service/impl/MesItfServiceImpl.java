@@ -18,6 +18,7 @@ import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
+import com.zlt.aps.maindata.mapper.MdmCxScheFinishQtyEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
@@ -57,6 +58,9 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
     @Autowired
     private MdmMouldShellInfoEntityMapper mouldShellInfoEntityMapper;
+
+    @Autowired
+    private MdmCxScheFinishQtyEntityMapper cxScheFinishQtyEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
@@ -76,9 +80,6 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MdmStructureTreadConfigEntityMapper structureTreadConfigEntityMapper;
-
-    @Autowired
-    private MdmCxScheFinishQtyEntityMapper cxScheFinishQtyEntityMapper;
 
     @Autowired
     private IMdmProductModelRelationService iMdmProductModelRelationService;

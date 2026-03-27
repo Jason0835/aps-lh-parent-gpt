@@ -15,7 +15,9 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureOutService;
@@ -292,7 +294,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
         //结构外调整记录
-        contextDTO.setMpAdjustStructureOutList(mpAdjustStructureOutService.selectMpAdjustStructureOutList(contextDTO));
+        contextDTO.setMpAdjustStructureOutList(getAdjustDataWithDoOddEven(mpAdjustStructureOutService.selectMpAdjustStructureOutList(contextDTO)));
         //1.结构外订单调整记录空检查
         if (PubUtil.isEmpty(contextDTO.getMpAdjustStructureOutList())){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
@@ -357,6 +359,30 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         //11.保存调整日志
         saveMpAdjustLog(contextDTO);
+    }
+
+    /**
+     * 获取调整数据，并处理奇偶性
+     * @param mpAdjustStructureOutList
+     * @return
+     */
+    private List<MpAdjustStructureOut> getAdjustDataWithDoOddEven(List<MpAdjustStructureOut> mpAdjustStructureOutList){
+        if (PubUtil.isEmpty(mpAdjustStructureOutList)){
+            return mpAdjustStructureOutList;
+        }
+        for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
+            if (structureOut.getConfirmAdjustQty() == null || structureOut.getConfirmAdjustQty() <= 0){
+                continue;
+            }
+            if (isEven(structureOut.getConfirmAdjustQty())){
+                //偶数 + 2
+                structureOut.setConfirmAdjustQty(structureOut.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER);
+            }else{
+                //奇数 + 3
+                structureOut.setConfirmAdjustQty(structureOut.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER);
+            }
+        }
+        return mpAdjustStructureOutList;
     }
 
     @Override

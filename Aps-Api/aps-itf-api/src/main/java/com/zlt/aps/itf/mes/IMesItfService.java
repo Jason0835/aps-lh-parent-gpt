@@ -230,4 +230,18 @@ public interface IMesItfService {
     @ApiOperation("同步成型排程完成量")
     @PostMapping("/mesItf/syncCxClassShiftFinishQty")
     public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 硫化排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班）
+     * 3. 下发后天的3班（早中晚班）
+     *
+     * @param lhScheduleResultIssueList 硫化排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("硫化排程结果下发到MES")
+    @PostMapping("/mesItf/issueLhScheduleResult")
+    public AjaxResult issueLhScheduleResult(@RequestBody List<com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue> lhScheduleResultIssueList);
 }
