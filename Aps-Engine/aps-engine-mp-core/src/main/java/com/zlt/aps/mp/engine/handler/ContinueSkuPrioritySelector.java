@@ -38,20 +38,20 @@ public class ContinueSkuPrioritySelector {
             //todo 记录日志
             return Collections.emptyList();
         }
-        List<MonthPlanProductionRequirePlanVo> matchList = new ArrayList<>();
+        Map<Long, MonthPlanProductionRequirePlanVo> matchMap = new HashMap<>();
         continueSkuMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            //获取同规格同花纹或是同生胎同模具的其它sku排产计划
+            //获取同规格同花纹或是同生胎同模具的其它sku排产计划9
             Set<String> shareMouldMaterialDescSet = getShareMouldSkuByContinueSku(productionPlanList, cxContinueSkuInfo);
             List<MonthPlanProductionRequirePlanVo> singleMatchList = productionPlanInfo.getContinueListByType(productionStage, continueType, materialDesc, shareMouldMaterialDescSet, cxContinueSkuInfo);
             if (CollectionUtils.isEmpty(singleMatchList)) {
                 return;
             }
-            matchList.addAll(singleMatchList);
+            singleMatchList.forEach(singlePlan -> matchMap.put(singlePlan.getMonthPlanId(), singlePlan));
         });
-        if (CollectionUtils.isEmpty(matchList)) {
+        if (CollectionUtils.isEmpty(matchMap)) {
             return Collections.emptyList();
         }
-        return matchList;
+        return matchMap.values().stream().collect(Collectors.toList());
     }
 
     /**

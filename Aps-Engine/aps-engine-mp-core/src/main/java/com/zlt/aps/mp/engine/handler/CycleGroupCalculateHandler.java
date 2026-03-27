@@ -102,6 +102,8 @@ public class CycleGroupCalculateHandler {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             return BigDecimal.ZERO.intValue();
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String isWriteLog = Optional.ofNullable(productionContext.getBaseDataContainer().getParamConfiguration().getIsWriteCycleLog()).orElse("N");
         //实单量 奇数+3 偶数+2
         Integer minQty = skuPlanList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
         Integer sumActualQuantity = skuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
@@ -135,7 +137,9 @@ public class CycleGroupCalculateHandler {
         if (!CollectionUtils.isEmpty(dayProductionQtyMap)) {
             sumProductionQty = dayProductionQtyMap.values().stream().mapToInt(Integer::intValue).sum();
         }
-        TbrMouldProductionLogRecorder.addProductionCycleQtyDetailLog(context, groupName, materialDesc, sumProductionQty, sumActualQuantity);
+        if (ProductionConstant.YES_VALUE.equals(isWriteLog)) {
+            TbrMouldProductionLogRecorder.addProductionCycleQtyDetailLog(context, groupName, materialDesc, sumProductionQty, sumActualQuantity);
+        }
         if (sumProductionQty <= BigDecimal.ZERO.intValue()) {
             return BigDecimal.ZERO.intValue();
         }

@@ -162,7 +162,10 @@ public class ProductionCapacityParamConfiguration {
      * SYS0203013 周期储备量占实单的比例(%),防止储备量过大
      */
     private Integer reservePercent;
-
+    /**
+     * 是否写入日志
+     */
+    private String isWriteCycleLog;
     /**
      * 参与排产的特殊原材料编码信息
      */

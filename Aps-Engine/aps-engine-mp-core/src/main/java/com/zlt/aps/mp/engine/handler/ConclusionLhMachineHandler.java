@@ -88,20 +88,20 @@ public class ConclusionLhMachineHandler {
         if (StringUtils.isBlank(materialDesc) || StringUtils.isBlank(mainPattern)) {
             return null;
         }
-        List<SkuDayProductionInfoHelper> conclusionSkuInfo = getConclusionSkuInfo(context, groupInfo, productionDay);
-        if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
-            return null;
-        }
         Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer changMouldFirstQty = paramConfiguration.getChangeMouldFirstQty();
         boolean isChangeMould = changMouldFirstQty.equals(firstQty);
-        //换活字块
-        if (!isChangeMould) {
-            return findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);
+        if (isChangeMould) {
+            return null;
         }
-        return null;
+        //换活字块
+        List<SkuDayProductionInfoHelper> conclusionSkuInfo = getConclusionSkuInfo(context, groupInfo, productionDay);
+        if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
+            return null;
+        }
+        return findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);
     }
 
     /**

@@ -140,6 +140,7 @@ public class CxContinueProductionHandler {
             //todo 记录日志
             return;
         }
+        TbrMouldProductionLogRecorder.addContinueSkuEarliestConclusionLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType, startDay, endDay);
         List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanInfo.getGroupPlanData().stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productionPlanList)) {
             //todo 记录日志
@@ -158,6 +159,9 @@ public class CxContinueProductionHandler {
             excludeDaySet.add(startDay);
             //递归迭代下一个硫化组
             productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet);
+        }
+        if (null == selectSkuInfo && excludeDaySet.contains(startDay)) {
+            return;
         }
         String selectedMaterialDesc = selectSkuInfo.getMaterialDesc();
         //选择模具

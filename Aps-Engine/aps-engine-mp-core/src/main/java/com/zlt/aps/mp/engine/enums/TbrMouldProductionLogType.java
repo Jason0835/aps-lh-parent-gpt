@@ -415,6 +415,10 @@ public enum TbrMouldProductionLogType {
      */
     FORMAL_MOULD_ADD_GROUP_SINGLE_GROUP("40-05", "新增结构开始正式排产"),
     /**
+     * 40-51 续作排产
+     */
+    CONTINUE_SKU_PRODUCTION("40-51","续作排产"),
+    /**
      * 99 一键排产结束
      */
     WHOLE_PRODUCTION_END("99", "一键排产结束"),
