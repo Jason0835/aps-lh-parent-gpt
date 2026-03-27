@@ -476,10 +476,6 @@ public class MatchingProductionHandler {
                 if (!isBoost && productionQty <= 0) { // 非实单或者非常销规格，只要余量不足就直接跳过
                     break;
                 }
-                // 4.2、最大硫化机数校验
-                if (!this.checkLhMachineCount(productionContext, groupInfo, usedBeginDate)) {
-                    continue;
-                }
                 // 4.3、当天已经无法添加排产，跳过
                 MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
                 if (limitHelper == null || !limitHelper.isProduct()) {
@@ -555,7 +551,7 @@ public class MatchingProductionHandler {
             if (this.checkMouldHasProductMaterial(mouldInfo, lastDay, materialDesc)) { // 上一天有排产该物料，说明是续作
                 // 2.2、检查当天是否有排产该SKU
                 boolean hasProduct = this.checkMouldHasProductMaterial(mouldInfo, day, materialDesc); // 模具今天是否有生产该规格
-                // 2.2.1、如果有排产该SKU,相当于要加模，需要判断排产参数、上一天模具是否已经收尾
+                // 2.2.1、如果没有排产该SKU,相当于要加模，需要判断排产参数、上一天模具是否已经收尾
                 if (!hasProduct) {
                     // 2.2.1.1、排产参数校验
                     if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, day, startDay, endDay)) {
@@ -570,8 +566,11 @@ public class MatchingProductionHandler {
                     if (this.checkLastDayIsWrapUp(productionContext, groupInfo, mouldInfo, firstPlan, materialDesc, lastDay, startDay)) {
                         break inner;
                     }
-                    
-                // 2.2.2、如果没有排产该SKU,相当于要补模具的余量，需要模拟当天的排产，判断是否存在拼机台的情况，如果是拼机台可能会再加量后导致硫化机台数发生变化
+                    // 2.2.1.4、最大硫化机数校验
+                    if (!this.checkLhMachineCount(productionContext, groupInfo, day)) {
+                        continue;
+                    }
+                // 2.2.2、如果有排产该SKU,相当于要补模具的余量，需要模拟当天的排产，判断是否存在拼机台的情况，如果是拼机台可能会再加量后导致硫化机台数发生变化
                 } else {
                     // 2.2.2.1、执行模拟排产
                     MonthPlanProductionRequirePlanVo firstPlan = productionPlanList.get(0);
