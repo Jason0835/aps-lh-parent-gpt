@@ -433,7 +433,6 @@ public class MatchingProductionHandler {
                                           ProductionPlanGroupInfo groupInfo,
                                           TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
                                           String checkMaterialDesc) {
-        Boolean isActualOrder = productionContext.getIsActualOrder(); 
         Integer startDay = limitMap.firstKey();
         Integer endDay = limitMap.lastKey();
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData();
@@ -465,14 +464,7 @@ public class MatchingProductionHandler {
                 // 4.1、检查SKU是否还有待排产的需求量，没有则结束本SKU的检查
                 Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
                 // 4.1.1、收尾前两天，如果是常销规格，即使需求量不足，也要尝试补满
-                ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer()
-                        .getParamConfiguration();
-                Integer maxBoostDay = param.getMaxBoostDay();
-                Set<String> productionTypeSet = param.getBoostProductionType();
-                // 实单且常销规格，需要月底补量
-                boolean isBoost = isActualOrder
-                        && productionTypeSet.contains(productionPlanList.get(0).getProductionType())
-                        && endDay - usedBeginDate <= maxBoostDay;
+                boolean isBoost = this.checkIsBoost(productionContext, usedBeginDate, endDay, productionPlanList.get(0));
                 if (!isBoost && productionQty <= 0) { // 非实单或者非常销规格，只要余量不足就直接跳过
                     break;
                 }
@@ -510,6 +502,26 @@ public class MatchingProductionHandler {
             }
 
         } while (true);
+    }
+
+    /**
+     * 检查是否需要补量
+     * 
+     * @param productionContext 上下文
+     * @param day               排产日
+     * @param endDay            结构结束日
+     * @param requirePlan       需求计划
+     * @return
+     */
+    private boolean checkIsBoost(TbrProductionContext productionContext, Integer day, Integer endDay,
+                                 MonthPlanProductionRequirePlanVo requirePlan) {
+        Boolean isActualOrder = productionContext.getIsActualOrder();
+        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer maxBoostDay = param.getMaxBoostDay();
+        Set<String> productionTypeSet = param.getBoostProductionType();
+        // 实单且常销规格，需要月底补量
+        return isActualOrder && productionTypeSet.contains(requirePlan.getProductionType())
+                && endDay - day <= maxBoostDay;
     }
 
     /**
@@ -1043,8 +1055,9 @@ public class MatchingProductionHandler {
             if (nextDay > 0 && !this.checkLhMachineCount(productionContext, groupInfo, nextDay)) {
                 continue;
             }
-            // 6、检查下一天是否还有量
-            if (productionQty <= productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty()) {
+            // 6、检查下一天是否还有量，如果需要补量则不需要检查
+            boolean isBoost = this.checkIsBoost(productionContext, usedBeginDate, endDay, productionPlanList.get(0)); 
+            if (!isBoost && productionQty <= productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty()) {
                 continue; // 如果剩余排产量不足首日排产量，则结束
             }
             
