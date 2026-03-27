@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.entity.CxHolidaySettingMapper">
+
+    <resultMap type="com.zlt.aps.cxlh.cx.api.domain.dto.CxHolidaySettingDto" id="CxHolidaySettingResult">
+        <result property="id" column="id"/>
+        <result property="holidayName" column="holiday_name"/>
+        <result property="holidayDay" column="holiday_day"/>
+        <result property="remark" column="remark"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectCxHolidaySettingVo">
+        select id, holiday_name, holiday_day, remark, del_flag, create_by, create_time, update_by, update_time from
+        t_cx_holiday_setting
+    </sql>
+
+    <select id="selectCxHolidaySettingList" parameterType="com.zlt.aps.cxlh.cx.api.domain.entity.CxHolidaySetting"
+            resultMap="CxHolidaySettingResult">
+        <include refid="selectCxHolidaySettingVo"/>
+        where del_flag = '0'
+        <!--        <if test="holidayName != null  and holidayName != ''">and holiday_name like concat(concat('%',-->
+        <!--            #{holidayName}), '%')-->
+        <!--        </if>-->
+        <if test="startTime != null and startTime !=''">
+            and holiday_day  <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        </if>
+        <if test="endTime != null and endTime !=''">
+            and holiday_day  <![CDATA[   <=  ]]> to_date(#{endTime},'yyyy-MM-dd')
+        </if>
+        <if test="orderStr == null">
+            order by holiday_day desc
+        </if>
+        <if test="orderStr != null">
+            order by ${orderStr}
+        </if>
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.cxlh.cx.api.domain.entity.CxHolidaySetting"
+            resultMap="CxHolidaySettingResult">
+        <include refid="selectCxHolidaySettingVo"/>
+        where del_flag = '0'
+        <!-- holiday_name = #{holidayName} and -->
+        and holiday_day <![CDATA[  >=  ]]> to_date(#{startTime},'yyyy-MM-dd')
+        and holiday_day  <![CDATA[  <=  ]]> to_date(#{endTime},'yyyy-MM-dd')
+        <if test="id != null and id != ''">and id != #{id}</if>
+    </select>
+
+    <select id="checkUnique2" parameterType="com.zlt.aps.cxlh.cx.api.domain.entity.CxHolidaySetting"
+            resultMap="CxHolidaySettingResult">
+        <include refid="selectCxHolidaySettingVo"/>
+        where del_flag = '0'
+        and  holiday_day  =#{holidayDay}
+        <if test="id != null and id != ''">and id != #{id}</if>
+    </select>
+
+    <update id="mergeSql" parameterType="list">
+        merge into t_cx_holiday_setting a USING (
+        <foreach collection="list" item="STOCK" separator=" union ">
+            select
+            #{STOCK.holidayName,jdbcType=VARCHAR} holiday_name,
+            #{STOCK.holidayDay,jdbcType=DATE} holiday_day,
+
+            #{STOCK.createBy,jdbcType=VARCHAR} create_by,
+            #{STOCK.createTime,jdbcType=DATE} create_time,
+            #{STOCK.updateBy,jdbcType=VARCHAR} update_by,
+            #{STOCK.updateTime,jdbcType=DATE} update_time,
+            #{STOCK.remark,jdbcType=VARCHAR} remark
+            from dual
+        </foreach>
+        ) b ON (
+        a.holiday_day = b.holiday_day
+        AND a.del_flag = '0' )
+        WHEN MATCHED THEN
+        UPDATE SET
+        a.holiday_name = b.holiday_name,
+        a.update_by = b.create_by,
+        a.update_time = now(),
+        a.remark = b.remark
+        WHEN NOT MATCHED THEN
+        INSERT (a.id, a.holiday_day, a.holiday_name, a.create_by, a.create_time,a.remark, a.del_flag) values
+        (SEQ_PUBLIC.NEXTVAL, b.holiday_day, b.holiday_name,b.create_by, now(),b.remark, '0')
+    </update>
+
+
+</mapper>

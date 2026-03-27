@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhParamsEntityMapper">
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhParams" id="LhParamsResult">
+            <result property="id" column="ID"/>
+            <result property="factoryCode" column="FACTORY_CODE"/>
+            <result property="paramCode" column="PARAM_CODE"/>
+            <result property="paramName" column="PARAM_NAME"/>
+            <result property="paramValue" column="PARAM_VALUE"/>
+            <result property="regularExpression" column="REGULAR_EXPRESSION"/>
+            <result property="errorTips" column="ERROR_TIPS"/>
+            <result property="createBy" column="CREATE_BY"/>
+            <result property="createTime" column="CREATE_TIME"/>
+            <result property="updateBy" column="UPDATE_BY"/>
+            <result property="updateTime" column="UPDATE_TIME"/>
+            <result property="isDelete" column="IS_DELETE"/>
+            <result property="remark" column="REMARK"/>
+    </resultMap>
+
+    <sql id="selectLhParamsVo">
+        SELECT ID, FACTORY_CODE, PARAM_CODE, PARAM_NAME, PARAM_VALUE, REGULAR_EXPRESSION, ERROR_TIPS, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK, FROM T_LH_PARAMS
+    </sql>
+
+
+</mapper>

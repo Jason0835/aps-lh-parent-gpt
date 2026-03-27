@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhTestScheduleResultEntityMapper">
+
+    <!-- 根据分厂编码和排程时间进行真删除 -->
+    <delete id="deleteByFactoryCodeAndScheduleDate">
+        DELETE FROM t_test_schedule_result
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND SCHEDULE_DATE = #{scheduleDate}
+    </delete>
+
+</mapper>

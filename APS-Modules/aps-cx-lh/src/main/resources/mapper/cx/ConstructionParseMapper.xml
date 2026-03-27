@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.entity.ConstructionParseMapper">
+
+	<!-- 查询施工表字段映射配置列表 -->
+    <select id="selectTPlmBomConstructionMapping" resultType="com.zlt.aps.cxlh.cx.api.domain.vo.TMesConstructionMapping">
+		SELECT T.CONSTRUCTION_COLUMN COLUMN_NAME, 
+		       T.REGULAR_EXPRESSION, 
+		       T.ERROR_TIPS
+		  FROM T_PLM_BOM_CONSTRUCTION_MAPPING T
+		 WHERE IS_DELETE = '0'
+		   AND CONSTRUCTION_COLUMN NOT IN (
+		   <!-- 胎号、版本不允许修改，因此需要过滤掉 -->
+		   'EMBRYO_CODE', 'EMBRYO_VERSION',
+		   <!-- 合模压力根硫化时间不需要解析到施工表，而是在硫化施工表单独解析，因此需要过滤掉 -->
+		   'CLAMPING_PRESSURE', 'CURING_TIME'
+		   )
+    </select>
+    
+	<!-- 解析bom表，关联plm参数表与施工表字段映射配置表，抓取本次同步需要更新施工表哪个胎胚号的数据 -->
+	<!-- 由于一条胎胚的更新数据有可能分成几个版本发送过来，如果胎胚层（第一层）延迟发送会导致先发送过来的栏位更新会被忽略掉
+		  因此每次更新都将该胎胚的所有字段刷新一边 -->
+    <select id="selectTMesConstructionInfo" resultType="com.zlt.aps.cxlh.cx.api.domain.vo.TMesConstructionInfo">
+		WITH TEMP_TAB AS
+		<!--=======================树解析start===================-->
+		<!-- 将bom表解析成树结构，每一个胎胚一棵树 -->
+		 (SELECT CONNECT_BY_ROOT REGEXP_SUBSTR(T.CHILD_CODE, '\w+') EMBRYO_CODE,
+		         CONNECT_BY_ROOT CHILD_MATERIAL_VERSION EMBRYO_VERSION,
+		         CONNECT_BY_ROOT T.SAP_VERSION SAP_VERSION,
+		         <!-- 从根节点到当前节点的状态，用于判断上层节点是否有废止的，从废止节点开始的子树节点都要视为废止 -->
+		         SYS_CONNECT_BY_PATH(NVL(STATUS, 1), '/') STATUS_PATH,
+		         <!-- 父节点的物料名称编号，用于识别字段映射关系，通过解析树结构获取每一层的物料名称编号，通过截取获取上一层的编号 -->
+		         CASE
+		           WHEN CHILD_MATERIAL_NAME_CODE IS NULL THEN
+		            NULL
+		           ELSE
+		            SUBSTR(REPLACE(SYS_CONNECT_BY_PATH(CHILD_MATERIAL_NAME_CODE, '/'),
+		                           '/' || CHILD_MATERIAL_NAME_CODE),
+		                   INSTR(REPLACE(SYS_CONNECT_BY_PATH(CHILD_MATERIAL_NAME_CODE,
+		                                                     '/'),
+		                                 '/' || CHILD_MATERIAL_NAME_CODE),
+		                         '/',
+		                         -1) + 1)
+		         END PARENT_MATERIAL_NAME_CODE,
+		         <!-- 从根节点到当前节点的ID序列，用于确认最操作 -->
+		         SYS_CONNECT_BY_PATH(id, '/') ID_PATH,
+		         CHILD_MATERIAL_NAME_CODE,
+		         CHILD_MATERIAL_CODE,
+		         CHILD_CODE,
+		         BOM_VERSION,
+		         PARENT_MATERIAL_CODE,
+		         PARENT_CODE,
+		         <!-- 数据时间相关字段，用于去重 -->
+		         NVL(T.MES_UPDATE_DATE, T.MES_CREATE_DATE)        UPDATE_DATE,
+		         NVL(T.MES_CREATE_DATE, T.MES_UPDATE_DATE)        CREATE_DATE,
+		         T.CHILD_MATERIAL_VERSION,
+         		 NVL(STATUS, 1) STATUS,
+		         T.DOSAGE,
+		         T.ID
+		    FROM T_BOM_INFO T
+        <if test="enable">
+           WHERE NVL(STATUS, 1) != '3'
+        </if>
+		<!-- 树解析方式：
+				以修改节点为根节点
+				父节点的CHILD_MATERIAL_CODE = 子节点的PARENT_MATERIAL_CODE
+				父节点的CHILD_MATERIAL_VERSION = 子节点的BOM_VERSION
+		  -->
+		   START WITH T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+          		  AND T.CHILD_CODE LIKE #{embryoCode} || '%'
+          		  AND T.CHILD_MATERIAL_VERSION = #{embryoVersion}
+          		  <if test="enable">
+          		  AND NVL(STATUS, 1) != '3'
+          		  </if>
+		<!-- 胎胚层去重看更新时间，较晚的优先级更高
+		  -->
+		          AND NOT EXISTS
+		   (SELECT 1
+		                 FROM T_BOM_INFO TT
+		                WHERE T.CHILD_MATERIAL_CODE = TT.CHILD_MATERIAL_CODE
+		                  AND TT.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		                  AND T.CHILD_MATERIAL_VERSION = TT.CHILD_MATERIAL_VERSION
+		                  AND (TT.MES_UPDATE_DATE > T.MES_UPDATE_DATE OR
+		                      TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE > T.MES_CREATE_DATE OR
+			                  TT.MES_UPDATE_DATE = T.MES_UPDATE_DATE AND TT.MES_CREATE_DATE = T.MES_CREATE_DATE AND
+		                      TT.ID > T.ID)
+          		  <if test="enable">
+		                  AND NVL(TT.STATUS, 1) != '3')
+          		  </if>
+		  <!-- 胎胚层与下一层需要通过版本关联，其余层不需要关联版本 -->
+		  CONNECT BY PRIOR T.CHILD_MATERIAL_CODE = T.PARENT_MATERIAL_CODE
+		         AND (PRIOR T.CHILD_MATERIAL_VERSION = T.BOM_VERSION
+		          AND PRIOR T.CHILD_MATERIAL_NAME_CODE = 'EMBRYO'
+		           OR PRIOR T.CHILD_MATERIAL_NAME_CODE != 'EMBRYO'
+		         )
+		) 
+		<!--============================树解析end=========================-->
+		SELECT T1.EMBRYO_CODE, 		<!--胎号-->
+		       T1.EMBRYO_VERSION,	<!--胎胚版本-->
+		       T1.SAP_VERSION,		<!--sap版本 -->
+		       M.CONSTRUCTION_COLUMN COLUMN_NAME, <!--施工表字段名-->
+		<!--根据来源配置从不同的字段取字段值：
+		       1、取BOM表的CHILD_CODE，
+		       2、取BOM表的CHILD_MATERIAL_CODE，
+		       3、取BOM表的PARENT_CODE
+		       4、取PLM表的PARAM_VALUE
+		       5、取BOM表的DOSAGE
+		       5、取BOM表的BOM_VERSION
+		         另外，如果bom状态为已废止，则直接清空-->
+        <if test="enable">
+		       CASE
+		         WHEN T1.STATUS_PATH like '%3%' THEN
+		          null
+		         ELSE
+        </if>
+				       DECODE(M.SOURCE_COLUMN,
+				              1,
+				              T1.CHILD_CODE,
+				              2,
+				              T1.CHILD_MATERIAL_CODE,
+				              3,
+				              T1.PARENT_CODE,
+				              4,
+				              DECODE(P.IS_DELETE, 0, P.PARAM_VALUE, null),  <!--从PLM取值，如果PLM参数状态为删除，也需要清空 -->
+				              5,
+				              to_char(T1.DOSAGE),
+				              6,
+				              T1.CHILD_MATERIAL_VERSION,
+				              NULL)
+        <if test="enable">
+		       END 
+        </if>
+		       COLUMN_VALUE,
+		       T1.CHILD_MATERIAL_CODE,
+		       T1.CHILD_MATERIAL_NAME_CODE,
+		       T1.PARENT_MATERIAL_CODE,
+		       <!-- 树ID序列，用于判断是否最新 -->
+		       ID_PATH ID,
+		       M.SORT_CODE,
+		       T1.UPDATE_DATE,
+		       T1.CREATE_DATE,
+		       <!-- 当数据不是从PLM获取时，PLM更新时间取BOM的更新时间，不要返回空值 -->
+		       NVL(p.UPDATE_DATE, NVL(p.CREATE_DATE, T1.UPDATE_DATE)) PLM_UPDATE_DATE,
+		       nvl(T1.DOSAGE, 0) DOSAGE,
+		       M.REMARK,
+		       M.MATERIAL_TYPE
+		  FROM TEMP_TAB T1
+		 INNER JOIN T_PLM_BOM_CONSTRUCTION_MAPPING M
+		    ON T1.CHILD_MATERIAL_NAME_CODE || ':' || T1.PARENT_MATERIAL_NAME_CODE = 
+		       M.CHILD_MATERIAL_NAME_CODE || ':' || M.PARENT_MATERIAL_NAME_CODE
+		   AND M.CONSTRUCTION_COLUMN NOT IN (
+		   <!-- 胎号、版本不允许修改，直接过滤掉 -->
+		   		'EMBRYO_CODE', 'EMBRYO_VERSION',
+		   <!-- 合模压力根硫化时间不解析到施工表中，直接过滤掉 -->
+		   		'CLAMPING_PRESSURE', 'CURING_TIME'
+		   )
+   		   AND M.IS_DELETE = 0
+   		   AND M.Material_Type = #{materialType}
+		  LEFT JOIN T_PLM_CONSTRUCTION_INFO P
+		    ON P.SAP_CODE = T1.CHILD_MATERIAL_CODE
+		   AND P.PARAM_CODE = M.PARAM_CODE
+		   AND M.SOURCE_COLUMN = 4
+		<!-- 胎胚的PLM参数要关联版本 -->
+		   AND (T1.CHILD_MATERIAL_NAME_CODE = 'EMBRYO' AND
+		       T1.CHILD_MATERIAL_VERSION = P.VERSION OR
+		       T1.CHILD_MATERIAL_NAME_CODE != 'EMBRYO')
+		 WHERE NOT EXISTS
+   		 (SELECT 0
+	            FROM T_PLM_CONSTRUCTION_INFO PP
+	           WHERE PP.SAP_CODE = P.SAP_CODE
+	             AND PP.PARAM_CODE = P.PARAM_CODE
+	             AND (T1.CHILD_MATERIAL_NAME_CODE = 'EMBRYO' AND PP.VERSION = P.VERSION OR
+	                 T1.CHILD_MATERIAL_NAME_CODE != 'EMBRYO')
+	             AND (NVL(PP.UPDATE_DATE, PP.CREATE_DATE) > NVL(P.UPDATE_DATE, P.CREATE_DATE) OR
+	                 NVL(PP.UPDATE_DATE, PP.CREATE_DATE) = NVL(P.UPDATE_DATE, P.CREATE_DATE) AND PP.ID > P.ID))
+    </select>
+    
+
+</mapper>
