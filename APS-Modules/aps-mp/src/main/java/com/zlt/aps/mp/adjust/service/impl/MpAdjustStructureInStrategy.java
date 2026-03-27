@@ -78,18 +78,18 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 //        });
 
         // 检查有错误的信息
-        Map<String, List<String>> messageMap = contextDTO.getMessageMap();
-        List<String> errorMsgList = messageMap.get(ApsConstant.APS_STRING_1);
-        if (PubUtil.isNotEmpty(errorMsgList)) {
-            String errorMsg = Optional.ofNullable(errorMsgList)
-                    .orElse(Collections.emptyList())
-                    .stream()
-                    .distinct()
-                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
-            Assert.isFalse(StringUtils.isNotEmpty(errorMsg), () -> {
-                return new BusinessException(errorMsg);
-            });
-        }
+//        Map<String, List<String>> messageMap = contextDTO.getMessageMap();
+//        List<String> errorMsgList = messageMap.get(ApsConstant.APS_STRING_1);
+//        if (PubUtil.isNotEmpty(errorMsgList)) {
+//            String errorMsg = Optional.ofNullable(errorMsgList)
+//                    .orElse(Collections.emptyList())
+//                    .stream()
+//                    .distinct()
+//                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+//            Assert.isFalse(StringUtils.isNotEmpty(errorMsg), () -> {
+//                return new BusinessException(errorMsg);
+//            });
+//        }
         // 5、通过结构过滤调整明细
         filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
