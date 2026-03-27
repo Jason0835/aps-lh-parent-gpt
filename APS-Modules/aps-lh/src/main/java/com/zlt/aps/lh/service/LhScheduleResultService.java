@@ -182,6 +182,15 @@ public interface LhScheduleResultService extends IDocService<LhScheduleResult> {
 
     List<LhScheduleResult> getScheduleResultList(Date scheduleDate);
 
+    /**
+     * 查询硫化排程结果列表（返回aps-cx-lh-api实体，包含8班数据）
+     * 用于硫化排程结果下发到MES
+     *
+     * @param scheduleDate 排程日期
+     * @return 硫化排程结果列表（aps-cx-lh-api实体）
+     */
+    List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate);
+
     void splitLeftRightMold(LhScheduleResult docEntity, List<LhScheduleResult> splitList);
 
     void copyToDbScheduleResult(LhScheduleResult scheduleResult, LhScheduleResult dbScheduleResult);

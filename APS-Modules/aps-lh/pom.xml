@@ -61,11 +61,21 @@
             <groupId>com.zlt.aps.lh</groupId>
             <artifactId>aps-lh-api</artifactId>
         </dependency>
-<!--        &lt;!&ndash; 月度计划API模块 &ndash;&gt;-->
-<!--        <dependency>-->
-<!--            <groupId>com.zlt.aps</groupId>-->
-<!--            <artifactId>aps-mp-api</artifactId>-->
-<!--        </dependency>-->
+        <!-- 成型硫化API模块（包含8班数据的LhScheduleResult实体） -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-cx-lh-api</artifactId>
+        </dependency>
+        <!-- ITF API模块 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-itf-api</artifactId>
+        </dependency>
+        <!-- 月度计划API模块 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-mp-api</artifactId>
+        </dependency>
         <!-- Hutool工具库 -->
         <dependency>
             <groupId>cn.hutool</groupId>

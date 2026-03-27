@@ -33,6 +33,7 @@ import com.zlt.aps.lh.api.enums.LhParamCodeEnums;
 import com.zlt.aps.lh.api.enums.MachineTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftSystemEnum;
 import com.zlt.aps.lh.handle.LhScheduleResultHandle;
+import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhMoldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultEntityMapper;
 import com.zlt.aps.lh.mapper.LhUnscheduledResultEntityMapper;
@@ -88,6 +89,9 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
     private LhScheduleResultEntityMapper lhScheduleResultEntityMapper;
 
     @Autowired
+    private CxLhScheduleResultMapper cxLhScheduleResultMapper;
+
+    @Autowired
     private LhUnscheduledResultEntityMapper lhUnscheduledResultEntityMapper;
 
     @Autowired
@@ -140,6 +144,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
 
     private static final HashMap<String, Date> statisticsDay = new HashMap<>();
     private static final HashMap<String, String> monthPlanVersion = new HashMap<>();
+
     /**
      * 查询排程当天可查询机台信息
      * 根据规格代号计算机台今日剩余产能：
@@ -634,11 +639,12 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
             }
         }
         // 设置换模次数限制
-        setChangeMouldLimit(lhScheduledResultAllFinalVoList,contextDTO);
+        setChangeMouldLimit(lhScheduledResultAllFinalVoList, contextDTO);
     }
 
     /**
      * 设置换模次数限制
+     *
      * @param lhScheduledResultAllFinalVoList
      * @param contextDTO
      */
@@ -676,9 +682,9 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
                 .collect(Collectors.toSet());
         List<LhScheduleResultVo> limitScheduleResultList = lhScheduledResultAllFinalVoList.stream()
                 .filter(v -> {
-            String key = v.getLhMachineCode() + ApsConstant.SPLIT_CHAR + v.getSpecCode();
-            return keys.contains(key);
-        }).collect(Collectors.toList());
+                    String key = v.getLhMachineCode() + ApsConstant.SPLIT_CHAR + v.getSpecCode();
+                    return keys.contains(key);
+                }).collect(Collectors.toList());
         log.info("[硫化排程] 设置换模次数限制 ==> 限制硫化排程结果列表={}", JSONObject.toJSONString(limitScheduleResultList));
         // 4、设置硫化排程结果各班次计划量为：0，原因分析为：超出换模次数限制
         int workShifts = contextDTO.getWorkShifts();
@@ -686,10 +692,10 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         String[] classAnalysisFieldNameArr = ShiftSystemEnum.getByCode(workShifts).getClassAnalysisFieldNames();
         limitScheduleResultList.forEach(v -> {
             for (String fieldName : classQtyFieldNameArr) {
-                v.setFieldValueByFieldName(fieldName,0);
+                v.setFieldValueByFieldName(fieldName, 0);
             }
             for (String fieldName : classAnalysisFieldNameArr) {
-                v.setFieldValueByFieldName(fieldName,ApsConstant.CHANGE_MOULD_LIMIT);
+                v.setFieldValueByFieldName(fieldName, ApsConstant.CHANGE_MOULD_LIMIT);
             }
         });
         log.info("[硫化排程] 设置换模次数限制 ==> 最终限制硫化排程结果列表={}", JSONObject.toJSONString(limitScheduleResultList));
@@ -1156,7 +1162,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         wrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.DEL_FLAG_NORMAL);
         wrapper.eq(StringUtils.isNotEmpty(factoryCode), LhScheduleResult::getFactoryCode, factoryCode);
         wrapper.between(LhScheduleResult::getScheduleDate, startDate, scheduleTime);
-        wrapper.last(" AND STR_TO_DATE(SCHEDULE_DATE, '%Y-%m-%d' ) = STR_TO_DATE(REAL_SCHEDULE_DATE, '%Y-%m-%d' ) ORDER BY MACHINE_ORDER ASC " );
+        wrapper.last(" AND STR_TO_DATE(SCHEDULE_DATE, '%Y-%m-%d' ) = STR_TO_DATE(REAL_SCHEDULE_DATE, '%Y-%m-%d' ) ORDER BY MACHINE_ORDER ASC ");
         //后续是否需要过滤只查询已发布的数据呢
         List<LhScheduleResult> lhScheduleResults = lhScheduleResultEntityMapper.selectList(wrapper);
         if (CollectionUtils.isNotEmpty(lhScheduleResults)) {
@@ -1369,7 +1375,6 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
     }
 
 
-
     @Override
     public void copyToDbScheduleResult(LhScheduleResult srcScheduleResult, LhScheduleResult destScheduleResult) {
         if (srcScheduleResult == null || destScheduleResult == null) {
@@ -1476,25 +1481,28 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
             return;
         }
 //        String[] split = scheduleResult.getSpecCode().split("\\*");
-        String[] specArr = new String[]{scheduleResult.getSpecCode().substring(0,4),scheduleResult.getSpecCode().substring(5,9)};
-        String[] embryoArr,productArr,specDescArr;
-        if (scheduleResult.getEmbryoCode().indexOf("*")>=0){
-            embryoArr = new String[]{scheduleResult.getEmbryoCode().substring(0,4),scheduleResult.getEmbryoCode().substring(5,9)};
-        }else{
+        String[] specArr = new String[]{scheduleResult.getSpecCode().substring(0, 4), scheduleResult.getSpecCode().substring(5, 9)};
+        String[] embryoArr, productArr, specDescArr;
+        if (scheduleResult.getEmbryoCode().indexOf("*") >= 0) {
+            embryoArr = new String[]{scheduleResult.getEmbryoCode().substring(0, 4), scheduleResult.getEmbryoCode().substring(5, 9)};
+        } else {
             embryoArr = new String[]{scheduleResult.getEmbryoCode()};
-        };
+        }
+        ;
         if (scheduleResult.getProductCode().indexOf("*") >= 0) {
             productArr = new String[]{scheduleResult.getProductCode().substring(0, 8), scheduleResult.getProductCode().substring(9, 17)};
         } else {
             productArr = new String[]{scheduleResult.getProductCode()};
-        };
+        }
+        ;
         int xinIndex = scheduleResult.getSpecDesc().indexOf("*");
         int totalLen = scheduleResult.getSpecDesc().length();
-        if (xinIndex >=0){
-            specDescArr = new String[]{scheduleResult.getSpecDesc().substring(0,xinIndex),scheduleResult.getSpecDesc().substring(xinIndex+1,totalLen)};
-        }else{
+        if (xinIndex >= 0) {
+            specDescArr = new String[]{scheduleResult.getSpecDesc().substring(0, xinIndex), scheduleResult.getSpecDesc().substring(xinIndex + 1, totalLen)};
+        } else {
             specDescArr = new String[]{scheduleResult.getSpecDesc()};
-        };
+        }
+        ;
         scheduleResult.setMoldQty(2);
         for (int i = 0; i < specArr.length; i++) {
             LhScheduleResult newScheduleResult = new LhScheduleResult();
@@ -1506,11 +1514,11 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
             if (productArr.length == 2) {
                 newScheduleResult.setProductCode(productArr[i]);
             }
-            if (specDescArr.length ==2){
+            if (specDescArr.length == 2) {
                 newScheduleResult.setSpecDesc(specDescArr[i]);
             }
-            if (newScheduleResult.getClass1PlanQty() != null){
-                newScheduleResult.setClass1PlanQty(newScheduleResult.getClass1PlanQty()/2);
+            if (newScheduleResult.getClass1PlanQty() != null) {
+                newScheduleResult.setClass1PlanQty(newScheduleResult.getClass1PlanQty() / 2);
             }
             if (newScheduleResult.getClass2PlanQty() != null) {
                 newScheduleResult.setClass2PlanQty(newScheduleResult.getClass2PlanQty() / 2);
@@ -1539,6 +1547,15 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         QueryWrapper<LhScheduleResult> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("schedule_date", scheduleDate);
         return lhScheduleResultEntityMapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate) {
+        // 直接使用aps-cx-lh-api的Mapper查询（包含8班数据）
+        QueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult> queryWrapper =
+                new QueryWrapper<>();
+        queryWrapper.eq("schedule_date", scheduleDate);
+        return cxLhScheduleResultMapper.selectList(queryWrapper);
     }
 
     /**
@@ -1708,8 +1725,8 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
     }
 
     @Override
-    public List<SpecCodeAndProductCodeVO> getConstructionList(String factoryCode, List<String> specCodes){
-        return  productConstructionEntityMapper.queryBySpecCodeAndProductCode(factoryCode, specCodes);
+    public List<SpecCodeAndProductCodeVO> getConstructionList(String factoryCode, List<String> specCodes) {
+        return productConstructionEntityMapper.queryBySpecCodeAndProductCode(factoryCode, specCodes);
     }
 
 
@@ -1725,7 +1742,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         List<LhScheduleResultTotalVo> lhScheduleResults = lhScheduleResultEntityMapper.selectLhScheduleResultTotal(factoryMonthPlanProdFinalVo);
         Map<String, List<LhScheduleResultTotalVo>> lhScheduledMap = lhScheduleResults.stream()
                 .filter(item -> StringUtil.isNotEmpty(item.getSpecCode()) && StringUtil.isNotEmpty(item.getProductCode()))
-                .collect(Collectors.groupingBy(item -> item.getSpecCode()+"-"+item.getProductCode()));
+                .collect(Collectors.groupingBy(item -> item.getSpecCode() + "-" + item.getProductCode()));
         // 获取月度开始跟结束时间
         LocalDate startDate = factoryMonthPlanProdFinalVo.getProductionStartDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate endDate = factoryMonthPlanProdFinalVo.getProductionEndDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
@@ -1744,7 +1761,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         List<LhMonthPlanSurplus> lhMonthPlanSurpluses = lhMonthPlanSurplusEntityMapper.selectList(surplus);
         Map<String, List<LhMonthPlanSurplus>> surplusesdMap = lhMonthPlanSurpluses.stream()
                 .filter(item -> StringUtil.isNotEmpty(item.getSpecCode()) && StringUtil.isNotEmpty(item.getProductCode()))
-                .collect(Collectors.groupingBy(item -> item.getSpecCode()+"-"+item.getProductCode()));
+                .collect(Collectors.groupingBy(item -> item.getSpecCode() + "-" + item.getProductCode()));
         // 获取规格匹配的spa跟施工关系
         List<MdmProductConstruction> mdmProductConstructionVOS = mdmProductConstructionService.selectListByFactoryCodeAndSpecCode(queryVO.getFactoryCode(), lhMonthPlanSurpluses.stream().map(LhMonthPlanSurplus::getSpecCode).distinct().collect(Collectors.toList()));
 
@@ -1755,10 +1772,10 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         stockParams.setMonth(DateUtils.getMonth(queryVO.getScheduleTime()) - 1);
         stockParams.setFactoryCode(queryVO.getFactoryCode());
         List<ProductStockMonth> productStockMonthList = iProductStockMonthRemoteService.selectList(stockParams);
-        log.debug("monthFinishQtyList ==> productStockMonthList={}",JSONObject.toJSONString(productStockMonthList));
+        log.debug("monthFinishQtyList ==> productStockMonthList={}", JSONObject.toJSONString(productStockMonthList));
         Map<String, Integer> stockMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(productStockMonthList)) {
-            stockMap = productStockMonthList.stream().collect(Collectors.toMap(ProductStockMonth::getProductCode, ProductStockMonth::getStockQty,(entity1, entity2) -> entity1));
+            stockMap = productStockMonthList.stream().collect(Collectors.toMap(ProductStockMonth::getProductCode, ProductStockMonth::getStockQty, (entity1, entity2) -> entity1));
         }
         Map<String, Integer> finalStockMap = stockMap;
 
@@ -1785,10 +1802,9 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
         Map<String, Long> finalMouldStatusMap = mouldStatusMap;
 
 
-
         //全部月计划硫化剩余量 循环 每个规格
         List<LhMonthFinishQtyVo> list = new ArrayList<>();
-        lhScheduledMap.forEach((item,values) -> {
+        lhScheduledMap.forEach((item, values) -> {
             String specCode = item.split("-")[0];
             String productCode = item.split("-")[1];
             LhMonthFinishQtyVo qtyVo = new LhMonthFinishQtyVo();
@@ -1826,7 +1842,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
                 qtyVo.setEmbryoCode(mdmProductConstructionVO.getEmbryoCode());
             }
             // 获取月计划剩余量
-            List<LhMonthPlanSurplus> monthPlanSurpluses = surplusesdMap.get(specCode+"-"+productCode);
+            List<LhMonthPlanSurplus> monthPlanSurpluses = surplusesdMap.get(specCode + "-" + productCode);
             if (PubUtil.isEmpty(monthPlanSurpluses)) {
                 qtyVo.setMonthRemainQty(0);
             } else {
@@ -1838,8 +1854,8 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
 //            System.out.println("前循specCode："+ specCode+"------productCode："+productCode);
             dateRange.forEach(dr -> {
                 LhMonthDayFinishQtyVo dayFinishQtyVo = new LhMonthDayFinishQtyVo();
-                List<LocalDate> collect = values.stream().map(rsd ->rsd.getRealScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate()).collect(Collectors.toList());
-                if (collect.contains( dr)) {
+                List<LocalDate> collect = values.stream().map(rsd -> rsd.getRealScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate()).collect(Collectors.toList());
+                if (collect.contains(dr)) {
                     LhScheduleResultTotalVo result = values.stream().filter(re -> dr.equals(re.getRealScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate())).findFirst().get();
 //                    System.out.println("当前循环日期："+ dr+"------记录："+JSON.toJSONString(result));
                     dayFinishQtyVo.setFinishDay(dr.toString());
@@ -1860,66 +1876,66 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
             String specCode = item.getSpecCode();
             String productCode = item.getProductCode();
 
-            if (!lhScheduledMap.containsKey(specCode+"-"+productCode)) {
-            LhMonthFinishQtyVo qtyVo = new LhMonthFinishQtyVo();
-            qtyVo.setFactoryCode(factoryMonthPlanProdFinalVo.getFactoryCode());
-            qtyVo.setProductCode(productCode);
-            qtyVo.setSpecCode(specCode);
-            qtyVo.setPlanStartDate(factoryMonthPlanProdFinalVo.getProductionStartDate());
-            qtyVo.setPlanEndDate(factoryMonthPlanProdFinalVo.getProductionEndDate());
+            if (!lhScheduledMap.containsKey(specCode + "-" + productCode)) {
+                LhMonthFinishQtyVo qtyVo = new LhMonthFinishQtyVo();
+                qtyVo.setFactoryCode(factoryMonthPlanProdFinalVo.getFactoryCode());
+                qtyVo.setProductCode(productCode);
+                qtyVo.setSpecCode(specCode);
+                qtyVo.setPlanStartDate(factoryMonthPlanProdFinalVo.getProductionStartDate());
+                qtyVo.setPlanEndDate(factoryMonthPlanProdFinalVo.getProductionEndDate());
 
-            // 期初库存
-            if (finalStockMap.containsKey(productCode)) {
-                Integer stockQty = finalStockMap.get(productCode);
-                qtyVo.setInitQty(stockQty);
-            }
-            //根据productCode跟specCode查找当前的月计划最终定稿
-            List<FactoryMonthPlanProdFinalVo> vos = currentMonthPlanList.stream().filter(it -> it.getProductCode().equals(productCode) && it.getSpecCode().equals(specCode)).collect(Collectors.toList());
-            if (CollectionUtils.isNotEmpty(vos)) {
-                qtyVo.setSpecDesc(vos.get(0).getProductDesc());
-                qtyVo.setBrand(vos.get(0).getBrand());
-                qtyVo.setUsedMouldQty(vos.get(0).getMouldQty());
-                qtyVo.setMouldNo(vos.get(0).getMouldNo());
-                // 月计划排产量
-                qtyVo.setMonthPlanQty(calculateTotalSum(vos));//月计划量
-            }
-            // 可用模具数
-            if (finalMouldStatusMap.containsKey(qtyVo.getMouldNo())) {
-                Long mouldNum = finalMouldStatusMap.get(qtyVo.getMouldNo());
-                qtyVo.setMouldQty(mouldNum.intValue());
-            }
-            MdmProductConstruction mdmProductConstructionVO = mdmProductConstructionVOS.stream().filter(it -> it.getProductCode().equals(productCode) && it.getSpecCode().equals(specCode)).findFirst().orElse(null);
-            if (mdmProductConstructionVO != null) {
-                qtyVo.setConstructionCode(mdmProductConstructionVO.getConstructionCode());
-                qtyVo.setCuringTime(mdmProductConstructionVO.getCuringTime());
-                qtyVo.setCuringTime2(mdmProductConstructionVO.getCuringTime2());
-                qtyVo.setEmbryoCode(mdmProductConstructionVO.getEmbryoCode());
-            }
-            // 获取月计划剩余量
-            List<LhMonthPlanSurplus> monthPlanSurpluses = surplusesdMap.get(specCode+"-"+productCode);
-            if (PubUtil.isEmpty(monthPlanSurpluses)) {
-                qtyVo.setMonthRemainQty(0);
-            } else {
-                qtyVo.setMonthRemainQty(monthPlanSurpluses.stream().mapToInt(LhMonthPlanSurplus::getMonthRemainQty).sum());//剩余数量
-            }
-            List<LhMonthDayFinishQtyVo> dayFinishQtyList = new ArrayList<>();
+                // 期初库存
+                if (finalStockMap.containsKey(productCode)) {
+                    Integer stockQty = finalStockMap.get(productCode);
+                    qtyVo.setInitQty(stockQty);
+                }
+                //根据productCode跟specCode查找当前的月计划最终定稿
+                List<FactoryMonthPlanProdFinalVo> vos = currentMonthPlanList.stream().filter(it -> it.getProductCode().equals(productCode) && it.getSpecCode().equals(specCode)).collect(Collectors.toList());
+                if (CollectionUtils.isNotEmpty(vos)) {
+                    qtyVo.setSpecDesc(vos.get(0).getProductDesc());
+                    qtyVo.setBrand(vos.get(0).getBrand());
+                    qtyVo.setUsedMouldQty(vos.get(0).getMouldQty());
+                    qtyVo.setMouldNo(vos.get(0).getMouldNo());
+                    // 月计划排产量
+                    qtyVo.setMonthPlanQty(calculateTotalSum(vos));//月计划量
+                }
+                // 可用模具数
+                if (finalMouldStatusMap.containsKey(qtyVo.getMouldNo())) {
+                    Long mouldNum = finalMouldStatusMap.get(qtyVo.getMouldNo());
+                    qtyVo.setMouldQty(mouldNum.intValue());
+                }
+                MdmProductConstruction mdmProductConstructionVO = mdmProductConstructionVOS.stream().filter(it -> it.getProductCode().equals(productCode) && it.getSpecCode().equals(specCode)).findFirst().orElse(null);
+                if (mdmProductConstructionVO != null) {
+                    qtyVo.setConstructionCode(mdmProductConstructionVO.getConstructionCode());
+                    qtyVo.setCuringTime(mdmProductConstructionVO.getCuringTime());
+                    qtyVo.setCuringTime2(mdmProductConstructionVO.getCuringTime2());
+                    qtyVo.setEmbryoCode(mdmProductConstructionVO.getEmbryoCode());
+                }
+                // 获取月计划剩余量
+                List<LhMonthPlanSurplus> monthPlanSurpluses = surplusesdMap.get(specCode + "-" + productCode);
+                if (PubUtil.isEmpty(monthPlanSurpluses)) {
+                    qtyVo.setMonthRemainQty(0);
+                } else {
+                    qtyVo.setMonthRemainQty(monthPlanSurpluses.stream().mapToInt(LhMonthPlanSurplus::getMonthRemainQty).sum());//剩余数量
+                }
+                List<LhMonthDayFinishQtyVo> dayFinishQtyList = new ArrayList<>();
 
-            qtyVo.setMonthFinishQty(0);//本月完成数量
+                qtyVo.setMonthFinishQty(0);//本月完成数量
 //            System.out.println("前循specCode："+ specCode+"------productCode："+productCode);
-            dateRange.forEach(dr -> {
-                LhMonthDayFinishQtyVo dayFinishQtyVo = new LhMonthDayFinishQtyVo();
-                dayFinishQtyVo.setFinishDay(dr.toString());
-                dayFinishQtyVo.setFinishQty(0);
-                dayFinishQtyList.add(dayFinishQtyVo);
-            });
-            qtyVo.setDayFinishQtyList(dayFinishQtyList);
-            list.add(qtyVo);
+                dateRange.forEach(dr -> {
+                    LhMonthDayFinishQtyVo dayFinishQtyVo = new LhMonthDayFinishQtyVo();
+                    dayFinishQtyVo.setFinishDay(dr.toString());
+                    dayFinishQtyVo.setFinishQty(0);
+                    dayFinishQtyList.add(dayFinishQtyVo);
+                });
+                qtyVo.setDayFinishQtyList(dayFinishQtyList);
+                list.add(qtyVo);
             }
         });
-        return buildQueryCondition(list,queryVO);
+        return buildQueryCondition(list, queryVO);
     }
 
-    private List buildQueryCondition(List<LhMonthFinishQtyVo> list,LhMonthPlanSurplusDetail queryVO) {
+    private List buildQueryCondition(List<LhMonthFinishQtyVo> list, LhMonthPlanSurplusDetail queryVO) {
         if (PubUtil.isEmpty(list)) {
             return Collections.emptyList();
         }
@@ -1929,7 +1945,7 @@ public class LhScheduleResultServiceImpl extends AbstractDocService<LhScheduleRe
                 .filter(item -> StringUtils.isEmpty(queryVO.getSpecCode()) || queryVO.getSpecCode().equals(item.getSpecCode()))
                 .filter(item -> StringUtils.isEmpty(queryVO.getEmbryoCode()) || queryVO.getEmbryoCode().equals(item.getEmbryoCode()))
                 .filter(item -> StringUtils.isEmpty(queryVO.getMouldNo()) || queryVO.getMouldNo().equals(item.getMouldNo()))
-                .filter(item -> StringUtils.isEmpty(queryVO.getSpecDesc()) || StringUtils.contains(item.getSpecDesc(),queryVO.getSpecDesc()))
+                .filter(item -> StringUtils.isEmpty(queryVO.getSpecDesc()) || StringUtils.contains(item.getSpecDesc(), queryVO.getSpecDesc()))
                 .filter(item -> StringUtils.isEmpty(queryVO.getBrand()) || queryVO.getBrand().equals(item.getBrand()))
                 .collect(Collectors.toList());
     }
