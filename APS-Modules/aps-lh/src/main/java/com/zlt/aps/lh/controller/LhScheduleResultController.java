@@ -41,6 +41,7 @@ import com.zlt.aps.lh.service.LhScheduleResultService;
 import com.zlt.aps.maindata.service.IMdmProductConstructionService;
 import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.LhMonthPlanSurplusDetail;
+import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.mp.api.domain.vo.LhMonthFinishQtyVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -63,6 +64,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -106,6 +109,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     private SyncDataLogsService syncDataLogsService;
     @Autowired
     private FactoryService factoryService;
+    @Autowired
+    private com.zlt.aps.itf.mes.IMesItfService mesItfService;
     /**
      * 查询2025213硫化排程列表查询
      */
@@ -666,5 +671,268 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             return AjaxResult.success(Collections.emptyList());
         }
         return AjaxResult.success(lhScheduleResultService.getStatisticsDay(param));
+    }
+
+    /**
+     * 硫化排程结果下发到MES
+     * 背景逻辑：
+     * 1. 夜班是凌晨的叫夜班，所以当天的夜班是已经在执行确定了
+     * 2. 到早上的时候触发排程，排程逻辑是夜早中
+     * 3. 8班对应关系（使用aps-cx-lh-api实体）：
+     *    - 1-2班：当天的早、中班（夜班已生产）
+     *    - 3-5班：第二天的夜、早、中班
+     *    - 6-8班：第三天的夜、早、中班
+     * 4. 中间表映射：1班=夜班，2班=早班，3班=中班
+     * 5. 当天、隔天数据更新（存在则更新，不存在则插入）
+     * 6. 第三天数据下发（插入）
+     *
+     * @return 下发结果
+     */
+    @ApiOperation(value = "硫化排程结果下发到MES", notes = "将硫化排程结果下发到MES中间表，8班数据对应3天班次")
+    @Log(title = "硫化排程结果下发", businessType = BusinessType.PUBLISH)
+    @PostMapping("/issueToMes")
+    public AjaxResult issueLhScheduleResultToMes() {
+
+        // 获取今天、明天、后天的日期
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        LocalDate dayAfterTomorrow = today.plusDays(2);
+
+        // 只查询当天的排程结果数据（包含8班数据）- 使用aps-cx-lh-api实体
+        List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> scheduleResultList =
+                lhScheduleResultService.getCxLhScheduleResultList(java.sql.Date.valueOf(today));
+
+        if (scheduleResultList.isEmpty()) {
+            return AjaxResult.error("没有需要下发的硫化排程结果数据");
+        }
+
+        // 转换为3天的下发数据
+        List<LhScheduleResultIssue> day1IssueList = new ArrayList<>();    // 当天（更新）
+        List<LhScheduleResultIssue> day2IssueList = new ArrayList<>();    // 隔天（更新）
+        List<LhScheduleResultIssue> day3IssueList = new ArrayList<>();    // 后天（插入）
+
+        for (com.zlt.aps.cx.entity.schedule.LhScheduleResult source : scheduleResultList) {
+            // 第1天（当天）- 更新2班数据（早中班）
+            LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, today);
+            if (day1Issue != null) {
+                day1IssueList.add(day1Issue);
+            }
+
+            // 第2天（隔天）- 更新3班数据（夜早中班）
+            LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, tomorrow);
+            if (day2Issue != null) {
+                day2IssueList.add(day2Issue);
+            }
+
+            // 第3天（后天）- 下发3班数据（夜早中班）
+            LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, dayAfterTomorrow);
+            if (day3Issue != null) {
+                day3IssueList.add(day3Issue);
+            }
+        }
+
+        if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
+            return AjaxResult.error("没有需要下发的硫化排程结果数据");
+        }
+
+        // 合并所有数据并调用下发接口
+        List<LhScheduleResultIssue> allIssueList = new ArrayList<>();
+        allIssueList.addAll(day1IssueList);
+        allIssueList.addAll(day2IssueList);
+        allIssueList.addAll(day3IssueList);
+
+        // 通过Feign客户端调用itf模块的下发接口
+        return mesItfService.issueLhScheduleResult(allIssueList);
+    }
+
+    /**
+     * 转换为第1天（当天）的下发实体
+     * 8班数据：1班(早)、2班(中) -> 中间表：1班(夜)=空, 2班(早)=1班, 3班(中)=2班
+     * 业务规则：只更新2班数据（早中班），即中间表的2班(早)和3班(中)
+     * 使用aps-cx-lh-api实体（有8班数据）
+     */
+    private LhScheduleResultIssue convertToDay1IssueEntity(com.zlt.aps.cx.entity.schedule.LhScheduleResult source, LocalDate scheduleDate) {
+        if (source == null) {
+            return null;
+        }
+
+        LhScheduleResultIssue target = new LhScheduleResultIssue();
+
+        // 基础字段映射
+        target.setId(source.getId());
+        target.setLhBatchNo(source.getBatchNo());
+        target.setOrderNo(source.getOrderNo());
+        target.setScheduleDate(scheduleDate.atStartOfDay());
+
+        // 机台信息
+        target.setLhMachineCode(source.getLhMachineCode());
+        target.setLhMachineName(source.getLhMachineName());
+        target.setLeftRightMold(source.getLeftRightMould());
+
+        // 物料信息（aps-cx-lh-api使用materialCode而不是productCode）
+        target.setMaterialCode(source.getMaterialCode());
+        target.setMesMaterialCode(null); // MES物料编码需要另外查询
+        target.setSpecCode(source.getSpecCode());
+        target.setSpecDesc(source.getSpecDesc());
+        target.setDailyPlanQty(BigDecimal.valueOf(source.getDailyPlanQty() != null ? source.getDailyPlanQty() : 0));
+
+
+        // 中间表2班 = 早班（对应APS 1班）
+        target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
+        target.setClass2AnalysisInput(null);
+        target.setClass2Analysis(source.getClass1Analysis());
+        target.setClass2PlanQty(BigDecimal.valueOf(source.getClass1PlanQty() != null ? source.getClass1PlanQty() : 0));
+        target.setClass2ExampleType(null);
+        target.setClass2ExampleNo(null);
+
+        // 中间表3班 = 中班（对应APS 2班）
+        target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
+        target.setClass3AnalysisInput(null);
+        target.setClass3Analysis(source.getClass2Analysis());
+        target.setClass3PlanQty(BigDecimal.valueOf(source.getClass2PlanQty() != null ? source.getClass2PlanQty() : 0));
+        target.setClass3ExampleType(null);
+        target.setClass3ExampleNo(null);
+
+        // 硫化时长
+        target.setLhTime(source.getLhTime());
+
+        // 版本和工厂信息（aps-cx-lh-api没有bomVersion字段，使用dataSource或其他字段）
+        target.setDataVersion(null);
+        target.setCompanyCode(source.getFactoryCode()); // 使用分厂编码作为分公司编码
+        target.setFactoryCode(source.getFactoryCode());
+
+        return target;
+    }
+
+    /**
+     * 转换为第2天（隔天）的下发实体
+     * 8班数据：3班(夜)、4班(早)、5班(中) -> 中间表：1班(夜)=3班, 2班(早)=4班, 3班(中)=5班
+     * 业务规则：更新3班数据（夜早中班）
+     * 使用aps-cx-lh-api实体（有8班数据）
+     */
+    private LhScheduleResultIssue convertToDay2IssueEntity(com.zlt.aps.cx.entity.schedule.LhScheduleResult source, LocalDate scheduleDate) {
+        if (source == null) {
+            return null;
+        }
+
+        LhScheduleResultIssue target = new LhScheduleResultIssue();
+
+        // 基础字段映射
+        target.setId(source.getId());
+        target.setLhBatchNo(source.getBatchNo());
+        target.setOrderNo(source.getOrderNo());
+        target.setScheduleDate(scheduleDate.atStartOfDay());
+
+        // 机台信息
+        target.setLhMachineCode(source.getLhMachineCode());
+        target.setLhMachineName(source.getLhMachineName());
+        target.setLeftRightMold(source.getLeftRightMould());
+
+        // 物料信息（aps-cx-lh-api使用materialCode）
+        target.setMaterialCode(source.getMaterialCode());
+        target.setMesMaterialCode(null);
+        target.setSpecCode(source.getSpecCode());
+        target.setSpecDesc(source.getSpecDesc());
+        target.setDailyPlanQty(BigDecimal.valueOf(source.getDailyPlanQty() != null ? source.getDailyPlanQty() : 0));
+
+        // 中间表1班 = 夜班（对应APS 3班）
+        target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
+        target.setClass1AnalysisInput(null);
+        target.setClass1Analysis(source.getClass3Analysis());
+        target.setClass1PlanQty(BigDecimal.valueOf(source.getClass3PlanQty() != null ? source.getClass3PlanQty() : 0));
+        target.setClass1ExampleType(null);
+        target.setClass1ExampleNo(null);
+
+        // 中间表2班 = 早班（对应APS 4班）
+        target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
+        target.setClass2AnalysisInput(null);
+        target.setClass2Analysis(source.getClass4Analysis());
+        target.setClass2PlanQty(BigDecimal.valueOf(source.getClass4PlanQty() != null ? source.getClass4PlanQty() : 0));
+        target.setClass2ExampleType(null);
+        target.setClass2ExampleNo(null);
+
+        // 中间表3班 = 中班（对应APS 5班）
+        target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
+        target.setClass3AnalysisInput(null);
+        target.setClass3Analysis(source.getClass5Analysis());
+        target.setClass3PlanQty(BigDecimal.valueOf(source.getClass5PlanQty() != null ? source.getClass5PlanQty() : 0));
+        target.setClass3ExampleType(null);
+        target.setClass3ExampleNo(null);
+
+        // 硫化时长
+        target.setLhTime(source.getLhTime());
+
+        // 版本和工厂信息（aps-cx-lh-api没有bomVersion字段）
+        target.setDataVersion(null);
+        target.setCompanyCode(source.getFactoryCode());
+        target.setFactoryCode(source.getFactoryCode());
+
+        return target;
+    }
+
+    /**
+     * 转换为第3天（后天）的下发实体
+     * 8班数据：6班(夜)、7班(早)、8班(中) -> 中间表：1班(夜)=6班, 2班(早)=7班, 3班(中)=8班
+     * 业务规则：下发3班数据（夜早中班）
+     * 使用aps-cx-lh-api实体（有8班数据）
+     */
+    private LhScheduleResultIssue convertToDay3IssueEntity(com.zlt.aps.cx.entity.schedule.LhScheduleResult source, LocalDate scheduleDate) {
+        if (source == null) {
+            return null;
+        }
+
+        LhScheduleResultIssue target = new LhScheduleResultIssue();
+
+        // 基础字段映射
+        target.setId(source.getId());
+        target.setLhBatchNo(source.getBatchNo());
+        target.setOrderNo(source.getOrderNo());
+        target.setScheduleDate(scheduleDate.atStartOfDay());
+
+        // 机台信息
+        target.setLhMachineCode(source.getLhMachineCode());
+        target.setLhMachineName(source.getLhMachineName());
+        target.setLeftRightMold(source.getLeftRightMould());
+
+        // 物料信息（aps-cx-lh-api使用materialCode）
+        target.setMaterialCode(source.getMaterialCode());
+        target.setMesMaterialCode(null);
+        target.setSpecCode(source.getSpecCode());
+        target.setSpecDesc(source.getSpecDesc());
+        target.setDailyPlanQty(BigDecimal.valueOf(source.getDailyPlanQty() != null ? source.getDailyPlanQty() : 0));
+
+        // 中间表1班 = 夜班（对应APS 6班）
+        target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
+        target.setClass1AnalysisInput(null);
+        target.setClass1Analysis(source.getClass6Analysis());
+        target.setClass1PlanQty(BigDecimal.valueOf(source.getClass6PlanQty() != null ? source.getClass6PlanQty() : 0));
+        target.setClass1ExampleType(null);
+        target.setClass1ExampleNo(null);
+
+        // 中间表2班 = 早班（对应APS 7班）
+        target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
+        target.setClass2AnalysisInput(null);
+        target.setClass2Analysis(source.getClass7Analysis());
+        target.setClass2PlanQty(BigDecimal.valueOf(source.getClass7PlanQty() != null ? source.getClass7PlanQty() : 0));
+        target.setClass2ExampleType(null);
+        target.setClass2ExampleNo(null);
+
+        // 中间表3班 = 中班（对应APS 8班）
+        target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
+        target.setClass3AnalysisInput(null);
+        target.setClass3Analysis(source.getClass8Analysis());
+        target.setClass3PlanQty(BigDecimal.valueOf(source.getClass8PlanQty() != null ? source.getClass8PlanQty() : 0));
+        target.setClass3ExampleType(null);
+        target.setClass3ExampleNo(null);
+
+        // 硫化时长
+        target.setLhTime(source.getLhTime());
+
+        // 版本和工厂信息（aps-cx-lh-api没有bomVersion字段）
+        target.setDataVersion(null);
+        target.setCompanyCode(source.getFactoryCode());
+        target.setFactoryCode(source.getFactoryCode());
+
+        return target;
     }
 }
