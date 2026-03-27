@@ -2855,20 +2855,27 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 productStatus = ConstructionStageEnum.TRIAL_FLAG;
             }
         }
-        // 按物料编码+产品状态优先级匹配SKU与示方书记录
-        MdmSkuConstructionRef skuConstructionRef = matchSkuConstruction(materialCode, productStatus, mdmSkuConstructionRefList);
-        // 检查SKU与示方书关系
-        List<String> errorMsgList = checkSkuConstructionRef(contextDTO, skuConstructionRef, materialCode);
-        if (PubUtil.isNotEmpty(errorMsgList)) {
-            return;
-        }
-        // 胎胚号
-        adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
         // 物料信息
         Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
         MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
         // 结构名称
         adjustDetailVo.setStructureName(materialInfo.getStructureName());
+        // 按物料编码+产品状态优先级匹配SKU与示方书记录
+        MdmSkuConstructionRef skuConstructionRef = matchSkuConstruction(materialCode, productStatus, mdmSkuConstructionRefList);
+        // 错误信息列表
+        List<String> errorMsgList = new ArrayList<>();
+        // 结构名称
+        String structureName = contextDTO.getStructureName();
+        if (StringUtils.isEmpty(structureName) || StringUtils.equals(structureName, materialInfo.getStructureName())) {
+            // 检查SKU与示方书关系
+            errorMsgList = checkSkuConstructionRef(contextDTO, skuConstructionRef, materialCode);
+        }
+        if (PubUtil.isNotEmpty(errorMsgList)) {
+            return;
+        }
+        // 胎胚号
+        adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
+
         // 月计划结构转产
         Map<String, List<MpStructureAllocation>> structureAllocationMap = contextDTO.getStructureAllocationMap();
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());
