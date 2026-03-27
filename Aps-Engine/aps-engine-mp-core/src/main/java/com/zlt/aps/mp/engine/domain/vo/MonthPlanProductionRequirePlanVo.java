@@ -110,9 +110,9 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      */
     private Integer producedQty;
     /**
-     * 是否补实单
+     * 其余搭配量
      */
-    private Boolean isSkuProduced;
+    private Integer otherMatchingQty;
 
     /**
      * 初始的排产数据设置
@@ -315,6 +315,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //默认可生产
         plan.setCantProduce(YesOrNoEnum.NO.getCode());
         plan.setIsPrioritize(require.getScmPriority());
+        plan.setStructurePriority(require.getStructurePriority());
         //排产为空，则默认可排产
         if (StringUtils.isBlank(require.getIsProduction())) {
             plan.setIsProduction(YesOrNoEnum.YES.getCode());

@@ -85,6 +85,7 @@
         AND mmi.IS_DELETE = 0
         WHERE msm.IS_DELETE = 0
         AND msm.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+        <if test="!allMaterial"> <!-- 非全物料导出，需要关联需求计划 -->
         AND EXISTS (
         SELECT 1 FROM (
         SELECT mpi.MATERIAL_DESC, mpi.FACTORY_CODE
@@ -107,6 +108,7 @@
         WHERE combined.MATERIAL_DESC = msm.MATERIAL_DESC
         AND combined.FACTORY_CODE = msm.FACTORY_CODE
         )
+        </if>
     </select>
 
     <select id="getEnableMouldDeliveryInfoByNetDemand" resultType="com.zlt.aps.mp.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo">

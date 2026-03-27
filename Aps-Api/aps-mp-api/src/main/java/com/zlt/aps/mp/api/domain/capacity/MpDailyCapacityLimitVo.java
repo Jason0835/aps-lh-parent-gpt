@@ -59,6 +59,21 @@ public class MpDailyCapacityLimitVo {
     private Integer maxDayProductionQty = 0;
 
     /**
+     *  (结构+日)剩余最大日产量
+     */
+    private Integer remainMaxDayProductionQty = 0;
+
+    /**
+     *  (结构+日)剩余硫化机台数
+     */
+    private Integer remainLhMachines = 0;
+
+    /**
+     *  (结构)剩余贴牌计划量
+     */
+    private Integer remainOemQty = 0;
+
+    /**
      *  是否开产首日
      */
     private boolean openProductionFirstDay = false;

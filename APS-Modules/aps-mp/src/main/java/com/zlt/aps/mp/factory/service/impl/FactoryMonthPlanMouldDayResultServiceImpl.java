@@ -156,7 +156,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         if (isAllMaterial) {
             List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
                     .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
-                            null, null);
+                            null, null, true);
             if (CollectionUtils.isNotEmpty(moldResult)) {
                 cavityResults = moldResult.get(0).getCavityResults();
                 insertResults = moldResult.get(0).getInsertResults();
