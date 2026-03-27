@@ -515,13 +515,14 @@ public class MatchingProductionHandler {
      */
     private boolean checkIsBoost(TbrProductionContext productionContext, Integer day, Integer endDay,
                                  MonthPlanProductionRequirePlanVo requirePlan) {
-        Boolean isActualOrder = productionContext.getIsActualOrder();
-        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
-        Integer maxBoostDay = param.getMaxBoostDay();
-        Set<String> productionTypeSet = param.getBoostProductionType();
-        // 实单且常销规格，需要月底补量
-        return isActualOrder && productionTypeSet.contains(requirePlan.getProductionType())
-                && endDay - day <= maxBoostDay;
+//        Boolean isActualOrder = productionContext.getIsActualOrder();
+//        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
+//        Integer maxBoostDay = param.getMaxBoostDay();
+//        Set<String> productionTypeSet = param.getBoostProductionType();
+//        // 实单且常销规格，需要月底补量
+//        return isActualOrder && productionTypeSet.contains(requirePlan.getProductionType())
+//                && endDay - day <= maxBoostDay;
+        return false;
     }
 
     /**
