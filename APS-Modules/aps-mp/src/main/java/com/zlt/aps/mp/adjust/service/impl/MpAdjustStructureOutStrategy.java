@@ -18,6 +18,7 @@ import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureOutService;
@@ -51,7 +52,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
 
     @Autowired
-    private MatchingProductionHandler matchingProductionHandler;
+    private MatchingAdjuestProductionHandler matchingAdjuestProductionHandler;
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -337,7 +338,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         //7 执行结构间搭配排产,暂不考虑特殊结构
         //=========================================================
-        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList, false);
+        matchingAdjuestProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList, false);
         //=========================================================
 
         //8.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
