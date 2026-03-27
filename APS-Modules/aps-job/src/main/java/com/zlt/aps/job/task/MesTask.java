@@ -98,4 +98,20 @@ public class MesTask {
     public void syncLhClassShiftFinishQty() {
         iMesItfService.syncLhClassShiftFinishQty(new AuxReqSyncDataLogs());
     }
+
+    /**
+     * 同步成型排程日完成量
+     */
+    @ApiOperation("同步成型排程日完成量")
+    public void syncCxScheDayFinishQty() {
+        iMesItfService.syncCxScheDayFinishQty(new AuxReqSyncDataLogs());
+    }
+
+    /**
+     * 同步硫化排程日完成量
+     */
+    @ApiOperation("同步硫化排程日完成量")
+    public void syncLhScheDayFinishQty() {
+        iMesItfService.syncLhScheDayFinishQty(new AuxReqSyncDataLogs());
+    }
 }
