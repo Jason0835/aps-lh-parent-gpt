@@ -12,16 +12,11 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
-import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
-import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
@@ -50,7 +45,6 @@ import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.ProductionCycleUtils;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.utils.SpringBeanUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
@@ -83,6 +77,14 @@ public class MatchingProductionHandler {
     @Autowired
     private ProductionMdmDataService productionSchedulingDataService;
     @Autowired
+    private DpRequireDataService dpRequireDataService;
+    @Autowired
+    private MonthProductionDataService monthProductionDataService;
+    @Autowired
+    private ISysConfigService sysConfigService;
+    @Autowired
+    private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
+    @Autowired
     private FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
     @Autowired
     private FactoryMonthPlanMouldDayDetailMapper factoryMonthPlanMouldDayDetailMapper;
@@ -91,21 +93,9 @@ public class MatchingProductionHandler {
     @Autowired
     private MpStructureAllocationMapper mpStructureAllocationMapper;
     @Autowired
-    private MdmSkuLhCapacityEntityMapper mdmSkuLhCapacityEntityMapper;
-    @Autowired
     private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
     @Autowired
     private BaseDao baseDao;
-    @Autowired
-    private DpRequireDataService dpRequireDataService;
-    @Autowired
-    private MonthProductionDataService monthProductionDataService;
-    @Autowired
-    private CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
-    @Autowired
-    private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
-    @Autowired
-    private ISysConfigService sysConfigService;
 
     @Value("${debug.ignorSkip.matching:false}")
     private Boolean isIgnorSkip;
@@ -173,775 +163,7 @@ public class MatchingProductionHandler {
         // 构建排产结果并保存
         this.saveMouldProductionResult(productionContext, planList, detailLogList, factProdReqMap, matchingQtyMap);
     }
-
-    /**
-     * 初始化月计划调整的必要数据
-     *
-     * @param contextDTO
-     */
-    public void initAdjustContextDTO(MpRollAdjustContextDTO contextDTO) {
-        TbrProductionContext productionContext = this.initProductionContext(contextDTO); // 初始化上下文
-        this.getMdmProductStock(contextDTO, productionContext);
-        this.getSkuLhCapacity(contextDTO);
-        // 日硫化产能表，key:物料描述
-        this.getMdmSkuConstructionRefMap(contextDTO); // 获取SKU与施工关系，key：物料号
-    }
-
-    /**
-     * 周程滚动的结构内搭配算法
-     *
-     * @param contextDTO      周程滚动调整上下文
-     * @param mpProdFinalList 月计划定稿表列表（只有当前结构的记录）
-     * @param isInner         是否结构内调整
-     */
-    public void matchingAdjustProduction(MpRollAdjustContextDTO contextDTO,
-                                         List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList, boolean isInner) {
-        try {
-            String config = sysConfigService.selectConfigByKey("monthAdjust.skip.matching");
-            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
-                return; // 跳过搭配开关打开，则直接返回
-            }
-        } catch (Exception e) {
-            log.error("获取配置失败", e);
-        }
-
-        // 结构排产的开始不能早于锁定日的校验
-        Integer startDay = contextDTO.getStartDay();
-        Integer endDay = contextDTO.getEndDay();
-        Integer lockEndDay = contextDTO.getLockEndDay();
-        Integer realBeginDay = Math.max(lockEndDay + 1, startDay);
-        if (endDay <= lockEndDay) { // 结束日在锁定日结束前的结构不搭配
-            return;
-        }
-        // 特殊材料可搭配量校验（只有结构内需要考虑）
-        boolean isSpecial = isInner && Optional.ofNullable(contextDTO.getSpecStructureTotalQty()).orElse(0) > 0;
-        Integer remaindSpecQty = 0;
-        if (isSpecial) {
-            Integer totalQty = mpProdFinalList.stream().filter(p -> p.getTotalQty() != null).mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
-            remaindSpecQty = contextDTO.getSpecStructureTotalQty() - totalQty;
-            if (remaindSpecQty <= 0) {
-                return;
-            }
-        }
-        // 取调整需求计划
-        List<DpDemandPlan> demandPlanList = this.loadAdjustDemandPlanList(contextDTO);
-        if (CollectionUtils.isEmpty(demandPlanList)) {
-            return;
-        }
-        log.info("周程滚动搭配算法start");
-        TbrProductionContext productionContext = this.initProductionContext(contextDTO); // 初始化上下文
-        List<MdmProductStock> stockList = this.getMdmProductStock(contextDTO, productionContext);
-        productionContext.setOverSixMonthStockMap(this.overSixMonthStockHandler(productionContext, stockList)); // 超6个成品库存信息
-        productionContext.getBaseDataContainer().setParamConfiguration(this.buildParam(contextDTO.getParamMap()));
-        // 部分list转换成map，方便取数
-        Map<String, Integer> stockMap = stockList.stream()
-                .filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc())).collect(Collectors
-                        .toMap(MdmProductStock::getMaterialDesc, MdmProductStock::getStockQty, (q1, q2) -> q1 + q2)); // key：规格描述，value：库存
-        Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap = this.initMpProdFinalMap(contextDTO, mpProdFinalList, demandPlanList);
-        mpProdFinalList.forEach(plan -> this.reCaculateInventorySalesRatio(contextDTO, plan, stockMap)); // 重算库销比
-        demandPlanList.forEach(demand -> demand.setStockQty(stockMap.get(demand.getMaterialDesc()))); // 设置库存
-        // 按天统计已排产量
-        Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap = this.buildDayProductionMap(mpProdFinalList,
-                startDay, endDay);
-        do {
-            // 先执行模具续作分配
-            this.doAllocationAdjuest(contextDTO, productionContext, mpProdFinalList, mpProdFinalMap, demandPlanList, dayProductionMap,
-                    realBeginDay, endDay, isSpecial, remaindSpecQty, true);
-            // 再执行新增模具分配
-            int totalAllocationQty = this.doAllocationAdjuest(contextDTO, productionContext, mpProdFinalList, mpProdFinalMap, demandPlanList, dayProductionMap,
-                    realBeginDay, endDay, isSpecial, remaindSpecQty, false);
-            if (isSpecial && totalAllocationQty > 0) {
-                remaindSpecQty -= totalAllocationQty; // 特殊结构，更新剩余可分配量量
-            }
-            if (totalAllocationQty <= 0) { // 没有搭配，结束
-                break;
-            }
-        } while (true);
-        log.info("周程滚动搭配算法end");
-    }
-
-    /**
-     * 初始化调整计划Map，包含需求计划有但是月计划没有的SKU
-     *
-     * @param contextDTO
-     * @param mpProdFinalList
-     * @param demandPlanList
-     * @return
-     */
-    private Map<String, FactoryMonthPlanFinalAdjustVo> initMpProdFinalMap(MpRollAdjustContextDTO contextDTO,
-                                                                          List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                                          List<DpDemandPlan> demandPlanList) {
-        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = this.getSkuLhCapacity(contextDTO); // 日硫化产能表，key:物料描述
-        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = this.getMdmSkuConstructionRefMap(contextDTO); // 获取SKU与施工关系，key：物料号
-        // 构建Map
-        Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap = mpProdFinalList.stream()
-                .filter(p -> StringUtils.isNotEmpty(p.getMaterialDesc())).collect(Collectors
-                        .toMap(FactoryMonthPlanFinalAdjustVo::getMaterialDesc, Function.identity(), (p1, p2) -> p1)); // key：规格描述
-
-        for (DpDemandPlan demandPlan : demandPlanList) {
-            FactoryMonthPlanFinalAdjustVo plan = mpProdFinalMap.get(demandPlan.getMaterialDesc()); // 获取排产结果
-            if (plan != null) {
-                continue;
-            }
-            // 如果没有，说明是新增规格，需要新增记录
-            FactoryMonthPlanFinalAdjustVo firstPlan = CollectionUtils.firstElement(mpProdFinalList);
-            plan = new FactoryMonthPlanFinalAdjustVo();
-            if (firstPlan != null) {
-                SpringBeanUtils.copyPropertiesIgnoreNull(firstPlan, plan);
-            }
-            plan.setId(null);
-            plan.setMaterialCode(demandPlan.getMaterialCode());
-            plan.setMaterialDesc(demandPlan.getMaterialDesc());
-            plan.setMainPattern(demandPlan.getMainPattern());
-            MdmSkuConstructionRef skuConstructionRef = mdmSkuConstructionRefMap.get(demandPlan.getMaterialCode());
-            if (skuConstructionRef != null) {
-                plan.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
-            }
-            String materialCode = demandPlan.getMaterialCode(); // 物料号
-            Integer capacity = this.getMdmSkuLhCapacity(contextDTO, materialCode, mdmSkuLhCapacityMap); // 产能
-            plan.setDayVulcanizationQty(capacity / ProductionConstant.DOUBLE_MOULD_PRODUCTION); // 单模产能
-            plan.setMesMaterialCode(demandPlan.getMesMaterialCode());
-            plan.setProductionType(demandPlan.getProductionType());
-            plan.setAverageSaleQty(demandPlan.getAverageSaleQty());
-            plan.setHeightProductionQty(0);
-            plan.setMidProductionQty(0);
-            plan.setCycleProductionQty(0);
-            plan.setConventionProductionQty(0);
-            plan.setPostponeProductionQty(0);
-            plan.setDifferenceQty(0);
-            plan.setTotalQty(0);
-            plan.setBeginDay(null);
-            plan.setEndDay(null);
-            plan.setAdjustDetailId(null);
-            this.reCaculateInventorySalesRatio(contextDTO, plan,
-                    Collections.singletonMap(demandPlan.getMaterialCode(), demandPlan.getStockQty())); // 计算库销比
-            for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
-                plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, null); // 清空每天排产量
-            }
-            mpProdFinalMap.put(demandPlan.getMaterialDesc(), plan);
-        }
-        return mpProdFinalMap;
-    }
-
-    /**
-     * 执行调整搭配量分配
-     *
-     * @param contextDTO        调整上下文
-     * @param productionContext 月计划上下文
-     * @param mpProdFinalList   排产计划列表
-     * @param mpProdFinalMap    排产计划Map
-     * @param demandPlanList    需求计划列表
-     * @param dayProductionMap  日生产量统计列表
-     * @param beginDay          结构排产开始日期
-     * @param endDay            结构排产结束日期
-     * @param isSpecial         是否特殊结构
-     * @param remaindSpecQty    特殊结构剩余量
-     * @param isCheckContinue   是否处理续作，每个SKU都是从续作开始检查
-     * @return
-     */
-    private int doAllocationAdjuest(MpRollAdjustContextDTO contextDTO, TbrProductionContext productionContext,
-                                    List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                    Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap, List<DpDemandPlan> demandPlanList,
-                                    Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap, Integer beginDay,
-                                    Integer endDay, boolean isSpecial, int remaindSpecQty,
-                                    boolean isCheckContinue) {
-        int totalAllocationQty = 0; // 本次遍历总搭配量
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
-        Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
-        do {
-            // 获取最高优先级的可搭配调整规格
-            String materialDesc = this.getHeightPriorityAdjuestMaterial(demandPlanList, mpProdFinalMap,
-                    productionContext, scheduleMaterialDesc);
-            if (StringUtils.isEmpty(materialDesc)) {
-                break;
-            }
-            scheduleMaterialDesc.add(materialDesc); // 选中的规格加入已排产列表（无论是否能排上，下次轮询均不再处理该规格）
-            List<DpDemandPlan> needProductPlanList = demandPlanList.stream()
-                    .filter(p -> materialDesc.equals(p.getMaterialDesc())).collect(Collectors.toList());
-            FactoryMonthPlanFinalAdjustVo plan = mpProdFinalMap.get(materialDesc); // 获取定稿计划
-            int capacity = plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 产能都从final表获取
-            boolean isNewPlan = plan.getBeginDay() == null;
-            
-            int unAllocationQty = needProductPlanList.stream().mapToInt(DpDemandPlan::getConventionReserveQty).sum(); // 未搭配量 = 储备池的量
-            unAllocationQty = isSpecial? Math.min(unAllocationQty, remaindSpecQty): unAllocationQty; // 如果包含特殊材料，不能超过特殊材料的总数量
-            List<FactoryMonthPlanFinalAdjustVo> safeList = new ArrayList<>();
-            int lastProductDay = 0; // 本SKU的收尾日
-            for (int day = endDay; day >= beginDay; day --) {
-                if (Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)).orElse(0) > 0) {
-                    lastProductDay = day;
-                    break;
-                }
-            }
-            if (isCheckContinue && lastProductDay < beginDay) { // 新规格，如果本次是续作排产，则跳过
-                continue;
-            }
-            if (plan.getMatchEndDay() == null) {
-                plan.setMatchEndDay(lastProductDay); // 实际结束日期，如果SKU提前结束，则需要把结束日期也提前，防止下一次轮询后出现断层
-            }
-            safeList.addAll(mpProdFinalList);
-            if (isNewPlan) {
-                safeList.add(plan);
-            }
-
-            out: do {
-                int startUnAllocationQty = unAllocationQty;
-                for (int day = beginDay; day <= plan.getMatchEndDay(); day++) { // 遍历结构排产日，如果锁定日超过开始i日期，从锁定日下一天开始
-                    if (unAllocationQty <= 0) {
-                        break out;
-                    }
-                    if (!this.checkDayCanProduct(contextDTO, day)) { // 检查生产日历，停产日不处理
-                        continue;
-                    }
-                    this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 先重算产能限制
-                    // 检查模具是否有剩余产能
-                    MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
-                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, plan, capacity, day, beginDay, dayProductionMap, dailyCapacityLimitMap); // 获取模具剩余产能
-                    if (mouldRemaindCapacity <=0 && dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) { // 如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
-                        if (this.setMatchEndDayIfBeginMatch(plan, day)) { // 如果已经开始搭配，则设置结束搭配时间，防止中断不连续的问题出现
-                            break;
-                        }
-                        continue;
-                    }
-                    // 如果有余量，需要检查当天是否有其他排产量小于余量的，有说明是拼机台的，不要尝试补
-                    if (mouldRemaindCapacity > 0) {
-                        // 尝试计算可以补的量
-                        List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(day);
-                        Integer changeMouldFirstQty = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode()); // 换模首日可排产量
-                        Integer changeBlockQtyDiffQty = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode()); // 换模首日可排产量
-                        // 统计当天加模数
-                        int addMouldNum = (int) dayProductionList.stream()
-                                .filter(p -> p.getProductionQty() % p.getDayVulcanizationQty() == changeMouldFirstQty)
-                                .count();
-                        // 统计当天下机可拼机台数
-                        int remainNum = (int) dayProductionList.stream()
-                                .filter(p -> (p.getProductionQty() % p.getDayVulcanizationQty()) > changeMouldFirstQty
-                                        && (p.getProductionQty() % p.getDayVulcanizationQty()) <= changeBlockQtyDiffQty)
-                                .count();
-                        if (remainNum <= addMouldNum) { // 如果可拼机台数小于等于加模数，则补允许补量
-                            continue;
-                        }
-//                        if (dayProductionList != null && dayProductionList.stream()
-//                                .anyMatch(p -> !Objects.equals(p.getMaterialDesc(), materialDesc)
-//                                        && p.getProductionQty() <= mouldRemaindCapacity)) {
-//                            if (this.setMatchEndDayIfBeginMatch(plan, day)) { // 如果已经开始搭配，则设置结束搭配时间，防止中断不连续的问题出现
-//                                break;
-//                            }
-//                            continue;
-//                        }
-                    }
-                    // 检查胎胚数是否满足条件
-                    if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
-                        Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
-                        if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
-                            if (this.setMatchEndDayIfBeginMatch(plan, day)) { // 如果已经开始搭配，则设置结束搭配时间，防止中断不连续的问题出现
-                                break;
-                            }
-                            continue;
-                        }
-                    }
-                    // 检查当天如果搭配是否会导致二次上机
-                    if (!isNewPlan && !this.checkSecOnlineAdjuest(contextDTO, plan, day)) { // 非新增SKU需要检查二次上机
-                        continue;
-                    }
-                    
-                    // 为当天分配搭配量
-                    int allocationQty = this.allcatAdjustProductQty(contextDTO, day, beginDay, plan, safeList,
-                            dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitMap, mouldRemaindCapacity, isCheckContinue);
-                    if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
-                        totalAllocationQty += allocationQty;
-                        unAllocationQty -= allocationQty;
-                        if (lastProductDay < day) { // 如果延后了SKU的收尾日，更新收尾日
-                            lastProductDay = day;
-                        }
-                        this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 有搭配，则再次重算产能限制
-                    } else if (this.setMatchEndDayIfBeginMatch(plan, day)) { // 如果已经开始搭配，则设置结束搭配时间，防止中断不连续的问题出现
-                        break;
-                    }
-                }
-                if (startUnAllocationQty == unAllocationQty) { // 如果遍历后没有发生变化
-                    // 检查续作的情况下，如果已经开始搭配，且结束日期在SKU收尾日与结构收尾日之间，则把结束期推后一天再尝试排产一次。
-                    // 目的是在SKU收尾日搭配满后，才尝试往后一天搭配
-                    int realEndDay = plan.getMatchEndDay();
-                    if (isCheckContinue && this.checkIsBeginMatch(plan) && realEndDay >= lastProductDay && realEndDay < endDay) {
-                        Integer nextDay = this.getNextDay(contextDTO, realEndDay, endDay);
-                        if (nextDay > 0) {
-                            plan.setMatchEndDay(nextDay); 
-                            continue;
-                        }
-                    }
-                    break out; // 结束本规格的搭配
-                }
-            } while (true);
-            if (isNewPlan && plan.getBeginDay() != null) { // 排上的规格添加导列表中
-                mpProdFinalList.add(plan);
-            }
-        } while (true);
-        return totalAllocationQty;
-    }
-
-    /**
-     * 如果已经开始搭配，则设置结束搭配时间
-     * @param plan  搭配计划
-     * @param day   排产日
-     * @return
-     */
-    private boolean setMatchEndDayIfBeginMatch(FactoryMonthPlanFinalAdjustVo plan, int day) {
-        boolean isBegin = this.checkIsBeginMatch(plan);
-        if (isBegin) {
-            plan.setMatchEndDay(day); // 中断后记录当前日期作为搭配结束日
-        }
-        return isBegin;
-    }
-
-    /**
-     * 检查计划是否已经开始搭配
-     * @param plan  搭配计划
-     * @return
-     */
-    private boolean checkIsBeginMatch(FactoryMonthPlanFinalAdjustVo plan) {
-        return plan.getMatchBeginDay() != null;
-    }
-
-    /**
-     * 检查调整搭配是否满足二次上机限制限制
-     *
-     * @param contextDTO 上下文
-     * @param plan       排程计划
-     * @param checkDay   检查日
-     * @return
-     */
-    private boolean checkSecOnlineAdjuest(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
-                                          int checkDay) {
-        boolean isSecOnLine = true;
-        // 1、检查当天排产情况
-        Integer dayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + checkDay)).orElse(0);
-        if (dayProductQty > 0) { // 如果当天没有排产才需要继续检查是否引起二次上机
-            return isSecOnLine;
-        }
-        Integer skuSecondProduction = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
-        Integer skuBeginDay = plan.getBeginDay();
-        Integer skuEndDay = plan.getEndDay();
-        Integer dayCount = 0;
-        // 2、向前看是否有超出二次上机限制
-        for (Integer i = checkDay - 1; i >= skuBeginDay; i--) {
-            if (i == 0) {
-                break;
-            }
-            if (!this.checkDayCanProduct(contextDTO, i)) {
-                continue;
-            }
-            dayCount ++;
-            Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
-            if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = dayCount == 1 || dayCount >= skuSecondProduction || i == skuBeginDay;
-                break;
-            }
-        }
-        if (!isSecOnLine) { // 校验不通过，则直接结束
-            return isSecOnLine;
-        }
-
-        // 3、先向后看是否有超出二次上机限制
-        dayCount = 0;
-        for (Integer i = checkDay + 1; i <= skuEndDay; i++) {
-            if (!this.checkDayCanProduct(contextDTO, i)) {
-                continue;
-            }
-            dayCount ++;
-            Integer checkDayProductQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + i)).orElse(0);
-            if (checkDayProductQty > 0) { // 如果有排产，则检查是否超过限制
-                isSecOnLine = dayCount == 1 || dayCount >= skuSecondProduction || i == skuEndDay;
-                break;
-            }
-        }
-        return isSecOnLine;
-    }
-
-    /**
-     * 构建调整计划Map，包括重算各SKU的库销比
-     *
-     * @param contextDTO      上下文
-     * @param mpProdFinalList 调整计划列表
-     * @param stockMap        库存
-     * @return
-     */
-    private void reCaculateInventorySalesRatio(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
-                                               Map<String, Integer> stockMap) {
-        Integer lockEndDay = contextDTO.getLockEndDay();
-        BigDecimal inventorySalesRatio = Optional.ofNullable(plan.getInventorySalesRatio()).orElse(BigDecimal.ZERO);
-        int averageSaleQty1 = Optional.ofNullable(plan.getAverageSaleQty()).orElse(0);
-        int stock1 = stockMap.getOrDefault(plan.getMaterialDesc(), 0);
-        int planQty1 = this.getSumPlanQtyLockEndDay(plan, lockEndDay);
-        if (averageSaleQty1 != 0) {
-            inventorySalesRatio = BigDecimalUtils.div(stock1 + planQty1, averageSaleQty1);
-        }
-        plan.setInventorySalesRatio(inventorySalesRatio);
-    }
-
-    /**
-     * 收尾补量算法
-     *
-     * @param contextDTO      上下文
-     * @param mpProdFinalList 定稿计划列表
-     */
-    public void structureAdjuestBoots(MpRollAdjustContextDTO contextDTO,
-                                      List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
-        Integer matchingBoostDay = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
-        String boostProductionTypeValue = (String) contextDTO.getParamMap()
-                .get(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
-        Set<String> boostProductionTypeSet;
-        if (StringUtils.isBlank(boostProductionTypeValue)) {
-            boostProductionTypeSet = Collections.emptySet();
-        } else {
-            boostProductionTypeSet = Stream.of(boostProductionTypeValue.split(StringConstant.COMMA))
-                    .collect(Collectors.toSet());
-        }
-        if (matchingBoostDay <= 0 || CollectionUtils.isEmpty(boostProductionTypeSet)) {
-            return;
-        }
-        // 特殊材料可补量计算
-        Integer specStructureTotalQty = Optional.ofNullable(contextDTO.getSpecStructureTotalQty()).orElse(0);
-        boolean isSpecial = specStructureTotalQty > 0;
-        Integer unAllocatSpecStructureQty = this.getUnAllocatSpecStructureQty(specStructureTotalQty, mpProdFinalList);
-        if (isSpecial && unAllocatSpecStructureQty <= 0) {
-            return;
-        }
-        // 加载上下文中的各项必要数据
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
-        Integer startDay = contextDTO.getStartDay();
-        Integer endDay = contextDTO.getEndDay();
-        Integer realStartDay = Math.max(startDay, endDay - (matchingBoostDay - 1)); // 实际开始日期要看补量天数的设置，哪个晚用哪个
-        Integer bootsQty = 0; // 总补量
-
-        out:
-        for (FactoryMonthPlanFinalAdjustVo plan : mpProdFinalList) {
-            Integer actualAdjustQty = Optional.ofNullable(plan.getActualAdjustQty()).orElse(0); // 实际调整量
-            if (!boostProductionTypeSet.contains(plan.getProductionType())) { // 非主销规格不补量
-                continue;
-            }
-            if (actualAdjustQty <= 0) { // 减量或者不调整的SKU不补量
-                continue;
-            }
-            // 统计补量日期各天排产量
-            Map<Integer, Integer> dayProductionQtyMap = this.getDayProductionQtyMap(plan, realStartDay, endDay);
-            // 补量期间任意一天有量，都需要补量
-            if (dayProductionQtyMap.values().stream().noneMatch(qty -> qty > 0)) {
-                continue;
-            }
-            // 统计在产硫化机数
-            Map<Integer, Integer> bootsDayLhMachineMap = this.getBootsDayLhMachineMap(contextDTO, plan, realStartDay,
-                    endDay, dailyCapacityLimitMap); // 每日已使用硫化机数
-            // 统计最大补量机台数，以包括补量天以及前一天的最大硫化机为准
-            Integer maxLhMachineCount = bootsDayLhMachineMap.values().stream().max(Integer::compareTo).orElse(0);
-            if (maxLhMachineCount <= 0) {
-                continue;
-            }
-
-            // 遍历补量开始日到收尾日之间的生产量，并尝试开始补量
-            for (int day = realStartDay; day <= endDay; day++) {// 根据日产比例限制产能
-                // 如果当天有排产，在不加模的前提下检查是否已经占满
-                MpDailyCapacityLimitVo dailyCapacityLimit = dailyCapacityLimitMap.get(day);
-                if (dailyCapacityLimit == null) {
-                    continue;
-                }
-                Integer useMachineCount = bootsDayLhMachineMap.getOrDefault(day, 0);
-                Integer remainMachineCount = dailyCapacityLimit.getMaxLhMachines() - dailyCapacityLimit.getUsedLhMachines(); // 当天剩余可用机台，超了就是负数（异常情况）
-                Integer bootsMachineCount = remainMachineCount + useMachineCount; // 补量相关机台数 = 剩余机台 + 可用机台
-                bootsMachineCount = bootsMachineCount > 0 ? bootsMachineCount : 0;
-                Integer productionQty = dayProductionQtyMap.getOrDefault(day, 0); // 当天已排产量
-                int capacity = plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 单机产能
-                Integer allocationQty = capacity * Math.min(maxLhMachineCount, bootsMachineCount) - productionQty; // 计算分配量 = 产能 *机台 - 已排量
-                Integer realAllocationQty = isSpecial ? Math.min(unAllocatSpecStructureQty, allocationQty) : allocationQty; // 如果是特殊材料需要控制不能超过总量
-                if (realAllocationQty <= 0) {
-                    continue;
-                }
-                Integer realProductionQty = productionQty + realAllocationQty;
-                plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, realProductionQty);
-                plan.setTotalQty(plan.getTotalQty() + realAllocationQty);
-                plan.setEndDay(plan.getEndDay() < day ? day : plan.getEndDay());
-                // 更新各项统计数据
-                bootsQty += realAllocationQty;
-                unAllocatSpecStructureQty -= realAllocationQty; // 更新待分配特殊材料总数
-                dayProductionQtyMap.put(day, realProductionQty); // 更新当天排产量统计
-                contextDTO.getLogDetail().append(String.format("结构:%s,【收尾补量】物料编码:%s,排产日:%s,补量:%s", contextDTO.getStructureName(), plan.getMaterialCode(), day, realAllocationQty)).append(ApsConstant.DIVISION); // 记录日志
-                // 如果是特殊结构，且特殊结构已分配完，则结束
-                if (isSpecial && unAllocatSpecStructureQty <= 0) {
-                    break out;
-                }
-            }
-        }
-        if (isSpecial) {
-            contextDTO.setSpecStructureTotalQty(specStructureTotalQty - bootsQty);
-        }
-    }
-
-    /**
-     * 获取特殊结构待分配量
-     *
-     * @param specStructureTotalQty
-     * @param mpProdFinalList
-     * @return
-     */
-    private Integer getUnAllocatSpecStructureQty(Integer specStructureTotalQty,
-                                                 List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
-        boolean isSpecial = specStructureTotalQty > 0;
-        Integer unAllocatSpecStructureTotalQty = 0; // 特殊材料可分配量
-        if (isSpecial) {
-            Integer totalQty = mpProdFinalList.stream().filter(p -> p.getTotalQty() != null).mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
-            unAllocatSpecStructureTotalQty = specStructureTotalQty - totalQty;
-
-        }
-        return unAllocatSpecStructureTotalQty;
-    }
-
-    /**
-     * 统计补量日期区间的在产硫化机数
-     *
-     * @param contextDTO            上下文
-     * @param plan                  排产记录
-     * @param startDay              补量区间开始日
-     * @param endDay                补量区间结束日
-     * @param dailyCapacityLimitMap 每日产能限制
-     * @return
-     */
-    private Map<Integer, Integer> getBootsDayLhMachineMap(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
-                                                          Integer startDay, Integer endDay,
-                                                          Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
-        Map<Integer, Integer> bootsDayLhMachineMap = new HashMap<>();
-        for (int day = startDay; day <= endDay; day++) {
-            bootsDayLhMachineMap.put(day, this.getDayUsedLhMachines(contextDTO, plan, day, dailyCapacityLimitMap));
-        }
-        return bootsDayLhMachineMap;
-    }
-
-    /**
-     * 统计各天排产量
-     *
-     * @param plan
-     * @param startDay
-     * @param endDay
-     * @return
-     */
-    private Map<Integer, Integer> getDayProductionQtyMap(FactoryMonthPlanFinalAdjustVo plan, Integer startDay,
-                                                         Integer endDay) {
-        Map<Integer, Integer> dayProductionQtyMap = new HashMap<>();
-        for (int day = startDay - 1; day <= endDay; day++) {
-            if (day > 0) {
-                dayProductionQtyMap.put(day, Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)).orElse(0));
-            }
-        }
-        return dayProductionQtyMap;
-    }
-
-    /**
-     * 获取新的型腔数量
-     *
-     * @param contextDTO 周程滚动上下文
-     * @param mpFinalVo  定稿Vo
-     * @param iDay       当前天
-     * @return 型腔数量
-     */
-    private int getNewCavityQty(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo mpFinalVo, int iDay) {
-        DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
-        if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null) {
-            Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName() + mpFinalVo.getMainPattern());
-            return cavityQty != null ? cavityQty : mpFinalVo.getMouldCavityQty();
-        }
-        return mpFinalVo.getMouldCavityQty();
-    }
-
-    /**
-     * 检查模具满足情况
-     *
-     * @param dailyCapacityLimitVo 产能限制Vo
-     * @param cavityQty            型腔数
-     * @return true-满足，false-不满足
-     */
-    private boolean checkMouldSatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo, int cavityQty) {
-        //型腔台数
-        int patternCount = cavityQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        //主花纹向下所有SKU的模具数量 < 主花纹.型腔数量
-        return dailyCapacityLimitVo.getPatternUsedLhMachines() < patternCount;
-    }
-
-    /**
-     * 重算指定天的日产能限制，包括硫化机台数、胎胚种类数
-     *
-     * @param contextDTO      周程滚动上下文
-     * @param mpProdFinalList 定稿记录列表
-     * @param mpProdFinal     定稿记录
-     * @param day             排产日
-     */
-    private void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO,
-                                                List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                FactoryMonthPlanFinalAdjustVo mpProdFinal, int day) {
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
-        MpDailyCapacityLimitVo daylyCapacityLimit = dailyCapacityLimitVoMap.get(day);
-        if (daylyCapacityLimit == null) {
-            return;
-        }
-        adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, day, daylyCapacityLimit,
-                contextDTO.getParamMap(), mpProdFinal.getMainPattern());
-    }
-
-    /**
-     * 获取SKU与施工关系
-     *
-     * @param contextDTO
-     * @return
-     */
-    private Map<String, MdmSkuConstructionRef> getMdmSkuConstructionRefMap(MpRollAdjustContextDTO contextDTO) {
-        Map<String, MdmSkuConstructionRef> mdmSkuConstructionRefMap = contextDTO.getMdmSkuConstructionRefMap();
-        if (mdmSkuConstructionRefMap == null) {
-            LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, contextDTO.getFactoryCode());
-            queryWrapper.eq(MdmSkuConstructionRef::getIsDelete, YesOrNoEnum.NO.getValue());
-            List<MdmSkuConstructionRef> skuConstructionRefList = mdmSkuConstructionRefEntityMapper
-                    .selectList(queryWrapper);
-            mdmSkuConstructionRefMap = skuConstructionRefList.stream()
-                    .filter(construction -> StringUtils.isNotEmpty(construction.getMaterialCode()))
-                    .collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, construction -> construction,
-                            (existingVal, newVal) -> newVal));
-        }
-        return mdmSkuConstructionRefMap;
-    }
-
-    /**
-     * 获取成品库存
-     *
-     * @param contextDTO
-     * @param productionContext
-     * @return
-     */
-    private List<MdmProductStock> getMdmProductStock(MpRollAdjustContextDTO contextDTO,
-                                                     TbrProductionContext productionContext) {
-        List<MdmProductStock> stockList = contextDTO.getMdmProductStockList(); // 库存
-        if (CollectionUtils.isEmpty(stockList)) {
-            stockList = getDataService().getMdmProductStock(productionContext); // 如果没有需要加载库存
-            contextDTO.setMdmProductStockList(stockList);
-        }
-        return stockList;
-    }
-
-    /**
-     * 获取模具剩余产能
-     *
-     * @param contextDTO
-     * @param plan
-     * @param capacity
-     * @param day
-     * @param beginDay
-     * @param endDay
-     * @param dayProductionMap
-     * @param dailyCapacityLimitMap
-     * @return
-     */
-    private Integer getMouldRemaindCapacity(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
-                                            int capacity, int day, int beginDay,
-                                            Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap,
-                                            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
-        String materialDesc = plan.getMaterialDesc();
-        int endDay = plan.getMatchEndDay();
-        Integer remaindCapacity = 0;
-        // 1、检查当天排产情况
-        MatchingProductionAdjuestVo dayProduction = this.getMatchingProductionAdjuest(materialDesc, day,
-                dayProductionMap);
-        if (dayProduction == null) {
-            return remaindCapacity;
-        }
-        Integer changeMouldFirstQty = (Integer) contextDTO.getParamMap()
-                .get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode()); // 换模首日可排产量
-        int realCapacity = dayProduction.getIsFirstDay() ? changeMouldFirstQty : capacity;
-        if (realCapacity == 0) {
-            return remaindCapacity;
-        }
-        Integer useCapacity = BigDecimalUtils.valueOf(dayProduction.getProductionQty())
-                .remainder(BigDecimalUtils.valueOf(realCapacity)).intValue(); // 计算余数
-        if (useCapacity == 1) { // 余数是1只会是因为奇数转偶数引起的，可以忽略
-            return remaindCapacity;
-        } else if (useCapacity > 0) { // 余数大于0，说明最后一个硫化机没有排满，优先补满逞能剩余的量
-            // 2、先判断后续天数是否满产能排产
-            Integer nextDay = this.getNextDay(contextDTO, day, endDay);
-            if (nextDay > 0) { // 非收尾日，需要判断下一天产能是否占满
-                MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(nextDay);
-                if (dailyCapacityLimitVo != null
-                        && dailyCapacityLimitVo.getMaxLhMachines() == dailyCapacityLimitVo.getUsedLhMachines()) { // 下一天产能占满，则当天不需要搭配补量
-                    return remaindCapacity;
-                }
-            }
-            // 3、判断如果今天的硫化机数比昨天多，说明有新增模具，不能补量
-            Integer lastDay = this.getLastDay(contextDTO, day, beginDay);
-            if (lastDay > 0) {
-                Integer lastDayUsedLhMachines = this.getDayUsedLhMachines(contextDTO, plan, lastDay,
-                        dailyCapacityLimitMap); // 上一天已使用的硫化机数量
-                Integer todayDayUsedLhMachines = this.getDayUsedLhMachines(contextDTO, plan, day,
-                        dailyCapacityLimitMap); // 当天已使用的硫化机数量
-                if (todayDayUsedLhMachines > lastDayUsedLhMachines) { // 今天的硫化机数比昨天多
-                    return remaindCapacity;
-                }
-            }
-            return realCapacity - useCapacity;
-        }
-        return remaindCapacity;
-    }
-
-    /**
-     * 获取指定天指定SKU的调整排产记录
-     *
-     * @param materialDesc     规格描述
-     * @param day              排产日
-     * @param dayProductionMap 调整排产记录列表
-     * @return
-     */
-    private MatchingProductionAdjuestVo getMatchingProductionAdjuest(String materialDesc, int day,
-                                                                     Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap) {
-        List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(day);
-        if (CollectionUtils.isEmpty(dayProductionList)) {
-            return null;
-        }
-        return dayProductionList.stream().filter(p -> materialDesc.equals(p.getMaterialDesc())).findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * 获取下一个排产日
-     *
-     * @param contextDTO
-     * @param day
-     * @param endDay
-     * @return
-     */
-    private Integer getNextDay(MpRollAdjustContextDTO contextDTO, int day, int endDay) {
-        Integer nextDay = 0;
-        for (int i = day + 1; i <= endDay; i++) {
-            if (this.checkDayCanProduct(contextDTO, i)) { // 下一天是排产日返回，否则跳过看下一天
-                nextDay = i;
-                break;
-            }
-        }
-        return nextDay;
-    }
-
-    /**
-     * 获取上一个排产日
-     *
-     * @param contextDTO
-     * @param day
-     * @param beginDay
-     * @return
-     */
-    private Integer getLastDay(MpRollAdjustContextDTO contextDTO, int day, int beginDay) {
-        Integer lastDay = 0;
-        for (int i = day - 1; i >= beginDay; i--) {
-            if (this.checkDayCanProduct(contextDTO, i)) { // 下一天是排产日返回，否则跳过看下一天
-                lastDay = i;
-                break;
-            }
-        }
-        return lastDay;
-    }
-
+    
     /**
      * 获取下一个排产日
      *
@@ -979,455 +201,7 @@ public class MatchingProductionHandler {
         }
         return lastDay;
     }
-
-    /**
-     * 根据产能模具获取指定SKU的硫化产能
-     *
-     * @param contextDTO          上下文
-     * @param materialDesc        规格描述
-     * @param mdmSkuLhCapacityMap 硫化产能列表
-     * @return
-     */
-    private int getMdmSkuLhCapacity(MpRollAdjustContextDTO contextDTO, String materialDesc,
-                                    Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap) {
-        Integer capacity = 0;
-        MdmSkuLhCapacity mdmSkuLhCapacity = mdmSkuLhCapacityMap.get(materialDesc);
-        if (mdmSkuLhCapacity == null) {
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
-                    materialDesc));
-        }
-        DayVulcanizationModeEnum dayVulcanizationMode = DayVulcanizationModeEnum
-                .getInstance((String) contextDTO.getParamMap().get(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode()));
-        if (dayVulcanizationMode == DayVulcanizationModeEnum.MES_CAPACITY) {
-            capacity = mdmSkuLhCapacity.getMesCapacity();
-        } else if (dayVulcanizationMode == DayVulcanizationModeEnum.STANDARD_CAPACITY) {
-            capacity = mdmSkuLhCapacity.getStandardCapacity();
-        } else if (dayVulcanizationMode == DayVulcanizationModeEnum.APS_CAPACITY) {
-            capacity = mdmSkuLhCapacity.getApsCapacity();
-        }
-        if (capacity == null) {
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
-                    materialDesc));
-        }
-        return capacity;
-    }
-
-    /**
-     * 加载需求计划
-     *
-     * @param contextDTO
-     * @return
-     */
-    private List<DpDemandPlan> loadAdjustDemandPlanList(MpRollAdjustContextDTO contextDTO) {
-        String monthPlanVersion = null;
-        MpAdjustStructureIn mpAdjustStructureIn = CollectionUtils.firstElement(contextDTO.getMpAdjustStructureInList());
-        MpAdjustStructureOut mpAdjustStructureOut = CollectionUtils.firstElement(contextDTO.getMpAdjustStructureOutList());
-        if (mpAdjustStructureIn != null) {
-            monthPlanVersion = mpAdjustStructureIn.getLastMonthPlanVersion();
-        } else if (mpAdjustStructureOut != null) {
-            monthPlanVersion = mpAdjustStructureOut.getLastMonthPlanVersion();
-        }
-        if (StringUtils.isEmpty(monthPlanVersion)) {
-            return new ArrayList<>(0);
-        }
-        // 加载需求计划
-        LambdaQueryWrapper<DpDemandPlan> demandQueryWrapper = new LambdaQueryWrapper<DpDemandPlan>();
-        demandQueryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
-        demandQueryWrapper.eq(DpDemandPlan::getStructureName, contextDTO.getStructureName()); // 过滤空结构的数据
-//        demandQueryWrapper.gt(DpDemandPlan::getConventionReserveQty, 0);
-        List<DpDemandPlan> demandPlanList = monthPlanRequireMapper.selectList(demandQueryWrapper);
-        return demandPlanList;
-    }
-
-    /**
-     * 日硫化产能表
-     *
-     * @param contextDTO
-     * @return
-     */
-    private Map<String, MdmSkuLhCapacity> getSkuLhCapacity(MpRollAdjustContextDTO contextDTO) {
-        Map<String, MdmSkuLhCapacity> mdmSkuLhCapacityMap = contextDTO.getMdmSkuLhCapacityMap(); // 日硫化产能表，key:物料描述
-        if (mdmSkuLhCapacityMap == null) {
-
-            LambdaQueryWrapper<MdmSkuLhCapacity> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(MdmSkuLhCapacity::getFactoryCode, contextDTO.getFactoryCode());
-            queryWrapper.eq(MdmSkuLhCapacity::getIsDelete, YesOrNoEnum.NO.getValue());
-            List<MdmSkuLhCapacity> skuLhCapacityList = mdmSkuLhCapacityEntityMapper.selectList(queryWrapper);
-
-            mdmSkuLhCapacityMap = skuLhCapacityList.stream()
-                    .filter(skuLhCapacity -> StringUtils.isNotEmpty(skuLhCapacity.getMaterialCode()))
-                    .collect(Collectors.toMap(
-                            MdmSkuLhCapacity::getMaterialCode,
-                            skuLhCapacity -> skuLhCapacity,
-                            (existingVal, newVal) -> newVal
-                    ));
-            contextDTO.setMdmSkuLhCapacityMap(mdmSkuLhCapacityMap);
-        }
-        return mdmSkuLhCapacityMap;
-    }
-
-    /**
-     * 获取最高优先级的可搭配调整规格
-     *
-     * @param demandPlanList       需求计划列表
-     * @param mpProdFinalMap       定稿列表，key：规格描述
-     * @param productionContext    上下文
-     * @param scheduleMaterialDesc 已排产物料描述
-     * @return
-     */
-    private String getHeightPriorityAdjuestMaterial(List<DpDemandPlan> demandPlanList,
-                                                    Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap,
-                                                    TbrProductionContext productionContext,
-                                                    Set<String> scheduleMaterialDesc) {
-        String materialDesc = demandPlanList.stream().filter(p -> !scheduleMaterialDesc.contains(p.getMaterialDesc()))
-                .min((p1, p2) -> {
-                    if (Objects.equals(p1.getMaterialDesc(), p2.getMaterialDesc())) { // 同规格的，不需要比较
-                        return 0;
-                    }
-                    // 排序1、优先库销比低的
-                    FactoryMonthPlanFinalAdjustVo finalPlan1 = mpProdFinalMap.get(p1.getMaterialDesc());
-                    FactoryMonthPlanFinalAdjustVo finalPlan2 = mpProdFinalMap.get(p2.getMaterialDesc());
-                    BigDecimal inventorySalesRatio1 = BigDecimal.ZERO;
-                    BigDecimal inventorySalesRatio2 = BigDecimal.ZERO;
-                    if (finalPlan1 != null) {
-                        inventorySalesRatio1 = finalPlan1.getInventorySalesRatio();
-                    }
-                    if (finalPlan2 != null) {
-                        inventorySalesRatio2 = finalPlan2.getInventorySalesRatio();
-                    }
-                    int result = inventorySalesRatio1.compareTo(inventorySalesRatio2);
-                    if (result != 0) {
-                        return result;
-                    }
-                    // 排序2、优先超6个月库存少的
-                    Integer sixStock1 = productionContext.getOverSixMonthStockMap().getOrDefault(p1.getMaterialCode(), 0);
-                    Integer sixStock2 = productionContext.getOverSixMonthStockMap().getOrDefault(p2.getMaterialCode(), 0);
-                    return sixStock1.compareTo(sixStock2);
-                }).map(DpDemandPlan::getMaterialDesc).orElse(null);
-        return materialDesc;
-    }
-
-    /**
-     * 取截至锁定日前的排产量汇总值
-     *
-     * @param plan
-     * @param lockEndDay
-     * @return
-     */
-    private Integer getSumPlanQtyLockEndDay(FactoryMonthPlanFinalAdjustVo plan, Integer lockEndDay) {
-        if (plan == null) {
-            return 0;
-        }
-        Integer sumPlanQty = plan.getSumPlanQtyBeforeLockDay();
-        if (sumPlanQty == null) {
-            sumPlanQty = 0;
-            for (int day = 1; day <= lockEndDay; day++) {
-                sumPlanQty += Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)).orElse(0);
-            }
-            plan.setSumPlanQtyBeforeLockDay(sumPlanQty);
-        }
-        return sumPlanQty;
-    }
-
-    /**
-     * 分配搭配生产量
-     *
-     * @param contextDTO            上下文
-     * @param scheduleDay           排产日期
-     * @param beginDay              结构排产开始日
-     * @param plan                  排产记录
-     * @param mpProdFinalList       排产记录列表
-     * @param dayProductionMap      日排产信息统计表
-     * @param unAllocationQty       未分配搭配量
-     * @param capacity              单机台产能
-     * @param dailyCapacityLimitMap 产能限制列表
-     * @param mouldRemaindCapacity  模具剩余产能
-     * @param isCheckContinue       是否仅检查续作
-     * @return
-     */
-    private Integer allcatAdjustProductQty(MpRollAdjustContextDTO contextDTO, Integer scheduleDay, Integer beginDay,
-                                           FactoryMonthPlanFinalAdjustVo plan,
-                                           List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                           Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap,
-                                           Integer unAllocationQty, Integer capacity,
-                                           Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap,
-                                           Integer mouldRemaindCapacity, boolean isCheckContinue) {
-        MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(scheduleDay);
-        String materialDesc = plan.getMaterialDesc();
-        Integer endDay = plan.getMatchEndDay();
-        boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
-        int mouldCavityQty = this.getNewCavityQty(contextDTO, plan, scheduleDay); // 总型腔数量
-//        int typeBlockQty = cavity2Block.getInsertResults().getOrDefault(mouldKey, 0); // 总活块数量
-        
-        // 判断当天成型硫化比是否已经满足条件
-        List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
-        // 统计当天的已排量，判断不能超过最大排产量限制
-        int remainDayTotalCapacity = this.getRemainDayTotalCapacity(contextDTO, dailyCapacityLimitVo, scheduleDay);
-        if (remainDayTotalCapacity <= 0) {
-            return 0;
-        }
-        Integer lastDay = this.getLastDay(contextDTO, scheduleDay, beginDay);
-        Integer lastDayUsedLhMachines = this.getDayUsedLhMachines(contextDTO, plan, lastDay, dailyCapacityLimitMap); // 上一天已使用的硫化机数量
-        Integer todayDayUsedLhMachines = this.getDayUsedLhMachines(contextDTO, plan, scheduleDay, dailyCapacityLimitMap); // 当天已使用的硫化机数量
-        // 如果只检查续作，模具不需要补量，且今天的机台比不比昨天的少，则跳过今天
-        if (isCheckContinue && !isRemaindCapacity && lastDayUsedLhMachines <= todayDayUsedLhMachines) {
-            return 0;
-        } 
-        // 根据上一天的排产情况判断是否需要换模
-        boolean isChangeMould = false;
-        List<MatchingProductionAdjuestVo> lastDayProductionList = dayProductionMap.get(lastDay);
-        if (lastDayProductionList == null) {
-            isChangeMould = true;
-        } else if (isRemaindCapacity) {
-            isChangeMould = false; // 补模具产能不需要加模
-        } else if (lastDay > 0) {
-            if (lastDayProductionList.stream().noneMatch(p -> materialDesc.equals(p.getMaterialDesc()))) {
-                isChangeMould = true; //  昨天没有排产，则需要换模具
-            } else {
-                // 如果有排产，根据排产量计算硫化机数量
-                isChangeMould = lastDayUsedLhMachines <= todayDayUsedLhMachines; // 昨天的硫化机数量不超过今天的，需要加模具
-            }
-        }
-
-        // 如果需要换模，则还需要满足如下条件才允许上机
-        if (isChangeMould) {
-            // 1、剩余型腔数不足最低排产模具数
-            if (!this.checkMouldSatisfy(dailyCapacityLimitVo, mouldCavityQty)) {
-                return 0;
-            }
-            // 2、当天满足上机条件按，但是下一天不满足上机条件的，也不允许上机
-            boolean isOk = this.checkNextDayCanContinueProduct(contextDTO, plan, scheduleDay, endDay, mpProdFinalList,
-                    unAllocationQty, dailyCapacityLimitMap);
-
-            if (!isOk) {
-                return 0;
-            }
-        }
-        // 取出已有的排产计划
-        MatchingProductionAdjuestVo dayProduct = dayProductionList.stream()
-                .filter(p -> materialDesc.equals(p.getMaterialDesc())).findAny().orElse(null);
-        if (dayProduct == null) {
-            dayProduct = new MatchingProductionAdjuestVo();
-            dayProduct.setMaterialCode(plan.getMaterialCode());
-            dayProduct.setMaterialDesc(materialDesc);
-            dayProduct.setProductionDate(scheduleDay);
-            dayProduct.setProductionQty(0);
-            dayProduct.setDayVulcanizationQty(capacity);
-            dayProduct.setIsFirstDay(isChangeMould);
-            dayProductionList.add(dayProduct);
-        }
-        
-        // 计算排产量
-        int allocationQty = capacity; // 本次排产量，默认是双模*模具产能
-        if (isChangeMould) { // 如果是换模具，则只能增加首日排产量
-            Integer changeMouldFirstQty = new MpAdjustDailyCapacityLimit().getFirstDayQty(
-                    contextDTO.getFactoryMonthPlanProdFinalList(), scheduleDay, dailyCapacityLimitVo,
-                    contextDTO.getParamMap(), plan.getMainPattern());
-            allocationQty = Optional.ofNullable(changeMouldFirstQty).orElse(0); // 每次仅新增一台硫化机
-        }
-        if (allocationQty <= 0) {
-            return 0;
-        }
-        if (isRemaindCapacity) {
-            allocationQty = Math.min(allocationQty, mouldRemaindCapacity); // 如果当天模具有剩余产能的，优先补满
-        }
-        allocationQty = Math.min(Math.min(allocationQty, unAllocationQty), remainDayTotalCapacity); // 分配量不能超过未分配量以及剩余产能
-        if (((dayProduct.getProductionQty() + allocationQty)& 1) != 0) { // 如果原排产量 + 新排产量为奇数，则排产量需要 + 1
-            allocationQty ++;
-        }
-        Integer oldProductionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay)).orElse(0);
-        plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay, allocationQty + oldProductionQty);
-        plan.setTotalQty(Optional.ofNullable(plan.getTotalQty()).orElse(0) + allocationQty);
-        plan.setConventionProductionQty(Optional.ofNullable(plan.getConventionProductionQty()).orElse(0) + allocationQty);
-        plan.setActualAdjustQty(Optional.ofNullable(plan.getActualAdjustQty()).orElse(0) + allocationQty);
-        if (plan.getBeginDay() == null) {
-            plan.setBeginDay(scheduleDay);
-        }
-        if (plan.getEndDay() == null || plan.getEndDay() < scheduleDay) {
-            plan.setEndDay(scheduleDay);
-        }
-        if (!this.checkIsBeginMatch(plan)) {
-            plan.setMatchBeginDay(scheduleDay); // 设置开始搭配日期
-        }
-        dayProduct.setProductionQty(dayProduct.getProductionQty() + allocationQty);
-        if (!isRemaindCapacity) { // 除了补模具产能以外的场景，需要更新日产能限制
-            dailyCapacityLimitVo.setUsedLhMachines(dailyCapacityLimitVo.getUsedLhMachines() + 1); // 更新硫化机使用情况
-            dailyCapacityLimitVo.setPatternUsedLhMachines(dailyCapacityLimitVo.getPatternUsedLhMachines() + 1);
-            Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
-            if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
-                embryoCodes.add(plan.getMainMaterialDesc());
-                dailyCapacityLimitVo.setUsedEmbryoTypes(embryoCodes.size());
-            }
-        }
-        String logDetail = String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,allocationQty);
-        log.debug(logDetail);
-        contextDTO.getLogDetail().append(logDetail).append(ApsConstant.DIVISION); // 记录日志
-        return allocationQty;
-    }
-
-    /**
-     * 检查隔天是否可以继续生产
-     *
-     * @param contextDTO            上下文
-     * @param plan                  排产记录
-     * @param scheduleDay           排产日
-     * @param endDay                搭配结束日
-     * @param mpProdFinalList       排产列表
-     * @param unAllocationQty       未分配搭配量
-     * @param dailyCapacityLimitMap 产能限制列表
-     * @return
-     */
-    private boolean checkNextDayCanContinueProduct(MpRollAdjustContextDTO contextDTO,
-                                                   FactoryMonthPlanFinalAdjustVo plan, Integer scheduleDay,
-                                                   Integer endDay, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                   Integer unAllocationQty,
-                                                   Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
-        // 取出下一个排产日
-        Integer nextDay = this.getNextDay(contextDTO, scheduleDay, endDay);
-        // 1、已经是结构收尾日，不搭配
-        if (nextDay <= 0) {
-            return false;
-        }
-        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, nextDay); // 先重算下一个排产日的产能限制
-        // 2、校验机台限制
-        MpDailyCapacityLimitVo nextDailyCapacityLimitVo = dailyCapacityLimitMap.get(nextDay);
-        if (nextDailyCapacityLimitVo.getMaxLhMachines() <= nextDailyCapacityLimitVo.getUsedLhMachines()) { // 如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
-            return false;
-        }
-        // 3、检查胎胚数限制
-        if (nextDailyCapacityLimitVo.getMaxEmbryoTypes() <= nextDailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
-            Set<String> embryoCodes = nextDailyCapacityLimitVo.getEmbryoCodes();
-            if (!embryoCodes.contains(plan.getEmbryoCode())) {
-                return false;
-            }
-        }
-        // 4、校验分配量限制，如果待分配量不足首日的量，不搭配
-        Integer firstQty = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
-        if (unAllocationQty <= firstQty) {
-            return false;
-        }
-        // 5、下一天的总剩余产能不足时，不搭配
-        int remainNextDayTotalCapacity = this.getRemainDayTotalCapacity(contextDTO, nextDailyCapacityLimitVo, nextDay);
-        if (remainNextDayTotalCapacity <= 0) {
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * 获取每日最大产能扣除已排产量后的剩余产能
-     *
-     * @param contextDTO           上下文
-     * @param dailyCapacityLimitVo 产能限制对象
-     * @param day                  排产日
-     * @return
-     */
-    private int getRemainDayTotalCapacity(MpRollAdjustContextDTO contextDTO,
-                                          MpDailyCapacityLimitVo dailyCapacityLimitVo, Integer day) {
-        int dayTotalCapacityLimit = Optional.ofNullable(dailyCapacityLimitVo.getMaxDayProductionQty()).orElse(0);
-        List<FactoryMonthPlanFinalAdjustVo> mpPlanFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
-        if (CollectionUtils.isEmpty(mpPlanFinalAdjustList)) {
-            return dayTotalCapacityLimit;
-        }
-        // 1.计算检查日的汇总值
-        String dayField = FactoryConstant.DAY_FIELD + day;
-        int totalPlanQty = mpPlanFinalAdjustList.stream().filter(Objects::nonNull).mapToInt(x -> {
-            Object val = x.getFieldValueByFieldName(dayField);
-            return val instanceof Number ? ((Number) val).intValue() : 0;
-        }).sum();
-
-        // 2.检查日的汇总值 小于等于 日总产能限制
-        if (totalPlanQty < dayTotalCapacityLimit) {
-            return dayTotalCapacityLimit - totalPlanQty;
-        } else {
-            return 0;
-        }
-    }
-
-    /**
-     * 获取sku一天的已使用硫化机
-     *
-     * @param contextDTO            上下文
-     * @param plan                  SKU已排产计划
-     * @param day                   排产日
-     * @param dailyCapacityLimitMap 日产能限制
-     * @return
-     */
-    private Integer getDayUsedLhMachines(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
-                                         Integer day, Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
-        MpDailyCapacityLimitVo oldDailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
-        if (oldDailyCapacityLimitVo == null) {
-            return 0;
-        }
-        MpDailyCapacityLimitVo newDailyCapacityLimitVo = new MpDailyCapacityLimitVo();
-        newDailyCapacityLimitVo.setDayOpenCloseFlag(oldDailyCapacityLimitVo.getDayOpenCloseFlag());
-        newDailyCapacityLimitVo.setDayProductionRate(oldDailyCapacityLimitVo.getDayProductionRate());
-        new MpAdjustDailyCapacityLimit().calcLhMachinesWithEmbryoTypes(Collections.singletonList(plan), day,
-                newDailyCapacityLimitVo, contextDTO.getParamMap(), null);
-        return newDailyCapacityLimitVo.getUsedLhMachines();
-    }
-
-    /**
-     * 构建日排产列表，用于搭配排产过程中的拍段逻辑
-     *
-     * @param mpProdFinalList
-     * @param startDay
-     * @param endDay
-     * @return
-     */
-    private Map<Integer, List<MatchingProductionAdjuestVo>> buildDayProductionMap(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                                                  Integer startDay, Integer endDay) {
-        Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap = new HashMap<>();
-//        Map<Integer, Integer> dayProductionQtyMap = new HashMap<>();
-        for (FactoryMonthPlanFinalAdjustVo plan : mpProdFinalList) {
-            String materialDesc = plan.getMaterialDesc();
-            MatchingProductionAdjuestVo lastDayProduct = null; // 昨日排产
-            for (int day = startDay; day <= endDay; day++) {
-                Integer productionQty = Optional.ofNullable((Integer) plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + day)).orElse(0);
-                List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(day);
-                if (dayProductionList == null) {
-                    dayProductionList = new ArrayList<>();
-                    dayProductionMap.put(day, dayProductionList);
-                }
-                MatchingProductionAdjuestVo dayProduct = dayProductionList.stream()
-                        .filter(d -> Objects.equals(d.getMaterialDesc(), materialDesc)).findAny().orElse(null);
-                if (dayProduct == null) {
-                    dayProduct = new MatchingProductionAdjuestVo();
-                    dayProduct.setMaterialCode(plan.getMaterialCode());
-                    dayProduct.setMaterialDesc(materialDesc);
-                    dayProduct.setProductionDate(day);
-                    dayProduct.setProductionQty(0);
-                    dayProduct.setDayVulcanizationQty(
-                            plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION);
-                    dayProductionList.add(dayProduct);
-                }
-                int sumProductQty = dayProduct.getProductionQty() + productionQty;
-                dayProduct.setProductionQty(sumProductQty);
-                dayProduct.setIsFirstDay(lastDayProduct == null || (lastDayProduct.getProductionQty() == 0 && sumProductQty > 0)); // 上一天没有排产，且今天有排产，说明是首日
-
-                lastDayProduct = dayProduct;
-            }
-        }
-        return dayProductionMap;
-    }
-
-    /**
-     * 检查日历是否可生产
-     *
-     * @param contextDTO
-     * @param day
-     * @return
-     */
-    private boolean checkDayCanProduct(MpRollAdjustContextDTO contextDTO, int day) {
-        boolean isProduct = true;
-        Map<Integer, MdmWorkCalendar> workCalendarMap = contextDTO.getWorkCalendarMap(); // 工作日历
-        MdmWorkCalendar calendar = workCalendarMap.get(day);
-        if (calendar != null && YesOrNoEnum.NO.getCode().equals(calendar.getDayFlag())) {
-            isProduct = false;
-        }
-        return isProduct;
-    }
-
+    
     /**
      * 搭配排产（主流程入口）
      *
@@ -1444,6 +218,7 @@ public class MatchingProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String scheduleLogName = isActualOrder? "实单补量": "搭配排产";
         this.addTempLog(productionContext, context.getProductionVersion() + scheduleLogName + "start");
+        productionContext.setIsActualOrder(isActualOrder); // 切换实单排产和搭配排产模式
         // 按结构分组的模具排产信息
         Map<String, List<CxMouldDayProductionHelper>> mouldProductionGroup = this
                 .buildMouldProductionGroup(productionContext);
@@ -1494,12 +269,6 @@ public class MatchingProductionHandler {
                 if (remainMatchingQty > 0) {
                     plan.setProductionFlag(YesOrNoEnum.YES.getCode()); // 设置成应生产
                 }
-                // 实单补量，要把储备量放到其余待搭配量中，防止
-                if (isActualOrder) {
-                    plan.setOtherMatchingQty(plan.getConventionReserveQty());
-                } else {
-                    plan.setOtherMatchingQty(0);
-                }
                 plan.setProductionQty(remainMatchingQty);
                 plan.setHeightProductionQty(0); // 高优先级
                 if (plan.getDayVulcanizationQty() == null) { // 硫化日产能空的赋值为0，防止报错
@@ -1519,10 +288,10 @@ public class MatchingProductionHandler {
             String checkMaterialDesc = null; // 检查指定的SKU，用于新模排产后执行模具续作算法
             do {
                 // 续作规格搭配排产
-                this.matchingScheduleContinue(productionContext, newSkuQtyMap, groupInfo, limitMap, isActualOrder, checkMaterialDesc);
+                this.matchingScheduleContinue(productionContext, newSkuQtyMap, groupInfo, limitMap, checkMaterialDesc);
                 // 新增模具搭配排产
                 checkMaterialDesc = this.matchingScheduleNewMould(productionContext, newSkuQtyMap, groupInfo,
-                        continueInfo, limitMap, isActualOrder);
+                        continueInfo, limitMap);
                 if (StringUtils.isEmpty(checkMaterialDesc)) { // 如果有新增模具，则再跑一次续作；没有新增模具则结束。
                     break;
                 }
@@ -1545,14 +314,13 @@ public class MatchingProductionHandler {
     private String matchingScheduleNewMould(TbrProductionContext productionContext,
                                                  Map<String, Integer> newSkuQtyMap, ProductionPlanGroupInfo groupInfo,
                                                  CxContinueInfoHelper continueInfo,
-                                                 TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
-                                                 boolean isActualOrder) {
+                                                 TreeMap<Integer, MatchingPlanLimitHelper> limitMap) {
         TreeMap<Integer, MatchingPlanLimitHelper> copyLimitMap = new TreeMap<>(limitMap); // 先复制一份产能限制列表，筛选SKU时会根据本次轮询对列表进行删减
         // 循环取结构向下所有符合搭配生产条件的SKU进行搭配排产
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
         do {
             List<MonthPlanProductionRequirePlanVo> productionPlanList = this.getMatchStartDayPlan(productionContext,
-                    groupInfo, copyLimitMap, scheduleMaterialDesc, isActualOrder); // 获取符合开始日期的规格，包括校验二次上机和换模能力，同时删减不符合条件的产能限制列表
+                    groupInfo, copyLimitMap, scheduleMaterialDesc); // 获取符合开始日期的规格，包括校验二次上机和换模能力，同时删减不符合条件的产能限制列表
             if (productionPlanList.isEmpty()) { // 没有符合条件的SKU，直接结束
                 break;
             }
@@ -1573,7 +341,7 @@ public class MatchingProductionHandler {
             }
             // 执行搭配排产算法
             boolean isAddMould = this.matchingScheduleNewSchedule(productionContext, materialDesc, needProductionInfo, newSkuQtyMap, groupInfo,
-                    continueInfo, copyLimitMap, isActualOrder);
+                    continueInfo, copyLimitMap);
             if (isAddMould) {
                 return materialDesc; // 只要有新增模具，则直接结束走续作逻辑
             }
@@ -1609,8 +377,7 @@ public class MatchingProductionHandler {
     private List<MonthPlanProductionRequirePlanVo> getMatchStartDayPlan(TbrProductionContext productionContext,
                                                                         ProductionPlanGroupInfo groupInfo,
                                                                         TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
-                                                                        Set<String> scheduleMaterialDesc,
-                                                                        boolean isActualOrder) {
+                                                                        Set<String> scheduleMaterialDesc) {
         // 取出还未轮询过的列表
         List<MonthPlanProductionRequirePlanVo> productionPlanList = groupInfo.getGroupPlanData().stream()
                 .filter(plan -> !scheduleMaterialDesc.contains(plan.getMaterialDesc())).collect(Collectors.toList());
@@ -1665,7 +432,8 @@ public class MatchingProductionHandler {
     private void matchingScheduleContinue(TbrProductionContext productionContext, Map<String, Integer> newSkuQtyMap,
                                           ProductionPlanGroupInfo groupInfo,
                                           TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
-                                          boolean isActualOrder, String checkMaterialDesc) {
+                                          String checkMaterialDesc) {
+        Boolean isActualOrder = productionContext.getIsActualOrder(); 
         Integer startDay = limitMap.firstKey();
         Integer endDay = limitMap.lastKey();
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData();
@@ -1673,68 +441,54 @@ public class MatchingProductionHandler {
                 .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
         do {
-            // 获取优先级最高的SKU信息
+            // 1、获取优先级最高的SKU信息
             String materialDesc = this.getSelectedAddSku(productionContext, startDay, endDay, groupPlanData,
                     scheduleMaterialDesc, checkMaterialDesc);
             if (StringUtils.isBlank(materialDesc)) {
                 break;
             }
             scheduleMaterialDesc.add(materialDesc);
-            // 计算需要排产的量
+            // 2、计算需要排产的量
             SkuNeedProductionInfo needProductionInfo = this.getNeedProductionQty(groupPlanData, materialDesc);
             if (null == needProductionInfo) {
                 continue;
             }
             List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(materialDesc);
             Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty();
+            // 3、统计每一天所有可用模具
             List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext,
-                    materialDesc, maxProductionQty, startDay, endDay); // 统计每一天所有可用模具
-            for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) { // 遍历各模具可用列表
-                Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
-                if (productionQty <= 0) {
-                    break;
-                }
+                    materialDesc, maxProductionQty, startDay, endDay);
+            // 4、遍历各模具可用列表，取出符合排产条件的日期以及模具
+            for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) {
                 Integer usedBeginDate = mouldDayUsed.getBeginDate();
                 Integer usedEndDate = mouldDayUsed.getEndDate();
-                // 最大硫化机数校验
+                // 4.1、检查SKU是否还有待排产的需求量，没有则结束本SKU的检查
+                Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
+                // 4.1.1、收尾前两天，如果是常销规格，即使需求量不足，也要尝试补满
+                ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer()
+                        .getParamConfiguration();
+                Integer maxBoostDay = param.getMaxBoostDay();
+                Set<String> productionTypeSet = param.getBoostProductionType();
+                // 实单且常销规格，需要月底补量
+                boolean isBoost = isActualOrder
+                        && productionTypeSet.contains(productionPlanList.get(0).getProductionType())
+                        && endDay - usedBeginDate <= maxBoostDay;
+                if (!isBoost && productionQty <= 0) { // 非实单或者非常销规格，只要余量不足就直接跳过
+                    break;
+                }
+                // 4.2、最大硫化机数校验
                 if (!this.checkLhMachineCount(productionContext, groupInfo, usedBeginDate)) {
                     continue;
                 }
-
+                // 4.3、当天已经无法添加排产，跳过
                 MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
                 if (limitHelper == null || !limitHelper.isProduct()) {
-                    continue; // 当天已经无法添加排产，跳过
+                    continue;
                 }
-                List<ProductionMouldInfoVo> doubleMouldList = mouldDayUsed.getMouldInfoList();
-
-                // 判断是否续作
-                List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
-                List<ProductionMouldInfoVo> twoMouldList = new ArrayList<>(); // 一次添加双模
-                Integer lastDay = this.getLastDay(productionContext, usedBeginDate, startDay); // 上一个排产日
-                for (ProductionMouldInfoVo mouldInfo : doubleMouldList) {
-                    inner:
-                    // 判断上一天有排产，当天没排产
-                    if (this.checkMouldHasProductMaterial(mouldInfo, lastDay, materialDesc)) { // 上一天有排产该物料，说明是续作
-                        boolean hasProduct = this.checkMouldHasProductMaterial(mouldInfo, usedBeginDate, materialDesc); // 模具今天是否有生产该规格
-                        // 非补量情况下，需要检查是否满足排产条件
-                        if (!hasProduct) {
-                            // 排产参数校验
-                            if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, usedBeginDate, startDay, endDay, isActualOrder)) {
-                                break inner;
-                            }
-                            // 最大模具数校验
-                            if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty()) {
-                                break inner;
-                            }
-                        }
-                        twoMouldList.add(mouldInfo);
-                    }
-                    if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) { // 凑够双模才添加
-                        continueMouldList.addAll(twoMouldList);
-                        twoMouldList.clear();
-                    }
-                }
-                // 执行非首日续作排程算法
+                // 4.4、获取可以排产模具列表
+                List<ProductionMouldInfoVo> continueMouldList = this.getContinueMouldList(productionContext, groupInfo,
+                        materialDesc, mouldDayUsed, limitMap, productionQty, isBoost);
+                // 4.5、执行非首日续作排程算法
                 if (!CollectionUtils.isEmpty(continueMouldList)) {
                     continueMouldList.stream().forEach(mould -> {
                         if (this.checkMouldHasProductMaterial(mould, usedBeginDate, materialDesc)) { // 当天没有排产该规格，则当天的排产模具数+1
@@ -1742,14 +496,15 @@ public class MatchingProductionHandler {
                         }
                     });
 
-                    // 获取实际日产量
+                    // 4.5.1、获取实际日产量
                     Integer realMaxProductionQty = this.getRealDayMaxProductionQty(productionContext, usedBeginDate, maxProductionQty);
-                    // 续做排程
+                    // 4.5.2、续做排程
                     Integer totalProductionQty = this.matchingScheduleNextDayContinue(productionContext, materialDesc,
-                            newSkuQtyMap, groupInfo, productionPlanList, productionQty, realMaxProductionQty, usedBeginDate,
-                            usedEndDate, continueMouldList, isActualOrder);
-                    this.updatePlanRemainQty(productionPlanList, totalProductionQty); // 更新计划的剩余排产量
-                    productionQty -= totalProductionQty;
+                            newSkuQtyMap, groupInfo, productionPlanList, productionQty, isBoost, realMaxProductionQty, usedBeginDate,
+                            usedEndDate, continueMouldList);
+                    // 4.5.3、更新计划的剩余排产量
+                    this.updatePlanRemainQty(productionPlanList, totalProductionQty);
+                    productionQty = productionQty > totalProductionQty? productionQty - totalProductionQty: 0;
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
                     if (totalProductionQty > 0) {
                         String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
@@ -1759,6 +514,218 @@ public class MatchingProductionHandler {
             }
 
         } while (true);
+    }
+
+    /**
+     * 获取可续作模具模具的列表
+     * 
+     * @param productionContext 上下文
+     * @param groupInfo         结构信息
+     * @param materialDesc      排产SKU
+     * @param mouldDayUsed      模具日可使用情况
+     * @param limitMap          排产限制列表
+     * @param productionQty     剩余可搭配量
+     * @param isBoots           是否月底补量
+     * @return
+     */
+    private List<ProductionMouldInfoVo> getContinueMouldList(TbrProductionContext productionContext,
+                                                             ProductionPlanGroupInfo groupInfo, String materialDesc,
+                                                             MatchingMouldDayUsedHelper mouldDayUsed,
+                                                             TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
+                                                             Integer productionQty,
+                                                             Boolean isBoost) {
+        Integer startDay = limitMap.firstKey(); // 结构排产区间开始日
+        Integer endDay = limitMap.lastKey(); // 结构排产区间结束日
+        Integer day = mouldDayUsed.getBeginDate(); // 排产日
+        Integer lastDay = this.getLastDay(productionContext, day, startDay); // 上一个排产日
+        MatchingPlanLimitHelper limitHelper = limitMap.get(day); // 当天排产限制
+        
+        // 1、取出物料描述涉及的需求计划
+        List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData(); // 需求计划
+        Map<String, List<MonthPlanProductionRequirePlanVo>> productionPlanMap = groupPlanData.stream()
+                .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc)); // 需求按计划物料描述分组
+        List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(materialDesc);
+        List<ProductionMouldInfoVo> continueMouldList = new ArrayList<>(); // 续作模具
+        List<ProductionMouldInfoVo> twoMouldList = new ArrayList<>(); // 一次添加双模
+        // 2、从可用模具中挑选两付符合条件的模具
+        List<ProductionMouldInfoVo> mouldList = mouldDayUsed.getMouldInfoList();
+        for (ProductionMouldInfoVo mouldInfo : mouldList) {
+            inner:
+            // 2.1、模具上一天有排产该SKU
+            if (this.checkMouldHasProductMaterial(mouldInfo, lastDay, materialDesc)) { // 上一天有排产该物料，说明是续作
+                // 2.2、检查当天是否有排产该SKU
+                boolean hasProduct = this.checkMouldHasProductMaterial(mouldInfo, day, materialDesc); // 模具今天是否有生产该规格
+                // 2.2.1、如果有排产该SKU,相当于要加模，需要判断排产参数、上一天模具是否已经收尾
+                if (!hasProduct) {
+                    // 2.2.1.1、排产参数校验
+                    if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, day, startDay, endDay)) {
+                        break inner;
+                    }
+                    // 2.2.1.2、最大模具数校验
+                    if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty()) {
+                        break inner;
+                    }
+                    // 2.2.1.3、判断上一天该模具是否已经收尾
+                    MonthPlanProductionRequirePlanVo firstPlan = productionPlanList.get(0);
+                    if (this.checkLastDayIsWrapUp(productionContext, groupInfo, mouldInfo, firstPlan, materialDesc, lastDay, startDay)) {
+                        break inner;
+                    }
+                    
+                // 2.2.2、如果没有排产该SKU,相当于要补模具的余量，需要模拟当天的排产，判断是否存在拼机台的情况，如果是拼机台可能会再加量后导致硫化机台数发生变化
+                } else {
+                    // 2.2.2.1、执行模拟排产
+                    MonthPlanProductionRequirePlanVo firstPlan = productionPlanList.get(0);
+                    this.simulatedMould(productionContext, groupInfo, mouldInfo, firstPlan, day, endDay, productionQty, isBoost);
+                    // 2.2.2.2、判断排产结果是否出现硫化机台数超出限制
+                    int maxLhMachineCount = groupInfo.getDayProductionLimitInfo().get(day).getMaxLhMachineCount();
+                    int usedLhMachines = groupInfo.getDailyCapacityLimitVoMap().get(day).getUsedLhMachines();
+                    // 2.2.2.3、完成判断后重算当天的排产统计，防止后续使用有问题
+                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern());
+                    if (usedLhMachines > maxLhMachineCount) {
+                        break inner;
+                    }
+                }
+                // 2.3、符合排产条件校验的模具添加到列表中
+                twoMouldList.add(mouldInfo);
+            }
+            // 2.4、有两幅符合排产条件的模具就开始执行续作排产
+            if (twoMouldList.size() == ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+                continueMouldList.addAll(twoMouldList);
+                twoMouldList.clear();
+            }
+        }
+        return continueMouldList;
+    }
+
+    /**
+     * 判断当天该模具是否已经收尾
+     * 
+     * @param productionContext 上下文
+     * @param groupInfo         结构信息
+     * @param mouldInfo         待校验模具
+     * @param materialDesc      规格
+     * @param day               排产日
+     * @param startDay          开始日期
+     * @return
+     */
+    private boolean checkLastDayIsWrapUp(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo,
+                              ProductionMouldInfoVo mouldInfo, MonthPlanProductionRequirePlanVo requirePlan, String materialDesc, Integer day, Integer startDay) {
+        if (day <= 0) {
+            return false;
+        }
+        // 计算模具当天的已排产量，如果没有达到日产，则需要判断是收尾、还是增模
+        Integer dayProductionQty = this.sumMouldMaterialProductQty(mouldInfo, day, materialDesc);
+        Integer dayVulcanizationQty = requirePlan.getDayVulcanizationQty(); // 日产
+        Integer singleMouldVulcanizationQty = dayVulcanizationQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 单模硫化日产
+        if (dayProductionQty <= 0 || dayProductionQty >= singleMouldVulcanizationQty) { // 昨天有排产，且没有排满
+            return false;
+        }
+        // 查看前天如果也有排产，说明是减模，不可以续作
+        Integer lastDay = this.getLastDay(productionContext, day, startDay);
+        if (lastDay <= 0) {
+            return false;
+        }
+        if (this.sumMouldMaterialProductQty(mouldInfo, lastDay, materialDesc) > 0) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 模拟排模具
+     * 
+     * @param productionContext 上下文
+     * @param groupInfo         结构信息
+     * @param mouldInfo         模具信息
+     * @param requirePlan       待排产需求计划
+     * @param day               排产日
+     * @param endDay            结构排产结束日期
+     * @param productionQty     剩余可排产量
+     * @param isBoots           是否月底补量
+     */
+    private void simulatedMould(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo,
+                                ProductionMouldInfoVo mouldInfo, MonthPlanProductionRequirePlanVo requirePlan,
+                                Integer day, Integer endDay, Integer productionQty, Boolean isBoots) {
+        Integer dayVulcanizationQty = requirePlan.getDayVulcanizationQty();
+        Integer singleMouldVulcanizationQty = dayVulcanizationQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 单模硫化日产 = 硫化日产 / 双模
+        String materialDesc = requirePlan.getMaterialDesc();
+        // 1、将结构排产信息转换成模具日排产信息
+        Map<String, FactoryMonthPlanMouldDayResult> resultMap = this.convertMouldDayResult(groupInfo, endDay);
+        // 2、计算模具当天的剩余产能，大于0的才能排产
+        Integer dayProductionQty = this.sumMouldMaterialProductQty(mouldInfo, day, materialDesc);
+        Integer remainQty = singleMouldVulcanizationQty > dayProductionQty? singleMouldVulcanizationQty - dayProductionQty: 0;
+        if (remainQty <= 0) {
+            return;
+        }
+        // 3、获取规格描述对应的排产记录，如果没有则需要新增一笔
+        FactoryMonthPlanMouldDayResult mpMouldDayResult = resultMap.get(materialDesc);
+        if (mpMouldDayResult == null) {
+            mpMouldDayResult = new FactoryMonthPlanMouldDayResult();
+            mpMouldDayResult.setStructureName(requirePlan.getStructureName());
+            mpMouldDayResult.setMaterialDesc(requirePlan.getMaterialDesc());
+            mpMouldDayResult.setMaterialCode(requirePlan.getMaterialCode());
+            mpMouldDayResult.setEmbryoCode(requirePlan.getEmbryoCode());
+            mpMouldDayResult.setMainMaterialDesc(requirePlan.getMainMaterialDesc());
+            mpMouldDayResult.setMainPattern(requirePlan.getMainPattern());
+            mpMouldDayResult.setDayVulcanizationQty(dayVulcanizationQty);
+            resultMap.put(materialDesc, mpMouldDayResult);
+        }
+        // 4、更新已生产量
+        String fieldName = FactoryConstant.DAY_FIELD + day;
+        Integer produceQty = Optional.ofNullable((Integer)mpMouldDayResult.getFieldValueByFieldName(fieldName)).orElse(0);
+        // 5、计算可生产量，如果是月底补量，则直接补到产能上限
+        Integer canProductQty = isBoots? Math.min(productionQty, remainQty): remainQty;
+        mpMouldDayResult.setFieldValueByFieldName(fieldName, produceQty + canProductQty);
+        // 6、模拟运算统计排产数据
+        MpMonthPlanDailyCapacityLimit dailyCapacityLimitObj = new MpMonthPlanDailyCapacityLimit();
+        Map<String, Object> paramMap = groupInfo.composeDailyCapacityParamMap(productionContext);
+        List<FactoryMonthPlanMouldDayResult> mouldDayResultList = new ArrayList<>(resultMap.values());
+        MpDailyCapacityLimitVo daylyCapacityLimitlt = groupInfo.getDailyCapacityLimitVoMap().get(day);
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, day, daylyCapacityLimitlt, paramMap, mpMouldDayResult.getMainPattern());
+    }
+    
+
+    /**
+     * 转换模具排产结果
+     *
+     * @param groupInfo 结构
+     * @param endDay    结束日
+     * @return 模具排产结果列表，KEY：规格描述，VALUE：排产结果
+     */
+    private Map<String, FactoryMonthPlanMouldDayResult> convertMouldDayResult(ProductionPlanGroupInfo groupInfo,
+                                                                              Integer endDay) {
+        String structureName = groupInfo.getGroupName();
+        GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
+        Map<String, FactoryMonthPlanMouldDayResult> mpProdFinalMap = new HashMap<>();
+        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
+            String dayField = FactoryConstant.DAY_FIELD + i;
+            capacityLimitHelper = groupInfo.getDayProductionLimitInfo().get(i);
+            if (capacityLimitHelper == null) {
+                continue;
+            }
+            Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = capacityLimitHelper.getProductionSkuQtyInfo();
+            if (PubUtil.isEmpty(productionSkuQtyMap)) {
+                continue;
+            }
+
+            // 组装模具日排产结果
+            productionSkuQtyMap.forEach((materialDesc, skuProductionInfo) -> {
+                FactoryMonthPlanMouldDayResult mpMouldDayResult = mpProdFinalMap.get(skuProductionInfo.getMaterialDesc());
+                if (mpMouldDayResult == null) {
+                    mpMouldDayResult = new FactoryMonthPlanMouldDayResult();
+                    mpMouldDayResult.setStructureName(structureName);
+                    mpMouldDayResult.setMaterialCode(skuProductionInfo.getMaterialCode());
+                    mpMouldDayResult.setMaterialDesc(skuProductionInfo.getMaterialDesc());
+                    mpMouldDayResult.setEmbryoCode(skuProductionInfo.getEmbryoCode());
+                    mpMouldDayResult.setMainMaterialDesc(skuProductionInfo.getMainMaterialDesc());
+                    mpMouldDayResult.setMainPattern(skuProductionInfo.getMainPattern());
+                    mpMouldDayResult.setDayVulcanizationQty(skuProductionInfo.getDayVulcanizationQty());
+                }
+                mpMouldDayResult.setFieldValueByFieldName(dayField, skuProductionInfo.getSumProductionQty());
+                mpProdFinalMap.put(skuProductionInfo.getMaterialDesc(), mpMouldDayResult);
+            });
+        }
+        return mpProdFinalMap;
     }
 
     /**
@@ -1814,21 +781,32 @@ public class MatchingProductionHandler {
      * @return
      */
     private boolean checkMouldHasProductMaterial(ProductionMouldInfoVo mouldInfo, Integer day, String materialDesc) {
+        return sumMouldMaterialProductQty(mouldInfo, day, materialDesc) > 0;
+    }
+    
+    /**
+     * 合计模具当天有排产指定SKU的量
+     * 
+     * @param mouldInfo
+     * @param day
+     * @param materialDesc
+     * @return
+     */
+    private Integer sumMouldMaterialProductQty(ProductionMouldInfoVo mouldInfo, Integer day, String materialDesc) {
         if (day <= 0) {
-            return false;
+            return 0;
         }
         if (StringUtils.isEmpty(materialDesc)) {
-            return false;
+            return 0;
         }
         List<CxMouldDayProductionHelper> dayProduction = mouldInfo.getDayProductionInfo().get(day);
         if (dayProduction == null) {
-            return false; // 模具空闲，没生成该SKU
+            return 0; // 模具空闲，没生成该SKU
         }
-        return dayProduction.stream()
-                .filter(s -> s.getMaterialDesc().equals(materialDesc))
-                .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum() > 0; // 模具不空闲，但是生产的是同一个规格，可以尝试补量
+        return dayProduction.stream().filter(s -> s.getMaterialDesc().equals(materialDesc))
+                .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 模具不空闲，但是生产的是同一个规格，可以尝试补量
     }
-
+    
     /**
      * 计算生产日期
      *
@@ -1999,14 +977,13 @@ public class MatchingProductionHandler {
                                                     Map<String, Integer> newSkuQtyMap,
                                                     ProductionPlanGroupInfo groupInfo,
                                                     CxContinueInfoHelper continueInfo,
-                                                    TreeMap<Integer, MatchingPlanLimitHelper> limitMap,
-                                                    boolean isActualOrder) {
+                                                    TreeMap<Integer, MatchingPlanLimitHelper> limitMap) {
         Integer lhMouldQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 硫化机模具配比
         String structureName = groupInfo.getGroupName();
         List<MonthPlanProductionRequirePlanVo> productionPlanList = needProductionInfo.getNeedProductionList();
         // 1、非实单搭配时，如果结构有设置模具分配比例，需要限制不允许超过模具分配数
         int allocationMouldNum = lhMouldQty; 
-        if (!isActualOrder) {
+        if (!productionContext.getIsActualOrder()) {
             MouldAllocationInfoVo mouldAllocationControlInfo = productionContext
                     .getMouldAllocationInfo(CollectionUtils.firstElement(productionPlanList));
             if (mouldAllocationControlInfo != null) {
@@ -2041,7 +1018,7 @@ public class MatchingProductionHandler {
             }
             // 检查是否满足排产条件
             // 1、排产参数检查
-            if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, usedBeginDate, startDay, endDay, isActualOrder)) {
+            if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, usedBeginDate, startDay, endDay)) {
                 continue;
             }
             // 2、检查换模次数检查
@@ -2051,7 +1028,7 @@ public class MatchingProductionHandler {
             }
             // 3、次日是否满足排产参数检查
             Integer nextDay = this.getNextDay(productionContext, usedBeginDate, endDay);
-            if (nextDay <= 0 || !this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, nextDay, startDay, endDay, isActualOrder)) {
+            if (nextDay <= 0 || !this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, nextDay, startDay, endDay)) {
                 continue;
             }
             // 4、检查次日的模具是否满足条件续作
@@ -2128,7 +1105,7 @@ public class MatchingProductionHandler {
                 Integer realProductionQty = lhProductionQtyHelper.getRealSumProductionQty() - realSumProductionQty;
                 if (realProductionQty > 0) {
                     Set<String> useMouldSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
-                    String scheduleLogName = isActualOrder? "实单补量": "搭配排产";
+                    String scheduleLogName = productionContext.getIsActualOrder()? "实单补量": "搭配排产";
                     this.addTempLog(productionContext, String.format("结构:%s,【%s】,%s日,规格:%s,新增模具%s,排产量:%s", structureName, scheduleLogName, usedBeginDate, materialDesc, useMouldSet, realProductionQty));
                     // 更新换模数
                     Set<String> mouldCodeSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
@@ -2215,10 +1192,8 @@ public class MatchingProductionHandler {
     private boolean checkProductParam(TbrProductionContext productionContext,
                                       List<MonthPlanProductionRequirePlanVo> requireList,
                                       ProductionPlanGroupInfo groupInfo, String materialDesc,
-                                      Integer day, Integer beginDay, Integer endDay,
-                                      boolean isActualOrder) {
+                                      Integer day, Integer beginDay, Integer endDay) {
         MonthPlanProductionRequirePlanVo firstPlan = CollectionUtils.firstElement(requireList);
-        ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
         // 1、统计当天的总排产量，如果已经达到最大排产量则直接取消
         if (!this.checkRealProductQty(productionContext, day)) {
             return false;
@@ -2248,6 +1223,7 @@ public class MatchingProductionHandler {
 //        if (productionQty <= 0) {
 //            return false;
 //        }
+//      ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
 //        Integer maxBoostDay = param.getMaxBoostDay();
 //        Set<String> productionTypeSet = param.getBoostProductionType();
 //        if (endDay - day > maxBoostDay) {
@@ -2317,15 +1293,21 @@ public class MatchingProductionHandler {
      * @return
      */
     private Integer sumMaterialProductQty(TbrProductionContext productionContext, String materialDesc, Integer day) {
-        Integer dayTotalProductQty = productionContext.getBaseDataContainer().getMouldInfoMap().values().stream()
-                .mapToInt(m -> {
-                    List<CxMouldDayProductionHelper> dayPlan = m.getDayProductionInfo().get(day);
-                    if (CollectionUtils.isEmpty(dayPlan)) {
-                        return 0;
-                    }
-                    return dayPlan.stream().filter(p -> Objects.equals(materialDesc, p.getMaterialDesc()))
-                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
-                }).sum();
+        Integer dayTotalProductQty = productionContext.getGroupProductionInfo().values().stream().mapToInt(groupInfo -> {
+            GroupPlanCxLhCapacityLimitHelper capacityLimitHelper = groupInfo.getDayProductionLimitInfo().get(day);
+            if (capacityLimitHelper == null) {
+                return 0;
+            }
+            Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = capacityLimitHelper.getProductionSkuQtyInfo();
+            if (PubUtil.isEmpty(productionSkuQtyMap)) {
+                return 0;
+            }
+            SkuDayProductionInfoHelper skuProductionInfo = productionSkuQtyMap.get(materialDesc);
+            if (skuProductionInfo == null) {
+                return 0;
+            }
+            return Optional.ofNullable(skuProductionInfo.getSumProductionQty()).orElse(0);
+        }).sum();
         return dayTotalProductQty;
     }
 
@@ -2416,29 +1398,30 @@ public class MatchingProductionHandler {
     /**
      * 非首日续作排程算法
      *
-     * @param productionContext
-     * @param materialDesc
-     * @param newSkuQtyMap
-     * @param groupInfo
-     * @param productionPlanList
-     * @param productionQty
-     * @param maxProductionQty
-     * @param beginDate
-     * @param endDate
-     * @param continueMouldList
+     * @param productionContext  上下文
+     * @param materialDesc       排产规格描述
+     * @param newSkuQtyMap       搭配量统计列表
+     * @param groupInfo          结构信息
+     * @param productionPlanList 同SK需求计划列表
+     * @param productionQty      剩余可排产量
+     * @param isBoots            是否月底补量
+     * @param maxProductionQty   日硫化量
+     * @param beginDate          结构排产开始日期
+     * @param endDate            结构排产结束日期
+     * @param continueMouldList  本次需要排产的模具
      */
     private Integer matchingScheduleNextDayContinue(TbrProductionContext productionContext, String materialDesc,
-                                                    Map<String, Integer> newSkuQtyMap, ProductionPlanGroupInfo groupInfo,
+                                                    Map<String, Integer> newSkuQtyMap,
+                                                    ProductionPlanGroupInfo groupInfo,
                                                     List<MonthPlanProductionRequirePlanVo> productionPlanList,
-                                                    Integer productionQty, Integer maxProductionQty, Integer beginDate,
-                                                    Integer endDate, List<ProductionMouldInfoVo> continueMouldList,
-                                                    boolean isActualOrder) {
+                                                    Integer productionQty, Boolean isBoots, Integer maxProductionQty,
+                                                    Integer beginDate, Integer endDate,
+                                                    List<ProductionMouldInfoVo> continueMouldList) {
         // 续作规格排产
         if (CollectionUtils.isEmpty(continueMouldList)) {
             return 0;
         }
         Integer lhMouldQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-//        Integer sumProductionQty = productionContext.getSpecialMaterialBatchRemainQty(groupInfo, productionQty, true); // 待排量 = 需求量如果是特殊材料需要以特殊材料为准
         Integer sumProductionQty = productionQty;
         // 构建续作规格对象
         CxContinueSkuInfoHelper continueSkuInfo = CxContinueSkuInfoHelper.buildContinueProductInfo(materialDesc,
@@ -2460,7 +1443,7 @@ public class MatchingProductionHandler {
                 }
                 // 模具数换算成机台数
                 Integer lhQty = remainMouldList.size() / lhMouldQty;
-                Integer realProductionQty = NumberUtils.min(sumProductionQty, capacityQty, maxProductionQty); // 取计划量、产能剩余量、最大排产量的最小值
+                Integer realProductionQty = isBoots? capacityQty: NumberUtils.min(sumProductionQty, capacityQty, maxProductionQty); // 月底补量，直接按剩余产能排产；其余情况取计划量、产能剩余量、最大排产量的最小值
                 if (realProductionQty <= 0) {
                     continue;
                 }
@@ -2471,7 +1454,7 @@ public class MatchingProductionHandler {
                 newSkuQtyMap.put(materialDesc, newSkuQtyMap.getOrDefault(materialDesc, 0) + realProductionQty); // 累计已排量
                 sumProductionQty -= realProductionQty; // 待排量扣减已排量，要乘上硫化机数
                 totalProductionQty += realProductionQty;
-                String scheduleLogName = isActualOrder? "实单补量": "搭配排产";
+                String scheduleLogName = productionContext.getIsActualOrder()? "实单补量": "搭配排产";
                 this.addTempLog(productionContext, String.format("结构:%s,【%s】,%s日,规格:%s,模具续作,排产量:%s", groupInfo.getGroupName(), scheduleLogName, beginDate, materialDesc, realProductionQty));
             }
         }
@@ -2524,16 +1507,17 @@ public class MatchingProductionHandler {
                 continue;
             }
 
-            // 根据日产能比例重算日产能
+            // 根据日产能比例计算实际日产能
             Integer realDayMoldQty = dayMoldQty;
-            Integer realDayVulcanizationQty = this.getRealDayMaxProductionQty(productionContext, day, dayVulcanizationQty);
-            if (realDayVulcanizationQty.compareTo(dayVulcanizationQty) != 0) { // 如果日产能有发生变化，重算日单模产量
+            Integer realDayVulcanizationQty = this.getRealDayMaxProductionQty(productionContext, day,
+                    dayVulcanizationQty);
+            if (realDayVulcanizationQty.compareTo(dayVulcanizationQty) != 0) { // 如果日产能有发生变化，计算实际日单模产量
                 realDayMoldQty = realDayVulcanizationQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
             }
             List<ProductionMouldInfoVo> canUseMould = this.selectedAllMouldByDay(productionContext, materialDesc,
                     realDayMoldQty, day);
             if (!CollectionUtils.isEmpty(canUseMould)) {
-                mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day)); // 记录可用时间段
+                mouldDayUsedList.add(new MatchingMouldDayUsedHelper(canUseMould, day, day, realDayVulcanizationQty)); // 记录可用时间段
             }
         }
         return mouldDayUsedList;
@@ -3131,25 +2115,6 @@ public class MatchingProductionHandler {
         return productionContext;
     }
 
-    /**
-     * 将周程滚动上下文构建成算法要求的上下文结构
-     *
-     * @param contextDTO 定稿计划
-     * @return
-     */
-    private TbrProductionContext initProductionContext(MpRollAdjustContextDTO contextDTO) {
-        FactoryMonthPlanMouldDayResult result = new FactoryMonthPlanMouldDayResult();
-        result.setProductionVersion(contextDTO.getProductionVersion());
-        result.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
-        result.setYear(contextDTO.getMpYear());
-        result.setMonth(contextDTO.getMpMonth());
-        result.setFactoryCode(contextDTO.getFactoryCode());
-        FactoryMonthPlanFinalAdjustVo plan = CollectionUtils.firstElement(contextDTO.getFactoryMonthPlanProdFinalList());
-        if (plan != null) {
-            result.setProductTypeCode(plan.getProductTypeCode());
-        }
-        return initProductionContext(result);
-    }
 
 
     /**
@@ -3694,6 +2659,9 @@ public class MatchingProductionHandler {
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(productionContext,
                     groupAllocationList);
+            Integer maxCycleQty = groupProductionInfo.getGroupPlanData().stream()
+                    .mapToInt(MonthPlanProductionRequirePlanVo::getCycleReserveQty).sum();
+            groupProductionInfo.setMaxCycleQty(maxCycleQty);
         });
 //      // 处理计划的待排产量及排产标记重置
 //      Map<Long, MonthPlanProductionRequirePlanVo> allSinglePlanMap = productionContext.getAllProductionPlan();

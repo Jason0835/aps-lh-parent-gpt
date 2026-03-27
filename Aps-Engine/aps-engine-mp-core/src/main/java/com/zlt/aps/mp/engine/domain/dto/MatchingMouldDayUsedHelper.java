@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
@@ -13,6 +14,7 @@ import lombok.Data;
  * @date 20251219
  */
 @Data
+@AllArgsConstructor
 public class MatchingMouldDayUsedHelper {
 	/**
 	 * 可用模具
@@ -26,11 +28,8 @@ public class MatchingMouldDayUsedHelper {
 	 * 结束使用日 1~31
 	 */
 	private Integer endDate;
-
-	public MatchingMouldDayUsedHelper(List<ProductionMouldInfoVo> mouldInfoList, Integer beginDate, Integer endDate) {
-		super();
-		this.mouldInfoList = mouldInfoList;
-		this.beginDate = beginDate;
-		this.endDate = endDate;
-	}
+	/**
+	 * 硫化日产
+	 */
+	private Integer dayVulcanizationQty;
 }

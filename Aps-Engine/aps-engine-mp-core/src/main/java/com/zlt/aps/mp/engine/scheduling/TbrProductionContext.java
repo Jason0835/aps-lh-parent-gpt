@@ -103,6 +103,10 @@ public class TbrProductionContext extends Context {
      */
     private StringBuilder tempLogBuilder;
     /**
+     * 是否实单补量，用于搭配排产中部分逻辑的判断，逻辑进入实单排产和搭配排产时会进行切换
+     */
+    private Boolean isActualOrder;
+    /**
      * 加入收尾，方向匹配结构集合
      *
      * @param cxMachineCode
