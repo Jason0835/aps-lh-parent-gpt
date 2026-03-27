@@ -15,6 +15,8 @@ import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.ConclusionLhMachineHandler;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -106,7 +108,10 @@ public class ProductionPlanGroupInfo {
      * 近3个月的排产次数-机台挑计划时使用
      */
     private Integer productionCount;
-
+    /**
+     * 最大周期排产量的值
+     */
+    private Integer maxCycleQty;
     /**
      * 排产-成型硫化产能限制
      * 包含 最大胎胚数
@@ -614,16 +619,19 @@ public class ProductionPlanGroupInfo {
     /**
      * 获取结构下，最早续作收尾的硫化组信息
      *
+     * @param context
+     * @param continueSkuMap
+     * @param excludeDaySet
      * @return
      */
-    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfoByContinueSku(Context context, Map<String, CxContinueSkuInfoHelper> continueSkuMap) {
+    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfoByContinueSku(Context context, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Set<Integer> excludeDaySet) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || CollectionUtils.isEmpty(continueSkuMap)) {
             return null;
         }
         //得到续作最大硫化组可使用的模具数
         Integer sumMouldNumber = continueSkuMap.values().stream().mapToInt(CxContinueSkuInfoHelper::getMouldNumber).sum();
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        List<GroupPlanCxLhCapacityLimitHelper> hasAddContinueSkuList = dayLimitList.stream().filter(dayLimit -> dayLimit.getProductionMouldSet().size() < sumMouldNumber).collect(Collectors.toList());
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddContinueSkuList = dayLimitList.stream().filter(dayLimit -> !excludeDaySet.contains(dayLimit.getDay()) && dayLimit.getProductionMouldSet().size() < sumMouldNumber).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddContinueSkuList)) {
             return null;
         }
@@ -725,6 +733,10 @@ public class ProductionPlanGroupInfo {
         Integer preClosingDay = preSelected.getClosingDay();
         Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
+        //20260327 修正根据materialDesc重新构建前Sku信息
+        BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findBeforeSkuProductionInfoByAddSku(context, addSkuInfo, this, preClosingDay);
+        TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(context, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
+        preSelected.updateBeforeSkuInfo(lhBeforeSkuInfo);
         BeforeSkuProductionInfo mouldSkuInfo = ChangeMouldInfo.buildBeforeSkuProductionInfoByMould(productionContext, preClosingDay, selectedMould);
         ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo(), mouldSkuInfo);
         boolean isChangeMould = changeMouldInfo.isChangeMould();
@@ -948,18 +960,19 @@ public class ProductionPlanGroupInfo {
      * 1、同规格同花纹
      * 2、同生胎同模具
      *
+     * @param productionStage           排产阶段
      * @param continueType              续作类型
      * @param materialDesc              续作Sku
      * @param shareMouldMaterialDescSet 共用模具的物料集合
      * @param continueProductInfoHelper 续作Sku详细信息
      * @return
      */
-    public List<MonthPlanProductionRequirePlanVo> getContinueListByType(ContinueTypeEnum continueType, String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
+    public List<MonthPlanProductionRequirePlanVo> getContinueListByType(ProductionStageEnum productionStage, ContinueTypeEnum continueType, String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType) {
             return getSameSpecificationsAndPatternPlan(materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
         }
         if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
-            return getSameEmbryoCodeAndMouldPlan(materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
+            return getSameEmbryoCodeAndMouldPlan(productionStage, materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
         }
         return Collections.emptyList();
     }
@@ -998,11 +1011,12 @@ public class ProductionPlanGroupInfo {
     /**
      * 获取分组下同生胎同模具下的Sku计划
      *
+     * @param productionStage           排产阶段
      * @param materialDesc              前规格
      * @param shareMouldMaterialDescSet 共用模具的sku集合
      * @param continueProductInfoHelper 前规格详情信息
      */
-    public List<MonthPlanProductionRequirePlanVo> getSameEmbryoCodeAndMouldPlan(String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
+    public List<MonthPlanProductionRequirePlanVo> getSameEmbryoCodeAndMouldPlan(ProductionStageEnum productionStage, String materialDesc, Set<String> shareMouldMaterialDescSet, CxContinueSkuInfoHelper continueProductInfoHelper) {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             Collections.emptyList();
         }
@@ -1020,7 +1034,12 @@ public class ProductionPlanGroupInfo {
             if (!shareMouldMaterialDescSet.contains(groupPlan.getMaterialDesc())) {
                 return;
             }
-            //同生胎
+            //20260326 不是测算阶段，共用模具都算续作
+            if (ProductionStageEnum.CALCULATION_STAGE != productionStage) {
+                sameEmbryoCodeAndMouldList.add(groupPlan);
+                return;
+            }
+            //测算阶段-同生胎
             if (groupPlan.isSameEmbryoCode(continueProductInfoHelper)) {
                 sameEmbryoCodeAndMouldList.add(groupPlan);
             }
@@ -1727,7 +1746,7 @@ public class ProductionPlanGroupInfo {
      * @param currentLimit 当前排产信息
      * @return
      */
-    private GroupPlanCxLhCapacityLimitHelper getNextDayInfo(GroupPlanCxLhCapacityLimitHelper currentLimit) {
+    public GroupPlanCxLhCapacityLimitHelper getNextDayInfo(GroupPlanCxLhCapacityLimitHelper currentLimit) {
         if (null == currentLimit) {
             return null;
         }
@@ -1800,14 +1819,15 @@ public class ProductionPlanGroupInfo {
      */
     public Integer getPreviousDay(Integer currentDay) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
-            return currentDay;
+            return null;
         }
-        Integer previousDay = currentDay - BigDecimal.ONE.intValue();
         Set<Integer> productionDaySet = dayProductionLimitInfo.keySet();
-        if (productionDaySet.contains(previousDay)) {
-            return previousDay;
+        List<Integer> previousDayList = productionDaySet.stream().filter(day -> day < currentDay).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(previousDayList)) {
+            return null;
         }
-        return getPreviousDay(previousDay);
+        previousDayList.sort(Comparator.comparing(Integer::intValue, Comparator.reverseOrder()));
+        return previousDayList.get(BigDecimal.ZERO.intValue());
     }
 
     /**
@@ -2145,7 +2165,7 @@ public class ProductionPlanGroupInfo {
      * @param productionContext
      * @return
      */
-    private Map<String, Object> composeDailyCapacityParamMap(TbrProductionContext productionContext) {
+    public Map<String, Object> composeDailyCapacityParamMap(TbrProductionContext productionContext) {
         Map<String, Object> paramMap = new HashMap<>();
         paramMap.put(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty());
         paramMap.put(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode(), productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQty());
@@ -2160,7 +2180,7 @@ public class ProductionPlanGroupInfo {
      * @param endDay 结束日
      * @return 模具排产结果列表
      */
-    private List<FactoryMonthPlanMouldDayResult> convertMouldDayResult(Integer endDay) {
+    public List<FactoryMonthPlanMouldDayResult> convertMouldDayResult(Integer endDay) {
         GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
         Map<String, FactoryMonthPlanMouldDayResult> mpProdFinalMap = new HashMap<>();
         for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
