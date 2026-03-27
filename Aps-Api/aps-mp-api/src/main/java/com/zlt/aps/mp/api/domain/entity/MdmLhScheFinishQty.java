@@ -1,8 +1,6 @@
 package com.zlt.aps.mp.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -27,10 +25,6 @@ import java.util.Date;
 public class MdmLhScheFinishQty extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
-
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
 
     @ApiModelProperty(value = "硫化工单号")
     @TableField(value = "ORDER_NO")
@@ -99,13 +93,4 @@ public class MdmLhScheFinishQty extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "厂别")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    @ApiModelProperty(value = "删除标识")
-    @TableField(value = "IS_DELETE")
-    private BigDecimal isDelete;
-
-    @ApiModelProperty(value = "备注")
-    @TableField(value = "REMARK")
-    private String remark;
-
 }
