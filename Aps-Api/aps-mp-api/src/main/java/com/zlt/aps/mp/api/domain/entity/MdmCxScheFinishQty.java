@@ -28,10 +28,6 @@ public class MdmCxScheFinishQty extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
-
     @ApiModelProperty(value = "成型工单号")
     @TableField(value = "ORDER_NO")
     private String orderNo;

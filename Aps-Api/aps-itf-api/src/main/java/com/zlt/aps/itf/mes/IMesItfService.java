@@ -232,6 +232,24 @@ public interface IMesItfService {
     public AjaxResult syncLhClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步成型排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程日完成量")
+    @PostMapping("/mesItf/syncCxScheDayFinishQty")
+    public AjaxResult syncCxScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步硫化排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程日完成量")
+    @PostMapping("/mesItf/syncLhScheDayFinishQty")
+    public AjaxResult syncLhScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 成型排程结果下发到MES
      * 业务规则：
      * 1. 更新当天的2班（早中班，即二班和三班）- 清空一班数据

@@ -28,10 +28,6 @@ public class MdmMesCxStock extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
-
     @ApiModelProperty(value = "库存日期")
     @TableField(value = "STOCK_DATE")
     private Date stockDate;
@@ -83,9 +79,5 @@ public class MdmMesCxStock extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "厂别")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
-    @TableField(value = "IS_DELETE")
-    private Integer isDelete;
 
 }

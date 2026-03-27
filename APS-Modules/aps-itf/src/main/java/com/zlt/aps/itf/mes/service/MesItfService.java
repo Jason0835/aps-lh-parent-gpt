@@ -200,4 +200,19 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步成型排程日完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    public AjaxResult syncCxScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步硫化排程日完成量
+     * @param syncDataLogs
+     * @return
+     */
+    AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
 }

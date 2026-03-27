@@ -26,10 +26,6 @@ public class MdmLhRepairCapsule extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
-
     @ApiModelProperty(value = "获取日期")
     @TableField(value = "OBTAIN_TIME")
     private String obtainTime;
@@ -54,9 +50,6 @@ public class MdmLhRepairCapsule extends BaseEntity implements Serializable {
     @TableField(value = "BRAND")
     private String brand;
 
-    @ApiModelProperty(value = "备注")
-    @TableField(value = "REMARK")
-    private String remark;
 
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")

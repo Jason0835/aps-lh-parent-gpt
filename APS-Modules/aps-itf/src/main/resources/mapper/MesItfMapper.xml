@@ -318,4 +318,39 @@
         <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <select id="selectCxScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheDayFinishQty">
+        SELECT
+        ID,
+        FINISH_DATE,
+        DAY_FINISH_QTY,
+        EMBRYO_CODE,
+        EXAMPLE_TYPE,
+        BOM_DATA_VERSION,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_CX_DAY_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectLhScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheDayFinishQty">
+        SELECT
+        ID,
+        FINISH_DATE,
+        DAY_FINISH_QTY,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_LH_DAY_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
 </mapper>

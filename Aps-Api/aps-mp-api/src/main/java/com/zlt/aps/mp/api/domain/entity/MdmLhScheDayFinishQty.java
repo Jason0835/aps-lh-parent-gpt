@@ -11,32 +11,38 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
- * APS结构整车胎面配置
+ * APS硫化排程日完成量接口
  *
- * @author zlt
- * @since 2025/12/25
+ * @author APS Team
+ * @since 2026/03/27
  */
-@ApiModel(value = "APS结构整车胎面配置", description = "APS结构整车胎面配置")
+@ApiModel(value = "APS硫化排程日完成量接口", description = "APS硫化排程日完成量接口")
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("T_MDM_STRUCTURE_TREAD_CONFIG")
-public class MdmStructureTreadConfig extends BaseEntity implements Serializable {
+@TableName("T_MDM_MES_LH_DAY_FINISH_QTY")
+public class MdmLhScheDayFinishQty extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "结构")
-    @TableField(value = "STRUCTURE_CODE")
-    private String structureCode;
+    @ApiModelProperty(value = "完成日期")
+    @TableField(value = "FINISH_DATE")
+    private Date finishDate;
 
-    @ApiModelProperty(value = "整车胎面条数")
-    @TableField(value = "TREAD_COUNT")
-    private Integer treadCount;
+    @ApiModelProperty(value = "胚胎日完成量")
+    @TableField(value = "DAY_FINISH_QTY")
+    private BigDecimal dayFinishQty;
 
-    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
-    @TableField(value = "DEL_FLAG")
-    private Integer delFlag;
+    @ApiModelProperty(value = "物料编码（NC）")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
+
+    @ApiModelProperty(value = "物料编码（MES）")
+    @TableField(value = "MES_MATERIAL_CODE")
+    private String mesMaterialCode;
 
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")

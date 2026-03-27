@@ -7,6 +7,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.util.Date;
+
 /**
  * 硫化在机信息表
  */
@@ -20,7 +22,7 @@ public class MdmLhMachineOnlineInfo extends BaseEntity {
     /** 日期 */
     @ApiModelProperty(value = "日期", name = "onlineDate")
     @TableField(value = "ONLINE_DATE")
-    private java.util.Date onlineDate;
+    private Date onlineDate;
 
     /** 硫化机台 */
     @ApiModelProperty(value = "硫化机台", name = "lhCode")

@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
  * @since 2.0.0
  */
 @Data
-@TableName("T_LH_SCHEDULE_RESULT_ISSUE")
 public class LhScheduleResultIssue {
 
     /** 主键ID */

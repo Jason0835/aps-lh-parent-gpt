@@ -468,6 +468,36 @@ public class MesItfController {
     }
 
     /**
+     * 同步成型排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程日完成量")
+    @PostMapping("/syncCxScheDayFinishQty")
+    public AjaxResult syncCxScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncCxScheDayFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步硫化排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程日完成量")
+    @PostMapping("/syncLhScheDayFinishQty")
+    public AjaxResult syncLhScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhScheDayFinishQty(syncDataLogs);
+    }
+
+    /**
      * 硫化排程结果下发到MES
      * 业务规则：
      * 1. 更新当天的2班（早中班）- 清空一班数据

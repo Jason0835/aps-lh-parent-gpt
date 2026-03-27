@@ -26,10 +26,6 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
-
     @ApiModelProperty(value = "硫化机台")
     @TableField(value = "LH_CODE")
     private String lhCode;
@@ -45,10 +41,6 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "二次清洗时间")
     @TableField(value = "SECOND_WASH_TIME")
     private String secondWashTime;
-
-    @ApiModelProperty(value = "备注")
-    @TableField(value = "REMARK")
-    private String remark;
 
     @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
     @TableField(value = "DEL_FLAG")

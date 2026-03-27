@@ -20,6 +20,8 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.mapper.MdmCxScheFinishQtyEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmLhScheFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmCxScheDayFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmLhScheDayFinishQtyEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
@@ -64,6 +66,10 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmCxScheFinishQtyEntityMapper cxScheFinishQtyEntityMapper;
     @Autowired
     private MdmLhScheFinishQtyEntityMapper lhScheFinishQtyEntityMapper;
+    @Autowired
+    private MdmCxScheDayFinishQtyEntityMapper cxScheDayFinishQtyEntityMapper;
+    @Autowired
+    private MdmLhScheDayFinishQtyEntityMapper lhScheDayFinishQtyEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
@@ -1393,6 +1399,164 @@ public class MesItfServiceImpl implements MesItfService {
                     if (existsMap.containsKey(mapKey)) {
                         // 已存在，更新
                         MdmLhScheFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步成型排程日完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncCxScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmCxScheDayFinishQty> syncList = mesItfMapper.selectCxScheDayFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（完成日期+胚胎编码+施工版本号+厂别）
+        Map<String, MdmCxScheDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getEmbryoCode() + "|" + item.getBomDataVersion(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmCxScheDayFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmCxScheDayFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmCxScheDayFinishQty> existsList = cxScheDayFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmCxScheDayFinishQty qty = new MdmCxScheDayFinishQty();
+                            qty.setFinishDate(item.getFinishDate());
+                            qty.setEmbryoCode(item.getEmbryoCode());
+                            qty.setBomDataVersion(item.getBomDataVersion());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmCxScheDayFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getEmbryoCode(), item.getBomDataVersion()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmCxScheDayFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmCxScheDayFinishQty item : saveList) {
+                    MdmCxScheDayFinishQty entity = new MdmCxScheDayFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getEmbryoCode(), entity.getBomDataVersion());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmCxScheDayFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步硫化排程日完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmLhScheDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（完成日期+物料编码+MES物料编码+厂别）
+        Map<String, MdmLhScheDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmLhScheDayFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmLhScheDayFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmLhScheDayFinishQty> existsList = lhScheDayFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmLhScheDayFinishQty qty = new MdmLhScheDayFinishQty();
+                            qty.setFinishDate(item.getFinishDate());
+                            qty.setMaterialCode(item.getMaterialCode());
+                            qty.setMesMaterialCode(item.getMesMaterialCode());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmLhScheDayFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmLhScheDayFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmLhScheDayFinishQty item : saveList) {
+                    MdmLhScheDayFinishQty entity = new MdmLhScheDayFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmLhScheDayFinishQty existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
                     }
                     insertOrUpdateList.add(entity);
