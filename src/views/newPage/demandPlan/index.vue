@@ -635,7 +635,13 @@ export default {
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          label: this.$t("物料优先"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
+        {
+          prop: "structurePriority",
+          label: this.$t("结构优先"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
