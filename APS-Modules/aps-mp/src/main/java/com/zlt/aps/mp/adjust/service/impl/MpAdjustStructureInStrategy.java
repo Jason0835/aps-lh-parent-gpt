@@ -13,6 +13,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
@@ -124,7 +125,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
         //注：结构内自动调整列表：关单直接排除，同时取订单列表与月计划最大并集；
         //结构内调整记录
-        contextDTO.setMpAdjustStructureInList(mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO));
+        contextDTO.setMpAdjustStructureInList(getAdjustDataWithDoOddEven(mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO)));
         //1.结构内订单调整记录空检查
         if (PubUtil.isEmpty(contextDTO.getMpAdjustStructureInList())){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
@@ -214,6 +215,31 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
     }
+
+    /**
+     * 获取调整数据，并处理奇偶性
+     * @param mpAdjustStructureInList
+     * @return
+     */
+    private List<MpAdjustStructureIn> getAdjustDataWithDoOddEven(List<MpAdjustStructureIn> mpAdjustStructureInList){
+        if (PubUtil.isEmpty(mpAdjustStructureInList)){
+            return mpAdjustStructureInList;
+        }
+        for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
+            if (structureIn.getConfirmAdjustQty() == null || structureIn.getConfirmAdjustQty() <= 0){
+                continue;
+            }
+            if (isEven(structureIn.getConfirmAdjustQty())){
+                //偶数 + 2
+                structureIn.setConfirmAdjustQty(structureIn.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER);
+            }else{
+                //奇数 + 3
+                structureIn.setConfirmAdjustQty(structureIn.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER);
+            }
+        }
+        return mpAdjustStructureInList;
+    }
+
 
     /**
      * 复制上下文副本

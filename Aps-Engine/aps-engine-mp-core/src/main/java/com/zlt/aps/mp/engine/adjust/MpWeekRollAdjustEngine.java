@@ -528,15 +528,12 @@ public class MpWeekRollAdjustEngine {
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
         //物料编码：[%s]，确认调整量非偶数！
-        if (structureIn.getConfirmAdjustQty() != null && !isEven(structureIn.getConfirmAdjustQty())){
+       /* if (structureIn.getConfirmAdjustQty() != null && !isEven(structureIn.getConfirmAdjustQty())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
-        }
+        }*/
     }
 
-    private boolean isEven(int number) {
-        return (number & 1) == 0;
-    }
     /**
      * 检查日硫化量及主花纹是否为空
      * @param sbError
@@ -552,10 +549,10 @@ public class MpWeekRollAdjustEngine {
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }
         //物料编码：[%s]，确认调整量非偶数！
-        if (structureOut.getConfirmAdjustQty() != null && !isEven(structureOut.getConfirmAdjustQty())){
+        /*if (structureOut.getConfirmAdjustQty() != null && !isEven(structureOut.getConfirmAdjustQty())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
-        }
+        }*/
     }
 
     /**
