@@ -75,12 +75,8 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     public TableDataInfo list(@RequestBody MpStructureAllocation queryCondition) {
         try {
             startPage();
-            List<MpStructureAllocation> list = new ArrayList<>();
-            List<FactoryMonthPlanProductionFinalResult> monthPlanProductionFinalResultList = listMonthProdFinalPlans(queryCondition);
-            if (PubUtil.isNotEmpty(monthPlanProductionFinalResultList)) {
-                setProductionVersion(queryCondition);
-                list = mpStructureAllocationService.getDataList(queryCondition);
-            }
+            setProductionVersion(queryCondition);
+            List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();
