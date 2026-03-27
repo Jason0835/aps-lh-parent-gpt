@@ -28,6 +28,7 @@ import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
+import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.deduct.DeductMouldScheduler;
 import com.zlt.common.utils.PubUtil;
@@ -1154,7 +1155,7 @@ public class MpWeekRollAdjustEngine {
                             break;
                         }
                         //3.3 检查总产能限制(允许上下波动)
-                        if (!checkTotalCapacityLimit(contextDTO,m,mpFinalVo.getMaterialCode(),dailyCapacityLimitVoMap.get(m),mpProdFinalList)){
+                        if (!checkTotalCapacityLimit(contextDTO,m,mpFinalVo,dailyCapacityLimitVoMap.get(m),mpProdFinalList)){
                             break;
                         }
 
@@ -1374,27 +1375,20 @@ public class MpWeekRollAdjustEngine {
      * @param checkDay 检查日
      * @return true-符合总产能，false-不符合总产能
      */
-    private boolean checkTotalCapacityLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,String materialCode,MpDailyCapacityLimitVo limitVo,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
+    private boolean checkTotalCapacityLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo limitVo,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,limitVo.getRemainMaxDayProductionQty(),checkDay);
         boolean bCheck = dayTotalCapacityChecker.doCheck();
         String hint = bCheck ? "满足":"不满足,退出！";
-        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,日剩余排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxDayProductionQty(),limitVo.getRemainMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,日剩余排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),checkDay,limitVo.getMaxDayProductionQty(),limitVo.getRemainMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
+        if (bCheck && YesOrNoEnum.YES.getCode().equals(mpFinalVo.getOemFlag())){
+            //继续 检查OEM的限制情况
+            OemTotalCapacityChecker oemTotalCapacityChecker = new OemTotalCapacityChecker(mpProdFinalList,limitVo.getRemainOemQty());
+            bCheck = oemTotalCapacityChecker.doCheck();
+            hint = bCheck ? "满足":"不满足,退出！";
+            contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,剩余OEM排产量:%s,已排产OEM计划量:%s,%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),checkDay,limitVo.getRemainOemQty(),oemTotalCapacityChecker.getTotalPlanQty(),hint)).append(ApsConstant.DIVISION);
+        }
         return bCheck;
     }
-
-    /**
-     * 检查硫化机台数限制
-     * @param contextDTO 周程滚动上下文
-     * @param checkDay 检查日
-     * @return true-符合总硫化机台数，false-不符合总硫化机台数
-     */
-    /*private boolean checkTotalLhMachinesLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,String materialCode,MpDailyCapacityLimitVo limitVo){
-        int maxLhMachines = limitVo.getRemainLhMachines() > limitVo.getMaxLhMachines() ? limitVo.getMaxLhMachines() : limitVo.getRemainLhMachines();
-        boolean bCheck = limitVo.getUsedLhMachines() <=  maxLhMachines;
-        String hint = bCheck ? "满足":"不满足,退出！";
-        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,min(最大配比硫化机台数:%s,剩余硫化机台数:%s),已排产硫化机台数:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxLhMachines(),limitVo.getRemainLhMachines(),limitVo.getUsedLhMachines(),hint)).append(ApsConstant.DIVISION);
-        return bCheck;
-    }*/
 
     /**
      * 检查二次上机
@@ -1827,7 +1821,7 @@ public class MpWeekRollAdjustEngine {
                 //注：这里不能做预检查，会导致可以拼的SKU被忽略掉
 
                 //检查总产能限制(允许上下波动)
-                if (!checkTotalCapacityLimit(contextDTO,i,mpFinalVo.getMaterialCode(),dailyCapacityLimitVoMap.get(i),mpProdFinalList)){
+                if (!checkTotalCapacityLimit(contextDTO,i,mpFinalVo,dailyCapacityLimitVoMap.get(i),mpProdFinalList)){
                     if (incMouldContext.getBeforeProductionQty() > 0 && YesOrNoEnum.YES.getCode().equals(dailyCapacityLimitVoMap.get(i).getDayOpenCloseFlag())){
                         newPlanQty += revertPreDayQty(contextDTO,mpFinalVo,i,incMouldContext);
                         break;

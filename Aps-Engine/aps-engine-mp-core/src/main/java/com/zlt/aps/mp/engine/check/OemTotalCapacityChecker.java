@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.check;
 
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.common.utils.PubUtil;
 
@@ -45,18 +46,22 @@ public class OemTotalCapacityChecker implements IProductionCheck {
         if (totalCapacityLimit == 0){
             return false;
         }
-        //1.计算检查日的汇总值
-        String dayField = FactoryConstant.DAY_FIELD + 1;
+        //1.计算检查汇总值
+        String dayField;
+        this.totalPlanQty = 0;
         List<FactoryMonthPlanFinalAdjustVo> safeList = new ArrayList<>(mpPlanFinalAdjustList);
         for (FactoryMonthPlanFinalAdjustVo prodFinal:safeList){
-            //prodFinal
+            if (YesOrNoEnum.YES.getCode().equals(prodFinal.getOemFlag())){
+                //若 OEM标识 = Y
+                for (int i = FactoryConstant.MONTH_START_DAY; i <= FactoryConstant.MONTH_MAX_DAY; i++){
+                    dayField = FactoryConstant.DAY_FIELD + i;
+                    if (prodFinal.getFieldValueByFieldName(dayField) == null){
+                        continue;
+                    }
+                    this.totalPlanQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
+                }
+            }
         }
-        this.totalPlanQty = safeList.stream()
-                .filter(Objects::nonNull)
-                .mapToInt(x -> {
-                    Object val = x.getFieldValueByFieldName(dayField);
-                    return val instanceof Number ? ((Number) val).intValue() : 0;
-                }).sum();
 
         //2.检查贴牌汇总值 小于等于 贴牌总产能限制
         return totalPlanQty <= totalCapacityLimit;

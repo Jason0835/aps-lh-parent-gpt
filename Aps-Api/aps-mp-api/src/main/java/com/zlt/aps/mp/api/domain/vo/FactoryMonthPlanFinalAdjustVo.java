@@ -51,7 +51,14 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     @TableField(exist = false)
     @ApiModelProperty(value = "搭配结束日期", name = "matchBeginDay")
     private Integer matchEndDay;
-    
+
+    /**
+     * OEM标识
+     */
+    @TableField(exist = false)
+    @ApiModelProperty(value = "OEM标识", name = "oemFlag")
+    private String oemFlag;
+
     /**
      * 搭配量
      */

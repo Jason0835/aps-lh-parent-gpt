@@ -544,7 +544,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     continue;
                 }
                 totalQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
-                if (contextDTO.getOemBrandConfigSet().contains(prodFinal.getBrand())){
+                if (YesOrNoEnum.YES.getCode().equals(prodFinal.getOemFlag())){
                     //若是贴牌，计划量进行累计
                     oemQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
                 }
@@ -622,6 +622,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         Integer specStructureTotalQty = mpFinalList.stream().mapToInt(FactoryMonthPlanFinalAdjustVo::getTotalQty).sum();
         contextDTO.setSpecStructureTotalQty(specStructureTotalQty);
+    }
+
+    /**
+     * 初始化OEM标记
+     * @param contextDTO
+     * @param mpFinalList
+     */
+    protected void initOemFlag(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpFinalList){
+        if (PubUtil.isEmpty(mpFinalList)){
+            return;
+        }
+        for (FactoryMonthPlanFinalAdjustVo prodFinal:mpFinalList){
+            if (contextDTO.getOemBrandConfigSet().contains(prodFinal.getBrand())){
+                prodFinal.setOemFlag(YesOrNoEnum.YES.getCode());
+            }else {
+                prodFinal.setOemFlag(YesOrNoEnum.NO.getCode());
+            }
+        }
     }
 
     /**

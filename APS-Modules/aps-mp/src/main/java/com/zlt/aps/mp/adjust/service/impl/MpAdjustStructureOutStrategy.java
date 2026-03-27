@@ -309,6 +309,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         //contextDTO.setStructureName(contextDTO.getStructureName());
         List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
+        // 初始OEM标识
+        initOemFlag(contextDTO,oneStructMpFinalList);
         contextDTO.setSpecStructureTotalQty(0);
         if (YesOrNoEnum.YES.getCode().equals(contextDTO.getMpAdjustStructureOutList().get(0).getHasSpecialMaterial())){
             //若是特殊结构,预存特殊结构的总实际排产量

@@ -156,6 +156,8 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 //2.1 初始结构上下文
                 MpRollAdjustContextDTO copyContextDTO = copyContext(contextDTO,currentStructureName);
                 List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = new ArrayList<>(mpProdFinalMap.get(copyContextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(currentStructureName));
+                // 初始OEM标识
+                initOemFlag(copyContextDTO,oneStructMpFinalList);
                 if (YesOrNoEnum.YES.getCode().equals(currentAdjustList.get(0).getHasSpecialMaterial())){
                     //若是特殊结构,预存特殊结构的总实际排产量
                     setSpecStructureTotalQty(copyContextDTO,oneStructMpFinalList);
