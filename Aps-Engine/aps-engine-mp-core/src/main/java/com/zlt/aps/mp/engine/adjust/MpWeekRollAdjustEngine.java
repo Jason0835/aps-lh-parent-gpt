@@ -1378,7 +1378,7 @@ public class MpWeekRollAdjustEngine {
         DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,limitVo.getRemainMaxDayProductionQty(),checkDay);
         boolean bCheck = dayTotalCapacityChecker.doCheck();
         String hint = bCheck ? "满足":"不满足,退出！";
-        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
+        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,日剩余排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxDayProductionQty(),limitVo.getRemainMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
         return bCheck;
     }
 
