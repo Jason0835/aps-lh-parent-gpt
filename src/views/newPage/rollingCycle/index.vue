@@ -1299,13 +1299,13 @@ export default {
     },
 
     async editAdjust(row, type) {
-      if (!type) {
-        if (!this.isEven(row.confirmAdjustQty)) {
-          return this.$modal.msgWarning(
-            `物料编码${row.materialCode}--确认调整量不能为奇数`
-          );
-        }
-      }
+      // if (!type) {
+      //   if (!this.isEven(row.confirmAdjustQty)) {
+      //     return this.$modal.msgWarning(
+      //       `物料编码${row.materialCode}--确认调整量不能为奇数`
+      //     );
+      //   }
+      // }
 
       try {
         let res = await saveAdjust(row);
@@ -1323,13 +1323,13 @@ export default {
       //     return this.$modal.msgWarning("请输入正整数");
       //   }
       // }
-      if (!type) {
-        if (!this.isEven(row.confirmAdjustQty)) {
-          return this.$modal.msgWarning(
-            `物料编码${row.materialCode}--确认调整量不能为奇数`
-          );
-        }
-      }
+      // if (!type) {
+      //   if (!this.isEven(row.confirmAdjustQty)) {
+      //     return this.$modal.msgWarning(
+      //       `物料编码${row.materialCode}--确认调整量不能为奇数`
+      //     );
+      //   }
+      // }
       try {
         let res = await editOutHistory(row);
         // this.$modal.msgSuccess(res.msg);
