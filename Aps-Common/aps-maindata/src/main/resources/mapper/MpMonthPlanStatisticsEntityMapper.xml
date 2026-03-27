@@ -4,12 +4,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper">
 
-    <delete id="deleteMonthPlanStatisticsByCondition" parameterType="String">
+    <delete id="deleteMonthPlanStatisticsByCondition">
         DELETE FROM T_MP_MONTH_PLAN_STATISTICS
         WHERE FACTORY_CODE = #{factoryCode}
                   AND YEAR= #{year}
                   AND MONTH= #{month}
           AND PRODUCTION_VERSION= #{productionVersion}
+        <if test="structureList != null and structureList.size() > 0">
+            and structure_name in
+            <foreach item="structureName" collection="structureList" open="(" separator="," close=")">
+                #{structureName}
+            </foreach>
+        </if>
+
     </delete>
 
 </mapper>

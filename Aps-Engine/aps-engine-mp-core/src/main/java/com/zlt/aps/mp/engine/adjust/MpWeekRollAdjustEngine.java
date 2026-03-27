@@ -214,7 +214,7 @@ public class MpWeekRollAdjustEngine {
             totalOemQty += capacityArr[2];
         }
         //计算剩余贴牌计划量
-        remainTotalOemQty = contextDTO.getTotalOemQtY() - totalOemQty;
+        remainTotalOemQty = contextDTO.getTotalOemQty() - totalOemQty;
         remainTotalOemQty = remainTotalOemQty < 0 ? 0 : remainTotalOemQty;
         for (Map.Entry<Integer, MpDailyCapacityLimitVo> entry : dailyCapacityLimitVoMap.entrySet()) {
             dailyCapacityLimitVo = entry.getValue();

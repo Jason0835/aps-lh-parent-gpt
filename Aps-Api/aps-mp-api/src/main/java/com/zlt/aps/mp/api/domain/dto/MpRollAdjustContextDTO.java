@@ -118,7 +118,7 @@ public class MpRollAdjustContextDTO implements Serializable {
     private Set<String> oemBrandConfigSet;
 
     @ApiModelProperty(value = "OEM总数")
-    private Integer totalOemQtY;
+    private Integer totalOemQty;
 
     @ApiModelProperty(value = "SKU原余量未满的消息模板")
     private String msgTemplateWithRemainQtyNoFull;

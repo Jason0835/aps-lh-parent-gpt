@@ -249,9 +249,9 @@ public class MpWeekRollAdjustController extends BaseController {
         }
         contextDTO.setOemBrandConfigSet(oemBrandConfigSet);
         if (contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()) == null){
-            contextDTO.setTotalOemQtY(0);
+            contextDTO.setTotalOemQty(0);
         }else{
-            contextDTO.setTotalOemQtY((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+            contextDTO.setTotalOemQty((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
         }
     }
 

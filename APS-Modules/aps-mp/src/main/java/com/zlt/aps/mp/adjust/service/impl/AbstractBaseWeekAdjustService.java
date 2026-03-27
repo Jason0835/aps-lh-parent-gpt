@@ -633,11 +633,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(monthPlanStatisticsList)){
             return;
         }
+        List<String> structureNameList = monthPlanStatisticsList.stream().map(x->x.getStructureName()).collect(Collectors.toList());
         // 删除月计划统计结果（物理删除）
         mpMonthPlanStatisticsService.deleteMonthPlanStatisticsByCondition(contextDTO.getFactoryCode(),
-                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion());
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion(),structureNameList);
         // 去重月计划统计结果
-        monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
+        //monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
         baseDao.insertBatch(monthPlanStatisticsList);
         log.info("保存月计划统计结果成功，共新增:{}条记录", monthPlanStatisticsList.size());
