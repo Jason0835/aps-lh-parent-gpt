@@ -59,6 +59,11 @@ public class MpDailyCapacityLimitVo {
     private Integer maxDayProductionQty = 0;
 
     /**
+     *  最大日换模次数
+     */
+    private Integer maxDayChangeMould = 0;
+
+    /**
      *  (结构+日)剩余最大日产量
      */
     private Integer remainMaxDayProductionQty = 0;
@@ -72,6 +77,11 @@ public class MpDailyCapacityLimitVo {
      *  (结构)剩余贴牌计划量
      */
     private Integer remainOemQty = 0;
+
+    /**
+     *  (结构+日)剩余换模次数
+     */
+    private Integer remainChangeMould = 0;
 
     /**
      *  是否开产首日
