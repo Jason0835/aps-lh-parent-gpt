@@ -187,7 +187,6 @@ public interface MesItfService {
 
     /**
      * 同步成型排程完成量
-     * 采用更新删除标识模式，而不是先删后插
      * @param syncDataLogs 同步参数
      * @return 结果
      */

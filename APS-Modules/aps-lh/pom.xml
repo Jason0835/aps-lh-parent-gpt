@@ -68,7 +68,7 @@
         </dependency>
         <!-- ITF API模块 -->
         <dependency>
-            <groupId>com.zlt.aps</groupId>
+            <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
         </dependency>
         <!-- 月度计划API模块 -->

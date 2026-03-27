@@ -773,23 +773,23 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setMaterialCode(source.getMaterialCode());
         target.setMesMaterialCode(null); // MES物料编码需要另外查询
         target.setSpecCode(source.getSpecCode());
-        target.setSpecDesc(source.getSpecDesc());
-        target.setDailyPlanQty(BigDecimal.valueOf(source.getDailyPlanQty() != null ? source.getDailyPlanQty() : 0));
+         target.setSpecDesc(source.getSpecDesc());
+        target.setDailyPlanQty(source.getDailyPlanQty());
 
 
         // 中间表2班 = 早班（对应APS 1班）
-        target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
+        target.setClass2PlanQtySeq(2);
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass1Analysis());
-        target.setClass2PlanQty(BigDecimal.valueOf(source.getClass1PlanQty() != null ? source.getClass1PlanQty() : 0));
+        target.setClass2PlanQty(source.getClass1PlanQty());
         target.setClass2ExampleType(null);
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 2班）
-        target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
+        target.setClass3PlanQtySeq(3);
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass2Analysis());
-        target.setClass3PlanQty(BigDecimal.valueOf(source.getClass2PlanQty() != null ? source.getClass2PlanQty() : 0));
+        target.setClass3PlanQty(source.getClass2PlanQty());
         target.setClass3ExampleType(null);
         target.setClass3ExampleNo(null);
 
@@ -833,29 +833,29 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setMesMaterialCode(null);
         target.setSpecCode(source.getSpecCode());
         target.setSpecDesc(source.getSpecDesc());
-        target.setDailyPlanQty(BigDecimal.valueOf(source.getDailyPlanQty() != null ? source.getDailyPlanQty() : 0));
+        target.setDailyPlanQty(source.getDailyPlanQty());
 
         // 中间表1班 = 夜班（对应APS 3班）
-        target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
+        target.setClass1PlanQtySeq(1);
         target.setClass1AnalysisInput(null);
         target.setClass1Analysis(source.getClass3Analysis());
-        target.setClass1PlanQty(BigDecimal.valueOf(source.getClass3PlanQty() != null ? source.getClass3PlanQty() : 0));
+        target.setClass1PlanQty(source.getClass3PlanQty());
         target.setClass1ExampleType(null);
         target.setClass1ExampleNo(null);
 
         // 中间表2班 = 早班（对应APS 4班）
-        target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
+        target.setClass2PlanQtySeq(2);
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass4Analysis());
-        target.setClass2PlanQty(BigDecimal.valueOf(source.getClass4PlanQty() != null ? source.getClass4PlanQty() : 0));
+        target.setClass2PlanQty(source.getClass4PlanQty());
         target.setClass2ExampleType(null);
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 5班）
-        target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
+        target.setClass3PlanQtySeq(3);
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass5Analysis());
-        target.setClass3PlanQty(BigDecimal.valueOf(source.getClass5PlanQty() != null ? source.getClass5PlanQty() : 0));
+        target.setClass3PlanQty(source.getClass5PlanQty());
         target.setClass3ExampleType(null);
         target.setClass3ExampleNo(null);
 
@@ -899,29 +899,29 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setMesMaterialCode(null);
         target.setSpecCode(source.getSpecCode());
         target.setSpecDesc(source.getSpecDesc());
-        target.setDailyPlanQty(BigDecimal.valueOf(source.getDailyPlanQty() != null ? source.getDailyPlanQty() : 0));
+        target.setDailyPlanQty(source.getDailyPlanQty());
 
         // 中间表1班 = 夜班（对应APS 6班）
-        target.setClass1PlanQtySeq(BigDecimal.valueOf(1));
+        target.setClass1PlanQtySeq(1);
         target.setClass1AnalysisInput(null);
         target.setClass1Analysis(source.getClass6Analysis());
-        target.setClass1PlanQty(BigDecimal.valueOf(source.getClass6PlanQty() != null ? source.getClass6PlanQty() : 0));
+        target.setClass1PlanQty(source.getClass6PlanQty());
         target.setClass1ExampleType(null);
         target.setClass1ExampleNo(null);
 
         // 中间表2班 = 早班（对应APS 7班）
-        target.setClass2PlanQtySeq(BigDecimal.valueOf(2));
+        target.setClass2PlanQtySeq(2);
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass7Analysis());
-        target.setClass2PlanQty(BigDecimal.valueOf(source.getClass7PlanQty() != null ? source.getClass7PlanQty() : 0));
+        target.setClass2PlanQty(source.getClass7PlanQty());
         target.setClass2ExampleType(null);
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 8班）
-        target.setClass3PlanQtySeq(BigDecimal.valueOf(3));
+        target.setClass3PlanQtySeq(3);
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass8Analysis());
-        target.setClass3PlanQty(BigDecimal.valueOf(source.getClass8PlanQty() != null ? source.getClass8PlanQty() : 0));
+        target.setClass3PlanQty(source.getClass8PlanQty());
         target.setClass3ExampleType(null);
         target.setClass3ExampleNo(null);
 
