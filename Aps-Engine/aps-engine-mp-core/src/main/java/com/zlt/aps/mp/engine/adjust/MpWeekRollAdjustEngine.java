@@ -47,6 +47,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -248,9 +249,12 @@ public class MpWeekRollAdjustEngine {
             dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldName);
             if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
                 dayStatistics = JSONObject.parseObject(dayStatisticsStr,MpDayProductionStatisticsDetailVo.class);
-                resultArr[0] += dayStatistics.getTotalQty();
-                resultArr[1] += dayStatistics.getLhMachines();
-                resultArr[2] += dayStatistics.getOemQty();
+                if (dayStatistics == null){
+                    continue;
+                }
+                resultArr[0] += Optional.ofNullable(dayStatistics.getTotalQty()).orElse(0);
+                resultArr[1] += Optional.ofNullable(dayStatistics.getLhMachines()).orElse(0);
+                resultArr[2] += Optional.ofNullable(dayStatistics.getOemQty()).orElse(0);
             }
         }
         return resultArr;
@@ -1387,13 +1391,13 @@ public class MpWeekRollAdjustEngine {
      * @param checkDay 检查日
      * @return true-符合总硫化机台数，false-不符合总硫化机台数
      */
-    private boolean checkTotalLhMachinesLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,String materialCode,MpDailyCapacityLimitVo limitVo){
-       /* int maxLhMachines = limitVo.setRemainLhMachines();
+    /*private boolean checkTotalLhMachinesLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,String materialCode,MpDailyCapacityLimitVo limitVo){
+        int maxLhMachines = limitVo.getRemainLhMachines() > limitVo.getMaxLhMachines() ? limitVo.getMaxLhMachines() : limitVo.getRemainLhMachines();
+        boolean bCheck = limitVo.getUsedLhMachines() <=  maxLhMachines;
         String hint = bCheck ? "满足":"不满足,退出！";
-        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,日最大排产量:%s,已排产总计划量:%s,比例:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxDayProductionQty(),dayTotalCapacityChecker.getTotalPlanQty(),limitVo.getDayProductionRate(),hint)).append(ApsConstant.DIVISION);
-        return bCheck;*/
-        return false;
-    }
+        contextDTO.getLogDetail().append(String.format("结构:%s,【续作/增模排产】,物料编码:%s,排产日:%s,min(最大配比硫化机台数:%s,剩余硫化机台数:%s),已排产硫化机台数:%s,%s！",contextDTO.getStructureName(),materialCode,checkDay,limitVo.getMaxLhMachines(),limitVo.getRemainLhMachines(),limitVo.getUsedLhMachines(),hint)).append(ApsConstant.DIVISION);
+        return bCheck;
+    }*/
 
     /**
      * 检查二次上机
