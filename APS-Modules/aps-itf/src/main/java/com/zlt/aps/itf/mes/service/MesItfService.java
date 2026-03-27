@@ -192,4 +192,12 @@ public interface MesItfService {
      * @return 结果
      */
     AjaxResult syncCxClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步硫化排程完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
 }

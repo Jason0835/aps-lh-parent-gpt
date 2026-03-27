@@ -90,4 +90,12 @@ public class MesTask {
     public void syncCxClassShiftFinishQty() {
         iMesItfService.syncCxClassShiftFinishQty(new AuxReqSyncDataLogs());
     }
+
+    /**
+     * 同步硫化排程完成量
+     */
+    @ApiOperation("同步硫化排程完成量")
+    public void syncLhClassShiftFinishQty() {
+        iMesItfService.syncLhClassShiftFinishQty(new AuxReqSyncDataLogs());
+    }
 }

@@ -121,4 +121,12 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<MdmCxScheFinishQty> selectCxClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询硫化排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmLhScheFinishQty> selectLhClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 }

@@ -95,6 +95,11 @@ public enum MesInterfaceCodeEnum {
      * 成型排程完成量同步
      */
     CX_CLASS_SHIFT_FINISH_QTY("CX_CLASS_SHIFT_FINISH_QTY", "mesItfService", "syncCxClassShiftFinishQty", "成型排程完成量同步"),
+    
+    /**
+     * 硫化排程完成量同步
+     */
+    LH_CLASS_SHIFT_FINISH_QTY("LH_CLASS_SHIFT_FINISH_QTY", "mesItfService", "syncLhClassShiftFinishQty", "硫化排程完成量同步"),
     ;
 
     private final String code;

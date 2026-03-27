@@ -139,4 +139,22 @@ public interface IMesItfService {
     @ApiOperation("同步模具清洗预警计划")
     @PostMapping("/mesItf/syncMouldCleanPlan")
     public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步成型排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程完成量")
+    @PostMapping("/mesItf/syncCxClassShiftFinishQty")
+    public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步硫化排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程完成量")
+    @PostMapping("/mesItf/syncLhClassShiftFinishQty")
+    public AjaxResult syncLhClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }
