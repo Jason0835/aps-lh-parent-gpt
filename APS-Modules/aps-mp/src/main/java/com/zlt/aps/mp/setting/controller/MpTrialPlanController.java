@@ -11,10 +11,12 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMpTrialPlanService;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.mp.api.domain.entity.MpTrialPlan;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -97,27 +99,40 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
             LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(MdmSkuConstructionRef::getMaterialCode, materialCode);
             List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
-            Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
-            if (CollectionUtils.isNotEmpty(mdmSkuConstructionRefList)) {
-                skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, Function.identity(), (old, now) -> old));
-            }
-            if (skuConstructionRefMap.containsKey(materialCode)) {
-                MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
-                // 为空才关联更新
-                String embryoNo = billVO.getEmbryoNo();
-                if (StringUtils.isBlank(embryoNo)) {
-                    billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                    billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
-                    billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
-                    billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
-                    billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
-                    billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
-                } else {
-                    if (!embryoNo.equals(mdmSkuConstructionRef.getEmbryoNo())) {
-                        String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
-                        throw new RuntimeException(message);
-                    }
+            List<MdmSkuConstructionRef> skuStatusRefList = null;
+            if (billVO.getTrialStatus().equals(ConstructionStageEnum.MEASUREMENT.getStage())){
+                //试制
+                if (StringUtils.isNotBlank(billVO.getEmbryoNo())){
+                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->billVO.getEmbryoNo().equals(x.getEmbryoNo()) && x.getTrialStatus().equals(ConstructionStageEnum.MEASUREMENT_FLAG)).collect(Collectors.toList());
+                }else{
+                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->x.getTrialStatus().equals(ConstructionStageEnum.MEASUREMENT_FLAG)).collect(Collectors.toList());
                 }
+            }
+            if (billVO.getTrialStatus().equals(ConstructionStageEnum.TRIAL_PRODUCTION.getStage())){
+                //量试
+                if (StringUtils.isNotBlank(billVO.getEmbryoNo())){
+                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->billVO.getEmbryoNo().equals(x.getEmbryoNo()) && x.getTrialStatus().equals(ConstructionStageEnum.TRIAL_FLAG)).collect(Collectors.toList());
+                }else{
+                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->x.getTrialStatus().equals(ConstructionStageEnum.TRIAL_FLAG)).collect(Collectors.toList());
+                }
+
+            }
+            if (PubUtil.isEmpty(skuStatusRefList)){
+                String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
+                throw new RuntimeException(message);
+            }
+            MdmSkuConstructionRef mdmSkuConstructionRef;
+            if (skuStatusRefList.size() >= 1){
+                mdmSkuConstructionRef = skuStatusRefList.get(0);
+                billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+                billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
+                billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
+                billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
+                billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
+                billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
+            }else {
+                String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
+                throw new RuntimeException(message);
             }
         }
         return super.save(billVO);

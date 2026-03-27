@@ -7,11 +7,12 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldFormalProductionLogRecorder;
-import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,12 +34,13 @@ public class OnLineGroupOnLineMachineHandler {
      * 2、同规格同花纹
      * 3、共生胎同模具
      *
-     * @param productionStage   排产阶段
-     * @param productionContext 排产上下文
-     * @param allContinueInfo   续作Sku信息
-     * @param allGroupPlanInfo  所有分组计划
+     * @param cxAddSkuProductionHandler 处理器
+     * @param productionStage           排产阶段
+     * @param productionContext         排产上下文
+     * @param allContinueInfo           续作Sku信息
+     * @param allGroupPlanInfo          所有分组计划
      */
-    public void productionContinue(ProductionStageEnum productionStage, TbrProductionContext productionContext, Map<String, CxContinueInfoHelper> allContinueInfo, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
+    public void productionContinue(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, TbrProductionContext productionContext, Map<String, CxContinueInfoHelper> allContinueInfo, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
         //1、续作先排
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
@@ -47,7 +49,7 @@ public class OnLineGroupOnLineMachineHandler {
             if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
                 log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SKU));
             }
-            productionContinueByType(productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
+            productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
         //2、接着进行同规格同花纹的续作高优先级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
@@ -57,7 +59,7 @@ public class OnLineGroupOnLineMachineHandler {
             if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
                 log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN));
             }
-            productionContinueByType(productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
+            productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
         });
         //3、接着进行共生胎，同模具的续作高优级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
@@ -67,21 +69,22 @@ public class OnLineGroupOnLineMachineHandler {
             if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
                 log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD));
             }
-            productionContinueByType(productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
+            productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
         });
     }
 
     /**
      * 进行续作排产
      *
-     * @param productionStage  排产阶段
-     * @param context          排产上下文
-     * @param allGroupPlanInfo 所有分组计划对象
-     * @param groupName        分组名
-     * @param cxContinueInfo   对应的续作信息
-     * @param type             续作类型
+     * @param cxAddSkuProductionHandler 处理器
+     * @param productionStage           排产阶段
+     * @param context                   排产上下文
+     * @param allGroupPlanInfo          所有分组计划对象
+     * @param groupName                 分组名
+     * @param cxContinueInfo            对应的续作信息
+     * @param type                      续作类型
      */
-    private void productionContinueByType(ProductionStageEnum productionStage, Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String groupName, CxContinueInfoHelper cxContinueInfo, ContinueTypeEnum type) {
+    private void productionContinueByType(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String groupName, CxContinueInfoHelper cxContinueInfo, ContinueTypeEnum type) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(groupName);
         if (null == groupPlan) {
@@ -121,7 +124,7 @@ public class OnLineGroupOnLineMachineHandler {
         Integer deadLineDay = groupPlan.getContinueSkuDeadLineDay(context);
         //同规格同花纹 or 共生胎同模具
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == type || ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == type) {
-            CxContinueProductionHandler.productionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap);
+            CxContinueProductionHandler.oldProductionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap, new HashSet<>());
             return;
         }
     }

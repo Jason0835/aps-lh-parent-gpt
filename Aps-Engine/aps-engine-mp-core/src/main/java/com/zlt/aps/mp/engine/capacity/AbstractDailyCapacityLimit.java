@@ -661,8 +661,9 @@ public abstract class AbstractDailyCapacityLimit {
      * @return true-满足，false-不满足
      */
     public boolean checkCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        int maxLhMachines = dailyCapacityLimitVo.getRemainLhMachines() > dailyCapacityLimitVo.getMaxLhMachines() ? dailyCapacityLimitVo.getMaxLhMachines() : dailyCapacityLimitVo.getRemainLhMachines();
         return dailyCapacityLimitVo.getUsedEmbryoTypes() <= dailyCapacityLimitVo.getMaxEmbryoTypes() &&
-                dailyCapacityLimitVo.getUsedLhMachines() <= dailyCapacityLimitVo.getMaxLhMachines();
+                dailyCapacityLimitVo.getUsedLhMachines() <= maxLhMachines;
     }
 
     /**

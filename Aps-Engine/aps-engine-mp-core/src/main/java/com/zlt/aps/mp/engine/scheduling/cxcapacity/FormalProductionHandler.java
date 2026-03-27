@@ -71,7 +71,7 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
         allGroupPlanInfo.forEach((structureName, groupPlanInfo) -> groupPlanInfo.setThisRoundCanProduction());
         log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupLog(productionContext));
         //续作部分排产 1、续作Sku 2、续作Sku同规格同花纹高优先级量 3、续作Sku同生胎共模具高优先级量
-        productionContinue(ProductionStageEnum.FORMAL_STAGE, productionContext, allContinueInfo, allGroupPlanInfo);
+        productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.FORMAL_STAGE, productionContext, allContinueInfo, allGroupPlanInfo);
         //4、在机机构新增Sku排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(structureName);

@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.daylimit;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -365,6 +366,26 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer reduction = changeMap.values().stream().mapToInt(Integer::intValue).sum();
         reduction = reduction + initChangeCount;
         return Math.abs(reduction);
+    }
+
+    /**
+     * 根据后一日排产情况，获取收尾的Sku信息
+     *
+     * @param context       排产上下文
+     * @param productionDay 当前排产日
+     * @param nexDayLimit   下一日排产情况
+     * @return
+     */
+    public List<SkuDayProductionInfoHelper> getConclusionSkuInfo(Context context, Integer productionDay, GroupPlanCxLhCapacityLimitHelper previousLimit, GroupPlanCxLhCapacityLimitHelper nexDayLimit) {
+        if (null == productionDay) {
+            return Collections.emptyList();
+        }
+        //结构首日?
+        if (null == previousLimit) {
+            return getConclusionInfoByFirstOrEnd(context);
+        }
+        //todo 先忽略如果没有排产
+        return getConclusionInfoByMid(context, previousLimit);
     }
 
     /**
@@ -743,6 +764,68 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 构建收尾日的余量Sku信息
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    private List<SkuDayProductionInfoHelper> getConclusionInfoByFirstOrEnd(Context context) {
+        List<SkuDayProductionInfoHelper> conclusionList = new ArrayList<>();
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
+            return Collections.emptyList();
+        }
+        skuProductionDetailInfo.forEach((materialDesc, skuList) -> {
+            if (CollectionUtils.isEmpty(skuList)) {
+                return;
+            }
+            skuList.forEach(singleLh -> {
+                if (singleLh.isFullProduction(context)) {
+                    return;
+                }
+                conclusionList.add(singleLh);
+            });
+        });
+        if (CollectionUtils.isEmpty(conclusionList)) {
+            return Collections.emptyList();
+        }
+        return conclusionList;
+    }
+
+    /**
+     * 根据前日排产，对比当日排产，获取余量
+     *
+     * @param context       排产上下文
+     * @param previousLimit 前日排产
+     * @return
+     */
+    private List<SkuDayProductionInfoHelper> getConclusionInfoByMid(Context context, GroupPlanCxLhCapacityLimitHelper previousLimit) {
+        List<SkuDayProductionInfoHelper> conclusionList = new ArrayList<>();
+        Map<String, List<SkuDayProductionInfoHelper>> previousSkuProductionDetail = previousLimit.getSkuProductionDetailInfo();
+        Set<String> previousSkuSet = CollectionUtils.isEmpty(previousSkuProductionDetail) ? Sets.newHashSet() : previousSkuProductionDetail.keySet();
+        skuProductionDetailInfo.forEach((materialDesc, skuList) -> {
+            if (CollectionUtils.isEmpty(skuList)) {
+                return;
+            }
+            //新增Sku-增模
+            if (!previousSkuSet.contains(materialDesc)) {
+                return;
+            }
+            //增模
+            if (skuList.size() > previousSkuProductionDetail.get(materialDesc).size()) {
+                return;
+            }
+            //减模
+            skuList.forEach(single -> {
+                if (single.isFullProduction(context)) {
+                    return;
+                }
+                conclusionList.add(single);
+            });
+        });
+        return conclusionList;
+    }
+
+    /**
      * 根据结构转产配置，更新基础的限制信息
      * 胎胚种类数
      * 最大硫化配比
@@ -815,8 +898,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String continueStruct = productionContext.getContinueStructureMap() == null ? "" : productionContext.getContinueStructureMap().get(singleCxMachineAllocation.getCxMachineCode());
         if (singleCxMachineAllocation.getBeginDay().equals(productionDay)) {
-            if (!(singleCxMachineAllocation.getBeginDay().equals(FactoryConstant.MONTH_START_DAY) &&
-                    singleCxMachineAllocation.getStructureName().equals(continueStruct))) {
+            if (!(singleCxMachineAllocation.getBeginDay().equals(FactoryConstant.MONTH_START_DAY) && singleCxMachineAllocation.getStructureName().equals(continueStruct))) {
                 //若非（1号且续作结构）
                 //若是结构开产首日，将最大成型机数-3 sandy+ 2026.3.19
                 Integer decLhMachines = productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();

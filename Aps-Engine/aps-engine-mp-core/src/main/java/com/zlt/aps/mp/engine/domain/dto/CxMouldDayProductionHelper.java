@@ -5,6 +5,7 @@ import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.util.Set;
@@ -121,7 +122,9 @@ public class CxMouldDayProductionHelper implements Serializable {
         CxMouldDayProductionHelper mouldProductionHelper = new CxMouldDayProductionHelper();
         BeanUtils.copyProperties(groupPlan, mouldProductionHelper);
         mouldProductionHelper.setMonthPlanId(groupPlan.getMonthPlanId());
-        mouldProductionHelper.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeInfo));
+        if(!CollectionUtils.isEmpty(cxMachineCodeInfo)) {
+            mouldProductionHelper.setCxMachineCode(String.join(StringConstant.COMMA, cxMachineCodeInfo));
+        }
         mouldProductionHelper.setProductionDate(day);
         mouldProductionHelper.setProductionQty(productionQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION);
         return mouldProductionHelper;

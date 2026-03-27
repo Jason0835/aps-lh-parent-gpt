@@ -6,7 +6,6 @@ import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
-import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -78,7 +77,6 @@ public class CalculateStructureCxMachineNumber {
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(productionContext);
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer minProductionDays = paramConfiguration.getMinProductionDays();
-//        Integer minAllocationDays = paramConfiguration.getMinAllocationDays();
         mapGroupByStructureName.forEach((structureName, groupDatas) -> {
             ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(productionContext, structureName, productionContext.getProductType(), groupDatas);
             groupInfoMap.put(structureName, groupInfo);
@@ -125,9 +123,6 @@ public class CalculateStructureCxMachineNumber {
                 log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
                         productionContext, structureName, groupInfo.getSumPlanQty(), groupInfo.getMinLhMachineCount(),
                         groupInfo.getMinLhDayCapacityQty(), groupInfo.getTheoryDays(), groupInfo.getNeedCxCapacityMachineCount()));
-//                if (!groupInfo.isSpecialMaterial()) {
-//
-//                }
             }
         });
         return groupInfoMap;
@@ -344,92 +339,47 @@ public class CalculateStructureCxMachineNumber {
         }
         Integer sumAllNetQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
         //所有的实单
-        Integer sumActualQuantity = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+        Integer sumActualQuantity = getAllActualQuantity(productionPlanList);
         Integer addPercent = percent + ProductionConstant.PERCENTAGE;
         //得到储备上限值
         Integer maxCycleQty = BigDecimal.valueOf(sumActualQuantity).multiply(BigDecimal.valueOf(addPercent))
                 .divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
         PlanRequireLogRecorder.addGroupRequireEstimateInfoLog(productionContext, percent, groupInfo.getGroupName(), sumActualQuantity, sumAllNetQty, sumEffectiveQty, maxCycleQty);
         sumEffectiveQty = Math.min(sumEffectiveQty, maxCycleQty);
+        Integer realMaxCycleQty = sumEffectiveQty - sumActualQuantity;
+        groupInfo.setMaxCycleQty(realMaxCycleQty);
         return sumEffectiveQty;
-//        Integer totalVacateQty = BigDecimal.ZERO.intValue();
-//        if (!CollectionUtils.isEmpty(vacateQtyList)) {
-//            totalVacateQty = vacateQtyList.stream().mapToInt(Integer::intValue).sum();
-//        }
-//        Integer totalWaitAddQty = BigDecimal.ZERO.intValue();
-//        if (!CollectionUtils.isEmpty(waitAddQtyList)) {
-//            totalWaitAddQty = waitAddQtyList.stream().mapToInt(Integer::intValue).sum();
-//        }
-//        PlanRequireLogRecorder.addMouldMoreCapacityWaitQtyLog(productionContext, groupInfo.getGroupName(), totalVacateQty, percent, totalWaitAddQty);
-//        if (CollectionUtils.isEmpty(totalMaxMouldCapacity)) {
-//            return BigDecimal.ZERO.intValue();
-//        }
-//        //（3）按结构汇总需求量 = SUM(结构向下主花纹模具最大可排产量)；
-//        BigDecimal result = BigDecimal.ZERO;
-//        for (Integer maxMouldCapacity : totalMaxMouldCapacity) {
-//            result = result.add(new BigDecimal(maxMouldCapacity));
-//        }
-//        return result.intValue();
     }
 
     /**
-     * 20260325 周期结构-净需求总量控制，上浮比例
-     * 获取结构按主花纹分组后的总需求
-     * 1、非周期结构，直接按需求汇总
-     * 2、周期结构，需看参数，取周期实单基础上+配比值%
+     * 获取实单总量，先按Sku分组
+     * 奇数+3 偶数+2
      *
-     * @param groupKey     结构+主花纹
-     * @param percent      周期储备比例
-     * @param groupKeyList 结构+主花纹的分组
+     * @param productionPlanList
      * @return
      */
-    private Integer getGroupKeyMaxSumQty(Context context, String groupKey, Integer percent, List<MonthPlanProductionRequirePlanVo> groupKeyList) {
-        if (CollectionUtils.isEmpty(groupKeyList)) {
+    private Integer getAllActualQuantity(List<MonthPlanProductionRequirePlanVo> productionPlanList) {
+        if (CollectionUtils.isEmpty(productionPlanList)) {
             return BigDecimal.ZERO.intValue();
         }
-        String structureType = groupKeyList.get(BigDecimal.ZERO.intValue()).getStructureType();
-        //总净需求(高 + 中 + 周期)
-        Integer sumNetQty = groupKeyList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
-        //非周期结构
-        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(structureType)) {
-            return sumNetQty;
-        }
-        if (null == percent || percent < BigDecimal.ZERO.intValue()) {
-            return sumNetQty;
-        }
-        //增加后值 = 100 + 比例值
-        percent = percent + ProductionConstant.PERCENTAGE;
-        //高 + 中
-        Integer actualSumQty = groupKeyList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
-        if (actualSumQty <= BigDecimal.ZERO.intValue()) {
-            PlanRequireLogRecorder.addRequireEstimateLog(context, groupKey, actualSumQty, sumNetQty, percent, BigDecimal.ZERO.intValue());
+        Map<String, Integer> skuActualQuantityMap = Maps.newHashMap();
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuMap = productionPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        skuMap.forEach((materialDesc, skuDetailList) -> {
+            Integer sumActualQuantity = skuDetailList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+            if (sumActualQuantity <= BigDecimal.ZERO.intValue()) {
+                return;
+            }
+            if ((sumActualQuantity & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+            } else {
+                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+            }
+            skuActualQuantityMap.put(materialDesc, sumActualQuantity);
+        });
+        if (CollectionUtils.isEmpty(skuActualQuantityMap)) {
             return BigDecimal.ZERO.intValue();
         }
-        Integer addedSkuSumQty = BigDecimal.valueOf(actualSumQty).multiply(BigDecimal.valueOf(percent)).divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), 0, RoundingMode.UP).intValue();
-        Integer effectiveSumQty = Math.min(sumNetQty, addedSkuSumQty);
-        PlanRequireLogRecorder.addRequireEstimateLog(context, groupKey, actualSumQty, sumNetQty, percent, effectiveSumQty);
-        return effectiveSumQty;
-    }
-
-    /**
-     * 得到Sku增加比例后的值
-     *
-     * @param percent       需要增加的比例
-     * @param singleSkuList sku计划集合
-     * @return
-     */
-    private Integer addPercentQty(Integer percent, List<MonthPlanProductionRequirePlanVo> singleSkuList) {
-        Integer skuSumQty = singleSkuList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
-        if (skuSumQty <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        Integer addSkuSumQty = BigDecimal.valueOf(skuSumQty).multiply(BigDecimal.valueOf(percent)).divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), 0, RoundingMode.UP).intValue();
-        if ((addSkuSumQty & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
-            addSkuSumQty = addSkuSumQty + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
-        } else {
-            addSkuSumQty = addSkuSumQty + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
-        }
-        return addSkuSumQty;
+        return skuActualQuantityMap.values().stream().mapToInt(Integer::intValue).sum();
     }
 
     /**
