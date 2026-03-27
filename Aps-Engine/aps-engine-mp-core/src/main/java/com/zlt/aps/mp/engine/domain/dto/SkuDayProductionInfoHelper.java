@@ -3,12 +3,13 @@ package com.zlt.aps.mp.engine.domain.dto;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -164,6 +165,30 @@ public class SkuDayProductionInfoHelper implements Serializable {
         //考虑开产日
         dayLhMachineQty = context.getOpenDayMaxQty(productionDay, dayLhMachineQty);
         return sumProductionQty >= dayLhMachineQty;
+    }
+
+    /**
+     * 是否直接允许换模
+     *
+     * @return
+     */
+    public boolean isChangeMould() {
+        return sumProductionQty < dayVulcanizationQty;
+    }
+
+    /**
+     * 判断当前是否能直接允许换活字块
+     *
+     * @param context
+     * @return
+     */
+    public boolean isChangeTypeBlock(Context context) {
+        Integer dayLhMachineQty = dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer diffValue = dayLhMachineQty - sumProductionQty;
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
+        return diffValue >= changeTypeBlockQtyDiff;
     }
 
     /**

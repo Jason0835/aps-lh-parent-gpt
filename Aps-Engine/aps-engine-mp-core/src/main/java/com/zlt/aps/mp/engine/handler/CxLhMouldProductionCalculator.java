@@ -123,6 +123,12 @@ public class CxLhMouldProductionCalculator {
             if (stopDay.contains(day)) {
                 continue;
             }
+            //20260326 检测是否超周期储备量
+            if (!CycleGroupCalculateHandler.checkCycleGroupHasProductionQty(context, skuMaterialDesc, productionPlanInfo)) {
+                skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
+                TbrMouldProductionLogRecorder.addExceedCycleQtyLog(context, productionPlanInfo.getGroupName(), skuMaterialDesc, continueType);
+                break;
+            }
             if (null == firstDay) {
                 firstDay = day;
             }

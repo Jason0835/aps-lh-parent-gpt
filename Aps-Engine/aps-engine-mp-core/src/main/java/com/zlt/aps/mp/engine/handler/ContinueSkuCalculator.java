@@ -6,13 +6,16 @@ import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -153,12 +156,18 @@ public class ContinueSkuCalculator {
      * 如果是按总量排，则Sum(净需求排产量)
      * 否则Sum(高优先级排产量)
      *
-     * @param planList 续作Sku计划集合
+     * @param productionStage 排产阶段
+     * @param planList        续作Sku计划集合
      * @return
      */
-    public static Integer getContinueSkuSummaryQty(List<MonthPlanProductionRequirePlanVo> planList) {
+    public static Integer getContinueSkuSummaryQty(ProductionStageEnum productionStage, List<MonthPlanProductionRequirePlanVo> planList) {
         if (CollectionUtils.isEmpty(planList)) {
             return BigDecimal.ZERO.intValue();
+        }
+        //非测算阶段
+        if(ProductionStageEnum.CALCULATION_STAGE != productionStage){
+            //总净需求量
+            return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         }
         //是否按总需求排产
         Integer isProductionBySum = planList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();

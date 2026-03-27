@@ -379,6 +379,10 @@ public enum TbrMouldProductionLogType {
      */
     FORMAL_MOULD_START("40-01", "分组计划正式开始模具排产"),
     /**
+     * 40-01-09 周期储备控制
+     */
+    CYCLE_CONTROL_PRODUCTION("40-01-09", "周期储备控制"),
+    /**
      * 40-02 分组计划正式开始模具排产数据重置完成
      */
     FORMAL_MOULD_RESET_DATA_FINISH("40-02", "分组计划正式开始模具排产数据重置完成"),

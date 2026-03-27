@@ -134,7 +134,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //1、在机结构-在产机台-续作Sku排产
-        productionContinue(ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
+        productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         //2、在机结构-新增Sku排产 优先给特殊结构所在机台选择

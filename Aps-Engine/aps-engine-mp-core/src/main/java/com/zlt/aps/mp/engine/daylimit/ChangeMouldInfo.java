@@ -131,7 +131,7 @@ public class ChangeMouldInfo implements Serializable {
         //前Sku的排产量
         Integer beforeSkuProductionQty = Optional.ofNullable(productionQty).orElse(BigDecimal.ZERO.intValue());
         String connectSkuMaterialDesc = addSkuInfo.getMaterialDesc();
-        boolean isShareMould = !baseDataContainer.isShareMouldSameGroup(materialDesc, connectSkuMaterialDesc);
+        boolean isShareMould = baseDataContainer.isShareMouldSameGroup(materialDesc, connectSkuMaterialDesc);
         //换活字块
         if (isShareMould) {
             //前Sku排产量与前Sku日硫化量的差值
