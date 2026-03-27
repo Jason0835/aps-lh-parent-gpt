@@ -23,7 +23,7 @@ public enum ItfSyncKeyEnum {
     /**
      * 胶囊已使用次数同步
      */
-    LH_USED_CAPSULE("LH_REPAIR_CAPSULE", "MES", "APS", "胶囊已使用次数同步"),
+    LH_USED_CAPSULE("LH_USED_CAPSULE", "MES", "APS", "胶囊已使用次数同步"),
 
     /**
      * 模具清洗预警计划同步
@@ -38,23 +38,26 @@ public enum ItfSyncKeyEnum {
     /**
      * 生胎库存同步
      */
-    EMBRYO_STOCK_SYNC("MES_CX_STOCK", "MES", "APS", "生胎库存同步"),
+    EMBRYO_STOCK_SYNC("EMBRYO_STOCK_SYNC", "MES", "APS", "生胎库存同步"),
 
     /**
      * 成型排程结果下发
      */
-    SYNC_CX_SCHEDULE_RESULT("CX_SCHEDULE_RESULT_ISSUE", "APS", "MES", "成型排程结果下发接口"),
+    SYNC_CX_SCHEDULE_RESULT("FINISH_SCHE_RST_FBK", "APS", "MES", "成型排程结果下发接口"),
 
     /**
      * 成型排程完成量同步
      */
-    CX_CLASS_SHIFT_FINISH_QTY("CX_CLASS_SHIFT_FINISH_QTY", "MES", "APS", "成型排程完成量同步"),
+    CX_CLASS_SHIFT_FINISH_QTY("FINISH_SCHE_COMPLETE", "MES", "APS", "成型排程完成量同步"),
 
     /**
      * 硫化排程结果下发
      */
-    SYNC_LH_SCHEDULE_RESULT("LH_SCHEDULE_RESULT_ISSUE", "APS", "MES", "硫化排程结果下发接口"),
-
+    SYNC_LH_SCHEDULE_RESULT("VULCANIZE_SCHE_RST_FBK", "APS", "MES", "硫化排程结果下发接口"),
+    /**
+     * 硫化排程完成量同步
+     */
+    LH_CLASS_SHIFT_FINISH_QTY("LH_CLASS_SHIFT_FINISH_QTY", "MES", "APS", "成型排程完成量同步"),
     ;
 	/**
 	 * 接口码
