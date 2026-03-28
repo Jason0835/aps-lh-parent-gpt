@@ -127,7 +127,9 @@ public class CxContinueProductionHandler {
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
         //取得最早收尾的续作硫化组
-        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfoByContinueSku(context, continueSkuMap, excludeDaySet);
+
+        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, excludeDaySet);
+//        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfoByContinueSku(context, continueSkuMap, excludeDaySet);
         if (null == earliestConclusionLhGroup) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
@@ -154,7 +156,7 @@ public class CxContinueProductionHandler {
         }
         Set<String> excludeSkuSet = new HashSet<>();
         //挑选下一个同规格同花纹的sku进行排产
-        ContinueSkuNextSkuInfo selectSkuInfo = getNextSku(productionContext, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+        ContinueSkuNextSkuInfo selectSkuInfo = getNextSku(productionContext, earliestConclusionLhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         if (null == selectSkuInfo) {
             excludeDaySet.add(startDay);
             //递归迭代下一个硫化组
@@ -263,6 +265,7 @@ public class CxContinueProductionHandler {
      * 获取下一个排产Sku
      *
      * @param productionContext 排产上下文
+     * @param lhGroup           硫化组
      * @param productionStage   排产阶段
      * @param matchList         可排产计划集合
      * @param excludeSkuSet     需要剔除的Sku集合
@@ -270,7 +273,7 @@ public class CxContinueProductionHandler {
      * @param endDay            结束日
      * @return
      */
-    private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+    private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
         String selectedMaterialDesc = ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
         String groupName = productionPlanInfo.getGroupName();
         if (StringUtils.isBlank(selectedMaterialDesc)) {
@@ -283,16 +286,32 @@ public class CxContinueProductionHandler {
             excludeSkuSet.add(selectedMaterialDesc);
             //记录日志
             productionContext.addSkuProductionLimitInfo(selectedMaterialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
-            return getNextSku(productionContext, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         }
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //20260327 修正根据materialDesc重新构建前Sku信息
         MonthPlanProductionRequirePlanVo addSkuInfo = selectedProductionPlanList.get(BigDecimal.ZERO.intValue());
+        //SKU二次上机检查 sandy+ 20260129
+        if (!SecondOnLineMachineHandler.checkSecondOnLine(productionPlanInfo, productionContext, addSkuInfo, startDay)) {
+            TbrMouldProductionLogRecorder.addSkuProductionLimitLog(productionContext, productionPlanInfo.getGroupName(), "", addSkuInfo, startDay, MouldProductionLimitTypeEnum.SECOND_PRODUCTION_LIMIT);
+            excludeSkuSet.add(selectedMaterialDesc);
+            return getNextSku(productionContext,lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+        }
+        Set<String> cxMachineCodeInfo = Optional.ofNullable(productionPlanInfo.getAllocationCxMachineCodeSet()).orElse(Collections.emptySet());
+        String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
+        productionPlanInfo.correctProductionDateRange(productionContext, addSkuInfo, lhGroup, selectedMouldList, onLineMachineInfo);
+        Integer newStartDay = lhGroup.getClosingDay();
+        endDay = lhGroup.getEndDay();
+        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, startDay, endDay);
+        if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
+            excludeSkuSet.add(selectedMaterialDesc);
+            return getNextSku(productionContext,lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+        }
         BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findChangeTypeBlockBeforeSkuByAddSku(productionContext, addSkuInfo, productionPlanInfo, startDay);
         TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(productionContext, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
         if (null == lhBeforeSkuInfo) {
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext,lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         }
         return new ContinueSkuNextSkuInfo(selectedMaterialDesc, selectedMouldList, lhBeforeSkuInfo);
     }

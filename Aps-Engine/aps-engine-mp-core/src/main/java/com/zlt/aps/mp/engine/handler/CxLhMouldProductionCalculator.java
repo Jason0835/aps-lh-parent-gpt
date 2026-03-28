@@ -443,7 +443,7 @@ public class CxLhMouldProductionCalculator {
             return true;
         }
         //SKU二次上机检查 sandy+ 20260129
-        if (!checkSecOnline(productionPlanInfo, productionContext, productionPlan, startDay)) {
+        if (!SecondOnLineMachineHandler.checkSecondOnLine(productionPlanInfo, productionContext, productionPlan, startDay)) {
             TbrMouldProductionLogRecorder.addSkuProductionLimitLog(productionContext, productionPlanInfo.getGroupName(), "", productionPlan, startDay, MouldProductionLimitTypeEnum.SECOND_PRODUCTION_LIMIT);
             skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
             return true;
@@ -508,33 +508,6 @@ public class CxLhMouldProductionCalculator {
             lossQty = dayProductionInfo.getLossQty();
         }
         return new NewProductionInfo(day, lossQty);
-    }
-
-    /**
-     * 检查二次上机
-     *
-     * @param productionPlanInfo 排产计划信息
-     * @param productionContext  排产上下文
-     * @param productionPlan     排产计划信息
-     * @param realStartDay       上机日
-     * @return true-允许二次上机，false-不允许二次上机
-     */
-    private static boolean checkSecOnline(ProductionPlanGroupInfo productionPlanInfo, TbrProductionContext productionContext,
-                                          MonthPlanProductionRequirePlanVo productionPlan, Integer realStartDay) {
-        List<Integer> dayList = productionPlanInfo.getProductionDaySetBySku(productionPlan.getMaterialDesc());
-        if (CollectionUtils.isEmpty(dayList)) {
-            return true;
-        }
-        Set<Integer> productionDaySet = dayList.stream().collect(Collectors.toSet());
-        if (productionDaySet.contains(realStartDay)) {
-            return true;
-        }
-        //降序,第一个元素最大
-        dayList.sort(Comparator.reverseOrder());
-        Integer lastCloseDay = dayList.get(0);
-        int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
-        SkuSecondChecker skuSecondChecker = new SkuSecondChecker(realStartDay, lastCloseDay, skuSecondProductionDays);
-        return skuSecondChecker.doCheck();
     }
 
     /**
