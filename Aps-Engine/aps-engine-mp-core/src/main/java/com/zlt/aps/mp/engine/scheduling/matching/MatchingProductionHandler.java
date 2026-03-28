@@ -1225,25 +1225,18 @@ public class MatchingProductionHandler {
                 }
             }
         }
-        
-        // 3、检查是否二次上机
+        // 3、判断品牌是OEM则需要控制总量
+        if (DayCapacityLimitHelper.checkIsOemBrand(productionContext, firstPlan.getBrand())) {
+            DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit(); // 每日产能限制
+            Set<Integer> oemBrandSet = changeMouldLimitHandler.getEnableOemBrandProductionRange(productionContext,
+                    firstPlan); // 获取是否还有可排产日，如果没有了就说明已经达到上限
+            return !CollectionUtils.isEmpty(oemBrandSet);
+
+        }
+        // 4、检查是否二次上机
         if (!this.checkIsSecOnlineSku(productionContext, materialDesc, day, beginDay, endDay)) {
             return false;
         }
-        
-        // 4、如果非收尾前两天，如果已经待排产量不足则不需要补量
-//        Integer productionQty = requireList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
-//        if (productionQty <= 0) {
-//            return false;
-//        }
-//      ProductionCapacityParamConfiguration param = productionContext.getBaseDataContainer().getParamConfiguration();
-//        Integer maxBoostDay = param.getMaxBoostDay();
-//        Set<String> productionTypeSet = param.getBoostProductionType();
-//        if (endDay - day > maxBoostDay) {
-//            if (!isActualOrder && !productionTypeSet.contains(firstPlan.getProductionType())) { // 非实单且非补量类型，要判断剩余产能
-//                
-//            }
-//        }
         return true;
     }
 
@@ -1638,7 +1631,6 @@ public class MatchingProductionHandler {
                 statisticsDetailVo.setEmbryoCount(daylyCapacityLimit.getEmbryoCodes().size());
                 statisticsDetailVo.setLhMachines(daylyCapacityLimit.getUsedLhMachines());
                 statisticsDetailVo.setChangeMould(daylyCapacityLimit.getUsedChangeMould());
-                statistics.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, JSON.toJSONString(statisticsDetailVo));
                 skuDayProductionInfoHelperMap = groupPlanInfo.getDayProductionLimitInfo().get(day).getProductionSkuQtyInfo();
                 totalQty = 0;
                 totalOemQty = 0;
@@ -1650,6 +1642,7 @@ public class MatchingProductionHandler {
                 }
                 statisticsDetailVo.setTotalQty(totalQty);
                 statisticsDetailVo.setOemQty(totalOemQty);
+                statistics.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + day, JSON.toJSONString(statisticsDetailVo));
             }
             productionStatisticsList.add(statistics);
         }
@@ -2420,7 +2413,7 @@ public class MatchingProductionHandler {
      */
     private ProductionCapacityParamConfiguration createParamConfiguration(TbrProductionContext productionContext) {
         List<String> paramCodeList = new ArrayList<>(64);
-        // 日排产相关
+        //日排产相关
         paramCodeList.add(MonthPlanEnums.DAY_CHANGE_GROUP_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_MOULD_LH_MACHINE_NUMBER.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
@@ -2430,18 +2423,20 @@ public class MatchingProductionHandler {
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MIN_CAPACITY.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
-        // 排产控制相关
+        //排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
-        paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
-        // 降膜排产相关
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
+        //降膜排产相关
         paramCodeList.add(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
@@ -2449,24 +2444,12 @@ public class MatchingProductionHandler {
         paramCodeList.add(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
-        // 其他
+        //其他
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
-        // 周程滚动相关
-        paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode());
-        paramCodeList.add(MonthPlanEnums.MULTI_CX_MACHINE_LOCK_DAYS.getCode());
-        paramCodeList.add(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
-        // 获取数据
+        paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
+        //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
-        return this.buildParam(paramConfigurationMap);
-    }
-
-    /**
-     * 业务的参数封装未配置对象
-     *
-     * @param paramConfigurationMap
-     * @return
-     */
-    private ProductionCapacityParamConfiguration buildParam(Map<String, Object> paramConfigurationMap) {
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
             return null;
         }
@@ -2486,6 +2469,18 @@ public class MatchingProductionHandler {
         } else {
             configuration.setBoostProductionType(Stream.of(boostProductionTypeValue.split(StringConstant.COMMA)).collect(Collectors.toSet()));
         }
+        //外销贴牌-品牌配置
+        String oemBrandConfig = (String) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        if (StringUtils.isBlank(oemBrandConfig)) {
+            configuration.setOemBrandConfig(Collections.emptySet());
+        } else {
+            configuration.setOemBrandConfig(Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        //外销贴牌-总产量配置，单位条
+        configuration.setOemBrandCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+        //周期储备量占实单的比例(%)
+        configuration.setReservePercent((Integer) paramConfigurationMap.get(MonthPlanEnums.RESERVE_PERCENT.getCode()));
+
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
         configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
@@ -2501,7 +2496,6 @@ public class MatchingProductionHandler {
         configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
         configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
         configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
-        configuration.setDeductionLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode()));
         //降膜排产相关
         configuration.setDeductMouldMinLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode()));
         configuration.setFirstNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
@@ -2512,14 +2506,20 @@ public class MatchingProductionHandler {
         configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
         //其它
         configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
-        // 周程滚动相关
-        configuration.setSingleCxMachineLockDay((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_MACHINE_LOCK_DAYS.getCode()));
-        configuration.setMultiCxMachineLockDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MULTI_CX_MACHINE_LOCK_DAYS.getCode()));
-        configuration.setWeekRollAdjustDate((String) paramConfigurationMap.get(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode()));
-
+        Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        Integer deductionLhMachine = Optional.ofNullable((Integer) deductionLhMachineValue).orElse(BigDecimal.ZERO.intValue());
+        configuration.setDeductionLhMachineCount(deductionLhMachine);
+        //特殊原材料
+        Object specialMaterialCodeValue = paramConfigurationMap.get(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
+        String specialMaterialCode = (String) Optional.ofNullable(specialMaterialCodeValue).orElse("");
+        if (StringUtils.isBlank(specialMaterialCode)) {
+            configuration.setSpecialMaterialCodeSet(Collections.emptySet());
+        } else {
+            configuration.setSpecialMaterialCodeSet(Stream.of(specialMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
         return configuration;
     }
-
+    
     /**
      * 检查二次上机
      *
@@ -2880,18 +2880,6 @@ public class MatchingProductionHandler {
                         return; // 已经满产能，该模具当天不可用
                     }
                 }
-                // 如果上一天排满了其他sku，当天不可用
-//                List<CxMouldDayProductionHelper> latestProductionList = dayProductionInfo.get(this.getLastDay(productionContext, day, 1));
-//                if (!CollectionUtils.isEmpty(latestProductionList)) {
-//                    Integer productionQty = latestProductionList.stream()
-//                            .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 合计当天的已排量
-//                    boolean isMaxProduct = productionQty >= dayMoldQty;
-//                    boolean hasOtherSku = latestProductionList.stream().anyMatch(p -> StringUtils.isNotEmpty(p.getMaterialDesc())
-//                            && !p.getMaterialDesc().equals(materialDesc));
-//                    if (isMaxProduct && hasOtherSku) {
-//                        return;
-//                    }
-//                }
             }
             effectiveList.add(mouldInfo);
         });
