@@ -542,13 +542,25 @@ public abstract class AbstractDailyCapacityLimit {
             //若余数 == 换模起排量，则视新增机台数
             resultArr[0] = 1;
             resultArr[3] = 1;
+            if (mpFinalVo.getFieldValueByFieldName(day2Field) == null){
+                //若次日为空，则当日的8也是收尾，不算换模
+                resultArr[3] = 0;
+            }
         }else if (remainQty == changeMouldBlockQty){
             //若余数 == 换活字块20条
             resultArr[1] = 1;
             resultArr[3] = 1;
+            if (mpFinalVo.getFieldValueByFieldName(day2Field) == null){
+                //若次日为空，则当日的8也是收尾，不算换模
+                resultArr[3] = 0;
+            }
         }else if (remainQty == changeMouldXBlockQty){
             resultArr[2] = 1;
             resultArr[3] = 1;
+            if (mpFinalVo.getFieldValueByFieldName(day2Field) == null){
+                //若次日为空，则当日的8也是收尾，不算换模
+                resultArr[3] = 0;
+            }
         }else {
             resultArr[0] = 1;
         }
