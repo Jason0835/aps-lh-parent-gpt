@@ -15,6 +15,7 @@ import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
 import com.zlt.aps.mp.engine.handler.SkuPrioritySelector;
+import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.common.utils.PubUtil;
@@ -38,6 +39,50 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class CxAddSkuProductionHandler {
+
+    private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
+
+    /**
+     * 单分组计划-新增Sku模拟排产
+     *
+     * @param structureName               分组
+     * @param context                     排产上下文
+     * @param groupPlanInfo               分组计划信息
+     * @param continueCxMachineAllocation 机台分配信息
+     */
+    public void productionAddSkuBySingleGroup(String structureName, Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+            log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
+            return;
+        }
+        Map<String, ProductionPlanGroupInfo> allGroupPlanMap = productionContext.getGroupProductionInfo();
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        //3.1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+        setRemainLhMachineCount(context, allGroupPlanMap, structureName);
+        //3.2 初始日产能限制信息，用于统计使用
+        groupPlanInfo.initMpDailyCapacityLimit(context);
+        //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
+        groupPlanInfo.setThisRoundCanProduction();
+        //在机结构-新增Sku模拟排产
+        productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
+        //再次设置可排产的计划在本轮次可进行排产
+        groupPlanInfo.setThisRoundCanProduction();
+        //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
+        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
+        //设置收尾机台
+        continueCxMachineAllocation.forEach(cxMachineAllocation -> {
+            String cxMachineCode = cxMachineAllocation.getCxMachineCode();
+            CxMachineBaseInfoVo machineInfo = allCxMachineInfo.get(cxMachineCode);
+            Integer newRemainingDays = machineInfo.getRemainingDays();
+            //加入收尾匹配
+            if (newRemainingDays > BigDecimal.ZERO.intValue()) {
+                productionContext.addReverseMachine(machineInfo.getCxMachineCode());
+            }
+        });
+        //3.3 重新计算统计产能
+        groupPlanInfo.reCalcMpDailyCapacityLimit(context);
+    }
 
     /**
      * 在机结构 - 在产机台的新增规格排产

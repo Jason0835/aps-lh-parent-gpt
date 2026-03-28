@@ -43,34 +43,35 @@ public class OnLineGroupOnLineMachineHandler {
     public void productionContinue(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, TbrProductionContext productionContext, Map<String, CxContinueInfoHelper> allContinueInfo, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
         //1、续作先排
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
-            if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-                log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SKU));
-            }
-            if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-                log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SKU));
-            }
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
         //2、接着进行同规格同花纹的续作高优先级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
-            if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-                log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN));
-            }
-            if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-                log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN));
-            }
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
         });
         //3、接着进行共生胎，同模具的续作高优级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
-            if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-                log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD));
-            }
-            if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-                log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD));
-            }
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
         });
+    }
+
+    /**
+     * 单分组，续作重新排产
+     *
+     * @param cxAddSkuProductionHandler 新增sku处理器
+     * @param productionStage           排产阶段
+     * @param productionContext         排产上下文
+     * @param groupName                 分组名
+     * @param cxContinueInfo            分组续作信息
+     * @param allGroupPlanInfo          所有分组
+     */
+    public void productionContinueBySingleGroup(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, TbrProductionContext productionContext, String groupName, CxContinueInfoHelper cxContinueInfo, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
+        //1、续作先排
+        productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, groupName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
+        //2、接着进行同规格同花纹的续作高优先级部分进行排产
+        productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, groupName, cxContinueInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
+        //3、接着进行共生胎，同模具的续作高优级部分进行排产
+        productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, groupName, cxContinueInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
     }
 
     /**
@@ -86,6 +87,7 @@ public class OnLineGroupOnLineMachineHandler {
      */
     private void productionContinueByType(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String groupName, CxContinueInfoHelper cxContinueInfo, ContinueTypeEnum type) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        recordStartProductionLog(productionContext, groupName, productionStage, type);
         ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(groupName);
         if (null == groupPlan) {
             if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
@@ -132,6 +134,23 @@ public class OnLineGroupOnLineMachineHandler {
             //4.3 重新计算统计产能
             groupPlan.reCalcMpDailyCapacityLimit(context);
             return;
+        }
+    }
+
+    /**
+     * 增加开始排产日志
+     *
+     * @param productionContext 排产上下文
+     * @param structureName     分组名
+     * @param productionStage   阶段
+     * @param continueType      类型
+     */
+    private void recordStartProductionLog(TbrProductionContext productionContext, String structureName, ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
+        if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType));
+        }
+        if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
+            log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType));
         }
     }
 }

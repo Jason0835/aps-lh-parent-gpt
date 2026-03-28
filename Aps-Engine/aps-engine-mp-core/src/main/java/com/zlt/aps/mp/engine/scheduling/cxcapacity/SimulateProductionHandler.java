@@ -136,7 +136,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //1、在机结构-在产机台-续作Sku排产
         productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
-        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+//        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         //2、在机结构-新增Sku排产 优先给特殊结构所在机台选择
         allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {
                     // 判断结构是否包含特殊结构，优先给特殊结构所在机台选择
@@ -151,36 +151,37 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                         return;
                     }
                     List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
-                    if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                        log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
-                        return;
-                    }
-                    //3.1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
-                    cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanMap, structureName);
-                    //3.2 初始日产能限制信息，用于统计使用
-                    groupPlanInfo.initMpDailyCapacityLimit(context);
-
-                    //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
-                    groupPlanInfo.setThisRoundCanProduction();
-                    //在机结构-新增Sku模拟排产
-                    cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
-                    //再次设置可排产的计划在本轮次可进行排产
-                    groupPlanInfo.setThisRoundCanProduction();
-                    //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
-                    groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
-                    //设置收尾机台
-                    continueCxMachineAllocation.forEach(cxMachineAllocation -> {
-                        String cxMachineCode = cxMachineAllocation.getCxMachineCode();
-                        CxMachineBaseInfoVo machineInfo = allCxMachineInfo.get(cxMachineCode);
-                        Integer newRemainingDays = machineInfo.getRemainingDays();
-                        //加入收尾匹配
-                        if (newRemainingDays > BigDecimal.ZERO.intValue()) {
-                            productionContext.addReverseMachine(machineInfo.getCxMachineCode());
-                        }
-                    });
-
-                    //3.3 重新计算统计产能
-                    groupPlanInfo.reCalcMpDailyCapacityLimit(context);
+                    cxAddSkuProductionHandler.productionAddSkuBySingleGroup(structureName, context, groupPlanInfo, continueCxMachineAllocation);
+//                    if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+//                        log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
+//                        return;
+//                    }
+//                    //3.1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+//                    cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanMap, structureName);
+//                    //3.2 初始日产能限制信息，用于统计使用
+//                    groupPlanInfo.initMpDailyCapacityLimit(context);
+//
+//                    //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
+//                    groupPlanInfo.setThisRoundCanProduction();
+//                    //在机结构-新增Sku模拟排产
+//                    cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, groupPlanInfo, new HashSet<>());
+//                    //再次设置可排产的计划在本轮次可进行排产
+//                    groupPlanInfo.setThisRoundCanProduction();
+//                    //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
+//                    groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
+//                    //设置收尾机台
+//                    continueCxMachineAllocation.forEach(cxMachineAllocation -> {
+//                        String cxMachineCode = cxMachineAllocation.getCxMachineCode();
+//                        CxMachineBaseInfoVo machineInfo = allCxMachineInfo.get(cxMachineCode);
+//                        Integer newRemainingDays = machineInfo.getRemainingDays();
+//                        //加入收尾匹配
+//                        if (newRemainingDays > BigDecimal.ZERO.intValue()) {
+//                            productionContext.addReverseMachine(machineInfo.getCxMachineCode());
+//                        }
+//                    });
+//
+//                    //3.3 重新计算统计产能
+//                    groupPlanInfo.reCalcMpDailyCapacityLimit(context);
                 });
     }
 

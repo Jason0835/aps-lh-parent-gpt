@@ -65,7 +65,7 @@ public class DayProductionStatisticsHandler {
             // 重算
             groupPlanInfo.reCalcMpDailyCapacityLimit(productionContext);
             Map<Integer, MpDailyCapacityLimitVo> dayCapacityLimitMap = groupPlanInfo.getDailyCapacityLimitVoMap();
-            if (dayCapacityLimitMap == null) {
+            if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
                 return;
             }
             MpMonthPlanStatisticsResultVo statistics = buildGroupStatisticsBaseInfo(productionContext, groupPlanInfo);
