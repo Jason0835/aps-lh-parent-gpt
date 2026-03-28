@@ -122,9 +122,15 @@ public class OnLineGroupOnLineMachineHandler {
             return;
         }
         Integer deadLineDay = groupPlan.getContinueSkuDeadLineDay(context);
+        // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+        cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, groupName);
+        //4.1 初始日产能限制信息，用于统计使用
+        groupPlan.initMpDailyCapacityLimit(context);
         //同规格同花纹 or 共生胎同模具
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == type || ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == type) {
-            CxContinueProductionHandler.oldProductionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap, new HashSet<>());
+            CxContinueProductionHandler.productionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap, new HashSet<>());
+            //4.3 重新计算统计产能
+            groupPlan.reCalcMpDailyCapacityLimit(context);
             return;
         }
     }

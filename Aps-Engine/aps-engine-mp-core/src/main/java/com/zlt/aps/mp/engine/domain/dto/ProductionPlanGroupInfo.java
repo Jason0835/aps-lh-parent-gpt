@@ -628,10 +628,24 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || CollectionUtils.isEmpty(continueSkuMap)) {
             return null;
         }
+        //重算使用硫化组机台数
+        reCalcMpDailyCapacityLimit(context);
         //得到续作最大硫化组可使用的模具数
         Integer sumMouldNumber = continueSkuMap.values().stream().mapToInt(CxContinueSkuInfoHelper::getMouldNumber).sum();
+        Integer maxLhMachineCount = sumMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        List<GroupPlanCxLhCapacityLimitHelper> hasAddContinueSkuList = dayLimitList.stream().filter(dayLimit -> !excludeDaySet.contains(dayLimit.getDay()) && dayLimit.getProductionMouldSet().size() < sumMouldNumber).collect(Collectors.toList());
+        List<GroupPlanCxLhCapacityLimitHelper> hasAddContinueSkuList = dayLimitList.stream().filter(dayLimit -> {
+            Integer day = dayLimit.getDay();
+            if(excludeDaySet.contains(day)){
+                return false;
+            }
+            MpDailyCapacityLimitVo dayUsedDetail = dailyCapacityLimitVoMap.get(day);
+            if(null == dayUsedDetail){
+                return true;
+            }
+            Integer realUsedLhMachines = Optional.ofNullable(dayUsedDetail.getUsedLhMachines()).orElse(BigDecimal.ZERO.intValue());
+            return realUsedLhMachines < maxLhMachineCount;
+        }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddContinueSkuList)) {
             return null;
         }

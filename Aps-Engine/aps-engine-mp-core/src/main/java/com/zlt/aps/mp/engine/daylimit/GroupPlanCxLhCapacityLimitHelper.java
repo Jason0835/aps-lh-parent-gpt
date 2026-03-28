@@ -822,6 +822,29 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 conclusionList.add(single);
             });
         });
+        //减模：隔天换模、换活字块
+        previousSkuProductionDetail.forEach((materialDesc, skuList) -> {
+            if (CollectionUtils.isEmpty(skuList)) {
+                return;
+            }
+            List<SkuDayProductionInfoHelper> currentSkuList = skuProductionDetailInfo.get(materialDesc);
+            if (CollectionUtils.isEmpty(currentSkuList)) {
+                skuList.forEach(single -> {
+                    if (single.isChangeMouldByNext() || single.isChangeTypeBlockByNext(context)) {
+                        conclusionList.add(SkuDayProductionInfoHelper.createCloneByOneProduction(single, day));
+                    }
+                });
+                return;
+            }
+            int currentSize = currentSkuList.size();
+            int previousSize = skuList.size();
+            if (currentSize == previousSize) {
+                return;
+            }
+            //满产收尾
+            skuList.sort(Comparator.comparing(SkuDayProductionInfoHelper::getSumProductionQty, Comparator.reverseOrder()));
+            conclusionList.add(SkuDayProductionInfoHelper.createCloneByOneProduction(skuList.get(BigDecimal.ZERO.intValue()), day));
+        });
         return conclusionList;
     }
 

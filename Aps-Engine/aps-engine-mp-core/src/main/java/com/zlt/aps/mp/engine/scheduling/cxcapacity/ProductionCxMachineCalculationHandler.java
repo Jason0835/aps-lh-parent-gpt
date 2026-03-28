@@ -12,6 +12,7 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -47,8 +48,10 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ProductionCxMachineCalculationHandler {
 
+    private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
     /**
      * 对在机分组进行在机机台产能分配
      * 通过模拟排产其续作部分来确定
@@ -174,11 +177,21 @@ public class ProductionCxMachineCalculationHandler {
         });
         //1、先使用续作Sku的高优先级部分进行模拟排产
         CxContinueProductionHandler.productionContinueSku(productionContext, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, continueSkuInfoMap);
+        String groupName = groupPlanInfo.getGroupName();
+        // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+        Map<String, ProductionPlanGroupInfo> allGroupPlanInfo = productionContext.getGroupProductionInfo();
+        cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, groupName);
+        //4.1 初始日产能限制信息，用于统计使用
+        groupPlanInfo.initMpDailyCapacityLimit(context);
         //2、接着进行同规格同花纹的续作高优先级部分进行模拟排产
         Integer monthDays = context.getMonthDays();
-        CxContinueProductionHandler.oldProductionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap, new HashSet<>());
+        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap, new HashSet<>());
+        //4.3 重新计算统计产能
+        groupPlanInfo.reCalcMpDailyCapacityLimit(context);
         //3、接着进行共生胎，同模具的续作高优级部分进行模拟排产
-        CxContinueProductionHandler.oldProductionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap, new HashSet<>());
+        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap, new HashSet<>());
+        //4.3 重新计算统计产能
+        groupPlanInfo.reCalcMpDailyCapacityLimit(context);
     }
 
     /**
