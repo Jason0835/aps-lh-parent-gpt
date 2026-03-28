@@ -285,8 +285,8 @@ public class MatchingAdjuestProductionHandler {
 
             out: do {
                 int startUnAllocationQty = unAllocationQty;
-                Integer realBeginDay = plan.getMatchBeginDay() != null? plan.getMatchBeginDay(): beginDay;
-                Integer realEndDay = plan.getMatchEndDay() != null? plan.getMatchEndDay(): endDay;
+                Integer realBeginDay = plan.getMatchBeginDay() != null? plan.getMatchBeginDay(): beginDay; // 本次循环的开始日期
+                Integer realEndDay = this.getRealEndDay(contextDTO, plan, realBeginDay, endDay); // 本次循环的结束日期
                 for (int day = realBeginDay; day <= realEndDay; day++) { // 遍历结构排产日，如果锁定日超过开始i日期，从锁定日下一天开始
                     if (unAllocationQty <= 0) {
                         break out;
@@ -329,7 +329,7 @@ public class MatchingAdjuestProductionHandler {
                     }
                     
                     // 为当天分配搭配量
-                    int allocationQty = this.allcatAdjustProductQty(contextDTO, day, beginDay, plan, safeList,
+                    int allocationQty = this.allcatAdjustProductQty(contextDTO, day, beginDay, endDay, plan, safeList,
                             dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitMap, mouldRemaindCapacity, isCheckContinue);
                     if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
                         producedQty += allocationQty;
@@ -351,6 +351,35 @@ public class MatchingAdjuestProductionHandler {
             }
         } while (true);
         return totalAllocationQty;
+    }
+
+    /**
+     * 本次SKU搭配结束日期
+     * 
+     * @param plan           需求计划
+     * @param beginDay   搭配开始日期
+     * @param endDay         结构结束日期
+     * @param lastProductDay 收尾日期
+     * @return
+     */
+    private Integer getRealEndDay(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan, Integer beginDay, Integer endDay) {
+        if (plan.getEndDay() == null) { // 新增规格，直接返回结构结束日期
+            return endDay;
+        }
+        // 1、如果需求计划的搭配结束日期已经在之前的循环中结算出来则以此为准，否则以sku的收尾日为准
+        Integer realEndDay = plan.getMatchEndDay() != null? plan.getMatchEndDay(): plan.getEndDay();
+        // 2、不能早于搭配开始日期
+        if (realEndDay < beginDay) {
+            realEndDay = beginDay;
+        }
+        // 3、如果搭配结束日期还早于结构结束日期，则需要看到下一天
+        if (realEndDay < endDay) {
+            Integer nextDay = this.getNextDay(contextDTO, realEndDay, endDay);
+            if (nextDay > 0) {
+                realEndDay = nextDay;
+            }
+        }
+        return realEndDay;
     }
 
     /**
@@ -908,7 +937,8 @@ public class MatchingAdjuestProductionHandler {
                                                     Map<String, FactoryMonthPlanFinalAdjustVo> mpProdFinalMap,
                                                     TbrProductionContext productionContext,
                                                     Set<String> scheduleMaterialDesc) {
-        return demandPlanList.stream().filter(p -> !scheduleMaterialDesc.contains(p.getMaterialDesc()))
+        return demandPlanList.stream().filter(p -> p.getProductionQty() > 0)
+                .filter(p -> !scheduleMaterialDesc.contains(p.getMaterialDesc()))
                 .min((p1, p2) -> {
                     // 排序1、优先库销比低的
                     FactoryMonthPlanFinalAdjustVo finalPlan1 = mpProdFinalMap.get(p1.getMaterialDesc());
@@ -959,7 +989,8 @@ public class MatchingAdjuestProductionHandler {
      *
      * @param contextDTO            上下文
      * @param scheduleDay           排产日期
-     * @param beginDay              结构排产开始日
+     * @param beginDay              搭配开始日
+     * @param beginDay              搭配结束日
      * @param plan                  排产记录
      * @param mpProdFinalList       排产记录列表
      * @param dayProductionMap      日排产信息统计表
@@ -971,7 +1002,7 @@ public class MatchingAdjuestProductionHandler {
      * @return
      */
     private Integer allcatAdjustProductQty(MpRollAdjustContextDTO contextDTO, Integer scheduleDay, Integer beginDay,
-                                           FactoryMonthPlanFinalAdjustVo plan,
+                                           Integer endDay, FactoryMonthPlanFinalAdjustVo plan,
                                            List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
                                            Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap,
                                            Integer unAllocationQty, Integer capacity,
@@ -979,7 +1010,6 @@ public class MatchingAdjuestProductionHandler {
                                            Integer mouldRemaindCapacity, boolean isCheckContinue) {
         MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(scheduleDay);
         String materialDesc = plan.getMaterialDesc();
-        Integer endDay = plan.getMatchEndDay();
         boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
         int mouldCavityQty = this.getNewCavityQty(contextDTO, plan, scheduleDay); // 总型腔数量
 //        int typeBlockQty = cavity2Block.getInsertResults().getOrDefault(mouldKey, 0); // 总活块数量
