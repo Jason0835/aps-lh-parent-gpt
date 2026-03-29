@@ -15,8 +15,21 @@ public class ApsNumberUtils {
      * @return
      */
     public static Integer safeAdd(Integer val1, Integer val2) {
-        Integer newVal1 = Optional.ofNullable(val1).orElse(0);
-        Integer newVal2 = Optional.ofNullable(val2).orElse(0);
+        Integer newVal1 = intValue(val1);
+        Integer newVal2 = intValue(val2);
         return newVal1 + newVal2;
+    }
+    
+    /**
+     * 空值自动转0
+     * @param val
+     * @return
+     */
+    public static Integer intValue(Object val) {
+        if (val instanceof Integer) {
+            return Optional.ofNullable((Integer) val).orElse(0);
+        } else {
+            return 0;
+        }
     }
 }
