@@ -109,6 +109,7 @@ public class MatchingProductionHandler {
         try {
             String config = sysConfigService.selectConfigByKey("monthPlan.skip.matching");
             if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+//            if (true) {
                 if (productionContext != null) {
                     baseDao.saveBatch(this.buildProductionStatisticsList(productionContext)); // 跳过搭配也要保存统计
                 }
@@ -630,14 +631,13 @@ public class MatchingProductionHandler {
     private void simulatedMould(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo,
                                 ProductionMouldInfoVo mouldInfo, MonthPlanProductionRequirePlanVo requirePlan,
                                 Integer day, Integer endDay, Integer productionQty, Boolean isBoots) {
-        Integer dayVulcanizationQty = requirePlan.getDayVulcanizationQty();
-        Integer singleMouldVulcanizationQty = dayVulcanizationQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 单模硫化日产 = 硫化日产 / 双模
+        Integer dayVulcanizationQty = requirePlan.getDayVulcanizationQty(); // 单模硫化日产 = 硫化日产 / 双模
         String materialDesc = requirePlan.getMaterialDesc();
         // 1、将结构排产信息转换成模具日排产信息
         Map<String, FactoryMonthPlanMouldDayResult> resultMap = this.convertMouldDayResult(groupInfo, endDay);
         // 2、计算模具当天的剩余产能，大于0的才能排产
         Integer dayProductionQty = this.sumMouldMaterialProductQty(mouldInfo, day, materialDesc);
-        Integer remainQty = singleMouldVulcanizationQty > dayProductionQty? singleMouldVulcanizationQty - dayProductionQty: 0;
+        Integer remainQty = dayVulcanizationQty > dayProductionQty? dayVulcanizationQty - dayProductionQty: 0;
         if (remainQty <= 0) {
             return;
         }
