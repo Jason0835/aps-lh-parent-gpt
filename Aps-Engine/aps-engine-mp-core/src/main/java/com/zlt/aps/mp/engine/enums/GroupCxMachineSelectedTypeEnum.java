@@ -41,7 +41,12 @@ public enum GroupCxMachineSelectedTypeEnum {
     /**
      * 07 含有结构优先
      */
-    SAME_STRUCTURE_PRIORITY("07", "含有结构优先");
+    SAME_STRUCTURE_PRIORITY("07", "含有结构优先"),
+
+    /**
+     * 08 结构需求与成型产能接近的优先
+     */
+    NEAR_CAPACITY_PRIORITY("08", "结构需求与成型产能接近的优先");
 
     private String selectedType;
 

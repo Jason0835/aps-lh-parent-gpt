@@ -445,8 +445,9 @@ public class BaseDataContainer implements Serializable {
             //没有找到与tireDrumMatch匹配的成型工装限制信息
             return null;
         }
-        //随意一条
-        limitGroupList.sort(Comparator.comparing(TireDrumInfoVo::getGroupId));
+        // 英寸通性性差的优先 sandy+ 2026.3.29
+        limitGroupList.sort(Comparator.comparingInt(TireDrumInfoVo::getProSizeCount)
+                .thenComparing(TireDrumInfoVo::getGroupId));
         TireDrumInfoVo tireDrumInfo = limitGroupList.get(BigDecimal.ZERO.intValue());
         Map<Integer, TireDrumDayInfoHelper> dayLimitInfoMap = tireDrumInfo.getDayLimitInfoMap();
         if (CollectionUtils.isEmpty(dayLimitInfoMap)) {

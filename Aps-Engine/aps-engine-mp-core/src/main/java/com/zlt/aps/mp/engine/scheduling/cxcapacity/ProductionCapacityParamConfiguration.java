@@ -162,6 +162,12 @@ public class ProductionCapacityParamConfiguration {
      * SYS0203013 周期储备量占实单的比例(%),防止储备量过大
      */
     private Integer reservePercent;
+
+    /**
+     * SYS0203014 按高优先级SKU个数降序的结构清单-前 X 个结构，单位个
+     */
+    private Integer structureBillPreCount;
+
     /**
      * 是否写入日志
      */

@@ -52,6 +52,12 @@ public class TireDrumInfoVo implements Serializable {
      */
     private Map<Integer, TireDrumDayInfoHelper> dayLimitInfoMap;
 
+    public Integer getProSizeCount(){
+        if (CollectionUtils.isEmpty(proSizeSet)){
+            return 0;
+        }
+        return proSizeSet.size();
+    }
     /**
      * 根据成型鼓台账配置转化成成型鼓限制信息
      * 构建每日限制对象集合

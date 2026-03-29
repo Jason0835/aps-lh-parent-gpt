@@ -150,6 +150,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 计划是否断面宽范围
      */
     private String sectionWidthCondition;
+
     /**
      * 成型硫化配比最后一天排产分组信息
      */

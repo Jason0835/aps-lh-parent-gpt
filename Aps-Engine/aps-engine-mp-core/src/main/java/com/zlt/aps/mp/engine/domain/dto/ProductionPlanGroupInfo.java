@@ -112,6 +112,13 @@ public class ProductionPlanGroupInfo {
      * 最大周期排产量的值
      */
     private Integer maxCycleQty;
+
+    /**
+     * 结构需求与机台产能差异天数，用于最优匹配
+     * sandy+ 2026.3.28
+     */
+    private Integer diffStructureAndMachineDays;
+
     /**
      * 排产-成型硫化产能限制
      * 包含 最大胎胚数
@@ -1061,6 +1068,13 @@ public class ProductionPlanGroupInfo {
         return sameEmbryoCodeAndMouldList;
     }
 
+    /**
+     * 结构需求与机台产能差异天数的绝对值
+     * @return
+     */
+    public Integer getAbsDiffStructureAndMachineDays() {
+        return Math.abs(diffStructureAndMachineDays);
+    }
     /**
      * 获取剩余排产中高优先级的SKU个数
      *
