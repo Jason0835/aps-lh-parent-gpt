@@ -2167,7 +2167,7 @@ public class MpWeekRollAdjustEngine {
             otherMachines = dayPlanQty % dailyLhQty > 0 ? 1:0;
         }else{
             //增模
-            int[]addMouldArr = adjustDailyCapacityLimitObj.getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day2Field);
+            int[]addMouldArr = adjustDailyCapacityLimitObj.getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day1Field,day2Field);
             otherMachines = addMouldArr[0];
         }
         return (fullMachines+otherMachines)*2;
