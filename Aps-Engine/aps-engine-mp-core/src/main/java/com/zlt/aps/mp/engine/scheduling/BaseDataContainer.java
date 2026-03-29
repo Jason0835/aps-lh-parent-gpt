@@ -440,7 +440,8 @@ public class BaseDataContainer implements Serializable {
         if (CollectionUtils.isEmpty(workWeakTypeLimitInfo) || null == tireDrumMatch || tireDrumMatch.isEmptyValue() || null == productionDay) {
             return null;
         }
-        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch)).collect(Collectors.toList());
+        //增加规格型号、使用类型匹配及还有剩余量的匹配
+        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch) && singleGroupLimit.hasLeftOverQty(productionDay)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(limitGroupList)) {
             //没有找到与tireDrumMatch匹配的成型工装限制信息
             return null;
