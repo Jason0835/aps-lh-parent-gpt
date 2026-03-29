@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
-import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
@@ -8,9 +7,11 @@ import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.GroupConclusionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.enums.DeductionDayProductionTypeEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
+import com.zlt.aps.mp.engine.handler.GroupPlanConclusionHandler;
 import com.zlt.aps.mp.engine.handler.GroupPlanDeductionDayHandler;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
@@ -35,7 +36,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GroupPlanBeforeConclusionHandler {
     /**
-     * 产能释放处理器
+     * 结构收尾业务处理器
+     */
+    private final GroupPlanConclusionHandler groupPlanConclusionHandler;
+    /**
+     * 产能释放业务处理器
      */
     private final GroupPlanDeductionDayHandler groupPlanDeductionDayHandler;
 
@@ -62,50 +67,29 @@ public class GroupPlanBeforeConclusionHandler {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<MonthPlanStructureLhRatioVo> effectiveRatioList = new ArrayList<>();
-        Map<MonthPlanStructureLhRatioVo, Set<String>> effectiveRationMap = new HashMap<>();
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        allCxMachineCodeSet.forEach(cxMachineCode -> {
-            MonthPlanStructureLhRatioVo findLhRatio = groupPlanInfo.getLhRatio(cxMachineBaseInfo.get(cxMachineCode));
-            if (null == findLhRatio) {
-                return;
-            }
-            Set<String> cxMachineCodeSet = effectiveRationMap.get(findLhRatio);
-            if (null == cxMachineCodeSet) {
-                cxMachineCodeSet = new HashSet<>();
-                effectiveRationMap.put(findLhRatio, cxMachineCodeSet);
-            }
-            cxMachineCodeSet.add(cxMachineCode);
-            effectiveRatioList.add(findLhRatio);
-        });
-        if (CollectionUtils.isEmpty(effectiveRatioList)) {
-            //记录日志
-            addNoLhRatioInfoLog(context, groupName);
+        //收尾业务判断
+        GroupConclusionInfoVo groupConclusionInfo = groupPlanConclusionHandler.getConclusionInfoByProductionInfo(context, groupPlanInfo);
+        if (null == groupConclusionInfo) {
+            addBeforeConclusionConditionErrorInfoLog(context, groupName);
             return;
         }
-        effectiveRatioList.sort(Comparator.comparing(MonthPlanStructureLhRatioVo::getLhMachineMaxQty));
-        MonthPlanStructureLhRatioVo selectedLhRatio = effectiveRatioList.get(BigDecimal.ZERO.intValue());
-        Integer minLhMachineCount = selectedLhRatio.getLhMachineMinQty();
-        //转化成模具数
-        Integer minMouldNumber = minLhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        //获取使用模具数低于minMouldNumber的天数数据
-        List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = dayLimitList.stream().filter(singleDay -> singleDay.isLowMinMouldNumber(minMouldNumber)).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(lowMinMouldNumberList)) {
-            //记录日志
+        Integer minLhMachineCount = groupConclusionInfo.getMinLhMachineCount();
+        if (!groupConclusionInfo.isSuccessFlag()) {
             addNoBeforeConclusionInfoLog(context, groupName, minLhMachineCount);
             return;
         }
-        //按日期排序
-        lowMinMouldNumberList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
-        //取得最小和最大日期
-        Integer beforeConclusionDay = lowMinMouldNumberList.get(BigDecimal.ZERO.intValue()).getDay();
-        List<String> selectedCxMachineList = new ArrayList<>(effectiveRationMap.get(selectedLhRatio));
-        Collections.sort(selectedCxMachineList);
-        String selectedCxMachineCode = selectedCxMachineList.get(BigDecimal.ZERO.intValue());
-        CxMachineBaseInfoVo selectCxMachineInfo = cxMachineBaseInfo.get(selectedCxMachineCode);
-        Integer deductionDay = lowMinMouldNumberList.size();
-        Set<Integer> deductionDaySet = lowMinMouldNumberList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Integer beforeConclusionDay = groupConclusionInfo.getConclusionDay();
+        Set<Integer> deductionDaySet = groupConclusionInfo.getDeductionDaySet();
+        Integer deductionDay = groupConclusionInfo.getDeductionDay();
+        //收尾机台选择
+        CxMachineBaseInfoVo selectCxMachineInfo = groupPlanConclusionHandler.getConclusionCxMachine(context, groupPlanInfo);
+        if (null == selectCxMachineInfo) {
+            addNoFindBeforeConclusionCxMachineInfoLog(context, groupName);
+            return;
+        }
+        groupConclusionInfo.addSelectedConclusionCxMachine(selectCxMachineInfo);
+        String selectedCxMachineCode = selectCxMachineInfo.getCxMachineCode();
+
         List<CxMachineAllocationPlanHelper> allocationList = selectCxMachineInfo.getAllocationList();
         if (CollectionUtils.isEmpty(allocationList)) {
             //记录日志
@@ -344,6 +328,23 @@ public class GroupPlanBeforeConclusionHandler {
 
     /**
      * 增加没有分配信息-退出结构提前收尾业务逻辑日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有找到提前收尾机台，退出结构收尾业务 ====
+     *
+     * @param context   排程上下文
+     * @param groupName 分组
+     * @return
+     */
+    private String addNoFindBeforeConclusionCxMachineInfoLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有找到提前收尾机台，退出结构收尾业务 ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_BEFORE_CONCLUSION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加没有分配信息-退出结构提前收尾业务逻辑日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有分配信息，退出结构收尾业务 ====
      *
      * @param context   排程上下文
@@ -360,15 +361,15 @@ public class GroupPlanBeforeConclusionHandler {
     }
 
     /**
-     * 增加没有成型硫化配比，退出结构提前收尾业务日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有结构成型硫化配比信息，退出结构收尾业务 ====
+     * 增加 收尾业务判断前置条件错误 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 提前收尾业务判断基础条件错误，退出提前结构收尾业务 ====
      *
      * @param context   排程上下文
      * @param groupName 分组
      * @return
      */
-    private String addNoLhRatioInfoLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有结构成型硫化配比信息，退出结构收尾业务 ====",
+    private String addBeforeConclusionConditionErrorInfoLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 提前收尾业务判断基础条件错误，退出提前结构收尾业务 ====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
