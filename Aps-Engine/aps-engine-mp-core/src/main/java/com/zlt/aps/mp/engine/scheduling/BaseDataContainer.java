@@ -15,7 +15,6 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -184,6 +183,23 @@ public class BaseDataContainer implements Serializable {
             return Collections.emptyList();
         }
         return ratioList;
+    }
+
+    /**
+     * 获取分组收尾条件：一个分组收尾条件都一样
+     *
+     * @param groupName 分组名
+     * @return
+     */
+    public Integer getMinConclusionLhMachineCount(String groupName) {
+        if (StringUtils.isBlank(groupName)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanStructureLhRatioVo> allConfiguration = getAllLhRationListByGroup(groupName);
+        if (CollectionUtils.isEmpty(allConfiguration)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return allConfiguration.get(BigDecimal.ZERO.intValue()).getLhMachineMinQty();
     }
 
     /**

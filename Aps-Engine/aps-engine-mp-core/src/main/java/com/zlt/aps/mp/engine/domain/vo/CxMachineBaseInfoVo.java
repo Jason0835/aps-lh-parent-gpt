@@ -826,6 +826,33 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 获取本次分配段排产日信息
+     *
+     * @param allocationInfo 分配信息
+     * @return
+     */
+    public Set<Integer> getAllocationDaySet(CxMachineAllocationPlanHelper allocationInfo) {
+        if (null == allocationInfo || StringUtils.isBlank(allocationInfo.getCxMachineCode())) {
+            return Collections.emptySet();
+        }
+        if (!allocationInfo.getCxMachineCode().equals(cxMachineCode)) {
+            return Collections.emptySet();
+        }
+        Integer startDay = allocationInfo.getStartDay();
+        Integer endDay = allocationInfo.getEndDay();
+        if (null == startDay || null == endDay || startDay > endDay) {
+            return Collections.emptySet();
+        }
+        Set<Integer> thisTimeSet = new HashSet<>();
+        for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
+            if (allocationDaySet.contains(productionDay)) {
+                thisTimeSet.add(productionDay);
+            }
+        }
+        return thisTimeSet;
+    }
+
+    /**
      * 获取下一个排产起始日，在当前最大的排产日基础上 + 1
      *
      * @return

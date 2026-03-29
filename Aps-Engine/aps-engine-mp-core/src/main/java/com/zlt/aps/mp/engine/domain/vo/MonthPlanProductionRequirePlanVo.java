@@ -501,6 +501,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 判断是否还有实单剩余排产量
+     *
+     * @return
+     */
+    public boolean hasActualProductionQuantity() {
+        //非周期结构
+        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(getStructureType())) {
+            return hasProduction();
+        }
+        //周期结构，看剩余排产量与周期储备的差值
+        if (!hasProduction()) {
+            return false;
+        }
+        Integer realProductionQty = originProductionQty - productionQty;
+        Integer actualQty = originHeightProductionQty + getMinProductionQty();
+        return realProductionQty < actualQty;
+    }
+
+    /**
      * 判断计划是否为续作Sku排产计划
      * 同规格同花纹或是同生胎
      *

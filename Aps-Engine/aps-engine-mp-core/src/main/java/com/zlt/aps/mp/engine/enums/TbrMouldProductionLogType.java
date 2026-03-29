@@ -69,6 +69,11 @@ public enum TbrMouldProductionLogType {
      * 20-01 开始分组(结构)排产
      */
     START_GROUP("20-01", "开始分组(结构)排产"),
+
+    /**
+     * 20-35 分组产能释放
+     */
+    GROUP_DEDUCTION_DAY("20-35", "分组产能释放"),
     /**
      * 20-02 获取排产版本计划数据
      */
@@ -140,7 +145,7 @@ public enum TbrMouldProductionLogType {
     /**
      * 20-44 特殊原材料结构排产
      */
-    SPECIAL_MATERIAL_GROUP_PRODUCTION("20-44","特殊原材料结构排产"),
+    SPECIAL_MATERIAL_GROUP_PRODUCTION("20-44", "特殊原材料结构排产"),
     /**
      * 20-25 结构提前收尾业务
      */
@@ -293,7 +298,7 @@ public enum TbrMouldProductionLogType {
     /**
      * 20-90 成型补量分配
      */
-    SUPPLEMENT_CX_MACHINE_DISTRIBUTION("20-90","成型补量分配"),
+    SUPPLEMENT_CX_MACHINE_DISTRIBUTION("20-90", "成型补量分配"),
     /**
      * 30-01-00 开始分组计划模具排产
      */
@@ -417,7 +422,7 @@ public enum TbrMouldProductionLogType {
     /**
      * 40-51 续作排产
      */
-    CONTINUE_SKU_PRODUCTION("40-51","续作排产"),
+    CONTINUE_SKU_PRODUCTION("40-51", "续作排产"),
     /**
      * 99 一键排产结束
      */
