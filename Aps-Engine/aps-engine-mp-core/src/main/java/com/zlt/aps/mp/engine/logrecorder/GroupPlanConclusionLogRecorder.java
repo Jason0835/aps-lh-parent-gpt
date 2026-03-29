@@ -89,4 +89,23 @@ public class GroupPlanConclusionLogRecorder {
         return logContent;
     }
 
+
+    /**
+     * 增加 成型机台没有分配信息错误，导致结构收尾业务错误 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 成型机台：%s 没有分配信息导致结构收尾业务无法继续进行错误 ====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组
+     * @param cxMachineCode 成型机台
+     * @return
+     */
+    public static String addCxMachineNoAllocationInfoLog(Context context, String groupName, String cxMachineCode) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 成型机台：%s 没有分配信息导致结构收尾业务无法继续进行错误 ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineCode);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_CONCLUSION, logContent);
+        return logContent;
+    }
+
 }
