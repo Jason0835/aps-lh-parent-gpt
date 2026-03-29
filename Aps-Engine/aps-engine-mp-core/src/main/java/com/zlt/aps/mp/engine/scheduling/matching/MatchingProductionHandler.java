@@ -422,50 +422,59 @@ public class MatchingProductionHandler {
             // 3、统计每一天所有可用模具
             List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext,
                     materialDesc, maxProductionQty, startDay, endDay);
-            // 4、遍历各模具可用列表，取出符合排产条件的日期以及模具
-            for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) {
-                Integer usedBeginDate = mouldDayUsed.getBeginDate();
-                Integer usedEndDate = mouldDayUsed.getEndDate();
-                // 4.1、检查SKU是否还有待排产的需求量，没有则结束本SKU的检查
-                Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
-                // 4.1.1、收尾前两天，如果是常销规格，即使需求量不足，也要尝试补满
-                boolean isBoost = this.checkIsBoost(productionContext, usedBeginDate, endDay, productionPlanList.get(0));
-                if (!isBoost && productionQty <= 0) { // 非实单或者非常销规格，只要余量不足就直接跳过
-                    break;
-                }
-                // 4.3、当天已经无法添加排产，跳过
-                MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
-                if (limitHelper == null || !limitHelper.isProduct()) {
-                    continue;
-                }
-                // 4.4、获取可以排产模具列表
-                List<ProductionMouldInfoVo> continueMouldList = this.getContinueMouldList(productionContext, groupInfo,
-                        materialDesc, mouldDayUsed, limitMap, productionQty, isBoost);
-                // 4.5、执行非首日续作排程算法
-                if (!CollectionUtils.isEmpty(continueMouldList)) {
-                    continueMouldList.stream().forEach(mould -> {
-                        if (this.checkMouldHasProductMaterial(mould, usedBeginDate, materialDesc)) { // 当天没有排产该规格，则当天的排产模具数+1
-                            limitHelper.setMouldQty(limitHelper.getMouldQty() + 1);
+            // 4、SKU外层循环，反复扫描该SKU搭配期间的每一天，只要一次扫描能搭配上任意一天，则再重新尝试扫描一次，知道无法搭配上后则结束外层循环
+            do {
+                int beginProductQty = newSkuQtyMap.getOrDefault(materialDesc, 0); // 记录内层循环开始时的搭配量
+                // 5、遍历各模具可用列表，取出符合排产条件的日期以及模具
+                for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) {
+                    Integer usedBeginDate = mouldDayUsed.getBeginDate();
+                    Integer usedEndDate = mouldDayUsed.getEndDate();
+                    // 5.1、检查SKU是否还有待排产的需求量，没有则结束本SKU的检查
+                    Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
+                    // 5.1.1、收尾前两天，如果是常销规格，即使需求量不足，也要尝试补满
+                    boolean isBoost = this.checkIsBoost(productionContext, usedBeginDate, endDay,
+                            productionPlanList.get(0));
+                    if (!isBoost && productionQty <= 0) { // 非实单或者非常销规格，只要余量不足就直接跳过
+                        break;
+                    }
+                    // 5.3、当天已经无法添加排产，跳过
+                    MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);
+                    if (limitHelper == null || !limitHelper.isProduct()) {
+                        continue;
+                    }
+                    // 5.4、获取可以排产模具列表
+                    List<ProductionMouldInfoVo> continueMouldList = this.getContinueMouldList(productionContext,
+                            groupInfo, materialDesc, mouldDayUsed, limitMap, productionQty, isBoost);
+                    // 5.5、执行非首日续作排程算法
+                    if (!CollectionUtils.isEmpty(continueMouldList)) {
+                        continueMouldList.stream().forEach(mould -> {
+                            if (this.checkMouldHasProductMaterial(mould, usedBeginDate, materialDesc)) { // 当天没有排产该规格，则当天的排产模具数+1
+                                limitHelper.setMouldQty(limitHelper.getMouldQty() + 1);
+                            }
+                        });
+                        // 5.5.1、获取实际日产量
+                        Integer realMaxProductionQty = this.getRealDayMaxProductionQty(productionContext, usedBeginDate,
+                                maxProductionQty);
+                        // 5.5.2、续做排产
+                        Integer totalProductionQty = this.matchingScheduleNextDayContinue(productionContext,
+                                materialDesc, newSkuQtyMap, groupInfo, productionPlanList, productionQty, isBoost,
+                                realMaxProductionQty, usedBeginDate, usedEndDate, continueMouldList);
+                        // 5.5.3、更新计划的剩余排产量
+                        this.updatePlanRemainQty(productionPlanList, totalProductionQty);
+                        productionQty = productionQty > totalProductionQty ? productionQty - totalProductionQty : 0;
+                        limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
+                        if (totalProductionQty > 0) {
+                            String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
+                            groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
                         }
-                    });
-
-                    // 4.5.1、获取实际日产量
-                    Integer realMaxProductionQty = this.getRealDayMaxProductionQty(productionContext, usedBeginDate, maxProductionQty);
-                    // 4.5.2、续做排程
-                    Integer totalProductionQty = this.matchingScheduleNextDayContinue(productionContext, materialDesc,
-                            newSkuQtyMap, groupInfo, productionPlanList, productionQty, isBoost, realMaxProductionQty, usedBeginDate,
-                            usedEndDate, continueMouldList);
-                    // 4.5.3、更新计划的剩余排产量
-                    this.updatePlanRemainQty(productionPlanList, totalProductionQty);
-                    productionQty = productionQty > totalProductionQty? productionQty - totalProductionQty: 0;
-                    limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
-                    if (totalProductionQty > 0) {
-                        String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
-                        groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
                     }
                 }
-            }
-
+                // 6、如果本轮循环没有更新搭配量，则说明SKU已经无法继续搭配，结束SKU外层循环
+                int newProductQty = newSkuQtyMap.getOrDefault(materialDesc, 0);
+                if (beginProductQty == newProductQty) {
+                    break;
+                }
+            } while (true);
         } while (true);
     }
 
