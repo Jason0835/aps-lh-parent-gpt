@@ -165,44 +165,6 @@ public class MatchingProductionHandler {
     }
     
     /**
-     * 获取下一个排产日
-     *
-     * @param contextDTO
-     * @param day
-     * @param beginDay
-     * @return
-     */
-    private Integer getNextDay(TbrProductionContext productionContext, int day, int endDay) {
-        Integer lastDay = 0;
-        for (int i = day + 1; i <= endDay; i++) {
-            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
-                lastDay = i;
-                break;
-            }
-        }
-        return lastDay;
-    }
-
-    /**
-     * 获取上一个排产日
-     *
-     * @param contextDTO
-     * @param day
-     * @param beginDay
-     * @return
-     */
-    private Integer getLastDay(TbrProductionContext productionContext, int day, int beginDay) {
-        Integer lastDay = 0;
-        for (int i = day - 1; i >= beginDay; i--) {
-            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
-                lastDay = i;
-                break;
-            }
-        }
-        return lastDay;
-    }
-    
-    /**
      * 搭配排产（主流程入口）
      *
      * @param context                      上下文
@@ -566,34 +528,44 @@ public class MatchingProductionHandler {
                 boolean hasProduct = this.checkMouldHasProductMaterial(mouldInfo, day, materialDesc); // 模具今天是否有生产该规格
                 // 2.2.1、如果没有排产该SKU,相当于要加模，需要判断排产参数、上一天模具是否已经收尾
                 if (!hasProduct) {
-                    // 2.2.1.1、排产参数校验
+                    // 1、排产参数校验
                     if (!this.checkProductParam(productionContext, productionPlanList, groupInfo, materialDesc, day, startDay, endDay)) {
                         break inner;
                     }
-                    // 2.2.1.2、最大模具数校验
+                    // 2、最大模具数校验
                     if (limitHelper.getMaxMouldQty() <= limitHelper.getMouldQty()) {
                         break inner;
                     }
-                    // 2.2.1.3、判断上一天该模具是否已经收尾
+                    // 3、判断上一天该模具是否已经收尾
                     MonthPlanProductionRequirePlanVo firstPlan = productionPlanList.get(0);
                     if (this.checkLastDayIsWrapUp(productionContext, groupInfo, mouldInfo, firstPlan, materialDesc, lastDay, startDay)) {
                         break inner;
                     }
-                    // 2.2.1.4、最大硫化机数校验
+                    // 4、最大硫化机数校验
                     if (!this.checkLhMachineCount(productionContext, groupInfo, day)) {
                         continue;
                     }
                 // 2.2.2、如果有排产该SKU,相当于要补模具的余量，需要模拟当天的排产，判断是否存在拼机台的情况，如果是拼机台可能会再加量后导致硫化机台数发生变化
                 } else {
-                    // 2.2.2.1、执行模拟排产
+                    // 1、执行模拟排产
                     MonthPlanProductionRequirePlanVo firstPlan = productionPlanList.get(0);
                     this.simulatedMould(productionContext, groupInfo, mouldInfo, firstPlan, day, endDay, productionQty, isBoost);
-                    // 2.2.2.2、判断排产结果是否出现硫化机台数超出限制
+                    // 2、判断排产结果是否出现硫化机台数超出限制
                     int maxLhMachineCount = groupInfo.getDayProductionLimitInfo().get(day).getMaxLhMachineCount();
                     int usedLhMachines = groupInfo.getDailyCapacityLimitVoMap().get(day).getUsedLhMachines();
-                    // 2.2.2.3、完成判断后重算当天的排产统计，防止后续使用有问题
+                    // 3、检查是否超总硫化机数量
+                    Integer allUsedLhMachines = productionContext.getGroupProductionInfo().values().stream()
+                            .map(g -> g.getDailyCapacityLimitVoMap().get(day)).filter(Objects::nonNull)
+                            .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
+                    Integer allMaxLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+                    // 4、完成判断后重算当天的排产统计，防止后续使用有问题
                     groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern());
+                    // 5、判断结构机台数
                     if (usedLhMachines > maxLhMachineCount) {
+                        break inner;
+                    }
+                    // 6、判断总机台数
+                    if (allUsedLhMachines > allMaxLhMachines) {
                         break inner;
                     }
                 }
@@ -2892,6 +2864,44 @@ public class MatchingProductionHandler {
         Integer lastDay = this.getLastDay(productionContext, day, 1);
         effectiveList.sort((m1, m2) -> this.usedMouldCompare(materialDesc, day, lastDay, m1, m2));
         return effectiveList;
+    }
+    
+    /**
+     * 获取下一个排产日
+     *
+     * @param contextDTO
+     * @param day
+     * @param beginDay
+     * @return
+     */
+    private Integer getNextDay(TbrProductionContext productionContext, int day, int endDay) {
+        Integer lastDay = 0;
+        for (int i = day + 1; i <= endDay; i++) {
+            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
+                lastDay = i;
+                break;
+            }
+        }
+        return lastDay;
+    }
+
+    /**
+     * 获取上一个排产日
+     *
+     * @param contextDTO
+     * @param day
+     * @param beginDay
+     * @return
+     */
+    private Integer getLastDay(TbrProductionContext productionContext, int day, int beginDay) {
+        Integer lastDay = 0;
+        for (int i = day - 1; i >= beginDay; i--) {
+            if (!productionContext.getStopDays().contains(i)) { // 下一天是排产日返回，否则跳过看下一天
+                lastDay = i;
+                break;
+            }
+        }
+        return lastDay;
     }
 
     /**
