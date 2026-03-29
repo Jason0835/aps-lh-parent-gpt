@@ -196,13 +196,13 @@ public class GroupPlanPrioritySelector {
         }
 
         //5、设置该成型机近1个月的排产分组和排产次数
-        sectionWidthList.forEach(groupPlan -> {
+        fixedGroupPlanList.forEach(groupPlan -> {
             groupPlan.setLastBoardingDate(BigDecimal.ZERO.intValue());
             groupPlan.setProductionCount(BigDecimal.ZERO.intValue());
             productionHistoryHandler.setCxMachineProductionGroupPlanHistory(context, groupPlan, cxMachineInfo);
         });
-        sectionWidthList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
-        selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+        fixedGroupPlanList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
+        selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
         log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.HISTORY_QUALITY_PRIORITY));
         return selected;
     }

@@ -118,7 +118,12 @@ public class ProductionPlanGroupInfo {
      * sandy+ 2026.3.28
      */
     private Integer diffStructureAndMachineDays;
-
+    /**
+     * 机台反选结构，实际可分配天数
+     * 20260329
+     * 只在机台反选场景使用，因不再产能覆盖，导致不能使用需求剩余天数
+     */
+    private Integer machineReverseAllocationDays;
     /**
      * 排产-成型硫化产能限制
      * 包含 最大胎胚数
@@ -643,11 +648,11 @@ public class ProductionPlanGroupInfo {
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         List<GroupPlanCxLhCapacityLimitHelper> hasAddContinueSkuList = dayLimitList.stream().filter(dayLimit -> {
             Integer day = dayLimit.getDay();
-            if(excludeDaySet.contains(day)){
+            if (excludeDaySet.contains(day)) {
                 return false;
             }
             MpDailyCapacityLimitVo dayUsedDetail = dailyCapacityLimitVoMap.get(day);
-            if(null == dayUsedDetail){
+            if (null == dayUsedDetail) {
                 return true;
             }
             Integer realUsedLhMachines = Optional.ofNullable(dayUsedDetail.getUsedLhMachines()).orElse(BigDecimal.ZERO.intValue());
@@ -1070,11 +1075,13 @@ public class ProductionPlanGroupInfo {
 
     /**
      * 结构需求与机台产能差异天数的绝对值
+     *
      * @return
      */
     public Integer getAbsDiffStructureAndMachineDays() {
         return Math.abs(diffStructureAndMachineDays);
     }
+
     /**
      * 获取剩余排产中高优先级的SKU个数
      *

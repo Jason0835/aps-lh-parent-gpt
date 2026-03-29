@@ -172,7 +172,8 @@ public class CxCapacityAllocationHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = allocationGroupPlan.getGroupName();
         Integer startDay = cxMachineInfo.getNextStartDay();
-        Integer leftOverDays = allocationGroupPlan.getLeftOverNeedAllocationDays();
+        //20260329 机台反选不再要求产能覆盖，故而不能直接取需求剩余天数allocationGroupPlan.getLeftOverNeedAllocationDays()
+        Integer leftOverDays = allocationGroupPlan.getMachineReverseAllocationDays();
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
         //20260209 特殊材料是否需要拉量或是舍弃
         CxMachineAllocationPlanHelper calculationAllocation = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, leftOverDays, startDay, context.getMonthDays());
@@ -561,6 +562,7 @@ public class CxCapacityAllocationHandler {
         }*/
         //结构需求与机台产能差异天数 sandy+ 2026.3.29
         groupPlan.setDiffStructureAndMachineDays(remainingNeedDays - realRemainingDays);
+        groupPlan.setMachineReverseAllocationDays(Math.min(remainingNeedDays, realRemainingDays));
         capacityCoverageMap.put(structureName, groupPlan);
     }
 
