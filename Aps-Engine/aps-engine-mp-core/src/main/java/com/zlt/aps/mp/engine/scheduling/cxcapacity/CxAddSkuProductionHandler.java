@@ -122,7 +122,7 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(leftOverHasProductionList, materialDesc);
+        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(leftOverHasProductionList, materialDesc, true);
         if (null == needProductionInfo) {
             //todo 记录日志
             return;
@@ -213,7 +213,7 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(productionPlanList, materialDesc);
+        SkuNeedProductionInfo needProductionInfo = getNeedProductionQty(productionPlanList, materialDesc, true);
         if (null == needProductionInfo) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoProductionQtyLog(context, groupName, cxMachineCode, materialDesc));
@@ -363,9 +363,10 @@ public class CxAddSkuProductionHandler {
      *
      * @param productionPlanList   分组排产计划(TBR-结构名)
      * @param selectedMaterialDesc 选中的Sku
+     * @param isAllSum             是否都一起排
      * @return
      */
-    private SkuNeedProductionInfo getNeedProductionQty(List<MonthPlanProductionRequirePlanVo> productionPlanList, String selectedMaterialDesc) {
+    private SkuNeedProductionInfo getNeedProductionQty(List<MonthPlanProductionRequirePlanVo> productionPlanList, String selectedMaterialDesc, boolean isAllSum) {
         if (CollectionUtils.isEmpty(productionPlanList) || StringUtils.isBlank(selectedMaterialDesc)) {
             return null;
         }
@@ -387,6 +388,10 @@ public class CxAddSkuProductionHandler {
         List<MonthPlanProductionRequirePlanVo> heightList = selectedPlanList.stream().filter(plan -> plan.getHeightProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
         //高优先级优先
         if (!CollectionUtils.isEmpty(heightList)) {
+            if (isAllSum) {
+                //20260329 只要挑选上来，就一起排
+                return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, selectedPlanList);
+            }
             return new SkuNeedProductionInfo(ProductionQtyModelEnum.HEIGHT_QTY, heightList);
         }
         return new SkuNeedProductionInfo(ProductionQtyModelEnum.NET_QTY, selectedPlanList);
