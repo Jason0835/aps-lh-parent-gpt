@@ -32,14 +32,19 @@ public interface ILhMachineInfoRemoteService {
      * 查询列表
      */
     @ApiOperation("查询列表")
-    @PostMapping("/info/list")
+    @PostMapping("/lhMachineInfo/list")
     TableDataInfo list(@RequestBody LhMachineInfo QueryVO);
+
+
+    @ApiOperation("查询列表")
+    @PostMapping("/lhMachineInfo/getList")
+    List<LhMachineInfo> getList(@RequestBody LhMachineInfo query);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
-    @PostMapping("/info/save")
+    @PostMapping("/lhMachineInfo/save")
     AjaxResult save(@RequestBody LhMachineInfo lhMachineInfo);
 
 
@@ -47,35 +52,35 @@ public interface ILhMachineInfoRemoteService {
      * 删除
      */
     @ApiOperation("删除")
-    @DeleteMapping("/info/remove")
+    @DeleteMapping("/lhMachineInfo/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/info/{id}")
+    @GetMapping(value = "/lhMachineInfo/{id}")
     LhMachineInfo getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
-    @PostMapping("/info/checkUnique")
+    @PostMapping("/lhMachineInfo/checkUnique")
     String checkUnique(@RequestBody LhMachineInfo lhMachineInfoVO);
 
     /**
      * 导出硫化机台信息列表
      */
     @ApiOperation("导出列表")
-    @PostMapping("/info/exportData/{fileName}")
+    @PostMapping("/lhMachineInfo/exportData/{fileName}")
     byte[] exportData(@RequestBody LhMachineInfo queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入硫化机台信息数据
      */
     @ApiOperation("导入硫化机台信息")
-    @PostMapping("/info/importData")
+    @PostMapping("/lhMachineInfo/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
 }
