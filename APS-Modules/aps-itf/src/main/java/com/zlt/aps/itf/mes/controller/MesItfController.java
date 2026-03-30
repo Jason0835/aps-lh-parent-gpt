@@ -515,4 +515,26 @@ public class MesItfController {
         String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
         return lhScheduleResultIssueService.issueLhScheduleResult(lhScheduleResultIssueList, factoryCode, companyCode);
     }
+
+    /**
+     * 模具交替计划下发到MES
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 结果
+     */
+    @ApiOperation("模具交替计划下发到MES")
+    @PostMapping("/issueMoldAlterPlan")
+    public AjaxResult issueMoldAlterPlan(@RequestBody List<MdmMoldAlterPlan> moldAlterPlanList) {
+        return mesItfService.issueMoldAlterPlan(moldAlterPlanList);
+    }
+
+    /**
+     * 同步模具交替计划完成回报
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具交替计划完成回报")
+    @PostMapping("/syncMoldAlterPlanFinish")
+    public AjaxResult syncMoldAlterPlanFinish(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncMoldAlterPlanFinish(syncDataLogs);
+    }
 }

@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.MoldAlterPlanIssue;
 import com.zlt.aps.mp.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -145,4 +146,20 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<MdmLhScheDayFinishQty> selectLhScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 插入模具交替计划到中间表
+     *
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 插入数量
+     */
+    int insertMoldAlterPlanList(@Param("list") List<MoldAlterPlanIssue> moldAlterPlanList);
+
+    /**
+     * 查询模具交替计划完成回报同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmMoldAlterPlanFinish> selectMoldAlterPlanFinishList(AuxReqSyncDataLogs syncDataLogs);
 }

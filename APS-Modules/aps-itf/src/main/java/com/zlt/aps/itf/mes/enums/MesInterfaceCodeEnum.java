@@ -110,6 +110,16 @@ public enum MesInterfaceCodeEnum {
      * 硫化排程日完成量同步
      */
     LH_SCHE_DAY_FINISH_QTY("LH_SCHE_DAY_FINISH_QTY", "mesItfService", "syncLhScheDayFinishQty", "硫化排程日完成量同步"),
+    
+    /**
+     * 模具交替计划下发
+     */
+    MOLD_ALTER_PLAN_ISSUE("MOLD_ALTER_PLAN_ISSUE", "mesItfService", "issueMoldAlterPlan", "模具交替计划下发"),
+
+    /**
+     * 模具交替计划完成回报
+     */
+    MOLD_ALTER_PLAN_FINISH("MOLD_ALTER_PLAN_FINISH", "mesItfService", "syncMoldAlterPlanFinish", "模具交替计划完成回报"),
     ;
 
     private final String code;
