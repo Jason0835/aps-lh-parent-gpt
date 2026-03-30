@@ -721,6 +721,21 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 延长一天收尾的处理
+     *
+     * @param newEndDay
+     */
+    public void timeExtensionOneDayConclusion(Integer newEndDay) {
+        if (null == newEndDay) {
+            return;
+        }
+        if (allocationDaySet.contains(newEndDay)) {
+            return;
+        }
+        allocationDaySet.add(newEndDay);
+    }
+
+    /**
      * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
      *
      * @param context         排产上下文

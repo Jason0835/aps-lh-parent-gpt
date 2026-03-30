@@ -39,18 +39,25 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class CxAddSkuProductionHandler {
-
+    /**
+     * 结构分配延长处理器
+     */
+    private final GroupTimeExtensionHandler groupTimeExtensionHandler;
+    /**
+     * 结构提前收尾处理器
+     */
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
     /**
      * 单分组计划-新增Sku模拟排产
      *
-     * @param structureName               分组
      * @param context                     排产上下文
      * @param groupPlanInfo               分组计划信息
+     * @param structureName               分组
+     * @param cxContinueInfo              续作信息对象
      * @param continueCxMachineAllocation 机台分配信息
      */
-    public void productionAddSkuBySingleGroup(String structureName, Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+    public void productionAddSkuBySingleGroup(Context context, ProductionPlanGroupInfo groupPlanInfo, String structureName, CxContinueInfoHelper cxContinueInfo, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
             log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
@@ -70,6 +77,9 @@ public class CxAddSkuProductionHandler {
         groupPlanInfo.setThisRoundCanProduction();
         //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
+
+        //20260303 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
+//        groupTimeExtensionHandler.handlerTimeExtension(this, context, structureName, cxContinueInfo, continueCxMachineAllocation);
         //设置收尾机台
         continueCxMachineAllocation.forEach(cxMachineAllocation -> {
             String cxMachineCode = cxMachineAllocation.getCxMachineCode();

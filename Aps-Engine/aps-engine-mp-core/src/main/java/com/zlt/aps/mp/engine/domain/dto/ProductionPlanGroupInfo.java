@@ -177,7 +177,7 @@ public class ProductionPlanGroupInfo {
     /**
      * 根据模具数计算的硫化机台数（用于特殊材料粗算天数）
      */
-    private Integer minLhMachineCountBymould;
+    private Integer minLhMachineCountByMould;
 
     /**
      * 构建初始化分组信息对象
@@ -244,7 +244,7 @@ public class ProductionPlanGroupInfo {
             mouldCodeSet.addAll(newMouldCodeSet);
         }
         // 模具数换算成硫化机台数
-        groupInfo.minLhMachineCountBymould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        groupInfo.minLhMachineCountByMould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
 
         return groupInfo;
     }
@@ -367,7 +367,7 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public Integer getThreshold() {
-        return Math.min(minLhMachineCount, minLhMachineCountBymould) * getDayCapacityBySingleLh();
+        return Math.min(minLhMachineCount, minLhMachineCountByMould) * getDayCapacityBySingleLh();
     }
 
     /**
@@ -377,7 +377,7 @@ public class ProductionPlanGroupInfo {
      * @return
      */
     public Integer getMaxThreshold() {
-        return Math.max(minLhMachineCount, minLhMachineCountBymould) * getDayCapacityBySingleLh();
+        return Math.max(minLhMachineCount, minLhMachineCountByMould) * getDayCapacityBySingleLh();
     }
 
     /**
@@ -553,6 +553,17 @@ public class ProductionPlanGroupInfo {
             isAllocationFinish = YesOrNoEnum.YES.getValue();
             leftOverNeedAllocationDays = BigDecimal.ZERO.intValue();
         }
+    }
+
+    /**
+     * 结构延长一天收尾的处理
+     * 将剩余分配天数 -1
+     */
+    public void timeExtensionOneDayConclusion(){
+        if (null == leftOverNeedAllocationDays) {
+            return;
+        }
+        leftOverNeedAllocationDays = leftOverNeedAllocationDays - BigDecimal.ONE.intValue();
     }
 
     /**

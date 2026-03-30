@@ -191,6 +191,22 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 延长收尾处理 +1
+     *
+     * @param newEndDay
+     */
+    public void timeExtensionOneDay(Integer newEndDay) {
+        if (null == newEndDay) {
+            return;
+        }
+        if (endDay >= newEndDay) {
+            return;
+        }
+        endDay = newEndDay;
+        allocationDay = allocationDay + BigDecimal.ONE.intValue();
+    }
+
+    /**
      * 更新分配天数，因特殊材料进行调整
      *
      * @param newAllocationDays 新的分配天数

@@ -623,7 +623,7 @@ public class TbrProductionContext extends Context {
         }
         // 保留一天作为换模日，其余天才满额生产
         Integer firstQty = this.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
-        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountBymould());
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountByMould());
         Integer otherDay = allocationDays - 1;
         BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
         BigDecimal otherDayProductionQty = BigDecimalUtils.multiply(otherDay, groupInfo.getThreshold()); // 其余日排产量

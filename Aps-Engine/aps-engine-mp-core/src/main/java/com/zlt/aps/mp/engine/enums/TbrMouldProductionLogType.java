@@ -155,6 +155,10 @@ public enum TbrMouldProductionLogType {
      */
     GROUP_CONCLUSION("20-25", "结构收尾业务"),
     /**
+     * 20-27 结构延长收尾业务
+     */
+    GROUP_TIME_EXTENSION_CONCLUSION("20-27", "结构延长收尾业务"),
+    /**
      * 20-26 日排产限制业务控制
      */
     DAY_LIMIT_CONTROL("20-26", "日排产限制业务控制"),

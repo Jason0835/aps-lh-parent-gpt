@@ -168,6 +168,7 @@ public class GroupPlanConclusionHandler {
 
     /**
      * 从分组计划分配的成型机台中，获取提前收尾，配比大的机台
+     * 场景：在机机构在产机台的排产，故而此时机台都是只有一个结构分配
      *
      * @param context       排产上下文
      * @param groupPlanInfo 分组
@@ -184,9 +185,13 @@ public class GroupPlanConclusionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MonthPlanStructureLhRatioVo> effectiveRatioList = new ArrayList<>();
         Map<MonthPlanStructureLhRatioVo, Set<String>> effectiveRationMap = new HashMap<>();
-        Map<String, CxMachineBaseInfoVo> cxMachineBaseInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         allCxMachineCodeSet.forEach(cxMachineCode -> {
-            MonthPlanStructureLhRatioVo findLhRatio = groupPlanInfo.getLhRatio(cxMachineBaseInfo.get(cxMachineCode));
+            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
+            if(null == cxMachineInfo){
+                return ;
+            }
+            MonthPlanStructureLhRatioVo findLhRatio = groupPlanInfo.getLhRatio(cxMachineInfo);
             if (null == findLhRatio) {
                 return;
             }
@@ -206,6 +211,6 @@ public class GroupPlanConclusionHandler {
         List<String> selectedCxMachineList = new ArrayList<>(effectiveRationMap.get(selectedLhRatio));
         Collections.sort(selectedCxMachineList);
         String selectedCxMachineCode = selectedCxMachineList.get(BigDecimal.ZERO.intValue());
-        return cxMachineBaseInfo.get(selectedCxMachineCode);
+        return allCxMachineInfo.get(selectedCxMachineCode);
     }
 }
