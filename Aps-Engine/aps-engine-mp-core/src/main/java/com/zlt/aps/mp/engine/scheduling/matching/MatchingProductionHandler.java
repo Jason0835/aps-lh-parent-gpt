@@ -659,7 +659,6 @@ public class MatchingProductionHandler {
         // 2、计算模具当天的剩余产能，大于0的才能排产
         Integer dayProductionQty = twoMouldList.stream().mapToInt(m -> this.sumMouldMaterialProductQty(m, day, materialDesc)).sum();
         Integer remainQty = dayVulcanizationQty > dayProductionQty? dayVulcanizationQty - dayProductionQty: 0; // 日硫化量 - 模具已排量
-        remainQty *= ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 需求量需要 * 2
         if (remainQty <= 0) {
             return;
         }
