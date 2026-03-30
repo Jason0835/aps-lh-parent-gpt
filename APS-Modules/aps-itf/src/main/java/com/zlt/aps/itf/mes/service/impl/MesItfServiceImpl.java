@@ -14,6 +14,7 @@ import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -1666,7 +1667,7 @@ public class MesItfServiceImpl implements MesItfService {
 
                     // 设置删除标识（0-正常，1-已删除）
                     if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(new Date());
+                        entity.setIsDelete(0);
                     }
 
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());

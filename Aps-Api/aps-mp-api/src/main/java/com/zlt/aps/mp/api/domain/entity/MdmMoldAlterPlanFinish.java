@@ -67,4 +67,8 @@ public class MdmMoldAlterPlanFinish extends BaseEntity implements Serializable {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
+    @ApiModelProperty(value = "删除标识")
+    @TableField(value = "IS_DELETE")
+    private Integer isDelete;
+
 }

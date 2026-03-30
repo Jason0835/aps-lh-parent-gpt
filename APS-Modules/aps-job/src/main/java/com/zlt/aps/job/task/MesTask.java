@@ -114,4 +114,12 @@ public class MesTask {
     public void syncLhScheDayFinishQty() {
         iMesItfService.syncLhScheDayFinishQty(new AuxReqSyncDataLogs());
     }
+
+    /**
+     * 同步模具交替计划完成回报
+     */
+    @ApiOperation("同步模具交替计划完成回报")
+    public void syncMoldAlterPlanFinish() {
+        iMesItfService.syncMoldAlterPlanFinish(new AuxReqSyncDataLogs());
+    }
 }
