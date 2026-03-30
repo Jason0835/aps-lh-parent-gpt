@@ -30,8 +30,11 @@
 
 <script>
 import { mapState } from "vuex";
+import {
+  saveDemandPlan,
 
-import {saveSpecialMaterialInfo} from "@/api/maindata/rawSpecialMaterial";
+} from "@/api/monthplan/demandPlan";
+
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
@@ -45,56 +48,48 @@ export default {
       editType: null,
       form: {},
       rules: {
-        factoryCode: [
+        orderPriority: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        materialCode: [
+        sapCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        materialDesc: [
+        embryoCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-
-        materialType: [
+        machineCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
+        lineType: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        quota: [
+        jobType: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
+            message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        rubberSpec: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
-        unit: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ]
       },
     };
   },
@@ -109,54 +104,63 @@ export default {
     },
     columns() {
       return [
+        // {
+        //     prop: "factoryCode",
+        //     label: this.$t("common.factory"),
+        //     type: "select",
+        //     disabled: true,
+        //     dictData: this.parentDict.type.biz_factory_name,
+        //   },
+
+        //   {
+        //     prop: "productType",
+        //     label: this.$t("ui.data.column.monthplan.productType"),
+        //     type: "select",
+        //     disabled: true,
+        //     dictData: this.parentDict.type.biz_product_type,
+        //   },
         {
-          label: this.$t("common.factory"),
-          prop: "factoryCode",
+          prop: "structureName",
+          disabled: true,
+          label: this.$t("ui.data.column.finishStock.structureName"),
+
+        },
+        {
+          prop: "structurePriority",
+          label: this.$t("结构优先"),
           type: "select",
-          dictData: this.parentDict.type.biz_factory_name,
+          dictData: this.parentDict.type.biz_yes_no,
         },
-        {
-          label: this.$t("ui.data.column.masterdata.materialType"),
-          prop: "materialType",
-          type: "select",
-          dictData: this.parentDict.type.biz_rawMaterial_type,
-        },
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.specialMaterial.materialCode"),
-          maxlength:30
-        },
-        {
-          prop: "materialDesc",
-          label: this.$t("物料名称"),
-          maxlength:100
-        },
-        {
-          prop: "rubberSpec",
-          label: this.$t("ui.data.specialMaterial.rubberSpec"),
-          maxlength:100
-        },
-        {
-          prop: "quota",
-          label: this.$t("ui.data.column.quota.quota"),
-          type: "number",
-          max:99999999
-        },
-        {
-          prop: "unit",
-          label: this.$t("common.unit"),
-          maxlength:10
-        },
-        {
-          prop: "partName",
-          label: this.$t("部件名称"),
-          maxlength: 100,
-        },
-        {
-          prop: "remark",
-          label: this.$t("common.remark"),
-          maxlength:300
-        },
+        // {
+        //   prop: "area",
+        //   label: this.$t("common.area"),
+        //   disabled: true,
+        // },
+        // {
+        //   prop: "salCode",
+        //   label: this.$t("ui.data.column.monthplan.salCode"),
+        //   disabled: true,
+        // },
+        // {
+        //   prop: "salNCode",
+        //   label: this.$t("ui.data.column.monthplan.salNCode"),
+        //   disabled: true,
+        // },
+        // {
+        //   prop: "natCode",
+        //   label: this.$t("ui.data.column.monthplan.natCode"),
+        //   disabled: true,
+        // },
+        // {
+        //   prop: "brand",
+        //   label: this.$t("common.brand"),
+        //   disabled: true,
+        // },
+
+        // {
+        //   prop: "备注",
+        //   label: this.$t("备注"),
+        // },
       ];
     },
   },
@@ -165,8 +169,11 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await saveSpecialMaterialInfo(params);
+        let obj = {
+          id: params.id,
+          structurePriority: params.structurePriority,
+        };
+        const res = await saveDemandPlan(obj);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -187,9 +194,9 @@ export default {
           ...data,
         };
       } else {
-        // this.form = {
-        //   factoryCode: "AH01",
-        // };
+        this.form = {
+          factoryCode: "",
+        };
       }
     },
     hide() {

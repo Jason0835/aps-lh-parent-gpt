@@ -373,7 +373,7 @@ export default {
         this.$set(this.form, "materialDesc", row.materialDesc);
         this.$set(this.form, "specifications", row.specifications);
         this.$set(this.form, "pattern", row.pattern);
-        this.$set(this.form, "embryoNo", row.embryoNo);
+        // this.$set(this.form, "embryoNo", row.embryoNo);
         this.$set(this.form, "textNo", row.textNo);
         this.$set(this.form, "lhNo", row.lhNo);
 
@@ -381,7 +381,7 @@ export default {
         this.$set(this.form, "materialDesc", "");
         this.$set(this.form, "specifications", '');
         this.$set(this.form, "pattern", '');
-        this.$set(this.form, "embryoNo",'');
+        // this.$set(this.form, "embryoNo",'');
         this.$set(this.form, "textNo", '');
         this.$set(this.form, "lhNo", '');
       }

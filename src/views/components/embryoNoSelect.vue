@@ -185,7 +185,7 @@ export default {
         pageNum: this.page.current,
         ...this.query,
         // userName: this.filterKey,
-        status: 0, //过滤，只显示启用的用户
+        // status: 0, //过滤，只显示启用的用户
       };
     },
     getTitle() {

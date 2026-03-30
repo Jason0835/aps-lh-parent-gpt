@@ -6,3 +6,10 @@ export function getMonthSurplusList(query) {
     data: query
   })
 }
+export function getVersionSelect(query) {
+  return request({
+    url: '/monthplan/mdmMonthSurplus/listRequireVersions',
+    method: 'post',
+    data: query
+  })
+}

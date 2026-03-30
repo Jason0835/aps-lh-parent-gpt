@@ -7,7 +7,7 @@ import request, {downloadLink} from '@/utils/request'
  */
 export function listMachine(query) {
   return request({
-    url: '/lh/info/list',
+    url: '/lh/lhMachineInfo/list',
     method: 'post',
     data: query
   })
@@ -20,14 +20,14 @@ export function listMachine(query) {
  */
 export function editMachine(query) {
   return request({
-    url: '/lh/info/save',
+    url: '/lh/lhMachineInfo/save',
     method: 'post',
     data: query
   })
 }
 export function checkMachineCodeUnique(query) {
   return request({
-    url: '/lh/info/checkMachineCodeUnique',
+    url: '/lh/lhMachineInfo/checkMachineCodeUnique',
     method: 'post',
     data: query
   })
@@ -40,7 +40,7 @@ export function checkMachineCodeUnique(query) {
  */
 export function removeMachine(query) {
   return request({
-    url: '/lh/info/remove',
+    url: '/lh/lhMachineInfo/remove',
     method: 'post',
     data: query
   })
@@ -52,6 +52,6 @@ export function removeMachine(query) {
  * @returns
  */
 export function exportData(params) {
-  return downloadLink("/lh/info/export", params);
+  return downloadLink("/lh/lhMachineInfo/export", params);
 }
 

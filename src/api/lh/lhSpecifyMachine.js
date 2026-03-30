@@ -22,3 +22,10 @@ export function editLhSpecifyMachine(query) {
     data: query
   })
 }
+export function getLhMachineList(query) {
+  return request({
+    url: '/lh/lhSpecifyMachine/getMachineList',
+    method: 'post',
+    params: query
+  })
+}

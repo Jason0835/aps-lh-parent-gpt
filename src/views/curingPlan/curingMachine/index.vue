@@ -55,8 +55,8 @@
     <tlt-upload-form
       ref="tltUploadForm"
       title=""
-      downloadUrl="/lh/info/importTemplate"
-      uploadUrl="/lh/info/importData"
+      downloadUrl="/lh/lhMachineInfo/importTemplate"
+      uploadUrl="/lh/lhMachineInfo/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"

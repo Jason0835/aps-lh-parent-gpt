@@ -2179,6 +2179,17 @@
   "ui.data.column.scheduleAdjust.oriCxClass4PlanQty": "次日晚班",
   "ui.data.column.scheduleAdjust.oriCxClass5PlanQty": "次日早班",
   "ui.data.column.scheduleAdjust.newCx": "成型联动后计划",
-  "ui.data.column.scheduleAdjust.isConfirm": "是否确认"
+  "ui.data.column.scheduleAdjust.isConfirm": "是否确认",
+  "ui.data.column.lhSpecifyMachine.modelName": "硫化机规格机台关系",
+  "ui.data.column.lhSpecifyMachine.specCode": "物料编码",
+  "ui.data.column.lhSpecifyMachine.machineCode": "机台编号",
+  "ui.data.column.lhSpecifyMachine.lineType": "线路类型",
+  "ui.data.column.lhSpecifyMachine.jobType": "作业类型",
+  "ui.data.column.lhSpecifyMachine.checkUnique": "已经存在相同物料编码、机台编号的数据",
+  "ui.lh.lhSpecifyMachine.export.fileName": "硫化定点机台",
+  "ui.lh.lhSpecifyMachine.UniqueCheck": "存在相同SAP编号和机台名称的记录！",
+  "ui.alert.lhSpecifyMachine.machineCodeNotExist": "未找到对应的硫化机编号！",
+  "ui.data.column.createBy": "创建人",
+  "ui.data.column.createTime": "创建时间"
 
 }

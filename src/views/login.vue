@@ -82,7 +82,7 @@
     </el-form>
     <!--  底部  -->
     <div class="el-login-footer">
-      <span>Copyright © 2018-2022 Teletom All Rights Reserved.</span>
+      <span>Copyright © 2026-2030 Teletom All Rights Reserved.</span>
     </div>
   </div>
 </template>

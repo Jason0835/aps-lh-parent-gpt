@@ -20,6 +20,13 @@
     >
       <template slot="header">
         <el-button
+          :disabled="selection.length != 1"
+          type="primary"
+             v-hasPermi="['monthplan:demandPlan:edit']"
+          @click="handleEdit(selection[0])"
+          >{{ $t("结构优先") }}
+        </el-button>
+        <el-button
           type="primary"
           :loading="createLoading"
           plain
@@ -102,6 +109,7 @@
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getListResize" />
+    <editDialog ref="editRef" @success="getListResize" />
     <el-dialog
       :title="title"
       :visible="visible"
@@ -147,6 +155,7 @@ import {
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoForm from "@/views/components/infoForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+import editDialog from "./components/editDialog.vue";
 
 export default {
   name: "DemandPlan",
@@ -154,6 +163,7 @@ export default {
     tltUpload,
     infoForm,
     infoDialog,
+    editDialog
   },
   dicts: [
     "biz_factory_name",
@@ -227,7 +237,7 @@ export default {
     ...mapGetters("globalList", ["structureList"]),
     columns() {
       let columns = [
-        // { type: "selection", fixed: "left" },
+        { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
@@ -273,7 +283,7 @@ export default {
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          label: this.$t("物料优先"),
           // width:120,
           // formatter: (row, column, value) => {
           //   return this.selectDictLabel(this.dict.type.biz_order_type, value);
@@ -309,6 +319,16 @@ export default {
             );
           },
         },
+        {
+          prop: "structurePriority",
+          label: this.$t("结构优先"),
+          width:120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
+
+        },
+
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
@@ -615,7 +635,13 @@ export default {
         },
         {
           prop: "scmPriority",
-          label: this.$t("ui.data.column.monthplan.scmPriority"),
+          label: this.$t("物料优先"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
+        {
+          prop: "structurePriority",
+          label: this.$t("结构优先"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
@@ -804,8 +830,8 @@ export default {
       }
     },
     handleEdit(row) {
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(row);
+      if (this.$refs.editRef) {
+        this.$refs.editRef.show(row);
       }
     },
     handleDelete(rows) {

@@ -54,7 +54,6 @@ export default {
     multiple: {
       type: Boolean,
       default: false,
-
     },
     oldList: Array | [],
   },
@@ -186,44 +185,48 @@ export default {
 
   methods: {
     async getList(isFirst = false) {
-
       try {
         this.loading = true;
-        const data = await listProductinfo(this.formatParams());
-        this.data = data.rows;
-        this.page.total = data.total;
-        let that=this
-        if (isFirst) {
-          if (this.multiple) {
-            let topItems = [];
-            if(this.oldList){
-              let res=await listProductinfo({materialCodes:this.oldList})
-              topItems=res.rows
-            }
 
-            // console.log(that.oldList)
-            // let setList = this.oldList.split(",");
-            // data.rows.forEach((item) => {
-            //   if (setList.includes(item.materialCode)) {
-            //     topItems.push(item);
-            //   }
-            // });
-            this.$nextTick(() => {
-              const tableRef = this.$refs.tableRef.getTableRef();
-              topItems.forEach((item) => {
-                // 使用toggleRowSelection方法选中行
-                tableRef.toggleRowSelection(item, true);
-              });
-            });
+        let that = this;
+        if (isFirst && this.multiple) {
+          // if (this.multiple) {
+          let topItems = [];
+          if (this.oldList) {
+            let res = await listProductinfo({ materialCodes: this.oldList });
+            topItems = res.rows;
           }
+
+          this.$nextTick(() => {
+            const tableRef = this.$refs.tableRef.getTableRef();
+            topItems.forEach((item) => {
+              tableRef.toggleRowSelection(item, true);
+            });
+            this.getFirstList();
+          });
+          // }
+        } else {
+          const data = await listProductinfo(this.formatParams());
+          this.data = data.rows;
+          this.page.total = data.total;
+          this.loading = false;
         }
       } catch (error) {
         console.log(error);
       } finally {
+
+      }
+    },
+    async getFirstList() {
+      try {
+        const data = await listProductinfo(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
+      } catch (err) {}
+      finally{
         this.loading = false;
       }
     },
-
     //
     formatParams() {
       return {

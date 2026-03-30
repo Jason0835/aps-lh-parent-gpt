@@ -259,7 +259,7 @@ service.interceptors.response.use(
       if (res.config.url.indexOf('/monthplan/supplyOrderPool/checkOverdue') != -1) {
         return Promise.reject(msg)
       } else {
-        Message({ message: msg, type: 'error' ,dangerouslyUseHTMLString:true})
+        Message({ message: msg, type: 'error' , duration: 5 * 1000,dangerouslyUseHTMLString:true})
         return Promise.reject(new Error(msg))
       }
 
