@@ -28,10 +28,6 @@ public class MdmMoldAlterPlan extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
-
     @ApiModelProperty(value = "硫化批次号")
     @TableField(value = "LH_BATCH_NO")
     private String lhBatchNo;
@@ -111,9 +107,5 @@ public class MdmMoldAlterPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "厂别")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    @ApiModelProperty(value = "删除标识")
-    @TableField(value = "IS_DELETE")
-    private BigDecimal isDelete;
 
 }
