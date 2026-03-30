@@ -23,6 +23,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -46,8 +48,10 @@ import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
@@ -434,38 +438,29 @@ public class MatchingAdjuestProductionHandler {
                     if (!this.checkDayCanProduct(contextDTO, day)) {
                         continue;
                     }
-                    this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 先重算产能占用
-                    // 5.2.2、检查模具是否有产能余量
+                    // 5.2.2、排产参数校验
+                    if (!this.checkFactoryParams(contextDTO, plan, day, safeList)) {
+                        continue;
+                    }
+                    // 5.2.3、产能校验
                     MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
                     Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, plan, capacity, day, beginDay, dayProductionMap, dailyCapacityLimitMap); // 获取模具剩余产能
-                    // 如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
+                    // 5.2.3.1、如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
                     if (mouldRemaindCapacity <= 0
                             && dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) {
                         continue;
                     }
-                    // 5.2.3、检查胎胚数是否满足条件
-                    if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
-                        Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
-                        if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
-                            continue;
-                        }
-                    }
-                    // 5.2.4、检查当天搭配是否会导致二次上机
-                    if (!this.checkSecOnlineAdjuest(contextDTO, plan, day)) {
-                        continue;
-                    }
-                    // 5.2.5、检查补量是否会超过硫化机数量超限制
+                    // 5.2.3.2、检查补量是否会超过硫化机数量超限制
                     if (!this.checkOverMachineCountLimit(contextDTO, plan, mouldRemaindCapacity, day, safeList)) {
                         continue;
                     }
                     
-                    // 5.2.6、为当天分配搭配量
+                    // 5.2.4、为当天分配搭配量
                     int allocationQty = this.allcatAdjustProductQty(contextDTO, day, beginDay, endDay, plan, safeList,
                             dayProductionMap, unAllocationQty, capacity, dailyCapacityLimitMap, mouldRemaindCapacity, isCheckContinue);
                     if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
                         producedQty += allocationQty;
                         unAllocationQty -= allocationQty;
-                        this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 有搭配，则再次重算产能占用
                     }
                 }
                 // 5.3、如果本轮循环没有搭配量，则说明SKU已经无法继续搭配，结束SKU外层循环
@@ -486,6 +481,39 @@ public class MatchingAdjuestProductionHandler {
     }
 
     /**
+     * 排产参数校验
+     * 
+     * @param contextDTO 上下文
+     * @param plan       调整计划
+     * @param day        调整日
+     * @param safeList   调整计划列表
+     * @return
+     */
+    private boolean checkFactoryParams(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan, int day,
+                                       List<FactoryMonthPlanFinalAdjustVo> safeList) {
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
+        this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 先重算产能占用
+        MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
+        // 1、检查胎胚数是否满足条件
+        if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
+            Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
+            if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
+                return false;
+            }
+        }
+        // 2、检查当天搭配是否会导致二次上机
+        if (!this.checkSecOnlineAdjuest(contextDTO, plan, day)) {
+            return false;
+        }
+        // 3、外销贴牌总量限制
+        if (contextDTO.getOemBrandConfigSet().contains(plan.getBrand())
+                && intValue(dailyCapacityLimitVo.getRemainOemQty()) < 0) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * 检查是否超过机台产能
      * 
      * @param contextDTO 上下文
@@ -495,12 +523,14 @@ public class MatchingAdjuestProductionHandler {
      * @param planList   调整计划列表
      * @return
      */
-    private boolean checkOverMachineCountLimit(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan, Integer addQty,
-                              int day, List<FactoryMonthPlanFinalAdjustVo> planList) {
+    private boolean checkOverMachineCountLimit(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
+                                               Integer addQty, int day, List<FactoryMonthPlanFinalAdjustVo> planList) {
         if (addQty <= 0) {
             return true;
         }
+
         MpDailyCapacityLimitVo dailyCapacityLimitVo = contextDTO.getDailyCapacityLimitVoMap().get(day);
+        Integer oldUsedLhMachines = dailyCapacityLimitVo.getUsedLhMachines(); // 保存加量前的硫化机数量
         // 1、尝试加上量后计算产能占用情况
         String dayFieldName = FactoryConstant.DAY_FIELD + day;
         Integer oldValue = intValue(plan.getFieldValueByFieldName(dayFieldName));
@@ -512,7 +542,15 @@ public class MatchingAdjuestProductionHandler {
         // 3、还原数据
         plan.setFieldValueByFieldName(dayFieldName, oldValue);
         this.reCalcAdjustDailyCapacityLimit(contextDTO, planList, plan, day); // 先把量加上尝试计算
-        return maxLhMachines >= usedLhMachines;
+        // 4、校验增加机台数会导致超过限制的，不能搭配
+        if (maxLhMachines < usedLhMachines) {
+            return false;
+        }
+        // 5、校验增加的机台数少于剩余硫化机数，不能搭配
+        if (usedLhMachines - oldUsedLhMachines > dailyCapacityLimitVo.getRemainLhMachines()) {
+            return false; 
+        }
+        return true;
     }
 
     /**
@@ -1125,7 +1163,11 @@ public class MatchingAdjuestProductionHandler {
             if (!this.checkMouldSatisfy(dailyCapacityLimitVo, mouldCavityQty)) {
                 return 0;
             }
-            // 2、当天满足上机条件按，但是下一天不满足上机条件的，也不允许上机
+            // 2、如果需要换模具，不能超过换模次数限制
+            if (dailyCapacityLimitVo.getUsedChangeMould() >= dailyCapacityLimitVo.getMaxDayChangeMould()) {
+                return 0;
+            }
+            // 3、当天满足上机条件按，但是下一天不满足上机条件的，也不允许上机
             boolean isOk = this.checkNextDayCanContinueProduct(contextDTO, plan, scheduleDay, endDay, mpProdFinalList,
                     unAllocationQty, dailyCapacityLimitMap);
 
@@ -1192,6 +1234,13 @@ public class MatchingAdjuestProductionHandler {
                 dailyCapacityLimitVo.setUsedEmbryoTypes(embryoCodes.size());
             }
         }
+        
+        // 更新剩余硫化机台数
+        Integer oldLhMachines = dailyCapacityLimitVo.getUsedLhMachines();
+        this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, scheduleDay); // 有搭配，则再次重算产能占用
+        Integer newLhMachines = dailyCapacityLimitVo.getUsedLhMachines();
+        dailyCapacityLimitVo.setRemainLhMachines(safeAdd(dailyCapacityLimitVo.getRemainChangeMould(), oldLhMachines - newLhMachines)); // 使用机台如果有增加则剩余机台数会减少
+        
         String scheduleName = isCheckContinue? "补量": "增模";
         String logDetail = String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,scheduleName,allocationQty);
         log.debug(logDetail);
