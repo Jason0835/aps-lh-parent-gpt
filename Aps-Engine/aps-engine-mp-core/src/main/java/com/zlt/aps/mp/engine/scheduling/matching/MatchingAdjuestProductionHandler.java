@@ -1135,7 +1135,7 @@ public class MatchingAdjuestProductionHandler {
         // 判断当天成型硫化比是否已经满足条件
         List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
         // 统计当天的已排量，判断不能超过最大排产量限制
-        if (this.checkRemainDayTotalCapacity(contextDTO, dailyCapacityLimitVo, scheduleDay)) {
+        if (!this.checkRemainDayTotalCapacity(contextDTO, dailyCapacityLimitVo, scheduleDay)) {
             return 0;
         }
         Integer lastDay = this.getLastDay(contextDTO, scheduleDay, beginDay);
@@ -1294,7 +1294,7 @@ public class MatchingAdjuestProductionHandler {
             return false;
         }
         // 5、下一天的总剩余产能不足时，不搭配
-        if (this.checkRemainDayTotalCapacity(contextDTO, nextDailyCapacityLimitVo, nextDay)) {
+        if (!this.checkRemainDayTotalCapacity(contextDTO, nextDailyCapacityLimitVo, nextDay)) {
             return false;
         }
         return true;
