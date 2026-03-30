@@ -649,6 +649,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(monthPlanStatisticsList)){
             return;
         }
+
         List<String> structureNameList = monthPlanStatisticsList.stream().filter(x->x != null && !StringUtil.isEmptyWithTrim(x.getStructureName()))
                 .map(x->x.getStructureName()).collect(Collectors.toList());
         if (PubUtil.isEmpty(structureNameList)){
