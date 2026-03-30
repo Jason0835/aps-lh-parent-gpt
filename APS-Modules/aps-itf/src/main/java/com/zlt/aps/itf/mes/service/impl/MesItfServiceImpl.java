@@ -1696,6 +1696,7 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
         List<MdmOutbountOrdersNotScan> orderList = this.getOutbountOrdersNotScan(outbountOrdersNotScan);
         try {
             DynamicDataSourceContextHolder.push(DataSource.APS);

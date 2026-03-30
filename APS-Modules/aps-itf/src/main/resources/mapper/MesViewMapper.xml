@@ -76,33 +76,22 @@
 
     <select id="selectOutbountOrdersNotScan" resultType="com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan">
         SELECT
-            ID,
-            SALE_BILL_NO,
-            SALE_ORDER_NO,
-            SALE_ORG,
-            SALE_ORG_NAME,
-            SELL_TO,
-            BILL_ID,
-            MATERIAL_CODE,
-            SAP_CODE,
-            MATERIAL_NAME,
-            DOT,
-            SCAN_AMOUNT,
-            OUT_AMOUNT,
-            NOSCAN_AMOUNT,
-            SALE_ITEM_NO,
-            COMPANY_CODE,
-            FACTORY_CODE,
-            DATA_VERSION,
-            CREATE_BY,
-            CREATE_TIME,
-            UPDATE_BY,
-            UPDATE_TIME,
-            IS_DELETE,
-            REMARK
-        FROM T_MDM_OUTBOUNT_ORDERS_NOT_SCAN
+        SALE_BILL_NO,
+        SALE_ORDER_NO,
+        SALE_ORG,
+        SALE_ORG_NAME,
+        SELL_TO,
+        BILL_ID,
+        MATERIAL_CODE,
+        SAP_CODE,
+        MATERIAL_NAME,
+        DOT,
+        SCAN_AMOUNT,
+        OUT_AMOUNT,
+        NOSCAN_AMOUNT,
+        SALE_ITEM_NO
+        FROM VW_PSM_OUT_STOCK_UNSCAN
         WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>
         <if test="saleBillNo != null and saleBillNo != ''">AND SALE_BILL_NO = #{saleBillNo}</if>
         <if test="billId != null and billId != ''">AND BILL_ID = #{billId}</if>

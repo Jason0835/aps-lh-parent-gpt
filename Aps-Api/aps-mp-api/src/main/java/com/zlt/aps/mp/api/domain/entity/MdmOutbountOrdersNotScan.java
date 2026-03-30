@@ -75,7 +75,7 @@ public class MdmOutbountOrdersNotScan extends BaseEntity {
 
     @ApiModelProperty(value = "SCM行内码", name = "saleItemNo")
     @TableField(value = "SALE_ITEM_NO")
-    private BigDecimal saleItemNo;
+    private String saleItemNo;
 
     @ApiModelProperty(value = "分公司", name = "companyCode")
     @TableField(value = "COMPANY_CODE")
