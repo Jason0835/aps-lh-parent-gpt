@@ -228,11 +228,28 @@ public class ProductionCxMachineCalculationHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        List<CxMachineBaseInfoVo> cxMachineBaseInfoVoList = allCxMachineMap.values().stream().collect(Collectors.toList());
+
+        List<CxMachineBaseInfoVo> onlineMachineList = new ArrayList<>();
         List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
         productionCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
+
+            onlineMachineList.add(cxMachineInfo);
+        });
+
+        //设置机台固定信息(优先级、英寸种类数)
+        onlineMachineList.stream().forEach(cxMachineInfo -> {
+            cxMachineInfo.setFixedPriority(cxMachineInfo.getFixedPriorityValue(groupPlanInfo));
+            cxMachineInfo.setFixedProSizeTypes(cxMachineInfo.getAllFixedProSizeTypes());
+        });
+
+        //根据分配信息，优先释放通用性好的（固定结构优先级差的、固定结构种类数多的） sandy+ 2026.3.26
+        onlineMachineList.sort(Comparator.comparing(CxMachineBaseInfoVo::getFixedPriority,Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getFixedProSizeTypes,Comparator.nullsLast(Comparator.naturalOrder())));
+        onlineMachineList.forEach(cxMachineInfo ->{
             Integer allocationDays = cxMachineInfo.getMaxProductionDays();
-            allocationList.add(buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineCode, allocationDays));
+            allocationList.add(buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineInfo.getCxMachineCode(), allocationDays));
         });
         return allocationList;
     }
@@ -433,14 +450,16 @@ public class ProductionCxMachineCalculationHandler {
         if (null == initReleaseInfo) {
             return cxCapacityInfoList;
         }
+        //根据分配信息，优先释放通用性好的（固定结构优先级差的、固定结构种类数多的），配比大的，成型编号大的 sandy+ 2026.3.26
+        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getFixedPriority,Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getFixedProSizeTypes,Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount,Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode,Comparator.nullsLast(Comparator.reverseOrder())));
+
         Integer releaseCount = initReleaseInfo.getReleaseMachineCount();
         if (releaseCount <= BigDecimal.ZERO.intValue()) {
             return cxCapacityInfoList;
         }
-        //根据分配信息，优先释放通用性好的（固定结构多的），配比大的，成型编号大的 sandy+ 2026.3.26
-        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getFixStructureCount,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode,Comparator.nullsLast(Comparator.reverseOrder())));
         Integer minAllocationDays = initReleaseInfo.getEarliestConclusionDay();
         //月初就可释放，则直接释放对应
         if (ProductionConstant.MONTH_START_DAY.equals(minAllocationDays)) {
