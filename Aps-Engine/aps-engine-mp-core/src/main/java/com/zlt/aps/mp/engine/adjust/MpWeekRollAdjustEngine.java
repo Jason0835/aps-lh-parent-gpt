@@ -175,7 +175,7 @@ public class MpWeekRollAdjustEngine {
      * @param contextDTO
      * @param dailyCapacityLimitVoMap
      */
-    private void initDayProductionInfo(MpRollAdjustContextDTO contextDTO,Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap){
+    public void initDayProductionInfo(MpRollAdjustContextDTO contextDTO,Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap){
         Map<Integer, MdmWorkCalendar> workCalendarMap = contextDTO.getWorkCalendarMap();
         if (PubUtil.isEmpty(dailyCapacityLimitVoMap) || PubUtil.isEmpty(workCalendarMap)){
             return;
