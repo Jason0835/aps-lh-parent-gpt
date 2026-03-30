@@ -159,6 +159,7 @@ export default {
         });
       } else {
         let setList = this.oldList.split(",");
+        console.log("setList", setList);
         list.forEach((item) => {
           if (setList.includes(item.structureName)) {
             topItems.push(item);
@@ -167,6 +168,7 @@ export default {
           }
         });
       }
+      console.log("topItems", topItems);
 
       // 2. 合并数据：置顶的数据在前，普通数据在后
       //    如果需要按topIdList的顺序置顶，可以进一步排序
