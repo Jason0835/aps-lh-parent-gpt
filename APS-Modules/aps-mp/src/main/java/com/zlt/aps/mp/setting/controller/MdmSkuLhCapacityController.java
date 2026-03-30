@@ -184,5 +184,15 @@ public class MdmSkuLhCapacityController extends AbstractDocBizController<MdmSkuL
         return "MDM0135";
     }
 
+    /**
+     * 倒算班产，返回计算后的班产
+     */
+    @Log(title = "ui.data.column.mdmSkuLhCapacity.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("倒算班产，返回计算后的班产")
+    @PostMapping("/getClassCapacity")
+    public AjaxResult getClassCapacity(@RequestBody MdmSkuLhCapacity billVO) {
+        mdmSkuLhCapacityService.setClassCapacity(billVO);
+        return AjaxResult.success(billVO);
+    }
 
 }

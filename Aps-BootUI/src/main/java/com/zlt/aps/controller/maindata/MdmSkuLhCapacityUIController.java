@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.maindata;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -8,30 +9,22 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.service.IMdmSkuLhCapacityRemoteService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-import org.apache.commons.io.IOUtils;
-
-import java.util.Arrays;
-import java.io.IOException;
-import java.io.ByteArrayInputStream;
-
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -201,5 +194,15 @@ public class MdmSkuLhCapacityUIController extends BaseUIController<MdmSkuLhCapac
         context.setFileBytes(data);
         AjaxResult ajaxResult = iMdmSkuLhCapacityService.importData(context,updateSupport);
         return ajaxResult;
+    }
+
+    /**
+     * 倒算班产，返回计算后的班产
+     */
+    @ApiOperation("倒算班产，返回计算后的班产")
+    @PostMapping("/getClassCapacity")
+    @ResponseBody
+    public AjaxResult getClassCapacity(MdmSkuLhCapacity billVO) {
+        return iMdmSkuLhCapacityService.getClassCapacity(billVO);
     }
 }

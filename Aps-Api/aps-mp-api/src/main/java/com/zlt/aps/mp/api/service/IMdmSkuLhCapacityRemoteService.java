@@ -2,13 +2,14 @@ package com.zlt.aps.mp.api.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
-import org.springframework.cloud.openfeign.FeignClient;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 
 
 /**
@@ -77,4 +78,10 @@ public interface IMdmSkuLhCapacityRemoteService {
     @PostMapping("/mdmSkuLhCapacity/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 倒算班产，返回计算后的班产
+     */
+    @ApiOperation("倒算班产，返回计算后的班产")
+    @PostMapping("/mdmSkuLhCapacity/getClassCapacity")
+    public AjaxResult getClassCapacity(@RequestBody MdmSkuLhCapacity billVO);
 }

@@ -149,6 +149,8 @@ public class MdmSkuLhCapacityServiceImpl extends AbstractDocService<MdmSkuLhCapa
         if (standardCapacity != null && paramValue != 0) {
             BigDecimal result = new BigDecimal(standardCapacity).divide(new BigDecimal(paramValue), RoundingMode.UP);
             billVO.setClassCapacity(result.intValue());
+        } else {
+            billVO.setClassCapacity(0);
         }
     }
 
