@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.logrecorder;
 
+import com.alibaba.fastjson.JSON;
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
@@ -29,9 +31,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addStartCxMachineMouldProductionPlanLog(Context context, String cxMachineCode, String groupName) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s 成型机台：%s，结构：%s 开始进行模具排产====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                cxMachineCode, groupName);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), cxMachineCode, groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.START_CX_MACHINE_GROUP_MOULD_PRODUCTION, logContent);
         return logContent;
@@ -64,9 +64,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupContinueCxMachineNoPlanLog(Context context, String groupName, String onLineMachineInfo) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有计划====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_PLAN_EMPTY, logContent);
         return logContent;
@@ -83,9 +81,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupContinueCxMachineNoProductionPlanLog(Context context, String groupName, String onLineMachineInfo) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有待排产计划====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_PRODUCTION_PLAN_EMPTY, logContent);
         return logContent;
@@ -104,11 +100,33 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupContinueSkuNoLhGroupLog(Context context, ProductionStageEnum productionStage, String groupName, String onLineMachineInfo, ContinueTypeEnum continueType) {
         String logContentFormat = " =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s  没有找到续作Sku收尾的硫化组，无需%s排产====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, continueType.getDesc());
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, continueType.getDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加在机结构续作Sku收尾机台日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s  最早收尾的硫化：%s~%s====
+     *
+     * @param context           排程上下文
+     * @param productionStage   排产阶段
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param continueType      排产类型
+     * @param closingDay        收尾时间点
+     * @param endDay            结构收尾点
+     * @return
+     */
+    public static String addContinueSkuEarliestConclusionLhGroupLog(Context context, ProductionStageEnum productionStage, String groupName, String onLineMachineInfo, ContinueTypeEnum continueType, Integer closingDay, Integer endDay) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s-%s %s 最早收尾的硫化：%s~%s====";
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(),
+                context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, productionStage.getStageDesc(), continueType.getDesc(),
+                closingDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_SKU_PRODUCTION, logContent);
         return logContent;
     }
 
@@ -123,9 +141,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupContinueCxMachineNoLhGroupLog(Context context, String groupName, String onLineMachineInfo) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到待待硫化组====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP, logContent);
         return logContent;
@@ -144,11 +160,28 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupContinueCxMachineLhGroupRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 排产硫化组%s~%s====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, startDay, endDay);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, startDay, endDay);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加获取结构排产硫化组排产日访问日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param startDay          开始日
+     * @param endDay            结束日
+     * @return
+     */
+    public static String addGroupFindLhMachineRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====";
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, startDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_FIND_LH_MACHINE_RANGE, logContent);
         return logContent;
     }
 
@@ -165,9 +198,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupContinueMachineCorrectLhGroupRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 排产硫化组修正后排产日范围：%s~%s====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, startDay, endDay);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, startDay, endDay);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE, logContent);
         return logContent;
@@ -185,9 +216,25 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueGroupLhGroupFindSkuLog(Context context, String groupName, String onLineMachineInfo, String materialDesc) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 排产硫化组找到可排产Sku：%s====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, materialDesc);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 在排产日最后找到的一个Sku日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到是否[%s]最后一个排产Sku：%s====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param isLast       是否最后一个
+     * @param materialDesc Sku
+     * @return
+     */
+    public static String addIsLastFindSkuLog(Context context, String groupName, boolean isLast, String materialDesc) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到是否[%s]最后一个排产Sku：%s====";
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isLast, materialDesc);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP, logContent);
         return logContent;
@@ -205,11 +252,30 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueLhGroupSkuNoFindMouldLog(Context context, String groupName, String onLineMachineInfo, String materialDesc) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台：%s 进行模具排产，物料：%s 没有找到合适的模具====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, materialDesc);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, materialDesc);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_SKU_NO_FIND_MOULD_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加结构-硫化组排产Sku限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 在[%s]日达到%s限制====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 成型机台编码
+     * @param skuInfo           Sku信息
+     * @param startDay          时间
+     * @param limitType         限制类型
+     * @return
+     */
+    public static String addSkuProductionLimitLog(Context context, String groupName, String onLineMachineInfo, MonthPlanProductionRequirePlanVo skuInfo, Integer startDay, MouldProductionLimitTypeEnum limitType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 在[%s]日达到%s====";
+        String materialDesc = skuInfo.getMaterialDesc();
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, materialDesc, startDay, limitType.getLimitDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_LH_GROUP, logContent);
         return logContent;
     }
 
@@ -227,9 +293,7 @@ public class TbrMouldProductionLogRecorder {
     public static String addLhGroupSkuLimitLog(Context context, String groupName, String onLineMachineInfo, MonthPlanProductionRequirePlanVo skuInfo, String mouldShellInfo, MouldProductionLimitTypeEnum limitType) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 模壳型号：%s 超出%s====";
         String materialDesc = skuInfo.getMaterialDesc();
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, onLineMachineInfo, materialDesc, mouldShellInfo, limitType.getLimitDesc());
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, materialDesc, mouldShellInfo, limitType.getLimitDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_LH_GROUP, logContent);
         return logContent;
@@ -367,10 +431,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addLhGroupSkuUsedFindMouldProductionLog(Context context, String groupName, String cxMachineCode, String materialDesc, String mouldInfo, Integer startDay, Integer endDay) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 物料：%s 使用模具[%s]排产 %s~%s====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, cxMachineCode, materialDesc,
-                mouldInfo, startDay, endDay);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_SKU_USED_FIND_MOULD_PRODUCTION, logContent);
         return logContent;
@@ -388,10 +449,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addMouldProductionLeftOverOddNumberPlan(Context context, String groupName, String materialDesc, String mouldInfo, Integer productionDay, Integer size) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 物料：%s 使用模具[%s]在[%s]日排产计划余量奇数 %s条====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, materialDesc,
-                mouldInfo, productionDay, size);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc, mouldInfo, productionDay, size);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_PRODUCTION_PLAN, logContent);
         return logContent;
@@ -425,9 +483,7 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addContinueSkuMouldProductionByMouldLog(Context context, String groupName, String materialDesc, String mouldInfo) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 使用模具：%s 进行模具排产====";
-        String logContent = String.format(logContentFormat,
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, materialDesc, mouldInfo);
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc, mouldInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_FOR_MOULD_PRODUCTION, logContent);
         return logContent;
@@ -443,9 +499,7 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addContinueSkuNoProductionQtyLog(Context context, String groupName, String materialDesc) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 模具排产当前阶段没有排产量====",
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, materialDesc);
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 模具排产当前阶段没有排产量====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY, logContent);
         return logContent;
@@ -463,9 +517,7 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addContinueSkuNoFindMouldLog(Context context, ProductionStageEnum productionStage, String groupName, String materialDesc, MouldProductionLimitTypeEnum limitType) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s [%s]模具排产因[%s]没有找到模具====",
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, materialDesc, productionStage.getStageDesc(), limitType.getLimitDesc());
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s [%s]模具排产因[%s]没有找到模具====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc, productionStage.getStageDesc(), limitType.getLimitDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_NO_MOULD, logContent);
         return logContent;
@@ -481,9 +533,7 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addContinueSkuNoProductionResultLog(Context context, String groupName, String materialDesc) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 降膜排产没有结果====",
-                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName, materialDesc);
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 降膜排产没有结果====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, materialDesc);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY, logContent);
         return logContent;
@@ -508,6 +558,84 @@ public class TbrMouldProductionLogRecorder {
         } else {
             TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_START_SAME_EMBRYO_MOULD_PRODUCTION, logContent);
         }
+        return logContent;
+    }
+
+    /**
+     * 增加周期结构 超出储备量日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 排产超出周期储备量不排====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param materialDesc Sku信息
+     * @param continueType 续作类型
+     * @return
+     */
+    public static String addExceedCycleQtyLog(Context context, String groupName, String materialDesc, ContinueTypeEnum continueType) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s %s 排产超出周期储备量，周期量不排====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, continueType.getDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CYCLE_CONTROL_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加Sku排产找的前Sku余量信息日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 前Sku信息：%s====
+     *
+     * @param context          排程上下文
+     * @param groupName        分组名-结构
+     * @param materialDesc     Sku信息
+     * @param beforeSkuContent 续作类型
+     * @return
+     */
+    public static String addFindBeforeSkuInfo(Context context, String groupName, String materialDesc, BeforeSkuProductionInfo beforeSkuContent) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 前Sku信息：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, JSON.toJSONString(beforeSkuContent));
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_PRODUCTION_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加周期结构 排产储备量日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 当前总排产量 %s 实单量 %s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param materialDesc      Sku信息
+     * @param sumProductionQty  总排产量
+     * @param sumActualQuantity 实单量
+     * @return
+     */
+    public static String addProductionCycleQtyDetailLog(Context context, String groupName, String materialDesc, Integer sumProductionQty, Integer sumActualQuantity) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 当前总排产量 %s 实单量 %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, sumProductionQty, sumActualQuantity);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CYCLE_CONTROL_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加周期储备排产日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 当前排产储备量 %s 最大可排产量 %s====
+     *
+     * @param context            排程上下文
+     * @param groupName          分组名-结构
+     * @param materialDesc       Sku信息
+     * @param cycleProductionQty 当前排产量
+     * @param maxCycleQty        最大可排产量
+     * @return
+     */
+    public static String addProductionCycleQtyInfoLog(Context context, String groupName, String materialDesc, Integer cycleProductionQty, Integer maxCycleQty) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 当前排产储备量 %s 最大可排产量 %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, cycleProductionQty, maxCycleQty);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CYCLE_CONTROL_PRODUCTION, logContent);
         return logContent;
     }
 

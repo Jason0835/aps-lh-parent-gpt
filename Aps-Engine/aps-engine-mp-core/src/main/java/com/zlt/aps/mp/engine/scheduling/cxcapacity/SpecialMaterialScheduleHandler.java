@@ -128,7 +128,7 @@ public class SpecialMaterialScheduleHandler {
         }
         //计算新的排产天数 = ceil(计划量 / 日硫化量 / 配比)
         Integer firstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
-        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(productionPlanInfo.getMinLhMachineCountBymould());
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(productionPlanInfo.getMinLhMachineCountByMould());
         BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
         Integer resultTheoryDays = 0;
         if (realProductionQty > firstDayProductionQty.intValue()) { // 需排产量大于首日排产量，则计算除了首日之外的计划所需天数

@@ -107,12 +107,20 @@ public class DpDemandPlan extends BaseEntity {
     private String brand;
 
     /**
-     * 供应链优先级
+     * 物料优先
      */
     @Excel(name = "ui.data.column.demandPlan.scmPriority", dictType = "biz_yes_no")
-    @ApiModelProperty(value = "供应链优先级", name = "scmPriority")
+    @ApiModelProperty(value = "物料优先", name = "scmPriority")
     @TableField(value = "SCM_PRIORITY")
     private String scmPriority;
+
+    /**
+     * 结构优先
+     */
+    @Excel(name = "ui.data.column.demandPlan.structurePriority", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "结构优先", name = "structurePriority")
+    @TableField(value = "STRUCTURE_PRIORITY")
+    private String structurePriority;
 
     /**
      * 产品结构

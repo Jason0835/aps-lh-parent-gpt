@@ -21,9 +21,13 @@ public class SpecialMaterialStockVo implements Serializable {
      */
     private String materialDesc;
     /**
-     * 标准长
+     * 标准长（转换成重量=批次箱数 * 总重量/总箱数）
      */
     private Long standardLength;
+    /**
+     * 标准长（实际是批次编号，转换前的数）
+     */
+    private Long oriStandardLength;
     /**
      * 库存量
      */

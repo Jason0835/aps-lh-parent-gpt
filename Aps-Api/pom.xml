@@ -8,9 +8,8 @@
         <module>aps-mp-api</module>
         <module>aps-cx-lh-api</module>
         <module>tm-api</module>
+<!--        <module>lh-api</module>-->
         <module>cx-api</module>
-       <!-- <module>lh-api</module>-->
-       <!-- <module>cx-api</module>-->
         <module>mps-api</module>
         <module>tc-api</module>
         <module>nc-api</module>
@@ -27,6 +26,7 @@
         <module>aps-all-api</module>
         <module>aps-mdm-api</module>
         <module>aps-dp-api</module>
+        <module>aps-lh-api</module>
     </modules>
 
     <groupId>com.zlt.aps</groupId>

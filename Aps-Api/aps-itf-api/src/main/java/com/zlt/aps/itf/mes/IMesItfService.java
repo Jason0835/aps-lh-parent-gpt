@@ -149,4 +149,149 @@ public interface IMesItfService {
     @ApiOperation("生成超期SKU")
     @PostMapping("/mesItf/genOverDueSkuByStock")
     public AjaxResult genOverDueSkuByStock(@RequestBody MdmProductStock mdmProductStock) throws ParseException;
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型在机数据")
+    @PostMapping("/mesItf/syncMachineOnlineInfo")
+    public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化在机数据")
+    @PostMapping("/mesItf/syncLhMachineOnlineInfo")
+    public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+
+    /**
+     * 同步设备保养计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备保养计划")
+    @PostMapping("/mesItf/syncDevMaintenancePlan")
+    public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步胶囊已使用次数
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胶囊已使用次数")
+    @PostMapping("/mesItf/syncLhRepairCapsule")
+    public AjaxResult syncLhRepairCapsule(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步模具清洗预警计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具清洗预警计划")
+    @PostMapping("/mesItf/syncMouldCleanPlan")
+    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步结构整车胎面配置
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步结构整车胎面配置")
+    @PostMapping("/mesItf/syncStructureTreadConfig")
+    public AjaxResult syncStructureTreadConfig(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步生胎库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步生胎库存")
+    @PostMapping("/mesItf/syncMesCxStock")
+    public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步成型排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程完成量")
+    @PostMapping("/mesItf/syncCxClassShiftFinishQty")
+    public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步硫化排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程完成量")
+    @PostMapping("/mesItf/syncLhClassShiftFinishQty")
+    public AjaxResult syncLhClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步成型排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程日完成量")
+    @PostMapping("/mesItf/syncCxScheDayFinishQty")
+    public AjaxResult syncCxScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步硫化排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程日完成量")
+    @PostMapping("/mesItf/syncLhScheDayFinishQty")
+    public AjaxResult syncLhScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 模具交替计划下发到MES
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 结果
+     */
+    @ApiOperation("模具交替计划下发到MES")
+    @PostMapping("/mesItf/issueMoldAlterPlan")
+    public AjaxResult issueMoldAlterPlan(@RequestBody List<MdmMoldAlterPlan> moldAlterPlanList);
+
+    /**
+     * 同步模具交替计划完成回报
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具交替计划完成回报")
+    @PostMapping("/mesItf/syncMoldAlterPlanFinish")
+    public AjaxResult syncMoldAlterPlanFinish(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 成型排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班，即二班和三班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班，即一班、二班和三班）
+     * 3. 下发后天的3班（早中晚班，即一班、二班和三班）
+
+     * @param cxScheduleResultIssueList 成型排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("成型排程结果下发到MES")
+    @PostMapping("/mesItf/issueCxScheduleResult")
+    public AjaxResult issueCxScheduleResult(@RequestBody List<com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue> cxScheduleResultIssueList);
+
+    /**
+     * 硫化排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班）
+     * 3. 下发后天的3班（早中晚班）
+     *
+     * @param lhScheduleResultIssueList 硫化排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("硫化排程结果下发到MES")
+    @PostMapping("/mesItf/issueLhScheduleResult")
+    public AjaxResult issueLhScheduleResult(@RequestBody List<com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue> lhScheduleResultIssueList);
 }

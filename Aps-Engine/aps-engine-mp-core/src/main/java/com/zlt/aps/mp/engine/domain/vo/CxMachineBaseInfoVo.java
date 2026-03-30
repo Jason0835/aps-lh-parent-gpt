@@ -16,6 +16,7 @@ import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.CollectValueUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -149,6 +150,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 计划是否断面宽范围
      */
     private String sectionWidthCondition;
+
     /**
      * 成型硫化配比最后一天排产分组信息
      */
@@ -285,7 +287,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 在模拟排产阶段，且机台选结构，结构反选机台场景使用
      * 20260304 补充Sku排产信息及排产模具
      */
-    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo) {
+    public void addDayProductionInfo(Context context, SkuDayProductionInfoHelper skuDayProductionInfo) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == skuDayProductionInfo) {
             return;
         }
@@ -298,7 +300,10 @@ public class CxMachineBaseInfoVo implements Serializable {
         String embryoCode = skuDayProductionInfo.getEmbryoCode();
         Set<String> currentUsedMouldSet = skuDayProductionInfo.getUsedMouldSet();
         //更新生胎及模具
-        dayLimit.getProductionEmbryoCodeSet().add(embryoCode);
+        if (checkCanAddEmbryoCode(context, skuDayProductionInfo)) {
+            //增加日排产量<日换模数量时，不计算胎胚种类数 sandy+ 2026.3.24
+            dayLimit.getProductionEmbryoCodeSet().add(embryoCode);
+        }
         dayLimit.getProductionMouldSet().addAll(currentUsedMouldSet);
         //Sku排产模具信息
         Set<String> skuProductionMouldSet = dayLimit.getSkuProductionMouldMap().get(materialDesc);
@@ -315,6 +320,19 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         //更新数量
         planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+    }
+
+    /**
+     * 检查能否加胎胚种类数
+     *
+     * @param context
+     * @param skuDayProductionInfo
+     * @return
+     */
+    private boolean checkCanAddEmbryoCode(Context context, SkuDayProductionInfoHelper skuDayProductionInfo) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer changeMouldFirstQty = productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
+        return skuDayProductionInfo.getSumProductionQty() >= changeMouldFirstQty;
     }
 
     /**
@@ -361,13 +379,13 @@ public class CxMachineBaseInfoVo implements Serializable {
         //判定结构
         Set<String> fixedStructureSet = new HashSet<>();
         if (StringUtils.isNotBlank(fixedStructure1)) {
-            fixedStructureSet.addAll(Stream.of(fixedStructure1.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure1, StringConstant.COMMA);
         }
         if (StringUtils.isNotBlank(fixedStructure2)) {
-            fixedStructureSet.addAll(Stream.of(fixedStructure2.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure2, StringConstant.COMMA);
         }
         if (StringUtils.isNotBlank(fixedStructure3)) {
-            fixedStructureSet.addAll(Stream.of(fixedStructure3.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure3, StringConstant.COMMA);
         }
         if (fixedStructureSet.contains(groupPlanInfo.getGroupName())) {
             return true;
@@ -375,7 +393,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         //判定Sku
         Set<String> fixedMaterialCodeSet = new HashSet<>();
         if (StringUtils.isNotBlank(fixedMaterialCode)) {
-            fixedMaterialCodeSet.addAll(Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+            CollectValueUtils.addSingleValueToCollect(fixedMaterialCodeSet, fixedMaterialCode, StringConstant.COMMA);
         }
         if (CollectionUtils.isEmpty(fixedMaterialCodeSet)) {
             return false;
@@ -555,6 +573,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         ProductionPlanGroupInfo productionPlanInfo = addAllocationPlan.getProductionPlanInfo();
         CxMachineAllocationPlanHelper lastAllocation = getLastAllocationInfo();
         allocationList.add(addAllocationPlan);
+        allocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
         TbrProductionContext productionContext = (TbrProductionContext) context;
         handlerLimitInfo(productionContext, addAllocationPlan, productionPlanInfo);
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
@@ -702,6 +721,21 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 延长一天收尾的处理
+     *
+     * @param newEndDay
+     */
+    public void timeExtensionOneDayConclusion(Integer newEndDay) {
+        if (null == newEndDay) {
+            return;
+        }
+        if (allocationDaySet.contains(newEndDay)) {
+            return;
+        }
+        allocationDaySet.add(newEndDay);
+    }
+
+    /**
      * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
      *
      * @param context         排产上下文
@@ -805,6 +839,33 @@ public class CxMachineBaseInfoVo implements Serializable {
             return ProductionConstant.MONTH_START_DAY;
         }
         return lastHelper.getEndDay() + BigDecimal.ONE.intValue();
+    }
+
+    /**
+     * 获取本次分配段排产日信息
+     *
+     * @param allocationInfo 分配信息
+     * @return
+     */
+    public Set<Integer> getAllocationDaySet(CxMachineAllocationPlanHelper allocationInfo) {
+        if (null == allocationInfo || StringUtils.isBlank(allocationInfo.getCxMachineCode())) {
+            return Collections.emptySet();
+        }
+        if (!allocationInfo.getCxMachineCode().equals(cxMachineCode)) {
+            return Collections.emptySet();
+        }
+        Integer startDay = allocationInfo.getStartDay();
+        Integer endDay = allocationInfo.getEndDay();
+        if (null == startDay || null == endDay || startDay > endDay) {
+            return Collections.emptySet();
+        }
+        Set<Integer> thisTimeSet = new HashSet<>();
+        for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
+            if (allocationDaySet.contains(productionDay)) {
+                thisTimeSet.add(productionDay);
+            }
+        }
+        return thisTimeSet;
     }
 
     /**
@@ -932,7 +993,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (StringUtils.isBlank(fixedStructure) || StringUtils.isBlank(structureName)) {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
-        Set<String> fixedStructureSet = Stream.of(fixedStructure.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        Set<String> fixedStructureSet = new HashSet<>();
+        CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure, StringConstant.COMMA);
         if (fixedStructureSet.contains(structureName)) {
             return fixedPriority;
         }
@@ -954,7 +1016,8 @@ public class CxMachineBaseInfoVo implements Serializable {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
         Set<String> materialCodePlanSet = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
-        Set<String> fixedMaterialCodeSet = Stream.of(fixedMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        Set<String> fixedMaterialCodeSet = new HashSet<>();
+        CollectValueUtils.addSingleValueToCollect(fixedMaterialCodeSet, fixedMaterialCode, StringConstant.COMMA);
         for (String materialCode : materialCodePlanSet) {
             if (fixedMaterialCodeSet.contains(materialCode)) {
                 return CxMachineFixedPriorityEnum.FIXED_SKU;
@@ -1083,10 +1146,6 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (null == changeStartDay || StringUtils.isBlank(changeGroupName)) {
             return false;
         }
-//        //第一天先不判断
-//        if (ProductionConstant.MONTH_START_DAY.equals(changeStartDay)) {
-//            return false;
-//        }
         //没有分配信息，看续作
         if (null == beforeAllocation) {
             TbrProductionContext productionContext = (TbrProductionContext) context;

@@ -72,12 +72,31 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
     @Transactional(rollbackFor = Exception.class)
     public List<DailyMouldAvailabilityResult> moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
                                                                         Date targetDate, String monthPlanVersion){
+        return moldCavityInsertMaxValueCalculator(year, month, factoryCode, targetDate, monthPlanVersion, false);
+    }
+
+    /**
+     * 按照传入年月工厂的月度需求计划, 计算型腔活块可用量最大值
+     *
+     * @param year              年份    :  必须传入  -  抛出异常
+     * @param month             月份    :  必须传入  -  抛出异常
+     * @param factoryCode       工厂代码:  必须传入  -  抛出异常
+     * @param targetDate        指定日期:  可以不传
+     * @param monthPlanVersion  净需求计划版本号: 可以不传 -- 注意：不传不考虑净需求计划直接取所有
+     * @param monthPlanVersion  净需求计划版本号: 可以不传 -- 注意：不传不考虑净需求计划直接取所有
+     * @param isAllMaterial     获取全物料
+     * @return 计算结果：DailyMouldAvailabilityResult
+     * @throws Exception 抛出异常各自处理
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<DailyMouldAvailabilityResult> moldCavityInsertMaxValueCalculator(Integer year, Integer month, String factoryCode,
+                                                                        Date targetDate, String monthPlanVersion, Boolean isAllMaterial){
         // 参数校验
         validateParameters(year, month, factoryCode, targetDate);
 
         // 1. 获取SKU模具配置信息（含新模具）
         Map<String, List<MoldCavityInsertMaxValueCalculatorVo>> mouldRelationMap =
-                getProductionMouldInfo(year, month, factoryCode, targetDate, monthPlanVersion);
+                getProductionMouldInfo(year, month, factoryCode, targetDate, monthPlanVersion, isAllMaterial);
 
         if (CollectionUtils.isEmpty(mouldRelationMap)) {
             log.warn("未找到任何模具配置信息，工厂：{}，年月：{}-{}，日期：{}", factoryCode, year, month, targetDate);
@@ -540,9 +559,9 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      * 获取已有模具配置并添加到列表
      */
     private void addExistingMouldInfo(String factoryCode, Integer year, Integer month, String monthPlanVersion,
-                                      List<MoldCavityInsertMaxValueCalculatorVo> allMouldRelationInfoList) {
+                                      List<MoldCavityInsertMaxValueCalculatorVo> allMouldRelationInfoList, boolean isAllMatrial) {
         List<MoldCavityInsertMaxValueCalculatorVo> productMouldInfoList =
-                factoryMonthPlanProductMouldMapper.getEnableProductionMouldInfoByNetDemand(factoryCode, year, month, monthPlanVersion);
+                factoryMonthPlanProductMouldMapper.getEnableProductionMouldInfoByNetDemand(factoryCode, year, month, monthPlanVersion, isAllMatrial);
         if (!CollectionUtils.isEmpty(productMouldInfoList)) {
             allMouldRelationInfoList.addAll(productMouldInfoList);
         }
@@ -636,11 +655,11 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      * 获取需要排产的SKU的模具配置信息
      */
     public Map<String, List<MoldCavityInsertMaxValueCalculatorVo>> getProductionMouldInfo(Integer year, Integer month, String factoryCode,
-                                                                                          Date targetDate, String monthPlanVersion) {
+                                                                                          Date targetDate, String monthPlanVersion, boolean isAllMatrial) {
         List<MoldCavityInsertMaxValueCalculatorVo> allMouldRelationInfoList = new ArrayList<>();
 
         // 获取已有模具的配置关系
-        addExistingMouldInfo(factoryCode, year, month, monthPlanVersion, allMouldRelationInfoList);
+        addExistingMouldInfo(factoryCode, year, month, monthPlanVersion, allMouldRelationInfoList, isAllMatrial);
 
         // 获取新模具到货计划并去重
         addMouldDeliveryInfoWithDeDuplication(factoryCode, year, month, monthPlanVersion, allMouldRelationInfoList);

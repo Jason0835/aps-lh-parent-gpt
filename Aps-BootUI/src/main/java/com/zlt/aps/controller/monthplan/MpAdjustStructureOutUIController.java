@@ -107,13 +107,13 @@ public class MpAdjustStructureOutUIController extends BaseUIController<MpAdjustS
         if (UserConstants.NOT_UNIQUE.equals(iMpAdjustStructureOutService.checkUnique(mpAdjustStructureOut))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpAdjustStructureOut.checkUnique"));
         }
-        // 确认调整量
-        Integer confirmAdjustQty = mpAdjustStructureOut.getConfirmAdjustQty();
-        // 判断确认调整量是否为奇数，若是则返回错误提示
-        if (confirmAdjustQty != null && !NumberUtil.isEven(confirmAdjustQty)) {
-            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpAdjustStructure.isOddNumber"), mpAdjustStructureOut.getMaterialCode());
-            return AjaxResult.error(errorMsg);
-        }
+//        // 确认调整量
+//        Integer confirmAdjustQty = mpAdjustStructureOut.getConfirmAdjustQty();
+//        // 判断确认调整量是否为奇数，若是则返回错误提示
+//        if (confirmAdjustQty != null && !NumberUtil.isEven(confirmAdjustQty)) {
+//            String errorMsg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpAdjustStructure.isOddNumber"), mpAdjustStructureOut.getMaterialCode());
+//            return AjaxResult.error(errorMsg);
+//        }
         return iMpAdjustStructureOutService.save(mpAdjustStructureOut);
     }
 

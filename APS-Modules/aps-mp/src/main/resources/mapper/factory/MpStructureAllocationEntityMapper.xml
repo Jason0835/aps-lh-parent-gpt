@@ -26,6 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    t.END_DAY,
 		    t.ALLOT_DAYS,
 		    mm.CX_MACHINE_TYPE_CODE,
+		    t.ALTERNATING_TYPE,
 		    1 data_type
 		FROM
 		    T_MP_STRUCTURE_ALLOCATION t
@@ -42,7 +43,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND t.CX_MACHINE_CODE LIKE concat('%', #{cxMachineCode}, '%')
         </if>
 		GROUP BY
-		    t.STRUCTURE_NAME
+		    t.ID,
+		    t.FACTORY_CODE,
+		    t.YEAR,
+		    t.MONTH,
+		    t.MONTH_PLAN_VERSION,
+		    t.PRODUCTION_VERSION,
+		    t.PLAN_TYPE,
+		    t.DATA_SOURCE,
+		    t.CX_MACHINE_CODE,
+		    t.STRUCTURE_NAME,
+		    t.IS_HAS_SPECIAL_MATERIAL,
+		    t.MAX_EMBRYO_CODE_COUNT,
+		    t.MAX_LH_MACHINE_COUNT,
+		    t.MIN_LH_MACHINE_COUNT,
+		    t.NET_QTY,
+		    t.LOSS_QTY,
+		    t.BEGIN_DAY,
+		    t.END_DAY,
+		    t.ALLOT_DAYS,
+		    mm.CX_MACHINE_TYPE_CODE
 		ORDER BY t.CX_MACHINE_CODE, t.BEGIN_DAY
     </select>
 </mapper>

@@ -163,6 +163,35 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
+     * 获取可安排贴牌模具排产的排产日集合
+     *
+     * @return
+     */
+    public Set<Integer> getEnableOemBrandProductionRange(TbrProductionContext productionContext,MonthPlanProductionRequirePlanVo addSkuInfo) {
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return new HashSet<>();
+        }
+        List<DayCapacityLimitHelper> dayLimitList = dayCapacityLimitMap.values().stream().collect(Collectors.toList());
+        if (DayCapacityLimitHelper.checkIsOemBrand(productionContext,addSkuInfo.getBrand())){
+            //若是贴牌，增加贴牌总产能的限制
+            //1. 每日贴牌总产能合计
+            Integer sumBrandProductionCapacity = dayLimitList.stream()
+                    .filter(Objects::nonNull)           // 过滤 null 对象
+                    .mapToInt(helper -> helper.getSumBrandProductionCapacity() == null ? 0 : helper.getSumBrandProductionCapacity())
+                    .sum();
+            sumBrandProductionCapacity = sumBrandProductionCapacity == null ? 0 : sumBrandProductionCapacity;
+            //2. 贴牌总产能（参数）
+            Integer oemBrandCapacity = productionContext.getBaseDataContainer().getParamConfiguration().getOemBrandCapacity();
+            oemBrandCapacity = oemBrandCapacity == null ? 0 : oemBrandCapacity;
+            if (sumBrandProductionCapacity > oemBrandCapacity ){
+                // 每日贴牌总产能合计 > 贴牌总产能（参数）
+                return new HashSet<>();
+            }
+        }
+        return dayLimitList.stream().map(DayCapacityLimitHelper::getProductionDay).collect(Collectors.toSet());
+    }
+
+    /**
      * 增加Sku排产日产能占用量
      *
      * @param context        排产上下文
@@ -192,8 +221,9 @@ public class DayCapacityLimitVo implements Serializable {
      * @param usedMouldSet  排产模具
      * @param productionQty 排产量
      * @param lossQty       损耗量
+     * @param brand         品牌
      */
-    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty) {
+    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty, String brand) {
         if (null == productionDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(usedMouldSet)) {
             return;
         }
@@ -201,7 +231,7 @@ public class DayCapacityLimitVo implements Serializable {
         if (null == dayLimit) {
             return;
         }
-        dayLimit.deductionSkuDayProductionQty(context, productionDay, materialDesc, usedMouldSet, productionQty, lossQty);
+        dayLimit.deductionSkuDayProductionQty(context, productionDay, materialDesc, usedMouldSet, productionQty, lossQty, brand);
     }
 
     /**

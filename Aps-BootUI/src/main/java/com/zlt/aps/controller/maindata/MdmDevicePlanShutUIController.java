@@ -12,7 +12,7 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.common.core.enums.DeviceShutMachineTypeEnums;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
-import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.vo.MdmDevicePlanShutQueryMachineParamVo;

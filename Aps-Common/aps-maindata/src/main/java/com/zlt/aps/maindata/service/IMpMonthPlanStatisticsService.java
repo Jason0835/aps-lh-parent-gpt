@@ -3,6 +3,9 @@ package com.zlt.aps.maindata.service;
 
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.bill.common.service.IDocService;
+
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：IMpMonthPlanStatisticsService.java
@@ -25,6 +28,6 @@ public interface IMpMonthPlanStatisticsService  extends IDocService<MpMonthPlanS
      * @param month 月份
      * @param productionVersion 排程版本
      */
-    void deleteMonthPlanStatisticsByCondition(String factoryCode,String year,String month,String productionVersion);
+    void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion, List<String> structureList);
 
 }

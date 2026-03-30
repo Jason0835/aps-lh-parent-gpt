@@ -52,6 +52,13 @@ public class TireDrumInfoVo implements Serializable {
      */
     private Map<Integer, TireDrumDayInfoHelper> dayLimitInfoMap;
 
+    public Integer getProSizeCount() {
+        if (CollectionUtils.isEmpty(proSizeSet)) {
+            return 0;
+        }
+        return proSizeSet.size();
+    }
+
     /**
      * 根据成型鼓台账配置转化成成型鼓限制信息
      * 构建每日限制对象集合
@@ -108,6 +115,27 @@ public class TireDrumInfoVo implements Serializable {
         String groupPlanProSize = matchParam.getProSize();
         String cxMachineTypeCode = matchParam.getCxMachineTypeCode();
         return proSizeSet.contains(groupPlanProSize) && cxMachineTypeCodeSet.contains(cxMachineTypeCode);
+    }
+
+    /**
+     * 在productionDay日是否有余量
+     * 最大数量 > 使用量则表示有余量
+     *
+     * @param productionDay
+     * @return
+     */
+    public boolean hasLeftOverQty(Integer productionDay) {
+        if (null == productionDay) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(dayLimitInfoMap)) {
+            return false;
+        }
+        TireDrumDayInfoHelper dayInfo = dayLimitInfoMap.get(productionDay);
+        if (null == dayInfo) {
+            return false;
+        }
+        return dayInfo.getMaxLimitQty() > dayInfo.getUsedQty();
     }
 
     /**

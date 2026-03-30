@@ -21,7 +21,7 @@ public class DayTotalCapacityChecker implements IProductionCheck {
     private Integer totalPlanQty;
 
     /**
-     * 总产能限制
+     * 总产能限制(剩余)
      */
     private Integer dayTotalCapacityLimit;
 
@@ -31,7 +31,7 @@ public class DayTotalCapacityChecker implements IProductionCheck {
     private Integer checkDay;
 
     /**
-     * 定稿记录列表
+     * 当前结构 定稿记录列表
      */
     private List<FactoryMonthPlanFinalAdjustVo> mpPlanFinalAdjustList;
 

@@ -15,7 +15,6 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
-import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -184,6 +183,23 @@ public class BaseDataContainer implements Serializable {
             return Collections.emptyList();
         }
         return ratioList;
+    }
+
+    /**
+     * 获取分组收尾条件：一个分组收尾条件都一样
+     *
+     * @param groupName 分组名
+     * @return
+     */
+    public Integer getMinConclusionLhMachineCount(String groupName) {
+        if (StringUtils.isBlank(groupName)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        List<MonthPlanStructureLhRatioVo> allConfiguration = getAllLhRationListByGroup(groupName);
+        if (CollectionUtils.isEmpty(allConfiguration)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return allConfiguration.get(BigDecimal.ZERO.intValue()).getLhMachineMinQty();
     }
 
     /**
@@ -424,13 +440,15 @@ public class BaseDataContainer implements Serializable {
         if (CollectionUtils.isEmpty(workWeakTypeLimitInfo) || null == tireDrumMatch || tireDrumMatch.isEmptyValue() || null == productionDay) {
             return null;
         }
-        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch)).collect(Collectors.toList());
+        //增加规格型号、使用类型匹配及还有剩余量的匹配
+        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch) && singleGroupLimit.hasLeftOverQty(productionDay)).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(limitGroupList)) {
             //没有找到与tireDrumMatch匹配的成型工装限制信息
             return null;
         }
-        //随意一条
-        limitGroupList.sort(Comparator.comparing(TireDrumInfoVo::getGroupId));
+        // 英寸通性性差的优先 sandy+ 2026.3.29
+        limitGroupList.sort(Comparator.comparingInt(TireDrumInfoVo::getProSizeCount)
+                .thenComparing(TireDrumInfoVo::getGroupId));
         TireDrumInfoVo tireDrumInfo = limitGroupList.get(BigDecimal.ZERO.intValue());
         Map<Integer, TireDrumDayInfoHelper> dayLimitInfoMap = tireDrumInfo.getDayLimitInfoMap();
         if (CollectionUtils.isEmpty(dayLimitInfoMap)) {

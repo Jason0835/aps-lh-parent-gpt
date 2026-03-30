@@ -2,9 +2,11 @@ package com.zlt.aps.itf.mes.mapper;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
+import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.mp.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -57,4 +59,108 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<RawMaterialOutboundRecord> syncRawMaterialOutboundRecord(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询成型在机同步数据
+     *
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 列表
+     */
+    List<MdmCxMachineOnlineInfo> selectCxMachineOnlineSyncList(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+
+    /**
+     * 查询硫化在机同步数据
+     *
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 列表
+     */
+    List<MdmLhMachineOnlineInfo> selectLhMachineOnlineSyncList(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+
+    /**
+     * 查询设备保养计划同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmDevMaintenancePlan> selectDevMaintenancePlanList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询胶囊已使用次数同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmLhRepairCapsule> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询模具清洗预警计划同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmMouldCleanPlan> selectMouldCleanPlanList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询结构整车胎面配置同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmStructureTreadConfig> selectStructureTreadConfigList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询生胎库存同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmMesCxStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询成型排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmCxScheFinishQty> selectCxClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询硫化排程完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmLhScheFinishQty> selectLhClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询成型排程日完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmCxScheDayFinishQty> selectCxScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询硫化排程日完成量同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmLhScheDayFinishQty> selectLhScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 插入模具交替计划到中间表
+     *
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 插入数量
+     */
+    int insertMoldAlterPlanList(@Param("list") List<MoldAlterPlanIssue> moldAlterPlanList);
+
+    /**
+     * 查询模具交替计划完成回报同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmMoldAlterPlanFinish> selectMoldAlterPlanFinishList(AuxReqSyncDataLogs syncDataLogs);
 }

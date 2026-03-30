@@ -4,15 +4,15 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
+import com.zlt.aps.itf.mes.service.ICxScheduleResultIssueService;
+import com.zlt.aps.itf.mes.service.ILhScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.IMonthPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
-import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
-import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +53,12 @@ public class MesItfController {
 
     @Autowired
     private MesBomItfService mesBomItfService;
+
+    @Autowired
+    private ICxScheduleResultIssueService cxScheduleResultIssueService;
+
+    @Autowired
+    private ILhScheduleResultIssueService lhScheduleResultIssueService;
 
     /**
      * 同步SKU与模具关系
@@ -303,5 +309,232 @@ public class MesItfController {
         syncDataLogs.setFactoryCode(factoryCode);
         syncDataLogs.setDataVersion(dataVersion);
         return mesBomItfService.syncBomInfo(syncDataLogs);
+    }
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型在机数据")
+    @PostMapping("/syncMachineOnlineInfo")
+    public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
+        String factoryCode = mdmCxMachineOnlineInfo.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmCxMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMachineOnlineInfo(mdmCxMachineOnlineInfo);
+    }
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化在机数据")
+    @PostMapping("/syncLhMachineOnlineInfo")
+    public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
+        String factoryCode = mdmLhMachineOnlineInfo.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            mdmLhMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhMachineOnlineInfo(mdmLhMachineOnlineInfo);
+    }
+
+    /**
+     * 同步设备保养计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步设备保养计划")
+    @PostMapping("/syncDevMaintenancePlan")
+    public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncDevMaintenancePlan(syncDataLogs);
+    }
+
+    /**
+     * 同步胶囊已使用次数
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胶囊已使用次数")
+    @PostMapping("/syncLhRepairCapsule")
+    public AjaxResult syncLhRepairCapsule(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhRepairCapsule(syncDataLogs);
+    }
+
+    /**
+     * 同步模具清洗预警计划
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具清洗预警计划")
+    @PostMapping("/syncMouldCleanPlan")
+    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMouldCleanPlan(syncDataLogs);
+    }
+
+    /**
+     * 同步结构整车胎面配置
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步结构整车胎面配置")
+    @PostMapping("/syncStructureTreadConfig")
+    public AjaxResult syncStructureTreadConfig(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncStructureTreadConfig(syncDataLogs);
+    }
+
+    /**
+     * 同步生胎库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步生胎库存")
+    @PostMapping("/syncMesCxStock")
+    public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncMesCxStock(syncDataLogs);
+    }
+
+
+
+    /**
+     * 成型排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班，即二班和三班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班，即一班、二班和三班）
+     * 3. 下发后天的3班（早中晚班，即一班、二班和三班）
+     *
+     * @param cxScheduleResultIssueList 成型排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("成型排程结果下发到MES")
+    @PostMapping("/issueCxScheduleResult")
+    public AjaxResult issueCxScheduleResult(@RequestBody List<CxScheduleResultIssue> cxScheduleResultIssueList) {
+        // 从上下文中获取厂别和分公司编码
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
+        return cxScheduleResultIssueService.issueCxScheduleResult(cxScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 同步成型排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程完成量")
+    @PostMapping("/syncCxClassShiftFinishQty")
+    public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncCxClassShiftFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步硫化排程完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程完成量")
+    @PostMapping("/syncLhClassShiftFinishQty")
+    public AjaxResult syncLhClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhClassShiftFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步成型排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步成型排程日完成量")
+    @PostMapping("/syncCxScheDayFinishQty")
+    public AjaxResult syncCxScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncCxScheDayFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 同步硫化排程日完成量
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步硫化排程日完成量")
+    @PostMapping("/syncLhScheDayFinishQty")
+    public AjaxResult syncLhScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhScheDayFinishQty(syncDataLogs);
+    }
+
+    /**
+     * 硫化排程结果下发到MES
+     * 业务规则：
+     * 1. 更新当天的2班（早中班）- 清空一班数据
+     * 2. 更新明天的3班（早中晚班）
+     * 3. 下发后天的3班（早中晚班）
+     *
+     * @param lhScheduleResultIssueList 硫化排程结果列表
+     * @return 结果
+     */
+    @ApiOperation("硫化排程结果下发到MES")
+    @PostMapping("/issueLhScheduleResult")
+    public AjaxResult issueLhScheduleResult(@RequestBody List<LhScheduleResultIssue> lhScheduleResultIssueList) {
+        // 从上下文中获取厂别和分公司编码
+        String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
+        return lhScheduleResultIssueService.issueLhScheduleResult(lhScheduleResultIssueList, factoryCode, companyCode);
+    }
+
+    /**
+     * 模具交替计划下发到MES
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 结果
+     */
+    @ApiOperation("模具交替计划下发到MES")
+    @PostMapping("/issueMoldAlterPlan")
+    public AjaxResult issueMoldAlterPlan(@RequestBody List<MdmMoldAlterPlan> moldAlterPlanList) {
+        return mesItfService.issueMoldAlterPlan(moldAlterPlanList);
+    }
+
+    /**
+     * 同步模具交替计划完成回报
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @ApiOperation("同步模具交替计划完成回报")
+    @PostMapping("/syncMoldAlterPlanFinish")
+    public AjaxResult syncMoldAlterPlanFinish(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        return mesItfService.syncMoldAlterPlanFinish(syncDataLogs);
     }
 }

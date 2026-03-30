@@ -66,6 +66,60 @@ public enum MesInterfaceCodeEnum {
      */
     MOLD_SHELL_SYNC("MOLD_SHELL_SYNC", "mesItfService", "syncMoldShell", "模壳台账信息同步"),
 
+    /**
+     * 设备保养计划同步
+     */
+    DEV_MAINTENANCE_PLAN("DEV_MAINTENANCE_PLAN", "mesItfService", "syncDevMaintenancePlan", "设备保养计划同步"),
+
+    /**
+     * 胶囊已使用次数同步
+     */
+    LH_USED_CAPSULE("LH_REPAIR_CAPSULE", "mesItfService", "syncLhRepairCapsule", "胶囊已使用次数同步"),
+
+    /**
+     * 模具清洗预警计划同步
+     */
+    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanPlan", "模具清洗预警计划同步"),
+
+    /**
+     * 结构整车胎面配置同步
+     */
+    STRUCTURE_TREAD_CONFIG("STRUCTURE_TREAD_CONFIG", "mesItfService", "syncStructureTreadConfig", "结构整车胎面配置同步"),
+
+    /**
+     * 生胎库存同步
+     */
+    EMBRYO_STOCK_SYNC("MES_CX_STOCK", "mesItfService", "syncMesCxStock", "生胎库存同步"),
+
+    /**
+     * 成型排程完成量同步
+     */
+    CX_CLASS_SHIFT_FINISH_QTY("FINISH_SCHE_COMPLETE", "mesItfService", "syncCxClassShiftFinishQty", "成型排程完成量同步"),
+    
+    /**
+     * 硫化排程完成量同步
+     */
+    LH_CLASS_SHIFT_FINISH_QTY("LH_CLASS_SHIFT_FINISH_QTY", "mesItfService", "syncLhClassShiftFinishQty", "硫化排程完成量同步"),
+    
+    /**
+     * 成型排程日完成量同步
+     */
+    CX_SCHE_DAY_FINISH_QTY("CX_SCHE_DAY_FINISH_QTY", "mesItfService", "syncCxScheDayFinishQty", "成型排程日完成量同步"),
+    
+    /**
+     * 硫化排程日完成量同步
+     */
+    LH_SCHE_DAY_FINISH_QTY("LH_SCHE_DAY_FINISH_QTY", "mesItfService", "syncLhScheDayFinishQty", "硫化排程日完成量同步"),
+    
+    /**
+     * 模具交替计划下发
+     */
+    MOLD_ALTER_PLAN_ISSUE("MOLD_ALTER_PLAN_ISSUE", "mesItfService", "issueMoldAlterPlan", "模具交替计划下发"),
+
+    /**
+     * 模具交替计划完成回报
+     */
+    MOLD_ALTER_PLAN_FINISH("MOLD_ALTER_PLAN_FINISH", "mesItfService", "syncMoldAlterPlanFinish", "模具交替计划完成回报"),
     ;
 
     private final String code;

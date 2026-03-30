@@ -99,6 +99,14 @@ public class TbrProductionContext extends Context {
      */
     private Boolean reachMinSpecialMaterialStandard;
     /**
+     * 临时日志存储器
+     */
+    private StringBuilder tempLogBuilder;
+    /**
+     * 是否实单补量，用于搭配排产中部分逻辑的判断，逻辑进入实单排产和搭配排产时会进行切换
+     */
+    private Boolean isActualOrder;
+    /**
      * 加入收尾，方向匹配结构集合
      *
      * @param cxMachineCode
@@ -381,6 +389,23 @@ public class TbrProductionContext extends Context {
     }
 
     /**
+     * 获取贴牌还有可排产量的日期集合
+     *
+     * @return
+     */
+    public Set<Integer> getOemBrandCapacityLimitRange(TbrProductionContext productionContext,MonthPlanProductionRequirePlanVo addSkuInfo) {
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return Collections.emptySet();
+        }
+        Set<Integer> hasDayCapacitySet = dayCapacityLimit.getEnableOemBrandProductionRange(productionContext,addSkuInfo);
+        if (CollectionUtils.isEmpty(hasDayCapacitySet)) {
+            return Collections.emptySet();
+        }
+        return hasDayCapacitySet;
+    }
+
+    /**
      * 清空所有的换模使用量
      */
     public void clearAllDayLimitUsed() {
@@ -598,7 +623,7 @@ public class TbrProductionContext extends Context {
         }
         // 保留一天作为换模日，其余天才满额生产
         Integer firstQty = this.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty();
-        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountBymould());
+        BigDecimal lhMachineCount = BigDecimalUtils.valueOf(groupInfo.getMinLhMachineCountByMould());
         Integer otherDay = allocationDays - 1;
         BigDecimal firstDayProductionQty = BigDecimalUtils.multiply(firstQty, lhMachineCount); // 首日排产量
         BigDecimal otherDayProductionQty = BigDecimalUtils.multiply(otherDay, groupInfo.getThreshold()); // 其余日排产量

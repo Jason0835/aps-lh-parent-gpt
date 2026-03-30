@@ -105,11 +105,33 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
     /**
      * 列表查询
      */
+    /**
+     * 列表查询
+     */
     @Override
     public List<MonthPlanNoProductionPlan> selectList(MonthPlanNoProductionPlan query) {
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
         builderCondition(wrapper, query);
         List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(wrapper);
+        // 加载月计划排产明细，用于计算实际排产和实单未排产
+        if (CollectionUtils.isNotEmpty(list) && StringUtils.isNotBlank(query.getProductionVersion())) {
+            LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
+            resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, query.getProductionVersion());
+            Map<String, Integer> mouldingDayResultMap = factoryMouldingDayResultMapper
+                    .selectList(resultQueryWrapper).stream().collect(Collectors
+                            .toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, FactoryMonthPlanMouldDayResult::getTotalQty, (r1, r2) -> r1));
+            // 计算实际排产和实单未排产
+            for (MonthPlanNoProductionPlan item : list) {
+                // 实际排产
+                int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
+                item.setTotalQty((long) factProdQty);
+                // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
+                long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0L;
+                long midQty = item.getMidQty() != null ? item.getMidQty() : 0L;
+                long actualOrderUnproduced = heightQty + midQty - factProdQty;
+                item.setActualOrderUnproduced(actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0L);
+            }
+        }
         dealList(list);
         return list;
     }
@@ -176,17 +198,21 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         // 结构类型
         List<SysDictData> structureTypeDatas = sysDictDataCacheService.getType("structure_type");
         Map<String, String> structureTypeDictMap = structureTypeDatas != null ? structureTypeDatas.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel)) : new HashMap<>();
-        
-        
+
+
         // 表头信息
         Map<String, Object> tableMap = new HashMap<>(16);
         // 列表数据
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
 
-        // 按当前年月取数
-        Calendar calendar = Calendar.getInstance();
-        int currentYear = calendar.get(Calendar.YEAR);
-        int currentMonth = calendar.get(Calendar.MONTH) + 1;
+        // 按查询条件中的年月取数，如果没有则使用当前年月
+        Integer currentYear = queryVO.getYear();
+        Integer currentMonth = queryVO.getMonth();
+        if (currentYear == null || currentMonth == null) {
+            Calendar calendar = Calendar.getInstance();
+            currentYear = calendar.get(Calendar.YEAR);
+            currentMonth = calendar.get(Calendar.MONTH) + 1;
+        }
 
         // 查询数据 - 按物料编码分组汇总，只查询有@Excel注解的字段
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
@@ -195,7 +221,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
                 "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
                 "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
-                "PATTERN", "IS_PRODUCTION", "max(STOCK_QTY) as stockQty", "max(AVERAGE_SALE_QTY) as averageSaleQty",
+                "PATTERN", "max(STOCK_QTY) as stockQty", "max(AVERAGE_SALE_QTY) as averageSaleQty",
                 "sum(NET_QTY) as netQty", "sum(POSTPONE_NET_QTY) as postponeNetQty",
                 "sum(UN_POSTPONE_NET_QTY) as unPostponeNetQty", "sum(HEIGHT_QTY) as heightQty",
                 "sum(MID_QTY) as midQty", "sum(POSTPONE_QTY) as postponeQty",
@@ -203,11 +229,14 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty",
                 "sum(UN_PRODUCTION_QTY) as unProductionQty", "GROUP_CONCAT(distinct reason SEPARATOR '|') as reason",
                 "max(UPDATE_TIME) as UPDATE_TIME");
-        wrapper.groupBy("MATERIAL_CODE");
+        wrapper.groupBy("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
+                "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
+                "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
+                "PATTERN");
         wrapper.orderBy(true, true, "STRUCTURE_NAME", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC", "PRO_SIZE");
         wrapper.orderBy(true, false, "UPDATE_TIME");
         List<MonthPlanNoProductionPlan> dataList = monthPlanNoProductionPlanMapper.selectList(wrapper);
-        
+
         // 加载月计划排产明细
         LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
         resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, queryVO.getProductionVersion());
@@ -261,14 +290,22 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
         }
 
         // 设置年月标题和工厂、产品品类（第一行）
-        tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
-        // 第一行的工厂和产品品类需要字典转义，从查询结果第一条获取
+        // 从查询结果中获取年月，如果没有数据则使用查询条件中的年月
         if (dataList != null && !dataList.isEmpty()) {
             MonthPlanNoProductionPlan firstItem = dataList.get(0);
+            Integer dataYear = firstItem.getYear();
+            Integer dataMonth = firstItem.getMonth();
+            if (dataYear != null && dataMonth != null) {
+                tableMap.put("yearAndMonth", dataYear + "年" + dataMonth + "月份");
+            } else {
+                tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
+            }
             tableMap.put("factoryCode", factoryMap.getOrDefault(firstItem.getFactoryCode(), firstItem.getFactoryCode() != null ? firstItem.getFactoryCode() : ""));
             tableMap.put("productTypeCode", productTypeMap.getOrDefault(firstItem.getProductTypeCode(), firstItem.getProductTypeCode() != null ? firstItem.getProductTypeCode() : ""));
             tableMap.put("monthPlanVersion", firstItem.getMonthPlanVersion());
             tableMap.put("productionVersion", firstItem.getProductionVersion());
+        } else {
+            tableMap.put("yearAndMonth", currentYear + "年" + currentMonth + "月份");
         }
 
         if (dataList != null && !dataList.isEmpty()) {
@@ -307,7 +344,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 listDataMap.put("conventionReserveQty", item.getConventionReserveQty() != null ? item.getConventionReserveQty() : 0);
                 listDataMap.put("heightLossQty", item.getHeightLossQty() != null ? item.getHeightLossQty() : 0);
                 listDataMap.put("unProductionQty", item.getUnProductionQty() != null ? item.getUnProductionQty() : 0);
-                
+
                 // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0;

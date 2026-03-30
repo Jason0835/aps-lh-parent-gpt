@@ -16,9 +16,11 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.IncrementConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
+import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
+import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.utils.IncrementService;
 import com.zlt.aps.utils.ThreadPoolUtil;
@@ -90,6 +92,7 @@ import com.zlt.msg.message.domain.vo.MessageContext;
 import com.zlt.msg.message.enums.MsgTypeEnums;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
@@ -451,9 +454,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         saveMpAdjustProcLog(contextDTO);
         //4、回填实际调整
         backfillRealAdjustResult(contextDTO);
-        //5、保存月计划统计结果
-        saveMonthPlanStatisticsResult(contextDTO);
-        //6、发送消息
+        //5、发送消息
         if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
             sendMsgRemainQtyNoFull(contextDTO);
         }
@@ -513,34 +514,46 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     /**
      * 构建月计划统计结果
-     * @param dailyCapacityMap 日产能限制Map（key=1-31日期，value=日产能限制实体）
      * @param mpProdFinalList  月计划定稿列表
-     * @param oneStructureAllocationList 月计划结构转产表-单结构列表
      * @return 统计结果列表
      */
-    protected List<MpMonthPlanStatistics> buildMonthPlanStatistics(Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
-                                                                   List<MpStructureAllocation> oneStructureAllocationList) {
-        List<MpMonthPlanStatistics> resultList = new ArrayList<>();
-        if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList)) {
+    protected MpMonthPlanStatistics buildMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = contextDTO.getDailyCapacityLimitVoMap();
+        List<MpStructureAllocation> oneStructureAllocationList = contextDTO.getOneStructureAllocationList();
+        if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList) || PubUtil.isEmpty(mpProdFinalList)) {
             log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划结构转产表-单结构列表为空，跳过不处理");
-            return resultList;
+            return null;
         }
-        FactoryMonthPlanFinalAdjustVo monthPlan = new FactoryMonthPlanFinalAdjustVo();
-        if (PubUtil.isNotEmpty(mpProdFinalList)) {
-            monthPlan = mpProdFinalList.get(0);
-        }
-        for (MpStructureAllocation structureAllocation : oneStructureAllocationList) {
-            MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
-            // 设置月计划统计相关字段
-            setMonthPlanStatisticsField(monthPlan, structureAllocation, statistics);
-            // 遍历日期，设置每个dayN字段
-            for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
-                setDayField(statistics, day, dailyCapacityMap);
+
+        FactoryMonthPlanFinalAdjustVo monthPlan = mpProdFinalList.get(0);
+
+        MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
+        // 设置月计划统计相关字段
+        setMonthPlanStatisticsField(monthPlan, oneStructureAllocationList.get(0), statistics);
+        // 遍历日期，设置每个dayN字段
+        String dayField;
+        int totalQty,oemQty;
+        for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
+            totalQty = 0;
+            oemQty = 0;
+            for (FactoryMonthPlanFinalAdjustVo prodFinal : mpProdFinalList){
+                dayField = FactoryConstant.DAY_FIELD + day;
+                if (prodFinal.getFieldValueByFieldName(dayField) == null){
+                    continue;
+                }
+                totalQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
+                if (YesOrNoEnum.YES.getCode().equals(prodFinal.getOemFlag())){
+                    //若是贴牌，计划量进行累计
+                    oemQty += (Integer) prodFinal.getFieldValueByFieldName(dayField);
+                }
             }
-            // 添加到结果列表
-            resultList.add(statistics);
+
+            setDayField(statistics, day, dailyCapacityMap,totalQty,oemQty);
         }
-        return resultList;
+        //同步更新上下文的结构统计
+        contextDTO.getStructureStatisticMap().put(contextDTO.getStructureName(),statistics);
+        return statistics;
     }
 
     /**
@@ -565,8 +578,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param statistics 月计划统计实体
      * @param day 日期
      * @param capacityMap 日产能限制Map
+     * @param totalQty 日总计划量
+     * @param oemQty OEM日总计划量
      */
-    private void setDayField(MpMonthPlanStatistics statistics, int day, Map<Integer, MpDailyCapacityLimitVo> capacityMap) {
+    private void setDayField(MpMonthPlanStatistics statistics, int day, Map<Integer, MpDailyCapacityLimitVo> capacityMap,int totalQty,int oemQty) {
         MpDailyCapacityLimitVo capacityVo = capacityMap == null ? null : capacityMap.get(day);
         if (capacityVo == null) {
             return;
@@ -575,6 +590,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
         dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
         dayProductionStatisticsDetailVo.setChangeMould(Convert.toInt(capacityVo.getUsedChangeMould(), 0).equals(0) ? null : capacityVo.getUsedChangeMould());
+        dayProductionStatisticsDetailVo.setTotalQty(totalQty);
+        dayProductionStatisticsDetailVo.setOemQty(oemQty);
+
         statistics.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + day, JSONObject.toJSONString(dayProductionStatisticsDetailVo));
     }
 
@@ -606,6 +624,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * 初始化OEM标记
+     * @param contextDTO
+     * @param mpFinalList
+     */
+    protected void initOemFlag(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpFinalList){
+        if (PubUtil.isEmpty(mpFinalList)){
+            return;
+        }
+        for (FactoryMonthPlanFinalAdjustVo prodFinal:mpFinalList){
+            if (contextDTO.getOemBrandConfigSet().contains(prodFinal.getBrand())){
+                prodFinal.setOemFlag(YesOrNoEnum.YES.getCode());
+            }else {
+                prodFinal.setOemFlag(YesOrNoEnum.NO.getCode());
+            }
+        }
+    }
+
+    /**
      * 保存月计划统计结果
      * @param contextDTO
      */
@@ -614,11 +650,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(monthPlanStatisticsList)){
             return;
         }
+
+        List<String> structureNameList = monthPlanStatisticsList.stream().filter(x->x != null && !StringUtil.isEmptyWithTrim(x.getStructureName()))
+                .map(x->x.getStructureName()).collect(Collectors.toList());
+        if (PubUtil.isEmpty(structureNameList)){
+            return;
+        }
         // 删除月计划统计结果（物理删除）
         mpMonthPlanStatisticsService.deleteMonthPlanStatisticsByCondition(contextDTO.getFactoryCode(),
-                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion());
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion(),structureNameList);
         // 去重月计划统计结果
-        monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
+        //monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
         baseDao.insertBatch(monthPlanStatisticsList);
         log.info("保存月计划统计结果成功，共新增:{}条记录", monthPlanStatisticsList.size());
@@ -789,12 +831,83 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             insertMonthPlanList(contextDTO);
             // 8、更新结构转产
             updateStructureAllocationList(contextDTO);
+            // 9、处理月计划统计结果
+            handleMonthPlanStatistics(contextDTO);
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
             throw new BusinessException("周程调整确认失败：" + e.getMessage());
         }
     }
+
+
+    /**
+     * 处理月计划统计结果
+     *
+     * @param contextDTO
+     */
+    protected void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO) {
+        // 获取月度生产计划
+        List<FactoryMonthPlanFinalAdjustVo> monthPLanList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isEmpty(monthPLanList)) {
+            log.warn("处理月计划统计结果：月度生产计划列表为空，直接返回");
+            return;
+        }
+        // 结构名称
+        String structureName = contextDTO.getStructureName();
+        monthPLanList = monthPLanList.stream()
+                .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
+                .collect(Collectors.toList());
+        if (PubUtil.isEmpty(monthPLanList)) {
+            log.warn("处理月计划统计结果：过滤后月度生产计划列表为空，直接返回");
+            return;
+        }
+
+        // 获取产品品类
+        String productType = ProductTypeEnum.WHOLE_STEEL.getValue();
+        FactoryMonthPlanFinalAdjustVo monthPlan = monthPLanList.get(0);
+        if (StringUtils.isNotEmpty(monthPlan.getProductTypeCode())) {
+            productType = monthPlan.getProductTypeCode();
+        }
+
+        // 设置周程滚动参数
+        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
+        // 设置工作日历
+        contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
+        // 设置月计划结构转产表-单结构
+        List<MpStructureAllocation> structureAllocationList = mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO);
+        List<MpStructureAllocation> oneStructureAllocationList = structureAllocationList.stream()
+                .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
+                .collect(Collectors.toList());
+        contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
+
+        // 初始化日产信息
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
+        weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
+        // 设置日产能限制Map
+        contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+
+        // 初始结构开始日\收尾日
+        initStructureStartAndEndDay(contextDTO);
+
+        // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
+
+        // 构建月计划统计结果
+        MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList);
+        List<MpMonthPlanStatistics> monthPlanStatisticsKList = new ArrayList<>();
+        monthPlanStatisticsKList.add(monthPlanStatistics);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsKList);
+
+        // 保存月计划统计结果
+        saveMonthPlanStatisticsResult(contextDTO);
+    }
+
+
+
+
 
     /**
      * 汇总调整明细
@@ -2084,6 +2197,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     public abstract void doAutoAdjust(MpRollAdjustContextDTO contextDTO);
 
+    /**
+     * 检查偶数
+     * @param number
+     * @return
+     */
+    protected boolean isEven(int number) {
+        return (number & 1) == 0;
+    }
 
     /**
      * 生成分布式唯一版本号
@@ -2836,20 +2957,27 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 productStatus = ConstructionStageEnum.TRIAL_FLAG;
             }
         }
-        // 按物料编码+产品状态优先级匹配SKU与示方书记录
-        MdmSkuConstructionRef skuConstructionRef = matchSkuConstruction(materialCode, productStatus, mdmSkuConstructionRefList);
-        // 检查SKU与示方书关系
-        List<String> errorMsgList = checkSkuConstructionRef(contextDTO, skuConstructionRef, materialCode);
-        if (PubUtil.isNotEmpty(errorMsgList)) {
-            return;
-        }
-        // 胎胚号
-        adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
         // 物料信息
         Map<String, MdmMaterialInfo> mdmMaterialInfoMap = contextDTO.getMdmMaterialInfoMap();
         MdmMaterialInfo materialInfo = MapUtils.getObject(mdmMaterialInfoMap, materialCode, new MdmMaterialInfo());
         // 结构名称
         adjustDetailVo.setStructureName(materialInfo.getStructureName());
+        // 按物料编码+产品状态优先级匹配SKU与示方书记录
+        MdmSkuConstructionRef skuConstructionRef = matchSkuConstruction(materialCode, productStatus, mdmSkuConstructionRefList);
+        // 错误信息列表
+        List<String> errorMsgList = new ArrayList<>();
+        // 结构名称
+        String structureName = contextDTO.getStructureName();
+        if (StringUtils.isEmpty(structureName) || StringUtils.equals(structureName, materialInfo.getStructureName())) {
+            // 检查SKU与示方书关系
+            errorMsgList = checkSkuConstructionRef(contextDTO, skuConstructionRef, materialCode);
+        }
+        if (PubUtil.isNotEmpty(errorMsgList)) {
+            return;
+        }
+        // 胎胚号
+        adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
+
         // 月计划结构转产
         Map<String, List<MpStructureAllocation>> structureAllocationMap = contextDTO.getStructureAllocationMap();
         List<MpStructureAllocation> structureAllocationList = MapUtils.getObject(structureAllocationMap, adjustDetailVo.getStructureName(), new ArrayList<>());

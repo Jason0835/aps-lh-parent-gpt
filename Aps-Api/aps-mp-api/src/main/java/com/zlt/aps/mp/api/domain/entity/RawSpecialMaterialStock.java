@@ -10,6 +10,7 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -100,6 +101,11 @@ public class RawSpecialMaterialStock extends BaseEntity {
     @ApiModelProperty(value = "库存", name = "stock")
     @TableField(value = "STOCK")
     private Integer stock;
+
+    /** 库存 */
+    @ApiModelProperty(value = "箱数", name = "packageNum")
+    @TableField(value = "PACKAGE_NUM")
+    private BigDecimal packageNum;
 
     /**
      * 原材料仓库数

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhDayFinishQtyMapper">
+
+    <update id="updateMonthPlanSurplus">
+        UPDATE t_lh_month_plan_surplus tlp
+            JOIN (SELECT YEAR   AS `YEAR`,
+                         MONTH  AS `MONTH`,
+                         FACTORY_CODE,
+                         PRODUCT_CODE,
+                         SPEC_CODE,
+                         SUM(DAY_FINISH_QTY) AS MONTH_FINISH_QTY
+                  FROM t_lh_day_finish_qty
+                  WHERE IS_DELETE = 0
+                  GROUP BY YEAR,
+                           MONTH,
+                           FACTORY_CODE,
+                           PRODUCT_CODE,
+                           SPEC_CODE) tdfq
+            ON tlp.`YEAR` = tdfq.`YEAR`
+                AND tlp.`MONTH` = tdfq.`MONTH`
+                AND tlp.FACTORY_CODE = tdfq.FACTORY_CODE
+                AND tlp.PRODUCT_CODE = tdfq.PRODUCT_CODE
+                AND tlp.SPEC_CODE = tdfq.SPEC_CODE
+        SET tlp.MONTH_FINISH_QTY = tdfq.MONTH_FINISH_QTY,
+            tlp.MONTH_REMAIN_QTY = tlp.MONTH_PLAN_QTY - tdfq.MONTH_FINISH_QTY
+        WHERE tlp.IS_DELETE = 0
+          AND tlp.YEAR = #{scheduleYear}
+          AND tlp.`MONTH` = #{scheduleMonth}
+    </update>
+
+    <update id="updateByScheduleResult">
+        UPDATE t_lh_day_finish_qty tldfq
+            JOIN (SELECT SCHEDULE_DATE AS FINISH_DATE,
+                         FACTORY_CODE,
+                         PRODUCT_CODE,
+                         SPEC_CODE,
+                         SUM(
+                                 IFNULL(CLASS1_FINISH_QTY, 0) +
+                                 IFNULL(CLASS2_FINISH_QTY, 0) +
+                                 IFNULL(CLASS3_FINISH_QTY, 0)
+                         )             AS DAY_FINISH_QTY
+                  FROM t_lh_schedule_result
+                  WHERE IS_DELETE = 0
+                  GROUP BY SCHEDULE_DATE,
+                           FACTORY_CODE,
+                           PRODUCT_CODE,
+                           SPEC_CODE) tdfq
+            ON tldfq.FINISH_DATE = tdfq.FINISH_DATE
+                AND tldfq.FACTORY_CODE = tdfq.FACTORY_CODE
+                AND tldfq.PRODUCT_CODE = tdfq.PRODUCT_CODE
+                AND tldfq.SPEC_CODE = tdfq.SPEC_CODE
+        SET tldfq.DAY_FINISH_QTY = tdfq.DAY_FINISH_QTY,
+        tldfq.YEAR = #{scheduleYear},
+        tldfq.MONTH = #{scheduleMonth}
+        WHERE tldfq.IS_DELETE = 0
+          AND tldfq.FINISH_DATE = #{scheduleDate}
+    </update>
+
+    <insert id="insertByScheduleResultNotExist">
+        INSERT INTO t_lh_day_finish_qty (YEAR,MONTH,FINISH_DATE, FACTORY_CODE, PRODUCT_CODE, SPEC_CODE, DAY_FINISH_QTY, IS_DELETE)
+        SELECT #{scheduleYear},#{scheduleMonth},sr.SCHEDULE_DATE,
+               sr.FACTORY_CODE,
+               sr.PRODUCT_CODE,
+               sr.SPEC_CODE,
+               SUM(
+                       IFNULL(CLASS1_FINISH_QTY, 0) +
+                       IFNULL(CLASS2_FINISH_QTY, 0) +
+                       IFNULL(CLASS3_FINISH_QTY, 0)
+               ),
+               0
+        FROM t_lh_schedule_result sr
+        WHERE sr.SCHEDULE_DATE = #{scheduleDate}
+        AND (NOT EXISTS (SELECT 1
+                          FROM t_lh_day_finish_qty tldfq
+                          WHERE tldfq.IS_DELETE = 0
+                            AND tldfq.FINISH_DATE = sr.SCHEDULE_DATE
+                            AND tldfq.FACTORY_CODE = sr.FACTORY_CODE
+                            AND tldfq.PRODUCT_CODE = sr.PRODUCT_CODE
+                            AND tldfq.SPEC_CODE = sr.SPEC_CODE))
+        GROUP BY sr.SCHEDULE_DATE,
+                 sr.FACTORY_CODE,
+                 sr.PRODUCT_CODE,
+                 sr.SPEC_CODE
+    </insert>
+</mapper>

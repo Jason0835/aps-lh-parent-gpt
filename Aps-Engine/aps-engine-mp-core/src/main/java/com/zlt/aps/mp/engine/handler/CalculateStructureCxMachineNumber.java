@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
@@ -9,6 +10,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.mp.engine.logrecorder.PlanRequireLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -75,7 +77,6 @@ public class CalculateStructureCxMachineNumber {
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(productionContext);
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer minProductionDays = paramConfiguration.getMinProductionDays();
-//        Integer minAllocationDays = paramConfiguration.getMinAllocationDays();
         mapGroupByStructureName.forEach((structureName, groupDatas) -> {
             ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(productionContext, structureName, productionContext.getProductType(), groupDatas);
             groupInfoMap.put(structureName, groupInfo);
@@ -122,9 +123,6 @@ public class CalculateStructureCxMachineNumber {
                 log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(
                         productionContext, structureName, groupInfo.getSumPlanQty(), groupInfo.getMinLhMachineCount(),
                         groupInfo.getMinLhDayCapacityQty(), groupInfo.getTheoryDays(), groupInfo.getNeedCxCapacityMachineCount()));
-//                if (!groupInfo.isSpecialMaterial()) {
-//
-//                }
             }
         });
         return groupInfoMap;
@@ -286,7 +284,7 @@ public class CalculateStructureCxMachineNumber {
      * @param productionContext 排产上下文
      * @return 模具最大产能
      */
-    private int calculateMaxMouldCapacity(ProductionPlanGroupInfo groupInfo, List<MonthPlanProductionRequirePlanVo> groupDatas, Map<String, Integer> maxEnableMouldNumberMap, TbrProductionContext productionContext) {
+    private Integer calculateMaxMouldCapacity(ProductionPlanGroupInfo groupInfo, List<MonthPlanProductionRequirePlanVo> groupDatas, Map<String, Integer> maxEnableMouldNumberMap, TbrProductionContext productionContext) {
         // 模具最大产能=日硫化量<取最小>*模具数/2 * 月度最大天数，若是共用模，合并计算；
         if (CollectionUtils.isEmpty(maxEnableMouldNumberMap)) {
             return BigDecimal.ZERO.intValue();
@@ -304,7 +302,7 @@ public class CalculateStructureCxMachineNumber {
         if (CollectionUtils.isEmpty(groupMap)) {
             return BigDecimal.ZERO.intValue();
         }
-        List<Long> totalMaxMouldCapacity = Lists.newArrayList();
+        List<Integer> totalMaxMouldCapacity = Lists.newArrayList();
         groupMap.forEach((groupKey, requirePlanList) -> {
             if (!maxEnableMouldNumberMap.containsKey(groupKey)) {
                 return;
@@ -315,9 +313,12 @@ public class CalculateStructureCxMachineNumber {
                 return;
             }
             //（1）计算结构向下主花纹模具的最大产能；模具最大产能=日硫化量<取最小>*模具数/2 * 月度最大天数，若是共用模，合并计算；
-            long maxMouldCapacity = groupInfo.getMinLhDayCapacityQty() * lhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION * productionContext.getMaxProductionDays();
+            Integer maxMouldCapacity = groupInfo.getMinLhDayCapacityQty() * lhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION * productionContext.getMaxProductionDays();
             // SUM（结构向下主花纹对应的所有SKU的净需求量）
-            long sumNetQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
+            Integer sumNetQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
+            //实单量
+            Integer sumActualQuantity = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+            PlanRequireLogRecorder.addRequireEstimateInfoLog(productionContext, groupKey, sumActualQuantity, sumNetQty, maxMouldCapacity);
             // （2）计算结构向下主花纹模具的最大可排产量 = MIN { SUM（结构向下主花纹对应的所有SKU的净需求量），主花纹模具的最大产能}；
             totalMaxMouldCapacity.add(Math.min(maxMouldCapacity, sumNetQty));
         });
@@ -325,11 +326,60 @@ public class CalculateStructureCxMachineNumber {
             return BigDecimal.ZERO.intValue();
         }
         //（3）按结构汇总需求量 = SUM(结构向下主花纹模具最大可排产量)；
-        BigDecimal result = BigDecimal.ZERO;
-        for (long maxMouldCapacity : totalMaxMouldCapacity) {
-            result = result.add(new BigDecimal(maxMouldCapacity));
+        Integer sumEffectiveQty = totalMaxMouldCapacity.stream().mapToInt(Integer::intValue).sum();
+        String structureType = productionPlanList.get(BigDecimal.ZERO.intValue()).getStructureType();
+        //非周期结构
+        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(structureType)) {
+            return sumEffectiveQty;
         }
-        return result.intValue();
+        //20260325+ 周期结构--获取比例
+        Integer percent = productionContext.getBaseDataContainer().getParamConfiguration().getReservePercent();
+        if (null == percent || percent < BigDecimal.ZERO.intValue()) {
+            return sumEffectiveQty;
+        }
+        Integer sumAllNetQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
+        //所有的实单
+        Integer sumActualQuantity = getAllActualQuantity(productionPlanList);
+        Integer addPercent = percent + ProductionConstant.PERCENTAGE;
+        //得到储备上限值
+        Integer maxCycleQty = BigDecimal.valueOf(sumActualQuantity).multiply(BigDecimal.valueOf(addPercent))
+                .divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
+        PlanRequireLogRecorder.addGroupRequireEstimateInfoLog(productionContext, percent, groupInfo.getGroupName(), sumActualQuantity, sumAllNetQty, sumEffectiveQty, maxCycleQty);
+        sumEffectiveQty = Math.min(sumEffectiveQty, maxCycleQty);
+        Integer realMaxCycleQty = sumEffectiveQty - sumActualQuantity;
+        groupInfo.setMaxCycleQty(realMaxCycleQty);
+        return sumEffectiveQty;
+    }
+
+    /**
+     * 获取实单总量，先按Sku分组
+     * 奇数+3 偶数+2
+     *
+     * @param productionPlanList
+     * @return
+     */
+    private Integer getAllActualQuantity(List<MonthPlanProductionRequirePlanVo> productionPlanList) {
+        if (CollectionUtils.isEmpty(productionPlanList)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Map<String, Integer> skuActualQuantityMap = Maps.newHashMap();
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuMap = productionPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        skuMap.forEach((materialDesc, skuDetailList) -> {
+            Integer sumActualQuantity = skuDetailList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+            if (sumActualQuantity <= BigDecimal.ZERO.intValue()) {
+                return;
+            }
+            if ((sumActualQuantity & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+            } else {
+                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+            }
+            skuActualQuantityMap.put(materialDesc, sumActualQuantity);
+        });
+        if (CollectionUtils.isEmpty(skuActualQuantityMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return skuActualQuantityMap.values().stream().mapToInt(Integer::intValue).sum();
     }
 
     /**

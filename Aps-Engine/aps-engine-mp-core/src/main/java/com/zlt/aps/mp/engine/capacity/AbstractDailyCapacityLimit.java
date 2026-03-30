@@ -239,7 +239,7 @@ public abstract class AbstractDailyCapacityLimit {
         //Map<String,Integer> patternDiffDailyQtyDecMouldMap = new HashMap<>();
         //Map<主花纹,换20条活字块的增模机台数>
         //Map<String,Integer> patternTwentyBlockAddMouldMap = new HashMap<>();
-
+        Integer changeMouldFirstQty = (Integer)paramMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
         int dayPlanQty,dailyLhQty;
         // 当日字段-dayField，昨日字段-day1Field，次日字段-day2Field
         String dayField = FactoryConstant.DAY_FIELD + iDay;
@@ -272,7 +272,7 @@ public abstract class AbstractDailyCapacityLimit {
                 dailyLhQty = getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
             }
             int tmpCount;
-            if (isDecMould(mpFinalVo,dayField,day1Field)){
+            if (isDecMould(mpFinalVo,dayField,day1Field,day2Field,iDay)){
                 //减模处理：
                 // 取整(日计划量/日单台硫化量)
                 fullMachinesDecMould += dayPlanQty / dailyLhQty;
@@ -299,7 +299,7 @@ public abstract class AbstractDailyCapacityLimit {
                 // 取整(日计划量/日单台硫化量)
                 fullMachinesAddMould += dayPlanQty / dailyLhQty;
                 // 统计有余数的SKU个数
-                int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day2Field);
+                int[]addMouldArr = getAddMouldMachines(mpFinalVo,dailyLhQty,paramMap,dayField,day1Field,day2Field);
                 openMachinesAddMould += addMouldArr[0];
                 blockMachinesAddMould += addMouldArr[1] + addMouldArr[2];
                 // 统计换模次数(区别于addMouldArr[0]，主要是将收尾的排除)
@@ -319,7 +319,7 @@ public abstract class AbstractDailyCapacityLimit {
             }
 
             // 统计胎胚种类数
-            if (dayPlanQty >= 0){
+            if (dayPlanQty >= changeMouldFirstQty){
                 embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
                 dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
             }
@@ -519,7 +519,7 @@ public abstract class AbstractDailyCapacityLimit {
      * [3]--换模次数
      * @param mpFinalVo
      */
-    public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day2Field) {
+    public int[] getAddMouldMachines(BaseEntity mpFinalVo,Integer dailyLhQty,Map<String,Object> paramMap,String dayField,String day1Field,String day2Field) {
         //增模台数：有余数(日计划量/日单台硫化量)，记1台
         // 日计划量
         Integer dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
@@ -542,13 +542,28 @@ public abstract class AbstractDailyCapacityLimit {
             //若余数 == 换模起排量，则视新增机台数
             resultArr[0] = 1;
             resultArr[3] = 1;
+            if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
+                    mpFinalVo.getFieldValueByFieldName(day2Field) == null){
+                //若次日为空，则当日的8也是收尾，不算换模
+                resultArr[3] = 0;
+            }
         }else if (remainQty == changeMouldBlockQty){
             //若余数 == 换活字块20条
             resultArr[1] = 1;
             resultArr[3] = 1;
+            if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
+                    mpFinalVo.getFieldValueByFieldName(day2Field) == null){
+                //若次日为空，则当日的8也是收尾，不算换模
+                resultArr[3] = 0;
+            }
         }else if (remainQty == changeMouldXBlockQty){
             resultArr[2] = 1;
             resultArr[3] = 1;
+            if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
+                    mpFinalVo.getFieldValueByFieldName(day2Field) == null){
+                //若次日为空，则当日的8也是收尾，不算换模
+                resultArr[3] = 0;
+            }
         }else {
             resultArr[0] = 1;
         }
@@ -571,9 +586,11 @@ public abstract class AbstractDailyCapacityLimit {
                 resultArr[3] = afterMachines;
                 //例子：
                 //16 46
+                //40（32+8） 104(每日52)
                 if (remainQty != changeMouldBlockQty || remainQty != changeMouldXBlockQty){
                     int mouldCount = remainQty / changeMouldFirstQty;
-                    if (mouldCount > afterMachines){
+                    //3是换活块32/8与换模8/8的倍差
+                    if (mouldCount > afterMachines && (mouldCount - afterMachines)<3){
                         resultArr[0] = mouldCount;
                         resultArr[3] = mouldCount;
                     }
@@ -597,9 +614,10 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mpFinalVo 定稿对象Vo
      * @param dayField 当日计划量字段
      * @param day1Field 昨日计划量字段
+     * @param day2Field 明天计划量字段
      * @return
      */
-    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field){
+    public boolean isDecMould(BaseEntity mpFinalVo,String dayField,String day1Field,String day2Field, int iDay){
         if (mpFinalVo.getFieldValueByFieldName(dayField) == null){
             return false;
         }
@@ -607,11 +625,13 @@ public abstract class AbstractDailyCapacityLimit {
         // 日计划量
         Integer dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
 
-        //1. 若次日计划量 < 当日计划量
-      /*  if (mpFinalVo.getFieldValueByFieldName(day2Field) != null &&
-                (Integer)mpFinalVo.getFieldValueByFieldName(day2Field) < dayPlanQty) {
-            return true;
-        }*/
+        if (iDay == FactoryConstant.MONTH_START_DAY){
+            //1. 若是1号，采用后置判断 次日计划量 为空时，表示减量
+            if (mpFinalVo.getFieldValueByFieldName(day2Field) == null ||
+                    dayPlanQty > (Integer)mpFinalVo.getFieldValueByFieldName(day2Field)) {
+                return true;
+            }
+        }
 
         //2. 若昨日计划量 > 当日计划量
         if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
@@ -656,8 +676,10 @@ public abstract class AbstractDailyCapacityLimit {
      * @return true-满足，false-不满足
      */
     public boolean checkCapacitySatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        int maxLhMachines = dailyCapacityLimitVo.getRemainLhMachines() > dailyCapacityLimitVo.getMaxLhMachines() ? dailyCapacityLimitVo.getMaxLhMachines() : dailyCapacityLimitVo.getRemainLhMachines();
         return dailyCapacityLimitVo.getUsedEmbryoTypes() <= dailyCapacityLimitVo.getMaxEmbryoTypes() &&
-                dailyCapacityLimitVo.getUsedLhMachines() <= dailyCapacityLimitVo.getMaxLhMachines();
+                dailyCapacityLimitVo.getUsedLhMachines() <= maxLhMachines &&
+                dailyCapacityLimitVo.getUsedChangeMould() <= dailyCapacityLimitVo.getRemainChangeMould();
     }
 
     /**
@@ -669,8 +691,10 @@ public abstract class AbstractDailyCapacityLimit {
         if (dailyCapacityLimitVo == null) {
             return Boolean.FALSE;
         }
+        int maxLhMachines = dailyCapacityLimitVo.getRemainLhMachines() > dailyCapacityLimitVo.getMaxLhMachines() ? dailyCapacityLimitVo.getMaxLhMachines() : dailyCapacityLimitVo.getRemainLhMachines();
         return dailyCapacityLimitVo.getUsedEmbryoTypes() < dailyCapacityLimitVo.getMaxEmbryoTypes() &&
-                dailyCapacityLimitVo.getUsedLhMachines() < dailyCapacityLimitVo.getMaxLhMachines();
+                dailyCapacityLimitVo.getUsedLhMachines() < maxLhMachines &&
+                dailyCapacityLimitVo.getUsedChangeMould() < dailyCapacityLimitVo.getRemainChangeMould();
     }
 
     public Integer getDayVulcanizationQty(BaseEntity mpFinalVo){

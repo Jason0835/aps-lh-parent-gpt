@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper">
+
+    <resultMap id="BaseResultMap" type="com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan">
+        <id column="ID" property="id"/>
+        <result column="DEV_CODE" property="devCode"/>
+        <result column="PRECISION_TYPE" property="precisionType"/>
+        <result column="OPER_TIME" property="operTime"/>
+        <result column="FIRST_WASH_TIME" property="firstWashTime"/>
+        <result column="DEL_FLAG" property="delFlag"/>
+        <result column="DATA_VERSION" property="dataVersion"/>
+        <result column="COMPANY_CODE" property="companyCode"/>
+        <result column="FACTORY_CODE" property="factoryCode"/>
+        <result column="CREATE_BY" property="createBy"/>
+        <result column="CREATE_TIME" property="createTime"/>
+        <result column="UPDATE_BY" property="updateBy"/>
+        <result column="UPDATE_TIME" property="updateTime"/>
+        <result column="REMARK" property="remark"/>
+    </resultMap>
+
+    <select id="selectByUniqueKey" resultMap="BaseResultMap">
+        SELECT
+            ID, DEV_CODE, PRECISION_TYPE, OPER_TIME, FIRST_WASH_TIME,
+            DEL_FLAG, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
+            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
+        FROM T_MDM_DEV_MAINTENANCE_PLAN
+        WHERE DEV_CODE = #{devCode}
+          AND PRECISION_TYPE = #{precisionType}
+          AND FACTORY_CODE = #{factoryCode}
+    </select>
+
+    <select id="selectByUniqueKeyList" resultMap="BaseResultMap">
+        SELECT
+            ID, DEV_CODE, PRECISION_TYPE, OPER_TIME, FIRST_WASH_TIME,
+            DEL_FLAG, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
+            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
+        FROM T_MDM_DEV_MAINTENANCE_PLAN
+        WHERE (DEV_CODE, PRECISION_TYPE, FACTORY_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.devCode}, #{item.precisionType}, #{item.factoryCode})
+        </foreach>
+    </select>
+
+</mapper>

@@ -98,4 +98,12 @@ public class MdmMoldingMachine extends BaseEntity {
     @TableField(value = "REMARK")
     private String remark;
 
+
+    /**
+     * 是否启用：0-禁用 1-启用
+     */
+    @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
+    @TableField("IS_ACTIVE")
+    private Integer isActive;
+
 }

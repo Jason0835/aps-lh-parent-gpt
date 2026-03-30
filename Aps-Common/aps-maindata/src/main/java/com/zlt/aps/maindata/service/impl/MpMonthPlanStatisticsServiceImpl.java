@@ -66,8 +66,8 @@ public class MpMonthPlanStatisticsServiceImpl extends AbstractDocService<MpMonth
     }
 
     @Override
-    public void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion) {
-        monthPlanStatisticsEntityMapper.deleteMonthPlanStatisticsByCondition(factoryCode,year,month,productionVersion);
+    public void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion,List<String> structureList) {
+        monthPlanStatisticsEntityMapper.deleteMonthPlanStatisticsByCondition(factoryCode,year,month,productionVersion,structureList);
     }
 
 }

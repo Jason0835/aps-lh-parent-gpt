@@ -164,6 +164,15 @@ public class ProductionCapacityParamConfiguration {
     private Integer reservePercent;
 
     /**
+     * SYS0203014 按高优先级SKU个数降序的结构清单-前 X 个结构，单位个
+     */
+    private Integer structureBillPreCount;
+
+    /**
+     * 是否写入日志
+     */
+    private String isWriteCycleLog;
+    /**
      * 参与排产的特殊原材料编码信息
      */
     private Set<String> specialMaterialCodeSet;

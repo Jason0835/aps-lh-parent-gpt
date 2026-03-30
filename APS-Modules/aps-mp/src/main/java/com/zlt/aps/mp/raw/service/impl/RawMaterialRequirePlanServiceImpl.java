@@ -367,7 +367,7 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
         queryWrapper.select("version", "MAX(CREATE_TIME) as createTime")
                 .groupBy("version")
-                .orderByDesc("create_time");
+                .orderByDesc("createTime");
         
         List<Map<String, Object>> versionList = rawMaterialRequirePlanMapper.selectMaps(queryWrapper);
         

@@ -69,6 +69,11 @@ public enum TbrMouldProductionLogType {
      * 20-01 开始分组(结构)排产
      */
     START_GROUP("20-01", "开始分组(结构)排产"),
+
+    /**
+     * 20-35 分组产能释放
+     */
+    GROUP_DEDUCTION_DAY("20-35", "分组产能释放"),
     /**
      * 20-02 获取排产版本计划数据
      */
@@ -140,11 +145,19 @@ public enum TbrMouldProductionLogType {
     /**
      * 20-44 特殊原材料结构排产
      */
-    SPECIAL_MATERIAL_GROUP_PRODUCTION("20-44","特殊原材料结构排产"),
+    SPECIAL_MATERIAL_GROUP_PRODUCTION("20-44", "特殊原材料结构排产"),
     /**
      * 20-25 结构提前收尾业务
      */
     GROUP_BEFORE_CONCLUSION("20-25", "结构提前收尾业务"),
+    /**
+     * 20-26 结构收尾业务
+     */
+    GROUP_CONCLUSION("20-25", "结构收尾业务"),
+    /**
+     * 20-27 结构延长收尾业务
+     */
+    GROUP_TIME_EXTENSION_CONCLUSION("20-27", "结构延长收尾业务"),
     /**
      * 20-26 日排产限制业务控制
      */
@@ -153,6 +166,10 @@ public enum TbrMouldProductionLogType {
      * 20-14-01-05 在机分组使用在产机台排产硫化组
      */
     CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE("20-14-01-05", "在机分组使用在产机台排产硫化组"),
+    /**
+     * 20-14-99 分组查找硫化组
+     */
+    GROUP_FIND_LH_MACHINE_RANGE("20-14-01-05", "分组查找硫化组"),
     /**
      * 20-14-01-06 在机结构模具排产硫化组找到排产Sku
      */
@@ -289,7 +306,7 @@ public enum TbrMouldProductionLogType {
     /**
      * 20-90 成型补量分配
      */
-    SUPPLEMENT_CX_MACHINE_DISTRIBUTION("20-90","成型补量分配"),
+    SUPPLEMENT_CX_MACHINE_DISTRIBUTION("20-90", "成型补量分配"),
     /**
      * 30-01-00 开始分组计划模具排产
      */
@@ -375,6 +392,10 @@ public enum TbrMouldProductionLogType {
      */
     FORMAL_MOULD_START("40-01", "分组计划正式开始模具排产"),
     /**
+     * 40-01-09 周期储备控制
+     */
+    CYCLE_CONTROL_PRODUCTION("40-01-09", "周期储备控制"),
+    /**
      * 40-02 分组计划正式开始模具排产数据重置完成
      */
     FORMAL_MOULD_RESET_DATA_FINISH("40-02", "分组计划正式开始模具排产数据重置完成"),
@@ -406,6 +427,10 @@ public enum TbrMouldProductionLogType {
      * 40-05 新增结构开始正式排产
      */
     FORMAL_MOULD_ADD_GROUP_SINGLE_GROUP("40-05", "新增结构开始正式排产"),
+    /**
+     * 40-51 续作排产
+     */
+    CONTINUE_SKU_PRODUCTION("40-51", "续作排产"),
     /**
      * 99 一键排产结束
      */

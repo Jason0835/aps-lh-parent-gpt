@@ -94,11 +94,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             return;
         }
         // 排产版本为空，默认查询当前年月最新的排产版本
-        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
-        param.setFactoryCode(queryCondition.getFactoryCode());
-        param.setYear(queryCondition.getYear());
-        param.setMonth(queryCondition.getMonth());
-        List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
+        List<FactoryMonthPlanProductionFinalResult> monthPlanResultList = listMonthProdFinalPlans(queryCondition);
         if (PubUtil.isEmpty(monthPlanResultList)) {
             return;
         }
@@ -106,6 +102,19 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         String productionVersion = monthPlanResultList.get(0).getProductionVersion();
         log.info("排产版本为空，默认查询当前年月最新的排产版本:{}", productionVersion);
         queryCondition.setProductionVersion(productionVersion);
+    }
+
+
+    /**
+     * 获取定稿版本的月度计划
+     * @param queryCondition
+     */
+    private List<FactoryMonthPlanProductionFinalResult> listMonthProdFinalPlans(MpStructureAllocation queryCondition) {
+        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
+        param.setFactoryCode(queryCondition.getFactoryCode());
+        param.setYear(queryCondition.getYear());
+        param.setMonth(queryCondition.getMonth());
+        return monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
     }
 
 

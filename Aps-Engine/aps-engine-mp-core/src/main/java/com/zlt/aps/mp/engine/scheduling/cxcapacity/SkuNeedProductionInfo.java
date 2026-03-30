@@ -43,8 +43,8 @@ public class SkuNeedProductionInfo implements Serializable {
         if (CollectionUtils.isEmpty(needProductionList)) {
             return BigDecimal.ZERO.intValue();
         }
-        if (ProductionQtyModelEnum.RESERVE_QTY == productionQtyModel) {
-            return needProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
+        if (ProductionQtyModelEnum.REMAIN_MATCHING_QTY == productionQtyModel) {
+            return needProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         }
         if (ProductionQtyModelEnum.NET_QTY == productionQtyModel) {
             return needProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();

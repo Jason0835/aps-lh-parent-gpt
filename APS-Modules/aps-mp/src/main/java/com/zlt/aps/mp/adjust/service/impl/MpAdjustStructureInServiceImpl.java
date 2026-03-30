@@ -7,8 +7,13 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.ProductionProcessesTypeEnum;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
@@ -33,15 +38,18 @@ import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImp
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.sysdef.domain.SysDocType;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -90,6 +98,12 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
 
     @Autowired
     private IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
+
+    @Autowired
+    private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+
+    @Autowired
+    private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
 
     @Autowired
     private DataManager dataManager;
@@ -245,12 +259,15 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.CHANGE_MOULD_LH_MACHINE_NUMBER.getCode());
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
         paramCodeList.add(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
         return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
@@ -260,6 +277,21 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         wrapper.eq( "FACTORY_CODE", contextDTO.getFactoryCode());
         wrapper.eq("PRODUCTION_VERSION", contextDTO.getProductionVersion());
         return structureAllocationEntityMapper.selectList(wrapper);
+    }
+
+    @Override
+    public Map<String, MpMonthPlanStatistics> loadMpMonthPlanStatistics(MpRollAdjustContextDTO contextDTO) {
+        if (StringUtils.isEmpty(contextDTO.getProductionVersion())) {
+            return new HashMap<>();
+        }
+        LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, contextDTO.getFactoryCode());
+        queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, contextDTO.getProductionVersion());
+        Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
+                .stream().collect(
+                        Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        return statisticsMap;
     }
 
     @Override
@@ -344,5 +376,14 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, contextDTO.getFactoryCode());
         return mdmStructureLhRatioEntityMapper.selectList(queryWrapper);
+    }
+
+    @Override
+    public Integer getLhMachineCount(MpRollAdjustContextDTO contextDTO) {
+        QueryWrapper<LhMachineInfo> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
+        queryWrapper.eq("STATUS", YesOrNoEnum.YES.getValue());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        return lhMachineInfoEntityMapper.selectCount(queryWrapper).intValue();
     }
 }

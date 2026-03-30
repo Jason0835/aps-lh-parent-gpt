@@ -22,9 +22,9 @@ public enum ProductionQtyModelEnum {
      */
     NET_QTY(1, "总净需求量"),
     /**
-     * 2 总净需求量
+     * 2 剩余可搭配量
      */
-    RESERVE_QTY(2, "常规储备量");
+    REMAIN_MATCHING_QTY(2, "剩余可搭配量");
 
     private Integer modelCode;
 

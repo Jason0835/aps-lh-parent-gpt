@@ -30,4 +30,8 @@ public class MatchingProductionAdjuestVo {
      * 排产数量
      */
     private Integer productionQty;
+    /**
+     * 日硫化产能
+     */
+    private Integer dayVulcanizationQty;
 }

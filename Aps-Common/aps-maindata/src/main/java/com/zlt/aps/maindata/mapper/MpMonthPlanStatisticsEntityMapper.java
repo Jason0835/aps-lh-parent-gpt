@@ -5,6 +5,8 @@ import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpMonthPlanStatisticsMapper.java
@@ -31,6 +33,7 @@ public interface MpMonthPlanStatisticsEntityMapper extends CommBaseMapper<MpMont
     void deleteMonthPlanStatisticsByCondition(@Param("factoryCode") String factoryCode,
                                      @Param("year") String year,
                                      @Param("month") String month,
-                                     @Param("productionVersion") String productionVersion);
+                                     @Param("productionVersion") String productionVersion,
+                                              @Param("structureList") List<String> structureList);
 
 }

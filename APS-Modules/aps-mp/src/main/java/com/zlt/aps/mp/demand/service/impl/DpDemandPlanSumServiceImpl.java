@@ -89,7 +89,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
     @Override
     public void batchUpdateForDemand(DpDemandPlanSum billVO) {
         DpDemandPlanSum existObj =  dpDemandPlanSumEntityMapper.selectById(billVO.getId());
-        updateDpDemandPlanSum(billVO);
+        updateDpDemandPlanSum(billVO,existObj);
         List<DpDemandPlan> list = this.findDemandPlan(existObj);
         if(CollectionUtils.isEmpty(list)) {
             return;
@@ -99,9 +99,15 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             this.baseDao.updateBatch(list);
             return;
         }
+        if(StringUtils.isNotBlank(billVO.getStructurePriority())) {
+            batchUpdateStructurePriorityForDemandPlan(billVO,existObj);
+            return;
+        }
         list.forEach(dpDemandPlan -> dpDemandPlan.setIsProduction(billVO.getIsProduction()));
         this.baseDao.updateBatch(list);
     }
+
+
 
     @Override
     public List<String> findMonthPlanVersion(DpDemandPlanSum queryCondition) {
@@ -313,16 +319,51 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
         }
     }
 
-    private void updateDpDemandPlanSum(DpDemandPlanSum billVO) {
+    private void updateDpDemandPlanSum(DpDemandPlanSum billVO,DpDemandPlanSum existObj) {
         if(StringUtils.isNotBlank(billVO.getScmPriority())) {
             billVO.setScmPriority(billVO.getScmPriority());
             this.dpDemandPlanSumEntityMapper.updateById(billVO);
+            return;
+        }
+        if(StringUtils.isNotBlank(billVO.getStructurePriority())) {
+            batchUpdateStructurePriorityForDemandPlanSum(billVO,existObj);
             return;
         }
         billVO.setIsProduction(billVO.getIsProduction());
         this.dpDemandPlanSumEntityMapper.updateById(billVO);
 
     }
+
+    private void batchUpdateStructurePriorityForDemandPlanSum(DpDemandPlanSum billVO, DpDemandPlanSum existObj) {
+        DpDemandPlanSum param = new DpDemandPlanSum();
+        param.setStructurePriority(billVO.getStructurePriority());
+        param.setBaseVale(existObj.getId());
+        LambdaQueryWrapper<DpDemandPlanSum> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(DpDemandPlanSum::getFactoryCode, existObj.getFactoryCode());
+        wrapper.eq(DpDemandPlanSum::getYear, existObj.getYear());
+        wrapper.eq(DpDemandPlanSum::getMonth, existObj.getMonth());
+        wrapper.eq(DpDemandPlanSum::getProductTypeCode, existObj.getProductTypeCode());
+        wrapper.eq(DpDemandPlanSum::getMonthPlanVersion, existObj.getMonthPlanVersion());
+        wrapper.eq(DpDemandPlanSum::getStructureName, existObj.getStructureName());
+        wrapper.eq(DpDemandPlanSum::getIsDelete, YesOrNoEnum.NO.getValue());
+        this.dpDemandPlanSumEntityMapper.update(param,wrapper);
+    }
+
+    private void batchUpdateStructurePriorityForDemandPlan(DpDemandPlanSum billVO, DpDemandPlanSum existObj) {
+        DpDemandPlan param = new  DpDemandPlan();
+        param.setStructurePriority(billVO.getStructurePriority());
+        param.setBaseVale(existObj.getId());
+        LambdaQueryWrapper<DpDemandPlan> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(DpDemandPlan::getFactoryCode, existObj.getFactoryCode());
+        wrapper.eq(DpDemandPlan::getYear, existObj.getYear());
+        wrapper.eq(DpDemandPlan::getMonth, existObj.getMonth());
+        wrapper.eq(DpDemandPlan::getProductTypeCode, existObj.getProductTypeCode());
+        wrapper.eq(DpDemandPlan::getMonthPlanVersion, existObj.getMonthPlanVersion());
+        wrapper.eq(DpDemandPlan::getStructureName, existObj.getStructureName());
+        wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
+        this.demandPlanEntityMapper.update(param,wrapper);
+    }
+
 
     private List<DpDemandPlan> findDemandPlan(DpDemandPlanSum existObj) {
         LambdaQueryWrapper<DpDemandPlan> wrapper = Wrappers.lambdaQuery();
@@ -334,6 +375,5 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
         wrapper.eq(DpDemandPlan::getMaterialDesc, existObj.getMaterialDesc());
         wrapper.eq(DpDemandPlan::getIsDelete, YesOrNoEnum.NO.getValue());
         return demandPlanEntityMapper.selectList(wrapper);
-
     }
 }

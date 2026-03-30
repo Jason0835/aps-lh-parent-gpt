@@ -131,6 +131,24 @@ public class MpAdjustResult extends BaseEntity {
     @TableField(value = "TOTAL_PLAN_QTY")
     private Integer totalPlanQty;
 
+    /** 主花纹 */
+    @Excel(name = "ui.data.column.mpAdjustResult.mainPattern")
+    @ApiModelProperty(value = "主花纹", name = "mainPattern")
+    @TableField(value = "MAIN_PATTERN")
+    private String mainPattern;
+
+    /** 型腔 */
+    @Excel(name = "ui.data.column.mpAdjustResult.mouldCavityQty")
+    @ApiModelProperty(value = "型腔", name = "mouldCavityQty")
+    @TableField(value = "MOULD_CAVITY_QTY")
+    private Integer mouldCavityQty;
+
+    /** 活块 */
+    @Excel(name = "ui.data.column.mpAdjustResult.typeBlockQty")
+    @ApiModelProperty(value = "活块", name = "typeBlockQty")
+    @TableField(value = "TYPE_BLOCK_QTY")
+    private Integer typeBlockQty;
+
     /**
      * 开始日期
      */

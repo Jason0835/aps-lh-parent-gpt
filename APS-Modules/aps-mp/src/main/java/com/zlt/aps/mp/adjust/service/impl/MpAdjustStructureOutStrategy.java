@@ -15,7 +15,10 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureOutService;
@@ -49,7 +52,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
 
     @Autowired
-    private MatchingProductionHandler matchingProductionHandler;
+    private MatchingAdjuestProductionHandler matchingAdjuestProductionHandler;
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -73,19 +76,19 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 //            return new BusinessException(errorMsg);
 //        });
 
-        // 检查有错误的信息
-        Map<String, List<String>> messageMap = contextDTO.getMessageMap();
-        List<String> errorMsgList = messageMap.get(ApsConstant.APS_STRING_1);
-        if (PubUtil.isNotEmpty(errorMsgList)) {
-            String errorMsg = Optional.ofNullable(errorMsgList)
-                    .orElse(Collections.emptyList())
-                    .stream()
-                    .distinct()
-                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
-            Assert.isFalse(StringUtils.isNotEmpty(errorMsg), () -> {
-                return new BusinessException(errorMsg);
-            });
-        }
+//        // 检查有错误的信息
+//        Map<String, List<String>> messageMap = contextDTO.getMessageMap();
+//        List<String> errorMsgList = messageMap.get(ApsConstant.APS_STRING_1);
+//        if (PubUtil.isNotEmpty(errorMsgList)) {
+//            String errorMsg = Optional.ofNullable(errorMsgList)
+//                    .orElse(Collections.emptyList())
+//                    .stream()
+//                    .distinct()
+//                    .collect(Collectors.joining(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE));
+//            Assert.isFalse(StringUtils.isNotEmpty(errorMsg), () -> {
+//                return new BusinessException(errorMsg);
+//            });
+//        }
 
         // 4、通过排产机台、结构筛选结构外调整明细
         filterAdjustDetailList(contextDTO,resultList);
@@ -292,7 +295,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
         //结构外调整记录
-        contextDTO.setMpAdjustStructureOutList(mpAdjustStructureOutService.selectMpAdjustStructureOutList(contextDTO));
+        contextDTO.setMpAdjustStructureOutList(getAdjustDataWithDoOddEven(mpAdjustStructureOutService.selectMpAdjustStructureOutList(contextDTO)));
         //1.结构外订单调整记录空检查
         if (PubUtil.isEmpty(contextDTO.getMpAdjustStructureOutList())){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
@@ -306,6 +309,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         //contextDTO.setStructureName(contextDTO.getStructureName());
         List<FactoryMonthPlanFinalAdjustVo> oneStructMpFinalList = mpProdFinalMap.get(contextDTO.getStructureName()) == null ? new ArrayList<>():mpProdFinalMap.get(contextDTO.getStructureName());
+        // 初始OEM标识
+        initOemFlag(contextDTO,oneStructMpFinalList);
         contextDTO.setSpecStructureTotalQty(0);
         if (YesOrNoEnum.YES.getCode().equals(contextDTO.getMpAdjustStructureOutList().get(0).getHasSpecialMaterial())){
             //若是特殊结构,预存特殊结构的总实际排产量
@@ -335,7 +340,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         //7 执行结构间搭配排产,暂不考虑特殊结构
         //=========================================================
-        matchingProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList, false);
+        matchingAdjuestProductionHandler.matchingAdjustProduction(contextDTO, oneStructMpFinalList, false);
         //=========================================================
 
         //8.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
@@ -346,15 +351,35 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
         }
 
-        //10.构建月计划统计结果
-        List<MpMonthPlanStatistics> monthPlanStatisticsList = buildMonthPlanStatistics(contextDTO.getDailyCapacityLimitVoMap(), mpProdFinalMap.get(contextDTO.getStructureName()), contextDTO.getOneStructureAllocationList());
-
         contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
-        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         contextDTO.setSaveAdjustProcLogList(contextDTO.getAdjustProcLogList());
 
-        //11.保存调整日志
+        //10.保存调整日志
         saveMpAdjustLog(contextDTO);
+    }
+
+    /**
+     * 获取调整数据，并处理奇偶性
+     * @param mpAdjustStructureOutList
+     * @return
+     */
+    private List<MpAdjustStructureOut> getAdjustDataWithDoOddEven(List<MpAdjustStructureOut> mpAdjustStructureOutList){
+        if (PubUtil.isEmpty(mpAdjustStructureOutList)){
+            return mpAdjustStructureOutList;
+        }
+        for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
+            if (structureOut.getConfirmAdjustQty() == null || structureOut.getConfirmAdjustQty() <= 0){
+                continue;
+            }
+            if (isEven(structureOut.getConfirmAdjustQty())){
+                //偶数 + 2
+                structureOut.setConfirmAdjustQty(structureOut.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER);
+            }else{
+                //奇数 + 3
+                structureOut.setConfirmAdjustQty(structureOut.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER);
+            }
+        }
+        return mpAdjustStructureOutList;
     }
 
     @Override

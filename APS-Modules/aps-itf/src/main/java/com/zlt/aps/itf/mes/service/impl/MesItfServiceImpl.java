@@ -14,13 +14,16 @@ import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.MesItfService;
+import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
-import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.itf.vo.GoodsBoxVo;
-import com.zlt.aps.itf.vo.MdmProductStockContext;
-import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
+import com.zlt.aps.maindata.mapper.MdmCxScheFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmLhScheFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmCxScheDayFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmLhScheDayFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMoldAlterPlanFinishEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
@@ -60,12 +63,36 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
     @Autowired
     private MdmMouldShellInfoEntityMapper mouldShellInfoEntityMapper;
+
+    @Autowired
+    private MdmCxScheFinishQtyEntityMapper cxScheFinishQtyEntityMapper;
+    @Autowired
+    private MdmLhScheFinishQtyEntityMapper lhScheFinishQtyEntityMapper;
+    @Autowired
+    private MdmCxScheDayFinishQtyEntityMapper cxScheDayFinishQtyEntityMapper;
+    @Autowired
+    private MdmLhScheDayFinishQtyEntityMapper lhScheDayFinishQtyEntityMapper;
+    @Autowired
+    private MdmMoldAlterPlanFinishEntityMapper moldAlterPlanFinishEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
     private IFactoryParamService iFactoryParamService;
+
     @Autowired
     private MdmCycleSchStruConfEntityMapper cycleSchStruConfEntityMapper;
+
+    @Autowired
+    private MdmDevMaintenancePlanEntityMapper devMaintenancePlanEntityMapper;
+
+    @Autowired
+    private MdmLhRepairCapsuleEntityMapper lhRepairCapsuleEntityMapper;
+
+    @Autowired
+    private MdmMouldCleanPlanEntityMapper mouldCleanPlanEntityMapper;
+
+    @Autowired
+    private MdmStructureTreadConfigEntityMapper structureTreadConfigEntityMapper;
 
     @Autowired
     private IMdmProductModelRelationService iMdmProductModelRelationService;
@@ -809,5 +836,856 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MesBrandDict> selectMesBrandDict() {
         return mesViewMapper.selectMesBrandDict();
+    }
+
+    /**
+     * 同步成型在机数据
+     * @param mdmCxMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMachineOnlineInfo(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
+        // 查询中间表数据
+        List<MdmCxMachineOnlineInfo> syncList = mesItfMapper.selectCxMachineOnlineSyncList(mdmCxMachineOnlineInfo);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            if (CollectionUtils.isNotEmpty(syncList)) {
+                // 先删除旧数据，再插入新数据
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", mdmCxMachineOnlineInfo.getFactoryCode());
+                baseDao.deleteByMap(MdmCxMachineOnlineInfo.class, map);
+
+                for (MdmCxMachineOnlineInfo info : syncList) {
+                    info.setCreateBy("MES");
+                    info.setUpdateBy("MES");
+                    info.setCreateTime(DateUtils.getNowDate());
+                    info.setUpdateTime(DateUtils.getNowDate());
+                }
+
+                List<List<MdmCxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+                for (List<MdmCxMachineOnlineInfo> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步硫化在机数据
+     * @param mdmLhMachineOnlineInfo 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhMachineOnlineInfo(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
+        // 查询中间表数据
+        List<MdmLhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncList(mdmLhMachineOnlineInfo);
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            if (CollectionUtils.isNotEmpty(syncList)) {
+                // 先删除旧数据，再插入新数据
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", mdmLhMachineOnlineInfo.getFactoryCode());
+                baseDao.deleteByMap(MdmLhMachineOnlineInfo.class, map);
+
+                for (MdmLhMachineOnlineInfo info : syncList) {
+                    info.setCreateBy("MES");
+                    info.setUpdateBy("MES");
+                    info.setCreateTime(DateUtils.getNowDate());
+                    info.setUpdateTime(DateUtils.getNowDate());
+                }
+
+                List<List<MdmLhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+                for (List<MdmLhMachineOnlineInfo> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步设备保养计划
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmDevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
+
+        // 唯一键重复随机取一条（设备机台+精度类型+厂别）
+        Map<String, MdmDevMaintenancePlan> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmDevMaintenancePlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmDevMaintenancePlan> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmDevMaintenancePlan> existsList = devMaintenancePlanEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmDevMaintenancePlan plan = new MdmDevMaintenancePlan();
+                            plan.setDevCode(item.getDevCode());
+                            plan.setPrecisionType(item.getPrecisionType());
+                            plan.setFactoryCode(item.getFactoryCode());
+                            return plan;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmDevMaintenancePlan> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getDevCode(), item.getPrecisionType()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmDevMaintenancePlan> insertOrUpdateList = new ArrayList<>();
+                for (MdmDevMaintenancePlan item : saveList) {
+                    MdmDevMaintenancePlan entity = new MdmDevMaintenancePlan();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getDelFlag() == null) {
+                        entity.setDelFlag(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getDevCode(), entity.getPrecisionType());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmDevMaintenancePlan existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+
+    /**
+     * 同步模具清洗预警计划
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmMouldCleanPlan> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
+
+        // 唯一键重复随机取一条（硫化机台+厂别）
+        Map<String, MdmMouldCleanPlan> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getLhCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmMouldCleanPlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmMouldCleanPlan> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmMouldCleanPlan> existsList = mouldCleanPlanEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmMouldCleanPlan plan = new MdmMouldCleanPlan();
+                            plan.setLhCode(item.getLhCode());
+                            plan.setFactoryCode(item.getFactoryCode());
+                            return plan;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmMouldCleanPlan> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmMouldCleanPlan> insertOrUpdateList = new ArrayList<>();
+                for (MdmMouldCleanPlan item : saveList) {
+                    MdmMouldCleanPlan entity = new MdmMouldCleanPlan();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getDelFlag() == null) {
+                        entity.setDelFlag(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmMouldCleanPlan existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步胶囊已使用次数
+     * 采用先删后插模式
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhRepairCapsule(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmLhRepairCapsule> syncList = mesItfMapper.selectLhRepairCapsuleList(syncDataLogs);
+
+        // 唯一键重复随机取一条（硫化机台+分厂）
+        Map<String, MdmLhRepairCapsule> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getLhCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            if (CollectionUtils.isNotEmpty(syncList)) {
+                // 先删除旧数据，再插入新数据
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", syncDataLogs.getFactoryCode());
+                baseDao.deleteByMap(MdmLhRepairCapsule.class, map);
+
+                // 转换为APS实体并设置创建信息
+                List<MdmLhRepairCapsule> insertList = new ArrayList<>();
+                for (MdmLhRepairCapsule item : syncList) {
+                    MdmLhRepairCapsule entity = new MdmLhRepairCapsule();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+                    entity.setCreateTime(DateUtils.getNowDate());
+                    entity.setUpdateTime(DateUtils.getNowDate());
+                    insertList.add(entity);
+                }
+
+                // 分批插入
+                List<List<MdmLhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+                for (List<MdmLhRepairCapsule> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步结构整车胎面配置
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncStructureTreadConfig(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmStructureTreadConfig> syncList = mesItfMapper.selectStructureTreadConfigList(syncDataLogs);
+
+        // 唯一键重复随机取一条（结构+厂别）
+        Map<String, MdmStructureTreadConfig> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getStructureCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmStructureTreadConfig>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmStructureTreadConfig> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmStructureTreadConfig> existsList = structureTreadConfigEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmStructureTreadConfig config = new MdmStructureTreadConfig();
+                            config.setStructureCode(item.getStructureCode());
+                            config.setFactoryCode(item.getFactoryCode());
+                            return config;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmStructureTreadConfig> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getStructureCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmStructureTreadConfig> insertOrUpdateList = new ArrayList<>();
+                for (MdmStructureTreadConfig item : saveList) {
+                    MdmStructureTreadConfig entity = new MdmStructureTreadConfig();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getDelFlag() == null) {
+                        entity.setDelFlag(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getStructureCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmStructureTreadConfig existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    @Autowired
+    private MdmMesCxStockEntityMapper mesCxStockEntityMapper;
+
+    /**
+     * 同步生胎库存
+     * 采用先删后插模式
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmMesCxStock> syncList = mesItfMapper.selectMesCxStockList(syncDataLogs);
+
+        // 唯一键重复随机取一条（胎胚物料编码+厂别）
+        Map<String, MdmMesCxStock> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getEmbryoCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            if (CollectionUtils.isNotEmpty(syncList)) {
+                // 先删除旧数据，再插入新数据
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", syncDataLogs.getFactoryCode());
+                baseDao.deleteByMap(MdmMesCxStock.class, map);
+
+                // 转换为APS实体并设置创建信息
+                List<MdmMesCxStock> insertList = new ArrayList<>();
+                for (MdmMesCxStock item : syncList) {
+                    MdmMesCxStock entity = new MdmMesCxStock();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+                    entity.setCreateTime(DateUtils.getNowDate());
+                    entity.setUpdateTime(DateUtils.getNowDate());
+                    insertList.add(entity);
+                }
+
+                // 分批插入
+                List<List<MdmMesCxStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+                for (List<MdmMesCxStock> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步成型排程完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncCxClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmCxScheFinishQty> syncList = mesItfMapper.selectCxClassShiftFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（工单号+排程日期+机台编号+厂别）
+        Map<String, MdmCxScheFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getCxMachineCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmCxScheFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmCxScheFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmCxScheFinishQty> existsList = cxScheFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmCxScheFinishQty qty = new MdmCxScheFinishQty();
+                            qty.setOrderNo(item.getOrderNo());
+                            qty.setScheduleDate(item.getScheduleDate());
+                            qty.setCxMachineCode(item.getCxMachineCode());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmCxScheFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getCxMachineCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmCxScheFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmCxScheFinishQty item : saveList) {
+                    MdmCxScheFinishQty entity = new MdmCxScheFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getCxMachineCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmCxScheFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步硫化排程完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmLhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（工单号+排程日期+机台编号+厂别）
+        Map<String, MdmLhScheFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getLhMachineCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmLhScheFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmLhScheFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmLhScheFinishQty> existsList = lhScheFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmLhScheFinishQty qty = new MdmLhScheFinishQty();
+                            qty.setOrderNo(item.getOrderNo());
+                            qty.setScheduleDate(item.getScheduleDate());
+                            qty.setLhMachineCode(item.getLhMachineCode());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmLhScheFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmLhScheFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmLhScheFinishQty item : saveList) {
+                    MdmLhScheFinishQty entity = new MdmLhScheFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmLhScheFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步成型排程日完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncCxScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmCxScheDayFinishQty> syncList = mesItfMapper.selectCxScheDayFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（完成日期+胚胎编码+施工版本号+厂别）
+        Map<String, MdmCxScheDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getEmbryoCode() + "|" + item.getBomDataVersion(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmCxScheDayFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmCxScheDayFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmCxScheDayFinishQty> existsList = cxScheDayFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmCxScheDayFinishQty qty = new MdmCxScheDayFinishQty();
+                            qty.setFinishDate(item.getFinishDate());
+                            qty.setEmbryoCode(item.getEmbryoCode());
+                            qty.setBomDataVersion(item.getBomDataVersion());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmCxScheDayFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getEmbryoCode(), item.getBomDataVersion()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmCxScheDayFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmCxScheDayFinishQty item : saveList) {
+                    MdmCxScheDayFinishQty entity = new MdmCxScheDayFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getEmbryoCode(), entity.getBomDataVersion());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmCxScheDayFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步硫化排程日完成量
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmLhScheDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
+
+        // 唯一键重复随机取一条（完成日期+物料编码+MES物料编码+厂别）
+        Map<String, MdmLhScheDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmLhScheDayFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmLhScheDayFinishQty> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmLhScheDayFinishQty> existsList = lhScheDayFinishQtyEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmLhScheDayFinishQty qty = new MdmLhScheDayFinishQty();
+                            qty.setFinishDate(item.getFinishDate());
+                            qty.setMaterialCode(item.getMaterialCode());
+                            qty.setMesMaterialCode(item.getMesMaterialCode());
+                            qty.setFactoryCode(item.getFactoryCode());
+                            return qty;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmLhScheDayFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmLhScheDayFinishQty> insertOrUpdateList = new ArrayList<>();
+                for (MdmLhScheDayFinishQty item : saveList) {
+                    MdmLhScheDayFinishQty entity = new MdmLhScheDayFinishQty();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmLhScheDayFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 模具交替计划下发到MES
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 结果
+     */
+    @Override
+    public AjaxResult issueMoldAlterPlan(List<MdmMoldAlterPlan> moldAlterPlanList) {
+        if (CollectionUtils.isEmpty(moldAlterPlanList)) {
+            return AjaxResult.success();
+        }
+
+        // 转换为中间表实体
+        List<MoldAlterPlanIssue> issueList = new ArrayList<>();
+        for (MdmMoldAlterPlan plan : moldAlterPlanList) {
+            MoldAlterPlanIssue issue = new MoldAlterPlanIssue();
+            BeanUtils.copyProperties(plan, issue);
+            issueList.add(issue);
+        }
+
+        try {
+            // 切换MES数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+
+            // 批量插入到中间表
+            mesItfMapper.insertMoldAlterPlanList(issueList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换MES数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步模具交替计划完成回报
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMoldAlterPlanFinish(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmMoldAlterPlanFinish> syncList = mesItfMapper.selectMoldAlterPlanFinishList(syncDataLogs);
+
+        // 唯一键重复随机取一条（硫化批次号+工单号+计划日期+硫化机台编号+左右模+厂别）
+        Map<String, MdmMoldAlterPlanFinish> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getLhBatchNo() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getLhMachineCode() + "|" + item.getLeftRightMold(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmMoldAlterPlanFinish> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmMoldAlterPlanFinish> existsList = moldAlterPlanFinishEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmMoldAlterPlanFinish finish = new MdmMoldAlterPlanFinish();
+                            finish.setLhBatchNo(item.getLhBatchNo());
+                            finish.setOrderNo(item.getOrderNo());
+                            finish.setScheduleDate(item.getScheduleDate());
+                            finish.setLhMachineCode(item.getLhMachineCode());
+                            finish.setLeftRightMold(item.getLeftRightMold());
+                            finish.setFactoryCode(item.getFactoryCode());
+                            return finish;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmMoldAlterPlanFinish> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmMoldAlterPlanFinish> insertOrUpdateList = new ArrayList<>();
+                for (MdmMoldAlterPlanFinish item : saveList) {
+                    MdmMoldAlterPlanFinish entity = new MdmMoldAlterPlanFinish();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmMoldAlterPlanFinish existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
     }
 }

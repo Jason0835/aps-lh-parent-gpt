@@ -172,7 +172,8 @@ public class CxCapacityAllocationHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = allocationGroupPlan.getGroupName();
         Integer startDay = cxMachineInfo.getNextStartDay();
-        Integer leftOverDays = allocationGroupPlan.getLeftOverNeedAllocationDays();
+        //20260329 机台反选不再要求产能覆盖，故而不能直接取需求剩余天数allocationGroupPlan.getLeftOverNeedAllocationDays()
+        Integer leftOverDays = allocationGroupPlan.getMachineReverseAllocationDays();
         ProductGroupCxCapacityInfo lhRatioInfo = allocationGroupPlan.getLhRatioByCxMachine(cxMachineInfo);
         //20260209 特殊材料是否需要拉量或是舍弃
         CxMachineAllocationPlanHelper calculationAllocation = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, leftOverDays, startDay, context.getMonthDays());
@@ -431,15 +432,15 @@ public class CxCapacityAllocationHandler {
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoRemainingCapacityLog(context, cxMachineInfo));
             return null;
         }
-        //成型剩余产能能覆盖结构剩余排产净需求量
-        Map<String, ProductionPlanGroupInfo> capacityCoverageMap = getProductionCapacityCoverage(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
-        if (CollectionUtils.isEmpty(capacityCoverageMap)) {
+        //获取能够在该成型上生产的结构清单
+        Map<String, ProductionPlanGroupInfo> canProductionGroupMap = getCanProductionGroup(context, estimateGroupCxAllocationMap, cxMachineInfo, excludeGroupPlan);
+        if (CollectionUtils.isEmpty(canProductionGroupMap)) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindCapacityPlanLog(context, cxMachineInfo));
             return null;
         }
         //剔除不可匹配的结构信息（不可作业的结构或是SKU需要剔除,零度供料架）
-        Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(context, capacityCoverageMap, cxMachineInfo);
+        Map<String, ProductionPlanGroupInfo> enableGroupPlanMap = excludeDisable(context, canProductionGroupMap, cxMachineInfo);
         if (CollectionUtils.isEmpty(enableGroupPlanMap)) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addReverseCxMachineNoFindMatchPlanLog(context, cxMachineInfo));
@@ -450,7 +451,7 @@ public class CxCapacityAllocationHandler {
     }
 
     /**
-     * 得到成型机台剩余产能能覆盖剩余排产净需求的分组结构计划
+     * 得到成型机台能够排产的清单
      * 此时会结合成型工装的数量
      *
      * @param context                      排产上下文
@@ -459,7 +460,7 @@ public class CxCapacityAllocationHandler {
      * @param excludeGroupPlan             需要排产的分组计划
      * @return
      */
-    private Map<String, ProductionPlanGroupInfo> getProductionCapacityCoverage(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo, Set<String> excludeGroupPlan) {
+    private Map<String, ProductionPlanGroupInfo> getCanProductionGroup(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, CxMachineBaseInfoVo cxMachineInfo, Set<String> excludeGroupPlan) {
         if (null == cxMachineInfo || CollectionUtils.isEmpty(estimateGroupCxAllocationMap)) {
             return Collections.emptyMap();
         }
@@ -467,13 +468,13 @@ public class CxCapacityAllocationHandler {
         Map<String, ProductionPlanGroupInfo> capacityCoverageMap = new HashMap<>(estimateGroupCxAllocationMap.size());
         estimateGroupCxAllocationMap.forEach((structureName, groupPlan) -> {
             if (CollectionUtils.isEmpty(excludeGroupPlan)) {
-                addCapacityCoverageMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
+                calcDiffCapacityAndAddMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
                 return;
             }
             if (excludeGroupPlan.contains(structureName)) {
                 return;
             }
-            addCapacityCoverageMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
+            calcDiffCapacityAndAddMap(context, capacityCoverageMap, structureName, groupPlan, cxMachineInfo);
         });
         return capacityCoverageMap;
     }
@@ -503,8 +504,8 @@ public class CxCapacityAllocationHandler {
     }
 
     /**
-     * 机台反向挑选结构，将成型产能能覆盖，
-     * 且成型工装也满足的结构加入到capacityCoverageMap集合中
+     * 机台反向挑选结构，将成型工装也满足的结构加入到capacityCoverageMap集合中
+     * 同时计算结构需求与成型产能的差异
      *
      * @param context             排产上下文
      * @param capacityCoverageMap 需要加入的集合
@@ -512,10 +513,17 @@ public class CxCapacityAllocationHandler {
      * @param groupPlan           分组计划信息
      * @param cxMachineInfo       成型机台
      */
-    private void addCapacityCoverageMap(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, String structureName, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo) {
+    private void calcDiffCapacityAndAddMap(Context context, Map<String, ProductionPlanGroupInfo> capacityCoverageMap, String structureName, ProductionPlanGroupInfo groupPlan, CxMachineBaseInfoVo cxMachineInfo) {
         Integer minLhDayCapacityQty = groupPlan.getMinLhDayCapacityQty();
         if (null == minLhDayCapacityQty || minLhDayCapacityQty <= BigDecimal.ZERO.longValue()) {
             //todo 记录日志
+            return;
+        }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        Set<String> fixedCxMachineSet = Optional.ofNullable(groupPlan.getFixedCxMachineSet()).orElse(Collections.emptySet());
+        if (!CollectionUtils.isEmpty(fixedCxMachineSet) && !fixedCxMachineSet.contains(cxMachineCode)) {
+            String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
+            TbrProductionGroupLogRecorder.addGroupNoSelectedForFixedCxMachineLog(context, structureName, cxMachineCode, fixedMachineInfo);
             return;
         }
         Map<String, MonthPlanStructureLhRatioVo> lhRatioMap = groupPlan.getCxMachineLhRationMap();
@@ -549,9 +557,12 @@ public class CxCapacityAllocationHandler {
         //成型剩余产能
         Integer realRemainingDays = hasProductionSet.size();
         TbrProductionGroupLogRecorder.addReverseCxMachineMatchCapacityLog(context, cxMachineInfo, realRemainingDays, structureName, remainingNeedDays);
-        if (realRemainingDays < remainingNeedDays) {
+        /*if (realRemainingDays < remainingNeedDays) {
             return;
-        }
+        }*/
+        //结构需求与机台产能差异天数 sandy+ 2026.3.29
+        groupPlan.setDiffStructureAndMachineDays(remainingNeedDays - realRemainingDays);
+        groupPlan.setMachineReverseAllocationDays(Math.min(remainingNeedDays, realRemainingDays));
         capacityCoverageMap.put(structureName, groupPlan);
     }
 

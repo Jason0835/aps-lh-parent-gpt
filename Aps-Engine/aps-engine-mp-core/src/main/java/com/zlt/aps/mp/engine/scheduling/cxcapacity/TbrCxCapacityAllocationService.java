@@ -8,6 +8,7 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
@@ -60,6 +61,8 @@ import java.util.stream.Collectors;
 @Service(value = "tbrWholeProductionService")
 public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
+    private final GroupFixedInfoHandler groupFixedInfoHandler;
+
     private final FormalProductionHandler formalProductionHandler;
 
     private final ISysDictDataCacheService iSysDictDataCacheService;
@@ -84,6 +87,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
                                           DpRequireDataService dpRequireDataService,
+                                          GroupFixedInfoHandler groupFixedInfoHandler,
                                           MonthProductionDataService monthProductionDataService,
                                           FormalProductionHandler formalProductionHandler,
                                           ISysDictDataCacheService iSysDictDataCacheService,
@@ -98,6 +102,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
                                           MatchingProductionHandler matchingProductionHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+        this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;
         this.simulateProductionHandler = simulateProductionHandler;
@@ -163,8 +168,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList);
-        setGroupFixedCxMachineInfo(productionContext, estimateGroupCxAllocationMap);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
+        groupFixedInfoHandler.setGroupPlanFixedCxMachineInfo(productionContext);
         /**
          * 5、构建续作信息
          * 5.1、获取上个月度的月度定稿排产计划，得到在产Sku
@@ -204,7 +209,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //保存未排计划明细
         saveNoProductionPlanResult(productionContext, sumProductionMap);
         //12、最后搭配排产
-        matchingProductionHandler.matchingProduction(productionContext.getProductionVersion());
+        matchingProductionHandler.matchingProduction(productionContext.getProductionVersion(), productionContext);
         //13、预警信息发送
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         String userName = SecurityUtils.getUsername();
@@ -268,29 +273,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         getMonthProductionDataService().saveMouldUsedLog(usedLogList);
     }
 
-    /**
-     * 3：设置结构的指定机台信息
-     *
-     * @param productionContext 排产上下文
-     * @param allGroupMap       所有分组信息
-     */
-    private void setGroupFixedCxMachineInfo(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupMap) {
-        if (CollectionUtils.isEmpty(allGroupMap)) {
-            return;
-        }
-        Map<String, CxMachineBaseInfoVo> allCxMachineInfoMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        if (CollectionUtils.isEmpty(allCxMachineInfoMap)) {
-            return;
-        }
-        List<CxMachineBaseInfoVo> allCxMachineInfo = allCxMachineInfoMap.values().stream().collect(Collectors.toList());
-        allGroupMap.forEach((structureName, groupInfo) -> {
-            List<CxMachineBaseInfoVo> hasFixedList = allCxMachineInfo.stream().filter(singleMachineInfo -> singleMachineInfo.hasFixedMachine(groupInfo)).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(hasFixedList)) {
-                return;
-            }
-            groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
-        });
-    }
 
     /**
      * 5.1：获取续作排产信息
@@ -432,7 +414,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler.getSummaryBySkuResult(detailLogList, productionContext);
         getMonthProductionDataService().saveMouldProductionResult(dayResultList);
         //日排产统计信息
-        List<MpMonthPlanStatistics> productionStatisticsList = dayProductionStatisticsHandler.buildDayProductionStatisticsResult(productionContext);
+        List<MpMonthPlanStatistics> productionStatisticsList = dayProductionStatisticsHandler.buildDayProductionStatisticsResultByAdjustType(productionContext);
         getMonthProductionDataService().saveProductionStatisticsResult(productionStatisticsList);
         return sumProductionMap;
     }
@@ -550,9 +532,9 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
      * TBR-结构
      * PCR-英寸、寸别、寸口
      *
-     * @param context     排产上下文
+     * @param context         排产上下文
      * @param previousVersion 前一个月定稿版本信息
-     * @param lastDay     最后一天
+     * @param lastDay         最后一天
      * @return
      */
     private Map<String, Set<String>> getContinueGroupInfo(Context context, MpFactoryProductionVersion previousVersion, Integer lastDay) {

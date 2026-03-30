@@ -105,6 +105,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 本轮次是否参与排产 1 是 0 否
      */
     private Integer isThisRound;
+    /**
+     * 已排产量
+     */
+    private Integer producedQty;
+    /**
+     * 其余搭配量
+     */
+    private Integer otherMatchingQty;
 
     /**
      * 初始的排产数据设置
@@ -197,6 +205,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return sum;
         }
         sum = sum + Optional.of(getPostponeQty()).orElse(BigDecimal.ZERO.intValue());
+        return sum;
+    }
+
+    /**
+     * 获取Sku的实单量
+     * 高优先级的量 + 中优先级的量
+     *
+     * @return
+     */
+    public Integer getActualQuantity() {
+        Integer sum = Optional.ofNullable(getHeightQty()).orElse(BigDecimal.ZERO.intValue());
+        sum = sum + Optional.ofNullable(getMidQty()).orElse(BigDecimal.ZERO.intValue());
         return sum;
     }
 
@@ -295,6 +315,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         //默认可生产
         plan.setCantProduce(YesOrNoEnum.NO.getCode());
         plan.setIsPrioritize(require.getScmPriority());
+        plan.setStructurePriority(require.getStructurePriority());
         //排产为空，则默认可排产
         if (StringUtils.isBlank(require.getIsProduction())) {
             plan.setIsProduction(YesOrNoEnum.YES.getCode());
@@ -477,6 +498,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 判断是否还有实单剩余排产量
+     *
+     * @return
+     */
+    public boolean hasActualProductionQuantity() {
+        //非周期结构
+        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(getStructureType())) {
+            return hasProduction();
+        }
+        //周期结构，看剩余排产量与周期储备的差值
+        if (!hasProduction()) {
+            return false;
+        }
+        Integer realProductionQty = originProductionQty - productionQty;
+        Integer actualQty = originHeightProductionQty + getMinProductionQty();
+        return realProductionQty < actualQty;
     }
 
     /**

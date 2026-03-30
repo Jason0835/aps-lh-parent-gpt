@@ -113,6 +113,11 @@ public enum MonthPlanEnums {
     RESERVE_PERCENT("SYS0203013", "周期储备量占实单的比例(%)"),
 
     /**
+     * SYS0203014 按高优先级SKU个数降序的结构清单-前 X 个结构，单位个
+     */
+    STRUCTURE_BILL_PRE_COUNT("SYS0203014", "按高优先级SKU个数降序的结构清单-前 X 个结构，单位个"),
+
+    /**
      * SYS0204001 SKU总净需求量<=该值，SKU一次性排产
      */
     SUM_PRODUCTION_QTY("SYS0204001", "SKU总净需求量<=该值，SKU一次性排产"),

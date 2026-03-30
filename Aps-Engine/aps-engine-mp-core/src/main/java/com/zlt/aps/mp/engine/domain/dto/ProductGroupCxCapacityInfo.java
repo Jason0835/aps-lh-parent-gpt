@@ -1,8 +1,10 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.mp.engine.utils.CollectValueUtils;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -10,8 +12,10 @@ import org.springframework.util.CollectionUtils;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -56,6 +60,13 @@ public class ProductGroupCxCapacityInfo implements Serializable {
      * 最低硫化机台数
      */
     private Integer minLhMachineCount;
+
+    /**
+     * 固定结构的个数,用于续作机台释放，
+     * 判断机台的通用性（个数越多，表示越通用)
+     *
+     */
+    private Integer fixStructureCount;
 
     /**
      * 构建在机结构-在机机台的产能相关信息，结构成型硫化配比
@@ -103,6 +114,19 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         capacityInfo.setMaxEmbryoCodeCount(lhRatio.getMaxEmbryoQty());
         capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
         capacityInfo.setMinLhMachineCount(lhRatio.getLhMachineMinQty());
+
+        //设置固定结构个数,sandy+ 202.3.26
+        Set<String> fixedStructureSet = new HashSet<>();
+        if (StringUtils.isNotBlank(baseInfo.getFixedStructure1())) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, baseInfo.getFixedStructure1(), StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(baseInfo.getFixedStructure2())) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, baseInfo.getFixedStructure2(), StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(baseInfo.getFixedStructure3())) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, baseInfo.getFixedStructure3(), StringConstant.COMMA);
+        }
+        capacityInfo.setFixStructureCount(fixedStructureSet.size());
         return capacityInfo;
     }
 
@@ -154,6 +178,7 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         this.realMaxLhMachineCount = BigDecimal.ZERO.intValue();
         this.maxLhMachineCount = BigDecimal.ZERO.intValue();
         this.minLhMachineCount = BigDecimal.ZERO.intValue();
+        this.fixStructureCount = BigDecimal.ZERO.intValue();
     }
 
     /**

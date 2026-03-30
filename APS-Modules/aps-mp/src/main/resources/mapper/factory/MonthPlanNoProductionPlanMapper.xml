@@ -2,4 +2,142 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.factory.mapper.MonthPlanNoProductionPlanMapper">
 
+    <resultMap type="com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan" id="MonthPlanNoProductionPlanResult">
+        <result property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="year" column="YEAR"/>
+        <result property="month" column="MONTH"/>
+        <result property="monthPlanVersion" column="MONTH_PLAN_VERSION"/>
+        <result property="productionVersion" column="PRODUCTION_VERSION"/>
+        <result property="monthPlanId" column="MONTH_PLAN_ID"/>
+        <result property="productTypeCode" column="PRODUCT_TYPE_CODE"/>
+        <result property="locationType" column="LOCATION_TYPE"/>
+        <result property="brand" column="BRAND"/>
+        <result property="proSize" column="PRO_SIZE"/>
+        <result property="structureName" column="STRUCTURE_NAME"/>
+        <result property="mainMaterialDesc" column="MAIN_MATERIAL_DESC"/>
+        <result property="mesMaterialCode" column="MES_MATERIAL_CODE"/>
+        <result property="materialCode" column="MATERIAL_CODE"/>
+        <result property="materialDesc" column="MATERIAL_DESC"/>
+        <result property="specifications" column="SPECIFICATIONS"/>
+        <result property="pattern" column="PATTERN"/>
+        <result property="mainPattern" column="MAIN_PATTERN"/>
+        <result property="productionType" column="PRODUCTION_TYPE"/>
+        <result property="constructionStage" column="CONSTRUCTION_STAGE"/>
+        <result property="yearWeek" column="YEAR_WEEK"/>
+        <result property="isDynamicBalance" column="IS_DYNAMIC_BALANCE"/>
+        <result property="isTrialPlan" column="IS_TRIAL_PLAN"/>
+        <result property="isUniformity" column="IS_UNIFORMITY"/>
+        <result property="isProduction" column="IS_PRODUCTION"/>
+        <result property="isPrioritize" column="IS_PRIORITIZE"/>
+        <result property="orderQty" column="ORDER_QTY"/>
+        <result property="stockQty" column="STOCK_QTY"/>
+        <result property="averageSaleQty" column="AVERAGE_SALE_QTY"/>
+        <result property="plannedSurplus" column="PLANNED_SURPLUS"/>
+        <result property="netQty" column="NET_QTY"/>
+        <result property="postponeNetQty" column="POSTPONE_NET_QTY"/>
+        <result property="unPostponeNetQty" column="UN_POSTPONE_NET_QTY"/>
+        <result property="heightQty" column="HEIGHT_QTY"/>
+        <result property="midQty" column="MID_QTY"/>
+        <result property="postponeQty" column="POSTPONE_QTY"/>
+        <result property="cycleReserveQty" column="CYCLE_RESERVE_QTY"/>
+        <result property="conventionReserveQty" column="CONVENTION_RESERVE_QTY"/>
+        <result property="heightLossQty" column="HEIGHT_LOSS_QTY"/>
+        <result property="factProdReqQty" column="FACT_PROD_REQ_QTY"/>
+        <result property="unProductionQty" column="UN_PRODUCTION_QTY"/>
+        <result property="reason" column="REASON"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="remark" column="REMARK"/>
+        <result property="isDelete" column="IS_DELETE"/>
+    </resultMap>
+
+    <select id="selectExportList" parameterType="com.zlt.aps.mp.api.domain.entity.MonthPlanNoProductionPlan" resultMap="MonthPlanNoProductionPlanResult">
+        SELECT
+        MAX(ID) AS ID,
+        FACTORY_CODE,
+        YEAR,
+        MONTH,
+        MONTH_PLAN_VERSION,
+        PRODUCTION_VERSION,
+        MONTH_PLAN_ID,
+        PRODUCT_TYPE_CODE,
+        LOCATION_TYPE,
+        BRAND,
+        PRO_SIZE,
+        STRUCTURE_NAME,
+        MAIN_MATERIAL_DESC,
+        MES_MATERIAL_CODE,
+        MATERIAL_CODE,
+        MATERIAL_DESC,
+        SPECIFICATIONS,
+        PATTERN,
+        MAIN_PATTERN,
+        PRODUCTION_TYPE,
+        CONSTRUCTION_STAGE,
+        YEAR_WEEK,
+        IS_DYNAMIC_BALANCE,
+        IS_TRIAL_PLAN,
+        IS_UNIFORMITY,
+        IS_PRODUCTION,
+        IS_PRIORITIZE,
+        SUM(ORDER_QTY) AS ORDER_QTY,
+        SUM(STOCK_QTY) AS STOCK_QTY,
+        SUM(AVERAGE_SALE_QTY) AS AVERAGE_SALE_QTY,
+        SUM(PLANNED_SURPLUS) AS PLANNED_SURPLUS,
+        SUM(NET_QTY) AS NET_QTY,
+        SUM(POSTPONE_NET_QTY) AS POSTPONE_NET_QTY,
+        SUM(UN_POSTPONE_NET_QTY) AS UN_POSTPONE_NET_QTY,
+        SUM(HEIGHT_QTY) AS HEIGHT_QTY,
+        SUM(MID_QTY) AS MID_QTY,
+        SUM(POSTPONE_QTY) AS POSTPONE_QTY,
+        SUM(CYCLE_RESERVE_QTY) AS CYCLE_RESERVE_QTY,
+        SUM(CONVENTION_RESERVE_QTY) AS CONVENTION_RESERVE_QTY,
+        SUM(HEIGHT_LOSS_QTY) AS HEIGHT_LOSS_QTY,
+        SUM(FACT_PROD_REQ_QTY) AS FACT_PROD_REQ_QTY,
+        SUM(UN_PRODUCTION_QTY) AS UN_PRODUCTION_QTY,
+        MAX(REASON) AS REASON,
+        MAX(CREATE_TIME) AS CREATE_TIME,
+        MAX(UPDATE_TIME) AS UPDATE_TIME,
+        MAX(CREATE_BY) AS CREATE_BY,
+        MAX(UPDATE_BY) AS UPDATE_BY,
+        MAX(REMARK) AS REMARK,
+        MAX(IS_DELETE) AS IS_DELETE
+        FROM T_MP_PROC_NO_PRODUCTION_PLAN
+        WHERE IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''"> AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="year != null"> AND YEAR = #{year}</if>
+        <if test="month != null"> AND MONTH = #{month}</if>
+        <if test="monthPlanVersion != null and monthPlanVersion != ''"> AND MONTH_PLAN_VERSION = #{monthPlanVersion}</if>
+        <if test="productionVersion != null and productionVersion != ''"> AND PRODUCTION_VERSION = #{productionVersion}</if>
+        <if test="monthPlanId != null"> AND MONTH_PLAN_ID = #{monthPlanId}</if>
+        <if test="productTypeCode != null and productTypeCode != ''"> AND PRODUCT_TYPE_CODE = #{productTypeCode}</if>
+        <if test="locationType != null and locationType != ''"> AND LOCATION_TYPE = #{locationType}</if>
+        <if test="brand != null and brand != ''"> AND BRAND = #{brand}</if>
+        <if test="proSize != null and proSize != ''"> AND PRO_SIZE LIKE CONCAT('%', #{proSize}, '%')</if>
+        <if test="structureName != null and structureName != ''"> AND STRUCTURE_NAME LIKE CONCAT('%', #{structureName}, '%')</if>
+        <if test="mainMaterialDesc != null and mainMaterialDesc != ''"> AND MAIN_MATERIAL_DESC = #{mainMaterialDesc}</if>
+        <if test="mesMaterialCode != null and mesMaterialCode != ''"> AND MES_MATERIAL_CODE = #{mesMaterialCode}</if>
+        <if test="materialCode != null and materialCode != ''"> AND MATERIAL_CODE LIKE CONCAT('%', #{materialCode}, '%')</if>
+        <if test="materialDesc != null and materialDesc != ''"> AND MATERIAL_DESC LIKE CONCAT('%', #{materialDesc}, '%')</if>
+        <if test="specifications != null and specifications != ''"> AND SPECIFICATIONS LIKE CONCAT('%', #{specifications}, '%')</if>
+        <if test="pattern != null and pattern != ''"> AND PATTERN LIKE CONCAT('%', #{pattern}, '%')</if>
+        <if test="productionType != null and productionType != ''"> AND PRODUCTION_TYPE = #{productionType}</if>
+        <if test="constructionStage != null and constructionStage != ''"> AND CONSTRUCTION_STAGE = #{constructionStage}</if>
+        <if test="yearWeek != null and yearWeek != ''"> AND YEAR_WEEK = #{yearWeek}</if>
+        <if test="isDynamicBalance != null and isDynamicBalance != ''"> AND IS_DYNAMIC_BALANCE = #{isDynamicBalance}</if>
+        <if test="isTrialPlan != null and isTrialPlan != ''"> AND IS_TRIAL_PLAN = #{isTrialPlan}</if>
+        <if test="isUniformity != null and isUniformity != ''"> AND IS_UNIFORMITY = #{isUniformity}</if>
+        <if test="isProduction != null and isProduction != ''"> AND IS_PRODUCTION = #{isProduction}</if>
+        <if test="isPrioritize != null and isPrioritize != ''"> AND IS_PRIORITIZE = #{isPrioritize}</if>
+        ${params.dataScope}
+        GROUP BY FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, PRODUCTION_VERSION, MONTH_PLAN_ID,
+        PRODUCT_TYPE_CODE, LOCATION_TYPE, BRAND, PRO_SIZE, STRUCTURE_NAME, MAIN_MATERIAL_DESC,
+        MES_MATERIAL_CODE, MATERIAL_CODE, MATERIAL_DESC, SPECIFICATIONS, PATTERN, MAIN_PATTERN,
+        PRODUCTION_TYPE, CONSTRUCTION_STAGE, YEAR_WEEK, IS_DYNAMIC_BALANCE, IS_TRIAL_PLAN,
+        IS_UNIFORMITY, IS_PRODUCTION, IS_PRIORITIZE
+        ORDER BY STRUCTURE_NAME, SPECIFICATIONS, MAIN_PATTERN, PATTERN, MAIN_MATERIAL_DESC, PRO_SIZE, MAX(UPDATE_TIME) DESC
+    </select>
 </mapper>

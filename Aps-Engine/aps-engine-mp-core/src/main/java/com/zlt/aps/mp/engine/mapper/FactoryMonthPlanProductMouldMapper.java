@@ -98,12 +98,14 @@ public interface FactoryMonthPlanProductMouldMapper {
      * @param year              年份
      * @param month             月份
      * @param monthPlanVersion  需求计划版本
+     * @param allMaterial       取全物料，如果是true则不会关联需求计划
      * @return list
      */
     List<MoldCavityInsertMaxValueCalculatorVo> getEnableProductionMouldInfoByNetDemand(@Param("factoryCode") String factoryCode,
                                                                                        @Param("year") Integer year,
                                                                                        @Param("month") Integer month,
-                                                                                       @Param("monthPlanVersion") String monthPlanVersion);
+                                                                                       @Param("monthPlanVersion") String monthPlanVersion,
+                                                                                       @Param("allMaterial") Boolean allMaterial);
 
     /**
      * 根据净需求信息获取在排产周期范围内可到货的新物料模具关系信息

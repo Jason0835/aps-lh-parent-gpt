@@ -3,12 +3,13 @@ package com.zlt.aps.mp.engine.domain.dto;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -49,6 +50,11 @@ public class SkuDayProductionInfoHelper implements Serializable {
      * 主花纹
      */
     private String mainPattern;
+
+    /**
+     * 品牌
+     */
+    private String brand;
 
     /**
      * 使用的模具编号
@@ -94,6 +100,7 @@ public class SkuDayProductionInfoHelper implements Serializable {
         helper.lossQty = lossQty;
         helper.mainMaterialDesc = productionPlan.getMainMaterialDesc();
         helper.mainPattern = productionPlan.getMainPattern();
+        helper.brand = productionPlan.getBrand();
         return helper;
     }
 
@@ -119,6 +126,37 @@ public class SkuDayProductionInfoHelper implements Serializable {
         result.sumProductionQty = origin.getSumProductionQty();
         result.dayVulcanizationQty = origin.getDayVulcanizationQty();
         result.lossQty = origin.getLossQty();
+        result.mainMaterialDesc = origin.getMainMaterialDesc();
+        result.mainPattern = origin.getMainPattern();
+        result.brand = origin.getBrand();
+        return result;
+    }
+
+    /**
+     * 复制
+     *
+     * @param origin
+     * @return
+     */
+    public static SkuDayProductionInfoHelper createCloneByOneProduction(SkuDayProductionInfoHelper origin, Integer productionDay) {
+        if (null == origin) {
+            return null;
+        }
+        SkuDayProductionInfoHelper result = new SkuDayProductionInfoHelper();
+        result.productionDay = productionDay;
+        result.materialDesc = origin.getMaterialDesc();
+        result.materialCode = origin.getMaterialCode();
+        result.embryoCode = origin.getEmbryoCode();
+        Set<String> newUsedMouldSet = new HashSet<>();
+        newUsedMouldSet.addAll(origin.getUsedMouldSet());
+        result.usedMouldSet = newUsedMouldSet;
+        result.groupName = origin.getGroupName();
+        result.sumProductionQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        result.dayVulcanizationQty = origin.getDayVulcanizationQty();
+        result.lossQty = origin.getDayLhMachineQty() - result.sumProductionQty;
+        result.mainMaterialDesc = origin.getMainMaterialDesc();
+        result.mainPattern = origin.getMainPattern();
+        result.brand = origin.getBrand();
         return result;
     }
 
@@ -155,6 +193,88 @@ public class SkuDayProductionInfoHelper implements Serializable {
         //考虑开产日
         dayLhMachineQty = context.getOpenDayMaxQty(productionDay, dayLhMachineQty);
         return sumProductionQty >= dayLhMachineQty;
+    }
+
+    /**
+     * 可否换活字块 当天或是隔天
+     *
+     * @param context
+     * @param productionDay
+     * @return
+     */
+    public boolean isChangeTypeBlock(Context context, Integer productionDay) {
+        if (this.productionDay.equals(productionDay)) {
+            return isChangeTypeBlock(context);
+        }
+        if (this.productionDay.equals(context.getPreviousDay(productionDay))) {
+            return isChangeTypeBlockByNext(context);
+        }
+        return false;
+    }
+
+    /**
+     * 是否可换模，当天或是隔天
+     *
+     * @param context
+     * @param productionDay
+     * @return
+     */
+    public boolean isChangeMould(Context context, Integer productionDay) {
+        if (this.productionDay.equals(productionDay)) {
+            return isChangeMould();
+        }
+        if (this.productionDay.equals(context.getPreviousDay(productionDay))) {
+            return isChangeMouldByNext();
+        }
+        return false;
+    }
+
+    /**
+     * 是否直接允许换模
+     *
+     * @return
+     */
+    public boolean isChangeMould() {
+        return sumProductionQty < dayVulcanizationQty;
+    }
+
+    /**
+     * 是否允许隔天换模
+     *
+     * @return
+     */
+    public boolean isChangeMouldByNext() {
+        return sumProductionQty >= dayVulcanizationQty;
+    }
+
+    /**
+     * 判断当前是否能直接允许换活字块
+     *
+     * @param context
+     * @return
+     */
+    public boolean isChangeTypeBlock(Context context) {
+        Integer dayLhMachineQty = dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer diffValue = dayLhMachineQty - sumProductionQty;
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
+        return diffValue >= changeTypeBlockQtyDiff;
+    }
+
+    /**
+     * 判断隔天允许换活字块
+     *
+     * @param context
+     * @return
+     */
+    public boolean isChangeTypeBlockByNext(Context context) {
+        Integer dayLhMachineQty = dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        Integer diffValue = dayLhMachineQty - sumProductionQty;
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
+        return diffValue < changeTypeBlockQtyDiff;
     }
 
     /**

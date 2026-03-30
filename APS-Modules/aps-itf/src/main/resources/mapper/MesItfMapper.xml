@@ -131,4 +131,295 @@
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <select id="selectCxMachineOnlineSyncList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxMachineOnlineInfo">
+        SELECT ID,
+        ONLINE_DATE,
+        CX_CODE,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        SPEC_DESC,
+        EMBRYO_SPEC,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM CX_MACHINE_ONLINE_SYNC
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectLhMachineOnlineSyncList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhMachineOnlineInfo">
+        SELECT ID,
+        ONLINE_DATE,
+        LH_CODE,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        SPEC_DESC,
+        LR_MOLDS,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM LH_MACHINE_ONLINE_SYNC
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan">
+        SELECT
+        ID,
+        DEV_CODE,
+        PRECISION_TYPE,
+        OPER_TIME,
+        FIRST_WASH_TIME,
+        DEL_FLAG,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM DEV_MAINTENANCE_PLAN
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhRepairCapsule">
+        SELECT
+        ID,
+        OBTAIN_TIME,
+        LH_CODE,
+        MATERIAL_CODE,
+        REPLACE_CAPSULE_COUNT,
+        REPLACE_CAPSULE_COUNT2,
+        BRAND,
+        REMARK,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM LH_REPAIR_CAPSULE
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMouldCleanPlan">
+        SELECT
+        ID,
+        LH_CODE,
+        OPER_TIME,
+        FIRST_WASH_TIME,
+        SECOND_WASH_TIME,
+        REMARK,
+        DEL_FLAG,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MOULD_CLEAN_PLAN
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig">
+        SELECT
+        ID,
+        STRUCTURE_CODE,
+        TREAD_COUNT,
+        DEL_FLAG,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM STRUCTURE_TREAD_CONFIG
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectMesCxStockList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMesCxStock">
+        SELECT
+        ID,
+        STOCK_DATE,
+        EMBRYO_CODE,
+        STOCK_NUM,
+        LITI_STOCK,
+        EMBRYO_CAR,
+        LH_STOCK,
+        AVAILABLE_STOCK,
+        BOM_DATA_VERSION,
+        EXAMPLE_TYPE,
+        UNAVAILABLE_STOCK,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_CX_STOCK
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheFinishQty">
+        SELECT
+        ID,
+        ORDER_NO,
+        SCHEDULE_DATE,
+        CX_MACHINE_CODE,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        CLASS1_FINISH_QTY,
+        CLASS2_FINISH_QTY,
+        CLASS3_FINISH_QTY,
+        CLASS1_UN_REASON,
+        CLASS2_UN_REASON,
+        CLASS3_UN_REASON,
+        CLASS1_PERSON,
+        CLASS2_PERSON,
+        CLASS3_PERSON,
+        EMBRYO_CODE,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_CX_CLASS_SHIFT_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectLhClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheFinishQty">
+        SELECT
+        ID,
+        ORDER_NO,
+        SCHEDULE_DATE,
+        LH_MACHINE_CODE,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        CLASS1_FINISH_QTY,
+        CLASS2_FINISH_QTY,
+        CLASS3_FINISH_QTY,
+        CLASS1_UN_REASON,
+        CLASS2_UN_REASON,
+        CLASS3_UN_REASON,
+        CLASS1_PERSON,
+        CLASS2_PERSON,
+        CLASS3_PERSON,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_LH_CLASS_SHIFT_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectCxScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheDayFinishQty">
+        SELECT
+        ID,
+        FINISH_DATE,
+        DAY_FINISH_QTY,
+        EMBRYO_CODE,
+        EXAMPLE_TYPE,
+        BOM_DATA_VERSION,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_CX_DAY_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <select id="selectLhScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheDayFinishQty">
+        SELECT
+        ID,
+        FINISH_DATE,
+        DAY_FINISH_QTY,
+        MATERIAL_CODE,
+        MES_MATERIAL_CODE,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MES_LH_DAY_FINISH_QTY
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
+
+    <insert id="insertMoldAlterPlanList">
+        INSERT INTO MOLD_ALTER_PLAN (
+            LH_BATCH_NO,
+            ORDER_NO,
+            SCHEDULE_DATE,
+            CLASS_INDEX,
+            LH_MACHINE_CODE,
+            PLAN_INDEX,
+            LEFT_RIGHT_MOLD,
+            MATERIAL_CODE,
+            MES_MATERIAL_CODE,
+            SPEC_DESC,
+            PLAN_MATERIAL_CODE,
+            MES_PLAN_MATERIAL_CODE,
+            PLAN_SPEC_DESC,
+            CHANGE_MOLD_TYPE,
+            MOLD_NO,
+            REMARK,
+            FINISH_STATUS,
+            DATA_VERSION,
+            COMPANY_CODE,
+            FACTORY_CODE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.lhBatchNo},
+                #{item.orderNo},
+                #{item.scheduleDate},
+                #{item.classIndex},
+                #{item.lhMachineCode},
+                #{item.planIndex},
+                #{item.leftRightMold},
+                #{item.materialCode},
+                #{item.mesMaterialCode},
+                #{item.specDesc},
+                #{item.planMaterialCode},
+                #{item.mesPlanMaterialCode},
+                #{item.planSpecDesc},
+                #{item.changeMoldType},
+                #{item.moldNo},
+                #{item.remark},
+                #{item.finishStatus},
+                #{item.dataVersion},
+                #{item.companyCode},
+                #{item.factoryCode}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMoldAlterPlanFinish">
+        SELECT
+        ID,
+        LH_BATCH_NO,
+        ORDER_NO,
+        SCHEDULE_DATE,
+        LH_MACHINE_CODE,
+        LEFT_RIGHT_MOLD,
+        REMARK,
+        FINISH_STATUS,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MOLD_ALTER_PLAN_FINISH
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
 </mapper>

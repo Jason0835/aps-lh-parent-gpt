@@ -165,9 +165,7 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
 
     @Override
     protected List<MonthPlanNoProductionPlan> listExportData(MonthPlanNoProductionPlan obj) {
-        QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
-        this.builderCondition(wrapper, obj);
-        List<MonthPlanNoProductionPlan> list = entityMapper.selectList(wrapper);
+        List<MonthPlanNoProductionPlan> list = entityMapper.selectExportList(obj);
         if(CollectionUtils.isEmpty(list)) {
             return Collections.emptyList();
         }

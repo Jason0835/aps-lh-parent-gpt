@@ -122,11 +122,13 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
 
     /**
      * 构建前Sku信息
+     *
      * @return
      */
-    public BeforeSkuProductionInfo getBeforeSkuInfo(){
+    public BeforeSkuProductionInfo getBeforeSkuInfo() {
         return new BeforeSkuProductionInfo(beforeMaterialDesc, beforeMaterialCode, "", theoryStartDay, beforeProductionQty, beforeDayMaxQty);
     }
+
     /**
      * 当前硫化组是否需要换模
      *
@@ -165,6 +167,26 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         this.beforeMaterialCode = beforeMaterialCode;
         this.beforeProductionQty = beforeProductionQty;
         this.beforeDayMaxQty = beforeDayMaxQty;
+    }
+
+    /**
+     * 更新排产前Sku信息
+     *
+     * @param beforeSkuProductionInfo
+     */
+    public void updateBeforeSkuInfo(BeforeSkuProductionInfo beforeSkuProductionInfo){
+        this.beforeMaterialDesc = beforeSkuProductionInfo.getMaterialDesc();
+        this.beforeMaterialCode = beforeSkuProductionInfo.getMaterialCode();
+        this.beforeProductionQty = beforeSkuProductionInfo.getProductionQty();
+        this.beforeDayMaxQty = beforeSkuProductionInfo.getDayMaxQty();
+    }
+
+    /**
+     * 20260326 没有做好精确获取前Sku量时的特殊处理
+     * 在确认可换模场景下，将前Sku的量修改为1
+     */
+    public void updateBeforeSkuQtyChangeMould() {
+        this.beforeProductionQty = BigDecimal.ONE.intValue();
     }
 
 }

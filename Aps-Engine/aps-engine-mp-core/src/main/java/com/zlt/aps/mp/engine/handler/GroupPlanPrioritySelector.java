@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -12,11 +14,17 @@ import com.zlt.aps.mp.engine.logrecorder.TbrSpecialMaterialProductionLogRecorder
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -65,6 +73,14 @@ public class GroupPlanPrioritySelector {
             return null;
         }
         ProductionPlanGroupInfo selected;
+        //结构优先列表 sandy+ 2026.3.26
+        List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x -> {
+            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
+        }).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(structurePriorityList)){
+            needProductionGroupList = structurePriorityList;
+        }
+
         //高优先级需求SKU个数多的优先
         Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
         List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
@@ -109,6 +125,8 @@ public class GroupPlanPrioritySelector {
         if (CollectionUtils.isEmpty(groupPlanList)) {
             return null;
         }
+        List<ProductionPlanGroupInfo> sectionWidthList;
+        ProductionPlanGroupInfo selected;
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         String cxMachineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         // 1、如果在机结构有特殊材料，需要优先选择包含特殊材料的结构
@@ -117,7 +135,7 @@ public class GroupPlanPrioritySelector {
         Integer minFixedPriority = specialMaterialList.stream().mapToInt(ProductionPlanGroupInfo::getFixedPriority).min().getAsInt();
         List<ProductionPlanGroupInfo> fixedGroupPlanList = specialMaterialList.stream().filter(groupPlan -> minFixedPriority.equals(groupPlan.getFixedPriority())).collect(Collectors.toList());
         if (fixedGroupPlanList.size() == BigDecimal.ONE.intValue()) {
-            ProductionPlanGroupInfo selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
+            selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
             TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.FIXED_PRIORITY);
             return selected;
         }
@@ -125,45 +143,102 @@ public class GroupPlanPrioritySelector {
         //取前规格排产计划-所有
         List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getProductionPlanInfo().getGroupPlanData();
         //2、与前结构含有同规格的优先
-        List<ProductionPlanGroupInfo> sameSpecificationsList = fixedGroupPlanList.stream().filter(fixedPlan -> fixedPlan.hasSameSpecifications(realProductionPlanList)).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(sameSpecificationsList)) {
-            sameSpecificationsList = fixedGroupPlanList;
+        List<ProductionPlanGroupInfo> sameSpecificationList = fixedGroupPlanList.stream().filter(fixedPlan -> fixedPlan.hasSameSpecifications(realProductionPlanList)).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(sameSpecificationList)) {
+            if (sameSpecificationList.size() == BigDecimal.ONE.intValue()) {
+                selected = sameSpecificationList.get(BigDecimal.ZERO.intValue());
+                TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_SPECIFICATIONS_PRIORITY);
+                return selected;
+            }else{
+                //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
+                return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sameSpecificationList);
+            }
         }
-        if (sameSpecificationsList.size() == BigDecimal.ONE.intValue()) {
-            ProductionPlanGroupInfo selected = sameSpecificationsList.get(BigDecimal.ZERO.intValue());
-            TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_SPECIFICATIONS_PRIORITY);
-            return selected;
-        }
-        //3、与前结构含有同英寸的优先
-        List<ProductionPlanGroupInfo> sameProSizeList = sameSpecificationsList.stream().filter(sameSpecificationsPlan -> sameSpecificationsPlan.hasSameProSize(realProductionPlanList)).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(sameProSizeList)) {
-            sameProSizeList = sameSpecificationsList;
-        }
-        if (sameProSizeList.size() == BigDecimal.ONE.intValue()) {
-            ProductionPlanGroupInfo selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
-            TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_PRO_SIZE_PRIORITY);
-            return selected;
-        }
-        //4、断面宽差值±10 参数
+
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
-        List<ProductionPlanGroupInfo> sectionWidthList = sameProSizeList.stream().filter(sectionWidthPlan -> sectionWidthPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(sectionWidthList)) {
-            sectionWidthList = sameProSizeList;
+        //3、与前结构含有同英寸的优先
+        List<ProductionPlanGroupInfo> sameProSizeList = fixedGroupPlanList.stream().filter(fixedPlan -> fixedPlan.hasSameSpecifications(realProductionPlanList) || fixedPlan.hasSameProSize(realProductionPlanList)).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(sameProSizeList)) {
+            if (sameProSizeList.size() == BigDecimal.ONE.intValue()) {
+                selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
+                TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_PRO_SIZE_PRIORITY);
+                return selected;
+            }else{
+                //3.1、同英寸下 断面宽差值±10 参数
+                sectionWidthList = sameProSizeList.stream().filter(sectionWidthPlan -> sectionWidthPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)).collect(Collectors.toList());
+                if (!CollectionUtils.isEmpty(sectionWidthList)) {
+                    if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
+                        selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+                        TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY);
+                        return selected;
+                    }else{
+                        //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
+                        return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sectionWidthList);
+                    }
+                }
+                //3.2、同英寸下，没有断面宽差值±10
+                //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
+                return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sameProSizeList);
+            }
         }
-        if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
-            ProductionPlanGroupInfo selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
-            TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY);
-            return selected;
+
+        //4、断面宽差值±10 参数
+        sectionWidthList = fixedGroupPlanList.stream().filter(sectionWidthPlan -> sectionWidthPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(sectionWidthList)) {
+            if (sectionWidthList.size() == BigDecimal.ONE.intValue()) {
+                selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+                TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY);
+                return selected;
+            }else{
+                //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
+                return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sectionWidthList);
+            }
         }
+
         //5、设置该成型机近1个月的排产分组和排产次数
-        sectionWidthList.forEach(groupPlan -> {
+        fixedGroupPlanList.forEach(groupPlan -> {
             groupPlan.setLastBoardingDate(BigDecimal.ZERO.intValue());
             groupPlan.setProductionCount(BigDecimal.ZERO.intValue());
             productionHistoryHandler.setCxMachineProductionGroupPlanHistory(context, groupPlan, cxMachineInfo);
         });
-        sectionWidthList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
-        ProductionPlanGroupInfo selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
+        fixedGroupPlanList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
+        selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
         log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.HISTORY_QUALITY_PRIORITY));
+        return selected;
+    }
+
+    /**
+     * 在同等层级中，含有多个备选时，先 含有结构优先的 -> 结构需求与产能接近
+     * @param context 排产上下文
+     * @param cxMachineCode 当前需要选择的机台
+     * @param cxMachineTypeCode 当前需要选择的机台机型
+     * @param sameLevelGroupInfoList 同等层级结构清单
+     * @return
+     */
+    private ProductionPlanGroupInfo getScmProductionPlanGroupInfo(Context context, String cxMachineCode, String cxMachineTypeCode, List<ProductionPlanGroupInfo> sameLevelGroupInfoList) {
+        ProductionPlanGroupInfo selected;
+        //1. 含有结构优先的，优先选择
+        List<ProductionPlanGroupInfo> structurePriorityList = sameLevelGroupInfoList.stream().filter(x -> {
+            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(structurePriorityList)) {
+            structurePriorityList = sameLevelGroupInfoList;
+        }
+        if (structurePriorityList.size() == BigDecimal.ONE.intValue()) {
+            selected = structurePriorityList.get(BigDecimal.ZERO.intValue());
+            TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_STRUCTURE_PRIORITY);
+            return selected;
+        }
+        //2. 在供应链高优先级个数多的前4结构清单中，降序，获取结构需求与产能接近的结构 sandy+2026.3.29
+        structurePriorityList.sort( Comparator.comparingInt(ProductionPlanGroupInfo::getHeightPriorityCount).reversed());
+        Integer structureBillPreCount = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getStructureBillPreCount();
+        Integer subSize = structurePriorityList.size() > structureBillPreCount ? structureBillPreCount : structurePriorityList.size();
+        structurePriorityList = structurePriorityList.subList(0,subSize);
+        //结构需求与产能接近 -> 结构需求更大的
+        structurePriorityList.sort( Comparator.comparingInt(ProductionPlanGroupInfo::getAbsDiffStructureAndMachineDays)
+                .thenComparingInt(ProductionPlanGroupInfo::getRemainingNeedAllocationDays).reversed());
+        selected = structurePriorityList.get(BigDecimal.ZERO.intValue());
+        TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.NEAR_CAPACITY_PRIORITY);
         return selected;
     }
 

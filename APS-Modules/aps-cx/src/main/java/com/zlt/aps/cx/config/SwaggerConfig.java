@@ -1,6 +1,5 @@
 package com.zlt.aps.cx.config;
 
-import com.ruoyi.common.utils.StringUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import springfox.documentation.builders.RequestHandlerSelectors;
@@ -10,53 +9,48 @@ import springfox.documentation.spi.DocumentationType;
 import springfox.documentation.spring.web.plugins.Docket;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * 接口文档配置
- * 每新增一个模块，需要在这里新增一个配置组
+ * <p>
+ * 每新增一个模块，需要新增一个配置组
  * 每个模块单独分组
+ * </p>
+ * @author Nick
  */
 @Configuration
 public class SwaggerConfig {
 
     /**
-     * 过滤某些不需要提供给前端的API接口
-     */
-    private static final List<String> excludedPathPrefix = Arrays.asList(
-            "/importTemplate",
-            "/add",
-            "/edit/{id}",
-            "/exportAsync"
-    );
-
-    /**
-     * 过滤某些不需要提供给前端的API接口
-     */
-    private static final List<String> excludedOutPathPrefix = Arrays.asList(
-            "/importTemplate",
-            "/add",
-            "/edit/{id}",
-            "/exportAsync"
-    );
-
-    /**
      * 通用的文档信息
      *
-     * @return
+     * @return ApiInfo
      */
     private ApiInfo apiInfo() {
-        //作者信息
-        Contact contact = new Contact("双钱APS成型", "http://localhost:端口/doc.html", "com.tlt.aps");
+        Contact contact = new Contact(
+                "金宇 APS 成型",
+                "http://localhost:端口/doc.html",
+                "com.tlt.aps"
+        );
         return new ApiInfo(
-                "双钱APS成型硫化",
-                "接口API文档",
+                "金宇 APS 成型硫化",
+                "接口 API 文档",
                 "v1.0",
                 "http://localhost:端口/doc.html",
                 contact,
                 "TLT",
-                "https://com.tlt.scm",
-                new ArrayList<>());
+                "https://com.tlt.aps",
+                new ArrayList<>()
+        );
+    }
+
+    @Bean
+    public Docket createRestApi() {
+        return new Docket(DocumentationType.OAS_30)
+                .apiInfo(apiInfo())
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.zlt.aps.cx"))
+                .build()
+                .groupName("APS-CX-MODULES");
     }
 }
