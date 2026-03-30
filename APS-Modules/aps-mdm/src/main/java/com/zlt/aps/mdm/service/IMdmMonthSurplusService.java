@@ -29,4 +29,14 @@ public interface IMdmMonthSurplusService extends IDocService<MdmMonthSurplus> {
      */
     void importDataAsync(List<MdmMonthSurplus> list, boolean updateSupport, Long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
 
+    /**
+     * 根据工厂、年、月查询需求计划版本列表（去重）
+     *
+     * @param factoryCode 工厂编号
+     * @param year        年份
+     * @param month       月份
+     * @return 需求计划版本列表
+     */
+    List<String> listRequireVersions(String factoryCode, Integer year, Integer month);
+
 }

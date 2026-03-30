@@ -8,8 +8,10 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonthSurplusService;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -59,6 +61,9 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
 
     @Autowired
     private IRemoteImportErrorLogService iRemoteImportErrorLogService;
+
+    @Autowired
+    private MdmMonthSurplusEntityMapper mdmMonthSurplusEntityMapper;
 
   @Override
     protected String getDocTypeCode() {
@@ -147,5 +152,27 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
             }
         }
         return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+    }
+
+    /**
+     * 根据工厂、年、月查询需求计划版本列表（去重）
+     *
+     * @param factoryCode 工厂编号
+     * @param year        年份
+     * @param month       月份
+     * @return 需求计划版本列表
+     */
+    @Override
+    public List<String> listRequireVersions(String factoryCode, Integer year, Integer month) {
+        LambdaQueryWrapper<MdmMonthSurplus> wrapper = new LambdaQueryWrapper<MdmMonthSurplus>()
+                .select(MdmMonthSurplus::getRequireVersion)
+                .eq(MdmMonthSurplus::getIsDelete, ApsConstant.DEL_FLAG_NORMAL)
+                .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
+                .eq(MdmMonthSurplus::getYear, year)
+                .eq(MdmMonthSurplus::getMonth, month)
+                .isNotNull(MdmMonthSurplus::getRequireVersion)
+                .groupBy(MdmMonthSurplus::getRequireVersion);
+        List<MdmMonthSurplus> list = mdmMonthSurplusEntityMapper.selectList(wrapper);
+        return list.stream().map(MdmMonthSurplus::getRequireVersion).collect(Collectors.toList());
     }
 }

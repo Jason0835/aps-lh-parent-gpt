@@ -12,10 +12,10 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.mdm.service.IMdmMonthSurplusService;
 import com.zlt.aps.mdm.utils.RemoteImportExcelUtils;
-import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ImportExcelUtils;
@@ -207,5 +207,16 @@ public class MdmMonthSurplusController extends AbstractDocBizController<MdmMonth
         return "MDM0140";
     }
 
-
+    /**
+     * 根据工厂、年、月查询需求计划版本列表（去重）
+     *
+     * @param monthSurplus 年月工厂
+     * @return 需求计划版本列表
+     */
+    @ApiOperation("根据工厂、年、月查询需求计划版本列表（去重）")
+    @PostMapping("/listRequireVersions")
+    public AjaxResult listRequireVersions(@RequestBody com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus monthSurplus) {
+        List<String> requireVersions = mdmMonthSurplusService.listRequireVersions(monthSurplus.getFactoryCode(), monthSurplus.getYear(), monthSurplus.getMonth());
+        return AjaxResult.success(requireVersions);
+    }
 }

@@ -78,4 +78,13 @@ public interface IMdmMonthSurplusRemoteService {
     @PostMapping("/mdmMonthSurplus/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 根据工厂、年、月查询需求计划版本列表（去重）
+     *
+     * @param monthSurplus 年月工厂
+     * @return 需求计划版本列表
+     */
+    @ApiOperation("根据工厂、年、月查询需求计划版本列表（去重）")
+    @PostMapping("/mdmMonthSurplus/listRequireVersions")
+    public AjaxResult listRequireVersions(@RequestBody MdmMonthSurplus monthSurplus);
 }

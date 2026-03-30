@@ -207,5 +207,17 @@ public class MdmMonthSurplusController extends AbstractDocBizController<MdmMonth
         return "MDM0140";
     }
 
+    /**
+     * 根据工厂、年、月查询需求计划版本列表（去重）
+     *
+     * @param monthSurplus 年月工厂
+     * @return 需求计划版本列表
+     */
+    @ApiOperation("根据工厂、年、月查询需求计划版本列表（去重）")
+    @PostMapping("/listRequireVersions")
+    public AjaxResult listRequireVersions(@RequestBody MdmMonthSurplus monthSurplus) {
+        List<String> requireVersions = mdmMonthSurplusService.listRequireVersions(monthSurplus.getFactoryCode(), monthSurplus.getYear(), monthSurplus.getMonth());
+        return AjaxResult.success(requireVersions);
+    }
 
 }
