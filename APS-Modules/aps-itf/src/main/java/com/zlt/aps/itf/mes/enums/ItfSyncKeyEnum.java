@@ -68,6 +68,16 @@ public enum ItfSyncKeyEnum {
      * 硫化排程日完成量同步
      */
     LH_SCHE_DAY_FINISH_QTY("LH_SCHE_DAY_FINISH_QTY", "MES", "APS", "硫化排程日完成量同步"),
+
+    /**
+     * 模具交替计划下发
+     */
+    MOLD_ALTER_PLAN_ISSUE("MOLD_ALTER_PLAN_ISSUE", "APS", "MES", "模具交替计划下发"),
+
+    /**
+     * 模具交替计划完成回报
+     */
+    MOLD_ALTER_PLAN_FINISH("MOLD_ALTER_PLAN_FINISH", "MES", "APS", "模具交替计划完成回报"),
     ;
 	/**
 	 * 接口码

@@ -22,6 +22,7 @@ import com.zlt.aps.maindata.mapper.MdmCxScheFinishQtyEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmLhScheFinishQtyEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmCxScheDayFinishQtyEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmLhScheDayFinishQtyEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMoldAlterPlanFinishEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
@@ -70,6 +71,8 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmCxScheDayFinishQtyEntityMapper cxScheDayFinishQtyEntityMapper;
     @Autowired
     private MdmLhScheDayFinishQtyEntityMapper lhScheDayFinishQtyEntityMapper;
+    @Autowired
+    private MdmMoldAlterPlanFinishEntityMapper moldAlterPlanFinishEntityMapper;
     @Autowired
     private BaseDao baseDao;
     @Autowired
@@ -1557,6 +1560,119 @@ public class MesItfServiceImpl implements MesItfService {
                     if (existsMap.containsKey(mapKey)) {
                         // 已存在，更新
                         MdmLhScheDayFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 模具交替计划下发到MES
+     * @param moldAlterPlanList 模具交替计划列表
+     * @return 结果
+     */
+    @Override
+    public AjaxResult issueMoldAlterPlan(List<MdmMoldAlterPlan> moldAlterPlanList) {
+        if (CollectionUtils.isEmpty(moldAlterPlanList)) {
+            return AjaxResult.success();
+        }
+
+        // 转换为中间表实体
+        List<MoldAlterPlanIssue> issueList = new ArrayList<>();
+        for (MdmMoldAlterPlan plan : moldAlterPlanList) {
+            MoldAlterPlanIssue issue = new MoldAlterPlanIssue();
+            BeanUtils.copyProperties(plan, issue);
+            issueList.add(issue);
+        }
+
+        try {
+            // 切换MES数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+
+            // 批量插入到中间表
+            mesItfMapper.insertMoldAlterPlanList(issueList);
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换MES数据源 end
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 同步模具交替计划完成回报
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncMoldAlterPlanFinish(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmMoldAlterPlanFinish> syncList = mesItfMapper.selectMoldAlterPlanFinishList(syncDataLogs);
+
+        // 唯一键重复随机取一条（硫化批次号+工单号+计划日期+硫化机台编号+左右模+厂别）
+        Map<String, MdmMoldAlterPlanFinish> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getLhBatchNo() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getLhMachineCode() + "|" + item.getLeftRightMold(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmMoldAlterPlanFinish> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmMoldAlterPlanFinish> existsList = moldAlterPlanFinishEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmMoldAlterPlanFinish finish = new MdmMoldAlterPlanFinish();
+                            finish.setLhBatchNo(item.getLhBatchNo());
+                            finish.setOrderNo(item.getOrderNo());
+                            finish.setScheduleDate(item.getScheduleDate());
+                            finish.setLhMachineCode(item.getLhMachineCode());
+                            finish.setLeftRightMold(item.getLeftRightMold());
+                            finish.setFactoryCode(item.getFactoryCode());
+                            return finish;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmMoldAlterPlanFinish> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmMoldAlterPlanFinish> insertOrUpdateList = new ArrayList<>();
+                for (MdmMoldAlterPlanFinish item : saveList) {
+                    MdmMoldAlterPlanFinish entity = new MdmMoldAlterPlanFinish();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(new Date());
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmMoldAlterPlanFinish existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
                     }
                     insertOrUpdateList.add(entity);

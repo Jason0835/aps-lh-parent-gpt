@@ -42,6 +42,10 @@ public class GroupConclusionInfoVo implements Serializable {
      * 收尾机台
      */
     private CxMachineBaseInfoVo conclusionCxMachine;
+    /**
+     * 整段收尾标记--单台分配场景使用
+     */
+    private boolean wholeRangeFlag;
 
     /**
      * 构造函数
@@ -54,6 +58,7 @@ public class GroupConclusionInfoVo implements Serializable {
         this.successFlag = true;
         this.minLhMachineCount = minLhMachineCount;
         this.conclusionDay = conclusionDay;
+        this.wholeRangeFlag = false;
         if (null == deductionDaySet) {
             deductionDaySet = new HashSet<>();
         }
@@ -84,5 +89,21 @@ public class GroupConclusionInfoVo implements Serializable {
             return;
         }
         this.conclusionCxMachine = selectedCxMachine;
+    }
+
+    /**
+     * 更新收尾天数：单台机分配时
+     *
+     * @param deductionDay
+     */
+    public void updateDeductionDaysByCxMachine(Integer deductionDay) {
+        this.deductionDay = deductionDay;
+    }
+
+    /**
+     * 整段收尾
+     */
+    public void setWholeRangeConclusion() {
+        this.wholeRangeFlag = true;
     }
 }

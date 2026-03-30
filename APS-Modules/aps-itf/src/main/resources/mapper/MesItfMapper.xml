@@ -353,4 +353,73 @@
         <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <insert id="insertMoldAlterPlanList">
+        INSERT INTO MOLD_ALTER_PLAN (
+            LH_BATCH_NO,
+            ORDER_NO,
+            SCHEDULE_DATE,
+            CLASS_INDEX,
+            LH_MACHINE_CODE,
+            PLAN_INDEX,
+            LEFT_RIGHT_MOLD,
+            MATERIAL_CODE,
+            MES_MATERIAL_CODE,
+            SPEC_DESC,
+            PLAN_MATERIAL_CODE,
+            MES_PLAN_MATERIAL_CODE,
+            PLAN_SPEC_DESC,
+            CHANGE_MOLD_TYPE,
+            MOLD_NO,
+            REMARK,
+            FINISH_STATUS,
+            DATA_VERSION,
+            COMPANY_CODE,
+            FACTORY_CODE
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.lhBatchNo},
+                #{item.orderNo},
+                #{item.scheduleDate},
+                #{item.classIndex},
+                #{item.lhMachineCode},
+                #{item.planIndex},
+                #{item.leftRightMold},
+                #{item.materialCode},
+                #{item.mesMaterialCode},
+                #{item.specDesc},
+                #{item.planMaterialCode},
+                #{item.mesPlanMaterialCode},
+                #{item.planSpecDesc},
+                #{item.changeMoldType},
+                #{item.moldNo},
+                #{item.remark},
+                #{item.finishStatus},
+                #{item.dataVersion},
+                #{item.companyCode},
+                #{item.factoryCode}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMoldAlterPlanFinish">
+        SELECT
+        ID,
+        LH_BATCH_NO,
+        ORDER_NO,
+        SCHEDULE_DATE,
+        LH_MACHINE_CODE,
+        LEFT_RIGHT_MOLD,
+        REMARK,
+        FINISH_STATUS,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM MOLD_ALTER_PLAN_FINISH
+        WHERE 1 = 1
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+    </select>
 </mapper>
