@@ -185,11 +185,11 @@ public class ProductionCxMachineCalculationHandler {
         groupPlanInfo.initMpDailyCapacityLimit(context);
         //2、接着进行同规格同花纹的续作高优先级部分进行模拟排产
         Integer monthDays = context.getMonthDays();
-        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap, new HashSet<>());
+        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN, monthDays, continueSkuInfoMap, new HashSet<>(), new HashSet<>());
         //4.3 重新计算统计产能
         groupPlanInfo.reCalcMpDailyCapacityLimit(context);
         //3、接着进行共生胎，同模具的续作高优级部分进行模拟排产
-        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap, new HashSet<>());
+        CxContinueProductionHandler.productionContinueByType(context, ProductionStageEnum.CALCULATION_STAGE, groupPlanInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD, monthDays, continueSkuInfoMap, new HashSet<>(), new HashSet<>());
         //4.3 重新计算统计产能
         groupPlanInfo.reCalcMpDailyCapacityLimit(context);
     }

@@ -130,7 +130,7 @@ public class OnLineGroupOnLineMachineHandler {
         groupPlan.initMpDailyCapacityLimit(context);
         //同规格同花纹 or 共生胎同模具
         if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == type || ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == type) {
-            CxContinueProductionHandler.productionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap, new HashSet<>());
+            CxContinueProductionHandler.productionContinueByType(context, productionStage, groupPlan, type, deadLineDay, continueSkuInfoMap, new HashSet<>(), new HashSet<>());
             //4.3 重新计算统计产能
             groupPlan.reCalcMpDailyCapacityLimit(context);
             return;

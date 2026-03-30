@@ -120,16 +120,15 @@ public class CxContinueProductionHandler {
      * @param endDay             结束日
      * @param continueSkuMap     分组计划中续作Sku信息集合
      * @param excludeDaySet      需要剔除的天
+     * @param excludeSkuSet      需要剔除的Sku
      */
-    public static void productionContinueByType(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Set<Integer> excludeDaySet) {
+    public static void productionContinueByType(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Set<Integer> excludeDaySet, Set<String> excludeSkuSet) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String groupName = productionPlanInfo.getGroupName();
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
-        //取得最早收尾的续作硫化组
-
+        //取得最早收尾的续作硫化组 getEarliestConclusionLhInfoByContinueSku
         EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, excludeDaySet);
-//        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfoByContinueSku(context, continueSkuMap, excludeDaySet);
         if (null == earliestConclusionLhGroup) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
@@ -154,13 +153,12 @@ public class CxContinueProductionHandler {
             //todo
             return;
         }
-        Set<String> excludeSkuSet = new HashSet<>();
         //挑选下一个同规格同花纹的sku进行排产
         ContinueSkuNextSkuInfo selectSkuInfo = getNextSku(productionContext, earliestConclusionLhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         if (null == selectSkuInfo) {
             excludeDaySet.add(startDay);
             //递归迭代下一个硫化组
-            productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet);
+            productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet, new HashSet<>());
         }
         if (null == selectSkuInfo && excludeDaySet.contains(startDay)) {
             return;
@@ -181,8 +179,15 @@ public class CxContinueProductionHandler {
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, cxMachineCodeInfo, earliestConclusionLhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList, continueType);
+        //递归：实际没有排产，则该Sku跳过
+        Integer productionQty = lhProductionQtyHelper.getRealSumProductionQty();
+        if (productionQty <= BigDecimal.ZERO.intValue()) {
+            excludeSkuSet.add(selectedMaterialDesc);
+        }else{
+            excludeDaySet = new HashSet<>();
+        }
         //迭代下一个硫化组
-        productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet);
+        productionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet, excludeSkuSet);
     }
 
     /**
@@ -295,7 +300,7 @@ public class CxContinueProductionHandler {
         if (!SecondOnLineMachineHandler.checkSecondOnLine(productionPlanInfo, productionContext, addSkuInfo, startDay)) {
             TbrMouldProductionLogRecorder.addSkuProductionLimitLog(productionContext, productionPlanInfo.getGroupName(), "", addSkuInfo, startDay, MouldProductionLimitTypeEnum.SECOND_PRODUCTION_LIMIT);
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext,lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         }
         Set<String> cxMachineCodeInfo = Optional.ofNullable(productionPlanInfo.getAllocationCxMachineCodeSet()).orElse(Collections.emptySet());
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
@@ -305,13 +310,13 @@ public class CxContinueProductionHandler {
         TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, startDay, endDay);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext,lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         }
         BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findChangeTypeBlockBeforeSkuByAddSku(productionContext, addSkuInfo, productionPlanInfo, startDay);
         TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(productionContext, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
         if (null == lhBeforeSkuInfo) {
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext,lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);
         }
         return new ContinueSkuNextSkuInfo(selectedMaterialDesc, selectedMouldList, lhBeforeSkuInfo);
     }
