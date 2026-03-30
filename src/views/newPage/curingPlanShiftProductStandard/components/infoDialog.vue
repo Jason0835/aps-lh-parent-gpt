@@ -336,6 +336,10 @@ export default {
   methods: {
   async  handleStandardCapacity() {
       console.log(this.form.standardCapacity);
+       // 检查是否只包含数字
+       if (!/^\d+$/.test(this.form.standardCapacity)) {
+        return
+      }
       try{
         let res=await getCapacity({
           factoryCode:this.form.factoryCode,
