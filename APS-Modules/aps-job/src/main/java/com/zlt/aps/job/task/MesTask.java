@@ -28,6 +28,14 @@ public class MesTask {
     }
 
     /**
+     * 同步出库未扫描订单
+     */
+    @ApiOperation("同步出库未扫描订单-默认当前年月")
+    public void syncOutboundOrdersNotScan() {
+        iMesItfService.syncOutbountOrdersNotScan(new MdmOutbountOrdersNotScan());
+    }
+
+    /**
      * 同步不合格库存
      */
     @ApiOperation("同步不合格库存-默认当前日期")

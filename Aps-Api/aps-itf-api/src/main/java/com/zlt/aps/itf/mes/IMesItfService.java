@@ -294,4 +294,24 @@ public interface IMesItfService {
     @ApiOperation("硫化排程结果下发到MES")
     @PostMapping("/mesItf/issueLhScheduleResult")
     public AjaxResult issueLhScheduleResult(@RequestBody List<com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue> lhScheduleResultIssueList);
+
+    /**
+     * 同步出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @ApiOperation("同步出库未扫描订单")
+    @PostMapping("/mesItf/syncOutbountOrdersNotScan")
+    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan);
+
+    /**
+     * 查询出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @ApiOperation("查询出库未扫描订单")
+    @PostMapping("/mesItf/getOutbountOrdersNotScan")
+    public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan);
 }

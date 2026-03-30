@@ -183,6 +183,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
                     row.put("mainPattern", nullToEmpty(item.getMainPattern()));
                     row.put("productionType", productionTypeMap.getOrDefault(item.getProductionType(), ""));
                     row.put("scmPriority", yesNoMap.getOrDefault(item.getScmPriority(), ""));
+                    row.put("structurePriority", yesNoMap.getOrDefault(item.getStructurePriority(), ""));
                     row.put("orderQty", item.getOrderQty());
                     row.put("stockQty", item.getStockQty());
                     row.put("sub2YearStockQty", item.getSub2YearStockQty());
@@ -256,7 +257,7 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
         List<String> headerFields = Arrays.asList(
             "factoryCode", "productTypeCode", "locationType", "brand",
             "materialCode", "materialDesc", "structureName", "mainPattern",
-            "productionType", "scmPriority", "orderQty", "stockQty",
+            "productionType", "scmPriority", "structurePriority", "orderQty", "stockQty",
             "sub2YearStockQty", "sub1YearStockQty", "currentYearStockQty",
             "plannedSurplus", "netQty", "postponeNetQty", "unPostponeNetQty",
             "heightQty", "midQty", "postponeQty", "cycleReserveQty",
