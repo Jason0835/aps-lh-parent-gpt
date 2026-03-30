@@ -31,7 +31,7 @@
 <script>
 import { mapState } from "vuex";
 
-import { saveCapacity } from "@/api/monthplan/mdmSkuLhCapacity";
+import { saveCapacity,getCapacity } from "@/api/monthplan/mdmSkuLhCapacity";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -228,6 +228,7 @@ export default {
           label: this.$t("ui.data.column.curingPlan.classCapacity"),
           span: 12,
           type: "number",
+          disabled:true
         },
         {
           prop: "standardCapacity",
@@ -237,6 +238,9 @@ export default {
           required: true,
           min: 0,
           max: 99999999,
+          listeners: {
+            change: this.handleStandardCapacity,
+          },
         },
         {
           prop: "sumVulcanization",
@@ -330,6 +334,19 @@ export default {
     },
   },
   methods: {
+  async  handleStandardCapacity() {
+      console.log(this.form.standardCapacity);
+      try{
+        let res=await getCapacity({
+          factoryCode:this.form.factoryCode,
+          materialCode:this.form.materialCode,
+          standardCapacity:this.form.standardCapacity
+        });
+        this.$set(this.form,"classCapacity",res.classCapacity);
+      }catch(error){
+        console.log(error);
+      }
+    },
     // api
     async save(params) {
       try {

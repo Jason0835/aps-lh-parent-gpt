@@ -20,3 +20,10 @@ export function saveCapacity(query) {
     data: query
   })
 }
+export function getCapacity(query) {
+  return request({
+    url: '/monthplan/mdmSkuLhCapacity/getClassCapacity',
+    method: 'post',
+    data: query
+  })
+}

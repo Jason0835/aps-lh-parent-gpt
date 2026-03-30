@@ -68,10 +68,11 @@
 <script>
 import { downloadLink } from "@/utils/request";
 import {
-  getMonthSurplusList
+  getMonthSurplusList,getVersionSelect
 } from "@/api/monthplan/mdmMonthSurplus";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
+import clean from "highlight.js/lib/languages/clean";
 // import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -122,6 +123,7 @@ export default {
       },
       importDefaultValue: {},
       importRules: {},
+      versionList:[]
     };
   },
   computed: {
@@ -198,6 +200,10 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          clearable: false,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
         },
         {
           prop: "yearMonth",
@@ -205,10 +211,18 @@ export default {
           type: "date",
           dateType: "month",
           valueFormat: "yyyy-MM",
+          clearable: false,
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           prop: "requireVersion",
           label: this.$t("ui.data.column.finishStock.requireVersion"),
+          type: "select",
+          filterable: true,
+          clearable: false,
+          dictData: this.versionList,
         },
         {
           prop: "productTypeCode",
@@ -230,6 +244,63 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.getVersionList();
+    },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
+    },
+    async getVersionList(isGet,isSet=true) {
+      if (isGet) {
+        this.loading = true;
+      }
+      try {
+        const data = await getVersionSelect(this.formatParams());
+
+        let list = [];
+        for (let i = 0; i < data.length; i++) {
+          let obj = {
+            label: data[i],
+            value: data[i],
+          };
+          list.push(obj);
+        }
+        this.versionList = list;
+        console.log(this.versionList)
+        if(!isSet)return
+        if (list.length > 0) {
+          this.$set(this.search, "requireVersion", list[0].value);
+          this.$set(this.query, "requireVersion", list[0].value);
+        } else {
+          this.$set(this.search, "requireVersion", "");
+          this.$set(this.query, "requireVersion", "");
+        }
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+      } finally {
+        if (isGet) {
+          this.$set(this.page, "current", 1);
+          this.getList();
+        }
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -257,15 +328,18 @@ export default {
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
-      this.getList();
+      // this.getList();
+      this.getVersionList(true,false);
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
+      // this.getVersionList(true);
     },
     handelSuccess() {
       this.getList();
+      // this.getVersionList(true);
     },
     handleSortChange({ column, prop, order }) {
       if (order) {
@@ -348,7 +422,8 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    // this.getList();
+    this.getVersionList(true);
   },
   activated() {
   },
