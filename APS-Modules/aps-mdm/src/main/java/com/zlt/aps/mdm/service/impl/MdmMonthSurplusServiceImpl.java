@@ -171,7 +171,9 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
                 .eq(MdmMonthSurplus::getYear, year)
                 .eq(MdmMonthSurplus::getMonth, month)
                 .isNotNull(MdmMonthSurplus::getRequireVersion)
-                .groupBy(MdmMonthSurplus::getRequireVersion);
+                .groupBy(MdmMonthSurplus::getRequireVersion)
+                .orderByDesc(MdmMonthSurplus::getCreateTime)
+                .orderByDesc(MdmMonthSurplus::getId);
         List<MdmMonthSurplus> list = mdmMonthSurplusEntityMapper.selectList(wrapper);
         return list.stream().map(MdmMonthSurplus::getRequireVersion).collect(Collectors.toList());
     }
