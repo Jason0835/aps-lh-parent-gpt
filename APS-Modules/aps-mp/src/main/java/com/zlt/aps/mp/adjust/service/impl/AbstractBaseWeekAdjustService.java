@@ -888,10 +888,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 设置日产能限制Map
         contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
 
-        // 设置结构起产日
-        contextDTO.setStructureStartDay(contextDTO.getStartDay());
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+        // 初始结构开始日\收尾日
+        initStructureStartAndEndDay(contextDTO);
+
         // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
 
         // 构建月计划统计结果
