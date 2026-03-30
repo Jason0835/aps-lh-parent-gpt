@@ -121,7 +121,7 @@ public class MatchingAdjuestProductionHandler {
             log.error("获取配置失败", e);
         }
 
-        // 结构排产的开始不能早于锁定日的校验
+        // 1、结构排产的开始不能早于锁定日的校验
         Integer startDay = contextDTO.getStartDay();
         Integer endDay = contextDTO.getEndDay();
         Integer lockEndDay = contextDTO.getLockEndDay();
@@ -129,7 +129,7 @@ public class MatchingAdjuestProductionHandler {
         if (endDay <= lockEndDay) { // 结束日在锁定日结束前的结构不搭配
             return;
         }
-        // 特殊材料可搭配量校验（只有结构内需要考虑）
+        // 2、特殊材料可搭配量校验（只有结构内需要考虑）
         boolean isSpecial = isInner && intValue(contextDTO.getSpecStructureTotalQty()) > 0;
         Integer remaindSpecQty = 0;
         if (isSpecial) {
@@ -139,7 +139,7 @@ public class MatchingAdjuestProductionHandler {
                 return;
             }
         }
-        // 取调整需求计划
+        // 3、取调整需求计划
         List<MonthPlanProductionRequirePlanVo> demandPlanList = this.loadRequirePlanList(contextDTO);
         if (CollectionUtils.isEmpty(demandPlanList)) {
             return;
@@ -159,9 +159,11 @@ public class MatchingAdjuestProductionHandler {
         // 按天统计已排产量
         Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap = this.buildDayProductionMap(mpProdFinalList,
                 startDay, endDay);
+        boolean hasMatching = false;
+        // 4、反复循环执行搭配扫描
         do {
             // 先执行模具续作分配
-            this.doAllocationAdjuest(contextDTO, productionContext, mpProdFinalList, mpProdFinalMap, demandPlanList, dayProductionMap,
+            int continueAllocationQty = this.doAllocationAdjuest(contextDTO, productionContext, mpProdFinalList, mpProdFinalMap, demandPlanList, dayProductionMap,
                     realBeginDay, endDay, isSpecial, remaindSpecQty, true);
             // 再执行新增模具分配
             int totalAllocationQty = this.doAllocationAdjuest(contextDTO, productionContext, mpProdFinalList, mpProdFinalMap, demandPlanList, dayProductionMap,
@@ -169,11 +171,19 @@ public class MatchingAdjuestProductionHandler {
             if (isSpecial && totalAllocationQty > 0) {
                 remaindSpecQty -= totalAllocationQty; // 特殊结构，更新剩余可分配量量
             }
-            if (totalAllocationQty <= 0) { // 没有搭配，结束
+            // 补量或者加模有任意一个搭配上，则标记为已搭配
+            if (continueAllocationQty > 0 || totalAllocationQty > 0) {
+                hasMatching = true;
+            }
+            if (totalAllocationQty <= 0) { // 没有增模搭配，结束
                 break;
             }
         } while (true);
         log.info("周程滚动搭配算法end");
+        // 5、执行搭配后，有任意一个能搭配上，再次尝试补量
+        if (hasMatching) {
+            this.structureAdjuestBoots(contextDTO, mpProdFinalList);
+        }
     }
 
     /**
