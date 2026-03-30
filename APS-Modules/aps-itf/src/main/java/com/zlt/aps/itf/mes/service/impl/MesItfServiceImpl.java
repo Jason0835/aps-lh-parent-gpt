@@ -1684,8 +1684,44 @@ public class MesItfServiceImpl implements MesItfService {
             }
         } finally {
             DynamicDataSourceContextHolder.clear();
-            // 切换APS数据源 end
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 同步出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+        List<MdmOutbountOrdersNotScan> orderList = this.getOutbountOrdersNotScan(outbountOrdersNotScan);
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            if (CollectionUtils.isNotEmpty(orderList)) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("FACTORY_CODE", outbountOrdersNotScan.getFactoryCode());
+                baseDao.deleteByMap(MdmOutbountOrdersNotScan.class, map);
+                List<List<MdmOutbountOrdersNotScan>> splitList = ScmListUtils.getSplitList(orderList, 1000);
+                for (List<MdmOutbountOrdersNotScan> importList : splitList) {
+                    baseDao.insertBatch(importList);
+                }
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 查询出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @Override
+    public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+        return mesViewMapper.selectOutbountOrdersNotScan(outbountOrdersNotScan);
     }
 }

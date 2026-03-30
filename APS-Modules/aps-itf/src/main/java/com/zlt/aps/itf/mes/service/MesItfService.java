@@ -243,4 +243,20 @@ public interface MesItfService {
      * @return
      */
     public AjaxResult syncMoldAlterPlanFinish(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan);
+
+    /**
+     * 查询出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan);
 }

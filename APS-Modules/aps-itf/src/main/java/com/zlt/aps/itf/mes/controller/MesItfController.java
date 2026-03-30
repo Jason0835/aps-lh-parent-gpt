@@ -537,4 +537,36 @@ public class MesItfController {
     public AjaxResult syncMoldAlterPlanFinish(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return mesItfService.syncMoldAlterPlanFinish(syncDataLogs);
     }
+
+    /**
+     * 同步出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @ApiOperation("同步出库未扫描订单")
+    @PostMapping("/syncOutbountOrdersNotScan")
+    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+        String factoryCode = outbountOrdersNotScan.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncOutbountOrdersNotScan(outbountOrdersNotScan);
+    }
+
+    /**
+     * 查询出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @ApiOperation("查询出库未扫描订单")
+    @PostMapping("/getOutbountOrdersNotScan")
+    public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+        String factoryCode = outbountOrdersNotScan.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.getOutbountOrdersNotScan(outbountOrdersNotScan);
+    }
 }
