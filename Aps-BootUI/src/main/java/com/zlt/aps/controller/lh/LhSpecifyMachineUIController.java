@@ -1,34 +1,40 @@
 package com.zlt.aps.controller.lh;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
-import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.ILhSpecifyMachineRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import org.apache.commons.io.IOUtils;
+
 import java.util.Arrays;
 import java.util.List;
+import java.io.IOException;
+import java.io.ByteArrayInputStream;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -51,9 +57,6 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
 
     @Autowired
     private ILhSpecifyMachineRemoteService iLhSpecifyMachineService;
-
-    @Autowired
-    private ILhMachineInfoRemoteService iLhMachineInfoService;
 
     private final String prefix = "aps/lh/lhSpecifyMachine";
 
@@ -203,13 +206,5 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
         context.setFileBytes(data);
         AjaxResult ajaxResult = iLhSpecifyMachineService.importData(context,false);
         return ajaxResult;
-    }
-
-    @ApiOperation("获取机台下拉列表")
-    @PostMapping("/getMachineList")
-    @ResponseBody
-    public AjaxResult getMachineList( LhMachineInfo query) {
-        TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
-        return AjaxResult.success(tableDataInfo.getRows());
     }
 }
