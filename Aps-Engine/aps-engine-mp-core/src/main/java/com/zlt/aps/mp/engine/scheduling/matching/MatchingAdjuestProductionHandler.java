@@ -450,7 +450,7 @@ public class MatchingAdjuestProductionHandler {
                     }
                     // 5.2.3、产能校验
                     MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
-                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, plan, capacity, day, beginDay, dayProductionMap, dailyCapacityLimitMap); // 获取模具剩余产能
+                    Integer mouldRemaindCapacity = this.getMouldRemaindCapacity(contextDTO, plan, capacity, day, beginDay, endDay, dayProductionMap, dailyCapacityLimitMap); // 获取模具剩余产能
                     // 5.2.3.1、如果模具产能已满，且当天硫化机已经满足条件，则直接跳过
                     if (mouldRemaindCapacity <= 0
                             && dailyCapacityLimitVo.getMaxLhMachines() <= dailyCapacityLimitVo.getUsedLhMachines()) {
@@ -833,11 +833,10 @@ public class MatchingAdjuestProductionHandler {
      * @return
      */
     private Integer getMouldRemaindCapacity(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo plan,
-                                            int capacity, int day, int beginDay,
+                                            int capacity, int day, int beginDay, int endDay,
                                             Map<Integer, List<MatchingProductionAdjuestVo>> dayProductionMap,
                                             Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
         String materialDesc = plan.getMaterialDesc();
-        int endDay = plan.getEndDay();
         // 1、检查当天排产情况
         MatchingProductionAdjuestVo dayProduction = this.getMatchingProductionAdjuest(materialDesc, day,
                 dayProductionMap);
