@@ -520,15 +520,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = contextDTO.getDailyCapacityLimitVoMap();
         List<MpStructureAllocation> oneStructureAllocationList = contextDTO.getOneStructureAllocationList();
-        if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList)) {
+        if (PubUtil.isEmpty(dailyCapacityMap) || PubUtil.isEmpty(oneStructureAllocationList) || PubUtil.isEmpty(mpProdFinalList)) {
             log.warn("构建月计划统计结果 ==> 日产能限制Map或者月计划结构转产表-单结构列表为空，跳过不处理");
             return null;
         }
 
-        FactoryMonthPlanFinalAdjustVo monthPlan = new FactoryMonthPlanFinalAdjustVo();
-        if (PubUtil.isNotEmpty(mpProdFinalList)) {
-            monthPlan = mpProdFinalList.get(0);
-        }
+        FactoryMonthPlanFinalAdjustVo monthPlan = mpProdFinalList.get(0);
+
         MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
         // 设置月计划统计相关字段
         setMonthPlanStatisticsField(monthPlan, oneStructureAllocationList.get(0), statistics);
@@ -651,7 +649,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(monthPlanStatisticsList)){
             return;
         }
-        List<String> structureNameList = monthPlanStatisticsList.stream().map(x->x.getStructureName()).collect(Collectors.toList());
+        List<String> structureNameList = monthPlanStatisticsList.stream().filter(x->x != null && !StringUtil.isEmptyWithTrim(x.getStructureName()))
+                .map(x->x.getStructureName()).collect(Collectors.toList());
+        if (PubUtil.isEmpty(structureNameList)){
+            return;
+        }
         // 删除月计划统计结果（物理删除）
         mpMonthPlanStatisticsService.deleteMonthPlanStatisticsByCondition(contextDTO.getFactoryCode(),
                 String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion(),structureNameList);
