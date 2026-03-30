@@ -61,5 +61,11 @@ public class LhSpecifyMachine  extends BaseEntity implements Serializable {
     @TableField(value = "JOB_TYPE")
     private String jobType;
 
+    /** 创建人名称 */
+//    @Excel(name = "ui.data.column.createBy")
+    @ApiModelProperty(value = "创建人", name = "createByName")
+    @TableField(exist = false)
+    private String createByName;
+
 
 }
