@@ -23,8 +23,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -48,10 +46,8 @@ import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
-import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
@@ -1140,8 +1136,7 @@ public class MatchingAdjuestProductionHandler {
         // 判断当天成型硫化比是否已经满足条件
         List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
         // 统计当天的已排量，判断不能超过最大排产量限制
-        int remainDayTotalCapacity = this.getRemainDayTotalCapacity(contextDTO, dailyCapacityLimitVo, scheduleDay);
-        if (remainDayTotalCapacity <= 0) {
+        if (this.checkRemainDayTotalCapacity(contextDTO, dailyCapacityLimitVo, scheduleDay)) {
             return 0;
         }
         Integer lastDay = this.getLastDay(contextDTO, scheduleDay, beginDay);
@@ -1213,7 +1208,7 @@ public class MatchingAdjuestProductionHandler {
         if (isRemaindCapacity) {
             allocationQty = Math.min(allocationQty, mouldRemaindCapacity); // 如果当天模具有剩余产能的，优先补满
         }
-        allocationQty = Math.min(Math.min(allocationQty, unAllocationQty), remainDayTotalCapacity); // 分配量不能超过未分配量以及剩余产能
+        allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量以及剩余产能
         if (((dayProduct.getProductionQty() + allocationQty)& 1) != 0) { // 如果原排产量 + 新排产量为奇数，则排产量需要 + 1
             allocationQty ++;
         }
@@ -1300,8 +1295,7 @@ public class MatchingAdjuestProductionHandler {
             return false;
         }
         // 5、下一天的总剩余产能不足时，不搭配
-        int remainNextDayTotalCapacity = this.getRemainDayTotalCapacity(contextDTO, nextDailyCapacityLimitVo, nextDay);
-        if (remainNextDayTotalCapacity <= 0) {
+        if (this.checkRemainDayTotalCapacity(contextDTO, nextDailyCapacityLimitVo, nextDay)) {
             return false;
         }
         return true;
@@ -1315,12 +1309,12 @@ public class MatchingAdjuestProductionHandler {
      * @param day                  排产日
      * @return
      */
-    private int getRemainDayTotalCapacity(MpRollAdjustContextDTO contextDTO,
+    private boolean checkRemainDayTotalCapacity(MpRollAdjustContextDTO contextDTO,
                                           MpDailyCapacityLimitVo dailyCapacityLimitVo, Integer day) {
         int dayTotalCapacityLimit = intValue(dailyCapacityLimitVo.getMaxDayProductionQty());
         List<FactoryMonthPlanFinalAdjustVo> mpPlanFinalAdjustList = contextDTO.getFactoryMonthPlanProdFinalList();
         if (CollectionUtils.isEmpty(mpPlanFinalAdjustList)) {
-            return dayTotalCapacityLimit;
+            return true;
         }
         // 1.计算检查日的汇总值
         String dayField = FactoryConstant.DAY_FIELD + day;
@@ -1330,11 +1324,7 @@ public class MatchingAdjuestProductionHandler {
         }).sum();
 
         // 2.检查日的汇总值 小于等于 日总产能限制
-        if (totalPlanQty < dayTotalCapacityLimit) {
-            return dayTotalCapacityLimit - totalPlanQty;
-        } else {
-            return 0;
-        }
+        return totalPlanQty < dayTotalCapacityLimit;
     }
 
     /**
