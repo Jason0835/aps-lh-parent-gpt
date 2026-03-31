@@ -2199,6 +2199,12 @@
   "ui.data.column.lhRepairCapsule.materialCode": "物料编码",
   "ui.data.column.lhRepairCapsule.replaceCapsuleCount": "已使用次数",
   "ui.data.column.lhRepairCapsule.replaceCapsuleCount2": "已使用次数2",
-  "ui.data.column.lhRepairCapsule.brand": "品牌"
+  "ui.data.column.lhRepairCapsule.brand": "品牌",
+  "ui.data.column.mouldCleanPlan.modelName": "APS模具清洗计划",
+  "ui.data.column.mouldCleanPlan.brand": "品牌",
+  "ui.data.column.mouldCleanPlan.lhCode": "硫化机台",
+  "ui.data.column.mouldCleanPlan.operTime": "上机时间",
+  "ui.data.column.mouldCleanPlan.firstWashTime": "首次清洗时间",
+  "ui.data.column.mouldCleanPlan.secondWashTime": "二次清洗时间"
 
 }
