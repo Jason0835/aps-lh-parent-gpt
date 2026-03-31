@@ -911,7 +911,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                         .filter(vo -> structureName.equals(vo.getStructureName()))
                         .collect(Collectors.toList());
 
-                monthPLanList = monthPLanList.stream()
+                List<FactoryMonthPlanFinalAdjustVo> targetMonthPLanList = monthPLanList.stream()
                         .filter(vo -> structureName.equals(vo.getStructureName()))
                         .collect(Collectors.toList());
 
@@ -929,10 +929,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
                 // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-                reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
+                reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPLanList, adjustDailyCapacityLimitObj);
 
                 // 构建月计划统计结果
-                MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList,YesOrNoEnum.NO.getCode());
+                MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, targetMonthPLanList, YesOrNoEnum.NO.getCode());
                 monthPlanStatisticsList.add(monthPlanStatistics);
             }
 
