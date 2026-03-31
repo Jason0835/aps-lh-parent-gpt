@@ -416,6 +416,21 @@ public class MesItfController {
         return mesItfService.syncMesCxStock(syncDataLogs);
     }
 
+    /**
+     * 同步胎面库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎面库存")
+    @PostMapping("/syncTreadStock")
+    public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncTreadStock(syncDataLogs);
+    }
+
 
 
     /**
@@ -546,7 +561,7 @@ public class MesItfController {
      */
     @ApiOperation("同步出库未扫描订单")
     @PostMapping("/syncOutbountOrdersNotScan")
-    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException {
         String factoryCode = outbountOrdersNotScan.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
             outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);

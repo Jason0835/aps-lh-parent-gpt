@@ -55,6 +55,8 @@ public class MdmOutbountOrdersNotScanController extends AbstractDocBizController
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialName()), "MATERIAL_NAME", queryVO.getMaterialName());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSaleOrg()), "SALE_ORG", queryVO.getSaleOrg());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSellTo()), "SELL_TO", queryVO.getSellTo());
+        queryWrapper.ge(PubUtil.isNotEmpty(queryVO.getStockDateStart()), "STOCK_DATE", queryVO.getStockDateStart());
+        queryWrapper.le(PubUtil.isNotEmpty(queryVO.getStockDateEnd()), "STOCK_DATE", queryVO.getStockDateEnd());
     }
 
     @Override
