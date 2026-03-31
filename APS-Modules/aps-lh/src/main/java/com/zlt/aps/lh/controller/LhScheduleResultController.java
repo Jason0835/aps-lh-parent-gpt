@@ -20,10 +20,10 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.common.FactoryService;
 import com.zlt.aps.common.SyncDataLogsService;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.domain.SyncDataLogs;
 import com.zlt.aps.lh.api.domain.bo.ValidateResult;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhDispatcherLog;
@@ -32,7 +32,6 @@ import com.zlt.aps.lh.api.domain.vo.LhDispatcherLogVo;
 import com.zlt.aps.lh.api.domain.vo.LhGanttVo;
 import com.zlt.aps.lh.api.domain.vo.LhMachineInfoVo;
 import com.zlt.aps.lh.handle.LhScheduleResultCheckHandle;
-import com.zlt.aps.lh.handle.LhSyncDataHandle;
 import com.zlt.aps.lh.mapper.LhScheduleResultEntityMapper;
 import com.zlt.aps.lh.service.ILhDispatcherLogService;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
@@ -50,7 +49,7 @@ import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.queryformulas.QueryFormulaUtil;
-import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.sync.api.service.ISyncDataLogsApiService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -106,7 +105,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Autowired
     private ILhMachineInfoService lhMachineInfoService;
     @Resource
-    private SyncDataLogsService syncDataLogsService;
+    private ISyncDataLogsApiService syncDataLogsService;
     @Autowired
     private FactoryService factoryService;
     @Autowired
@@ -552,9 +551,6 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Autowired
     private SyncDataLogsService syncDataLogsService;*/
 
-    @Resource
-    private LhSyncDataHandle syncDataHandle;
-
     @Autowired
     private LhScheduleResultEntityMapper lhScheduleResultEntityMapper;
 
@@ -575,7 +571,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
         }
         //获取数据版本号
-        String dataVersion = syncDataHandle.getDataVersion(ApsConstant.LH_DEPLOY_SYNC_KEY);
+        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.LH_DEPLOY_SYNC_KEY);
         // 厂别、分公司编号
         String factoryCode = factoryService.getFactoryCode();
         String companyCode = factoryService.getCompanyCode();
@@ -603,17 +599,18 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         AjaxResult ajaxResult = null;
         try {
             ajaxResult = lhScheduleResultService.publish(arr, scheduleDate, dataVersion, factoryCode, companyCode);
-            // 请求参数
-            JSONObject params = new JSONObject();
-            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-            params.put("rowCount", arr.length);
-            SyncParamsVO syncParamsVO = new SyncParamsVO();
-            syncParamsVO.setSyncKey(ApsConstant.LH_DEPLOY_SYNC_KEY);
-            syncParamsVO.setDataVersion(dataVersion);
-            syncParamsVO.setParams(params);
-            syncParamsVO.setFactoryCode(factoryCode);
-            syncParamsVO.setCompanyCode(companyCode);
-            syncDataHandle.syncNotice(syncParamsVO);
+            // 后续需要替换成新的itf同步接口
+//            // 请求参数
+//            JSONObject params = new JSONObject();
+//            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
+//            params.put("rowCount", arr.length);
+//            SyncParamsVO syncParamsVO = new SyncParamsVO();
+//            syncParamsVO.setSyncKey(ApsConstant.LH_DEPLOY_SYNC_KEY);
+//            syncParamsVO.setDataVersion(dataVersion);
+//            syncParamsVO.setParams(params);
+//            syncParamsVO.setFactoryCode(factoryCode);
+//            syncParamsVO.setCompanyCode(companyCode);
+//            syncDataHandle.syncNotice(syncParamsVO);
 
             // 取回mes的反馈结果
             SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
