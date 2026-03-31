@@ -194,6 +194,30 @@ export default {
           ax:99999999
         },
         {
+          prop: "warehouseStock",
+          label: this.$t("原材料库存"),
+          type: "number",
+          max:99999999
+        },
+        {
+          prop: "midStock",
+          label: this.$t("中间库库存"),
+          type: "number",
+          max:99999999
+        },
+        {
+          prop: "workshopStock",
+          label: this.$t("车间库存"),
+          type: "number",
+          max:99999999
+        },
+        {
+          prop: "totalStock",
+          label: this.$t("总库存"),
+          type: "number",
+          max:99999999
+        },
+        {
           prop: "stock",
           label: this.$t("ui.data.column.masterdata.stock"),
           type: "number",

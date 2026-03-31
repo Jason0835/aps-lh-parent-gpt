@@ -165,6 +165,22 @@ export default {
           label: this.$t("ui.data.column.masterdata.standardLength"),
         },
         {
+          prop: "warehouseStock",
+          label: this.$t("原材料库存"),
+        },
+        {
+          prop: "midStock",
+          label: this.$t("中间库库存"),
+        },
+        {
+          prop: "workshopStock",
+          label: this.$t("车间库存"),
+        },
+        {
+          prop: "totalStock",
+          label: this.$t("总库存"),
+        },
+        {
           prop: "stock",
           label: this.$t("ui.data.column.masterdata.stock"),
         },
