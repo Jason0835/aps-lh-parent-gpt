@@ -1819,7 +1819,7 @@ export default {
         console.log(res);
         this.data = res;
         if (res.length != 0) {
-          this.getStatisticsResult(res[0]);
+          this.getStatisticsResult(res[0],1);
         }
         // this.data=res.rows
         this.show = true;
@@ -2102,7 +2102,7 @@ export default {
         this.outResultData = res.rows;
         if (res.rows.length != 0) {
           console.log("开始调用统计");
-          this.getStatisticsResult(res.rows[0]);
+          this.getStatisticsResult(res.rows[0],1);
         }
       } catch (err) {
         console.log(err);
@@ -2286,14 +2286,17 @@ export default {
     },
 
     //调整结果统计
-    async getStatisticsResult(data) {
+    async getStatisticsResult(data,tempFlag=0) {
       try {
+
         let params = {
           factoryCode: data.factoryCode,
           year: data.year,
           month: data.month,
           productionVersion: data.productionVersion,
+          tempFlag: tempFlag,
         };
+        console.log("调用统计接口",tempFlag,params);
         let res = await statisticsResult(params);
         let resultList = [];
         if (this.activeName == "three") {
