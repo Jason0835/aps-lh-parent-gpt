@@ -1180,7 +1180,7 @@ public class MatchingAdjuestProductionHandler {
                 return 0;
             }
             // 2、如果需要换模具，不能超过换模次数限制
-            if (dailyCapacityLimitVo.getUsedChangeMould() >= dailyCapacityLimitVo.getMaxDayChangeMould()) {
+            if (dailyCapacityLimitVo.getRemainChangeMould() <= dailyCapacityLimitVo.getUsedChangeMould()) {
                 return 0;
             }
             // 3、当天满足上机条件按，但是下一天不满足上机条件的，也不允许上机
