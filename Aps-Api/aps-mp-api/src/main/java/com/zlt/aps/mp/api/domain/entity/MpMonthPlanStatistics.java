@@ -89,6 +89,11 @@ public class MpMonthPlanStatistics extends BaseEntity {
     @TableField(value = "PRO_SIZE")
     private String proSize;
 
+    /** 自动调整  tempFlag = 1， 确认调整 tempFlag = 0，默认0*/
+    @ApiModelProperty(value = "临时标识", name = "tempFlag")
+    @TableField(value = "TEMP_FLAG")
+    private String tempFlag;
+
     /** 结构类型 01 周期结构 02 常规结构 */
     @Excel(name = "ui.data.column.mpMonthPlanStatistics.structureType")
     @ApiModelProperty(value = "结构类型 01 周期结构 02 常规结构", name = "structureType")
