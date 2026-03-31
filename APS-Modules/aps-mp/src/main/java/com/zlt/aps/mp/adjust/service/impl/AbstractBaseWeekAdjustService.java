@@ -933,7 +933,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
-        saveMonthPlanStatisticsResult(contextDTO,YesOrNoEnum.NO.getCode());
+        saveMonthPlanStatisticsResult(contextDTO, null);
     }
 
 
