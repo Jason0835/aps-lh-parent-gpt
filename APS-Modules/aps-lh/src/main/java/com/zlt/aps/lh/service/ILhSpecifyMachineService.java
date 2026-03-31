@@ -31,4 +31,9 @@ public interface ILhSpecifyMachineService  extends IDocService<LhSpecifyMachine>
      */
     List<LhSpecifyMachine> queryByFactoryCodeAndSpecCodes(String factoryCode,Set<String> specCodes);
 
+    /**
+     * 获取查询公式
+     * @return
+     */
+    String[] getQueryFormulas();
 }

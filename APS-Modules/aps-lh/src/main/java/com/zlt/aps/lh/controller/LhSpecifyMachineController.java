@@ -136,6 +136,11 @@ public class LhSpecifyMachineController extends AbstractDocBizController<LhSpeci
         return lhSpecifyMachineService;
     }
 
+    @Override
+    protected String[] getQueryFormulas() {
+        return lhSpecifyMachineService.getQueryFormulas();
+    }
+
     /**
      * 条件拼接
      *

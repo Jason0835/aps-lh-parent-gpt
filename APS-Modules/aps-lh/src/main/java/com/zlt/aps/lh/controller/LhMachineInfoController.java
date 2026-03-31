@@ -46,7 +46,7 @@ import java.util.List;
 @Slf4j
 @Api(tags = "硫化机台信息")
 @RestController
-@RequestMapping("/info")
+@RequestMapping("/lhMachineInfo")
 public class LhMachineInfoController extends AbstractDocBizController<LhMachineInfo> {
 
     @Autowired
@@ -64,6 +64,7 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
     public TableDataInfo list(@RequestBody LhMachineInfo queryVO) {
         return super.list(queryVO);
     }
+
 
 
     /**

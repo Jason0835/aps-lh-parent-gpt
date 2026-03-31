@@ -89,6 +89,18 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
     }
 
     /**
+     * 获取查询公式
+     *
+     * @return
+     */
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "createByName->getcolvaluewithcondition(SYS_USER, nick_name, user_name, createBy, DEL_FLAG='0')"
+        };
+    }
+
+    /**
      * 导入数据
      *
      * @param list
