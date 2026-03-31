@@ -29,6 +29,7 @@ import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;

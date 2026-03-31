@@ -186,7 +186,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhRepairCapsule">
+    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule">
         SELECT
         ID,
         OBTAIN_TIME,
