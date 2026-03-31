@@ -15,10 +15,12 @@ import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.IncrementConstant;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
@@ -87,6 +89,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.zlt.msg.message.domain.vo.MessageContext;
 import com.zlt.msg.message.enums.MsgTypeEnums;
@@ -880,6 +883,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
                 .collect(Collectors.toList());
         contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
+        // 设置总的硫化机台数
+        contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
+        // 设置OEM配置集合
+        initOemParam(contextDTO);
+        // 设置结构统计
+        contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO));
 
         try {
             // 初始结构开始日\收尾日
@@ -911,6 +920,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
 
+    /**
+     * 初始OEM相关参数
+     * @param contextDTO
+     */
+    public void initOemParam(MpRollAdjustContextDTO contextDTO) {
+        String oemBrandConfig = (String) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        Set<String> oemBrandConfigSet = Collections.emptySet();
+        if (!StringUtil.isEmptyWithTrim(oemBrandConfig)){
+            oemBrandConfigSet = Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        }
+        contextDTO.setOemBrandConfigSet(oemBrandConfigSet);
+        if (contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()) == null){
+            contextDTO.setTotalOemQty(0);
+        }else{
+            contextDTO.setTotalOemQty((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+        }
+    }
 
 
 
