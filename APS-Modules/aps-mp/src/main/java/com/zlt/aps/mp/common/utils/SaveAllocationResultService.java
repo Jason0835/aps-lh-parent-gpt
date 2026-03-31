@@ -36,14 +36,12 @@ public class SaveAllocationResultService {
       // 批量插入库存版本
       dpStockVersionService.insertBatchData(demandPlan, allocationResult.getStockMap());
     }
-    if(!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getNotScanMap())) {
-        // 批量插入未扫描订单版本
-        DpShippedNotScanVersion queryCondition = new DpShippedNotScanVersion();
-        queryCondition.setFactoryCode(demandPlan.getFactoryCode());
-        queryCondition.setYear(demandPlan.getYear());
-        queryCondition.setMonth(demandPlan.getMonth());
-        queryCondition.setRequireVersion(demandPlan.getMonthPlanVersion());
-        dpShippedNotScanVersion.generateShippedNotScanVersion(queryCondition);
-    }
+    // 批量插入未扫描订单版本
+    DpShippedNotScanVersion queryCondition = new DpShippedNotScanVersion();
+    queryCondition.setFactoryCode(demandPlan.getFactoryCode());
+    queryCondition.setYear(demandPlan.getYear());
+    queryCondition.setMonth(demandPlan.getMonth());
+    queryCondition.setRequireVersion(demandPlan.getMonthPlanVersion());
+    dpShippedNotScanVersion.generateShippedNotScanVersion(queryCondition);
   }
 }
