@@ -906,6 +906,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
             for (String structureName : structureNameSet) {
                 contextDTO.setStructureName(structureName);
+
+                List<MpStructureAllocation> targetStructureAllocationList = oneStructureAllocationList.stream()
+                        .filter(vo -> structureName.equals(vo.getStructureName()))
+                        .collect(Collectors.toList());
+
+                contextDTO.setOneStructureAllocationList(targetStructureAllocationList);
+
                 // 初始结构开始日\收尾日
                 initStructureStartAndEndDay(contextDTO);
 
@@ -920,11 +927,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
                 reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
 
-                List<MpStructureAllocation> targetStructureAllocationList = oneStructureAllocationList.stream()
-                        .filter(vo -> structureName.equals(vo.getStructureName()))
-                        .collect(Collectors.toList());
-
-                contextDTO.setOneStructureAllocationList(targetStructureAllocationList);
                 // 构建月计划统计结果
                 MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList,YesOrNoEnum.NO.getCode());
                 monthPlanStatisticsList.add(monthPlanStatistics);
