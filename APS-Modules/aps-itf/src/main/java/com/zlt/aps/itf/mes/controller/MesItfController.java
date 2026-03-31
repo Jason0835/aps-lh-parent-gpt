@@ -2,6 +2,7 @@ package com.zlt.aps.itf.mes.controller;
 
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.autoLogin.loginUtils.annotation.AutoLoginLog;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.ICxScheduleResultIssueService;
@@ -561,6 +562,7 @@ public class MesItfController {
      */
     @ApiOperation("同步出库未扫描订单")
     @PostMapping("/syncOutbountOrdersNotScan")
+    @AutoLoginLog
     public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException {
         String factoryCode = outbountOrdersNotScan.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {

@@ -89,8 +89,7 @@
         SCAN_AMOUNT,
         OUT_AMOUNT,
         NOSCAN_AMOUNT,
-        SALE_ITEM_NO,
-        CONVERT(DATE, STOCK_DATE, 23) AS STOCK_DATE
+        SALE_ITEM_NO
         FROM VW_PSM_OUT_STOCK_UNSCAN
         WHERE 1 = 1
         <if test="materialCode != null and materialCode != ''">AND MATERIAL_CODE = #{materialCode}</if>

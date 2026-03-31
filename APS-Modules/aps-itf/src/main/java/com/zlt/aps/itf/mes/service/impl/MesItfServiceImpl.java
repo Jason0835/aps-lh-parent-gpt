@@ -1720,6 +1720,9 @@ public class MesItfServiceImpl implements MesItfService {
                 for (MdmOutbountOrdersNotScan item : orderList) {
                     MdmOutbountOrdersNotScan entity = new MdmOutbountOrdersNotScan();
                     BeanUtils.copyProperties(item, entity);
+                    entity.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
+                    entity.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
+                    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
                     entity.setCreateTime(DateUtils.getNowDate());
