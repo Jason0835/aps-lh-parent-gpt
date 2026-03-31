@@ -1699,7 +1699,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException {
+    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
         // 设置默认分厂
         if (StringUtils.isBlank(outbountOrdersNotScan.getFactoryCode())) {
             outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -1736,6 +1736,8 @@ public class MesItfServiceImpl implements MesItfService {
                     baseDao.insertBatch(importList);
                 }
             }
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
         } finally {
             DynamicDataSourceContextHolder.clear();
         }

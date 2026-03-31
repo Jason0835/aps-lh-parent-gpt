@@ -563,7 +563,7 @@ public class MesItfController {
     @ApiOperation("同步出库未扫描订单")
     @PostMapping("/syncOutbountOrdersNotScan")
     @AutoLoginLog
-    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException {
+    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan) {
         String factoryCode = outbountOrdersNotScan.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
             outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
