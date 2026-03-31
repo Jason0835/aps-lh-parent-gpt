@@ -48,6 +48,7 @@ public class MpAdjustStructureOutServiceImpl extends AbstractDocService<MpAdjust
         structureOutQueryWrapper.eq("YEAR", contextDTO.getMpYear());
         structureOutQueryWrapper.eq("MONTH", contextDTO.getMpMonth());
         structureOutQueryWrapper.eq("VERSION", contextDTO.getVersion());
+        structureOutQueryWrapper.eq("STRUCTURE_NAME", contextDTO.getStructureName());
         return structureOutEntityMapper.selectList(structureOutQueryWrapper);
     }
 
