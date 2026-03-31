@@ -162,12 +162,12 @@ export default {
         },
         {
           prop: "materialCode",
-          label: "MES物料号",
-        },
-        {
-          prop: "sapCode",
           label: "物料编码",
         },
+        // {
+        //   prop: "sapCode",
+        //   label: "物料编码",
+        // },
         {
           prop: "materialName",
           label: "物料描述",
