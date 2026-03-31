@@ -881,19 +881,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .collect(Collectors.toList());
         contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
 
-        // 初始化日产信息
-        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
-        weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
-        // 设置日产能限制Map
-        contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+        try {
+            // 初始结构开始日\收尾日
+            initStructureStartAndEndDay(contextDTO);
 
-        // 初始结构开始日\收尾日
-        initStructureStartAndEndDay(contextDTO);
+            // 初始化日产信息
+            MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
+            weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
+            // 设置日产能限制Map
+            contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
 
-        // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-        reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
+            // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+            reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
+        } catch (Exception e) {
+            log.error("重算每日产能限制执行异常", e);
+            throw new BusinessException("重算每日产能限制执行异常,原因:" + e.getMessage());
+        }
 
         // 构建月计划统计结果
         MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList);
