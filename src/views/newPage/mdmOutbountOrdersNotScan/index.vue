@@ -58,6 +58,14 @@ export default {
     columns() {
       let columns = [
         {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          minWidth: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "saleBillNo",
           label: "DN号",
           minWidth: 120,
