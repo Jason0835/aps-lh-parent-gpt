@@ -67,12 +67,11 @@ export default {
           label: "出运单号",
           minWidth: 120,
         },
-        {
-          prop: "saleOrg",
-          label: "销售组织编码",
-          minWidth: 120,
-          hide: true,
-        },
+        // {
+        //   prop: "saleOrg",
+        //   label: "销售组织编码",
+        //   minWidth: 120,
+        // },
         {
           prop: "saleOrgName",
           label: "销售组织名称",
@@ -90,15 +89,14 @@ export default {
         },
         {
           prop: "materialCode",
-          label: "MES物料号",
-          minWidth: 150,
-          hide: true,
-        },
-        {
-          prop: "sapCode",
           label: "物料编码",
           minWidth: 150,
         },
+        // {
+        //   prop: "sapCode",
+        //   label: "NC物料号",
+        //   minWidth: 150,
+        // },
         {
           prop: "materialName",
           label: "物料描述",
