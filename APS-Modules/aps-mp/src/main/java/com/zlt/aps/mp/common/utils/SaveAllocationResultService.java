@@ -1,7 +1,9 @@
 package com.zlt.aps.mp.common.utils;
 
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpShippedNotScanVersion;
 import com.zlt.aps.mp.demand.service.IDpOrderOffsetDetailService;
+import com.zlt.aps.mp.demand.service.IDpShippedNotScanVersionService;
 import com.zlt.aps.mp.demand.service.IDpStockVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,8 @@ public class SaveAllocationResultService {
   private final IDpOrderOffsetDetailService dpOrderOffsetDetailService;
   // 版本库存
   private final IDpStockVersionService dpStockVersionService;
+  
+  private final IDpShippedNotScanVersionService dpShippedNotScanVersion;
 
   @Async("batchInsertExecutor")
   public void saveAllocationResults(
@@ -31,6 +35,15 @@ public class SaveAllocationResultService {
     if(!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getStockMap())) {
       // 批量插入库存版本
       dpStockVersionService.insertBatchData(demandPlan, allocationResult.getStockMap());
+    }
+    if(!org.springframework.util.CollectionUtils.isEmpty(allocationResult.getNotScanMap())) {
+        // 批量插入未扫描订单版本
+        DpShippedNotScanVersion queryCondition = new DpShippedNotScanVersion();
+        queryCondition.setFactoryCode(demandPlan.getFactoryCode());
+        queryCondition.setYear(demandPlan.getYear());
+        queryCondition.setMonth(demandPlan.getMonth());
+        queryCondition.setRequireVersion(demandPlan.getMonthPlanVersion());
+        dpShippedNotScanVersion.generateShippedNotScanVersion(queryCondition);
     }
   }
 }
