@@ -24,7 +24,7 @@ public class MdmOutbountOrdersNotScanUIController extends BaseUIController<MdmOu
     private IMdmOutbountOrdersNotScanRemoteService iMdmOutbountOrdersNotScanService;
 
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("monthplan:mdmOutbountOrdersNotScan:list")
+//    @RequiresPermissions("monthplan:mdmOutbountOrdersNotScan:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(MdmOutbountOrdersNotScan mdmOutbountOrdersNotScan) {
