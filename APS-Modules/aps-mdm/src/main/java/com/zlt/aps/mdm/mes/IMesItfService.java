@@ -10,6 +10,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.mdm.api.domain.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineOnlineInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmLhMachineOnlineInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -157,4 +158,24 @@ public interface IMesItfService {
     @ApiOperation("同步硫化排程完成量")
     @PostMapping("/mesItf/syncLhClassShiftFinishQty")
     public AjaxResult syncLhClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 同步出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @ApiOperation("同步出库未扫描订单")
+    @PostMapping("/mesItf/syncOutbountOrdersNotScan")
+    public AjaxResult syncOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan);
+
+    /**
+     * 查询出库未扫描订单
+     *
+     * @param outbountOrdersNotScan 参数
+     * @return 结果
+     */
+    @ApiOperation("查询出库未扫描订单")
+    @PostMapping("/mesItf/getOutbountOrdersNotScan")
+    public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan);
 }

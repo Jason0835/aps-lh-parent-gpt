@@ -17,6 +17,7 @@ import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.CollectValueUtils;
+import com.zlt.common.utils.StringUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -26,6 +27,8 @@ import org.springframework.util.CollectionUtils;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -130,6 +133,12 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 针对计划的固定优先级
      */
     private Integer fixedPriority;
+
+    /**
+     * 针对计划的固定英寸种类数
+     */
+    private Integer fixedProSizeTypes;
+
     /**
      * 分配的分组计划集合(TBR按结构)
      */
@@ -204,6 +213,49 @@ public class CxMachineBaseInfoVo implements Serializable {
             return maxProductionDays;
         }
         return maxProductionDays - allocationDaySet.size();
+    }
+
+    /**
+     * 获取固定机台种类数
+     * @return
+     */
+    public Integer getAllFixedProSizeTypes(){
+        //设置固定结构个数,sandy+ 202.3.26
+        Set<String> fixedStructureSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedStructure1)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure1, StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(fixedStructure2)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure2, StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(fixedStructure3)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure3, StringConstant.COMMA);
+        }
+        //capacityInfo.setFixStructureCount(fixedStructureSet.size());
+
+        Set<String> fixedProSizeSet = new HashSet<>();
+        //设置固定机台种类数
+        if (!CollectionUtils.isEmpty(fixedStructureSet)){
+            for (String structure : fixedStructureSet){
+                fixedProSizeSet.add(analyseTbrProSize(structure));
+            }
+        }
+        return fixedProSizeSet.size();
+    }
+
+    /**
+     * 从结构信息中解析出英寸
+     * @return 英寸
+     */
+    private static String analyseTbrProSize(String structureName){
+        if (StringUtil.isEmptyWithTrim(structureName)){
+            return "";
+        }
+        // 正则：R后面跟数字（可能带小数点）
+        Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
+        Matcher matcher = pattern.matcher(structureName);
+        String proSize = matcher.find() ? matcher.group() : "";
+        return proSize;
     }
 
     /**

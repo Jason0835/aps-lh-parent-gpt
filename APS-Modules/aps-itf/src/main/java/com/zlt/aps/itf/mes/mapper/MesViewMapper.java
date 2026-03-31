@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
@@ -50,4 +51,12 @@ public interface MesViewMapper {
      * @return 结果
      */
     List<MesBrandDict> selectMesBrandDict();
+
+    /**
+     * 查询出库未扫描订单列表
+     *
+     * @param outbountOrdersNotScan 查询参数
+     * @return 列表
+     */
+    List<MdmOutbountOrdersNotScan> selectOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan);
 }

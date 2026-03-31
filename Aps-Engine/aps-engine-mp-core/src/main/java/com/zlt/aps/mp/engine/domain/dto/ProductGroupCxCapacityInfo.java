@@ -1,10 +1,12 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.enums.CxMachineFixedPriorityEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import com.zlt.aps.mp.engine.utils.CollectValueUtils;
+import com.zlt.common.utils.StringUtil;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -17,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -66,7 +70,17 @@ public class ProductGroupCxCapacityInfo implements Serializable {
      * 判断机台的通用性（个数越多，表示越通用)
      *
      */
-    private Integer fixStructureCount;
+    //private Integer fixStructureCount;
+
+    /**
+     * 针对计划的固定优先级
+     */
+    private Integer fixedPriority;
+
+    /**
+     * 针对计划的固定结构英寸的种类数
+     */
+    private Integer fixedProSizeTypes;
 
     /**
      * 构建在机结构-在机机台的产能相关信息，结构成型硫化配比
@@ -115,19 +129,37 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         capacityInfo.setMaxLhMachineCount(lhRatio.getLhMachineMaxQty());
         capacityInfo.setMinLhMachineCount(lhRatio.getLhMachineMinQty());
 
-        //设置固定结构个数,sandy+ 202.3.26
-        Set<String> fixedStructureSet = new HashSet<>();
-        if (StringUtils.isNotBlank(baseInfo.getFixedStructure1())) {
-            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, baseInfo.getFixedStructure1(), StringConstant.COMMA);
-        }
-        if (StringUtils.isNotBlank(baseInfo.getFixedStructure2())) {
-            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, baseInfo.getFixedStructure2(), StringConstant.COMMA);
-        }
-        if (StringUtils.isNotBlank(baseInfo.getFixedStructure3())) {
-            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, baseInfo.getFixedStructure3(), StringConstant.COMMA);
-        }
-        capacityInfo.setFixStructureCount(fixedStructureSet.size());
+        //设置固定结构种类数
+        capacityInfo.setFixedProSizeTypes(baseInfo.getAllFixedProSizeTypes());
+
+        //设置结构优先级
+        Integer fixedPriorityValue = getFixedStructurePriority(baseInfo.getFixedStructure1(), CxMachineFixedPriorityEnum.FIXED_STRUCTURE_FIRST, structureName).getPriorityValue();
+        Integer fixedPriorityValue2 = getFixedStructurePriority(baseInfo.getFixedStructure2(), CxMachineFixedPriorityEnum.FIXED_STRUCTURE_SECOND, structureName).getPriorityValue();
+        fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue2);
+        Integer fixedPriorityValue3 = getFixedStructurePriority(baseInfo.getFixedStructure3(), CxMachineFixedPriorityEnum.FIXED_STRUCTURE_THIRD, structureName).getPriorityValue();
+        fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue3);
+        capacityInfo.setFixedPriority(fixedPriorityValue);
         return capacityInfo;
+    }
+
+    /**
+     * 根据固定结构值及优先级，得到其真实优先级
+     *
+     * @param fixedStructure 固定结构
+     * @param fixedPriority  固定优先级
+     * @param structureName  结构名
+     * @return
+     */
+    private static CxMachineFixedPriorityEnum getFixedStructurePriority(String fixedStructure, CxMachineFixedPriorityEnum fixedPriority, String structureName) {
+        if (StringUtils.isBlank(fixedStructure) || StringUtils.isBlank(structureName)) {
+            return CxMachineFixedPriorityEnum.DEFAULT;
+        }
+        Set<String> fixedStructureSet = new HashSet<>();
+        CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure, StringConstant.COMMA);
+        if (fixedStructureSet.contains(structureName)) {
+            return fixedPriority;
+        }
+        return CxMachineFixedPriorityEnum.DEFAULT;
     }
 
     /**
@@ -178,7 +210,9 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         this.realMaxLhMachineCount = BigDecimal.ZERO.intValue();
         this.maxLhMachineCount = BigDecimal.ZERO.intValue();
         this.minLhMachineCount = BigDecimal.ZERO.intValue();
-        this.fixStructureCount = BigDecimal.ZERO.intValue();
+        //this.fixStructureCount = BigDecimal.ZERO.intValue();
+        this.fixedPriority = BigDecimal.ZERO.intValue();
+        this.fixedProSizeTypes = BigDecimal.ZERO.intValue();
     }
 
     /**

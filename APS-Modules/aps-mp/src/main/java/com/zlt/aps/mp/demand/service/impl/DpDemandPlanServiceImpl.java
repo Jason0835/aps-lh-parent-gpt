@@ -15,10 +15,12 @@ import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmOutbountOrdersNotScanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
+import com.zlt.aps.maindata.service.IMdmOutbountOrdersNotScanService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
@@ -31,6 +33,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmAreaCapaAllocation;
 import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
@@ -148,6 +151,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final BatchInsertProcessor<DpDemandPlan> batchInsertProcessor;
 
     private final IMpStructureAllocationService mpStructureAllocationService;
+    
+    private final MdmOutbountOrdersNotScanEntityMapper mdmOutbountOrdersNotScanEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -499,6 +504,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(() -> this.fetchSalesOrderPool(factoryCode));
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(() ->  this.fetchFinishedProductStocks(factoryCode));
+        CompletableFuture<List<MdmOutbountOrdersNotScan>> notScanFuture =
+            CompletableFuture.supplyAsync(() ->  this.fetchOrdersNotScan(factoryCode));
         CompletableFuture<Map<String, String>> productionTypeFuture =
             CompletableFuture.supplyAsync(() ->  this.fetchProductionTypeMap(factoryCode));
         CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
@@ -517,13 +524,27 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
             List<MdmProductStock> finishedProductStocks = stocksFuture.get();
+            List<MdmOutbountOrdersNotScan> notScanStocks = notScanFuture.get();
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
+            
+
+            
             if(!CollectionUtils.isEmpty(finishedProductStocks)){
-                finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
+             // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
+                Map<String, BigDecimal> notScanStockMap = notScanStocks.stream()
+                        .collect(Collectors.toMap(MdmOutbountOrdersNotScan::getMaterialCode,
+                                MdmOutbountOrdersNotScan::getNoscanAmount, (amount1, amount2) -> amount1.add(amount2)));
+                finishedProductStocks.forEach(finishedProductStock -> {
+                    // 库存预先将未扫描订单量扣除，剩余的才给订单冲减
+                    Integer stockQty = Optional.ofNullable(finishedProductStock.getStockQty()).orElse(BigDecimal.ZERO.intValue());
+                    BigDecimal noscanAmount = notScanStockMap.getOrDefault(finishedProductStock.getMaterialCode(), BigDecimal.ZERO);
+                    Integer leftOverQty = stockQty > noscanAmount.intValue() ? stockQty - noscanAmount.intValue(): BigDecimal.ZERO.intValue();
+                    finishedProductStock.setLeftOverQty(leftOverQty);
+                });
             }
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
@@ -735,6 +756,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<List<MdmProductStock>> stocksFuture =
             CompletableFuture.supplyAsync(() ->  this.fetchFinishedProductStocks(createCondition.getFactoryCode()));
 
+        CompletableFuture<List<MdmOutbountOrdersNotScan>> notScanFuture =
+            CompletableFuture.supplyAsync(() ->  this.fetchOrdersNotScan(createCondition.getFactoryCode()));
+        
         CompletableFuture<Map<String, String>> productionTypeFuture =
             CompletableFuture.supplyAsync(() -> this.fetchProductionTypeMap(createCondition.getFactoryCode()));
 
@@ -752,13 +776,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findCycleSchStruConf(createCondition.getFactoryCode()));
         // 等待所有任务完成
         CompletableFuture.allOf(
-            salesOrdersFuture, stocksFuture, productionTypeFuture,
+            salesOrdersFuture, stocksFuture, notScanFuture, productionTypeFuture,
             supplyOrdersFuture, monthlySaleQtyFuture,minProductionQtyFuture,fetchMaterialInfoFuture,
             cycleSchStruConfFuture
         ).join();
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
             List<MdmProductStock> finishedProductStocks = stocksFuture.get();
+            List<MdmOutbountOrdersNotScan> notScanStocks = notScanFuture.get();
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
@@ -766,7 +791,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
             if(!CollectionUtils.isEmpty(finishedProductStocks)){
-                finishedProductStocks.forEach(finishedProductStock -> finishedProductStock.setLeftOverQty(null == finishedProductStock.getStockQty()?BigDecimal.ZERO.intValue():finishedProductStock.getStockQty()));
+                // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
+                Map<String, BigDecimal> notScanStockMap = notScanStocks.stream()
+                        .collect(Collectors.toMap(MdmOutbountOrdersNotScan::getMaterialCode,
+                                MdmOutbountOrdersNotScan::getNoscanAmount, (amount1, amount2) -> amount1.add(amount2)));
+                finishedProductStocks.forEach(finishedProductStock -> {
+                    // 库存预先将未扫描订单量扣除，剩余的才给订单冲减
+                    Integer stockQty = Optional.ofNullable(finishedProductStock.getStockQty()).orElse(BigDecimal.ZERO.intValue());
+                    BigDecimal noscanAmount = notScanStockMap.getOrDefault(finishedProductStock.getMaterialCode(), BigDecimal.ZERO);
+                    Integer leftOverQty = stockQty > noscanAmount.intValue() ? stockQty - noscanAmount.intValue(): BigDecimal.ZERO.intValue();
+                    finishedProductStock.setLeftOverQty(leftOverQty);
+                });
             }
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
@@ -887,6 +922,16 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
      */
     private List<SalesOrderPool> fetchSalesOrderPool(String factoryCode) {
         return this.salesOrderPoolService.findCurrentSalesOrderPool(factoryCode);
+    }
+    
+
+    /**
+     * 获取未扫描库存订单量
+     */
+    private List<MdmOutbountOrdersNotScan> fetchOrdersNotScan(String factoryCode) {
+        LambdaQueryWrapper<MdmOutbountOrdersNotScan> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmOutbountOrdersNotScan::getFactoryCode, factoryCode);
+        return mdmOutbountOrdersNotScanEntityMapper.selectList(queryWrapper);
     }
 
     /**
