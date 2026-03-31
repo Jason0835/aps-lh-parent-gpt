@@ -26,7 +26,7 @@ import { listLhRepairCapsule } from "@/api/lh/lhRepairCapsule";
 
 export default {
   name: "LhRepairCapsule",
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "biz_brand_type"],
   data() {
     return {
       loading: false,
@@ -97,6 +97,9 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.lhRepairCapsule.brand"),
           minWidth: 120,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+          },
         },
       ];
       return columns;
@@ -108,6 +111,7 @@ export default {
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          filterable: true,
         },
         {
           label: this.$t("ui.data.column.lhRepairCapsule.obtainTime"),
@@ -125,6 +129,13 @@ export default {
         {
           label: this.$t("ui.data.column.lhRepairCapsule.materialCode"),
           prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.column.lhRepairCapsule.brand"),
+          prop: "brand",
+          type: "select",
+          dictData: this.dict.type.biz_brand_type,
+          filterable: true,
         },
       ];
     },
