@@ -41,6 +41,11 @@ public enum ItfSyncKeyEnum {
     EMBRYO_STOCK_SYNC("EMBRYO_STOCK_SYNC", "MES", "APS", "生胎库存同步"),
 
     /**
+     * 胎面库存同步
+     */
+    TREAD_STOCK_SYNC("TREAD_STOCK_SYNC", "MES", "APS", "胎面库存同步"),
+
+    /**
      * 成型排程结果下发
      */
     SYNC_CX_SCHEDULE_RESULT("FINISH_SCHE_RST_FBK", "APS", "MES", "成型排程结果下发接口"),

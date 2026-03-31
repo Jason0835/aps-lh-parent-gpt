@@ -6,6 +6,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -93,6 +94,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MdmStructureTreadConfigEntityMapper structureTreadConfigEntityMapper;
+
+    @Autowired
+    private MdmTreadStockEntityMapper treadStockEntityMapper;
 
     @Autowired
     private IMdmProductModelRelationService iMdmProductModelRelationService;
@@ -1695,7 +1699,12 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
+    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException {
+        // 设置默认分厂
+        if (StringUtils.isBlank(outbountOrdersNotScan.getFactoryCode())) {
+            outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<MdmOutbountOrdersNotScan> orderList = this.getOutbountOrdersNotScan(outbountOrdersNotScan);
         try {
@@ -1703,8 +1712,23 @@ public class MesItfServiceImpl implements MesItfService {
             if (CollectionUtils.isNotEmpty(orderList)) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("FACTORY_CODE", outbountOrdersNotScan.getFactoryCode());
+                map.put("STOCK_DATE", DateUtils.getNowDate("yyyy-MM-dd"));
                 baseDao.deleteByMap(MdmOutbountOrdersNotScan.class, map);
-                List<List<MdmOutbountOrdersNotScan>> splitList = ScmListUtils.getSplitList(orderList, 1000);
+
+                // 转换为APS实体并设置创建信息
+                List<MdmOutbountOrdersNotScan> insertList = new ArrayList<>();
+                for (MdmOutbountOrdersNotScan item : orderList) {
+                    MdmOutbountOrdersNotScan entity = new MdmOutbountOrdersNotScan();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+                    entity.setCreateTime(DateUtils.getNowDate());
+                    entity.setUpdateTime(DateUtils.getNowDate());
+                    insertList.add(entity);
+                }
+
+                // 分批插入
+                List<List<MdmOutbountOrdersNotScan>> splitList = ScmListUtils.getSplitList(insertList, 1000);
                 for (List<MdmOutbountOrdersNotScan> importList : splitList) {
                     baseDao.insertBatch(importList);
                 }
@@ -1724,5 +1748,83 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
         return mesViewMapper.selectOutbountOrdersNotScan(outbountOrdersNotScan);
+    }
+
+    /**
+     * 同步胎面库存
+     * 采用更新删除标识模式，而不是先删后插
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询中间表数据
+        List<MdmTreadStock> syncList = mesItfMapper.selectTreadStockList(syncDataLogs);
+
+        // 唯一键重复随机取一条（库存日期+胎面物料编码+分厂）
+        Map<String, MdmTreadStock> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getStockDate() + "|" + item.getMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            // 切换APS数据源 start
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<MdmTreadStock>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MdmTreadStock> saveList : splitList) {
+                // 根据唯一键查询已存在的数据
+                List<MdmTreadStock> existsList = treadStockEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmTreadStock stock = new MdmTreadStock();
+                            stock.setStockDate(item.getStockDate());
+                            stock.setMaterialCode(item.getMaterialCode());
+                            stock.setFactoryCode(item.getFactoryCode());
+                            return stock;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmTreadStock> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getMaterialCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmTreadStock> insertOrUpdateList = new ArrayList<>();
+                for (MdmTreadStock item : saveList) {
+                    MdmTreadStock entity = new MdmTreadStock();
+                    BeanUtils.copyProperties(item, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    // 设置删除标识（0-正常，1-已删除）
+                    if (entity.getIsDelete() == null) {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getStockDate()), entity.getMaterialCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在，更新
+                        MdmTreadStock existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                // 批量保存（插入或更新）
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.clear();
+            // 切换APS数据源 end
+        }
+        return AjaxResult.success();
     }
 }

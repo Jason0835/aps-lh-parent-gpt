@@ -214,6 +214,15 @@ public interface IMesItfService {
     public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎面库存
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步胎面库存")
+    @PostMapping("/mesItf/syncTreadStock")
+    public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步成型排程完成量
      * @param syncDataLogs 参数
      * @return 结果

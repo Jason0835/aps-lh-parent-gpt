@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -40,6 +41,15 @@ public interface IMpStructureAllocationRemoteService {
     @ApiOperation("查询列表")
     @PostMapping("/mpStructureAllocation/list")
     TableDataInfo list(@RequestBody MpStructureAllocation queryCondition);
+
+    /**
+     * 根据条件查询结构调整列表
+     *
+     * @param queryCondition 查询条件
+     */
+    @ApiOperation("根据条件查询结构调整列表")
+    @PostMapping("/mpStructureAllocation/listAdjusts")
+    TableDataInfo listAdjusts(@RequestBody MpStructureAllocationVo queryCondition);
 
     /**
      * 校验唯一性
