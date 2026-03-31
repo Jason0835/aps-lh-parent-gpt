@@ -164,14 +164,14 @@ public class MdmMonthSurplusServiceImpl extends AbstractDocService<MdmMonthSurpl
      */
     @Override
     public List<String> listRequireVersions(String factoryCode, Integer year, Integer month) {
-        LambdaQueryWrapper<MdmMonthSurplus> wrapper = new LambdaQueryWrapper<MdmMonthSurplus>()
-                .select(MdmMonthSurplus::getRequireVersion)
+        LambdaQueryWrapper<MdmMonthSurplus> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(MdmMonthSurplus::getRequireVersion)
                 .eq(MdmMonthSurplus::getIsDelete, ApsConstant.DEL_FLAG_NORMAL)
                 .eq(MdmMonthSurplus::getFactoryCode, factoryCode)
                 .eq(MdmMonthSurplus::getYear, year)
                 .eq(MdmMonthSurplus::getMonth, month)
                 .isNotNull(MdmMonthSurplus::getRequireVersion)
-                .groupBy(MdmMonthSurplus::getRequireVersion)
+                .last("DISTINCT")
                 .orderByDesc(MdmMonthSurplus::getCreateTime)
                 .orderByDesc(MdmMonthSurplus::getId);
         List<MdmMonthSurplus> list = mdmMonthSurplusEntityMapper.selectList(wrapper);
