@@ -194,6 +194,15 @@ public interface MesItfService {
     AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 同步胎面库存
+     * 采用更新删除标识模式，而不是先删后插
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncTreadStock(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步成型排程完成量
      * 采用更新删除标识模式，而不是先删后插
      *
@@ -250,7 +259,7 @@ public interface MesItfService {
      * @param outbountOrdersNotScan 参数
      * @return 结果
      */
-    AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan);
+    AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException;
 
     /**
      * 查询出库未扫描订单

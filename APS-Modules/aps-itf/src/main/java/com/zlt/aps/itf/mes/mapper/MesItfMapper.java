@@ -117,6 +117,14 @@ public interface MesItfMapper {
     List<MdmMesCxStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 查询胎面库存同步数据
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<MdmTreadStock> selectTreadStockList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 查询成型排程完成量同步数据
      *
      * @param syncDataLogs 参数

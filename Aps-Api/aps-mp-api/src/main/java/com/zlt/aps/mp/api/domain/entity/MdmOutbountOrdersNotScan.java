@@ -84,4 +84,19 @@ public class MdmOutbountOrdersNotScan extends BaseEntity {
     @ApiModelProperty(value = "分厂", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    @ApiModelProperty(value = "库存日期", name = "stockDate")
+    @TableField(value = "STOCK_DATE")
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    private Date stockDate;
+
+    @ApiModelProperty(value = "库存日期开始", name = "stockDateStart")
+    @TableField(exist = false)
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    private Date stockDateStart;
+
+    @ApiModelProperty(value = "库存日期结束", name = "stockDateEnd")
+    @TableField(exist = false)
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    private Date stockDateEnd;
 }
