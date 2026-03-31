@@ -911,6 +911,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                         .filter(vo -> structureName.equals(vo.getStructureName()))
                         .collect(Collectors.toList());
 
+                monthPLanList = monthPLanList.stream()
+                        .filter(vo -> structureName.equals(vo.getStructureName()))
+                        .collect(Collectors.toList());
+
                 contextDTO.setOneStructureAllocationList(targetStructureAllocationList);
 
                 // 初始结构开始日\收尾日
