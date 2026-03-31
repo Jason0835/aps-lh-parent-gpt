@@ -29,3 +29,11 @@ export function getLhMachineList(query) {
     params: query
   })
 }
+
+export function getMaterialList(query) {
+  return request({
+    url: '/lh/lhSpecifyMachine/getMaterialList',
+    method: 'post',
+    data: query
+  })
+}
