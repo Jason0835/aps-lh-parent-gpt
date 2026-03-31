@@ -2972,9 +2972,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 检查SKU与示方书关系
             errorMsgList = checkSkuConstructionRef(contextDTO, skuConstructionRef, materialCode);
         }
-        if (PubUtil.isNotEmpty(errorMsgList)) {
-            return;
+//        if (PubUtil.isNotEmpty(errorMsgList)) {
+//            return;
+//        }
+
+        if (skuConstructionRef == null) {
+            skuConstructionRef = new MdmSkuConstructionRef();
         }
+
         // 胎胚号
         adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
 

@@ -45,12 +45,6 @@
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-maindata</artifactId>
         </dependency>
-        <!-- 和客户做接口的jar -->
-        <dependency>
-            <groupId>com.zlt</groupId>
-            <artifactId>zlt-sync-data</artifactId>
-            <version>1.0.1-SNAPSHOT</version>
-        </dependency>
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>
@@ -60,6 +54,7 @@
         <dependency>
             <groupId>com.zlt.aps.lh</groupId>
             <artifactId>aps-lh-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <!-- 成型硫化API模块（包含8班数据的LhScheduleResult实体） -->
         <dependency>

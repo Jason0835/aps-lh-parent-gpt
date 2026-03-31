@@ -11,6 +11,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
@@ -75,6 +76,26 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     public TableDataInfo list(@RequestBody MpStructureAllocation queryCondition) {
         try {
             startPage();
+            setProductionVersion(queryCondition);
+            List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
+            return getDataTable(list);
+        } finally {
+            PageUtils.clearPage();
+        }
+    }
+
+
+    /**
+     * 根据条件查询结构调整列表（周程滚动使用）
+     *
+     * @param queryCondition 查询条件
+     */
+    @ApiOperation("根据条件查询结构调整列表")
+    @PostMapping("/listAdjusts")
+    public TableDataInfo listAdjusts(@RequestBody MpStructureAllocationVo queryCondition) {
+        try {
+            startPage();
+            queryCondition.setCxMachineCode(queryCondition.getScheduledMachines());
             setProductionVersion(queryCondition);
             List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
             return getDataTable(list);
