@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.maindata.mapper.MdmLhRepairCapsuleEntityMapper;
@@ -58,15 +59,16 @@ public class LhRepairCapsuleController extends AbstractDocBizController<MdmLhRep
     @Override
     protected void builderCondition(QueryWrapper<MdmLhRepairCapsule> queryWrapper, MdmLhRepairCapsule queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhCode")), "LH_CODE", queryVO.getFieldValueByFieldName("lhCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         String obtainTimeBegin = queryVO.getObtainTimeBegin();
         String obtainTimeEnd = queryVO.getObtainTimeEnd();
         if (PubUtil.isNotEmpty(obtainTimeBegin)) {
-            queryWrapper.ge("OBTAIN_TIME", obtainTimeBegin);
+            queryWrapper.ge("OBTAIN_TIME", DateUtil.beginOfDay(DateUtil.parse(obtainTimeBegin, "yyyy-MM-dd")));
         }
         if (PubUtil.isNotEmpty(obtainTimeEnd)) {
-            queryWrapper.le("OBTAIN_TIME", obtainTimeEnd);
+            queryWrapper.le("OBTAIN_TIME", DateUtil.endOfDay(DateUtil.parse(obtainTimeEnd, "yyyy-MM-dd")));
         }
     }
 
