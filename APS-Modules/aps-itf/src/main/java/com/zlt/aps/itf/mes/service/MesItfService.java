@@ -259,7 +259,7 @@ public interface MesItfService {
      * @param outbountOrdersNotScan 参数
      * @return 结果
      */
-    AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException;
+    AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan);
 
     /**
      * 查询出库未扫描订单

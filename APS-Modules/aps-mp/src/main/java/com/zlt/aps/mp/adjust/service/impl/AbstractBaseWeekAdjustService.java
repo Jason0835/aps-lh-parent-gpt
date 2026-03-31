@@ -860,14 +860,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 结构名称
-        String structureName = contextDTO.getStructureName();
-        monthPLanList = monthPLanList.stream()
-                .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
-                .collect(Collectors.toList());
-        if (PubUtil.isEmpty(monthPLanList)) {
-            log.warn("处理月计划统计结果：过滤后月度生产计划列表为空，直接返回");
-            return;
-        }
+        String structureNameParam = contextDTO.getStructureName();
+//        monthPLanList = monthPLanList.stream()
+//                .filter(vo -> StringUtils.isEmpty(structureNameParam) || structureNameParam.equals(vo.getStructureName()))
+//                .collect(Collectors.toList());
+//        if (PubUtil.isEmpty(monthPLanList)) {
+//            log.warn("处理月计划统计结果：过滤后月度生产计划列表为空，直接返回");
+//            return;
+//        }
 
         // 获取产品品类
         String productType = ProductTypeEnum.WHOLE_STEEL.getValue();
@@ -884,7 +884,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 设置月计划结构转产表-单结构
         List<MpStructureAllocation> structureAllocationList = mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO);
         List<MpStructureAllocation> oneStructureAllocationList = structureAllocationList.stream()
-                .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
+                .filter(vo -> StringUtils.isEmpty(structureNameParam) || structureNameParam.equals(vo.getStructureName()))
                 .collect(Collectors.toList());
         contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
         // 设置总的硫化机台数
@@ -893,34 +893,47 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         initOemParam(contextDTO);
         // 设置结构统计
         contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO));
-
+        // 收集结构名称列表
+        Set<String> structureNameSet = oneStructureAllocationList.stream()
+                .map(MpStructureAllocation::getStructureName)
+                .collect(Collectors.toSet());
+        // 收集月计划列表
+        monthPLanList = monthPLanList.stream()
+                .filter(vo -> structureNameSet.contains(vo.getStructureName()))
+                .collect(Collectors.toList());
+        // 月计划统计结果列表
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
         try {
-            // 初始结构开始日\收尾日
-            initStructureStartAndEndDay(contextDTO);
 
-            // 初始化日产信息
-            MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
-            Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
-            weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
-            // 设置日产能限制Map
-            contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+            for (String structureName : structureNameSet) {
+                contextDTO.setStructureName(structureName);
+                // 初始结构开始日\收尾日
+                initStructureStartAndEndDay(contextDTO);
 
-            // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
-            MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-            reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
+                // 初始化日产信息
+                MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+                Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
+                weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
+                // 设置日产能限制Map
+                contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+
+                // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+                MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+                reCalcAdjustDailyCapacityLimit(contextDTO, monthPLanList, adjustDailyCapacityLimitObj);
+
+                // 构建月计划统计结果
+                MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList,YesOrNoEnum.NO.getCode());
+                monthPlanStatisticsList.add(monthPlanStatistics);
+            }
+
         } catch (Exception e) {
             log.error("重算每日产能限制执行异常", e);
             throw new BusinessException("重算每日产能限制执行异常,原因:" + e.getMessage());
         }
 
-        // 构建月计划统计结果
-        MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList,YesOrNoEnum.NO.getCode());
-        List<MpMonthPlanStatistics> monthPlanStatisticsKList = new ArrayList<>();
-        monthPlanStatisticsKList.add(monthPlanStatistics);
-        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsKList);
-
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
-        saveMonthPlanStatisticsResult(contextDTO,null);
+        saveMonthPlanStatisticsResult(contextDTO, null);
     }
 
 

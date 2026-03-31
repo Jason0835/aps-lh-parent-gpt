@@ -1699,7 +1699,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) throws ParseException {
+    public AjaxResult syncOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
         // 设置默认分厂
         if (StringUtils.isBlank(outbountOrdersNotScan.getFactoryCode())) {
             outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
@@ -1720,6 +1720,9 @@ public class MesItfServiceImpl implements MesItfService {
                 for (MdmOutbountOrdersNotScan item : orderList) {
                     MdmOutbountOrdersNotScan entity = new MdmOutbountOrdersNotScan();
                     BeanUtils.copyProperties(item, entity);
+                    entity.setStockDate(DateUtils.getNowDate("yyyy-MM-dd"));
+                    entity.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
+                    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
                     entity.setCreateTime(DateUtils.getNowDate());
@@ -1733,6 +1736,8 @@ public class MesItfServiceImpl implements MesItfService {
                     baseDao.insertBatch(importList);
                 }
             }
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
         } finally {
             DynamicDataSourceContextHolder.clear();
         }
