@@ -941,25 +941,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             contextDTO.setTotalOemQty((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
         }
     }
-    /**
-     * 初始OEM相关参数
-     * @param contextDTO
-     */
-    private void initOemParam(MpRollAdjustContextDTO contextDTO) {
-        String oemBrandConfig = (String) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
-        Set<String> oemBrandConfigSet = Collections.emptySet();
-        if (!StringUtil.isEmptyWithTrim(oemBrandConfig)){
-            oemBrandConfigSet = Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet());
-        }
-        contextDTO.setOemBrandConfigSet(oemBrandConfigSet);
-        if (contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()) == null){
-            contextDTO.setTotalOemQty(0);
-        }else{
-            contextDTO.setTotalOemQty((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
-        }
-    }
-
-
 
     /**
      * 汇总调整明细
