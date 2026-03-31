@@ -14,13 +14,14 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.ApsNumberUtils;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmOutbountOrdersNotScanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
-import com.zlt.aps.maindata.service.IMdmOutbountOrdersNotScanService;
 import com.zlt.aps.maindata.service.IMdmProductStockService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
@@ -79,6 +80,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -360,26 +362,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
             List<MdmProductStock> finishedProductStocks = stocksFuture.get();
-            List<MdmOutbountOrdersNotScan> notScanStocks = notScanFuture.get();
+            List<MdmOutbountOrdersNotScan> notScanOrderList = notScanFuture.get();
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
-            if(!CollectionUtils.isEmpty(finishedProductStocks)){
-                // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
-               Map<String, BigDecimal> notScanStockMap = notScanStocks.stream()
-                       .collect(Collectors.toMap(MdmOutbountOrdersNotScan::getMaterialCode,
-                               MdmOutbountOrdersNotScan::getNoscanAmount, (amount1, amount2) -> amount1.add(amount2)));
-               finishedProductStocks.forEach(finishedProductStock -> {
-                   // 库存预先将未扫描订单量扣除，剩余的才给订单冲减
-                   Integer stockQty = Optional.ofNullable(finishedProductStock.getStockQty()).orElse(BigDecimal.ZERO.intValue());
-                   BigDecimal noscanAmount = notScanStockMap.getOrDefault(finishedProductStock.getMaterialCode(), BigDecimal.ZERO);
-                   Integer leftOverQty = stockQty > noscanAmount.intValue() ? stockQty - noscanAmount.intValue(): BigDecimal.ZERO.intValue();
-                   finishedProductStock.setLeftOverQty(leftOverQty);
-               });
-            }
+            // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
+            this.reduceInventoryByNotScanOrder(finishedProductStocks, notScanOrderList);
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
@@ -543,22 +534,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConfs = cycleSchStruConfFuture.get();
-            
-
-            
-            if(!CollectionUtils.isEmpty(finishedProductStocks)){
-             // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
-                Map<String, BigDecimal> notScanStockMap = notScanStocks.stream()
-                        .collect(Collectors.toMap(MdmOutbountOrdersNotScan::getMaterialCode,
-                                MdmOutbountOrdersNotScan::getNoscanAmount, (amount1, amount2) -> amount1.add(amount2)));
-                finishedProductStocks.forEach(finishedProductStock -> {
-                    // 库存预先将未扫描订单量扣除，剩余的才给订单冲减
-                    Integer stockQty = Optional.ofNullable(finishedProductStock.getStockQty()).orElse(BigDecimal.ZERO.intValue());
-                    BigDecimal noscanAmount = notScanStockMap.getOrDefault(finishedProductStock.getMaterialCode(), BigDecimal.ZERO);
-                    Integer leftOverQty = stockQty > noscanAmount.intValue() ? stockQty - noscanAmount.intValue(): BigDecimal.ZERO.intValue();
-                    finishedProductStock.setLeftOverQty(leftOverQty);
-                });
-            }
+            // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
+            this.reduceInventoryByNotScanOrder(finishedProductStocks, notScanStocks);
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
@@ -796,26 +773,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         try {
             List<SalesOrderPool> salesOrders = salesOrdersFuture.get();
             List<MdmProductStock> finishedProductStocks = stocksFuture.get();
-            List<MdmOutbountOrdersNotScan> notScanStocks = notScanFuture.get();
+            List<MdmOutbountOrdersNotScan> notScanOrderList = notScanFuture.get();
             Map<String, String> productionTypeMap = productionTypeFuture.get();
             List<SupplyOrderPool> supplyOrderPools = supplyOrdersFuture.get();
             Map<String, Integer>  monthlySaleQty = monthlySaleQtyFuture.get();
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
-            if(!CollectionUtils.isEmpty(finishedProductStocks)){
-                // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
-                Map<String, BigDecimal> notScanStockMap = notScanStocks.stream()
-                        .collect(Collectors.toMap(MdmOutbountOrdersNotScan::getMaterialCode,
-                                MdmOutbountOrdersNotScan::getNoscanAmount, (amount1, amount2) -> amount1.add(amount2)));
-                finishedProductStocks.forEach(finishedProductStock -> {
-                    // 库存预先将未扫描订单量扣除，剩余的才给订单冲减
-                    Integer stockQty = Optional.ofNullable(finishedProductStock.getStockQty()).orElse(BigDecimal.ZERO.intValue());
-                    BigDecimal noscanAmount = notScanStockMap.getOrDefault(finishedProductStock.getMaterialCode(), BigDecimal.ZERO);
-                    Integer leftOverQty = stockQty > noscanAmount.intValue() ? stockQty - noscanAmount.intValue(): BigDecimal.ZERO.intValue();
-                    finishedProductStock.setLeftOverQty(leftOverQty);
-                });
-            }
+            // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
+            this.reduceInventoryByNotScanOrder(finishedProductStocks, notScanOrderList);
             // 处理成品库存映射
             Map<String, List<MdmProductStock>> finishedProductStockMap =
                 CollectionUtils.isEmpty(finishedProductStocks) ?
@@ -1293,6 +1259,96 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setIsImport(YesOrNoEnum.NO.getCode());
     }
 
+
+    /**
+     * 库存冲减未扫描订单
+     * 
+     * @param finishedProductStocks 成品库存列表
+     * @param notScanOrderList      未扫描订单列表
+     */
+    private void reduceInventoryByNotScanOrder(List<MdmProductStock> finishedProductStocks,
+                                               List<MdmOutbountOrdersNotScan> notScanOrderList) {
+        if (CollectionUtils.isEmpty(finishedProductStocks)) {
+            return;
+        }
+        // 1、初始化库存剩余量 = 库存量
+        finishedProductStocks.forEach(finishedProductStock -> {
+            Integer leftOverQty = ApsNumberUtils.intValue(finishedProductStock.getStockQty());
+            finishedProductStock.setLeftOverQty(leftOverQty);
+        });
+        if (CollectionUtils.isEmpty(notScanOrderList)) {
+            return;
+        }
+        // 2、先按物料号分组，再按年周号顺序分组
+        Map<String, TreeMap<String, List<MdmProductStock>>> stockGroupMap = finishedProductStocks.stream()
+                .collect(Collectors.groupingBy(MdmProductStock::getMaterialCode, // 第一层分组：物料号
+                        Collectors.collectingAndThen(Collectors.toList(),
+                                list -> list.stream().collect(Collectors.groupingBy(finishedProductStock -> this
+                                        .getWeekYearCompareKey(finishedProductStock.getWeekYear()) // 第二层分组：重构后的年周号，把年份放前面，周次放后面，方便比较
+                                        , TreeMap::new, Collectors.toList()))))); // 使用treeMap分组，年周号作为key，可以快速找到年周号最接近的库存数据
+
+        // 3、遍历未扫描订单列表，依次扣减库存
+        for (MdmOutbountOrdersNotScan notScanOrder : notScanOrderList) {
+            String dot = this.getWeekYearCompareKey(notScanOrder.getDot()); // 未扫描订单年周号要求
+            String sapCode = notScanOrder.getSapCode(); // NC物料号
+            Integer noscanAmount = BigDecimalUtils.valueOf(notScanOrder.getNoscanAmount()).intValue(); // 未扫描数量
+            // 3.1、取出物料各年周号的库存列表
+            TreeMap<String, List<MdmProductStock>> stockYearWeekGroupMap = stockGroupMap.get(sapCode);
+            // 3.2、按年周号由低到高依次依次冲减，一个年周号的库存不够则继续取更新年周号的库存，直到
+            while (noscanAmount > 0 && !CollectionUtils.isEmpty(stockYearWeekGroupMap)) {
+                // 3.2.1、取最订单年周要求接近且最小的库存年周号
+                String stockWeekYear = stockYearWeekGroupMap.ceilingKey(dot);
+                if (StringUtils.isEmpty(stockWeekYear)) {
+                    continue;
+                }
+                // 3.2.2、根据年周号取出库存列表
+                List<MdmProductStock> stockList = stockYearWeekGroupMap.get(stockWeekYear);
+                if (CollectionUtils.isEmpty(stockList)) {
+                    continue;
+                }
+                // 3.3.3、内层循环，依次冲减未扫描数量，直到库存耗尽或者冲减完毕，每一笔耗尽的库存记录需要从列表中删除
+                for (int i = stockList.size() - 1; i >= 0; i--) { // 由于有移除操作，需要倒序遍历
+                    // 3.3.3.1、取出剩余库存执行库存冲减运算
+                    MdmProductStock stockInfo = stockList.get(i);
+                    Integer leftOverQty = ApsNumberUtils.intValue(stockInfo.getLeftOverQty());
+                    Integer allocationStockQty = Math.min(leftOverQty, noscanAmount);
+                    leftOverQty -= allocationStockQty;
+                    noscanAmount -= allocationStockQty;
+                    stockInfo.setLeftOverQty(leftOverQty);
+                    // 3.3.3.2、剩余库存不足，则从列表移除改库存记录
+                    if (leftOverQty <= 0) {
+                        stockList.remove(i);
+                    }
+                    // 3.3.3.3、冲减完毕，结束内层循环
+                    if (noscanAmount <= 0) {
+                        break;
+                    }
+                }
+                // 同一年周号的库存全部耗尽，从列表移除该年周号记录
+                if (CollectionUtils.isEmpty(stockList)) {
+                    stockYearWeekGroupMap.remove(stockWeekYear);
+                }
+            }
+        }
+    }
+
+    /**
+     * 重构年周号，把年份放前面，周次放后面，方便比较
+     * @param weekYear
+     * @return
+     */
+    private String getWeekYearCompareKey(String weekYear) {
+        String newWeekYearStr = null;
+        if (StringUtils.isEmpty(weekYear)) {
+            newWeekYearStr = ZERO_YEAR_WEEK;
+        } else if (weekYear.equals(ZERO_YEAR_WEEK)) {
+            newWeekYearStr = weekYear;
+        } else if (StringUtils.length(weekYear) == 4) {
+            newWeekYearStr = StringUtils.join(weekYear.charAt(2), weekYear.charAt(3), // 原先的后两位年份，前置
+                    weekYear.charAt(0), weekYear.charAt(1));// 原先的前两位周次，后置
+        }
+        return newWeekYearStr;
+    }
 
 }
 
