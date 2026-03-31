@@ -12,6 +12,7 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
@@ -87,6 +88,21 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
         return getTableDataInfo(resultList, list.getTotal());
     }
+
+
+    /**
+     * 根据条件查询结构调整列表（周程滚动使用）
+     */
+    @ResponseBody
+    @PostMapping("/listAdjusts")
+    @ApiOperation("根据条件查询结构调整列表")
+    public TableDataInfo listAdjusts(MpStructureAllocationVo mpStructureAllocation) {
+        TableDataInfo list = iMpStructureAllocationService.listAdjusts(mpStructureAllocation);
+        // 实体转换
+        List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
+        return getTableDataInfo(resultList, list.getTotal());
+    }
+
 
     private TableDataInfo getTableDataInfo(List<?> resultList, long total) {
         TableDataInfo rspData = new TableDataInfo();
