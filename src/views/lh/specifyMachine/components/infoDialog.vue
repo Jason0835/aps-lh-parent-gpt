@@ -18,8 +18,42 @@
     >
       <el-row>
         <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.factoryCode')" prop="factoryCode">
+            <el-select
+              v-model="form.factoryCode"
+              :placeholder="$t('common.rule.select')"
+              clearable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="item in parentDict.type.biz_factory_name"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
           <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.specCode')" prop="specCode">
-            <el-input v-model="form.specCode" :placeholder="$t('common.rule.input')" clearable />
+            <el-select
+              v-model="form.specCode"
+              :placeholder="$t('common.rule.select')"
+              filterable
+              remote
+              :remote-method="remoteMaterialMethod"
+              :loading="materialLoading"
+              clearable
+              style="width: 100%"
+              @focus="handleMaterialFocus"
+            >
+              <el-option
+                v-for="item in materialOptions"
+                :key="item.materialCode"
+                :label="item.materialCode"
+                :value="item.materialCode"
+              />
+            </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="24">
@@ -35,12 +69,12 @@
               style="width: 100%"
               @focus="handleMachineFocus"
             >
-               <el-option
-                 v-for="item in machineOptions"
-                 :key="item.machineCode"
-                 :label="item.machineCode"
-                 :value="item.machineCode"
-               />
+              <el-option
+                v-for="item in machineOptions"
+                :key="item.machineCode"
+                :label="item.machineCode"
+                :value="item.machineCode"
+              />
             </el-select>
           </el-form-item>
         </el-col>
@@ -95,7 +129,7 @@
 </template>
 
 <script>
-import { editLhSpecifyMachine, getLhMachineList } from "@/api/lh/lhSpecifyMachine";
+import { editLhSpecifyMachine, getLhMachineList, getMaterialList } from "@/api/lh/lhSpecifyMachine";
 
 export default {
   inject: ["parentDict"],
@@ -103,16 +137,25 @@ export default {
     return {
       loading: false,
       machineLoading: false,
+      materialLoading: false,
       visible: false,
       isEdit: false,
       form: {},
       machineOptions: [],
-      rules: {
+      materialOptions: [],
+       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         specCode: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
         machineCode: [
@@ -163,6 +206,25 @@ export default {
         this.remoteMachineMethod('');
       }
     },
+    async remoteMaterialMethod(query) {
+      this.materialLoading = true;
+      try {
+        const res = await getMaterialList({ 
+          materialCode: query || '',
+          pageSize: 10 
+        });
+        this.materialOptions = res.data || res || [];
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.materialLoading = false;
+      }
+    },
+    handleMaterialFocus() {
+      if (this.materialOptions.length === 0) {
+        this.remoteMaterialMethod('');
+      }
+    },
     show(data) {
       this.visible = true;
       if (data) {
@@ -176,14 +238,23 @@ export default {
             },
           ];
         }
+        if (data.specCode) {
+          this.materialOptions = [
+            {
+              materialCode: data.specCode,
+            },
+          ];
+        }
       } else {
         this.form = {};
         this.machineOptions = [];
+        this.materialOptions = [];
       }
     },
     hide() {
       this.form = {};
       this.machineOptions = [];
+      this.materialOptions = [];
       if (this.$refs.form) {
         this.$refs.form.resetFields();
       }

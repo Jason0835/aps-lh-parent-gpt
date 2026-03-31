@@ -2189,6 +2189,8 @@
   "ui.lh.lhSpecifyMachine.export.fileName": "硫化定点机台",
   "ui.lh.lhSpecifyMachine.UniqueCheck": "存在相同SAP编号和机台名称的记录！",
   "ui.alert.lhSpecifyMachine.machineCodeNotExist": "未找到对应的硫化机编号！",
+  "ui.alert.lhSpecifyMachine.specCodeNotExist": "未找到对应的物料编码！",
+  "ui.data.column.factoryCode": "工厂",
   "ui.data.column.createBy": "创建人",
   "ui.data.column.createTime": "创建时间"
 

@@ -55,7 +55,7 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["LINE_TYPE", "JOB_TYPE"],
+  dicts: ["biz_factory_name", "LINE_TYPE", "JOB_TYPE"],
   provide() {
     return {
       parentDict: this.dict,
@@ -80,6 +80,16 @@ export default {
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
+        {
+          prop: "factoryCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.factoryCode"),
+          minWidth: 120,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
         {
           prop: "specCode",
           align: "center",
@@ -162,6 +172,12 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
           prop: "specCode",
