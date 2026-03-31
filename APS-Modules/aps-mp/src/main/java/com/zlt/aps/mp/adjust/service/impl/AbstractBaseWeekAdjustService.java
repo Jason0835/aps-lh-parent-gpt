@@ -532,7 +532,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
 
         FactoryMonthPlanFinalAdjustVo monthPlan = mpProdFinalList.get(0);
-
         MpMonthPlanStatistics statistics = new MpMonthPlanStatistics();
         // 设置月计划统计相关字段
         setMonthPlanStatisticsField(monthPlan, oneStructureAllocationList.get(0), statistics);
