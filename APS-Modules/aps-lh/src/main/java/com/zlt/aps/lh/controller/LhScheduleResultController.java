@@ -20,7 +20,8 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.itf.vo.SyncDataLogs;
+//import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.domain.SyncDataLogs;
 import com.zlt.aps.common.FactoryService;
 import com.zlt.aps.common.SyncDataLogsService;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -104,8 +105,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ILhMachineInfoService lhMachineInfoService;
-    @Resource
-    private ISyncDataLogsApiService syncDataLogsService;
+
+//    @Resource 由于报错先注释，后续由hak调整
+//    private ISyncDataLogsApiService syncDataLogsService;
+    @Autowired
+    private SyncDataLogsService syncDataLogsService;
+
     @Autowired
     private FactoryService factoryService;
     @Autowired
@@ -570,8 +575,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         if (releasingOrTimeoutByIds > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
         }
-        //获取数据版本号
-        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.LH_DEPLOY_SYNC_KEY);
+//        //获取数据版本号 由于报错先注释，后续由hak调整
+//        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.LH_DEPLOY_SYNC_KEY);
+        String dataVersion = "";
         // 厂别、分公司编号
         String factoryCode = factoryService.getFactoryCode();
         String companyCode = factoryService.getCompanyCode();
