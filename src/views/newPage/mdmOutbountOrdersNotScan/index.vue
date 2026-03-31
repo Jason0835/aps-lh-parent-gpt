@@ -33,7 +33,7 @@ import { listMdmOutbountOrdersNotScan } from "@/api/monthplan/mdmOutbountOrdersN
 export default {
   name: "MdmOutbountOrdersNotScan",
   components: {},
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -71,6 +71,7 @@ export default {
           prop: "saleOrg",
           label: "销售组织编码",
           minWidth: 120,
+          hide: true,
         },
         {
           prop: "saleOrgName",
@@ -91,10 +92,11 @@ export default {
           prop: "materialCode",
           label: "MES物料号",
           minWidth: 150,
+          hide: true,
         },
         {
           prop: "sapCode",
-          label: "NC物料号",
+          label: "物料编码",
           minWidth: 150,
         },
         {
@@ -105,6 +107,11 @@ export default {
         {
           prop: "dot",
           label: "年周号要求",
+          minWidth: 120,
+        },
+        {
+          prop: "stockDate",
+          label: "库存日期",
           minWidth: 120,
         },
         {
@@ -134,6 +141,12 @@ export default {
     searchColumns() {
       return [
         {
+          prop: "factoryCode",
+          label: this.$t("common.factory"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
           prop: "saleBillNo",
           label: "DN号",
         },
@@ -155,11 +168,18 @@ export default {
         },
         {
           prop: "sapCode",
-          label: "NC物料号",
+          label: "物料编码",
         },
         {
           prop: "materialName",
           label: "物料描述",
+        },
+        {
+          prop: "stockDate",
+          label: "库存日期",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
         },
       ];
     },
@@ -204,6 +224,11 @@ export default {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
+      if (params.stockDate && params.stockDate[0]) {
+        params.stockDateStart = params.stockDate[0];
+        params.stockDateEnd = params.stockDate[1];
+        params.stockDate = undefined;
+      }
       return params;
     },
     async getList() {
@@ -220,6 +245,15 @@ export default {
     },
   },
   created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
   activated() {},
