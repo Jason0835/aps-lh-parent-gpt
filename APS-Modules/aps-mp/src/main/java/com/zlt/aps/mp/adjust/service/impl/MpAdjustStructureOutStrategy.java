@@ -351,6 +351,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,contextDTO.getParamMap(),contextDTO.getStructureStartDay(),mpFinalVo,contextDTO.getDailyCapacityLimitVoMap());
         }
 
+        //10.构建月计划统计结果
+        MpMonthPlanStatistics monthPlanStatisticsVo = buildMonthPlanStatistics(contextDTO, mpProdFinalMap.get(contextDTO.getStructureName()),YesOrNoEnum.YES.getCode());
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
+        monthPlanStatisticsList.add(monthPlanStatisticsVo);
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
+
         contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
         contextDTO.setSaveAdjustProcLogList(contextDTO.getAdjustProcLogList());
 
@@ -478,7 +484,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
         //若结构收尾日小于锁定日，提示
-        if (contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
+        if (contextDTO.getLockEndDay() != null && contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.adjustDayLtLockEndDay"),
                     contextDTO.getStructureDeadLine(),contextDTO.getLockEndDay()));
         }

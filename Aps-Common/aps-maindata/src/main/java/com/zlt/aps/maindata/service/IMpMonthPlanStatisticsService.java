@@ -28,6 +28,6 @@ public interface IMpMonthPlanStatisticsService  extends IDocService<MpMonthPlanS
      * @param month 月份
      * @param productionVersion 排程版本
      */
-    void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion, List<String> structureList);
+    void deleteMonthPlanStatisticsByCondition(String factoryCode, String year, String month, String productionVersion, String tempFlag, List<String> structureList);
 
 }

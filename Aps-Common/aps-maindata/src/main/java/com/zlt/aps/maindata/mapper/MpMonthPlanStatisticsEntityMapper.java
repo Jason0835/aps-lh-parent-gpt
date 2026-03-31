@@ -34,6 +34,7 @@ public interface MpMonthPlanStatisticsEntityMapper extends CommBaseMapper<MpMont
                                      @Param("year") String year,
                                      @Param("month") String month,
                                      @Param("productionVersion") String productionVersion,
+                                              @Param("tempFlag") String tempFlag,
                                               @Param("structureList") List<String> structureList);
 
 }

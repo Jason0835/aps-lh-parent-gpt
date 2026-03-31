@@ -457,7 +457,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         saveMpAdjustProcLog(contextDTO);
         //4、回填实际调整
         backfillRealAdjustResult(contextDTO);
-        //5、发送消息
+        //5、保存月计划统计结果
+        saveMonthPlanStatisticsResult(contextDTO,YesOrNoEnum.YES.getCode());
+        //6、发送消息
         if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
             sendMsgRemainQtyNoFull(contextDTO);
         }
@@ -520,7 +522,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param mpProdFinalList  月计划定稿列表
      * @return 统计结果列表
      */
-    protected MpMonthPlanStatistics buildMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+    protected MpMonthPlanStatistics buildMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,String tempFlag) {
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = contextDTO.getDailyCapacityLimitVoMap();
         List<MpStructureAllocation> oneStructureAllocationList = contextDTO.getOneStructureAllocationList();
@@ -553,6 +555,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
 
             setDayField(statistics, day, dailyCapacityMap,totalQty,oemQty);
+            statistics.setTempFlag(tempFlag);
         }
         //同步更新上下文的结构统计
         contextDTO.getStructureStatisticMap().put(contextDTO.getStructureName(),statistics);
@@ -648,7 +651,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 保存月计划统计结果
      * @param contextDTO
      */
-    private void saveMonthPlanStatisticsResult(MpRollAdjustContextDTO contextDTO){
+    private void saveMonthPlanStatisticsResult(MpRollAdjustContextDTO contextDTO, String tempFlag){
         List<MpMonthPlanStatistics> monthPlanStatisticsList = contextDTO.getMonthPlanStatisticsList();
         if (PubUtil.isEmpty(monthPlanStatisticsList)){
             return;
@@ -661,7 +664,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 删除月计划统计结果（物理删除）
         mpMonthPlanStatisticsService.deleteMonthPlanStatisticsByCondition(contextDTO.getFactoryCode(),
-                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion(),structureNameList);
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getProductionVersion(),tempFlag,structureNameList);
         // 去重月计划统计结果
         //monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
@@ -877,6 +880,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
         // 设置工作日历
         contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
+
         // 设置月计划结构转产表-单结构
         List<MpStructureAllocation> structureAllocationList = mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO);
         List<MpStructureAllocation> oneStructureAllocationList = structureAllocationList.stream()
@@ -910,13 +914,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
 
         // 构建月计划统计结果
-        MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList);
+        MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, monthPLanList,YesOrNoEnum.NO.getCode());
         List<MpMonthPlanStatistics> monthPlanStatisticsKList = new ArrayList<>();
         monthPlanStatisticsKList.add(monthPlanStatistics);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsKList);
 
         // 保存月计划统计结果
-        saveMonthPlanStatisticsResult(contextDTO);
+        saveMonthPlanStatisticsResult(contextDTO,null);
     }
 
 
@@ -925,6 +929,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     public void initOemParam(MpRollAdjustContextDTO contextDTO) {
+        String oemBrandConfig = (String) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
+        Set<String> oemBrandConfigSet = Collections.emptySet();
+        if (!StringUtil.isEmptyWithTrim(oemBrandConfig)){
+            oemBrandConfigSet = Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet());
+        }
+        contextDTO.setOemBrandConfigSet(oemBrandConfigSet);
+        if (contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()) == null){
+            contextDTO.setTotalOemQty(0);
+        }else{
+            contextDTO.setTotalOemQty((Integer) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
+        }
+    }
+    /**
+     * 初始OEM相关参数
+     * @param contextDTO
+     */
+    private void initOemParam(MpRollAdjustContextDTO contextDTO) {
         String oemBrandConfig = (String) contextDTO.getParamMap().get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
         Set<String> oemBrandConfigSet = Collections.emptySet();
         if (!StringUtil.isEmptyWithTrim(oemBrandConfig)){

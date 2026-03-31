@@ -215,6 +215,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("tempFlag")), "TEMP_FLAG", queryVO.getFieldValueByFieldName("tempFlag"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureType")), "STRUCTURE_TYPE", queryVO.getFieldValueByFieldName("structureType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("day1")), "DAY_1", queryVO.getFieldValueByFieldName("day1"));

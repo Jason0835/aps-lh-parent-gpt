@@ -10,6 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                   AND YEAR= #{year}
                   AND MONTH= #{month}
           AND PRODUCTION_VERSION= #{productionVersion}
+        <if test="tempFlag != null  and tempFlag != ''">and temp_flag = #{tempFlag}</if>
         <if test="structureList != null and structureList.size() > 0">
             and structure_name in
             <foreach item="structureName" collection="structureList" open="(" separator="," close=")">
