@@ -53,6 +53,20 @@ public class HtmlDecodeAspect {
         return handleResult;
     }
 
+    @Before("execution(* com.zlt.aps.controller..*.export*(..))")
+    public void beforeExport(JoinPoint joinPoint) throws Throwable {
+        Object[] args = joinPoint.getArgs();
+        for (int i = 0; i < args.length; i++) {
+            Object arg = args[i];
+            try {
+                Object escapeParamField = escapeParamField(arg);
+                args[i] = escapeParamField;
+            } catch (IllegalAccessException e) {
+                log.error("参数转义失败", e);
+            }
+        }
+    }
+
     /**
      * 递归处理参数对象，对所有层级的String类型字段执行escapeHtml()
      *
@@ -149,7 +163,7 @@ public class HtmlDecodeAspect {
                     sb.append(c);
             }
         }
-        return sb.toString();
+        return sb.toString().trim();
     }
 
     /**
