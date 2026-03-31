@@ -95,16 +95,16 @@ export default {
           label: "出库单号",
           minWidth: 120,
         },
+        // {
+        //   prop: "materialCode",
+        //   label: "MES物料编码",
+        //   minWidth: 150,
+        // },
         {
-          prop: "materialCode",
+          prop: "sapCode",
           label: "物料编码",
           minWidth: 150,
         },
-        // {
-        //   prop: "sapCode",
-        //   label: "NC物料号",
-        //   minWidth: 150,
-        // },
         {
           prop: "materialName",
           label: "物料描述",
@@ -112,7 +112,7 @@ export default {
         },
         {
           prop: "dot",
-          label: "年周号要求",
+          label: "年周号",
           minWidth: 120,
         },
         {
@@ -168,14 +168,14 @@ export default {
           prop: "billId",
           label: "出库单号",
         },
+        // {
+        //   prop: "materialCode",
+        //   label: "MES物料编码",
+        // },
         {
-          prop: "materialCode",
+          prop: "sapCode",
           label: "物料编码",
         },
-        // {
-        //   prop: "sapCode",
-        //   label: "物料编码",
-        // },
         {
           prop: "materialName",
           label: "物料描述",
