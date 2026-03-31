@@ -5,6 +5,7 @@ import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

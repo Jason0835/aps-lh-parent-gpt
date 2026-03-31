@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMouldCleanPlanEntityMapper">
 
-    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMouldCleanPlan">
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan">
         SELECT
             ID,
             LH_CODE,

@@ -1,8 +1,6 @@
-package com.zlt.aps.mp.api.domain.entity;
+package com.zlt.aps.mdm.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -57,5 +55,11 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "厂别")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    @ApiModelProperty(value = "上机时间开始")
+    private String operTimeBegin;
+
+    @ApiModelProperty(value = "上机时间结束")
+    private String operTimeEnd;
 
 }

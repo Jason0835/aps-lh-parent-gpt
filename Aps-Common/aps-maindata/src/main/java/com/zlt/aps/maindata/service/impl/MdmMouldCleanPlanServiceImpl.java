@@ -3,7 +3,7 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zlt.aps.maindata.mapper.MdmMouldCleanPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldCleanPlanService;
-import com.zlt.aps.mp.api.domain.entity.MdmMouldCleanPlan;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
 import org.springframework.stereotype.Service;
 
 /**

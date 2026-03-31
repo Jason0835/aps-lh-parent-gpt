@@ -12,6 +12,7 @@ import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import io.swagger.annotations.Api;
