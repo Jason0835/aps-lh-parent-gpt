@@ -2192,6 +2192,13 @@
   "ui.alert.lhSpecifyMachine.specCodeNotExist": "未找到对应的物料编码！",
   "ui.data.column.factoryCode": "工厂",
   "ui.data.column.createBy": "创建人",
-  "ui.data.column.createTime": "创建时间"
+  "ui.data.column.createTime": "创建时间",
+  "ui.data.column.lhRepairCapsule.modelName": "APS胶囊已使用次数",
+  "ui.data.column.lhRepairCapsule.obtainTime": "获取日期",
+  "ui.data.column.lhRepairCapsule.lhCode": "硫化机台",
+  "ui.data.column.lhRepairCapsule.materialCode": "物料编码",
+  "ui.data.column.lhRepairCapsule.replaceCapsuleCount": "已使用次数",
+  "ui.data.column.lhRepairCapsule.replaceCapsuleCount2": "已使用次数2",
+  "ui.data.column.lhRepairCapsule.brand": "品牌"
 
 }
