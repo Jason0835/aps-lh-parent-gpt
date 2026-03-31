@@ -1887,7 +1887,7 @@ export default {
         let res = await autoAdjust(params);
         this.outResultData = res;
         if (res.length != 0) {
-          this.getStatisticsResult(res[0]);
+          this.getStatisticsResult(res[0],1);
           this.getSingleList({
             factoryCode: res[0].factoryCode,
             year: res[0].year,
@@ -2102,7 +2102,7 @@ export default {
         this.outResultData = res.rows;
         if (res.rows.length != 0) {
           console.log("开始调用统计");
-          this.getStatisticsResult(res.rows[0],1);
+          this.getStatisticsResult(res.rows[0]);
         }
       } catch (err) {
         console.log(err);
