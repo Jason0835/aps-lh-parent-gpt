@@ -467,6 +467,14 @@ public class MatchingAdjuestProductionHandler {
                     if (allocationQty > 0) { // 有分配量，说明成功搭配排产，需要更新相关数据
                         producedQty += allocationQty;
                         unAllocationQty -= allocationQty;
+                        if (!isCheckContinue) { // 如果是新增逻辑，则直接结束，走续作逻辑
+                            break out;
+                        } else if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
+                            Integer nextEndDay = this.getNextDay(contextDTO, realEndDay, endDay);
+                            if (nextEndDay > 0 && nextEndDay <= endDay) {
+                                realEndDay = nextEndDay;
+                            }
+                        }
                     }
                 }
                 // 5.3、如果本轮循环没有搭配量，则说明SKU已经无法继续搭配，结束SKU外层循环
@@ -481,6 +489,9 @@ public class MatchingAdjuestProductionHandler {
             totalAllocationQty += producedQty;
             if (isNewPlan && plan.getBeginDay() != null) { // 排上的规格添加导列表中
                 mpProdFinalList.add(plan);
+            }
+            if (!isCheckContinue) { // 如果是新增逻辑，则直接结束，走续作逻辑
+                break;
             }
         } while (true);
         return totalAllocationQty;
@@ -990,6 +1001,7 @@ public class MatchingAdjuestProductionHandler {
             // 加载需求计划
             LambdaQueryWrapper<DpDemandPlan> demandQueryWrapper = new LambdaQueryWrapper<DpDemandPlan>();
             demandQueryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
+            demandQueryWrapper.gt(DpDemandPlan::getConventionReserveQty, 0);
             demandQueryWrapper.isNotNull(DpDemandPlan::getStructureName); // 过滤空结构的数据
             demandPlanList = monthPlanRequireMapper.selectList(demandQueryWrapper);
             contextDTO.setDpDemandPlanList(demandPlanList);
@@ -999,7 +1011,7 @@ public class MatchingAdjuestProductionHandler {
                 .filter(dp -> Objects.equals(contextDTO.getStructureName(), dp.getStructureName())).map(dpPlan -> {
                     MonthPlanProductionRequirePlanVo requirePlan = new MonthPlanProductionRequirePlanVo();
                     BeanUtils.copyProperties(dpPlan, requirePlan);
-                    requirePlan.setProductionQty(0);
+                    requirePlan.setProductionQty(intValue(requirePlan.getConventionReserveQty()));
                     requirePlan.setProducedQty(0);
                     return requirePlan;
                 }).collect(Collectors.toList());
