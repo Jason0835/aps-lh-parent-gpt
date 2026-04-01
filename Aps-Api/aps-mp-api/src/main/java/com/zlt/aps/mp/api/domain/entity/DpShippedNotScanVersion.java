@@ -104,8 +104,8 @@ public class DpShippedNotScanVersion extends BaseEntity {
     @TableField(value = "NOSCAN_AMOUNT")
     private BigDecimal noscanAmount;
 
-    @Excel(name = "ui.data.column.dpShippedNotScanVersion.saleItemNo", cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "ui.data.column.dpShippedNotScanVersion.saleItemNo")
     @ApiModelProperty(value = "SCM行内码", name = "saleItemNo")
     @TableField(value = "SALE_ITEM_NO")
-    private BigDecimal saleItemNo;
+    private String saleItemNo;
 }
