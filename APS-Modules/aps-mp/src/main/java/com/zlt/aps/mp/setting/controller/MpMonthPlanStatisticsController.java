@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.setting.controller;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSONObject;
@@ -81,8 +82,10 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanStatistics queryVO) {
+        String tempFlag = queryVO.getTempFlag();
+        queryVO.setTempFlag(null);
         TableDataInfo tableDataInfo = super.list(queryVO);
-        filterByGroup(tableDataInfo.getRows(), queryVO.getTempFlag());
+        filterByGroup(tableDataInfo, tempFlag);
         handleZeroToNull(tableDataInfo.getRows());
         return tableDataInfo;
     }
@@ -99,13 +102,13 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
      * @param tempFlag 临时标识
      * @return
      */
-    public void filterByGroup(List<?> rows, String tempFlag) {
+    public void filterByGroup(TableDataInfo tableDataInfo, String tempFlag) {
         // 1. 空集合直接返回空列表，避免空指针
-        if (PubUtil.isEmpty(rows)) {
+        if (PubUtil.isEmpty(tableDataInfo.getRows())) {
             return;
         }
 
-        List<MpMonthPlanStatistics> sourceList = (List<MpMonthPlanStatistics>) rows;
+        List<MpMonthPlanStatistics> sourceList = (List<MpMonthPlanStatistics>) tableDataInfo.getRows();
         String targetTempFlag = StringUtils.isEmpty(tempFlag) ? YesOrNoEnum.NO.getCode() : tempFlag;
 
         // 2. 双字段分组：key = structureName + structureType
@@ -128,7 +131,8 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
                     return flagZeroData.orElse(groupData.get(0));
                 })
                 .collect(Collectors.toList());
-        rows = resultList;
+        tableDataInfo.setRows(resultList);
+        tableDataInfo.setTotal(Convert.toLong(resultList.size()));
     }
 
 
