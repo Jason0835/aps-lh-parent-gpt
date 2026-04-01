@@ -11,6 +11,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -375,6 +376,11 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         }
         for (MpAdjustStructureOut structureOut:mpAdjustStructureOutList){
             if (structureOut.getConfirmAdjustQty() == null || structureOut.getConfirmAdjustQty() <= 0){
+                continue;
+            }
+            if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(structureOut.getConstructionStage()) ||
+                    ConstructionStageEnum.MEASUREMENT.getStage().equals(structureOut.getConstructionStage())){
+                //试制或量试，略过
                 continue;
             }
             if (isEven(structureOut.getConfirmAdjustQty())){
