@@ -134,7 +134,7 @@ public class DpShippedNotScanVersionUIController extends BaseUIController<DpShip
     }
 
     @ApiOperation("生成已出库未扫描版本")
-    @RequiresPermissions("monthplan:dpShippedNotScanVersion:generate")
+//    @RequiresPermissions("monthplan:dpShippedNotScanVersion:generate")
     @PostMapping("/generate")
     @ResponseBody
     public AjaxResult generate(DpShippedNotScanVersion queryCondition) {

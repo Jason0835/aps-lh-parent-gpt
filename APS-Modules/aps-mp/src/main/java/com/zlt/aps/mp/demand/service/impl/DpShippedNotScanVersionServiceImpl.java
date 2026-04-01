@@ -97,7 +97,7 @@ public class DpShippedNotScanVersionServiceImpl extends AbstractDocService<DpShi
 
         LambdaQueryWrapper<MdmOutbountOrdersNotScan> notScanWrapper = Wrappers.lambdaQuery();
         notScanWrapper.eq(MdmOutbountOrdersNotScan::getFactoryCode, factoryCode);
-        notScanWrapper.in(MdmOutbountOrdersNotScan::getMaterialCode, materialCodeSet);
+        notScanWrapper.in(MdmOutbountOrdersNotScan::getSapCode, materialCodeSet);
         List<MdmOutbountOrdersNotScan> notScanList = mdmOutbountOrdersNotScanEntityMapper.selectList(notScanWrapper);
 
         if (CollectionUtils.isEmpty(notScanList)) {
