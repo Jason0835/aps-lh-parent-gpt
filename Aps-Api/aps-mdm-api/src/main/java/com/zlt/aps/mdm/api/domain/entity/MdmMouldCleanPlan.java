@@ -40,9 +40,7 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     @TableField(value = "SECOND_WASH_TIME")
     private String secondWashTime;
 
-    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
-    @TableField(value = "DEL_FLAG")
-    private Integer delFlag;
+
 
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")
@@ -62,4 +60,8 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "上机时间结束")
     private String operTimeEnd;
 
+
+    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
+    @TableField(exist = false)
+    private Integer delFlag;
 }

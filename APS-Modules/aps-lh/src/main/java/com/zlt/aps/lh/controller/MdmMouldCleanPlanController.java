@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmMouldCleanPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldCleanPlanService;
 import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
@@ -26,7 +27,7 @@ import java.io.IOException;
 import java.util.List;
 
 @Slf4j
-@Api(tags = "APS模具清洗计划")
+@Api(tags = "模具清洗计划")
 @RestController
 @RequestMapping("/mouldCleanPlan")
 public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMouldCleanPlan> {
@@ -60,7 +61,7 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
     @Override
     public AjaxResult save(@RequestBody MdmMouldCleanPlan billVO){
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
-            billVO.setFactoryCode("");
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         return super.save(billVO);
     }
@@ -94,7 +95,7 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
     /**
      * 导出列表
      */
-    @Log(title = "APS模具清洗计划", businessType = BusinessType.EXPORT)
+    @Log(title = "模具清洗计划", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
@@ -118,7 +119,6 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
     @Override
     protected void builderCondition(QueryWrapper<MdmMouldCleanPlan> queryWrapper, MdmMouldCleanPlan queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhCode")), "LH_CODE", queryVO.getFieldValueByFieldName("lhCode"));
         
         String operTimeBegin = queryVO.getOperTimeBegin();

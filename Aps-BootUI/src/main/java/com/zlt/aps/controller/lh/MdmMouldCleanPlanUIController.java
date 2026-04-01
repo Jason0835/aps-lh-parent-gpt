@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.IMdmMouldCleanPlanRemoteService;
 import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -26,13 +27,16 @@ import java.io.IOException;
 import java.util.List;
 
 @Slf4j
-@Api(tags = "APS模具清洗计划")
+@Api(tags = "模具清洗计划")
 @Controller
 @RequestMapping("/lh/mouldCleanPlan")
 public class MdmMouldCleanPlanUIController extends BaseUIController<MdmMouldCleanPlan> {
 
     @Autowired
     private IMdmMouldCleanPlanRemoteService iMdmMouldCleanPlanService;
+
+    @Autowired
+    private ILhMachineInfoRemoteService iLhMachineInfoService;
 
     @ApiOperation("根据条件查询数据")
     @RequiresPermissions("lh:mouldCleanPlan:list")
@@ -54,7 +58,7 @@ public class MdmMouldCleanPlanUIController extends BaseUIController<MdmMouldClea
     @RequiresPermissions("lh:mouldCleanPlan:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(@RequestBody MdmMouldCleanPlan mdmMouldCleanPlan) {
+    public AjaxResult save(MdmMouldCleanPlan mdmMouldCleanPlan) {
         return iMdmMouldCleanPlanService.save(mdmMouldCleanPlan);
     }
 
@@ -71,7 +75,7 @@ public class MdmMouldCleanPlanUIController extends BaseUIController<MdmMouldClea
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, MdmMouldCleanPlan entity) throws IOException {
-        String fileName = "APS模具清洗计划";
+        String fileName = "模具清洗计划";
         byte[] excelBytes = iMdmMouldCleanPlanService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
@@ -86,7 +90,7 @@ public class MdmMouldCleanPlanUIController extends BaseUIController<MdmMouldClea
         byte[] data = file.getBytes();
         ImportContext context = new ImportContext();
         context.setImportFilePath(null);
-        context.setFunctionName("APS模具清洗计划");
+        context.setFunctionName("模具清洗计划");
         context.setProcedureCode("0");
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
@@ -97,9 +101,17 @@ public class MdmMouldCleanPlanUIController extends BaseUIController<MdmMouldClea
     @ApiOperation("下载导入模板")
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = "APS模具清洗计划";
+        String fileName = "模具清洗计划";
         ExcelUtil<MdmMouldCleanPlan> util = new ExcelUtil<>(MdmMouldCleanPlan.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
+    }
+
+    @ApiOperation("获取机台下拉列表")
+    @PostMapping("/getMachineList")
+    @ResponseBody
+    public AjaxResult getMachineList(LhMachineInfo query) {
+        TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
+        return AjaxResult.success(tableDataInfo.getRows());
     }
 }

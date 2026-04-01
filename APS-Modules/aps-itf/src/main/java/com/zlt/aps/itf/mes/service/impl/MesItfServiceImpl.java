@@ -1055,7 +1055,7 @@ public class MesItfServiceImpl implements MesItfService {
 
                     // 设置删除标识（0-正常，1-已删除）
                     if (entity.getDelFlag() == null) {
-                        entity.setDelFlag(0);
+                        entity.setIsDelete(0);
                     }
 
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
