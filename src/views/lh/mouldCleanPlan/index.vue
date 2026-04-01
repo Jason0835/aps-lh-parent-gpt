@@ -23,31 +23,53 @@
           plain
           v-hasPermi="['lh:mouldCleanPlan:edit']"
           @click="handleAdd"
-        >{{ $t("ui.frame.btn.add") }}</el-button>
+          >{{ $t("ui.frame.btn.add") }}</el-button
+        >
+        <el-button
+          type="danger"
+           v-hasPermi="['lh:mouldCleanPlan:remove']"
+          :disabled="selection.length == 0"
+          @click="handleDeleteAll"
+          >{{ $t("ui.frame.btn.delete") }}</el-button
+        >
         <el-button
           v-hasPermi="['lh:mouldCleanPlan:import']"
           @click="$refs.tltUpload.handleImport()"
-        >{{ $t("ui.frame.btn.import") }}</el-button>
+          >{{ $t("ui.frame.btn.import") }}</el-button
+        >
+
         <el-button
           @click="handleExport"
           v-hasPermi="['lh:mouldCleanPlan:export']"
-        >{{ $t("ui.frame.btn.export") }}</el-button>
+          >{{ $t("ui.frame.btn.export") }}</el-button
+        >
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
+      :updateSupport="true"
       downloadUrl="/lh/mouldCleanPlan/importTemplate"
       uploadUrl="/lh/mouldCleanPlan/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
-
 <script>
+//lib
+//utils
 import { downloadLink } from "@/utils/request";
-import { listMouldCleanPlan, removeMouldCleanPlan } from "@/api/lh/mouldCleanPlan";
+
+import {
+  listMouldCleanPlan,
+  removeMouldCleanPlan
+} from "@/api/lh/mouldCleanPlan";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
+//components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
+
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
@@ -55,8 +77,9 @@ export default {
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm
   },
-  dicts: ["biz_factory_name", "biz_brand_type"],
+  dicts: ["biz_factory_name", "lh_machine"],
   provide() {
     return {
       parentDict: this.dict,
@@ -64,6 +87,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -75,6 +114,8 @@ export default {
       sort: {},
       search: {},
       query: {},
+      importDefaultValue: {},
+      importRules: {},
     };
   },
   computed: {
@@ -83,58 +124,38 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.factoryCode"),
-          minWidth: 120,
-          formatter: (row, column, value, index) => {
+          label: this.$t("common.factory"),
+          formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          prop: "brand",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.mouldCleanPlan.brand"),
-          minWidth: 120,
-          formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
-          },
-        },
-        {
           prop: "lhCode",
-          align: "center",
-          halign: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
-          minWidth: 150,
+          width: 180
         },
         {
           prop: "operTime",
-          align: "center",
-          halign: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
-          minWidth: 150,
         },
         {
           prop: "firstWashTime",
-          align: "center",
-          halign: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.firstWashTime"),
-          minWidth: 150,
         },
         {
           prop: "secondWashTime",
-          align: "center",
-          halign: "center",
           label: this.$t("ui.data.column.mouldCleanPlan.secondWashTime"),
-          minWidth: 150,
         },
         {
+          prop: "updateTime",
+          width: 180,
+          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+        },
+
+        {
           align: "center",
-          halign: "center",
           label: this.$t("ui.data.btn.option"),
-          prop: "option",
-          minWidth: 150,
+          width: 180,
           render: ({ row }) => {
             return (
               <div>
@@ -159,22 +180,22 @@ export default {
           },
         },
       ];
+
       return columns;
     },
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
-          filterable: true,
         },
         {
-          label: this.$t("ui.data.column.mouldCleanPlan.brand"),
-          prop: "brand",
+          label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
+          prop: "lhCode",
           type: "select",
-          dictData: this.dict.type.biz_brand_type,
+          dictData: this.dict.type.lh_machine,
           filterable: true,
         },
         {
@@ -183,12 +204,6 @@ export default {
           type: "date",
           dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
-        },
-        {
-          label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
-          prop: "lhCode",
         },
       ];
     },
@@ -204,6 +219,26 @@ export default {
         this.$refs.infoRef.show(row);
       }
     },
+    handleDeleteAll() {
+      console.log(this.selection);
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeMouldCleanPlan({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleDelete(row) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
@@ -216,6 +251,7 @@ export default {
         });
       });
     },
+
     handleSearch(data) {
       this.query = data;
       if (data.operTime && data.operTime.length === 2) {
@@ -234,6 +270,9 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
+    handelSuccess() {
+      this.getList();
+    },
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
@@ -241,6 +280,7 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
+        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -251,20 +291,25 @@ export default {
     handleExport() {
       downloadLink("/lh/mouldCleanPlan/export", this.formatParams(false));
     },
+
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort,
       };
+
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
+
       return params;
     },
+    // api
     async getList() {
       try {
         this.loading = true;
+
         const data = await listMouldCleanPlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
@@ -275,11 +320,26 @@ export default {
       }
     },
   },
-  activated() {
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
+  },
+  activated() {
+    // this.getList();
   },
 };
 </script>
-
 <style lang="scss" scoped>
+.more-btn {
+  margin: 2px 0;
+  width: 100%;
+}
 </style>

@@ -23,3 +23,11 @@ export function editMouldCleanPlan(query) {
     data: query
   })
 }
+
+export function getMachineList(query) {
+  return request({
+    url: '/lh/mouldCleanPlan/getMachineList',
+    method: 'post',
+    params: query
+  })
+}

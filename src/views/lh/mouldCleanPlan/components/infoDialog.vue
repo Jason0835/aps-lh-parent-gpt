@@ -34,26 +34,41 @@
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.brand')" prop="brand">
-            <el-select
-              v-model="form.brand"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.biz_brand_type"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
+<!--        <el-col :span="24">-->
+<!--          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.brand')" prop="brand">-->
+<!--            <el-select-->
+<!--              v-model="form.brand"-->
+<!--              :placeholder="$t('common.rule.select')"-->
+<!--              clearable-->
+<!--              style="width: 100%"-->
+<!--            >-->
+<!--              <el-option-->
+<!--                v-for="item in parentDict.type.biz_brand_type"-->
+<!--                :key="item.value"-->
+<!--                :label="item.label"-->
+<!--                :value="item.value"-->
+<!--              />-->
+<!--            </el-select>-->
+<!--          </el-form-item>-->
+<!--        </el-col>-->
         <el-col :span="24">
           <el-form-item :label="$t('ui.data.column.mouldCleanPlan.lhCode')" prop="lhCode">
-            <el-input v-model="form.lhCode" :placeholder="$t('common.rule.input')" clearable />
+            <el-select
+              v-model="form.lhCode"
+              :placeholder="$t('common.rule.select')"
+              filterable
+              clearable
+              style="width: 100%"
+              @focus="handleMachineFocus"
+              :loading="machineLoading"
+            >
+              <el-option
+                v-for="item in machineOptions"
+                :key="item.machineCode"
+                :label="item.machineCode"
+                :value="item.machineCode"
+              />
+            </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="24">
@@ -113,13 +128,15 @@
 </template>
 
 <script>
-import { editMouldCleanPlan } from "@/api/lh/mouldCleanPlan";
+import { editMouldCleanPlan, getMachineList } from "@/api/lh/mouldCleanPlan";
 
 export default {
   inject: ["parentDict"],
   data() {
     return {
       loading: false,
+      machineLoading: false,
+      machineOptions: [],
       visible: false,
       isEdit: false,
       form: {},
@@ -131,18 +148,18 @@ export default {
             trigger: "change",
           },
         ],
-        brand: [
+        lhCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        lhCode: [
+        operTime: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
       },
@@ -150,10 +167,31 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.column.mouldCleanPlan.modelName");
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
     },
   },
   methods: {
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await getMachineList({
+          machineCode: "",
+          pageSize: 1000,
+        });
+        this.machineOptions = res.data || res || [];
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.machineLoading = false;
+      }
+    },
+    handleMachineFocus() {
+      if (this.machineOptions.length === 0) {
+        this.loadMachineList();
+      }
+    },
     async save() {
       try {
         this.loading = true;
@@ -169,15 +207,27 @@ export default {
     },
     show(data) {
       this.visible = true;
+      this.machineOptions = [];
       if (data) {
         this.isEdit = true;
         this.form = { ...data };
+        if (data.lhCode) {
+          this.machineOptions = [
+            {
+              machineCode: data.lhCode,
+              machineName: data.lhCode,
+            },
+          ];
+        }
       } else {
-        this.form = {};
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {
       this.form = {};
+      this.machineOptions = [];
       if (this.$refs.form) {
         this.$refs.form.resetFields();
       }
