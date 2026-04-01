@@ -48,6 +48,10 @@
             <groupId>com.zlt.aps.itf</groupId>
             <artifactId>aps-itf-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.lh</groupId>
+            <artifactId>aps-lh-api</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
