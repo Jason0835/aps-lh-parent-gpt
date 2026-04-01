@@ -5,12 +5,15 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.CustomException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.maindata.mapper.MdmMouldCleanPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMouldCleanPlanService;
 import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
+import com.zlt.aps.mdm.api.domain.vo.MdmDeviceMaintenancePlanVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -18,6 +21,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -63,7 +67,8 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return super.save(billVO);
+        int result = mdmMouldCleanPlanService.save(billVO);
+        return result > 0 ? AjaxResult.success() : AjaxResult.error();
     }
 
     /**
@@ -76,6 +81,7 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
     public AjaxResult removeByIds(@RequestBody List<Long> ids){
         return super.removeByIds(ids);
     }
+
 
     /**
      * 根据集合导入模具清洗计划数据
@@ -92,6 +98,10 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         return super.importData(importContext,updateSupport);
     }
 
+
+    public AjaxResult doImportData(List list, boolean updateSupport, long importLogId) {
+        return mdmMouldCleanPlanService.importData(list, updateSupport, importLogId);
+    }
     /**
      * 导出列表
      */
@@ -113,7 +123,7 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
 
     @Override
     protected IDocService getDocService() {
-        return null;
+        return mdmMouldCleanPlanService;
     }
 
     @Override

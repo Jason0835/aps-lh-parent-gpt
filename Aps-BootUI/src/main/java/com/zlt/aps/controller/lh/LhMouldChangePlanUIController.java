@@ -122,7 +122,7 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
     @RequiresPermissions("lh:lhMouldChangePlan:remove")
     @PostMapping("/remove")
     @ResponseBody
-    public AjaxResult remove(String ids) {
+    public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
         return iLhMouldChangePlanService.removeByIds(Arrays.asList(arr));
     }
