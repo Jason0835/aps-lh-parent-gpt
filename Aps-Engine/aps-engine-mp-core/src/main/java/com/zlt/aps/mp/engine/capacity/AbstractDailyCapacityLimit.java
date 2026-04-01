@@ -553,7 +553,7 @@ public abstract class AbstractDailyCapacityLimit {
             resultArr[3] = 1;
             if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
                     mpFinalVo.getFieldValueByFieldName(day2Field) == null){
-                //若次日为空，则当日的8也是收尾，不算换模
+                //若次日为空，则当日的20也是收尾，不算换模
                 resultArr[3] = 0;
             }
         }else if (remainQty == changeMouldXBlockQty){
@@ -561,7 +561,7 @@ public abstract class AbstractDailyCapacityLimit {
             resultArr[3] = 1;
             if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
                     mpFinalVo.getFieldValueByFieldName(day2Field) == null){
-                //若次日为空，则当日的8也是收尾，不算换模
+                //若次日为空，则当日的32也是收尾，不算换模
                 resultArr[3] = 0;
             }
         }else {
