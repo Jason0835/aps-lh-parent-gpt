@@ -5,6 +5,7 @@ import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
@@ -21,6 +22,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,9 +35,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -76,9 +82,56 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanStatistics queryVO) {
         TableDataInfo tableDataInfo = super.list(queryVO);
+        filterByGroup(tableDataInfo.getRows(), queryVO.getTempFlag());
         handleZeroToNull(tableDataInfo.getRows());
         return tableDataInfo;
     }
+
+
+
+    /**
+     * 按规则筛选数据：
+     * 1. 按 structureName + structureType 分组
+     * 2. 组内优先取 tempFlag=0 的数据
+     * 3. 无0则取组内第一条数据
+     *
+     * @param rows 原始数据集合
+     * @param tempFlag 临时标识
+     * @return
+     */
+    public void filterByGroup(List<?> rows, String tempFlag) {
+        // 1. 空集合直接返回空列表，避免空指针
+        if (PubUtil.isEmpty(rows)) {
+            return;
+        }
+
+        List<MpMonthPlanStatistics> sourceList = (List<MpMonthPlanStatistics>) rows;
+        String targetTempFlag = StringUtils.isEmpty(tempFlag) ? YesOrNoEnum.NO.getCode() : tempFlag;
+
+        // 2. 双字段分组：key = structureName + structureType
+        Map<AbstractMap.SimpleEntry<String, String>, List<MpMonthPlanStatistics>> groupMap = sourceList.stream()
+                .collect(Collectors.groupingBy(
+                        item -> new AbstractMap.SimpleEntry<>(
+                                item.getStructureName(),
+                                item.getStructureType()
+                        )
+                ));
+
+        // 3. 遍历每组数据，执行优先级筛选
+        List<MpMonthPlanStatistics> resultList = groupMap.values().stream()
+                .map(groupData -> {
+                    // 优先查找 tempFlag = 0 的数据
+                    Optional<MpMonthPlanStatistics> flagZeroData = groupData.stream()
+                            .filter(item -> targetTempFlag.equals(item.getTempFlag()))
+                            .findFirst();
+                    // 有0则取0，无0则取组内第一条数据
+                    return flagZeroData.orElse(groupData.get(0));
+                })
+                .collect(Collectors.toList());
+        rows = resultList;
+    }
+
+
 
     /**
      * 将字段中值为0的字段设为null
