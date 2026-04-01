@@ -21,9 +21,19 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['lh:lhMouldChangePlan:add']"
+          v-hasPermi="['lh:lhMouldChangePlan:edit']"
           @click="handleAdd"
         >{{ $t("ui.frame.btn.add") }}</el-button>
+<!--        <el-button-->
+<!--          v-hasPermi="['lh:lhMouldChangePlan:edit']"-->
+<!--          @click="handleBatchEdit"-->
+<!--          :disabled="!selection.length"-->
+<!--        >{{ $t("ui.frame.btn.update") }}</el-button>-->
+        <el-button
+          v-hasPermi="['lh:lhMouldChangePlan:remove']"
+          @click="handleBatchDelete"
+          :disabled="!selection.length"
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           v-hasPermi="['lh:lhMouldChangePlan:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -300,12 +310,32 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeLhMouldChangePlan({ ids }).then((data) => {
+        removeLhMouldChangePlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
         });
       });
+    },
+    handleBatchDelete() {
+      if (!this.selection || this.selection.length === 0) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      const ids = this.selection.map(item => item.id).join(',');
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeLhMouldChangePlan(ids).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
+    handleBatchEdit() {
+      // 批量编辑可根据后续需求实现
+      this.$modal.msgWarning(this.$t("lhMouldChangePlan.batchEditNotOpen"));
     },
     handleSearch(data) {
       this.query = data;

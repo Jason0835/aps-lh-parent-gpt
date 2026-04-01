@@ -8,32 +8,256 @@
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <info-form
-      class="form-item-height"
+    <el-form
       ref="form"
-      :form="form"
+      :model="form"
       :rules="rules"
-      :columns="columns"
       label-position="right"
-      label-width="160px"
+      label-width="120px"
       v-loading="loading"
     >
-    </info-form>
+      <el-row>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.factoryCode')" prop="factoryCode">
+            <el-select
+              v-model="form.factoryCode"
+              :placeholder="$t('common.rule.select')"
+              clearable
+              filterable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="item in parentDict.type.biz_factory_name"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.lhResultBatchNo')" prop="lhResultBatchNo">
+            <el-input v-model="form.lhResultBatchNo" :placeholder="$t('common.rule.input')" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.orderNo')" prop="orderNo">
+            <el-input v-model="form.orderNo" :placeholder="$t('common.rule.input')" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.planDate')" prop="planDate">
+            <el-date-picker
+              v-model="form.planDate"
+              type="date"
+              placeholder="选择日期"
+              value-format="yyyy-MM-dd"
+              style="width: 100%"
+              clearable
+              popper-class="el-popper"
+              editable
+            >
+            </el-date-picker>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.scheduleDate')" prop="scheduleDate">
+            <el-date-picker
+              v-model="form.scheduleDate"
+              type="date"
+              placeholder="选择日期"
+              value-format="yyyy-MM-dd"
+              style="width: 100%"
+              clearable
+              popper-class="el-popper"
+              editable
+            >
+            </el-date-picker>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.planOrder')" prop="planOrder">
+            <el-input-number v-model="form.planOrder" :placeholder="$t('common.rule.input')" style="width: 100%" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.leftRightMould')" prop="leftRightMould">
+            <el-input v-model="form.leftRightMould" :placeholder="$t('common.rule.input')" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.lhMachineCode')" prop="lhMachineCode">
+            <el-select
+              v-model="form.lhMachineCode"
+              :placeholder="$t('common.rule.select')"
+              filterable
+              clearable
+              style="width: 100%"
+              @focus="handleMachineFocus"
+              @change="handleMachineChange"
+              :loading="machineLoading"
+            >
+              <el-option
+                v-for="item in machineOptions"
+                :key="item.machineCode"
+                :label="item.machineCode"
+                :value="item.machineCode"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.lhMachineName')" prop="lhMachineName">
+            <el-input v-model="form.lhMachineName" :placeholder="$t('common.rule.input')" disabled />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.beforeMaterialCode')" prop="beforeMaterialCode">
+            <el-select
+              v-model="form.beforeMaterialCode"
+              :placeholder="$t('common.rule.select')"
+              filterable
+              clearable
+              style="width: 100%"
+              @focus="handleBeforeMaterialFocus"
+              @change="handleBeforeMaterialChange"
+              :loading="beforeMaterialLoading"
+            >
+              <el-option
+                v-for="item in beforeMaterialOptions"
+                :key="item.materialCode"
+                :label="item.materialCode"
+                :value="item.materialCode"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.beforeMaterialDesc')" prop="beforeMaterialDesc">
+            <el-input v-model="form.beforeMaterialDesc" :placeholder="$t('common.rule.input')" disabled />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.changeMouldType')" prop="changeMouldType">
+            <el-select
+              v-model="form.changeMouldType"
+              :placeholder="$t('common.rule.select')"
+              clearable
+              filterable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="item in parentDict.type.CHANGE_MOULD_TYPE"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.afterMaterialCode')" prop="afterMaterialCode">
+            <el-select
+              v-model="form.afterMaterialCode"
+              :placeholder="$t('common.rule.select')"
+              filterable
+              clearable
+              style="width: 100%"
+              @focus="handleAfterMaterialFocus"
+              @change="handleAfterMaterialChange"
+              :loading="afterMaterialLoading"
+            >
+              <el-option
+                v-for="item in afterMaterialOptions"
+                :key="item.materialCode"
+                :label="item.materialCode"
+                :value="item.materialCode"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.afterMaterialDesc')" prop="afterMaterialDesc">
+            <el-input v-model="form.afterMaterialDesc" :placeholder="$t('common.rule.input')" disabled />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.changeTime')" prop="changeTime">
+            <el-date-picker
+              v-model="form.changeTime"
+              type="datetime"
+              placeholder="选择时间"
+              value-format="yyyy-MM-dd HH:mm:ss"
+              style="width: 100%"
+              clearable
+              popper-class="el-popper"
+              editable
+            >
+            </el-date-picker>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.mouldCode')" prop="mouldCode">
+            <el-input v-model="form.mouldCode" :placeholder="$t('common.rule.input')" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.isRelease')" prop="isRelease">
+            <el-select
+              v-model="form.isRelease"
+              :placeholder="$t('common.rule.select')"
+              clearable
+              filterable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="item in parentDict.type.IS_RELEASE"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.mouldStatus')" prop="mouldStatus">
+            <el-select
+              v-model="form.mouldStatus"
+              :placeholder="$t('common.rule.select')"
+              clearable
+              filterable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="item in parentDict.type.biz_yes_no"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+
+        <el-col :span="24">
+          <el-form-item :label="$t('common.remark')" prop="remark">
+            <el-input v-model="form.remark" type="textarea" :rows="3" :placeholder="$t('common.rule.input')" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+    </el-form>
     <template slot="footer">
-      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
+      <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        this.$t("common.button.confirm")
+        $t("common.button.confirm")
       }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import infoForm from "@/views/components/infoForm.vue";
 import { editLhMouldChangePlan, getMachineList, getMaterialList } from "@/api/lh/lhMouldChangePlan";
 
 export default {
-  components: { infoForm },
   inject: ["parentDict"],
   data() {
     return {
@@ -99,176 +323,8 @@ export default {
         ? this.$t("common.button.edit")
         : this.$t("common.button.add");
     },
-    columns() {
-      return [
-        {
-          prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
-          type: "select",
-          dictData: this.parentDict.type.biz_factory_name,
-          filterable: true,
-        },
-        {
-          prop: "lhResultBatchNo",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
-          maxlength: 32,
-        },
-        {
-          prop: "orderNo",
-          label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
-          maxlength: 32,
-        },
-        {
-          prop: "planDate",
-          label: this.$t("ui.data.column.lhMouldChangePlan.planDate"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
-          listeners: {
-          },
-        },
-        {
-          prop: "scheduleDate",
-          label: this.$t("ui.data.column.lhMouldChangePlan.scheduleDate"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
-          listeners: {
-          },
-        },
-        {
-          prop: "planOrder",
-          label: this.$t("ui.data.column.lhMouldChangePlan.planOrder"),
-          type: "number",
-        },
-        {
-          prop: "leftRightMould",
-          label: this.$t("ui.data.column.lhMouldChangePlan.leftRightMould"),
-          maxlength: 4,
-        },
-        {
-          prop: "lhMachineCode",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
-          type: "select",
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteMachineMethod,
-          loading: this.machineLoading,
-          clearable: true,
-          props: {
-            label: "machineCode",
-            value: "machineCode",
-          },
-          options: this.machineOptions,
-          onFocus: this.handleMachineFocus,
-        },
-        {
-          prop: "lhMachineName",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineName"),
-          maxlength: 100,
-          disabled: true,
-        },
-        {
-          prop: "beforeMaterialCode",
-          label: this.$t("ui.data.column.lhMouldChangePlan.beforeMaterialCode"),
-          type: "select",
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteBeforeMaterialMethod,
-          loading: this.beforeMaterialLoading,
-          clearable: true,
-          props: {
-            label: "materialCode",
-            value: "materialCode",
-          },
-          options: this.beforeMaterialOptions,
-          onFocus: this.handleBeforeMaterialFocus,
-        },
-        {
-          prop: "beforeMaterialDesc",
-          label: this.$t("ui.data.column.lhMouldChangePlan.beforeMaterialDesc"),
-          maxlength: 255,
-          disabled: true,
-        },
-        {
-          prop: "changeMouldType",
-          label: this.$t("ui.data.column.lhMouldChangePlan.changeMouldType"),
-          type: "select",
-          dictData: this.parentDict.type.CHANGE_MOULD_TYPE,
-          filterable: true,
-        },
-        {
-          prop: "afterMaterialCode",
-          label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialCode"),
-          type: "select",
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteAfterMaterialMethod,
-          loading: this.afterMaterialLoading,
-          clearable: true,
-          props: {
-            label: "materialCode",
-            value: "materialCode",
-          },
-          options: this.afterMaterialOptions,
-          onFocus: this.handleAfterMaterialFocus,
-        },
-        {
-          prop: "afterMaterialDesc",
-          label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialDesc"),
-          maxlength: 255,
-          disabled: true,
-        },
-        {
-          prop: "changeTime",
-          label: this.$t("ui.data.column.lhMouldChangePlan.changeTime"),
-          type: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
-          listeners: {
-          },
-        },
-        {
-          prop: "mouldCode",
-          label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
-          maxlength: 32,
-        },
-        {
-          prop: "isRelease",
-          label: this.$t("ui.data.column.lhMouldChangePlan.isRelease"),
-          type: "select",
-          dictData: this.parentDict.type.IS_RELEASE,
-          filterable: true,
-        },
-        {
-          prop: "mouldStatus",
-          label: this.$t("ui.data.column.lhMouldChangePlan.mouldStatus"),
-          type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
-          filterable: true,
-        },
-        {
-          prop: "remark",
-          label: this.$t("common.remark"),
-          type: "textarea",
-          maxlength: 500,
-          rows: 3,
-        },
-      ];
-    },
   },
   methods: {
-    async save(params) {
-      try {
-        this.loading = true;
-        const res = await editLhMouldChangePlan(params);
-        this.$modal.msgSuccess(res.msg);
-        this.$emit("success");
-        this.hide();
-      } catch (error) {
-        console.log(error);
-        this.loading = false;
-      } finally {
-        this.loading = false;
-      }
-    },
     async remoteMachineMethod(query) {
       this.machineLoading = true;
       try {
@@ -276,7 +332,8 @@ export default {
           machineCode: query || "",
           pageSize: 10,
         });
-        this.machineOptions = res.data || res || [];
+        this.machineOptions = res || [];
+        console.log('machineOptions', this.machineOptions);
       } catch (error) {
         console.log(error);
       } finally {
@@ -295,7 +352,8 @@ export default {
           materialCode: query || "",
           pageSize: 10,
         });
-        this.beforeMaterialOptions = res.data || res || [];
+        this.beforeMaterialOptions = res || [];
+        console.log('beforeMaterialOptions', this.beforeMaterialOptions);
       } catch (error) {
         console.log(error);
       } finally {
@@ -314,7 +372,8 @@ export default {
           materialCode: query || "",
           pageSize: 10,
         });
-        this.afterMaterialOptions = res.data || res || [];
+        this.afterMaterialOptions = res || [];
+        console.log('afterMaterialOptions', this.afterMaterialOptions);
       } catch (error) {
         console.log(error);
       } finally {
@@ -326,13 +385,54 @@ export default {
         this.remoteAfterMaterialMethod("");
       }
     },
+    handleMachineChange(val) {
+      if (val) {
+        const item = this.machineOptions.find(i => i.machineCode === val);
+        if (item) {
+          this.$set(this.form, 'lhMachineName', item.machineName || val);
+        }
+      } else {
+        this.$set(this.form, 'lhMachineName', '');
+      }
+    },
+    handleBeforeMaterialChange(val) {
+      if (val) {
+        const item = this.beforeMaterialOptions.find(i => i.materialCode === val);
+        if (item) {
+          this.$set(this.form, 'beforeMaterialDesc', item.materialDesc || val);
+        }
+      } else {
+        this.$set(this.form, 'beforeMaterialDesc', '');
+      }
+    },
+    handleAfterMaterialChange(val) {
+      if (val) {
+        const item = this.afterMaterialOptions.find(i => i.materialCode === val);
+        if (item) {
+          this.$set(this.form, 'afterMaterialDesc', item.materialDesc || val);
+        }
+      } else {
+        this.$set(this.form, 'afterMaterialDesc', '');
+      }
+    },
+    async save() {
+      try {
+        this.loading = true;
+        const res = await editLhMouldChangePlan(this.form);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
     show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
-        this.form = {
-          ...data,
-        };
+        this.form = { ...data };
         if (data.lhMachineCode) {
           this.machineOptions = [
             {
@@ -356,7 +456,10 @@ export default {
           ];
         }
       } else {
-        this.form = {};
+        this.isEdit = false;
+        this.form = {
+          factoryCode: "116",
+        };
         this.machineOptions = [];
         this.beforeMaterialOptions = [];
         this.afterMaterialOptions = [];
@@ -368,13 +471,17 @@ export default {
       this.beforeMaterialOptions = [];
       this.afterMaterialOptions = [];
       if (this.$refs.form) {
-        this.$refs.form.triggerResetForm();
+        this.$refs.form.resetFields();
       }
       this.isEdit = false;
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.validate((valid) => {
+        if (valid) {
+          this.save();
+        }
+      });
     },
   },
 };

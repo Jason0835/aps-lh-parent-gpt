@@ -198,13 +198,13 @@ export default {
           dictData: this.dict.type.lh_machine,
           filterable: true,
         },
-        {
-          label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
-          prop: "operTime",
-          type: "date",
-          dateType: "daterange",
-          valueFormat: "yyyy-MM-dd",
-        },
+        // {
+        //   label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
+        //   prop: "operTime",
+        //   type: "date",
+        //   dateType: "daterange",
+        //   valueFormat: "yyyy-MM-dd",
+        // },
       ];
     },
   },

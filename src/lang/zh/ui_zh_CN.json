@@ -2227,6 +2227,7 @@
   "ui.data.column.lhMouldChangePlan.mouldStatus": "模具交替完成状态",
   "ui.data.column.lhMouldChangePlan.companyCode": "分公司编码",
   "ui.data.column.lhMouldChangePlan.remark": "备注",
-  "lhMouldChangePlan.checkUnique": "模具交替计划已存在"
+  "lhMouldChangePlan.checkUnique": "模具交替计划已存在",
+  "lhMouldChangePlan.batchEditNotOpen": "批量编辑功能暂未开放"
 
 }

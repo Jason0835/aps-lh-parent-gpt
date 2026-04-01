@@ -161,9 +161,10 @@ export default {
       );
     },
     renderSelect(item) {
+      let labelKey = item.props?.label ? item.props.label : "label";
+      let valueKey = item.props?.value ? item.props.value : "value";
+      // 字典数据场景
       if (item.dictData) {
-        let labelKey = item.labelKey ? item.labelKey : "label";
-        let valueKey = item.valueKey ? item.valueKey : "value";
         return (
           <el-select
             style="width:100%;"
@@ -172,7 +173,11 @@ export default {
             clearable={typeof item.clearable === "boolean" ? item.clearable : true}
             filterable={item.filterable}
             disabled={item.disabled}
+            remote={item.remote}
+            remote-method={item.remoteMethod}
+            loading={item.loading}
             on={{ ...item.listeners }}
+            onFocus={item.onFocus}
           >
             {item.dictData.map((row) => {
               let value = row[valueKey];
@@ -184,6 +189,35 @@ export default {
               return (
                 <el-option
                   key={row[valueKey]}
+                  value={value}
+                  label={row[labelKey]}
+                ></el-option>
+              );
+            })}
+          </el-select>
+        );
+      }
+      // 远程搜索场景 (options + remoteMethod)
+      if (item.options) {
+        return (
+          <el-select
+            style="width:100%;"
+            v-model={this.form[item.prop]}
+            placeholder={item.placeholder || this.$t("common.rule.select")}
+            clearable={typeof item.clearable === "boolean" ? item.clearable : true}
+            filterable={item.filterable}
+            disabled={item.disabled}
+            remote={item.remote}
+            remote-method={item.remoteMethod}
+            loading={item.loading}
+            on={{ ...item.listeners }}
+            onFocus={item.onFocus}
+          >
+            {item.options.map((row) => {
+              let value = row[valueKey];
+              return (
+                <el-option
+                  key={value}
                   value={value}
                   label={row[labelKey]}
                 ></el-option>

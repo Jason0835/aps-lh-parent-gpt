@@ -7,11 +7,11 @@ export function listLhMouldChangePlan(query) {
     data: query
   })
 }
-export function removeLhMouldChangePlan(query) {
+export function removeLhMouldChangePlan(ids) {
   return request({
     url: '/lh/lhMouldChangePlan/remove',
     method: 'post',
-    data: query
+    params: { ids }
   })
 }
 export function editLhMouldChangePlan(query) {
@@ -33,6 +33,6 @@ export function getMaterialList(query) {
   return request({
     url: '/lh/lhMouldChangePlan/getMaterialList',
     method: 'post',
-    data: query
+    params: query
   })
 }
