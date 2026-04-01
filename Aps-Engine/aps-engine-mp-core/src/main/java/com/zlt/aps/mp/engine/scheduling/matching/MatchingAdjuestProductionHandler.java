@@ -369,6 +369,7 @@ public class MatchingAdjuestProductionHandler {
             plan.setBeginDay(null);
             plan.setEndDay(null);
             plan.setAdjustDetailId(null);
+            plan.setActualAdjustQty(0);
             this.reCaculateInventorySalesRatio(contextDTO, plan,
                     Collections.singletonMap(demandPlan.getMaterialCode(), demandPlan.getStockQty())); // 计算库销比
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
