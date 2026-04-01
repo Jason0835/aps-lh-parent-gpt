@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="MdmOutbountOrdersNotScanMainTable"
+      tableRef="ShippedNotScanVersionMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -18,8 +18,14 @@
     >
       <template slot="header">
         <el-button
+          type="primary"
+          v-hasPermi="['monthplan:dpShippedNotScanVersion:generate']"
+          @click="handleGenerate"
+          >生成版本
+        </el-button>
+        <el-button
           @click="handleExport"
-          v-hasPermi="['monthplan:mdmOutbountOrdersNotScan:export']"
+          v-hasPermi="['monthplan:dpShippedNotScanVersion:export']"
           >{{ $t("ui.frame.btn.export") }}
         </el-button>
       </template>
@@ -28,10 +34,10 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listMdmOutbountOrdersNotScan } from "@/api/monthplan/mdmOutbountOrdersNotScan";
+import { getList, getVersionSelect, generateVersion } from "@/api/monthplan/shippedNotScanVersion";
 
 export default {
-  name: "MdmOutbountOrdersNotScan",
+  name: "ShippedNotScanVersion",
   components: {},
   dicts: ["biz_factory_name"],
   provide() {
@@ -42,6 +48,7 @@ export default {
   data() {
     return {
       loading: false,
+      versionList: [],
       data: [],
       selection: [],
       page: {
@@ -66,6 +73,21 @@ export default {
           },
         },
         {
+          prop: "year",
+          label: this.$t("ui.data.colume.year"),
+          minWidth: 80,
+        },
+        {
+          prop: "month",
+          label: this.$t("ui.data.colume.month"),
+          minWidth: 80,
+        },
+        {
+          prop: "requireVersion",
+          label: "需求版本号",
+          minWidth: 150,
+        },
+        {
           prop: "saleBillNo",
           label: "DN号",
           minWidth: 120,
@@ -75,11 +97,6 @@ export default {
           label: "出运单号",
           minWidth: 120,
         },
-        // {
-        //   prop: "saleOrg",
-        //   label: "销售组织编码",
-        //   minWidth: 120,
-        // },
         {
           prop: "saleOrgName",
           label: "销售组织名称",
@@ -95,11 +112,6 @@ export default {
           label: "出库单号",
           minWidth: 120,
         },
-        // {
-        //   prop: "materialCode",
-        //   label: "MES物料编码",
-        //   minWidth: 150,
-        // },
         {
           prop: "sapCode",
           label: "物料编码",
@@ -113,12 +125,7 @@ export default {
         {
           prop: "dot",
           label: "年周号",
-          minWidth: 120,
-        },
-        {
-          prop: "stockDate",
-          label: "库存日期",
-          minWidth: 120,
+          minWidth: 100,
         },
         {
           prop: "scanAmount",
@@ -151,6 +158,26 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          listeners: {
+            change: this.handleFactoryChange,
+          },
+        },
+        {
+          prop: "yearMonth",
+          label: this.$t("ui.data.colume.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
+        },
+        {
+          prop: "requireVersion",
+          label: "需求版本号",
+          type: "select",
+          filterable: true,
+          dictData: this.versionList,
         },
         {
           prop: "saleBillNo",
@@ -168,10 +195,6 @@ export default {
           prop: "billId",
           label: "出库单号",
         },
-        // {
-        //   prop: "materialCode",
-        //   label: "MES物料编码",
-        // },
         {
           prop: "sapCode",
           label: "物料编码",
@@ -181,20 +204,76 @@ export default {
           label: "物料描述",
         },
         {
-          prop: "stockDate",
-          label: "库存日期",
-          type: "date",
-          dateType: "daterange",
-          valueFormat: "yyyy-MM-dd",
+          prop: "dot",
+          label: "年周号",
         },
       ];
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.query = {
+        ...this.search,
+        yearMonth: val,
+      };
+      this.getVersionList();
+    },
+    handleFactoryChange(val) {
+      this.search = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.query = {
+        ...this.search,
+        factoryCode: val,
+      };
+      this.getVersionList();
+    },
+    async getVersionList(isGet, isSet = true) {
+      if (isGet) {
+        this.loading = true;
+      }
+      try {
+        const data = await getVersionSelect(this.formatParams());
+        let list = [];
+        for (let i = 0; i < data.length; i++) {
+          let obj = {
+            label: data[i],
+            value: data[i],
+          };
+          list.push(obj);
+        }
+        this.versionList = list;
+        if (!isSet) return;
+        if (list.length > 0) {
+          this.$set(this.search, "requireVersion", list[0].value);
+          this.$set(this.query, "requireVersion", list[0].value);
+        } else {
+          this.$set(this.search, "requireVersion", "");
+          this.$set(this.query, "requireVersion", "");
+        }
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+      } finally {
+        if (isGet) {
+          this.page = {
+            current: 1,
+            pageSize: 20,
+            total: 0,
+          };
+          this.getList();
+        }
+      }
+    },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
-      this.getList();
+      this.getVersionList(true, false);
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);
@@ -214,33 +293,61 @@ export default {
     },
     handleExport() {
       downloadLink(
-        "/monthplan/mdmOutbountOrdersNotScan/export",
+        "/monthplan/dpShippedNotScanVersion/export",
         this.formatParams(false)
       );
     },
-    handleSelectionChange(rows) {
-      this.selection = rows;
+    handleGenerate() {
+      const params = this.formatParams(false);
+      if (!params.factoryCode) {
+        this.$modal.msgWarning("请选择工厂");
+        return;
+      }
+      if (!params.year || !params.month) {
+        this.$modal.msgWarning("请选择年月");
+        return;
+      }
+      if (!params.requireVersion) {
+        this.$modal.msgWarning("请选择需求版本号");
+        return;
+      }
+      this.$confirm("确认生成已出库未扫描版本?", "提示", {
+        type: "warning",
+      }).then(() => {
+        this.loading = true;
+        generateVersion(params)
+          .then((res) => {
+            this.$modal.msgSuccess("生成成功");
+            this.getVersionList(true);
+          })
+          .finally(() => {
+            this.loading = false;
+          });
+      });
     },
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort,
       };
+
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
-      if (params.stockDate && params.stockDate[0]) {
-        params.stockDateStart = params.stockDate[0];
-        params.stockDateEnd = params.stockDate[1];
-        params.stockDate = undefined;
+
+      if (params.yearMonth) {
+        const [year, month] = params.yearMonth.split("-");
+        params.year = year;
+        params.month = month;
       }
+
       return params;
     },
     async getList() {
       try {
         this.loading = true;
-        const data = await listMdmOutbountOrdersNotScan(this.formatParams());
+        const data = await getList(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -251,8 +358,13 @@ export default {
     },
   },
   created() {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const year = nextMonth.getFullYear();
+    const month = nextMonth.getMonth() + 1;
     let defaultParams = {
       factoryCode: "116",
+      yearMonth: `${year}-${month}`,
     };
     this.search = {
       ...defaultParams,
@@ -260,7 +372,7 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    this.getVersionList(true);
   },
   activated() {},
 };
