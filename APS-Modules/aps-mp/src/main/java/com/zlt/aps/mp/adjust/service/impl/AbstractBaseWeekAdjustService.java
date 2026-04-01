@@ -1948,6 +1948,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalList.stream()
                 .filter(vo -> StringUtils.isEmpty(structureName) || structureName.equals(vo.getStructureName()))
                 .collect(Collectors.toList());
+
         // 需要更新的月计划结果集
         List<FactoryMonthPlanFinalAdjustVo> monthPlanResult = new ArrayList<>();
         // 遍历生产计划列表匹配调整结果（更新计划量、开始日期、结束日期、调整量)
@@ -1969,10 +1970,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlanVo.setLastMonthPlanVersion(lastMonthPlanVersion);
 
             MpAdjustDetailVo adjustDetail = getFirstAdjustDetail(adjustDetailMap, materialCode);
-            if (adjustDetail == null) {
-                log.warn("更新月度生产计划：物料编号:{}未查询到对应调整明细，跳过", materialCode);
-                continue;
-            }
+//            if (adjustDetail == null) {
+//                log.warn("更新月度生产计划：物料编号:{}未查询到对应调整明细，跳过", materialCode);
+//                continue;
+//            }
+            adjustDetail = adjustDetail == null ? new MpAdjustDetailVo() : adjustDetail;
 
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
