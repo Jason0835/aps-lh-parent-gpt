@@ -415,6 +415,9 @@ public class MatchingAdjuestProductionHandler {
             String materialDesc = needProductPlan.getMaterialDesc();
             scheduleMaterialDesc.add(materialDesc); // 选中的规格加入已排产列表（无论是否能排上，下次轮询均不再处理该规格）
             FactoryMonthPlanFinalAdjustVo plan = mpProdFinalMap.get(materialDesc); // 获取定稿计划
+            if (intValue(plan.getActualAdjustQty()) < 0) { // 减量的SKU不搭配
+                continue;
+            }
             int capacity = plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 产能都从final表获取
             boolean isNewPlan = plan.getBeginDay() == null;
             
