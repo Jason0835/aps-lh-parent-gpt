@@ -1271,15 +1271,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         if (CollectionUtils.isEmpty(finishedProductStocks)) {
             return;
         }
-        // 1、初始化库存剩余量 = 库存量
-        finishedProductStocks.forEach(finishedProductStock -> {
-            Integer leftOverQty = ApsNumberUtils.intValue(finishedProductStock.getStockQty());
-            finishedProductStock.setLeftOverQty(leftOverQty);
-        });
-        if (CollectionUtils.isEmpty(notScanOrderList)) {
-            return;
-        }
-        // 2、先按物料号分组，再按年周号顺序分组
+        // 1、先按物料号分组，再按年周号顺序分组
         Map<String, TreeMap<String, List<MdmProductStock>>> stockGroupMap = finishedProductStocks.stream()
                 .collect(Collectors.groupingBy(MdmProductStock::getMaterialCode, // 第一层分组：物料号
                         Collectors.collectingAndThen(Collectors.toList(),
@@ -1287,39 +1279,39 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                                         .getWeekYearCompareKey(finishedProductStock.getWeekYear()) // 第二层分组：重构后的年周号，把年份放前面，周次放后面，方便比较
                                         , TreeMap::new, Collectors.toList()))))); // 使用treeMap分组，年周号作为key，可以快速找到年周号最接近的库存数据
 
-        // 3、遍历未扫描订单列表，依次扣减库存
+        // 2、遍历未扫描订单列表，依次扣减库存
         for (MdmOutbountOrdersNotScan notScanOrder : notScanOrderList) {
             String dot = this.getWeekYearCompareKey(notScanOrder.getDot()); // 未扫描订单年周号要求
             String sapCode = notScanOrder.getSapCode(); // NC物料号
             Integer noscanAmount = BigDecimalUtils.valueOf(notScanOrder.getNoscanAmount()).intValue(); // 未扫描数量
-            // 3.1、取出物料各年周号的库存列表
+            // 2.1、取出物料各年周号的库存列表
             TreeMap<String, List<MdmProductStock>> stockYearWeekGroupMap = stockGroupMap.get(sapCode);
-            // 3.2、按年周号由低到高依次依次冲减，一个年周号的库存不够则继续取更新年周号的库存，直到
+            // 2.2、按年周号由低到高依次依次冲减，一个年周号的库存不够则继续取更新年周号的库存，直到
             while (noscanAmount > 0 && !CollectionUtils.isEmpty(stockYearWeekGroupMap)) {
-                // 3.2.1、取最订单年周要求接近且最小的库存年周号
+                // 2.2.1、取最订单年周要求接近且最小的库存年周号
                 String stockWeekYear = stockYearWeekGroupMap.ceilingKey(dot);
                 if (StringUtils.isEmpty(stockWeekYear)) {
                     continue;
                 }
-                // 3.2.2、根据年周号取出库存列表
+                // 2.2.2、根据年周号取出库存列表
                 List<MdmProductStock> stockList = stockYearWeekGroupMap.get(stockWeekYear);
                 if (CollectionUtils.isEmpty(stockList)) {
                     continue;
                 }
-                // 3.3.3、内层循环，依次冲减未扫描数量，直到库存耗尽或者冲减完毕，每一笔耗尽的库存记录需要从列表中删除
+                // 2.3.3、内层循环，依次冲减未扫描数量，直到库存耗尽或者冲减完毕，每一笔耗尽的库存记录需要从列表中删除
                 for (int i = stockList.size() - 1; i >= 0; i--) { // 由于有移除操作，需要倒序遍历
-                    // 3.3.3.1、取出剩余库存执行库存冲减运算
+                    // 2.3.3.1、取出剩余库存执行库存冲减运算
                     MdmProductStock stockInfo = stockList.get(i);
-                    Integer leftOverQty = ApsNumberUtils.intValue(stockInfo.getLeftOverQty());
-                    Integer allocationStockQty = Math.min(leftOverQty, noscanAmount);
-                    leftOverQty -= allocationStockQty;
+                    Integer stockQty = ApsNumberUtils.intValue(stockInfo.getStockQty());
+                    Integer allocationStockQty = Math.min(stockQty, noscanAmount);
+                    stockQty -= allocationStockQty;
                     noscanAmount -= allocationStockQty;
-                    stockInfo.setLeftOverQty(leftOverQty);
-                    // 3.3.3.2、剩余库存不足，则从列表移除改库存记录
-                    if (leftOverQty <= 0) {
+                    stockInfo.setStockQty(stockQty);
+                    // 2.3.3.2、剩余库存不足，则从列表移除改库存记录
+                    if (stockQty <= 0) {
                         stockList.remove(i);
                     }
-                    // 3.3.3.3、冲减完毕，结束内层循环
+                    // 2.3.3.3、冲减完毕，结束内层循环
                     if (noscanAmount <= 0) {
                         break;
                     }
@@ -1329,6 +1321,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     stockYearWeekGroupMap.remove(stockWeekYear);
                 }
             }
+        }
+
+        // 3、初始化库存剩余量 = 库存量
+        finishedProductStocks.forEach(finishedProductStock -> {
+            Integer leftOverQty = ApsNumberUtils.intValue(finishedProductStock.getStockQty());
+            finishedProductStock.setLeftOverQty(leftOverQty);
+        });
+        if (CollectionUtils.isEmpty(notScanOrderList)) {
+            return;
         }
     }
 
