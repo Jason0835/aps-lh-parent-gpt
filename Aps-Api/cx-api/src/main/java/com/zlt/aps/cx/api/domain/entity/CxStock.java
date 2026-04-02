@@ -31,6 +31,7 @@ public class CxStock extends BaseEntity {
      */
     //@Excel(name = "ui.data.column.productStatus.bomDataVersion")
     // @ImportValidated(required = true,maxLength = 30)
+    @TableField(exist = false)
     private  String bomDataVersion;
 
     @ApiModelProperty(value = "胎胚代码")
@@ -43,6 +44,7 @@ public class CxStock extends BaseEntity {
      * 排程使用库存
      */
     @Excel(name = "ui.data.column.stock.scheduleUseStock",type = Excel.Type.EXPORT)
+    @TableField(exist = false)
     private Long scheduleUseStock;
 
     @ApiModelProperty(value = "库存量(可用)")
@@ -77,9 +79,11 @@ public class CxStock extends BaseEntity {
     private Long badNum;
 
     @ApiModelProperty(value = "查询库存的开始日期yyyy-MM-dd", position = 21)
+    @TableField(exist = false)
     private String startTime;
 
     @ApiModelProperty(value = "查询库存的结束日期yyyy-MM-dd", position = 22)
+    @TableField(exist = false)
     private String endTime;
 
     @ImportValidated(maxLength = 300)
@@ -89,10 +93,12 @@ public class CxStock extends BaseEntity {
     /**
      * 库存日期字符串条件(引擎端使用)
      */
+    @TableField(exist = false)
     private String stockDateStr;
 
     /**
      * 实际库存数=库存+修正-不良(引擎端使用)
      */
+    @TableField(exist = false)
     private Integer stockRealNum;
 }

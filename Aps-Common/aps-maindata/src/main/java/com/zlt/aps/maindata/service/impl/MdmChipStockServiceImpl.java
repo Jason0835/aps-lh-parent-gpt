@@ -148,8 +148,9 @@ public class MdmChipStockServiceImpl extends AbstractDocService<MdmChipStock> im
                     queryWrapper.eq("CHIP_CODE", docEntity.getChipCode());
                     MdmChipStock exist = mdmChipStockEntityMapper.selectOne(queryWrapper);
                     if (exist != null) {
-                        // 累加库存量
+                        // 累加库存量和完成量
                         exist.setStockNum(exist.getStockNum() + (docEntity.getStockNum() != null ? docEntity.getStockNum() : 0));
+                        exist.setFinishQty(exist.getFinishQty() + (docEntity.getFinishQty() != null ? docEntity.getFinishQty() : 0));
                         // 重新计算剩余可用量
                         calculateRemainStock(exist);
                         // 再次检查
@@ -191,7 +192,9 @@ public class MdmChipStockServiceImpl extends AbstractDocService<MdmChipStock> im
      */
     @Override
     public String checkUnique(MdmChipStock docEntityVO) {
-        // 唯一性判断依据: factoryCode + chipCode
+        if (PubUtil.isEmpty(docEntityVO.getFactoryCode()) || PubUtil.isEmpty(docEntityVO.getChipCode())) {
+            return UserConstants.UNIQUE;
+        }
         QueryWrapper<MdmChipStock> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(docEntityVO.getId()), "ID", docEntityVO.getId());
         queryWrapper.eq("FACTORY_CODE", docEntityVO.getFactoryCode().trim());

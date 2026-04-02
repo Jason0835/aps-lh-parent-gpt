@@ -49,7 +49,18 @@ public class MdmChipStockController extends AbstractDocBizController<MdmChipStoc
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmChipStock queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+        List<MdmChipStock> list = (List<MdmChipStock>) tableDataInfo.getRows();
+        if (list != null && !list.isEmpty()) {
+            for (MdmChipStock item : list) {
+                Integer finishQty = item.getFinishQty() == null ? 0 : item.getFinishQty();
+                item.setFinishQty(finishQty);
+                if (item.getStockNum() != null) {
+                    item.setRemainStockNum(item.getStockNum() - finishQty);
+                }
+            }
+        }
+        return tableDataInfo;
     }
 
     /**

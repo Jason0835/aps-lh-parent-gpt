@@ -25,18 +25,11 @@ import java.util.Date;
 @ApiModel(description = "芯片库存")
 public class MdmChipStock extends BaseEntity {
 
-    /**
-     * 主键
-     */
-    @TableId(type = IdType.AUTO)
-    @TableField(value = "ID")
-    @ApiModelProperty(value = "主键")
-    private Long id;
 
     /**
      * 分公司
      */
-    @Excel(name = "ui.data.column.mdmChipStock.companyCode", width = 20)
+    // @Excel(name = "ui.data.column.mdmChipStock.companyCode")
     @TableField(value = "COMPANY_CODE")
     @ApiModelProperty(value = "分公司")
     private String companyCode;
@@ -44,7 +37,7 @@ public class MdmChipStock extends BaseEntity {
     /**
      * 分厂
      */
-    @Excel(name = "ui.data.column.mdmChipStock.factoryCode", width = 20, dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.mdmChipStock.factoryCode", dictType = "biz_factory_name")
     @TableField(value = "FACTORY_CODE")
     @ApiModelProperty(value = "分厂")
     private String factoryCode;
@@ -52,7 +45,7 @@ public class MdmChipStock extends BaseEntity {
     /**
      * 芯片编号 - 芯片的唯一标识
      */
-    @Excel(name = "ui.data.column.mdmChipStock.chipCode", width = 30)
+    @Excel(name = "ui.data.column.mdmChipStock.chipCode")
     @TableField(value = "CHIP_CODE")
     @ApiModelProperty(value = "芯片编号 - 芯片的唯一标识")
     private String chipCode;
@@ -60,7 +53,7 @@ public class MdmChipStock extends BaseEntity {
     /**
      * 库存量 - 芯片库存量
      */
-    @Excel(name = "ui.data.column.mdmChipStock.stockNum", width = 20)
+    @Excel(name = "ui.data.column.mdmChipStock.stockNum")
     @TableField(value = "STOCK_NUM")
     @ApiModelProperty(value = "库存量 - 芯片库存量")
     private Integer stockNum;
@@ -68,15 +61,24 @@ public class MdmChipStock extends BaseEntity {
     /**
      * 完成量
      */
-    @Excel(name = "ui.data.column.mdmChipStock.finishQty", width = 20)
+    @Excel(name = "ui.data.column.mdmChipStock.finishQty")
     @TableField(value = "FINISH_QTY")
     @ApiModelProperty(value = "完成量")
     private Integer finishQty;
+    
+    // ============== 非数据库字段 ==============
+    /**
+     * 剩余可用量 = 库存量 - 完成量 (虚字段，不保存数据库)
+     */
+    @TableField(exist = false)
+    @Excel(name = "ui.data.column.mdmChipStock.remainStockNum")
+    @ApiModelProperty(value = "剩余可用量 = 库存量 - 完成量")
+    private Integer remainStockNum;
 
     /**
      * 版本号
      */
-//    @Excel(name = "ui.data.column.mdmChipStock.dataVersion", width = 20)
+//    @Excel(name = "ui.data.column.mdmChipStock.dataVersion")
     @TableField(value = "DATA_VERSION")
     @ApiModelProperty(value = "版本号")
     private String dataVersion;
@@ -85,17 +87,10 @@ public class MdmChipStock extends BaseEntity {
     /**
      * 备注
      */
-    @Excel(name = "ui.data.column.mdmChipStock.remark", width = 50)
+    @Excel(name = "ui.data.column.mdmChipStock.remark")
     @TableField(value = "REMARK")
     @ApiModelProperty(value = "备注")
     private String remark;
 
-    // ============== 非数据库字段 ==============
-    /**
-     * 剩余可用量 = 库存量 - 完成量 (虚字段，不保存数据库)
-     */
-    @TableField(exist = false)
-    @Excel(name = "ui.data.column.mdmChipStock.remainStockNum", width = 20)
-    @ApiModelProperty(value = "剩余可用量 = 库存量 - 完成量")
-    private Integer remainStockNum;
+
 }
