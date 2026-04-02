@@ -17,9 +17,11 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -59,7 +61,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
         try {
             LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_LH)
-                   .eq(MdmDevMaintenancePlan::getDelFlag, 0);
+                   .eq(MdmDevMaintenancePlan::getIsDelete, 0);
 
             List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanService.list(wrapper);
             if (mesPlans == null || mesPlans.isEmpty()) {
@@ -249,7 +251,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
         plan.setYear(new BigDecimal(planDate.getYear()));
         plan.setDueDate(planDate.plusYears(1));
 
-        if (StringUtils.hasText(mesPlan.getFirstWashTime())) {
+        if (mesPlan.getFirstWashTime() != null) {
             LocalDate actualDate = parseDate(mesPlan.getFirstWashTime());
             if (actualDate != null) {
                 plan.setActualDate(actualDate);
@@ -317,6 +319,18 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
                 log.warn("解析日期失败：{}", dateStr, ex);
                 return null;
             }
+        }
+    }
+
+    private LocalDate parseDate(Date date) {
+        if (date == null) {
+            return null;
+        }
+        try {
+            return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        } catch (Exception e) {
+            log.warn("解析Date失败：{}", date, e);
+            return null;
         }
     }
 
