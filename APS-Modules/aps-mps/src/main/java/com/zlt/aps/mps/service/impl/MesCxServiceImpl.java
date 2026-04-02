@@ -1,12 +1,11 @@
 package com.zlt.aps.mps.service.impl;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import com.zlt.aps.common.engine.domain.TCxEmbryoMonthPlanSurplus;
 import com.zlt.aps.common.engine.domain.TCxMonthPlanSurplus;
-import com.zlt.aps.common.engine.domain.TLhMonthStock;
-import com.zlt.aps.common.engine.domain.TSapEmbryoBadNumber;
 import com.zlt.aps.common.engine.service.MonthPlanService;
 import com.zlt.aps.common.engine.service.TCxEmbryoMonthPlanSurplusService;
 import com.zlt.aps.common.engine.service.TCxMonthPlanSurplusService;
@@ -236,11 +235,10 @@ public class MesCxServiceImpl implements MesCxService {
      * @param entity
      * @param <K>
      */
-    private <K extends ApsBaseEntity> void  setBaseSysValue(K entity) {
+    private <K extends BaseEntity> void  setBaseSysValue(K entity) {
         try {
             entity.setBaseVale(null);
         } catch (Exception e) {
-            entity.setDelFlag("0");
             entity.setCreateBy("system");
             entity.setUpdateBy("system");
             entity.setCreateTime(new Date());

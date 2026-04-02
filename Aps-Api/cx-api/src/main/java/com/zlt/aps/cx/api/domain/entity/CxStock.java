@@ -3,6 +3,7 @@ package com.zlt.aps.cx.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -11,22 +12,10 @@ import lombok.Data;
 
 import java.util.Date;
 
-/**
- * @ClassName CxStock
- * @Description TODO
- * @Author Joran.Zhang
- * @Date ${Date} ${Time}
- * @Version 1.0
- **/
 @Data
 @TableName("T_CX_STOCK")
 @ApiModel(value = "CxStock对象", description = "成型库存信息")
-@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
-public class CxStock extends ApsBaseEntity {
-
-    @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
+public class CxStock extends BaseEntity {
 
     /**
      * 库存日期

@@ -3,7 +3,7 @@ server:
   port: 9216
 
 nacos:
-  server-addr: 192.168.10.123:8848
+  server-addr: 127.0.0.1:8848
   run-group: APS_TEST_GROUP
   cfg-group: APS_TEST_GROUP
   run-namespace: jytest
