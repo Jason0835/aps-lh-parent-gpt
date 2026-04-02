@@ -82,10 +82,9 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanStatistics queryVO) {
-        String tempFlag = queryVO.getTempFlag();
         queryVO.setTempFlag(null);
         TableDataInfo tableDataInfo = super.list(queryVO);
-        filterByGroup(tableDataInfo, tempFlag);
+        filterByGroup(tableDataInfo, queryVO.getTempFlag());
         handleZeroToNull(tableDataInfo.getRows());
         return tableDataInfo;
     }
@@ -95,10 +94,10 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     /**
      * 按规则筛选数据：
      * 1. 按 structureName + structureType 分组
-     * 2. 组内优先取 tempFlag=0 的数据
-     * 3. 无0则取组内第一条数据
+     * 2. 组内优先取 tempFlag=1 的数据
+     * 3. 无1则取组内第一条数据
      *
-     * @param rows 原始数据集合
+     * @param tableDataInfo 原始数据集合
      * @param tempFlag 临时标识
      * @return
      */
@@ -109,7 +108,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
         }
 
         List<MpMonthPlanStatistics> sourceList = (List<MpMonthPlanStatistics>) tableDataInfo.getRows();
-        String targetTempFlag = StringUtils.isEmpty(tempFlag) ? YesOrNoEnum.NO.getCode() : tempFlag;
+        String targetTempFlag = StringUtils.isEmpty(tempFlag) ? YesOrNoEnum.YES.getCode() : tempFlag;
 
         // 2. 双字段分组：key = structureName + structureType
         Map<AbstractMap.SimpleEntry<String, String>, List<MpMonthPlanStatistics>> groupMap = sourceList.stream()
