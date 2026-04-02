@@ -303,7 +303,7 @@ export default {
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
-          prop: "saleArea",
+          prop: "saleAreaName",
           label: this.$t("区域"),
         },
 
