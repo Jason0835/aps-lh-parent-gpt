@@ -2228,6 +2228,20 @@
   "ui.data.column.lhMouldChangePlan.companyCode": "分公司编码",
   "ui.data.column.lhMouldChangePlan.remark": "备注",
   "lhMouldChangePlan.checkUnique": "模具交替计划已存在",
-  "lhMouldChangePlan.batchEditNotOpen": "批量编辑功能暂未开放"
+  "lhMouldChangePlan.batchEditNotOpen": "批量编辑功能暂未开放",
+  "ui.data.column.mdmChipStock.modelName": "芯片库存",
+  "ui.data.column.mdmChipStock.companyCode": "分公司",
+  "ui.data.column.mdmChipStock.factoryCode": "分厂",
+  "ui.data.column.mdmChipStock.chipCode": "芯片编号",
+  "ui.data.column.mdmChipStock.stockNum": "库存量",
+  "ui.data.column.mdmChipStock.finishQty": "完成量",
+  "ui.data.column.mdmChipStock.remainStockNum": "剩余可用量",
+  "ui.data.column.mdmChipStock.brand": "品牌",
+  "ui.data.column.mdmChipStock.boardingTime": "上机时间",
+  "ui.data.column.mdmChipStock.dataVersion": "版本号",
+  "ui.data.column.mdmChipStock.remark": "备注",
+  "mdmChipStock.notUnique": "芯片编号已存在",
+  "mdmChipStock.batchEditNotOpen": "批量编辑功能暂未开放",
+  "mdmChipStock.chipCodeExistsConfirmMerge": "芯片编号已存在，是否合并到已有记录？"
 
 }
