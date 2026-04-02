@@ -168,7 +168,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan">
+    <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
         SELECT
         ID,
         DEV_CODE,
@@ -186,7 +186,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule">
+    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.itf.vo.LhRepairCapsule">
         SELECT
         ID,
         OBTAIN_TIME,
@@ -206,7 +206,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan">
+    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.itf.vo.MouldCleanPlan">
         SELECT
         ID,
         LH_CODE,
@@ -225,7 +225,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig">
+    <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.itf.vo.StructureTreadConfig">
         SELECT
         ID,
         STRUCTURE_CODE,

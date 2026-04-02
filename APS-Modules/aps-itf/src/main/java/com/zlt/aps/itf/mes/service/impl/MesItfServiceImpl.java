@@ -929,11 +929,9 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs) {
-        // 查询中间表数据
-        List<MdmDevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
+        List<DevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
 
-        // 唯一键重复随机取一条（设备机台+精度类型+厂别）
-        Map<String, MdmDevMaintenancePlan> groupMap = syncList.stream()
+        Map<String, DevMaintenancePlan> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType(),
                         Function.identity(),
@@ -942,12 +940,10 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         try {
-            // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
-            List<List<MdmDevMaintenancePlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmDevMaintenancePlan> saveList : splitList) {
-                // 根据唯一键查询已存在的数据
+            List<List<DevMaintenancePlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<DevMaintenancePlan> saveList : splitList) {
                 List<MdmDevMaintenancePlan> existsList = devMaintenancePlanEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
                             MdmDevMaintenancePlan plan = new MdmDevMaintenancePlan();
@@ -969,32 +965,49 @@ public class MesItfServiceImpl implements MesItfService {
                 }
 
                 List<MdmDevMaintenancePlan> insertOrUpdateList = new ArrayList<>();
-                for (MdmDevMaintenancePlan item : saveList) {
+                for (DevMaintenancePlan item : saveList) {
                     MdmDevMaintenancePlan entity = new MdmDevMaintenancePlan();
-                    BeanUtils.copyProperties(item, entity);
+                    entity.setDevCode(item.getDevCode());
+                    entity.setPrecisionType(item.getPrecisionType());
+                    entity.setFactoryCode(item.getFactoryCode());
+                    entity.setCompanyCode(item.getCompanyCode());
+                    entity.setDataVersion(item.getDataVersion());
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
 
-                    // 设置删除标识（0-正常，1-已删除）
-                    if (entity.getDelFlag() == null) {
-                        entity.setDelFlag(0);
+                    if (StringUtils.isNotBlank(item.getOperTime())) {
+                        try {
+                            entity.setOperTime(DateUtils.parseDate(item.getOperTime(), "yyyy-MM-dd"));
+                        } catch (Exception e) {
+                            log.error("解析计划时间失败：{}", item.getOperTime(), e);
+                        }
+                    }
+                    if (StringUtils.isNotBlank(item.getFirstWashTime())) {
+                        try {
+                            entity.setFirstWashTime(DateUtils.parseDate(item.getFirstWashTime(), "yyyy-MM-dd"));
+                        } catch (Exception e) {
+                            log.error("解析实际时间失败：{}", item.getFirstWashTime(), e);
+                        }
+                    }
+
+                    if (StringUtils.isNotBlank(item.getDelFlag())) {
+                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+                    } else {
+                        entity.setIsDelete(0);
                     }
 
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getDevCode(), entity.getPrecisionType());
                     if (existsMap.containsKey(mapKey)) {
-                        // 已存在，更新
                         MdmDevMaintenancePlan existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
                     }
                     insertOrUpdateList.add(entity);
                 }
 
-                // 批量保存（插入或更新）
                 baseDao.saveBatch(insertOrUpdateList);
             }
         } finally {
             DynamicDataSourceContextHolder.clear();
-            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -1008,11 +1021,9 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs) {
-        // 查询中间表数据
-        List<MdmMouldCleanPlan> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
+        List<MouldCleanPlan> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
 
-        // 唯一键重复随机取一条（硫化机台+厂别）
-        Map<String, MdmMouldCleanPlan> groupMap = syncList.stream()
+        Map<String, MouldCleanPlan> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getLhCode(),
                         Function.identity(),
@@ -1021,12 +1032,10 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         try {
-            // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
-            List<List<MdmMouldCleanPlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmMouldCleanPlan> saveList : splitList) {
-                // 根据唯一键查询已存在的数据
+            List<List<MouldCleanPlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<MouldCleanPlan> saveList : splitList) {
                 List<MdmMouldCleanPlan> existsList = mouldCleanPlanEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
                             MdmMouldCleanPlan plan = new MdmMouldCleanPlan();
@@ -1047,32 +1056,58 @@ public class MesItfServiceImpl implements MesItfService {
                 }
 
                 List<MdmMouldCleanPlan> insertOrUpdateList = new ArrayList<>();
-                for (MdmMouldCleanPlan item : saveList) {
+                for (MouldCleanPlan item : saveList) {
                     MdmMouldCleanPlan entity = new MdmMouldCleanPlan();
-                    BeanUtils.copyProperties(item, entity);
+                    entity.setLhCode(item.getLhCode());
+                    entity.setFactoryCode(item.getFactoryCode());
+                    entity.setCompanyCode(item.getCompanyCode());
+                    entity.setDataVersion(item.getDataVersion());
+                    entity.setRemark(item.getRemark());
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
 
-                    // 设置删除标识（0-正常，1-已删除）
-                    if (entity.getDelFlag() == null) {
+                    if (StringUtils.isNotBlank(item.getOperTime())) {
+                        try {
+                            entity.setOperTime(DateUtils.parseDate(item.getOperTime(), "yyyy-MM-dd HH:mm:ss"));
+                        } catch (Exception e) {
+                            log.error("解析上机时间失败：{}", item.getOperTime(), e);
+                        }
+                    }
+
+                    if (StringUtils.isNotBlank(item.getFirstWashTime())) {
+                        try {
+                            entity.setFirstWashTime(DateUtils.parseDate(item.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss"));
+                        } catch (Exception e) {
+                            log.error("解析首次清洗时间失败：{}", item.getFirstWashTime(), e);
+                        }
+                    }
+
+                    if (StringUtils.isNotBlank(item.getSecondWashTime())) {
+                        try {
+                            entity.setSecondWashTime(DateUtils.parseDate(item.getSecondWashTime(), "yyyy-MM-dd HH:mm:ss"));
+                        } catch (Exception e) {
+                            log.error("解析二次清洗时间失败：{}", item.getSecondWashTime(), e);
+                        }
+                    }
+
+                    if (StringUtils.isNotBlank(item.getDelFlag())) {
+                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+                    } else {
                         entity.setIsDelete(0);
                     }
 
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
                     if (existsMap.containsKey(mapKey)) {
-                        // 已存在，更新
                         MdmMouldCleanPlan existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
                     }
                     insertOrUpdateList.add(entity);
                 }
 
-                // 批量保存（插入或更新）
                 baseDao.saveBatch(insertOrUpdateList);
             }
         } finally {
             DynamicDataSourceContextHolder.clear();
-            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -1085,11 +1120,9 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncLhRepairCapsule(AuxReqSyncDataLogs syncDataLogs) {
-        // 查询中间表数据
-        List<MdmLhRepairCapsule> syncList = mesItfMapper.selectLhRepairCapsuleList(syncDataLogs);
+        List<LhRepairCapsule> syncList = mesItfMapper.selectLhRepairCapsuleList(syncDataLogs);
 
-        // 唯一键重复随机取一条（硫化机台+分厂）
-        Map<String, MdmLhRepairCapsule> groupMap = syncList.stream()
+        Map<String, LhRepairCapsule> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getLhCode(),
                         Function.identity(),
@@ -1098,28 +1131,42 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         try {
-            // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
             if (CollectionUtils.isNotEmpty(syncList)) {
-                // 先删除旧数据，再插入新数据
                 Map<String, Object> map = new HashMap<>();
                 map.put("FACTORY_CODE", syncDataLogs.getFactoryCode());
                 baseDao.deleteByMap(MdmLhRepairCapsule.class, map);
 
-                // 转换为APS实体并设置创建信息
                 List<MdmLhRepairCapsule> insertList = new ArrayList<>();
-                for (MdmLhRepairCapsule item : syncList) {
+                for (LhRepairCapsule item : syncList) {
                     MdmLhRepairCapsule entity = new MdmLhRepairCapsule();
-                    BeanUtils.copyProperties(item, entity);
+                    entity.setLhCode(item.getLhCode());
+                    entity.setMaterialCode(item.getMaterialCode());
+                    entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
+                    entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
+                    entity.setBrand(item.getBrand());
+                    entity.setRemark(item.getRemark());
+                    entity.setDataVersion(item.getDataVersion());
+                    entity.setCompanyCode(item.getCompanyCode());
+                    entity.setFactoryCode(item.getFactoryCode());
+                    entity.setIsDelete(0);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
                     entity.setCreateTime(DateUtils.getNowDate());
                     entity.setUpdateTime(DateUtils.getNowDate());
+
+                    if (StringUtils.isNotBlank(item.getObtainTime())) {
+                        try {
+                            entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd"));
+                        } catch (Exception e) {
+                            log.error("解析获取日期失败：{}", item.getObtainTime(), e);
+                        }
+                    }
+
                     insertList.add(entity);
                 }
 
-                // 分批插入
                 List<List<MdmLhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
                 for (List<MdmLhRepairCapsule> importList : splitList) {
                     baseDao.insertBatch(importList);
@@ -1127,7 +1174,6 @@ public class MesItfServiceImpl implements MesItfService {
             }
         } finally {
             DynamicDataSourceContextHolder.clear();
-            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }
@@ -1140,11 +1186,9 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncStructureTreadConfig(AuxReqSyncDataLogs syncDataLogs) {
-        // 查询中间表数据
-        List<MdmStructureTreadConfig> syncList = mesItfMapper.selectStructureTreadConfigList(syncDataLogs);
+        List<StructureTreadConfig> syncList = mesItfMapper.selectStructureTreadConfigList(syncDataLogs);
 
-        // 唯一键重复随机取一条（结构+厂别）
-        Map<String, MdmStructureTreadConfig> groupMap = syncList.stream()
+        Map<String, StructureTreadConfig> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getStructureCode(),
                         Function.identity(),
@@ -1153,12 +1197,10 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         try {
-            // 切换APS数据源 start
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
-            List<List<MdmStructureTreadConfig>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmStructureTreadConfig> saveList : splitList) {
-                // 根据唯一键查询已存在的数据
+            List<List<StructureTreadConfig>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<StructureTreadConfig> saveList : splitList) {
                 List<MdmStructureTreadConfig> existsList = structureTreadConfigEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
                             MdmStructureTreadConfig config = new MdmStructureTreadConfig();
@@ -1179,32 +1221,34 @@ public class MesItfServiceImpl implements MesItfService {
                 }
 
                 List<MdmStructureTreadConfig> insertOrUpdateList = new ArrayList<>();
-                for (MdmStructureTreadConfig item : saveList) {
+                for (StructureTreadConfig item : saveList) {
                     MdmStructureTreadConfig entity = new MdmStructureTreadConfig();
-                    BeanUtils.copyProperties(item, entity);
+                    entity.setStructureCode(item.getStructureCode());
+                    entity.setTreadCount(item.getTreadCount());
+                    entity.setDataVersion(item.getDataVersion());
+                    entity.setCompanyCode(item.getCompanyCode());
+                    entity.setFactoryCode(item.getFactoryCode());
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");
 
-                    // 设置删除标识（0-正常，1-已删除）
-                    if (entity.getDelFlag() == null) {
-                        entity.setDelFlag(0);
+                    if (StringUtils.isNotBlank(item.getDelFlag())) {
+                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+                    } else {
+                        entity.setIsDelete(0);
                     }
 
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getStructureCode());
                     if (existsMap.containsKey(mapKey)) {
-                        // 已存在，更新
                         MdmStructureTreadConfig existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
                     }
                     insertOrUpdateList.add(entity);
                 }
 
-                // 批量保存（插入或更新）
                 baseDao.saveBatch(insertOrUpdateList);
             }
         } finally {
             DynamicDataSourceContextHolder.clear();
-            // 切换APS数据源 end
         }
         return AjaxResult.success();
     }

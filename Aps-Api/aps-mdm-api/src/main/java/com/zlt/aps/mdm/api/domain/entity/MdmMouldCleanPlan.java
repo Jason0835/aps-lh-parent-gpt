@@ -2,6 +2,7 @@ package com.zlt.aps.mdm.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
@@ -9,8 +10,11 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * APS模具清洗预警计划
@@ -44,22 +48,27 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     private String lhCode;
 
     @ApiModelProperty(value = "上机时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @Excel(name = "ui.data.column.mouldCleanPlan.operTime", width = 30)
     @ImportExcelValidated(required = true)
     @TableField(value = "OPER_TIME")
-    private String operTime;
+    private Date operTime;
 
     @ApiModelProperty(value = "首次清洗时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @Excel(name = "ui.data.column.mouldCleanPlan.firstWashTime", width = 30)
-
     @TableField(value = "FIRST_WASH_TIME")
-    private String firstWashTime;
+    private Date firstWashTime;
 
     @ApiModelProperty(value = "二次清洗时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @Excel(name = "ui.data.column.mouldCleanPlan.secondWashTime", width = 30)
     @ImportExcelValidated(required = true)
     @TableField(value = "SECOND_WASH_TIME")
-    private String secondWashTime;
+    private Date secondWashTime;
 
     @ApiModelProperty(value = "版本号")
 //    @Excel(name = "ui.data.column.mouldCleanPlan.dataVersion")
@@ -73,8 +82,4 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "上机时间结束")
     @TableField(exist = false)
     private String operTimeEnd;
-
-    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
-    @TableField(exist = false)
-    private Integer delFlag;
 }

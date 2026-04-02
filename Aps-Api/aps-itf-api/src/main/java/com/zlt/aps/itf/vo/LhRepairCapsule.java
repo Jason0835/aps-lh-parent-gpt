@@ -1,38 +1,29 @@
-package com.zlt.aps.mdm.api.domain.entity;
+package com.zlt.aps.itf.vo;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
-import java.util.Date;
 
-/**
- * APS胶囊已使用次数
- *
- * @author zlt
- * @since 2025/12/25
- */
-@ApiModel(value = "APS胶囊已使用次数", description = "APS胶囊已使用次数")
+@ApiModel(value = "胶囊已使用次数中间表", description = "胶囊已使用次数中间表")
 @Data
-@EqualsAndHashCode(callSuper = true)
-@TableName("T_MDM_LH_REPAIR_CAPSULE")
-public class MdmLhRepairCapsule extends BaseEntity implements Serializable {
+@TableName("LH_REPAIR_CAPSULE")
+public class LhRepairCapsule implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    @ApiModelProperty(value = "主键ID")
+    @TableId(value = "ID", type = IdType.INPUT)
+    private Long id;
+
     @ApiModelProperty(value = "获取日期")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @TableField(value = "OBTAIN_TIME")
-    private Date obtainTime;
+    private String obtainTime;
 
     @ApiModelProperty(value = "硫化机台")
     @TableField(value = "LH_CODE")
@@ -54,6 +45,10 @@ public class MdmLhRepairCapsule extends BaseEntity implements Serializable {
     @TableField(value = "BRAND")
     private String brand;
 
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
+
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
@@ -65,12 +60,4 @@ public class MdmLhRepairCapsule extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "分厂")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    @ApiModelProperty(value = "获取日期开始")
-    @TableField(exist = false)
-    private String obtainTimeBegin;
-
-    @ApiModelProperty(value = "获取日期结束")
-    @TableField(exist = false)
-    private String obtainTimeEnd;
 }
