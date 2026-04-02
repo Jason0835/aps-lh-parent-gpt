@@ -1,9 +1,8 @@
 package com.zlt.aps.mp.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -11,7 +10,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * APS结构整车胎面配置
@@ -28,14 +27,17 @@ public class MdmStructureTreadConfig extends BaseEntity implements Serializable 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "结构")
+    @Excel(name = "ui.data.column.mdmStructureTreadConfig.structureCode")
     @TableField(value = "STRUCTURE_CODE")
     private String structureCode;
 
     @ApiModelProperty(value = "整车胎面条数")
+    @Excel(name = "ui.data.column.mdmStructureTreadConfig.treadCount")
     @TableField(value = "TREAD_COUNT")
     private Integer treadCount;
 
     @ApiModelProperty(value = "版本号")
+    @Excel(name = "ui.data.column.mdmStructureTreadConfig.dataVersion")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
 
@@ -44,7 +46,16 @@ public class MdmStructureTreadConfig extends BaseEntity implements Serializable 
     private String companyCode;
 
     @ApiModelProperty(value = "厂别")
+    @Excel(name = "ui.data.column.mdmStructureTreadConfig.factoryCode", dictType = "biz_factory_name")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    @ApiModelProperty(value = "库存日期开始")
+    @TableField(exist = false)
+    private String stockDateBegin;
+
+    @ApiModelProperty(value = "库存日期结束")
+    @TableField(exist = false)
+    private String stockDateEnd;
 
 }
