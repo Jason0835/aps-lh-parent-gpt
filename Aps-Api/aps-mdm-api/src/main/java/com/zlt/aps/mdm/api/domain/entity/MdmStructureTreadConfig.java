@@ -1,4 +1,4 @@
-package com.zlt.aps.mp.api.domain.entity;
+package com.zlt.aps.mdm.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -10,7 +10,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * APS结构整车胎面配置
@@ -25,6 +24,10 @@ import java.util.Date;
 public class MdmStructureTreadConfig extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    @ApiModelProperty(value = "厂别")
+    @Excel(name = "ui.data.column.mdmStructureTreadConfig.factoryCode", dictType = "biz_factory_name")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
 
     @ApiModelProperty(value = "结构")
     @Excel(name = "ui.data.column.mdmStructureTreadConfig.structureCode")
@@ -37,7 +40,7 @@ public class MdmStructureTreadConfig extends BaseEntity implements Serializable 
     private Integer treadCount;
 
     @ApiModelProperty(value = "版本号")
-    @Excel(name = "ui.data.column.mdmStructureTreadConfig.dataVersion")
+//    @Excel(name = "ui.data.column.mdmStructureTreadConfig.dataVersion")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
 
@@ -45,17 +48,7 @@ public class MdmStructureTreadConfig extends BaseEntity implements Serializable 
     @TableField(value = "COMPANY_CODE")
     private String companyCode;
 
-    @ApiModelProperty(value = "厂别")
-    @Excel(name = "ui.data.column.mdmStructureTreadConfig.factoryCode", dictType = "biz_factory_name")
-    @TableField(value = "FACTORY_CODE")
-    private String factoryCode;
 
-    @ApiModelProperty(value = "库存日期开始")
-    @TableField(exist = false)
-    private String stockDateBegin;
 
-    @ApiModelProperty(value = "库存日期结束")
-    @TableField(exist = false)
-    private String stockDateEnd;
 
 }

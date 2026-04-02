@@ -4,12 +4,10 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmStructureTreadConfigEntityMapper">
 
-    <resultMap type="com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig" id="BaseResultMap">
+    <resultMap type="com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig" id="BaseResultMap">
         <id property="id" column="ID"/>
-        <result property="stockDate" column="STOCK_DATE"/>
         <result property="structureCode" column="STRUCTURE_CODE"/>
         <result property="treadCount" column="TREAD_COUNT"/>
-        <result property="delFlag" column="DEL_FLAG"/>
         <result property="dataVersion" column="DATA_VERSION"/>
         <result property="companyCode" column="COMPANY_CODE"/>
         <result property="factoryCode" column="FACTORY_CODE"/>
@@ -20,7 +18,7 @@
         <result property="updateTime" column="UPDATE_TIME"/>
     </resultMap>
 
-    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig">
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig">
         SELECT
             ID,
             STRUCTURE_CODE,
