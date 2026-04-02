@@ -1,8 +1,7 @@
 package com.zlt.aps.cx.service;
 
-import com.zlt.aps.cx.dto.ReScheduleRequest;
-import com.zlt.aps.cx.dto.ScheduleContextDTO;
-import com.zlt.aps.cx.dto.ScheduleRequest;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 
 import java.time.LocalDate;
@@ -28,7 +27,7 @@ public interface ScheduleService {
      * @param request 排程请求
      * @return 排程结果
      */
-    ScheduleResult executeSchedule(ScheduleRequest request);
+    ScheduleResult executeSchedule(ScheduleRequestVo request);
 
     /**
      * 执行重排程
@@ -36,39 +35,16 @@ public interface ScheduleService {
      * @param request 重排程请求
      * @return 是否成功
      */
-    boolean executeReSchedule(ReScheduleRequest request);
+    boolean reSchedule(ScheduleRequestVo request);
 
     /**
-     * 构建排程上下文
-     *
-     * @param request 排程请求
-     * @return 排程上下文
-     */
-    ScheduleContextDTO buildScheduleContext(ScheduleRequest request);
 
-    /**
+     /**
      * 执行动态调整
      *
      * @param shiftCode 班次编码
      * @return 是否成功
      */
-    boolean executeDynamicAdjust(String shiftCode);
-
-    /**
-     * 执行试制排程
-     *
-     * @param scheduleDate 排程日期
-     * @return 排程结果
-     */
-    ScheduleResult executeTrialSchedule(LocalDate scheduleDate);
-
-    /**
-     * 验证排程
-     *
-     * @param scheduleDate 排程日期
-     * @return 验证结果
-     */
-    ScheduleValidationResult validateSchedule(LocalDate scheduleDate);
 
     /**
      * 排程执行结果

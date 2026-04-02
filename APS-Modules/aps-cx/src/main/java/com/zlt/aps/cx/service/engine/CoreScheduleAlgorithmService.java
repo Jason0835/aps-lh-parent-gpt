@@ -1,6 +1,6 @@
-package com.zlt.aps.cx.service;
+package com.zlt.aps.cx.service.engine;
 
-import com.zlt.aps.cx.dto.ScheduleContextDTO;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 核心排程算法服务接口
@@ -35,16 +36,19 @@ public interface CoreScheduleAlgorithmService {
      * @param context 排程上下文
      * @return 排程结果列表
      */
-    List<CxScheduleResult> executeSchedule(ScheduleContextDTO context);
+    List<CxScheduleResult> executeSchedule(ScheduleContextVo context);
 
     /**
      * 第一步：计算日胎胚任务
      * 算需求量、检查收尾、处理节假日
      *
-     * @param context 排程上下文
+     * @param context                   排程上下文
+     * @param machineOnlineEmbryoMap   机台在产胎胚映射（用于续作判断）
      * @return 日胎胚任务列表
      */
-    List<DailyEmbryoTask> calculateDailyEmbryoTasks(ScheduleContextDTO context);
+    List<DailyEmbryoTask> calculateDailyEmbryoTasks(
+            ScheduleContextVo context,
+            Map<String, Set<String>> machineOnlineEmbryoMap);
 
     /**
      * 第二步：试错分配任务到机台
@@ -56,7 +60,7 @@ public interface CoreScheduleAlgorithmService {
      */
     List<MachineAllocationResult> allocateTasksToMachines(
             List<DailyEmbryoTask> tasks, 
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     /**
      * 第三步：班次均衡分配
@@ -68,7 +72,7 @@ public interface CoreScheduleAlgorithmService {
      */
     List<ShiftAllocationResult> balanceShiftAllocation(
             List<MachineAllocationResult> allocations,
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     /**
      * 第四步：排生产顺位
@@ -80,7 +84,7 @@ public interface CoreScheduleAlgorithmService {
      */
     List<CxScheduleDetail> calculateSequence(
             List<ShiftAllocationResult> shiftAllocations,
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     // ==================== 辅助算法 ====================
 
@@ -110,7 +114,7 @@ public interface CoreScheduleAlgorithmService {
     BigDecimal calculateDailyDemand(
             MdmMaterialInfo material,
             CxStock stock,
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     /**
      * 检查结构约束
@@ -124,7 +128,7 @@ public interface CoreScheduleAlgorithmService {
     boolean checkStructureConstraint(
             MdmMoldingMachine machine,
             MdmMaterialInfo material,
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     /**
      * 检查机台种类上限
@@ -140,7 +144,7 @@ public interface CoreScheduleAlgorithmService {
             MdmMoldingMachine machine,
             int currentTypes,
             MdmMaterialInfo newMaterial,
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     /**
      * 计算优先级分数
@@ -154,7 +158,7 @@ public interface CoreScheduleAlgorithmService {
     int calculatePriorityScore(
             MdmMaterialInfo material,
             CxStock stock,
-            ScheduleContextDTO context);
+            ScheduleContextVo context);
 
     /**
      * 整车取整
@@ -173,12 +177,12 @@ public interface CoreScheduleAlgorithmService {
      */
     @lombok.Data
     class DailyEmbryoTask {
-        /** 胎胚编码 */
+        /** 胎胚编码（注意：此字段名为 materialCode 但实际存储的是 embryoCode） */
         private String materialCode;
+        /** 物料编码（真正的物料编码，用于判断主销产品） */
+        private String relatedMaterialCode;
         /** 物料名称 */
         private String materialName;
-        /** 结构编码 */
-        private String structureCode;
         /** 结构名称 */
         private String structureName;
         /** 日需求量 */
@@ -225,10 +229,48 @@ public interface CoreScheduleAlgorithmService {
         private Integer daysToEnding;
         /** 是否紧急收尾（3天内收尾） */
         private Boolean isUrgentEnding;
+        /** 是否10天内收尾 */
+        private Boolean isNearEnding;
         /** 是否需要月计划调整（满产追不上时为true） */
         private Boolean needMonthPlanAdjust;
         /** 追赶量（平摊到未来3天的延误量） */
         private Integer catchUpQuantity;
+        
+        // ==================== S5.2 排程分类与余量计算新增字段 ====================
+        /** 分配的胎胚库存（按硫化需求占比分配） */
+        private Integer allocatedStock;
+        /** 待排产量 = (日硫化量 - 库存) × (1 + 损耗率) + 异常平摊 */
+        private Integer plannedProduction;
+        
+        // ==================== S5.3 开停产处理新增字段 ====================
+        /** 开产班次产能（首班只排6小时） */
+        private Integer openingShiftCapacity;
+        /** 是否开产日任务 */
+        private Boolean isOpeningDayTask;
+        /** 是否停产日任务 */
+        private Boolean isClosingDayTask;
+        /** 是否关键产品开产（首班不排） */
+        private Boolean isKeyProductOnOpening;
+        /** 是否收尾最后一批 */
+        private Boolean isLastEndingBatch;
+        /** 班次分配结果（班次编码 -> 计划量） */
+        private Map<String, Integer> shiftAllocation;
+
+        // ==================== 收尾处理新增字段 ====================
+        /** 收尾是否被舍弃（非主销产品余量≤2条） */
+        private Boolean endingAbandoned;
+        /** 舍弃数量 */
+        private Integer endingAbandonedQty;
+        /** 多做的库存量（主销产品按整车下时） */
+        private Integer endingExtraInventory;
+        
+        // ==================== 新增任务排序相关字段 ====================
+        /** 月计划优先级 */
+        private Integer monthPlanPriority;
+        /** 是否新胎胚（无历史生产记录） */
+        private Boolean isNewEmbryo;
+        /** 推荐机台列表（从月计划获取） */
+        private List<String> recommendedMachines;
     }
 
     /**
@@ -237,6 +279,7 @@ public interface CoreScheduleAlgorithmService {
     @lombok.Data
     class MachineAllocationResult {
         private String machineCode;
+        private String machineName;
         private String machineType;
         private Integer dailyCapacity;
         private Integer usedCapacity;
@@ -263,6 +306,7 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isEndingTask;
         private Integer endingSurplusQty;
         private Boolean isMainProduct;
+        private Boolean isContinueTask;
     }
 
     /**
