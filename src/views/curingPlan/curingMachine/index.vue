@@ -20,14 +20,14 @@
     >
       <template slot="header">
         <el-button
-          v-hasPermi="['lh:info:add']"
+          v-hasPermi="['lh:lhMachineInfo:edit']"
           type="primary"
           plain
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <!-- <el-button
-          v-hasPermi="['lh:info:edit']"
+          v-hasPermi="['lh:lhMachineInfo:edit']"
           type="primary"
           plain
           @click="handleEdit(selection[0])"
@@ -35,7 +35,7 @@
           >{{ $t("ui.frame.btn.modify") }}</el-button
         > -->
         <el-button
-          v-hasPermi="['lh:info:remove']"
+          v-hasPermi="['lh:lhMachineInfo:remove']"
           type="danger"
           plain
           @click="handleDeleteMulti"
@@ -43,11 +43,11 @@
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['lh:info:import']"
+          v-hasPermi="['lh:lhMachineInfo:import']"
           @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <el-button v-hasPermi="['lh:info:export']" @click="handleExport">{{
+        <el-button v-hasPermi="['lh:lhMachineInfo:export']" @click="handleExport">{{
           $t("ui.frame.btn.export")
         }}</el-button>
       </template>
@@ -330,7 +330,7 @@ export default {
                 <el-button
                   class="minus"
                   type="success"
-                  v-hasPermi={["lh:info:edit"]}
+                  v-hasPermi={["lh:lhMachineInfo:edit"]}
                   onClick={() => {
                     this.handleEdit(row);
                   }}
