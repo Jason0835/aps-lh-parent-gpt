@@ -53,7 +53,7 @@ public class LhRepairCapsuleController extends AbstractDocBizController<MdmLhRep
 
     @Override
     protected IDocService getDocService() {
-        return null;
+        return mdmLhRepairCapsuleService;
     }
 
     @Override

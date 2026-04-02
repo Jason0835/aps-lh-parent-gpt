@@ -6,7 +6,7 @@ import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
 import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
 import com.zlt.aps.lh.service.ILhPrecisionPlanService;
-import com.zlt.aps.maindata.service.IMdmDevMaintenancePlanService;
+import com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +46,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
     private static final Integer WARNING_DAYS = 30;
 
     @Autowired
-    private IMdmDevMaintenancePlanService mdmDevMaintenancePlanService;
+    private MdmDevMaintenancePlanEntityMapper mdmDevMaintenancePlanEntityMapper;
 
     @Override
     public List<LhPrecisionPlan> selectLhPrecisionPlanList(LhPrecisionPlanVo vo) {
@@ -63,7 +63,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
             wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_LH)
                    .eq(MdmDevMaintenancePlan::getIsDelete, 0);
 
-            List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanService.list(wrapper);
+            List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(wrapper);
             if (mesPlans == null || mesPlans.isEmpty()) {
                 log.warn("从MES查询硫化精度数据为空");
                 return 0;
