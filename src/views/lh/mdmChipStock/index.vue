@@ -25,14 +25,10 @@
           @click="handleAdd"
         >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
-          v-hasPermi="['lh:mdmChipStock:edit']"
-          @click="handleBatchEdit"
-          :disabled="!selection.length"
-        >{{ $t("ui.frame.btn.update") }}</el-button>
-        <el-button
+          type="danger"
           v-hasPermi="['lh:mdmChipStock:remove']"
+          :disabled="selection.length == 0"
           @click="handleBatchDelete"
-          :disabled="!selection.length"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           v-hasPermi="['lh:mdmChipStock:import']"
@@ -44,25 +40,28 @@
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
+      :updateSupport="true"
       downloadUrl="/lh/mdmChipStock/importTemplate"
       uploadUrl="/lh/mdmChipStock/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
 import { listMdmChipStock, removeMdmChipStock } from "@/api/lh/mdmChipStock";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "MdmChipStock",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name"],
@@ -73,6 +72,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -221,7 +236,9 @@ export default {
       });
     },
     handleBatchEdit() {
-      this.$modal.msgWarning(this.$t("mdmChipStock.batchEditNotOpen"));
+      if (this.selection && this.selection.length === 1) {
+        this.handleEdit(this.selection[0]);
+      }
     },
     handleBatchDelete() {
       if (!this.selection || this.selection.length === 0) {

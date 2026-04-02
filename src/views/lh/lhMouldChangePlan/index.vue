@@ -24,15 +24,16 @@
           v-hasPermi="['lh:lhMouldChangePlan:edit']"
           @click="handleAdd"
         >{{ $t("ui.frame.btn.add") }}</el-button>
-<!--        <el-button-->
-<!--          v-hasPermi="['lh:lhMouldChangePlan:edit']"-->
-<!--          @click="handleBatchEdit"-->
-<!--          :disabled="!selection.length"-->
-<!--        >{{ $t("ui.frame.btn.update") }}</el-button>-->
         <el-button
+          v-hasPermi="['lh:lhMouldChangePlan:edit']"
+          @click="handleBatchEdit"
+          :disabled="selection.length !== 1"
+        >{{ $t("ui.frame.btn.update") }}</el-button>
+        <el-button
+          type="danger"
           v-hasPermi="['lh:lhMouldChangePlan:remove']"
           @click="handleBatchDelete"
-          :disabled="!selection.length"
+          :disabled="selection.length == 0"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           v-hasPermi="['lh:lhMouldChangePlan:import']"
@@ -44,25 +45,28 @@
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
+      :updateSupport="true"
       downloadUrl="/lh/lhMouldChangePlan/importTemplate"
       uploadUrl="/lh/lhMouldChangePlan/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
 import { listLhMouldChangePlan, removeLhMouldChangePlan } from "@/api/lh/lhMouldChangePlan";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "LhMouldChangePlan",
   components: {
-    tltUpload,
+    TltUploadForm,
     infoDialog,
   },
   dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE"],
@@ -73,6 +77,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -334,8 +354,9 @@ export default {
       });
     },
     handleBatchEdit() {
-      // 批量编辑可根据后续需求实现
-      this.$modal.msgWarning(this.$t("lhMouldChangePlan.batchEditNotOpen"));
+      if (this.selection && this.selection.length === 1) {
+        this.handleEdit(this.selection[0]);
+      }
     },
     handleSearch(data) {
       this.query = data;

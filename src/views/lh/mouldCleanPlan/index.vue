@@ -26,6 +26,12 @@
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
+          v-hasPermi="['lh:mouldCleanPlan:edit']"
+          @click="handleBatchEdit"
+          :disabled="selection.length !== 1"
+          >{{ $t("ui.frame.btn.update") }}</el-button
+        >
+        <el-button
           type="danger"
            v-hasPermi="['lh:mouldCleanPlan:remove']"
           :disabled="selection.length == 0"
@@ -217,6 +223,11 @@ export default {
     handleEdit(row) {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show(row);
+      }
+    },
+    handleBatchEdit() {
+      if (this.selection && this.selection.length === 1) {
+        this.handleEdit(this.selection[0]);
       }
     },
     handleDeleteAll() {

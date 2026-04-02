@@ -131,7 +131,7 @@ export default {
     async checkUniqueAndSave() {
       try {
         const res = await checkMdmChipStockUnique(this.form);
-        if (res === "0") {
+        if (res == 0) {
           // 唯一，直接保存
           await this.save();
         } else {
@@ -170,6 +170,7 @@ export default {
         this.isEdit = false;
         this.form = {
           factoryCode: "116",
+          id: undefined,
         };
       }
     },
