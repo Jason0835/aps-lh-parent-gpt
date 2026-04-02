@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.mp.api.domain.entity.MdmLhRepairCapsule;
+import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
 
 /**
  * 胶囊已使用次数Service接口

@@ -9,9 +9,9 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.service.ILhMouldChangePlanRemoteService;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
-import com.zlt.aps.lh.api.service.ILhSpecifyMachineRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.service.IMdmMaterialInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -34,25 +34,25 @@ import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
- * 文件名称：LhSpecifyMachineUIController.java
- * 描    述：硫化定点机台信息 UI控制层类：....
- *@author zlt
- *@date 2026-03-30
+ * 文件名称：LhMouldChangePlanUIController.java
+ * 描    述：模具交替计划 UI控制层类
+ *@author APS Team
+ *@date 2026-04-01
  *@version 1.0
  *
- *  修改记录：
+ * 修改记录：
  *     修改时间：...
- *     修 改 人：zlt
+ *     修 改 人：...
  *     修改内容：...
  */
 @Slf4j
-@Api(tags = "硫化定点机台信息")
+@Api(tags = "模具交替计划")
 @Controller
-@RequestMapping("/lh/lhSpecifyMachine")
-public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMachine> {
+@RequestMapping("/lh/lhMouldChangePlan")
+public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChangePlan> {
 
     @Autowired
-    private ILhSpecifyMachineRemoteService iLhSpecifyMachineService;
+    private ILhMouldChangePlanRemoteService iLhMouldChangePlanService;
 
     @Autowired
     private ILhMachineInfoRemoteService iLhMachineInfoService;
@@ -60,15 +60,15 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @Autowired
     private IMdmMaterialInfoRemoteService iMdmMaterialInfoService;
 
-    private final String prefix = "aps/lh/lhSpecifyMachine";
+    private final String prefix = "aps/lh/lhMouldChangePlan";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("lh:lhSpecifyMachine:view")
+    @RequiresPermissions("lh:lhMouldChangePlan:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/lhSpecifyMachine";
+        return prefix + "/lhMouldChangePlan";
     }
 
     /**
@@ -76,7 +76,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("lhSpecifyMachine", new LhSpecifyMachine());
+        mmap.put("lhMouldChangePlan", new LhMouldChangePlan());
         return prefix + "/add";
     }
 
@@ -85,7 +85,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("lhSpecifyMachine", iLhSpecifyMachineService.getInfo(id));
+        mmap.put("lhMouldChangePlan", iLhMouldChangePlanService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -93,48 +93,48 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("lh:lhSpecifyMachine:list")
+    @RequiresPermissions("lh:lhMouldChangePlan:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(LhSpecifyMachine lhSpecifyMachine) {
-        return iLhSpecifyMachineService.list(lhSpecifyMachine);
+    public TableDataInfo list(LhMouldChangePlan lhMouldChangePlan) {
+        return iLhMouldChangePlanService.list(lhMouldChangePlan);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("lh:lhSpecifyMachine:edit")
+    @RequiresPermissions("lh:lhMouldChangePlan:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(LhSpecifyMachine lhSpecifyMachine) {
-        if (UserConstants.NOT_UNIQUE.equals(iLhSpecifyMachineService.checkUnique(lhSpecifyMachine))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.lhSpecifyMachine.checkUnique"));
+    public AjaxResult save(LhMouldChangePlan lhMouldChangePlan) {
+        if (UserConstants.NOT_UNIQUE.equals(iLhMouldChangePlanService.checkUnique(lhMouldChangePlan))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.checkUnique"));
         }
 
-        return iLhSpecifyMachineService.save(lhSpecifyMachine);
+        return iLhMouldChangePlanService.save(lhMouldChangePlan);
     }
 
     /**
-     * 删除硫化定点机台信息
+     * 删除模具交替计划
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("lh:lhSpecifyMachine:remove")
+    @RequiresPermissions("lh:lhMouldChangePlan:remove")
     @PostMapping("/remove")
     @ResponseBody
-    public AjaxResult remove(String ids) {
+    public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iLhSpecifyMachineService.removeByIds(Arrays.asList(arr));
+        return iLhMouldChangePlanService.removeByIds(Arrays.asList(arr));
     }
 
     /**
-     * 校验硫化定点机台信息唯一性
+     * 校验模具交替计划唯一性
      */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(LhSpecifyMachine lhSpecifyMachine) {
-        return iLhSpecifyMachineService.checkUnique(lhSpecifyMachine);
+    public String checkUnique(LhMouldChangePlan lhMouldChangePlan) {
+        return iLhMouldChangePlanService.checkUnique(lhMouldChangePlan);
     }
 
     /**
@@ -146,7 +146,6 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     public String getExportTemplateFileName(){
         return this.getFunctionName();
     }
-
 
     /**
      * 继承时重写方法。
@@ -165,7 +164,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.lhSpecifyMachine.modelName");
+        return I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.modelName");
     }
 
     /**
@@ -175,7 +174,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhSpecifyMachine> util = new ExcelUtil<>(LhSpecifyMachine.class);
+        ExcelUtil<LhMouldChangePlan> util = new ExcelUtil<>(LhMouldChangePlan.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -184,9 +183,9 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, LhSpecifyMachine entity) throws IOException {
+    public void export(HttpServletResponse response, LhMouldChangePlan entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iLhSpecifyMachineService.exportData(entity,fileName);
+        byte[] excelBytes = iLhMouldChangePlanService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -206,22 +205,22 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhSpecifyMachineService.importData(context,false);
+        AjaxResult ajaxResult = iLhMouldChangePlanService.importData(context,false);
         return ajaxResult;
     }
 
-    @ApiOperation("获取机台下拉列表")
+    @ApiOperation("获取机台下拉列表 - 支持搜索筛选")
     @PostMapping("/getMachineList")
     @ResponseBody
-    public AjaxResult getMachineList( LhMachineInfo query) {
+    public AjaxResult getMachineList(LhMachineInfo query) {
         TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }
 
-    @ApiOperation("获取物料下拉列表")
+    @ApiOperation("获取物料下拉列表 - 支持搜索筛选")
     @PostMapping("/getMaterialList")
     @ResponseBody
-    public AjaxResult getMaterialList( MdmMaterialInfo query) {
+    public AjaxResult getMaterialList(MdmMaterialInfo query) {
         TableDataInfo tableDataInfo = iMdmMaterialInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }

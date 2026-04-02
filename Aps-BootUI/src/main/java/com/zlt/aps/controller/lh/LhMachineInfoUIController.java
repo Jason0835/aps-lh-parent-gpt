@@ -162,7 +162,7 @@ public class LhMachineInfoUIController extends BaseUIController<LhMachineInfo> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.no.export.sheetName");
+        return I18nUtil.getMessage("ui.data.column.lh.LhMachineInfo.modelName");
     }
 
     /**

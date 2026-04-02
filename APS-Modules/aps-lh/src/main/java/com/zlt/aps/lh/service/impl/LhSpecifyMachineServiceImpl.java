@@ -14,8 +14,10 @@ import com.zlt.aps.lh.mapper.LhSpecifyMachineEntityMapper;
 import com.zlt.aps.lh.service.ILhSpecifyMachineService;
 import com.zlt.aps.maindata.enums.SystemBaseEnums;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -56,6 +58,9 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
 
     @Autowired
     private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+
+    @Autowired
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -130,13 +135,76 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
             }
         }
 
-        //2.进行数据库唯一性校验
+        //2.进行数据库唯一性校验 + 物料/机台存在性校验
+        //先批量查询，提升性能
+        List<String> specCodeList = list.stream().map(LhSpecifyMachine::getSpecCode).distinct().collect(Collectors.toList());
+        Map<String,List<LhSpecifyMachine>> specCodeMap = list.stream()
+                .collect(Collectors.groupingBy(LhSpecifyMachine::getFactoryCode));
+        // 查询机台
+        Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(16);
+        if (machineInfoMap != null && !specCodeMap.isEmpty()) {
+            for (String key : specCodeMap.keySet()){
+                List<LhSpecifyMachine> machineList = specCodeMap.get(key);
+                List<String> machineKeySubList = machineList.stream()
+                        .map(LhSpecifyMachine::getMachineCode)
+                        .distinct()
+                        .collect(Collectors.toList());
+                List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(machineKeySubList, 900);
+                List<LhMachineInfo> machineInfoList = new ArrayList<>();
+                for (List<String> codeList : splitList) {
+                    LambdaQueryWrapper<LhMachineInfo> wrapper = new LambdaQueryWrapper<LhMachineInfo>();
+                    wrapper.in(LhMachineInfo::getMachineCode, codeList);
+                    machineInfoList.addAll(lhMachineInfoEntityMapper.selectList(wrapper));
+                }
+                if (CollectionUtils.isNotEmpty(machineInfoList)) {
+                    machineInfoMap = machineInfoList.stream().collect(Collectors
+                            .toMap(x->x.getFactoryCode()+","+x.getMachineCode(), Function.identity()));
+                }
+            }
+
+        }
+        
+        // 查询物料
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(specCodeList)) {
+            List<List<String>> splitSpecList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(specCodeList, 900);
+            List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
+            for (List<String> specCodes : splitSpecList) {
+                LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()
+                    .in(MdmMaterialInfo::getMaterialCode, specCodes);
+                materialInfoList.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
+            }
+            if (CollectionUtils.isNotEmpty(materialInfoList)) {
+                materialInfoMap = materialInfoList.stream().collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, 
+                item -> item, (s1, s2) -> s1));
+            }
+        }
+        
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             LhSpecifyMachine docEntity = list.get(i);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
+            
+            // 检查物料编码是否存在
+            if (!materialInfoMap.containsKey(docEntity.getSpecCode())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.lhSpecifyMachine.specCodeNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+            
+            // 检查机台编码是否存在
+            if (!machineInfoMap.containsKey(docEntity.getFactoryCode() + ","+docEntity.getMachineCode())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.lhSpecifyMachine.machineCodeNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+            
             if (checkUnique(docEntity).equals(UserConstants.UNIQUE)){
                 docEntity.setRowState(RowStateEnum.ADDED);
                 if (StringUtil.isBlank(docEntity.getFactoryCode())) {
@@ -144,7 +212,6 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
                 }
                 importList.add(docEntity);
             }else {
-                //todo 如果是存在则更新,则需要自行实现
                 failureNum++;
                 //数据库已经存在,不允许插入
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId,errorNum,
@@ -198,38 +265,5 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
         return Arrays.asList("factoryCode", "specCode", "machineCode");
     }
 
-    @Override
-    protected Map<Object, Object> getServiceCheckParams(List<LhSpecifyMachine> list, List<LhSpecifyMachine> importList) {
-        List<String> machineCodeList = list.stream().map(item -> String.join(",", item.getFactoryCode(), item.getMachineCode())).distinct().collect(Collectors.toList());
-        Map<Object, Object> serviceCheckParams = super.getServiceCheckParams(list, importList);
-        List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(machineCodeList, 100);
-        List<LhMachineInfo> machineInfoList = new ArrayList<>();
-        for (List<String> codeList : splitList) {
-            LambdaQueryWrapper<LhMachineInfo> wrapper = new LambdaQueryWrapper<LhMachineInfo>()
-                    .apply(" CONCAT(FACTORY_CODE, ',', MACHINE_CODE) IN ({0})", String.join(",", codeList));
-            machineInfoList.addAll(lhMachineInfoEntityMapper.selectList(wrapper));
-        }
-        Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(16);
-        if (CollectionUtils.isNotEmpty(machineInfoList)) {
-            machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(item -> String.join(",", item.getFactoryCode(), item.getMachineCode()),
-                    Function.identity(), (s1, s2) -> s1));
-        }
-        serviceCheckParams.put("machineInfoMap", machineInfoMap);
-        return serviceCheckParams;
-    }
 
-    @Override
-    protected Boolean serviceCheckAndDataHandle(LhSpecifyMachine importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
-        if (serviceCheckParams.containsKey("machineInfoMap")) {
-            Map<String, LhMachineInfo> machineInfoMap = (Map<String, LhMachineInfo>) serviceCheckParams.get("machineInfoMap");
-            String mapKey = String.join(",", importDocEntity.getFactoryCode(), importDocEntity.getMachineCode());
-            if (!machineInfoMap.containsKey(mapKey)) {
-                String message = I18nUtil.getMessage("ui.data.alert.lhSpecifyMachine.machineCodeNotExist");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorRowNum, String.format(message, errorRowNum), importErrorLogs);
-                return Boolean.FALSE;
-            }
-        }
-        return super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
-    }
 }

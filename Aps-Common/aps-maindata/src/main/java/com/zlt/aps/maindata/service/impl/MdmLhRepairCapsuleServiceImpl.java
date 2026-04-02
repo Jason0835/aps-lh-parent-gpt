@@ -3,7 +3,7 @@ package com.zlt.aps.maindata.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zlt.aps.maindata.mapper.MdmLhRepairCapsuleEntityMapper;
 import com.zlt.aps.maindata.service.IMdmLhRepairCapsuleService;
-import com.zlt.aps.mp.api.domain.entity.MdmLhRepairCapsule;
+import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
 import org.springframework.stereotype.Service;
 
 /**

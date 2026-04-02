@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.mp.api.domain.entity.MdmMouldCleanPlan;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
