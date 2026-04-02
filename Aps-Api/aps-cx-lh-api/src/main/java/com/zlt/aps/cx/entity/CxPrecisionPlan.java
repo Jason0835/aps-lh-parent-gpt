@@ -73,7 +73,7 @@ public class CxPrecisionPlan extends BaseEntity {
     @TableField("LAST_PRECISION_DATE")
     private LocalDate lastPrecisionDate;
 
-    @ApiModelProperty(value = "到期日期（下次应做精度日期）")
+    @ApiModelProperty(value = "到期日期c")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("DUE_DATE")
     private LocalDate dueDate;
