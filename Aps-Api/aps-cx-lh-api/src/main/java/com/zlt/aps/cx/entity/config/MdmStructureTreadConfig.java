@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("T_CX_STRUCTURE_SHIFT_CAPACITY")
 @ApiModel(value = "结构班产配置")
-public class CxStructureShiftCapacity implements Serializable {
+public class MdmStructureTreadConfig implements Serializable {
 
     private static final long serialVersionUID = 1L;
 

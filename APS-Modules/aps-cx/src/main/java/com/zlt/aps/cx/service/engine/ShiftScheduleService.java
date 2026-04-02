@@ -4,20 +4,17 @@ import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.CxMachineStructureCapacity;
 import com.zlt.aps.cx.entity.CxPrecisionPlan;
 
-import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
-import com.zlt.aps.cx.entity.config.CxStructureShiftCapacity;
+import com.zlt.aps.cx.entity.config.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 班次排产服务
@@ -74,7 +71,7 @@ public class ShiftScheduleService {
                 .toArray(String[]::new);
 
         // 加载结构班产配置
-        Map<String, Map<String, CxStructureShiftCapacity>> structureCapacityMap = buildStructureShiftCapacityMap(context);
+        Map<String, Map<String, MdmStructureTreadConfig>> structureCapacityMap = buildStructureShiftCapacityMap(context);
 
         for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : allocations) {
             CoreScheduleAlgorithmService.ShiftAllocationResult shiftResult = new CoreScheduleAlgorithmService.ShiftAllocationResult();
@@ -137,7 +134,7 @@ public class ShiftScheduleService {
      */
     private Map<String, Integer> calculateStructureWaveAllocation(
             List<CoreScheduleAlgorithmService.TaskAllocation> tasks,
-            Map<String, Map<String, CxStructureShiftCapacity>> structureCapacityMap,
+            Map<String, Map<String, MdmStructureTreadConfig>> structureCapacityMap,
             Integer maxDailyCapacity,
             String[] shiftCodes,
             ScheduleContextVo context) {
@@ -153,7 +150,7 @@ public class ShiftScheduleService {
             String structureCode = task.getStructureName();
             int taskQty = task.getQuantity();
 
-            Map<String, CxStructureShiftCapacity> shiftCapacityMap = structureCapacityMap.get(structureCode);
+            Map<String, MdmStructureTreadConfig> shiftCapacityMap = structureCapacityMap.get(structureCode);
 
             if (shiftCapacityMap != null && !shiftCapacityMap.isEmpty()) {
                 int[] shiftQty = calculateShiftQtyByCapacity(taskQty, structureCode, shiftCapacityMap, shiftCodes, context);
@@ -193,7 +190,7 @@ public class ShiftScheduleService {
     private int[] calculateShiftQtyByCapacity(
             int taskQty,
             String structureCode,
-            Map<String, CxStructureShiftCapacity> shiftCapacityMap,
+            Map<String, MdmStructureTreadConfig> shiftCapacityMap,
             String[] shiftCodes,
             ScheduleContextVo context) {
 
@@ -203,7 +200,7 @@ public class ShiftScheduleService {
         int[] tripQtyPerShift = new int[shiftCodes.length];
 
         for (int i = 0; i < shiftCodes.length; i++) {
-            CxStructureShiftCapacity capacity = shiftCapacityMap.get(shiftCodes[i]);
+            MdmStructureTreadConfig capacity = shiftCapacityMap.get(shiftCodes[i]);
             if (capacity != null && capacity.getTripQty() != null) {
                 tripQtyPerShift[i] = capacity.getTripQty();
                 totalTripQty += capacity.getTripQty();
@@ -303,15 +300,15 @@ public class ShiftScheduleService {
     /**
      * 从上下文构建结构班产配置映射
      */
-    private Map<String, Map<String, CxStructureShiftCapacity>> buildStructureShiftCapacityMap(ScheduleContextVo context) {
-        Map<String, Map<String, CxStructureShiftCapacity>> result = new HashMap<>();
+    private Map<String, Map<String, MdmStructureTreadConfig>> buildStructureShiftCapacityMap(ScheduleContextVo context) {
+        Map<String, Map<String, MdmStructureTreadConfig>> result = new HashMap<>();
 
-        List<CxStructureShiftCapacity> capacities = context.getStructureShiftCapacities();
+        List<MdmStructureTreadConfig> capacities = context.getStructureShiftCapacities();
         if (capacities == null || capacities.isEmpty()) {
             return result;
         }
 
-        for (CxStructureShiftCapacity capacity : capacities) {
+        for (MdmStructureTreadConfig capacity : capacities) {
             String structureCode = capacity.getStructureCode();
             String shiftCode = capacity.getShiftCode();
             if (structureCode != null && shiftCode != null) {
@@ -326,9 +323,9 @@ public class ShiftScheduleService {
     /**
      * 获取结构的整车容量
      */
-    private int getTripCapacity(String structureCode, Map<String, CxStructureShiftCapacity> shiftCapacityMap) {
+    private int getTripCapacity(String structureCode, Map<String, MdmStructureTreadConfig> shiftCapacityMap) {
         if (shiftCapacityMap != null) {
-            for (CxStructureShiftCapacity capacity : shiftCapacityMap.values()) {
+            for (MdmStructureTreadConfig capacity : shiftCapacityMap.values()) {
                 if (capacity.getTripQty() != null && capacity.getTripQty() > 0) {
                     return capacity.getTripQty();
                 }
@@ -619,7 +616,7 @@ public class ShiftScheduleService {
      */
     private int getTripCapacity(String structureCode, ScheduleContextVo context) {
         if (context.getStructureShiftCapacities() != null) {
-            for (CxStructureShiftCapacity capacity : context.getStructureShiftCapacities()) {
+            for (MdmStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
                 if (capacity.getStructureCode() != null &&
                         capacity.getStructureCode().equals(structureCode)) {
                     if (capacity.getTripQty() != null && capacity.getTripQty() > 0) {

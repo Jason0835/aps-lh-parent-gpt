@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.cx.entity.config.CxStructureShiftCapacity;
+import com.zlt.aps.cx.entity.config.MdmStructureTreadConfig;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -10,5 +10,5 @@ import org.apache.ibatis.annotations.Mapper;
  * @author APS Team
  */
 @Mapper
-public interface CxStructureShiftCapacityMapper extends BaseMapper<CxStructureShiftCapacity> {
+public interface MdmStructureTreadConfigMapper extends BaseMapper<MdmStructureTreadConfig> {
 }
