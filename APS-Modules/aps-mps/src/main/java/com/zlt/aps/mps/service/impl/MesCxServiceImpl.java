@@ -72,7 +72,7 @@ public class MesCxServiceImpl implements MesCxService {
             this.setBaseSysValue(cx);
             cxList.add(cx);
         }
-        cxStockMapper.mergeSql(cxList);
+//        cxStockMapper.mergeSql(cxList);
         return AjaxResult.success();
     }
 
