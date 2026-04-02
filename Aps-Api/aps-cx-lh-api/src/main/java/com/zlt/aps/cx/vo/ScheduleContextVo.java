@@ -162,11 +162,6 @@ public class ScheduleContextVo {
     private List<CxPrecisionPlan> precisionPlans;
 
     /**
-     * 操作工请假列表
-     */
-    private List<CxOperatorLeave> operatorLeaves;
-
-    /**
      * 材料异常列表
      */
     private List<CxMaterialException> materialExceptions;
