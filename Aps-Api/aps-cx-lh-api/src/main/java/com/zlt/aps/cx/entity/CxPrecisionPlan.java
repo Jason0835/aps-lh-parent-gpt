@@ -2,6 +2,7 @@ package com.zlt.aps.cx.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -28,7 +29,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("T_CX_PRECISION_PLAN")
 @ApiModel(value = "成型精度计划", description = "成型机台精度校验计划")
-public class CxPrecisionPlan implements Serializable {
+public class CxPrecisionPlan extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -76,40 +77,4 @@ public class CxPrecisionPlan implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("DUE_DATE")
     private LocalDate dueDate;
-
-    @ApiModelProperty(value = "状态：PLANNED-已计划，IN_PROGRESS-进行中，COMPLETED-已完成，CANCELLED-已取消")
-    @TableField("STATUS")
-    private String status;
-
-    @ApiModelProperty(value = "安排原因：SCHEDULED-正常安排，URGENT-紧急安排，RESCHEDULED-重排")
-    @TableField("ARRANGE_REASON")
-    private String arrangeReason;
-
-    @ApiModelProperty(value = "是否影响硫化：0-否 1-是")
-    @TableField("AFFECT_VULCANIZE")
-    private Integer affectVulcanize;
-
-    @ApiModelProperty(value = "硫化减产比例（0-1），0表示不减产，0.5表示减半")
-    @TableField("VULCANIZE_REDUCE_RATIO")
-    private java.math.BigDecimal vulcanizeReduceRatio;
-
-    @ApiModelProperty(value = "关联胎胚编码（主要生产的胎胚）")
-    @TableField("EMBRYO_CODE")
-    private String embryoCode;
-
-    @ApiModelProperty(value = "备注")
-    @TableField("REMARK")
-    private String remark;
-
-    @ApiModelProperty(value = "创建时间")
-    @TableField(value = "CREATE_TIME", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
-
-    @ApiModelProperty(value = "更新时间")
-    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
-
-    @ApiModelProperty(value = "创建人")
-    @TableField("CREATE_BY")
-    private String createBy;
 }

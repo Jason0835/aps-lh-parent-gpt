@@ -56,10 +56,6 @@ public class CxScheduleDetail extends BaseEntity {
     @TableField("EMBRYO_CODE")
     private String embryoCode;
 
-    @ApiModelProperty(value = "物料编码（同胎胚代码）")
-    @TableField("MATERIAL_CODE")
-    private String materialCode;
-
     @ApiModelProperty(value = "状态：PLANNED-计划中，COMPLETED-已完成，CANCELLED-已取消")
     @TableField("STATUS")
     private String status;
