@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * @author APS Team
  */
 @Data
-@TableName("T_CX_STRUCTURE_SHIFT_CAPACITY")
+@TableName("T_MDM_STRUCTURE_TREAD_CONFIG")
 @ApiModel(value = "结构班产配置")
 public class MdmStructureTreadConfig implements Serializable {
 
