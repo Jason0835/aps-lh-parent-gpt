@@ -652,7 +652,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
             if (!CollectionUtils.isEmpty(result.getDetails())) {
                 for (CxScheduleDetail detail : result.getDetails()) {
-                    detail.setResultId(result.getId());
+                    detail.setMainId(result.getId());
                     detail.setCreateTime(new Date());
                     scheduleDetailMapper.insert(detail);
                 }
