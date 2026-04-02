@@ -147,6 +147,11 @@ export default {
           label: "SCM行内码",
           minWidth: 100,
         },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.colume.updateTime"),
+          minWidth: 150,
+        },
       ];
 
       return columns;
