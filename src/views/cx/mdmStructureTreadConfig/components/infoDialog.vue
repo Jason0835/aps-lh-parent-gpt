@@ -29,10 +29,11 @@
 
 <script>
 import infoForm from '@/views/components/infoForm.vue'
-import { addMdmStructureTreadConfig, editMdmStructureTreadConfig } from '@/api/cx/mdmStructureTreadConfig'
+import { saveMdmStructureTreadConfig } from '@/api/cx/mdmStructureTreadConfig'
 
 export default {
   components: { infoForm },
+  inject: ['parentDict'],
   data() {
     return {
       loading: false,
@@ -54,13 +55,13 @@ export default {
     columns() {
       return [
         {
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.stockDate'),
-          prop: 'stockDate',
+          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
+          prop: 'factoryCode',
           span: 24,
-          required: true,
-          type: 'date',
-          valueFormat: 'yyyy-MM-dd',
-          disabled: this.isEdit
+          type: 'select',
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+          required: true
         },
         {
           label: this.$t('ui.data.column.mdmStructureTreadConfig.structureCode'),
@@ -79,21 +80,8 @@ export default {
           precision: 0,
           required: true
         },
-        {
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
-          prop: 'factoryCode',
-          span: 24,
-          type: 'select',
-          dictType: 'biz_factory_name',
-          filterable: true,
-          required: true
-        },
-        {
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.dataVersion'),
-          prop: 'dataVersion',
-          span: 24,
-          maxlength: 50
-        },
+
+
         {
           label: this.$t('ui.common.column.remark'),
           prop: 'remark',
@@ -124,8 +112,7 @@ export default {
     async save(payload) {
       try {
         this.loading = true
-        const api = this.isEdit ? editMdmStructureTreadConfig : addMdmStructureTreadConfig
-        const res = await api(payload)
+        const res = await saveMdmStructureTreadConfig(payload)
         this.$modal.msgSuccess(res.msg)
         this.$emit('success')
         this.hide()

@@ -1,12 +1,10 @@
 import request from '@/utils/request'
 
 export function listMdmStructureTreadConfig(query) {
-  const { pageNum, pageSize, ...filters } = query
   return request({
     url: '/cx/mdmStructureTreadConfig/list',
     method: 'post',
-    params: { pageNum, pageSize },
-    data: filters
+    data: query
   })
 }
 
@@ -17,35 +15,35 @@ export function getMdmStructureTreadConfig(id) {
   })
 }
 
-export function addMdmStructureTreadConfig(data) {
+export function saveMdmStructureTreadConfig(data) {
   return request({
-    url: '/cx/mdmStructureTreadConfig/add',
+    url: '/cx/mdmStructureTreadConfig/save',
     method: 'post',
     data
   })
 }
 
-export function editMdmStructureTreadConfig(data) {
-  return request({
-    url: '/cx/mdmStructureTreadConfig/edit',
-    method: 'put',
-    data
-  })
-}
-
-export function removeMdmStructureTreadConfig(params) {
+export function removeMdmStructureTreadConfig(ids) {
   return request({
     url: '/cx/mdmStructureTreadConfig/remove',
     method: 'post',
-    params
+    params: { ids: ids.join(',') }
+  })
+}
+
+export function checkUniqueMdmStructureTreadConfig(data) {
+  return request({
+    url: '/cx/mdmStructureTreadConfig/checkUnique',
+    method: 'post',
+    data
   })
 }
 
 export function exportMdmStructureTreadConfig(data) {
   return request({
     url: '/cx/mdmStructureTreadConfig/export',
-    method: 'post',
-    data,
+    method: 'get',
+    params: data,
     responseType: 'blob'
   })
 }

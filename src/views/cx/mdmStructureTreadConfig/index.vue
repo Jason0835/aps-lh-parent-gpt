@@ -18,7 +18,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cx:mdmStructureTreadConfig:add']" @click="handleAdd">
+        <el-button type="primary" plain v-hasPermi="['cx:mdmStructureTreadConfig:edit']" @click="handleAdd">
           {{ $t('ui.frame.btn.add') }}
         </el-button>
         <el-button v-hasPermi="['cx:mdmStructureTreadConfig:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
@@ -38,10 +38,11 @@
     <tlt-upload-form
       ref="uploadRef"
       :updateSupport="true"
-      :downloadUrl="importTemplateUrl"
-      :uploadUrl="importUrl"
+      downloadUrl="/cx/mdmStructureTreadConfig/importTemplate"
+      uploadUrl="/cx/mdmStructureTreadConfig/importData"
       @uploadSuccess="getList"
       labelWidth="0"
+      :columns="importColumns"
     />
     <info-dialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -62,49 +63,59 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: '',
+          prop: 'updateSupport',
+          render: (form) => {
+            return (
+              <el-checkbox label={this.$t('common.rule.updateSupport')} v-model={form.updateSupport}>
+                {this.$t('common.rule.updateSupport')}
+              </el-checkbox>
+            )
+          }
+        }
+      ],
       loading: false,
       data: [],
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
       search: {},
-      query: {},
-      importUrl: '/cx/mdmStructureTreadConfig/importData',
-      importTemplateUrl: '/cx/mdmStructureTreadConfig/importTemplate',
-      searchColumns: [
+      query: {}
+    }
+  },
+  computed: {
+    searchColumns() {
+      return [
         {
-          prop: 'stockDateRange',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.stockDate'),
-          type: 'daterange',
-          valueFormat: 'yyyy-MM-dd'
+          prop: 'factoryCode',
+          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: true
         },
         {
           prop: 'structureCode',
           label: this.$t('ui.data.column.mdmStructureTreadConfig.structureCode'),
           placeholder: this.$t('common.rule.input'),
           type: 'input'
-        },
-        {
-          prop: 'factoryCode',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
-          type: 'select',
-          dictType: 'biz_factory_name',
-          filterable: true,
-          clearable: true
         }
       ]
-    }
-  },
-  computed: {
+    },
     columns() {
       return [
         { type: 'selection', fixed: 'left' },
-        {
-          prop: 'stockDate',
+         {
+          prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.stockDate'),
-          minWidth: 120
+          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
+          minWidth: 140,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          }
         },
         {
           prop: 'structureCode',
@@ -121,25 +132,39 @@ export default {
           minWidth: 140
         },
         {
-          prop: 'factoryCode',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
-          minWidth: 140,
-          dictType: 'biz_factory_name'
-        },
-        {
-          prop: 'dataVersion',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.dataVersion'),
-          minWidth: 120
-        },
-        {
           prop: 'remark',
           halign: 'center',
           label: this.$t('ui.common.column.remark'),
           minWidth: 160
+        },
+        {
+          prop: 'option',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.btn.option'),
+          minWidth: 150,
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-button
+                  v-hasPermi={['cx:mdmStructureTreadConfig:edit']}
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t('ui.frame.btn.update')}
+                </el-button>
+                <el-button
+                  v-hasPermi={['cx:mdmStructureTreadConfig:remove']}
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t('ui.frame.btn.delete')}
+                </el-button>
+              </div>
+            )
+          }
         }
       ]
     }
@@ -151,11 +176,11 @@ export default {
     handleEdit(row) {
       if (row) this.$refs.infoRef.show(row)
     },
-    handleDelete() {
+    handleDelete(row) {
       this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
-        const ids = this.selection.map(r => r.id).join(',')
+        const ids = row ? [row.id] : this.selection.map(r => r.id)
         this.loading = true
-        removeMdmStructureTreadConfig({ ids })
+        removeMdmStructureTreadConfig(ids)
           .then(res => {
             this.$modal.msgSuccess(res.msg)
             this.page.current = 1
