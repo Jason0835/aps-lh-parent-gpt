@@ -1,7 +1,8 @@
 package com.zlt.aps.cx.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.cx.entity.CxPrecisionPlan;
+import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -10,5 +11,5 @@ import org.apache.ibatis.annotations.Mapper;
  * @author APS Team
  */
 @Mapper
-public interface CxPrecisionPlanMapper extends BaseMapper<CxPrecisionPlan> {
+public interface CxPrecisionPlanMapper extends CommBaseMapper<CxPrecisionPlan> {
 }

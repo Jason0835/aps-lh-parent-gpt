@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.cx.entity.CxStock;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.mapper.CxStockMapper;
 import com.zlt.aps.cx.service.CxStockService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -128,22 +129,27 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
         return cxStockService;
     }
 
-    @Override
-    protected void builderCondition(QueryWrapper<CxStock> queryWrapper, CxStock queryVO) {
-        // 库存日期区间查询
-        if (PubUtil.isNotEmpty(queryVO.getStartTime()) && PubUtil.isNotEmpty(queryVO.getEndTime())) {
-            queryWrapper.between("STOCK_DATE", queryVO.getStartTime(), queryVO.getEndTime());
-        }
-        // 胎胚代码模糊查询
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
-        // 分厂编号精确查询
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
-        // 其他数字字段精确查询
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStockNum()), "STOCK_NUM", queryVO.getStockNum());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOverTimeStock()), "OVER_TIME_STOCK", queryVO.getOverTimeStock());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getModifyNum()), "MODIFY_NUM", queryVO.getModifyNum());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getBadNum()), "BAD_NUM", queryVO.getBadNum());
-    }
+	@Override
+	protected void builderCondition(QueryWrapper<CxStock> queryWrapper, CxStock queryVO) {
+		// 库存日期区间查询
+		if (PubUtil.isNotEmpty(queryVO.getStartTime()) && PubUtil.isNotEmpty(queryVO.getEndTime())) {
+            Date beginDay = DateUtil.parse(queryVO.getStartTime());
+            Date endDay = DateUtil.parse(queryVO.getEndTime());
+            endDay = DateUtil.endOfDay(endDay);
+			queryWrapper.between("STOCK_DATE", beginDay, endDay);
+		}
+		// 胎胚代码模糊查询
+		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
+		// 分厂编号精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
+		// 是否收尾SKU精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsEndingSku()), "IS_ENDING_SKU", queryVO.getIsEndingSku());
+		// 其他数字字段精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStockNum()), "STOCK_NUM", queryVO.getStockNum());
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOverTimeStock()), "OVER_TIME_STOCK", queryVO.getOverTimeStock());
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getModifyNum()), "MODIFY_NUM", queryVO.getModifyNum());
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getBadNum()), "BAD_NUM", queryVO.getBadNum());
+	}
 
     @Override
     protected String getTypeCode() {

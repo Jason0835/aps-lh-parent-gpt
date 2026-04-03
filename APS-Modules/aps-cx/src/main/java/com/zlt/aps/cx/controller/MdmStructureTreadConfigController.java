@@ -2,6 +2,7 @@ package com.zlt.aps.cx.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -100,7 +101,7 @@ public class MdmStructureTreadConfigController extends AbstractDocBizController<
     @ApiOperation("导入数据")
     @PostMapping("/importData")
     @Override
-    public AjaxResult importData(@RequestBody com.ruoyi.api.gateway.system.domain.vo.ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
     }
 

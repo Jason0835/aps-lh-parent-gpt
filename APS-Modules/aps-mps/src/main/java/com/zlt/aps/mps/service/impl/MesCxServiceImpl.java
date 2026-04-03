@@ -66,9 +66,9 @@ public class MesCxServiceImpl implements MesCxService {
             // 库存量=库存+硫化库存(弃用)
 //            Integer stockNum = mes.getStockNum() + mes.getLhStock();
             // 库存量 = 可用库存
-            cx.setStockNum(mes.getAvailableStock().longValue());
-            cx.setUnavailableStock(mes.getUnavailableStock().longValue());
-            cx.setOverTimeStock(mes.getOverTimeStock().longValue());
+            cx.setStockNum(mes.getAvailableStock());
+//            cx.setUnavailableStock(mes.getUnavailableStock().longValue());
+            cx.setOverTimeStock(mes.getOverTimeStock());
             this.setBaseSysValue(cx);
             cxList.add(cx);
         }

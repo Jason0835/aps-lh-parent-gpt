@@ -2,7 +2,7 @@ package com.zlt.aps.cx.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.cx.entity.CxStock;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.bill.common.service.IDocService;
 
 import java.math.BigDecimal;
