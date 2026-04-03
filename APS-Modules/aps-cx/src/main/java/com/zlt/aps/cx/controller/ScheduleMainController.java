@@ -63,6 +63,7 @@ public class ScheduleMainController {
             request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
             request.setFactoryCode(dto.getFactoryCode());
             request.setScheduleType(dto.getScheduleType());
+            request.setScheduleMode(dto.getScheduleType());
 
             ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
 

@@ -431,20 +431,30 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadMaterials(ScheduleContextVo context) {
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
 
-        Set<String> embryoCodes = lhScheduleResults.stream()
-                .map(LhScheduleResult::getEmbryoCode)
+        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
+            log.info("硫化排程结果为空，加载物料信息 0 条");
+            context.setMaterials(new ArrayList<>());
+            return;
+        }
+
+        Set<String> materialCodes = lhScheduleResults.stream()
+                .map(LhScheduleResult::getProductCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
+        log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", materialCodes.size());
+
         List<MdmMaterialInfo> materials;
-        if (!embryoCodes.isEmpty()) {
+        if (!materialCodes.isEmpty()) {
+            // 使用 embryoCode 查询物料信息（一个物料对应一个胎胚）
             materials = materialInfoMapper.selectList(
                     new LambdaQueryWrapper<MdmMaterialInfo>()
-                            .in(MdmMaterialInfo::getMaterialCode, embryoCodes));
-            log.info("根据硫化排程结果加载物料信息 {} 条", materials.size());
+                            .in(MdmMaterialInfo::getMaterialCode, materialCodes));
+            log.info("根据硫化排程结果加载物料信息 {} 条，涉及 {} 个外胎", materials.size(), materialCodes.size());
         } else {
             materials = new ArrayList<>();
-            log.info("硫化排程结果为空，加载物料信息 0 条");
+            log.warn("硫化排程结果中包含 {} 条记录，但没有有效的外胎代码 (materialCodes 均为 null)，加载物料信息 0 条",
+                    lhScheduleResults.size());
         }
         context.setMaterials(materials);
     }
@@ -1017,8 +1027,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         Set<String> materialCodes = new HashSet<>();
         if (context.getLhScheduleResults() != null) {
             materialCodes.addAll(context.getLhScheduleResults().stream()
-                    .filter(r -> r.getMaterialCode() != null)
-                    .map(LhScheduleResult::getMaterialCode)
+                    .filter(r -> r.getProductCode() != null)
+                    .map(LhScheduleResult::getProductCode)
                     .collect(Collectors.toSet()));
         }
         // 也包含月计划中的物料
@@ -1150,7 +1160,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         if (context.getLhScheduleResults() != null) {
             List<LhScheduleResult> filteredLhResults = context.getLhScheduleResults().stream()
                     .filter(r -> {
-                        String materialCode = r.getMaterialCode();
+                        String materialCode = r.getProductCode();
                         // 如果物料编码在已收尾集合中，则过滤掉
                         if (materialCode != null && completedMaterialCodes.contains(materialCode)) {
                             log.debug("过滤硫化排程结果：物料={}，成型余量={}",

@@ -79,18 +79,6 @@ public class CxPrecisionPlan extends BaseEntity implements  Serializable {
     @TableField("STATUS")
     private String status;
 
-    @ApiModelProperty(value = "安排原因：SCHEDULED-正常安排，URGENT-紧急安排，RESCHEDULED-重排")
-    @TableField("ARRANGE_REASON")
-    private String arrangeReason;
-
-    @ApiModelProperty(value = "是否影响硫化：0-否 1-是")
-    @TableField("AFFECT_VULCANIZE")
-    private Integer affectVulcanize;
-
-    @ApiModelProperty(value = "硫化减产比例（0-1），0表示不减产，0.5表示减半")
-    @TableField("VULCANIZE_REDUCE_RATIO")
-    private java.math.BigDecimal vulcanizeReduceRatio;
-
     @ApiModelProperty(value = "关联胎胚编码（主要生产的胎胚）")
     @TableField("EMBRYO_CODE")
     private String embryoCode;
@@ -98,6 +86,5 @@ public class CxPrecisionPlan extends BaseEntity implements  Serializable {
     @ApiModelProperty(value = "备注")
     @TableField("REMARK")
     private String remark;
-
 
 }
