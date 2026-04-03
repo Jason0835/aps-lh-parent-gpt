@@ -56,8 +56,9 @@ public class CxAddSkuProductionHandler {
      * @param structureName               分组
      * @param cxContinueInfo              续作信息对象
      * @param continueCxMachineAllocation 机台分配信息
+     * @param handledDayInfo              已经延长过的日期信息
      */
-    public void productionAddSkuBySingleGroup(Context context, ProductionPlanGroupInfo groupPlanInfo, String structureName, CxContinueInfoHelper cxContinueInfo, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+    public void productionAddSkuBySingleGroup(Context context, ProductionPlanGroupInfo groupPlanInfo, String structureName, CxContinueInfoHelper cxContinueInfo, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation, Set<String> handledDayInfo) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
             log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
@@ -78,8 +79,9 @@ public class CxAddSkuProductionHandler {
         //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
 
-        //20260303 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
-//        groupTimeExtensionHandler.handlerTimeExtension(this, context, structureName, cxContinueInfo, continueCxMachineAllocation);
+        //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
+//        markTimeExtensionCxMachine(context, continueCxMachineAllocation);
+//        groupTimeExtensionHandler.handlerTimeExtension(this, context, structureName, cxContinueInfo, continueCxMachineAllocation, handledDayInfo);
         //设置收尾机台
         continueCxMachineAllocation.forEach(cxMachineAllocation -> {
             String cxMachineCode = cxMachineAllocation.getCxMachineCode();
@@ -170,10 +172,13 @@ public class CxAddSkuProductionHandler {
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList(), ContinueTypeEnum.NO_CONTINUE);
         //递归：重新获取下一组
         Integer productionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        if (productionQty > BigDecimal.ZERO.intValue()) {
-            addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, doubleMouldList);
-            groupPlanInfo.afterProductionResetThisRound();
+        if (productionQty <= BigDecimal.ZERO.intValue()) {
+            TbrMouldProductionLogRecorder.addLhGroupSkuNoRealProductionQtyLog(context, groupName, onLineMachineInfo, materialDesc);
+            retrieveNextSku(context, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
+            return;
         }
+        addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, doubleMouldList);
+        groupPlanInfo.afterProductionResetThisRound();
         productionAddSkuByContinueCxMachine(context, groupPlanInfo, excludeDays);
     }
 
@@ -259,11 +264,39 @@ public class CxAddSkuProductionHandler {
         CxLhMouldProductionCalculator.lhProductionByCxMachineHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList());
         //递归：重新获取下一组
         Integer productionQty = lhProductionQtyHelper.getRealSumProductionQty();
-        if (productionQty > BigDecimal.ZERO.intValue()) {
-            addChangeMouldInfo(productionContext, addSkuInfo, startDay, cxLhGroup.getBeforeSku(), doubleMouldList);
-            productionPlanInfo.afterProductionResetThisRound();
+        if (productionQty <= BigDecimal.ZERO.intValue()) {
+            TbrMouldProductionLogRecorder.addLhGroupSkuNoRealProductionQtyLog(context, groupName, cxMachineCode, materialDesc);
+            retrieveNextSku(context, needProductionInfo, cxMachineCode, productionPlanList, productionPlan, mouldShellMap, excludeDays);
+            return;
         }
+        addChangeMouldInfo(productionContext, addSkuInfo, startDay, cxLhGroup.getBeforeSku(), doubleMouldList);
+        productionPlanInfo.afterProductionResetThisRound();
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap, excludeDays);
+    }
+
+    /**
+     * @param context                     排产上下文
+     * @param continueCxMachineAllocation 在机结构分配情况
+     */
+    private void markTimeExtensionCxMachine(Context context, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
+        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
+            return;
+        }
+        List<CxMachineAllocationPlanHelper> markList = continueCxMachineAllocation.stream().filter(single -> single.isTimeExtensionFlag()).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(markList)) {
+            return;
+        }
+        List<CxMachineAllocationPlanHelper> effectiveList = continueCxMachineAllocation.stream().filter(single -> single.getEndDay() < context.getProductionEndDay()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return;
+        }
+        //延长时间最长的，表明最合适，优先保留
+        effectiveList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getEndDay, Comparator.nullsLast(Comparator.reverseOrder())));
+        effectiveList.get(BigDecimal.ZERO.intValue()).markTimeExtension();
+        return;
     }
 
     /**

@@ -51,10 +51,7 @@ public class GroupPlanDeductionDayHandler {
      * @param deductionDaySet      释放日信息
      */
     public void deductionDayInfo(Context context, DeductionDayProductionTypeEnum deductionType, CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
-        if (!isEffectiveParam(cxMachineInfo, groupPlanInfo, allocationInfo)) {
-            return;
-        }
-        if (CollectionUtils.isEmpty(dayProductionInfoMap) || CollectionUtils.isEmpty(deductionDaySet)) {
+        if (!isEffectiveParam(cxMachineInfo, groupPlanInfo, allocationInfo, dayProductionInfoMap, deductionDaySet)) {
             return;
         }
         String daysInfo = deductionDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
@@ -62,25 +59,65 @@ public class GroupPlanDeductionDayHandler {
         String groupName = groupPlanInfo.getGroupName();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         DeductionDayProductionInfoLogRecorder.addStartGroupDeductionDayCapacityLog(productionContext, groupName, deductionType, cxMachineCode, daysInfo);
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+//        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Integer deductionDayCount = deductionDaySet.size();
         //不可以标记结构分配完成，需等下一轮分配：故而调整为更新分配的天数
         groupPlanInfo.deductionAllocationDays(deductionDayCount);
         //释放，成型工装使用量，切换结构使用量、分配日产能、特殊材料分配量
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
-        //模具排产信息
-        Map<String, ProductionMouldInfoVo> allMouldInfoMap = baseDataContainer.getMouldInfoMap();
-        //日产能限制信息
-        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
-        //逐日释放排产信息：模具产能占用、模壳、胶囊卡盘、换模次数等
-        deductionDaySet.forEach(singleDeductionDay -> {
-            GroupPlanCxLhCapacityLimitHelper productionDayLimit = dayProductionInfoMap.get(singleDeductionDay);
-            if (null == productionDayLimit) {
-                return;
-            }
-            clearProductionInfoByDay(productionContext, groupPlanInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
-        });
+        //逐日释放：模具排产信息 模具产能占用、模壳、胶囊卡盘、换模次数等
+        deductionMouldProductionInfo(productionContext, groupPlanInfo, dayProductionInfoMap, deductionDaySet);
+//        //模具排产信息
+//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = baseDataContainer.getMouldInfoMap();
+//        //日产能限制信息
+//        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+//        //逐日释放排产信息：模具产能占用、模壳、胶囊卡盘、换模次数等
+//        deductionDaySet.forEach(singleDeductionDay -> {
+//            GroupPlanCxLhCapacityLimitHelper productionDayLimit = dayProductionInfoMap.get(singleDeductionDay);
+//            if (null == productionDayLimit) {
+//                return;
+//            }
+//            clearProductionInfoByDay(productionContext, groupPlanInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
+//        });
         return;
+    }
+
+    /**
+     * 在dayProductionInfoMap中扣除deductionDaySet模具排产信息
+     * 同步释放模具产能占用、模壳、胶囊卡盘、换模次数
+     *
+     * @param context              排产上下文
+     * @param deductionType        扣除类型
+     * @param cxMachineInfo        成型机台
+     * @param groupPlanInfo        分组计划
+     * @param allocationInfo       分配信息
+     * @param dayProductionInfoMap 日产限制集合
+     * @param deductionDaySet      释放模具产能集合
+     */
+    public void deductionMouldDayInfo(Context context, DeductionDayProductionTypeEnum deductionType, CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
+        if (!isEffectiveParam(cxMachineInfo, groupPlanInfo, allocationInfo, dayProductionInfoMap, deductionDaySet)) {
+            return;
+        }
+        String daysInfo = deductionDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        String groupName = groupPlanInfo.getGroupName();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        DeductionDayProductionInfoLogRecorder.addStartGroupDeductionDayCapacityLog(productionContext, groupName, deductionType, cxMachineCode, daysInfo);
+//        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        //逐日释放：模具排产信息 模具产能占用、模壳、胶囊卡盘、换模次数等
+        deductionMouldProductionInfo(productionContext, groupPlanInfo, dayProductionInfoMap, deductionDaySet);
+//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = baseDataContainer.getMouldInfoMap();
+//        //日产能限制信息
+//        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+//        //逐日释放排产信息：模具产能占用、模壳、胶囊卡盘、换模次数等
+//        deductionDaySet.forEach(singleDeductionDay -> {
+//            GroupPlanCxLhCapacityLimitHelper productionDayLimit = dayProductionInfoMap.get(singleDeductionDay);
+//            if (null == productionDayLimit) {
+//                return;
+//            }
+//            clearProductionInfoByDay(productionContext, groupPlanInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
+//        });
+//        return;
     }
 
     /**
@@ -92,8 +129,11 @@ public class GroupPlanDeductionDayHandler {
      * @param allocationInfo 分配信息
      * @return
      */
-    private boolean isEffectiveParam(CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo) {
+    private boolean isEffectiveParam(CxMachineBaseInfoVo cxMachineInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineAllocationPlanHelper allocationInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
         if (null == cxMachineInfo || null == groupPlanInfo || null == allocationInfo) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(dayProductionInfoMap) || CollectionUtils.isEmpty(deductionDaySet)) {
             return false;
         }
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
@@ -105,6 +145,29 @@ public class GroupPlanDeductionDayHandler {
             return true;
         }
         return false;
+    }
+
+    /**
+     * 释放模具排产信息
+     *
+     * @param productionContext    排产上下文
+     * @param groupPlanInfo        分组计划
+     * @param dayProductionInfoMap 日排产信息
+     * @param deductionDaySet      需要释放的天数集合
+     */
+    private void deductionMouldProductionInfo(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap, Set<Integer> deductionDaySet) {
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        Map<String, ProductionMouldInfoVo> allMouldInfoMap = baseDataContainer.getMouldInfoMap();
+        //日产能限制信息
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        //逐日释放排产信息：模具产能占用、模壳、胶囊卡盘、换模次数等
+        deductionDaySet.forEach(singleDeductionDay -> {
+            GroupPlanCxLhCapacityLimitHelper productionDayLimit = dayProductionInfoMap.get(singleDeductionDay);
+            if (null == productionDayLimit) {
+                return;
+            }
+            clearProductionInfoByDay(productionContext, groupPlanInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
+        });
     }
 
     /**
@@ -147,7 +210,12 @@ public class GroupPlanDeductionDayHandler {
                     }
                     returnMonthPlanProductionQty(productionContext, materialDesc, singleProduction);
                 });
-                mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
+                mouldInfo.getFinishDaySet().remove(singleDeductionDay);
+                if (CollectionUtils.isEmpty(reserveList)) {
+                    mouldInfo.getDayProductionInfo().remove(singleDeductionDay);
+                } else {
+                    mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
+                }
             });
             //20260125 释放，日产能占用量
             if (null != dayCapacityLimit) {

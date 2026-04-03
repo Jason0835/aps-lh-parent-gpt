@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -57,6 +58,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
      * 2.4、模具到货计划：t_mdm_mould_delivery_plan：materialCode + factoryCode + mouldCode
      * 2.5、SKU与结构关系：t_mdm_sku_structure_ref：materialCode + factoryCode + structureName
      * 2.6、SKU日硫化产能：t_mdm_sku_lh_capacity：materialCode + factoryCode + mesCapacity/standardCapacity/apsCapacity
+     * 2.7、月周期排产清单：t_dp_month_cycle_struct_config：factoryCode + year + month + isDeleted
      *
      * @param context 排产上下文
      * @param userObj 用户数据
@@ -97,7 +99,8 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
         //SKU-日硫化产能
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
-
+        //20260403+ 月周期排产清单，检测周期结构不在月周期排产清单中则不排
+        Set<String> monthProductionCycleList = getMonthCycleGroupInfo(productionContext);
         //赋值施工信息，模具，日硫化产能
         requirePlanList.forEach(requirePlan -> {
             String materialCode = requirePlan.getMaterialCode();
@@ -127,7 +130,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
             }
             requirePlan.setVulcanizationInfo(lhCapacity);
             //不排产检测
-            requirePlan.checkProductionConditionByBase();
+            requirePlan.checkProductionConditionByBase(monthProductionCycleList);
         });
         //模具预占参数
         if (FactoryConstant.YES_VALUE.equalsIgnoreCase(paramConfiguration.getOpenPreemptionMouldCapacity())) {
@@ -266,7 +269,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
                 return;
             }
             Integer sumNetQty = planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getNetQty).sum();
-            if(sumNetQty <= BigDecimal.ZERO.intValue()){
+            if (sumNetQty <= BigDecimal.ZERO.intValue()) {
                 return;
             }
             Integer minQty = planList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();

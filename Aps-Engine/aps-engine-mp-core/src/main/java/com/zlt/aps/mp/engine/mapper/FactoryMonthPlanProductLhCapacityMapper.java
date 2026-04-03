@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.mapper;
 
 import com.zlt.aps.mp.engine.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.mp.engine.domain.vo.MonthCycleGroupInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
 import org.apache.ibatis.annotations.Mapper;
@@ -51,4 +52,16 @@ public interface FactoryMonthPlanProductLhCapacityMapper {
     List<CycleStructureMinLhMachineQtyVo> getCycleStructureMinLhRatioInfo(@Param("factoryCode") String factoryCode,
                                                                           @Param("year") Integer year,
                                                                           @Param("month") Integer month);
+
+    /**
+     * 获取工厂的月周期结构排产清单信息
+     *
+     * @param factoryCode 工厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return
+     */
+    List<MonthCycleGroupInfoVo> getMonthCycleGroupListInfo(@Param("factoryCode") String factoryCode,
+                                                           @Param("year") Integer year,
+                                                           @Param("month") Integer month);
 }

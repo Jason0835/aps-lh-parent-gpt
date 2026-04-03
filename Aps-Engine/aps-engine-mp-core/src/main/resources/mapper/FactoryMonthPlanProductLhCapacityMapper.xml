@@ -51,5 +51,17 @@
          WHERE IFNULL(csc.IS_DELETE, 0) = 0
            AND csc.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
     </select>
+    
+    <select id="getMonthCycleGroupListInfo" resultType="com.zlt.aps.mp.engine.domain.vo.MonthCycleGroupInfoVo">
+        SELECT msc.FACTORY_CODE,
+               msc.STRUCTURE_NAME AS GROUP_NAME,
+               msc.YEAR,
+               msc.MONTH
+          FROM t_dp_month_cycle_struct_config msc
+         WHERE IFNULL(msc.IS_DELETE, 0) = 0
+           AND msc.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND msc.YEAR = #{year,jdbcType=DECIMAL}
+           AND msc.MONTH = #{month,jdbcType=DECIMAL}
+    </select>
 
 </mapper>

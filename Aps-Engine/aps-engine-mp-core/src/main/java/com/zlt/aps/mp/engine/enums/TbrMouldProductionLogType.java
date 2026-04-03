@@ -111,6 +111,10 @@ public enum TbrMouldProductionLogType {
      */
     SUMMARY_INFO_SUM("20-06-04", "汇总"),
     /**
+     * 30-69 模具排产
+     */
+    GROUP_MOULD_PRODUCTION("30-69","模具排产"),
+    /**
      * 20-06-05 在机分组在产机台汇总
      */
     CONTINUE_GROUP_CONTINUE_CX_MACHINE_SUMMARY_INFO_SUM("20-06-05", "在机分组在产机台汇总"),

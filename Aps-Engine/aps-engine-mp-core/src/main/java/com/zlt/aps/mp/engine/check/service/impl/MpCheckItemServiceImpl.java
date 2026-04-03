@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -253,7 +254,8 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = getProductionConstructionInfo(productionContext);
             Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
             Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
-
+            //20260403+ 月周期排产清单
+            Set<String> monthProductionCycleList = getMonthCycleGroupInfo(productionContext);
             requirePlanList.forEach(requirePlan -> {
                 String materialCode = requirePlan.getMaterialCode();
                 String materialDesc = requirePlan.getMaterialDesc();
@@ -274,7 +276,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             Map<String, List<MonthPlanProductionRequirePlanVo>> monthPlanProductionRequirePlanVoMaps = validCheckList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialCode));
             for (Map.Entry<String, List<MonthPlanProductionRequirePlanVo>> monthPlanProductionRequirePlanVoMap : monthPlanProductionRequirePlanVoMaps.entrySet()) {
                 MonthPlanProductionRequirePlanVo plan = monthPlanProductionRequirePlanVoMap.getValue().get(0);
-                plan.checkProductionConditionByBase();
+                plan.checkProductionConditionByBase(monthProductionCycleList);
                 if (YesOrNoEnum.NO.getCode().equals(plan.getIsProduction())) {
                     isInitDataPass = false;
                     failReason = StringUtils.isBlank(plan.getNoProductionReason()) ? "未知原因导致无法排产" : plan.getNoProductionReason();
