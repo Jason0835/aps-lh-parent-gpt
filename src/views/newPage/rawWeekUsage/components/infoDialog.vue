@@ -34,7 +34,9 @@ import { mapState } from "vuex";
 import {
   monthRawWeekUsage,
 } from "@/api/maindata/rawWeekUsage";
-
+import {
+  getMdmProductVersion,
+} from "@/api/maindata/rawMaterialRequirePlan​";
 
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -99,6 +101,7 @@ export default {
           },
         ],
       },
+      selectList:[]
     };
   },
   computed: {
@@ -117,6 +120,9 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+          listeners: {
+            change: this.getVersion,
+          },
         },
 
         {
@@ -126,6 +132,17 @@ export default {
           dateType: "month",
           valueFormat: "yyyy-MM",
           clearable: false,
+          listeners: {
+            change: this.getVersion,
+          },
+        },
+        {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
+          type: "select",
+          dictData: this.selectList,
+          clearable: false,
+          filterable: true,
         },
       ];
     },
@@ -173,6 +190,7 @@ export default {
           yearMonth: `${year}-${month}`,
         };
       }
+      this.getVersion()
     },
     hide() {
       this.form = {};
@@ -183,6 +201,38 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    async getVersion() {
+      try {
+        this.loading = true;
+        const params = {
+          ...this.form,
+        };
+        let arr = params.yearMonth.split("-");
+        const res = await getMdmProductVersion({
+          factoryCode: params.factoryCode,
+          year: arr[0],
+          month: arr[1],
+        });
+        let list = [];
+        for (let i = 0; i < res.length; i++) {
+          list.push({
+            label: res[i].version,
+            value: res[i].version,
+          });
+        }
+        this.selectList = list;
+        if (res.length > 0) {
+          this.$set(this.form, "version", res[0].version);
+        } else {
+          this.$set(this.form, "version", "");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+
+      }
     },
   },
 };
