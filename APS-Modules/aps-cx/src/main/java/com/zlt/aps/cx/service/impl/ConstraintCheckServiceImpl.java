@@ -40,9 +40,6 @@ public class ConstraintCheckServiceImpl implements ConstraintCheckService {
     @Autowired
     private CxPrecisionPlanMapper precisionPlanMapper;
 
-    @Autowired
-    private CxOperatorLeaveMapper operatorLeaveMapper;
-
 
 
     @Autowired
