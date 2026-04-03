@@ -61,9 +61,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     private Integer maxEmbryoCodeCount;
     /**
-     * 是否结构切换：结构切换时，设置标记
+     * 是否进行延长收尾
+     * 只在在机结构进行结构延长探测时使用
      */
-    private Boolean isChangeGroup;
+    private boolean timeExtensionFlag;
     /**
      * 实际排产规格计划
      */
@@ -94,6 +95,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         this.allocationDay = allocationDay;
         this.startDay = startDay;
         this.endDay = endDay;
+        this.timeExtensionFlag = false;
         this.realProductionPlanList = new ArrayList<>();
     }
 
@@ -231,6 +233,28 @@ public class CxMachineAllocationPlanHelper implements Serializable {
             return;
         }
         allocationDay = allocationDay - deductionDay;
+    }
+
+    /**
+     * 标记进行结构延长探测处理
+     */
+    public void markTimeExtension() {
+        this.timeExtensionFlag = true;
+    }
+
+    /**
+     * 获取延长日信息
+     * 分组名|*|成型机编号|*|排产日
+     *
+     * @param timeExtensionEndDay 分组延长收尾日
+     * @return
+     */
+    public String getTimeExtensionDayInfo(Integer timeExtensionEndDay) {
+        String timeExtensionKeyFormat = "%s|*|%s|*|%s";
+        if (null == timeExtensionEndDay) {
+            return "";
+        }
+        return String.format(timeExtensionKeyFormat, getAllocationGroup(), cxMachineCode, timeExtensionEndDay);
     }
 
     /**

@@ -217,9 +217,10 @@ public class CxMachineBaseInfoVo implements Serializable {
 
     /**
      * 获取固定机台种类数
+     *
      * @return
      */
-    public Integer getAllFixedProSizeTypes(){
+    public Integer getAllFixedProSizeTypes() {
         //设置固定结构个数,sandy+ 202.3.26
         Set<String> fixedStructureSet = new HashSet<>();
         if (StringUtils.isNotBlank(fixedStructure1)) {
@@ -235,8 +236,8 @@ public class CxMachineBaseInfoVo implements Serializable {
 
         Set<String> fixedProSizeSet = new HashSet<>();
         //设置固定机台种类数
-        if (!CollectionUtils.isEmpty(fixedStructureSet)){
-            for (String structure : fixedStructureSet){
+        if (!CollectionUtils.isEmpty(fixedStructureSet)) {
+            for (String structure : fixedStructureSet) {
                 fixedProSizeSet.add(analyseTbrProSize(structure));
             }
         }
@@ -245,10 +246,11 @@ public class CxMachineBaseInfoVo implements Serializable {
 
     /**
      * 从结构信息中解析出英寸
+     *
      * @return 英寸
      */
-    private static String analyseTbrProSize(String structureName){
-        if (StringUtil.isEmptyWithTrim(structureName)){
+    private static String analyseTbrProSize(String structureName) {
+        if (StringUtil.isEmptyWithTrim(structureName)) {
             return "";
         }
         // 正则：R后面跟数字（可能带小数点）
@@ -777,7 +779,7 @@ public class CxMachineBaseInfoVo implements Serializable {
      *
      * @param newEndDay
      */
-    public void timeExtensionOneDayConclusion(Integer newEndDay) {
+    public void timeExtensionOneDayConclusion(Context context, Integer newEndDay, CxMachineAllocationPlanHelper timeExtensionAllocation) {
         if (null == newEndDay) {
             return;
         }
@@ -785,6 +787,15 @@ public class CxMachineBaseInfoVo implements Serializable {
             return;
         }
         allocationDaySet.add(newEndDay);
+        String proSize = timeExtensionAllocation.getProductionPlanInfo().getProSizeInfo();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        //成型工装占用量
+        baseDataContainer.addUsedCount(newEndDay, proSize, cxMachineCode);
+        //分组占用每日产能
+        dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, newEndDay, timeExtensionAllocation);
+
     }
 
     /**
