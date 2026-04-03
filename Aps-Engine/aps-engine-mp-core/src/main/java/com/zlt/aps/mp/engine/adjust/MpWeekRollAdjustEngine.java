@@ -364,18 +364,21 @@ public class MpWeekRollAdjustEngine {
         }
         //1、排序：按紧急程度/普通程度
         trialAdjustList = trialAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
-        Integer newOnlineDay;
+        Integer newOnlineDay,startDay;
         FactoryMonthPlanFinalAdjustVo mpFinalVo;
         String dayField;
+        Integer lockNexDay = contextDTO.getLockEndDay()+1;
         for (MpAdjustStructureIn structureIn:trialAdjustList){
             // 设置 试制计划量
             mpFinalVo = createMpFinalAdjustVo(contextDTO, structureIn);
             if (UrgencyTypeEnum.URGENCY.getValue().equals(structureIn.getUrgencyType())){
                 //紧急,可以从调整日开始
-                newOnlineDay = getTrialNewOnlineDay(contextDTO,contextDTO.getAdjustDay(),contextDTO.getStructureDeadLine(),mpProdFinalList);
+                startDay = contextDTO.getAdjustDay() < contextDTO.getStructureStartDay() ? contextDTO.getStructureStartDay() : contextDTO.getAdjustDay();
+                newOnlineDay = getTrialNewOnlineDay(contextDTO,startDay,contextDTO.getStructureDeadLine(),mpProdFinalList);
             }else {
                 //紧急,可以从锁定次日工始
-                newOnlineDay = getTrialNewOnlineDay(contextDTO,contextDTO.getLockEndDay()+1,contextDTO.getStructureDeadLine(),mpProdFinalList);
+                startDay = lockNexDay < contextDTO.getStructureStartDay() ? contextDTO.getStructureStartDay() : lockNexDay;
+                newOnlineDay = getTrialNewOnlineDay(contextDTO,startDay,contextDTO.getStructureDeadLine(),mpProdFinalList);
             }
             if (newOnlineDay == null){
                 contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,物料编码:%s,没有获取到可上机日,可能是日限制个数或周日或结构起产日的约束!",contextDTO.getStructureName(), structureIn.getMaterialCode())).append(ApsConstant.DIVISION);
