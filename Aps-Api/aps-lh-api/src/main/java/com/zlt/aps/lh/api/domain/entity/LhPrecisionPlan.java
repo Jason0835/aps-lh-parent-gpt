@@ -34,10 +34,6 @@ public class LhPrecisionPlan extends BaseEntity implements Serializable {
     @TableField("MACHINE_CODE")
     private String machineCode;
 
-    @ApiModelProperty(value = "机台名称")
-    @TableField("MACHINE_NAME")
-    private String machineName;
-
     @ApiModelProperty(value = "精度类型")
     @TableField("PRECISION_TYPE")
     private String precisionType;

@@ -22,9 +22,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 /**
  * 硫化精度计划Service实现类
@@ -113,14 +111,23 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
                    .eq(LhPrecisionPlan::getYear, year - 1)
                    .isNotNull(LhPrecisionPlan::getActualDate)
                    .eq(LhPrecisionPlan::getIsDelete, BigDecimal.ZERO)
-                   .groupBy(LhPrecisionPlan::getMachineCode);
+                   .orderByDesc(LhPrecisionPlan::getActualDate);
 
             List<LhPrecisionPlan> lastYearPlans = list(wrapper);
             log.info("查询到{}年已完成计划{}条", year - 1, lastYearPlans.size());
 
+            Map<String, LhPrecisionPlan> machinePlanMap = new HashMap<>();
+            for (LhPrecisionPlan plan : lastYearPlans) {
+                String machineCode = plan.getMachineCode();
+                if (!machinePlanMap.containsKey(machineCode)) {
+                    machinePlanMap.put(machineCode, plan);
+                }
+            }
+
             List<LhPrecisionPlan> plansToSave = new ArrayList<>();
-            for (LhPrecisionPlan lastPlan : lastYearPlans) {
-                String machineCode = lastPlan.getMachineCode();
+            for (Map.Entry<String, LhPrecisionPlan> entry : machinePlanMap.entrySet()) {
+                String machineCode = entry.getKey();
+                LhPrecisionPlan lastPlan = entry.getValue();
 
                 LhPrecisionPlan existingPlan = baseMapper.selectByMachineCodeAndYear(machineCode, year);
                 if (existingPlan != null) {
