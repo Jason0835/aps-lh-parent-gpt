@@ -1,4 +1,4 @@
-﻿{
+{
   "ui.glueGroup.column.glueGroupCode": "胶料组别代码",
   "ui.glueGroup.column.glueGroupName": "胶料组别名称",
   "ui.glueGroup.column.orderNum": "生产顺序",
@@ -2260,8 +2260,9 @@
   "cxStock.embryoCodeNotUnique": "胎胚代码已存在，不能重复",
   "ui.data.column.cxStock.isEndingSku": "是否收尾SKU",
   "ui.frame.placeholder.selectDate": "请选择日期",
+  "ui.frame.placeholder.selectDateTime": "请选择日期时间",
   "ui.data.column.cxPrecisionPlan.modelName": "成型精度计划",
-  "ui.data.column.cxPrecisionPlan.factoryCode": "分厂编号",
+  "ui.data.column.cxPrecisionPlan.factoryCode": "工厂",
   "ui.data.column.cxPrecisionPlan.accuracyType": "精度类型",
   "ui.data.column.cxPrecisionPlan.machineCode": "机台编码",
   "ui.data.column.cxPrecisionPlan.machineName": "机台名称",
@@ -2279,5 +2280,9 @@
   "ui.data.column.cxPrecisionPlan.embryoCode": "关联胎胚编码",
   "ui.data.column.cxPrecisionPlan.remark": "备注",
   "ui.data.column.cxPrecisionPlan.actualDate": "实际完成日期",
-  "ui.data.alert.cxPrecisionPlan.notUnique": "成型机台+精度类型+计划日期组合已存在，不能重复"
+  "ui.data.alert.cxPrecisionPlan.notUnique": "成型机台+精度类型+计划日期组合已存在，不能重复",
+  "ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate": "计划开始时间不能小于计划日期",
+  "ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime": "计划结束时间不能小于计划开始时间",
+  "ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime": "上次精度日期不能大于等于计划日期",
+  "ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate": "到期日期需大于计划日期"
 }
