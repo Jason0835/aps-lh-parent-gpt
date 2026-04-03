@@ -32,4 +32,7 @@ public class ScheduleGenerateVo implements Serializable {
 
     @ApiModelProperty(value = "机台编号列表（可选，为空则排所有机台）")
     private java.util.List<String> machineCodes;
+
+    @ApiModelProperty(value = "工厂编号")
+    private String factoryCode;
 }
