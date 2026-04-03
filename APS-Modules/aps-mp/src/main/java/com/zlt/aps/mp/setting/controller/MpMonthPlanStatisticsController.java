@@ -117,7 +117,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
                     return tempFlag.equals(vo.getTempFlag());
                 })
                 .collect(Collectors.groupingBy(
-                        vo -> new AbstractMap.SimpleEntry<>(vo.getStructureName(), vo.getStructureType()),
+                        vo -> vo.getStructureName(),
                         // 分组后处理：排序取第一条（最新）
                         Collectors.collectingAndThen(
                                 Collectors.toList(),

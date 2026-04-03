@@ -180,4 +180,8 @@ public class ProductionCapacityParamConfiguration {
      * 参与排产的特殊原材料编码信息
      */
     private Set<String> specialMaterialCodeSet;
+    /**
+     * 参与Sku排产竞争的优先级高的Sku列表个数
+     */
+    private Integer heightPrioritySkuPreCount;
 }
