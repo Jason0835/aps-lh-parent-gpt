@@ -4,6 +4,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionInitLogRecorder;
@@ -167,20 +168,4 @@ public abstract class AbstractInitDataLoadService extends AbstractBaseProduction
         return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc, Function.identity(), (before, after) -> after));
     }
 
-    /**
-     * 加载月周期排产清单
-     *
-     * @param productionContext
-     */
-    protected Set<String> getMonthCycleGroupInfo(TbrProductionContext productionContext) {
-        List<MonthCycleGroupInfoVo> monthProductionCycleGroupList = getDataService().getMonthCycleGroupList(productionContext);
-        if (CollectionUtils.isEmpty(monthProductionCycleGroupList)) {
-            return Collections.emptySet();
-        }
-        Set<String> monthProductionSet = monthProductionCycleGroupList.stream().map(MonthCycleGroupInfoVo::getGroupName).collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(monthProductionSet)) {
-            return Collections.emptySet();
-        }
-        return monthProductionSet;
-    }
 }
