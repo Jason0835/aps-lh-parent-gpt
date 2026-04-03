@@ -288,6 +288,14 @@ export default {
           },
         },
         {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
+          type: "select",
+          dictData: this.selectList,
+          clearable: false,
+          filterable: true,
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
@@ -303,14 +311,7 @@ export default {
         //   prop: "材料名称",
         //   label: this.$t("材料名称"),
         // },
-        {
-          prop: "version",
-          label: this.$t("plan.planProduction.planVersion"),
-          type: "select",
-          dictData: this.selectList,
-          clearable: false,
-          filterable: true,
-        },
+
         {
           prop: "materialType",
           label: this.$t("ui.data.column.trialPlan.trialType"),
