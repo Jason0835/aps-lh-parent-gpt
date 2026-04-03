@@ -2772,6 +2772,11 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setDayVulcanizationQty(adjustStructInVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructInVo.getCuringTime());
         mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
+        if (contextDTO.getOemBrandConfigSet().contains(mpFinalVo.getBrand())){
+            mpFinalVo.setOemFlag(YesOrNoEnum.YES.getCode());
+        }else {
+            mpFinalVo.setOemFlag(YesOrNoEnum.NO.getCode());
+        }
 
         mpFinalVo.setPostponeProductionQty( 0);
         mpFinalVo.setHeightProductionQty(0);
@@ -2821,7 +2826,11 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setDayVulcanizationQty(adjustStructOutVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructOutVo.getCuringTime());
         mpFinalVo.setHasSpecialMaterial(adjustStructOutVo.getHasSpecialMaterial());
-
+        if (contextDTO.getOemBrandConfigSet().contains(mpFinalVo.getBrand())){
+            mpFinalVo.setOemFlag(YesOrNoEnum.YES.getCode());
+        }else {
+            mpFinalVo.setOemFlag(YesOrNoEnum.NO.getCode());
+        }
         mpFinalVo.setPostponeProductionQty( 0);
         mpFinalVo.setHeightProductionQty(0);
         mpFinalVo.setCycleProductionQty(0);
