@@ -124,6 +124,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_PRODUCTION_CX_MACHINE("MP2104", "因没有分配到成型产能，整个结构不排", "alg.data.groupCapacity.NoAllocationCxMachineCapacity"),
     /**
+     * MP2105 周期结构不在月周期排产清单，整个结构不排
+     */
+    NO_PRODUCTION_NO_MONTH_LIST("MP2105","周期结构不在月周期排产清单，整个结构不排", "alg.data.initCheck.noExistMonthCycleGroupList"),
+    /**
      * MP2201 成型产能不足，整个英寸不排
      */
     EXCEED_CX_CAPACITY_WHOLE_PRO_SIZE("MP2201", "成型产能不足，整个英寸不排", "alg.data.groupCapacity.exceedCxCapacityWholeProSize"),

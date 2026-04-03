@@ -7,6 +7,7 @@ import cn.hutool.core.util.StrUtil;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.ThreadPoolManager;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -327,6 +328,21 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 .collect(Collectors.toSet());
 
         CollUtil.filter(adjustDetailList, item -> structureNameSet.contains(item.getStructureName()));
+
+        // 排除手动新增且在月计划中不存在的结构
+        Set<String> monthStructureNameSet = contextDTO.getFactoryMonthPlanProdFinalList().stream()
+                .filter(vo -> StringUtils.isNotEmpty(vo.getStructureName()))
+                .map(FactoryMonthPlanFinalAdjustVo::getStructureName)
+                .collect(Collectors.toSet());
+
+        Set<String> addStructureNameSet = contextDTO.getStructureAllocationList().stream()
+                .filter(vo -> DataSourceEnum.HAND.getCode().equals(vo.getDataSource()))
+                .map(MpStructureAllocation::getStructureName)
+                .collect(Collectors.toSet());
+
+        CollUtil.filter(adjustDetailList, item -> !addStructureNameSet.contains(item.getStructureName())
+                || (addStructureNameSet.contains(item.getStructureName()) && monthStructureNameSet.contains(item.getStructureName())));
+
     }
 
 

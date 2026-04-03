@@ -169,6 +169,10 @@ public class ProductionCapacityParamConfiguration {
     private Integer structureBillPreCount;
 
     /**
+     * SYS0203015 外销贴牌是否参与结构优先级的竞争
+     */
+    private Boolean oemJoinStructurePriority;
+    /**
      * 是否写入日志
      */
     private String isWriteCycleLog;

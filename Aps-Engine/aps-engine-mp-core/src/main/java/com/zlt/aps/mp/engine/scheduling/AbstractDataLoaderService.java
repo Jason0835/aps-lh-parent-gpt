@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.scheduling;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.Constant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.CheckItemTypeEnums;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
@@ -482,6 +483,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
         paramCodeList.add(MonthPlanEnums.STRUCTURE_BILL_PRE_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.OEM_JOIN_STRUCTURE_PRIORITY.getCode());
         //降膜排产相关
         paramCodeList.add(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode());
@@ -528,6 +530,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setReservePercent((Integer) paramConfigurationMap.get(MonthPlanEnums.RESERVE_PERCENT.getCode()));
         //按高优先级SKU个数降序的结构清单-前 X 个结构，单位个
         configuration.setStructureBillPreCount((Integer) paramConfigurationMap.get(MonthPlanEnums.STRUCTURE_BILL_PRE_COUNT.getCode()));
+        //外销贴牌是否参与结构优先级的竞争
+        String oemJoinStructurePriority = (String) paramConfigurationMap.get(MonthPlanEnums.OEM_JOIN_STRUCTURE_PRIORITY.getCode());
+        configuration.setOemJoinStructurePriority(FactoryConstant.YES_VALUE.equals(oemJoinStructurePriority));
 
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));

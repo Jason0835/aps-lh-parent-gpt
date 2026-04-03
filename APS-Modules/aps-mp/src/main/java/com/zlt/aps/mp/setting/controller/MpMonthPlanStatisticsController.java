@@ -84,9 +84,10 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanStatistics queryVO) {
+        String tempFlag = queryVO.getTempFlag();
         queryVO.setTempFlag(null);
         TableDataInfo tableDataInfo = super.list(queryVO);
-        filterByGroup(tableDataInfo, queryVO.getTempFlag());
+        filterByGroup(tableDataInfo, tempFlag);
         handleZeroToNull(tableDataInfo.getRows());
         return tableDataInfo;
     }

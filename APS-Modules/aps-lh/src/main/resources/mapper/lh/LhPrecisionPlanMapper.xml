@@ -7,7 +7,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan" id="LhPrecisionPlanResult">
         <id     property="id"                   column="ID"                     />
         <result property="machineCode"          column="MACHINE_CODE"           />
-        <result property="machineName"          column="MACHINE_NAME"           />
         <result property="precisionType"        column="PRECISION_TYPE"         />
         <result property="planDate"             column="PLAN_DATE"              />
         <result property="actualDate"           column="ACTUAL_DATE"            />
@@ -32,7 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectLhPrecisionPlanVo">
-        select ID, MACHINE_CODE, MACHINE_NAME, PRECISION_TYPE, PLAN_DATE, ACTUAL_DATE, DUE_DATE, DAYS_TO_DUE,
+        select ID, MACHINE_CODE, PRECISION_TYPE, PLAN_DATE, ACTUAL_DATE, DUE_DATE, DAYS_TO_DUE,
                LAST_MAINTENANCE_DATE, COMPLETION_STATUS, YEAR, WARNING_STATUS, WARNING_DATE, IS_WARNING_SENT,
                DATA_SOURCE, MES_SOURCE_ID, COMPANY_CODE, FACTORY_CODE, CREATE_BY, CREATE_TIME, UPDATE_BY,
                UPDATE_TIME, IS_DELETE, REMARK
@@ -45,9 +44,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             IS_DELETE = 0
             <if test="machineCode != null and machineCode != ''">
                 AND MACHINE_CODE like concat('%', #{machineCode}, '%')
-            </if>
-            <if test="machineName != null and machineName != ''">
-                AND MACHINE_NAME like concat('%', #{machineName}, '%')
             </if>
             <if test="precisionType != null and precisionType != ''">
                 AND PRECISION_TYPE = #{precisionType}

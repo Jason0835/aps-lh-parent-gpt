@@ -230,6 +230,15 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 常规储备量是否加入排产净需求
+     *
+     * @return
+     */
+    public boolean isAddNetQtyByConventionReserve() {
+        return YesOrNoEnum.YES.getCode().equals(getIsAddNetQty());
+    }
+
+    /**
      * 是否需要排产暂缓的类型计划
      * 实单模拟及产量预测类型需要进行暂缓订单排产
      *
@@ -322,12 +331,27 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         } else {
             plan.setIsProduction(require.getIsProduction());
         }
+        Integer sum = Optional.ofNullable(plan.getNetQty()).orElse(BigDecimal.ZERO.intValue());
         if (plan.isNeedPostponeTypePlan()) {
             //20260204 实单模拟及产能预测需要排产暂缓订单
-            Integer sum = Optional.ofNullable(plan.getNetQty()).orElse(BigDecimal.ZERO.intValue());
             sum = sum + Optional.ofNullable(plan.getPostponeQty()).orElse(BigDecimal.ZERO.intValue());
             plan.setNetQty(sum);
         }
+        Integer sumAddNetQty = Optional.ofNullable(plan.getAddNetQty()).orElse(BigDecimal.ZERO.intValue());
+        //20260403+ 常规储备量，如果参与排产则加入到排产净需求中，本身设置为量
+        plan.setIsAddNetQty(require.getIsSchecule());
+        if (plan.isAddNetQtyByConventionReserve()) {
+            //常规储备量加入排产净需求中
+            Integer conventionReserveQty = Optional.ofNullable(plan.getConventionReserveQty()).orElse(BigDecimal.ZERO.intValue());
+            sum = sum + conventionReserveQty;
+            plan.setNetQty(sum);
+            sumAddNetQty = sumAddNetQty + conventionReserveQty;
+            //常规储备量置为量
+            plan.setConventionReserveQty(BigDecimal.ZERO.intValue());
+            //存储增加的排产净需求量
+            plan.setAddNetQty(sumAddNetQty);
+        }
+
         return plan;
     }
 
@@ -592,15 +616,17 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 检测基本的排产条件
      * 并标记不排产原因及不排产标记
      * 初始化阶段使用
+     *
+     * @param monthProductionCycleList 月周期排产结果清单
      */
-    public void checkProductionConditionByBase() {
+    public void checkProductionConditionByBase(Set<String> monthProductionCycleList) {
         //检测是否符合不排产，且不用往下继续检测的业务场景
         String isProduction = checkNoContinueCondition();
         if (YesOrNoEnum.NO.getCode().equals(isProduction)) {
             return;
         }
         //检查物料基础业务
-        isProduction = checkMaterialCondition(isProduction);
+        isProduction = checkMaterialCondition(isProduction, monthProductionCycleList);
         //检查施工业务
         isProduction = checkConstructionCondition(isProduction);
         //检查模具业务
@@ -712,9 +738,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 检查物料基础业务
      *
      * @param isProduction
+     * @param monthProductionCycleList 月周期排产结果清单
      * @return
      */
-    private String checkMaterialCondition(String isProduction) {
+    private String checkMaterialCondition(String isProduction, Set<String> monthProductionCycleList) {
         //没有英寸
         if (StringUtils.isBlank(getProSize())) {
             isProduction = YesOrNoEnum.NO.getCode();
@@ -726,10 +753,18 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return isProduction;
         }
         //全钢 - 结构
-        if (StringUtils.isBlank(getStructureName())) {
+        String structureName = getStructureName();
+        if (StringUtils.isBlank(structureName)) {
             isProduction = YesOrNoEnum.NO.getCode();
             String noStructureNameReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_STRUCTURE_NAME);
             addNoProductionReason(noStructureNameReason);
+        } else {
+            //20260403+ 周期结构需判断是否在月周期清单中
+            if (ProductionGroupTypeEnum.CYCLE.getGroupType().equals(getStructureType()) && !monthProductionCycleList.contains(structureName)) {
+                isProduction = YesOrNoEnum.NO.getCode();
+                String noProductionListReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_PRODUCTION_NO_MONTH_LIST);
+                addNoProductionReason(noProductionListReason);
+            }
         }
         //全钢 - 主花纹
         if (StringUtils.isBlank(getMainPattern())) {

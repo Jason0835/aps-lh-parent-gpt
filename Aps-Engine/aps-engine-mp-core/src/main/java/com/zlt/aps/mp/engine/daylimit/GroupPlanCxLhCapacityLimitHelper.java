@@ -61,7 +61,10 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 理论最大硫化机台(因切换结构首日减机台，引入)
      */
     private Integer maxTheoryLhMachineCount;
-
+    /**
+     * 每日最低硫化机台数：按成型配比+末尾一台最低
+     */
+    private Integer dayMinLhMachineInfo;
     /**
      * 实单最低硫化机台数,到机台需要进行组合
      */

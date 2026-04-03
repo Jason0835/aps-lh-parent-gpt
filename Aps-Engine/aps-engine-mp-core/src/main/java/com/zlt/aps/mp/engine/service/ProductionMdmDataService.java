@@ -1,13 +1,12 @@
 package com.zlt.aps.mp.engine.service;
 
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.ProductALevelVo;
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.MachineCountDto;
-import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.vo.ProductALevelVo;
 import com.zlt.aps.mp.engine.domain.vo.*;
-import io.swagger.models.auth.In;
 
 import java.util.List;
 import java.util.Map;
@@ -46,6 +45,14 @@ public interface ProductionMdmDataService {
     List<ProductionDayInfoVo> getProductCalendar(Context context);
 
     /**
+     * 根据工厂、排产信息获取工厂对应的月排产周期结构清单
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    List<MonthCycleGroupInfoVo> getMonthCycleGroupList(Context context);
+
+    /**
      * 获取结构最小硫化机台配比信息
      *
      * @param context           排产上下文
@@ -76,6 +83,7 @@ public interface ProductionMdmDataService {
 
     /**
      * 获取硫化机台数
+     *
      * @param context
      * @return
      */
@@ -83,6 +91,7 @@ public interface ProductionMdmDataService {
 
     /**
      * 获取工作日历
+     *
      * @param context
      * @return
      */
@@ -128,6 +137,7 @@ public interface ProductionMdmDataService {
      * @return
      */
     List<EmbryoSpecialMaterialInfoVo> getEmbryoSpecialMaterialInfoByRequire(Context context);
+
     /**
      * 获取特殊材料库存
      *

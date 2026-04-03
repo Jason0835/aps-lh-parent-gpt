@@ -150,7 +150,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                         return;
                     }
                     List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
-                    cxAddSkuProductionHandler.productionAddSkuBySingleGroup(context, groupPlanInfo, structureName, entry.getValue(), continueCxMachineAllocation);
+                    cxAddSkuProductionHandler.productionAddSkuBySingleGroup(context, groupPlanInfo, structureName, entry.getValue(), continueCxMachineAllocation, new HashSet<>());
                 });
     }
 

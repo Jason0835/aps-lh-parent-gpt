@@ -118,6 +118,11 @@ public enum MonthPlanEnums {
     STRUCTURE_BILL_PRE_COUNT("SYS0203014", "按高优先级SKU个数降序的结构清单-前 X 个结构，单位个"),
 
     /**
+     * SYS0203015	外销贴牌是否参与结构优先级的竞争
+     */
+    OEM_JOIN_STRUCTURE_PRIORITY("SYS0203015", "外销贴牌是否参与结构优先级的竞争"),
+
+    /**
      * SYS0204001 SKU总净需求量<=该值，SKU一次性排产
      */
     SUM_PRODUCTION_QTY("SYS0204001", "SKU总净需求量<=该值，SKU一次性排产"),

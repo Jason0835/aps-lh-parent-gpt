@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -118,6 +117,18 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
     }
 
     @Override
+    public List<MonthCycleGroupInfoVo> getMonthCycleGroupList(Context context) {
+        if (isEmptyFactoryAndRequireVersion(context)) {
+            return Collections.emptyList();
+        }
+        List<MonthCycleGroupInfoVo> monthList = factoryMonthPlanProductLhCapacityMapper.getMonthCycleGroupListInfo(context.getFactoryCode(), context.getYear(), context.getMonth());
+        if (CollectionUtils.isEmpty(monthList)) {
+            return Collections.emptyList();
+        }
+        return monthList;
+    }
+
+    @Override
     public List<MonthPlanStructureLhRatioVo> getLhRatioInfo(Context context, List<String> structureNameList) {
         String factoryCode = context.getFactoryCode();
         if (StringUtils.isBlank(factoryCode) || CollectionUtils.isEmpty(structureNameList)) {
@@ -181,8 +192,8 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         queryWrapper.eq("YEAR", context.getYear());
         queryWrapper.eq("MONTH", context.getMonth());
         List<MdmWorkCalendar> workCalendarList = mdmWorkCalendarEntityMapper.selectList(queryWrapper);
-        Map<Integer, MdmWorkCalendar> workCalendarMap = workCalendarList.stream().collect(Collectors.groupingBy(item->item.getDay(),
-                Collectors.collectingAndThen(Collectors.toList(),m-> {
+        Map<Integer, MdmWorkCalendar> workCalendarMap = workCalendarList.stream().collect(Collectors.groupingBy(item -> item.getDay(),
+                Collectors.collectingAndThen(Collectors.toList(), m -> {
                     return m.get(0);
                 })));
         return workCalendarMap;

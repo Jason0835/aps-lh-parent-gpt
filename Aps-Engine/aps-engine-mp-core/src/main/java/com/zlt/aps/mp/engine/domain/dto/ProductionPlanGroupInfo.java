@@ -169,6 +169,17 @@ public class ProductionPlanGroupInfo {
      * 是否最后一个特殊材料结构
      */
     private Boolean isLatestSpecialMaterial;
+
+    /**
+     * OEM是否参与结构优先级竞争
+     */
+    private Boolean oemJoinStructurePriority;
+
+    /**
+     *  OEM品牌集合
+     */
+    private Set<String> oemBrandSet;
+
     /**
      * 是否需要提前收尾处理
      * 特殊材料的结构进行拉量时，不能进行提前收尾处理
@@ -197,6 +208,7 @@ public class ProductionPlanGroupInfo {
         groupInfo.setFixedCxMachineSet(new HashSet<>());
         groupInfo.setIsLatestSpecialMaterial(false);
         groupInfo.setHasBeforeConclusionHandler(true);
+
         //默认不含特殊材料信息
         groupInfo.setEmbryoSpecialMaterialInfoMap(Collections.emptyMap());
         if (CollectionUtils.isEmpty(groupPlanData)) {
@@ -209,6 +221,10 @@ public class ProductionPlanGroupInfo {
         }
         // 判断如果是特殊结构，需要判断是否最后一个结构
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        // OEM是否参与结构优先级竞争 sandy+ 2026.4.3
+        groupInfo.setOemJoinStructurePriority(productionContext.getBaseDataContainer().getParamConfiguration().getOemJoinStructurePriority());
+        // OEM品牌集合
+        groupInfo.setOemBrandSet(productionContext.getBaseDataContainer().getParamConfiguration().getOemBrandConfig());
         // 胎胚与特殊材料对应关系清单
         Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
         // 本结构涉及的特殊材料清单
@@ -1110,6 +1126,13 @@ public class ProductionPlanGroupInfo {
         List<MonthPlanProductionRequirePlanVo> hasHeightProductionList = hasProductionList.stream().filter(heightProductionPlan -> heightProductionPlan.getHeightProductionQty() > BigDecimal.ZERO.longValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasHeightProductionList)) {
             return BigDecimal.ZERO.intValue();
+        }
+        if (!oemJoinStructurePriority){
+            // OEM不参与结构优先级竞争
+            hasHeightProductionList = hasHeightProductionList.stream().filter(heightProductionPlan -> !oemBrandSet.contains(heightProductionPlan.getBrand())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(hasHeightProductionList)) {
+                return BigDecimal.ZERO.intValue();
+            }
         }
         Set<String> materialSet = hasHeightProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(materialSet)) {

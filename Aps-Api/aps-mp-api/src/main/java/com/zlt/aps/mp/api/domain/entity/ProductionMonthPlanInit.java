@@ -408,6 +408,19 @@ public class ProductionMonthPlanInit extends BaseEntity {
     private Integer netQty;
 
     /**
+     * 常规搭配是否加入排产净需求
+     */
+    @ApiModelProperty(value = "加入排产净需求", name = "isAddNetQty")
+    @TableField(value = "IS_ADD_NET_QTY")
+    private String isAddNetQty;
+
+    /**
+     * 加入排产净需求的量
+     */
+    @ApiModelProperty(value = "加入排产净需求的量", name = "addNetQty")
+    @TableField(value = "ADD_NET_QTY")
+    private Integer addNetQty;
+    /**
      * 净需求(含暂缓)
      */
     @Excel(name = "ui.data.column.productionMonthPlanInit.postponeNetQty", cellType = Excel.ColumnType.NUMERIC)

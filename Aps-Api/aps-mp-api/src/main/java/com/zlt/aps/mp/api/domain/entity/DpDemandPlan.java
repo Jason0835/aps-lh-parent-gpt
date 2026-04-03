@@ -426,6 +426,14 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "是否EXCEL导入", name = "isImport")
     @TableField(value = "IS_IMPORT")
     private String isImport;
+    
+    /**
+     * 是否参与排产
+     */
+    @Excel(name = "ui.data.column.demandPlan.isSchedule", dictType = "biz_yes_no")
+    @ApiModelProperty(value = "是否参与排产", name = "isSchecule")
+    @TableField(value = "IS_SCHECULE")
+    private String isSchecule;
     /**
      * 需求版本号前缀
      */

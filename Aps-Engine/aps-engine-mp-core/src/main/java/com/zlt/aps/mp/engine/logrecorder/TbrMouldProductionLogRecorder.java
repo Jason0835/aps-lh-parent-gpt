@@ -417,6 +417,25 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加 分组结构排产成型机台硫化组排产Sku没有实际排产量日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有实际排产量====
+     *
+     * @param context       排程上下文
+     * @param groupName     分组名-结构
+     * @param cxMachineCode 成型机台编码
+     * @param materialDesc  Sku信息
+     * @return
+     */
+    public static String addLhGroupSkuNoRealProductionQtyLog(Context context, String groupName, String cxMachineCode, String materialDesc) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，物料：%s 没有实际排产量====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineCode, materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加分组结构排产成型机台硫化组使用模具排产Sku日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 物料：%s 使用模具[%s]排产 %s~%s====
      *
