@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { saveAs } from 'file-saver'
 
 // 查询成型库存列表
 export function listCxStock(query) {
@@ -22,8 +23,8 @@ export function saveCxStock(data) {
 export function removeCxStock(ids) {
   return request({
     url: '/cx/cxStock/remove',
-    method: 'delete',
-    data: ids
+    method: 'post',
+    params: { ids: ids }
   })
 }
 
@@ -47,9 +48,12 @@ export function checkCxStockUnique(data) {
 // 导出成型库存
 export function exportCxStock(query, fileName) {
   return request({
-    url: `/cx/cxStock/export`,
-    method: 'get',
-    params: query,
+    url: `/cx/cxStock/exportData/${encodeURIComponent(fileName)}`,
+    method: 'post',
+    data: query,
     responseType: 'blob'
+  }).then(data => {
+    const blob = new Blob([data])
+    saveAs(blob, fileName + '.xlsx')
   })
 }

@@ -8,6 +8,20 @@
   >
     <el-form ref="form" :model="form" :rules="rules" label-width="100px">
       <el-row>
+        <el-row>
+          <el-col :span="24">
+            <el-form-item :label="$t('ui.data.column.cxStock.factoryCode')" prop="factoryCode">
+              <el-select v-model="form.factoryCode" filterable clearable :placeholder="$t('common.rule.select')" style="width: 100%">
+                <el-option
+                  v-for="item in dict.type.biz_factory_name"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-col :span="24">
           <el-form-item :label="$t('ui.data.column.cxStock.stockDate')" prop="stockDate">
             <el-date-picker
@@ -55,12 +69,13 @@
           </el-form-item>
         </el-col>
       </el-row>
+
       <el-row>
         <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.factoryCode')" prop="factoryCode">
-            <el-select v-model="form.factoryCode" filterable clearable :placeholder="$t('common.rule.select')" style="width: 100%">
+          <el-form-item :label="$t('ui.data.column.cxStock.isEndingSku')" prop="isEndingSku">
+            <el-select v-model="form.isEndingSku" filterable clearable :placeholder="$t('common.rule.select')" style="width: 100%">
               <el-option
-                v-for="item in dict.type.biz_factory_name"
+                v-for="item in dict.type.biz_yes_no"
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"
@@ -112,7 +127,9 @@ export default {
         this.form = { ...row }
       } else {
         this.title = this.$t('ui.frame.btn.add') + this.$t('ui.data.column.cxStock.modelName')
-        this.form = {}
+        this.form = {
+          isEndingSku: "0"
+        }
       }
       this.visible = true
     },

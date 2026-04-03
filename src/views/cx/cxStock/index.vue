@@ -35,42 +35,54 @@
         </el-button>
       </template>
     </page-table>
-    <tlt-upload-form
-      ref="uploadRef"
-      :updateSupport="true"
-      :downloadUrl="importTemplateUrl"
-      :uploadUrl="importUrl"
-      @uploadSuccess="getList"
-      labelWidth="0"
-    />
+  <tlt-upload-form
+    ref="uploadRef"
+    :updateSupport="true"
+    downloadUrl="/cx/cxStock/importTemplate"
+    uploadUrl="/cx/cxStock/importData"
+    @uploadSuccess="getList"
+    labelWidth="0"
+    :columns="importColumns"
+  />
     <info-dialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listCxStock, removeCxStock, exportCxStock } from '@/api/cx/cxStock'
+import { listCxStock, removeCxStock } from '@/api/cx/cxStock'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
 
 export default {
   name: 'CxStock',
   components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name'],
+  dicts: ['biz_factory_name', 'biz_yes_no'],
   provide() {
     return { parentDict: this.dict }
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: '',
+          prop: 'updateSupport',
+          render: (form) => {
+            return (
+              <el-checkbox label={this.$t('common.rule.updateSupport')} v-model={form.updateSupport}>
+                {this.$t('common.rule.updateSupport')}
+              </el-checkbox>
+            )
+          }
+        }
+      ],
       loading: false,
       data: [],
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
       search: {},
-      query: {},
-      importUrl: '/cx/cxStock/importData',
-      importTemplateUrl: '/cx/cxStock/importTemplate'
+      query: {}
     }
   },
   computed: {
@@ -79,9 +91,11 @@ export default {
         {
           prop: 'stockDate',
           label: this.$t('ui.data.column.cxStock.stockDate'),
-          type: 'daterange',
-          startPlaceholder: this.$t('ui.frame.placeholder.startDate'),
-          endPlaceholder: this.$t('ui.frame.placeholder.endDate'),
+          type: 'date',
+          dateType: 'daterange',
+          valueFormat: 'yyyy-MM-dd',
+          startPlaceholder: this.$t('common.startTime'),
+          endPlaceholder: this.$t('common.endTime'),
           clearable: true
         },
         {
@@ -97,12 +111,30 @@ export default {
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
           clearable: true
+        },
+        {
+          prop: 'isEndingSku',
+          label: this.$t('ui.data.column.cxStock.isEndingSku'),
+          type: 'select',
+          dictData: this.dict.type.biz_yes_no,
+          filterable: true,
+          clearable: true
         }
       ]
     },
     columns() {
       return [
         { type: 'selection', fixed: 'left' },
+        {
+          prop: 'factoryCode',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStock.factoryCode'),
+          minWidth: 140,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          }
+        },
         {
           prop: 'stockDate',
           align: 'center',
@@ -145,14 +177,15 @@ export default {
           label: this.$t('ui.data.column.cxStock.badNum'),
           minWidth: 120
         },
+
         {
-          prop: 'factoryCode',
+          prop: 'isEndingSku',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.factoryCode'),
-          minWidth: 140,
+          label: this.$t('ui.data.column.cxStock.isEndingSku'),
+          minWidth: 120,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           }
         },
         {
@@ -200,11 +233,11 @@ export default {
     handleEdit(row) {
       if (row) this.$refs.infoRef.show(row)
     },
-    handleDelete(row) {
-      this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
-        const ids = row ? [row.id] : this.selection.map(r => r.id)
-        this.loading = true
-        removeCxStock(ids)
+  handleDelete(row) {
+    this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
+      const ids = row && row.id ? row.id : this.selection.map(r => r.id).join(',')
+      this.loading = true
+      removeCxStock(ids)
           .then(res => {
             this.$modal.msgSuccess(res.msg)
             this.page.current = 1
@@ -213,10 +246,9 @@ export default {
           .finally(() => (this.loading = false))
       })
     },
-    handleExport() {
-      const fileName = this.$t('ui.data.column.cxStock.modelName')
-      exportCxStock(this.formatParams(false), fileName)
-    },
+  handleExport() {
+    downloadLink('/cx/cxStock/export', this.formatParams(false))
+  },
     handleSearch(data) {
       this.query = { ...data }
       if (data.stockDate && data.stockDate.length === 2) {
@@ -226,6 +258,7 @@ export default {
         this.query.startTime = undefined
         this.query.endTime = undefined
       }
+      delete this.query.stockDate
       this.page.current = 1
       this.getList()
     },
