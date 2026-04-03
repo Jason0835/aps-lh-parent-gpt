@@ -48,13 +48,4 @@ public class MdmStructureTreadConfig extends BaseEntity implements Serializable 
     @TableField(value = "COMPANY_CODE")
     private String companyCode;
 
-
-
-
-    /**
-     * 班次
-     */
-    @ApiModelProperty(value = "班次")
-    @TableField(value = "SHIFT_CODE")
-    private String shiftCode;
 }
