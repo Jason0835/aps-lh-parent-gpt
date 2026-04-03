@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -108,32 +110,48 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
         }
 
         List<MpMonthPlanStatistics> sourceList = (List<MpMonthPlanStatistics>) tableDataInfo.getRows();
-        String targetTempFlag = StringUtils.isEmpty(tempFlag) ? YesOrNoEnum.YES.getCode() : tempFlag;
-
-        // 2. 双字段分组：key = structureName + structureType
-        Map<AbstractMap.SimpleEntry<String, String>, List<MpMonthPlanStatistics>> groupMap = sourceList.stream()
-                .collect(Collectors.groupingBy(
-                        item -> new AbstractMap.SimpleEntry<>(
-                                item.getStructureName(),
-                                item.getStructureType()
-                        )
-                ));
-
-        // 3. 遍历每组数据，执行优先级筛选
-        List<MpMonthPlanStatistics> resultList = groupMap.values().stream()
-                .map(groupData -> {
-                    // 优先查找 tempFlag = 0 的数据
-                    Optional<MpMonthPlanStatistics> flagZeroData = groupData.stream()
-                            .filter(item -> targetTempFlag.equals(item.getTempFlag()))
-                            .findFirst();
-                    // 有0则取0，无0则取组内第一条数据
-                    return flagZeroData.orElse(groupData.get(0));
+        List<MpMonthPlanStatistics> resultList = sourceList.stream()
+                .filter(vo -> {
+                    if (StringUtils.isEmpty(tempFlag)) {
+                        return true;
+                    }
+                    return tempFlag.equals(vo.getTempFlag());
                 })
+                .collect(Collectors.groupingBy(
+                        vo -> new AbstractMap.SimpleEntry<>(vo.getStructureName(), vo.getStructureType()),
+                        // 分组后处理：排序取第一条（最新）
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                groupData -> getLatestOne(groupData)
+                        )
+                ))
+                .values()
+                .stream()
                 .collect(Collectors.toList());
+
         tableDataInfo.setRows(resultList);
         tableDataInfo.setTotal(Convert.toLong(resultList.size()));
     }
 
+    /**
+     * 单组数据：按更新时间降序，取最新的一条
+     */
+    private MpMonthPlanStatistics getLatestOne(List<MpMonthPlanStatistics> groupList) {
+        if (PubUtil.isEmpty(groupList)) {
+            return null;
+        }
+        // 时间降序排序 + null时间排最后 + 取第一条
+        return groupList.stream()
+                .sorted(
+                        // 按updateTime排序，null值放在最后
+                        Comparator.comparing(
+                                MpMonthPlanStatistics::getUpdateTime,
+                                Comparator.nullsLast(Date::compareTo)
+                        ).reversed()
+                )
+                .findFirst()
+                .orElse(null);
+    }
 
 
     /**
