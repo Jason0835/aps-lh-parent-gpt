@@ -142,7 +142,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
             
             for (MonthPlanNoProductionPlan item : list) {
                 int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
-                item.setFactProdReqQty(factProdQty);
+                item.setTotalQty((long) factProdQty);
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0L;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0L;
                 long actualOrderUnproduced = heightQty + midQty - factProdQty;
@@ -360,14 +360,17 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 listDataMap.put("cycleReserveQty", item.getCycleReserveQty() != null ? item.getCycleReserveQty() : 0);
                 listDataMap.put("conventionReserveQty", item.getConventionReserveQty() != null ? item.getConventionReserveQty() : 0);
                 listDataMap.put("heightLossQty", item.getHeightLossQty() != null ? item.getHeightLossQty() : 0);
+                listDataMap.put("factProdReqQty", item.getFactProdReqQty() != null ? item.getFactProdReqQty() : 0);
                 listDataMap.put("unProductionQty", item.getUnProductionQty() != null ? item.getUnProductionQty() : 0);
 
+                // 实际排产从 t_mp_moulding_day_result 表获取 totalQty
+                int totalQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
+                listDataMap.put("totalQty", totalQty);
+                
                 // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0;
-                int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
-                long actualOrderUnproduced = heightQty + midQty - factProdQty;
-                listDataMap.put("factProdReqQty", factProdQty);
+                long actualOrderUnproduced = heightQty + midQty - totalQty;
                 listDataMap.put("actualOrderUnproduced", actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0);
                 // 更新日期
                 if (item.getUpdateTime() != null) {
