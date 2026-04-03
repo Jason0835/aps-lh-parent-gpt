@@ -94,17 +94,15 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
 
 
     /**
-     * 按规则筛选数据：
-     * 1. 按 structureName + structureType 分组
-     * 2. 组内优先取 tempFlag=1 的数据
-     * 3. 无1则取组内第一条数据
-     *
+     * 按规则筛选数据:
+     * 分组：产品结构 + 结构类型
+     * 临时标识有值：按照临时标识过滤，组内去最新的数据
+     * 临时标识无值：组内去最新的数据
      * @param tableDataInfo 原始数据集合
      * @param tempFlag 临时标识
      * @return
      */
     public void filterByGroup(TableDataInfo tableDataInfo, String tempFlag) {
-        // 1. 空集合直接返回空列表，避免空指针
         if (PubUtil.isEmpty(tableDataInfo.getRows())) {
             return;
         }
