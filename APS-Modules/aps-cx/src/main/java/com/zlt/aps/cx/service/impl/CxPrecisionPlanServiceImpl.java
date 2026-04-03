@@ -21,6 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -107,21 +110,74 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 continue;
             }
 
-            LambdaQueryWrapper<MdmMoldingMachine> machineWrapper = new LambdaQueryWrapper<>();
-            machineWrapper.eq(MdmMoldingMachine::getCxMachineCode, docEntity.getMachineCode());
-            if (StringUtil.isNotBlank(docEntity.getFactoryCode())) {
-                machineWrapper.eq(MdmMoldingMachine::getFactoryCode, docEntity.getFactoryCode());
-            }
-            machineWrapper.last("LIMIT 1");
-            MdmMoldingMachine machine = moldingMachineMapper.selectOne(machineWrapper);
-            if (machine == null) {
-                failureNum++;
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+        LambdaQueryWrapper<MdmMoldingMachine> machineWrapper = new LambdaQueryWrapper<>();
+        machineWrapper.eq(MdmMoldingMachine::getCxMachineCode, docEntity.getMachineCode());
+        if (StringUtil.isNotBlank(docEntity.getFactoryCode())) {
+            machineWrapper.eq(MdmMoldingMachine::getFactoryCode, docEntity.getFactoryCode());
+        }
+        machineWrapper.last("LIMIT 1");
+        MdmMoldingMachine machine = moldingMachineMapper.selectOne(machineWrapper);
+        if (machine == null) {
+            failureNum++;
+            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                     errorNum, String.format(machineNotExistMsg, errorNum, docEntity.getMachineCode()), importErrorLogs);
+            continue;
+        }
+
+        if (docEntity.getPlanStartTime() != null && docEntity.getPlanDate() != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String planDateStr = sdf.format(docEntity.getPlanDate());
+            String startTimeStr = sdf.format(docEntity.getPlanStartTime());
+            if (startTimeStr.compareTo(planDateStr) < 0) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, String.format(message, errorNum), importErrorLogs);
                 continue;
             }
+        }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+        if (docEntity.getPlanStartTime() != null && docEntity.getPlanEndTime() != null) {
+            if (docEntity.getPlanEndTime().before(docEntity.getPlanStartTime())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+            long diffMillis = docEntity.getPlanEndTime().getTime() - docEntity.getPlanStartTime().getTime();
+            double hours = diffMillis / (1000.0 * 60 * 60);
+            BigDecimal estimatedHours = BigDecimal.valueOf(hours).setScale(1, RoundingMode.HALF_UP);
+            docEntity.setEstimatedHours(estimatedHours);
+        }
+
+        if (docEntity.getPlanDate() != null && docEntity.getLastPrecisionDate() != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String planDateStr = sdf.format(docEntity.getPlanDate());
+            String lastPrecisionStr = sdf.format(docEntity.getLastPrecisionDate());
+            if (lastPrecisionStr.compareTo(planDateStr) >= 0) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+        }
+
+        if (docEntity.getPlanDate() != null && docEntity.getDueDate() != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String planDateStr = sdf.format(docEntity.getPlanDate());
+            String dueDateStr = sdf.format(docEntity.getDueDate());
+            if (dueDateStr.compareTo(planDateStr) <= 0) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+        }
+
+        if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
                 importList.add(docEntity);
                 successNum++;
             } else {
