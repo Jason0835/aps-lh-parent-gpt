@@ -3,6 +3,7 @@ package com.zlt.aps.cx.api.domain.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -11,22 +12,10 @@ import lombok.Data;
 
 import java.util.Date;
 
-/**
- * @ClassName CxStock
- * @Description TODO
- * @Author Joran.Zhang
- * @Date ${Date} ${Time}
- * @Version 1.0
- **/
 @Data
 @TableName("T_CX_STOCK")
 @ApiModel(value = "CxStock对象", description = "成型库存信息")
-@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
-public class CxStock extends ApsBaseEntity {
-
-    @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_PUBLIC")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
+public class CxStock extends BaseEntity {
 
     /**
      * 库存日期
@@ -42,6 +31,7 @@ public class CxStock extends ApsBaseEntity {
      */
     //@Excel(name = "ui.data.column.productStatus.bomDataVersion")
     // @ImportValidated(required = true,maxLength = 30)
+    @TableField(exist = false)
     private  String bomDataVersion;
 
     @ApiModelProperty(value = "胎胚代码")
@@ -54,6 +44,7 @@ public class CxStock extends ApsBaseEntity {
      * 排程使用库存
      */
     @Excel(name = "ui.data.column.stock.scheduleUseStock",type = Excel.Type.EXPORT)
+    @TableField(exist = false)
     private Long scheduleUseStock;
 
     @ApiModelProperty(value = "库存量(可用)")
@@ -88,9 +79,11 @@ public class CxStock extends ApsBaseEntity {
     private Long badNum;
 
     @ApiModelProperty(value = "查询库存的开始日期yyyy-MM-dd", position = 21)
+    @TableField(exist = false)
     private String startTime;
 
     @ApiModelProperty(value = "查询库存的结束日期yyyy-MM-dd", position = 22)
+    @TableField(exist = false)
     private String endTime;
 
     @ImportValidated(maxLength = 300)
@@ -100,10 +93,12 @@ public class CxStock extends ApsBaseEntity {
     /**
      * 库存日期字符串条件(引擎端使用)
      */
+    @TableField(exist = false)
     private String stockDateStr;
 
     /**
      * 实际库存数=库存+修正-不良(引擎端使用)
      */
+    @TableField(exist = false)
     private Integer stockRealNum;
 }

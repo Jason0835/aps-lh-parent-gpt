@@ -17,21 +17,21 @@ import java.util.List;
 @Mapper
 public interface CxStockMapper extends BaseMapper<CxStock> {
 
-    /**
-     * 查询所有库存
-     */
-    @Select("SELECT * FROM T_CX_STOCK ORDER BY MATERIAL_CODE")
-    List<CxStock> selectAll();
-
-    /**
-     * 根据物料编码查询库存
-     */
-    @Select("SELECT * FROM T_CX_STOCK WHERE MATERIAL_CODE = #{materialCode}")
-    CxStock selectByMaterialCode(@Param("materialCode") String materialCode);
-
-    /**
-     * 更新库存数量
-     */
-    @Update("UPDATE T_CX_STOCK SET CURRENT_STOCK = #{currentStock}, UPDATE_TIME = NOW() WHERE MATERIAL_CODE = #{materialCode}")
-    int updateStock(@Param("materialCode") String materialCode, @Param("currentStock") Integer currentStock);
+//    /**
+//     * 查询所有库存
+//     */
+//    @Select("SELECT * FROM T_CX_STOCK ORDER BY MATERIAL_CODE")
+//    List<CxStock> selectAll();
+//
+//    /**
+//     * 根据物料编码查询库存
+//     */
+//    @Select("SELECT * FROM T_CX_STOCK WHERE MATERIAL_CODE = #{materialCode}")
+//    CxStock selectByMaterialCode(@Param("materialCode") String materialCode);
+//
+//    /**
+//     * 更新库存数量
+//     */
+//    @Update("UPDATE T_CX_STOCK SET CURRENT_STOCK = #{currentStock}, UPDATE_TIME = NOW() WHERE MATERIAL_CODE = #{materialCode}")
+//    int updateStock(@Param("materialCode") String materialCode, @Param("currentStock") Integer currentStock);
 }

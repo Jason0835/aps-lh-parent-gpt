@@ -2,6 +2,7 @@ package com.zlt.aps.cx.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -28,13 +29,10 @@ import java.time.LocalDateTime;
 @Data
 @TableName("T_CX_PRECISION_PLAN")
 @ApiModel(value = "成型精度计划", description = "成型机台精度校验计划")
-public class CxPrecisionPlan implements Serializable {
+public class CxPrecisionPlan extends BaseEntity implements  Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
 
     @ApiModelProperty(value = "机台编码")
     @TableField("MACHINE_CODE")
@@ -101,15 +99,5 @@ public class CxPrecisionPlan implements Serializable {
     @TableField("REMARK")
     private String remark;
 
-    @ApiModelProperty(value = "创建时间")
-    @TableField(value = "CREATE_TIME", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
 
-    @ApiModelProperty(value = "更新时间")
-    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
-
-    @ApiModelProperty(value = "创建人")
-    @TableField("CREATE_BY")
-    private String createBy;
 }

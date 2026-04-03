@@ -320,6 +320,7 @@ public class MesItfController {
      */
     @ApiOperation("同步成型在机数据")
     @PostMapping("/syncMachineOnlineInfo")
+    @AutoLoginLog
     public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
         String factoryCode = mdmCxMachineOnlineInfo.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -335,6 +336,7 @@ public class MesItfController {
      */
     @ApiOperation("同步硫化在机数据")
     @PostMapping("/syncLhMachineOnlineInfo")
+    @AutoLoginLog
     public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
         String factoryCode = mdmLhMachineOnlineInfo.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -350,6 +352,7 @@ public class MesItfController {
      */
     @ApiOperation("同步设备保养计划")
     @PostMapping("/syncDevMaintenancePlan")
+    @AutoLoginLog
     public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -365,6 +368,7 @@ public class MesItfController {
      */
     @ApiOperation("同步胶囊已使用次数")
     @PostMapping("/syncLhRepairCapsule")
+    @AutoLoginLog
     public AjaxResult syncLhRepairCapsule(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -380,6 +384,7 @@ public class MesItfController {
      */
     @ApiOperation("同步模具清洗预警计划")
     @PostMapping("/syncMouldCleanPlan")
+    @AutoLoginLog
     public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -395,6 +400,7 @@ public class MesItfController {
      */
     @ApiOperation("同步结构整车胎面配置")
     @PostMapping("/syncStructureTreadConfig")
+    @AutoLoginLog
     public AjaxResult syncStructureTreadConfig(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -410,6 +416,7 @@ public class MesItfController {
      */
     @ApiOperation("同步生胎库存")
     @PostMapping("/syncMesCxStock")
+    @AutoLoginLog
     public AjaxResult syncMesCxStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -425,6 +432,7 @@ public class MesItfController {
      */
     @ApiOperation("同步胎面库存")
     @PostMapping("/syncTreadStock")
+    @AutoLoginLog
     public AjaxResult syncTreadStock(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -447,6 +455,7 @@ public class MesItfController {
      */
     @ApiOperation("成型排程结果下发到MES")
     @PostMapping("/issueCxScheduleResult")
+    @AutoLoginLog
     public AjaxResult issueCxScheduleResult(@RequestBody List<CxScheduleResultIssue> cxScheduleResultIssueList) {
         // 从上下文中获取厂别和分公司编码
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
@@ -461,6 +470,7 @@ public class MesItfController {
      */
     @ApiOperation("同步成型排程完成量")
     @PostMapping("/syncCxClassShiftFinishQty")
+    @AutoLoginLog
     public AjaxResult syncCxClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -476,6 +486,7 @@ public class MesItfController {
      */
     @ApiOperation("同步硫化排程完成量")
     @PostMapping("/syncLhClassShiftFinishQty")
+    @AutoLoginLog
     public AjaxResult syncLhClassShiftFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -491,6 +502,7 @@ public class MesItfController {
      */
     @ApiOperation("同步成型排程日完成量")
     @PostMapping("/syncCxScheDayFinishQty")
+    @AutoLoginLog
     public AjaxResult syncCxScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -506,6 +518,7 @@ public class MesItfController {
      */
     @ApiOperation("同步硫化排程日完成量")
     @PostMapping("/syncLhScheDayFinishQty")
+    @AutoLoginLog
     public AjaxResult syncLhScheDayFinishQty(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
@@ -526,6 +539,7 @@ public class MesItfController {
      */
     @ApiOperation("硫化排程结果下发到MES")
     @PostMapping("/issueLhScheduleResult")
+    @AutoLoginLog
     public AjaxResult issueLhScheduleResult(@RequestBody List<LhScheduleResultIssue> lhScheduleResultIssueList) {
         // 从上下文中获取厂别和分公司编码
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
@@ -540,6 +554,7 @@ public class MesItfController {
      */
     @ApiOperation("模具交替计划下发到MES")
     @PostMapping("/issueMoldAlterPlan")
+    @AutoLoginLog
     public AjaxResult issueMoldAlterPlan(@RequestBody List<MdmMoldAlterPlan> moldAlterPlanList) {
         return mesItfService.issueMoldAlterPlan(moldAlterPlanList);
     }
@@ -551,6 +566,7 @@ public class MesItfController {
      */
     @ApiOperation("同步模具交替计划完成回报")
     @PostMapping("/syncMoldAlterPlanFinish")
+    @AutoLoginLog
     public AjaxResult syncMoldAlterPlanFinish(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         return mesItfService.syncMoldAlterPlanFinish(syncDataLogs);
     }

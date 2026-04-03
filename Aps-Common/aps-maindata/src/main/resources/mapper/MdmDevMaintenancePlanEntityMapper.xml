@@ -10,7 +10,7 @@
         <result column="PRECISION_TYPE" property="precisionType"/>
         <result column="OPER_TIME" property="operTime"/>
         <result column="FIRST_WASH_TIME" property="firstWashTime"/>
-        <result column="DEL_FLAG" property="delFlag"/>
+        <result column="IS_DELETE" property="isDelete"/>
         <result column="DATA_VERSION" property="dataVersion"/>
         <result column="COMPANY_CODE" property="companyCode"/>
         <result column="FACTORY_CODE" property="factoryCode"/>
@@ -24,7 +24,7 @@
     <select id="selectByUniqueKey" resultMap="BaseResultMap">
         SELECT
             ID, DEV_CODE, PRECISION_TYPE, OPER_TIME, FIRST_WASH_TIME,
-            DEL_FLAG, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
+            IS_DELETE, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
             CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
         FROM T_MDM_DEV_MAINTENANCE_PLAN
         WHERE DEV_CODE = #{devCode}
@@ -35,7 +35,7 @@
     <select id="selectByUniqueKeyList" resultMap="BaseResultMap">
         SELECT
             ID, DEV_CODE, PRECISION_TYPE, OPER_TIME, FIRST_WASH_TIME,
-            DEL_FLAG, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
+            IS_DELETE, DATA_VERSION, COMPANY_CODE, FACTORY_CODE,
             CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK
         FROM T_MDM_DEV_MAINTENANCE_PLAN
         WHERE (DEV_CODE, PRECISION_TYPE, FACTORY_CODE) IN

@@ -1,12 +1,12 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.cx.mapper.CxStockMapper;
 import com.zlt.aps.cx.service.CxStockService;
+import com.zlt.bill.common.service.AbstractDocService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,34 +22,37 @@ import java.util.List;
  * @author APS Team
  */
 @Service
-public class CxStockServiceImpl extends ServiceImpl<CxStockMapper, CxStock> implements CxStockService {
+public class CxStockServiceImpl extends AbstractDocService<CxStock> implements CxStockService {
+
+    @Autowired
+    CxStockMapper cxStockMapper;
 
     @Override
     public CxStock getByMaterialCode(String materialCode) {
         LambdaQueryWrapper<CxStock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CxStock::getEmbryoCode, materialCode);
-        return getOne(wrapper);
+        return cxStockMapper.selectOne(wrapper);
     }
 
     @Override
     public List<CxStock> listLowStock() {
         LambdaQueryWrapper<CxStock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CxStock::getAlertStatus, "LOW");
-        return list(wrapper);
+        return cxStockMapper.selectList(wrapper);
     }
 
     @Override
     public List<CxStock> listHighStock() {
         LambdaQueryWrapper<CxStock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CxStock::getAlertStatus, "HIGH");
-        return list(wrapper);
+        return cxStockMapper.selectList(wrapper);
     }
 
     @Override
     public List<CxStock> listEndingStock() {
         LambdaQueryWrapper<CxStock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CxStock::getIsEndingSku, 1);
-        return list(wrapper);
+        return cxStockMapper.selectList(wrapper);
     }
 
     @Override
@@ -71,7 +74,7 @@ public class CxStockServiceImpl extends ServiceImpl<CxStockMapper, CxStock> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void refreshAllAlertStatus() {
-        List<CxStock> stocks = list();
+        List<CxStock> stocks = cxStockMapper.selectList(null);
         Date now = new Date();
 
         for (CxStock stock : stocks) {
@@ -81,7 +84,7 @@ public class CxStockServiceImpl extends ServiceImpl<CxStockMapper, CxStock> impl
                 stock.setAlertStatus(alertStatus);
                 stock.setAlertTime(now);
                 stock.setUpdateTime(now);
-                updateById(stock);
+                cxStockMapper.updateById(stock);
             }
         }
     }
@@ -97,7 +100,7 @@ public class CxStockServiceImpl extends ServiceImpl<CxStockMapper, CxStock> impl
         wrapper.orderByDesc(CxStock::getAlertTime)
                 .orderByAsc(CxStock::getEmbryoCode);
 
-        return page(page, wrapper);
+        return cxStockMapper.selectPage(page, wrapper);
     }
 
     /**
@@ -125,5 +128,10 @@ public class CxStockServiceImpl extends ServiceImpl<CxStockMapper, CxStock> impl
         }
 
         return "NORMAL";
+    }
+
+    @Override
+    protected String getDocTypeCode() {
+        return "";
     }
 }

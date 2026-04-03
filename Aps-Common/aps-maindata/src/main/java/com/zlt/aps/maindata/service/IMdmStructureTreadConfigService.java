@@ -1,7 +1,7 @@
 package com.zlt.aps.maindata.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig;
+import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
+import com.zlt.bill.common.service.IDocService;
 
 /**
  * APS结构整车胎面配置Service接口
@@ -9,6 +9,6 @@ import com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig;
  * @author zlt
  * @since 2025/12/25
  */
-public interface IMdmStructureTreadConfigService extends IService<MdmStructureTreadConfig> {
+public interface IMdmStructureTreadConfigService extends IDocService<MdmStructureTreadConfig> {
 
 }

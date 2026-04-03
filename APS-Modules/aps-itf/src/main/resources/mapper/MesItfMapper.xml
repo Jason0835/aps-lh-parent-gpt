@@ -133,7 +133,7 @@
     </select>
 
     <select id="selectCxMachineOnlineSyncList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxMachineOnlineInfo">
-        SELECT ID,
+        SELECT
         ONLINE_DATE,
         CX_CODE,
         MATERIAL_CODE,
@@ -151,7 +151,7 @@
     </select>
 
     <select id="selectLhMachineOnlineSyncList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhMachineOnlineInfo">
-        SELECT ID,
+        SELECT
         ONLINE_DATE,
         LH_CODE,
         MATERIAL_CODE,
@@ -170,7 +170,6 @@
 
     <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
         SELECT
-        ID,
         DEV_CODE,
         PRECISION_TYPE,
         OPER_TIME,
@@ -188,7 +187,6 @@
 
     <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.itf.vo.LhRepairCapsule">
         SELECT
-        ID,
         OBTAIN_TIME,
         LH_CODE,
         MATERIAL_CODE,
@@ -208,7 +206,6 @@
 
     <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.itf.vo.MouldCleanPlan">
         SELECT
-        ID,
         LH_CODE,
         OPER_TIME,
         FIRST_WASH_TIME,
@@ -227,7 +224,6 @@
 
     <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.itf.vo.StructureTreadConfig">
         SELECT
-        ID,
         STRUCTURE_CODE,
         TREAD_COUNT,
         DEL_FLAG,
@@ -243,7 +239,6 @@
 
     <select id="selectMesCxStockList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMesCxStock">
         SELECT
-        ID,
         STOCK_DATE,
         EMBRYO_CODE,
         STOCK_NUM,
@@ -266,7 +261,6 @@
 
     <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheFinishQty">
         SELECT
-        ID,
         ORDER_NO,
         SCHEDULE_DATE,
         CX_MACHINE_CODE,
@@ -294,7 +288,6 @@
 
     <select id="selectLhClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheFinishQty">
         SELECT
-        ID,
         ORDER_NO,
         SCHEDULE_DATE,
         LH_MACHINE_CODE,
@@ -321,7 +314,6 @@
 
     <select id="selectCxScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheDayFinishQty">
         SELECT
-        ID,
         FINISH_DATE,
         DAY_FINISH_QTY,
         EMBRYO_CODE,
@@ -339,7 +331,6 @@
 
     <select id="selectLhScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheDayFinishQty">
         SELECT
-        ID,
         FINISH_DATE,
         DAY_FINISH_QTY,
         MATERIAL_CODE,
@@ -405,7 +396,6 @@
 
     <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMoldAlterPlanFinish">
         SELECT
-        ID,
         LH_BATCH_NO,
         ORDER_NO,
         SCHEDULE_DATE,

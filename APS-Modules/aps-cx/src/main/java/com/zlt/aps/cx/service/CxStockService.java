@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zlt.aps.cx.entity.CxStock;
+import com.zlt.bill.common.service.IDocService;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.List;
  *
  * @author APS Team
  */
-public interface CxStockService extends IService<CxStock> {
+public interface CxStockService extends IDocService<CxStock> {
 
     /**
      * 根据物料编码获取库存

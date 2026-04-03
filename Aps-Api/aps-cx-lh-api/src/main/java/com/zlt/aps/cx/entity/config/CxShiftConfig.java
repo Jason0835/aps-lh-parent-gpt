@@ -2,13 +2,16 @@ package com.zlt.aps.cx.entity.config;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 /**
  * 班次配置表
@@ -57,6 +60,26 @@ public class CxShiftConfig extends BaseEntity {
     @TableField("IS_CROSS_DAY")
     private Integer isCrossDay;
 
+    // ===== 排程周期配置（新增） =====
+
+    @ApiModelProperty(value = "排程天数：1-第一天 2-第二天 3-第三天")
+    @TableField("SCHEDULE_DAY")
+    private Integer scheduleDay;
+
+    @ApiModelProperty(value = "当天班次序号：该天第几个班")
+    @TableField("DAY_SHIFT_ORDER")
+    private Integer dayShiftOrder;
+
+    @ApiModelProperty(value = "对应结果表字段：CLASS1~CLASS8")
+    @TableField("CLASS_FIELD")
+    private String classField;
+
+    @ApiModelProperty(value = "工厂编号")
+    @TableField("FACTORY_CODE")
+    private String factoryCode;
+
+    // ===== 状态与审计 =====
+
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
     private Integer isActive;
@@ -64,4 +87,62 @@ public class CxShiftConfig extends BaseEntity {
     @ApiModelProperty(value = "备注")
     @TableField("REMARK")
     private String remark;
+
+    // ===== 辅助方法 =====
+
+    /**
+     * 获取班次开始时间（LocalTime格式）
+     */
+    public LocalTime getShiftStartTime() {
+        if (startTime == null || startTime.isEmpty()) {
+            return LocalTime.of(8, 0); // 默认8点开始
+        }
+        try {
+            return LocalTime.parse(startTime);
+        } catch (Exception e) {
+            return LocalTime.of(8, 0);
+        }
+    }
+
+    /**
+     * 获取班次结束时间（LocalTime格式）
+     */
+    public LocalTime getShiftEndTime() {
+        if (endTime == null || endTime.isEmpty()) {
+            return LocalTime.of(20, 0); // 默认20点结束
+        }
+        try {
+            return LocalTime.parse(endTime);
+        } catch (Exception e) {
+            return LocalTime.of(20, 0);
+        }
+    }
+
+    /**
+     * 获取开始小时
+     */
+    public Integer getStartHour() {
+        return getShiftStartTime().getHour();
+    }
+
+    /**
+     * 获取开始分钟
+     */
+    public Integer getStartMinute() {
+        return getShiftStartTime().getMinute();
+    }
+
+    /**
+     * 获取结束小时
+     */
+    public Integer getEndHour() {
+        return getShiftEndTime().getHour();
+    }
+
+    /**
+     * 获取结束分钟
+     */
+    public Integer getEndMinute() {
+        return getShiftEndTime().getMinute();
+    }
 }

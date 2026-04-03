@@ -15,7 +15,7 @@ import java.util.List;
  *
  * @author Joran.Zhang
  */
-@FeignClient(contextId = "cxStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cxlh:cxlh}")
+@FeignClient(contextId = "cxStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:cx}")
 public interface ICxStockService {
 
     /**

@@ -134,27 +134,6 @@ public interface ConstraintCheckService {
      */
     ConstraintCheckResult checkTrialConstraint(LocalDateTime scheduleDate, int trialTaskCount, String shiftCode, int quantity);
 
-    /**
-     * 检查精度计划约束
-     * 有精度计划的机台在精度期间不可排产
-     *
-     * @param machineCode   机台编码
-     * @param scheduleDate  排程日期
-     * @param shiftCode     班次编码
-     * @return 校验结果
-     */
-    ConstraintCheckResult checkPrecisionPlanConstraint(String machineCode, LocalDateTime scheduleDate, String shiftCode);
-
-    /**
-     * 检查操作工请假约束
-     * 请假期间该机台该班次不可用
-     *
-     * @param machineCode 机台编码
-     * @param shiftCode   班次编码
-     * @param scheduleDate 排程日期
-     * @return 校验结果
-     */
-    ConstraintCheckResult checkOperatorLeaveConstraint(String machineCode, String shiftCode, LocalDateTime scheduleDate);
 
     /**
      * 检查收尾约束
