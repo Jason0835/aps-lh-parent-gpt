@@ -1148,6 +1148,8 @@ public class MatchingAdjuestProductionHandler {
         boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
         int mouldCavityQty = this.getNewCavityQty(contextDTO, plan, scheduleDay); // 总型腔数量
 //        int typeBlockQty = cavity2Block.getInsertResults().getOrDefault(mouldKey, 0); // 总活块数量
+        Integer oemQty = intValue(dailyCapacityLimitVo.getRemainOemQty());
+        boolean isOem = contextDTO.getOemBrandConfigSet().contains(plan.getBrand());
         
         // 判断当天成型硫化比是否已经满足条件
         List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
@@ -1189,10 +1191,13 @@ public class MatchingAdjuestProductionHandler {
                 return 0;
             }
             // 3、当天满足上机条件按，但是下一天不满足上机条件的，也不允许上机
-            boolean isOk = this.checkNextDayCanContinueProduct(contextDTO, plan, scheduleDay, endDay, mpProdFinalList,
-                    unAllocationQty, dailyCapacityLimitMap);
-
-            if (!isOk) {
+            if (!this.checkNextDayCanContinueProduct(contextDTO, plan, scheduleDay, endDay, mpProdFinalList,
+                    unAllocationQty, dailyCapacityLimitMap)) {
+                return 0;
+            }
+            // 4、oem规格如果下一天的oem剩余量无法满排，则不搭配
+            Integer firstQty = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
+            if (isOem && oemQty < firstQty + capacity) {
                 return 0;
             }
         }
@@ -1225,6 +1230,10 @@ public class MatchingAdjuestProductionHandler {
             allocationQty = Math.min(allocationQty, mouldRemaindCapacity); // 如果当天模具有剩余产能的，优先补满
         }
         allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量以及剩余产能
+        // 如果是贴牌不能超过贴牌量
+        if (isOem) {
+            allocationQty = Math.min(allocationQty, oemQty); // 分配量不能超过未分配量以及剩余产能
+        }
         if (((dayProduct.getProductionQty() + allocationQty)& 1) != 0) { // 如果原排产量 + 新排产量为奇数，则排产量需要 + 1
             allocationQty ++;
         }
@@ -1261,6 +1270,11 @@ public class MatchingAdjuestProductionHandler {
         this.reCalcAdjustDailyCapacityLimit(contextDTO, mpProdFinalList, plan, scheduleDay); // 有搭配，则再次重算产能占用
         Integer newLhMachines = dailyCapacityLimitVo.getUsedLhMachines();
         dailyCapacityLimitVo.setRemainLhMachines(safeAdd(dailyCapacityLimitVo.getRemainChangeMould(), oldLhMachines - newLhMachines)); // 使用机台如果有增加则剩余机台数会减少
+        
+        // 更新贴牌数量
+        if (isOem) {
+            dailyCapacityLimitVo.setRemainOemQty(oemQty - allocationQty); // 扣减贴牌数量
+        }
         
         String scheduleName = isCheckContinue? "补量": "增模";
         String logDetail = String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,scheduleName,allocationQty);
