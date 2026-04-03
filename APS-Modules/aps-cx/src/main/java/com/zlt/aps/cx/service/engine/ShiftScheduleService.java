@@ -5,8 +5,8 @@ import com.zlt.aps.cx.entity.CxMachineStructureCapacity;
 import com.zlt.aps.cx.entity.CxPrecisionPlan;
 
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
-import com.zlt.aps.cx.entity.config.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureTreadConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -201,9 +201,9 @@ public class ShiftScheduleService {
 
         for (int i = 0; i < shiftCodes.length; i++) {
             MdmStructureTreadConfig capacity = shiftCapacityMap.get(shiftCodes[i]);
-            if (capacity != null && capacity.getTripQty() != null) {
-                tripQtyPerShift[i] = capacity.getTripQty();
-                totalTripQty += capacity.getTripQty();
+            if (capacity != null && capacity.getTreadCount() != null) {
+                tripQtyPerShift[i] = capacity.getTreadCount();
+                totalTripQty += capacity.getTreadCount();
             }
         }
 
@@ -326,8 +326,8 @@ public class ShiftScheduleService {
     private int getTripCapacity(String structureCode, Map<String, MdmStructureTreadConfig> shiftCapacityMap) {
         if (shiftCapacityMap != null) {
             for (MdmStructureTreadConfig capacity : shiftCapacityMap.values()) {
-                if (capacity.getTripQty() != null && capacity.getTripQty() > 0) {
-                    return capacity.getTripQty();
+                if (capacity.getTreadCount() != null && capacity.getTreadCount() > 0) {
+                    return capacity.getTreadCount();
                 }
             }
         }
@@ -619,8 +619,8 @@ public class ShiftScheduleService {
             for (MdmStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
                 if (capacity.getStructureCode() != null &&
                         capacity.getStructureCode().equals(structureCode)) {
-                    if (capacity.getTripQty() != null && capacity.getTripQty() > 0) {
-                        return capacity.getTripQty();
+                    if (capacity.getTreadCount() != null && capacity.getTreadCount() > 0) {
+                        return capacity.getTreadCount();
                     }
                 }
             }
