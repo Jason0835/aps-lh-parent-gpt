@@ -61,6 +61,7 @@ public class ScheduleMainController {
             ScheduleRequestVo request = new ScheduleRequestVo();
             request.setScheduleDate(currentDate);
             request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
+            request.setFactoryCode(dto.getFactoryCode());
             request.setScheduleType(dto.getScheduleType());
 
             ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
