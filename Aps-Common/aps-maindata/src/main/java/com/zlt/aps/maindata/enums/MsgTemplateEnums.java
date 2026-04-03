@@ -51,6 +51,11 @@ public enum MsgTemplateEnums {
      * SKU的排产类型与SKU与示方书匹配到的产品状态不一致提醒
      */
     MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME("MP_SKU_TYPE_PRODUCT_STATUS_NO_SAME", "SKU的排产类型与SKU与示方书匹配到的产品状态不一致提醒"),
+
+    /**
+     * 硫化精度计划30天预警
+     */
+    LH_PRECISION_PLAN_WARNING("LH_PRECISION_PLAN_WARNING", "硫化精度计划30天预警"),
     ;
 
     private final String code;

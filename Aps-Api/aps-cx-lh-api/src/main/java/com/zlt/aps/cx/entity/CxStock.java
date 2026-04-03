@@ -34,6 +34,12 @@ public class CxStock extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    /** 分厂编号 */
+    @Excel(name = "ui.data.column.cxStock.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "分厂编号", name = "factoryCode")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
     /** 库存日期，格式：yyyy-MM-dd */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "ui.data.column.cxStock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
@@ -70,6 +76,16 @@ public class CxStock extends BaseEntity {
     @ApiModelProperty(value = "不良数量", name = "badNum")
     @TableField(value = "BAD_NUM")
     private Integer badNum;
+
+    /** 查询开始日期 */
+    @ApiModelProperty(value = "查询开始日期", hidden = true)
+    @TableField(exist = false)
+    private String startTime;
+
+    /** 查询结束日期 */
+    @ApiModelProperty(value = "查询结束日期", hidden = true)
+    @TableField(exist = false)
+    private String endTime;
 
     // ============== 非数据库字段（用于业务计算） ==============
 
@@ -127,6 +143,7 @@ public class CxStock extends BaseEntity {
         }
         return Math.max(0, effective);
     }
+
 
     /**
      * 计算可用库存

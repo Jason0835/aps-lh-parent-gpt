@@ -29,13 +29,10 @@ import java.time.LocalDateTime;
 @Data
 @TableName("T_CX_PRECISION_PLAN")
 @ApiModel(value = "成型精度计划", description = "成型机台精度校验计划")
-public class CxPrecisionPlan extends BaseEntity {
+public class CxPrecisionPlan extends BaseEntity implements  Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
 
     @ApiModelProperty(value = "机台编码")
     @TableField("MACHINE_CODE")
@@ -73,8 +70,34 @@ public class CxPrecisionPlan extends BaseEntity {
     @TableField("LAST_PRECISION_DATE")
     private LocalDate lastPrecisionDate;
 
-    @ApiModelProperty(value = "到期日期c")
+    @ApiModelProperty(value = "到期日期（下次应做精度日期）")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("DUE_DATE")
     private LocalDate dueDate;
+
+    @ApiModelProperty(value = "状态：PLANNED-已计划，IN_PROGRESS-进行中，COMPLETED-已完成，CANCELLED-已取消")
+    @TableField("STATUS")
+    private String status;
+
+    @ApiModelProperty(value = "安排原因：SCHEDULED-正常安排，URGENT-紧急安排，RESCHEDULED-重排")
+    @TableField("ARRANGE_REASON")
+    private String arrangeReason;
+
+    @ApiModelProperty(value = "是否影响硫化：0-否 1-是")
+    @TableField("AFFECT_VULCANIZE")
+    private Integer affectVulcanize;
+
+    @ApiModelProperty(value = "硫化减产比例（0-1），0表示不减产，0.5表示减半")
+    @TableField("VULCANIZE_REDUCE_RATIO")
+    private java.math.BigDecimal vulcanizeReduceRatio;
+
+    @ApiModelProperty(value = "关联胎胚编码（主要生产的胎胚）")
+    @TableField("EMBRYO_CODE")
+    private String embryoCode;
+
+    @ApiModelProperty(value = "备注")
+    @TableField("REMARK")
+    private String remark;
+
+
 }

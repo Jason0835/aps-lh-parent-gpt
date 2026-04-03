@@ -8,11 +8,10 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Map;
-import java.util.Set;
+import java.lang.reflect.Modifier;
+import java.util.*;
 
 /**
  * 含有<></>转义切面
@@ -46,7 +45,7 @@ public class HtmlDecodeAspect {
         Object handleResult = originalResult;
         try {
             handleResult = unescapeResultData(originalResult);
-            log.debug("结果数据反向转义：{}", handleResult);
+            log.debug("结果数据反向转义完成");
         } catch (IllegalAccessException e) {
             log.error("结果数据反向转义失败", e);
         }
@@ -69,68 +68,74 @@ public class HtmlDecodeAspect {
 
     /**
      * 递归处理参数对象，对所有层级的String类型字段执行escapeHtml()
-     *
-     * @param param 方法入参（支持：单个对象、集合、数组、基本类型+String）
      */
     private Object escapeParamField(Object param) throws IllegalAccessException {
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        return escapeParamField(param, visited);
+    }
+
+    private Object escapeParamField(Object param, Set<Object> visited) throws IllegalAccessException {
         if (param == null) {
             return null;
         }
+
         Class<?> clazz = param.getClass();
 
-        //  情况1：参数是【字符串】→ 直接转义
         if (clazz == String.class) {
             return escapeHtml((String) param);
         }
 
-        //  情况2：参数是【集合】（List/Set）→ 遍历集合元素递归转义
-        if (param instanceof Collection) {
-            Collection<?> collection = (Collection<?>) param;
-            collection.forEach(item -> {
-                try {
-                    escapeParamField(item);
-                } catch (IllegalAccessException e) {
-                    log.error("集合参数转义失败", e);
-                }
-            });
+        if (isPrimitiveLike(clazz)) {
             return param;
         }
 
-        //  情况3：参数是【数组】→ 遍历数组元素递归转义
-        if (clazz.isArray()) {
-            Object[] array = (Object[]) param;
-            for (Object item : array) {
-                escapeParamField(item);
+        if (!visited.add(param)) {
+            return param;
+        }
+
+        if (param instanceof Collection) {
+            for (Object item : (Collection<?>) param) {
+                escapeParamField(item, visited);
             }
             return param;
         }
 
-        //  情况4：参数是【基本类型/包装类型】（Integer/Long/Boolean等）→ 不处理，直接返回
-        if (clazz.isPrimitive() || Number.class.isAssignableFrom(clazz)
-                || Boolean.class == clazz || Character.class == clazz || Date.class == clazz) {
+        if (clazz.isArray()) {
+            int len = Array.getLength(param);
+            for (int i = 0; i < len; i++) {
+                Object item = Array.get(param, i);
+                Object escaped = escapeParamField(item, visited);
+                if (item instanceof String) {
+                    Array.set(param, i, escaped);
+                }
+            }
             return param;
         }
 
-        //  情况5：参数是【自定义实体对象】→ 反射遍历所有字段（含私有），递归转义
-        // 获取对象的所有字段（包括私有字段、父类字段）
+        if (param instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) param;
+            for (Object value : map.values()) {
+                escapeParamField(value, visited);
+            }
+            return param;
+        }
+
         Field[] fields = clazz.getDeclaredFields();
         for (Field field : fields) {
-            // 暴力反射：允许访问私有字段（核心，否则无法修改private字段）
+            if (Modifier.isStatic(field.getModifiers())
+                    || Modifier.isFinal(field.getModifiers())
+                    || field.isSynthetic()) {
+                continue;
+            }
             field.setAccessible(true);
-            String fieldName = field.getName();
             Object fieldValue = field.get(param);
             Class<?> fieldType = field.getType();
 
-            // 字段是String类型 → 执行转义并重新赋值
             if (fieldType == String.class) {
                 String escapeValue = escapeHtml((String) fieldValue);
                 field.set(param, escapeValue);
-                log.debug("字段【{}】转义完成，原值：{} → 新值：{}", fieldName, fieldValue, escapeValue);
-            }
-            // 字段是【对象/集合】→ 递归处理嵌套字段
-            else if (!fieldType.isPrimitive() && !Number.class.isAssignableFrom(fieldType)
-                    && !Boolean.class.isAssignableFrom(fieldType)) {
-                escapeParamField(fieldValue);
+            } else if (!isPrimitiveLike(fieldType)) {
+                escapeParamField(fieldValue, visited);
             }
         }
         return param;
@@ -168,88 +173,77 @@ public class HtmlDecodeAspect {
 
     /**
      * 递归处理参数对象，对所有层级的String类型字段执行unescapeHtml()
-     * 支持：单个对象、集合、数组、基本类型+String、嵌套对象（与转义工具完全兼容）
      */
     private Object unescapeResultData(Object result) throws IllegalAccessException {
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        return unescapeResultData(result, visited);
+    }
+
+    private Object unescapeResultData(Object result, Set<Object> visited) throws IllegalAccessException {
         if (result == null) {
-            return null; // 空结果直接返回
+            return null;
         }
+
         Class<?> clazz = result.getClass();
 
-        // 场景1：返回值是【String字符串】→ 直接反向转义（核心）
         if (clazz == String.class) {
-            String escapeStr = unescapeHtml((String) result);
-            log.debug("字符串返回值反向转义：{} → {}", result, escapeStr);
-            return escapeStr;
+            return unescapeHtml((String) result);
         }
 
-        // 场景2：返回值是【集合】（List/Set）→ 遍历元素递归处理
-        if (result instanceof Collection) {
-            Collection<?> collection = (Collection<?>) result;
-            collection.forEach(item -> {
-                try {
-                    unescapeResultData(item);
-                } catch (IllegalAccessException e) {
-                    log.error("集合返回值元素反向转义失败", e);
-                }
-            });
+        if (isPrimitiveLike(clazz)) {
             return result;
         }
 
-        // 场景3：返回值是【数组】→ 遍历数组元素递归处理
+        if (!visited.add(result)) {
+            return result;
+        }
+
+        if (result instanceof Collection) {
+            for (Object item : (Collection<?>) result) {
+                unescapeResultData(item, visited);
+            }
+            return result;
+        }
+
         if (clazz.isArray()) {
-            Object[] array = (Object[]) result;
-            for (int i = 0; i < array.length; i++) {
-                array[i] = unescapeResultData(array[i]);
+            int len = Array.getLength(result);
+            for (int i = 0; i < len; i++) {
+                Object item = Array.get(result, i);
+                Object unescaped = unescapeResultData(item, visited);
+                if (item instanceof String) {
+                    Array.set(result, i, unescaped);
+                }
             }
             return result;
         }
 
         if (result instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) result;
-            Set<? extends Map.Entry<String, Object>> entrySet = map.entrySet();
-            for (Map.Entry<String, Object> entry : entrySet) {
-                Object value = entry.getValue();
-                try {
-                    value = unescapeResultData(value);
-                } catch (IllegalAccessException e) {
-                    log.error("map返回值元素反向转义失败", e);
-                }
-                entry.setValue(value);
+            Map<?, ?> map = (Map<?, ?>) result;
+            for (Object value : map.values()) {
+                unescapeResultData(value, visited);
             }
             return result;
         }
 
-        // 场景4：返回值是【基本类型/包装类型】→ 不处理，直接返回
-        if (clazz.isPrimitive() || Number.class.isAssignableFrom(clazz)
-                || Boolean.class == clazz || Character.class == clazz || Date.class == clazz) {
-            return result;
-        }
-
-        // 场景5：返回值是【自定义实体/业务对象】→ 反射遍历所有字段（含私有）递归处理
         Field[] fields = clazz.getDeclaredFields();
         for (Field field : fields) {
+            if (Modifier.isStatic(field.getModifiers())
+                    || Modifier.isFinal(field.getModifiers())
+                    || field.isSynthetic()) {
+                continue;
+            }
             field.setAccessible(true);
-            String fieldName = field.getName();
             Object fieldValue = field.get(result);
             Class<?> fieldType = field.getType();
 
-            // 字段是String类型 → 执行反向转义并重新赋值给对象
             if (fieldType == String.class) {
-                String oldValue = (String) fieldValue;
-                String newValue = unescapeHtml(oldValue);
+                String newValue = unescapeHtml((String) fieldValue);
                 field.set(result, newValue);
-                log.debug("对象字段【{}】反向转义完成：{} → {}", fieldName, oldValue, newValue);
-            }
-            // 字段是【对象/集合/数组】→ 递归处理嵌套字段（多层对象全覆盖）
-            else if (!fieldType.isPrimitive()
-                    && !Number.class.isAssignableFrom(fieldType)
-                    && !Boolean.class.isAssignableFrom(fieldType)) {
-                unescapeResultData(fieldValue);
+            } else if (!isPrimitiveLike(fieldType)) {
+                unescapeResultData(fieldValue, visited);
             }
         }
 
-        // 场景6：兜底返回（所有类型处理完毕，返回处理后的结果）
         return result;
     }
 
@@ -289,5 +283,15 @@ public class HtmlDecodeAspect {
             i++;
         }
         return sb.toString();
+    }
+
+    private boolean isPrimitiveLike(Class<?> clazz) {
+        return clazz.isPrimitive()
+                || Number.class.isAssignableFrom(clazz)
+                || Boolean.class == clazz
+                || Character.class == clazz
+                || Date.class.isAssignableFrom(clazz)
+                || Enum.class.isAssignableFrom(clazz)
+                || Class.class == clazz;
     }
 }

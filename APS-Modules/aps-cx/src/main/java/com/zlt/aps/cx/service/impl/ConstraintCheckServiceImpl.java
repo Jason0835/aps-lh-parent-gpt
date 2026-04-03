@@ -38,6 +38,11 @@ public class ConstraintCheckServiceImpl implements ConstraintCheckService {
     private CxTreadParkingConfigMapper treadParkingConfigMapper;
 
     @Autowired
+    private CxPrecisionPlanMapper precisionPlanMapper;
+
+
+
+    @Autowired
     private CxMachineStructureCapacityMapper machineStructureCapacityMapper;
 
     @Autowired
