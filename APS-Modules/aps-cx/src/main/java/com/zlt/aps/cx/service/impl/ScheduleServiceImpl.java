@@ -438,7 +438,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         Set<String> materialCodes = lhScheduleResults.stream()
-                .map(LhScheduleResult::getProductCode)
+                .map(LhScheduleResult::getMaterialCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
@@ -1027,8 +1027,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         Set<String> materialCodes = new HashSet<>();
         if (context.getLhScheduleResults() != null) {
             materialCodes.addAll(context.getLhScheduleResults().stream()
-                    .filter(r -> r.getProductCode() != null)
-                    .map(LhScheduleResult::getProductCode)
+                    .filter(r -> r.getMaterialCode() != null)
+                    .map(LhScheduleResult::getMaterialCode)
                     .collect(Collectors.toSet()));
         }
         // 也包含月计划中的物料
@@ -1160,7 +1160,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         if (context.getLhScheduleResults() != null) {
             List<LhScheduleResult> filteredLhResults = context.getLhScheduleResults().stream()
                     .filter(r -> {
-                        String materialCode = r.getProductCode();
+                        String materialCode = r.getMaterialCode();
                         // 如果物料编码在已收尾集合中，则过滤掉
                         if (materialCode != null && completedMaterialCodes.contains(materialCode)) {
                             log.debug("过滤硫化排程结果：物料={}，成型余量={}",
