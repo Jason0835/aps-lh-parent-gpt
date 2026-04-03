@@ -686,6 +686,7 @@ export default {
           year: data.year,
           month: data.month,
           productionVersion: data.productionVersion,
+          tempFlag:0
         };
         let res = await statisticsResult(params);
 
