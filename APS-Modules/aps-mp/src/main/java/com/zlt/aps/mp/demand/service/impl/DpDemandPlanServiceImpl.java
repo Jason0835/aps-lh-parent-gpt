@@ -1291,7 +1291,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 // 2.2.1、取最订单年周要求接近且最小的库存年周号
                 String stockWeekYear = stockYearWeekGroupMap.ceilingKey(dot);
                 if (StringUtils.isEmpty(stockWeekYear)) {
-                    continue;
+                    break;
                 }
                 // 2.2.2、根据年周号取出库存列表
                 List<MdmProductStock> stockList = stockYearWeekGroupMap.get(stockWeekYear);

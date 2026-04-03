@@ -6,7 +6,9 @@ import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
 import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
 import com.zlt.aps.lh.service.ILhPrecisionPlanService;
+import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper;
+import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,9 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
 
     @Autowired
     private MdmDevMaintenancePlanEntityMapper mdmDevMaintenancePlanEntityMapper;
+
+    @Autowired
+    private MessageServiceUtils messageServiceUtils;
 
     @Override
     public List<LhPrecisionPlan> selectLhPrecisionPlanList(LhPrecisionPlanVo vo) {
@@ -337,5 +342,20 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
     private void sendWarning(LhPrecisionPlan plan) {
         log.info("发送预警通知：机台={}, 计划日期={}, 剩余天数={}", 
             plan.getMachineCode(), plan.getPlanDate(), plan.getDaysToDue());
+
+        try {
+            String templateCode = MsgTemplateEnums.LH_PRECISION_PLAN_WARNING.getCode();
+            
+            String planDateStr = plan.getPlanDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            
+            messageServiceUtils.sendWarning(templateCode, (String) null, 
+                plan.getMachineCode(), 
+                planDateStr, 
+                plan.getDaysToDue());
+            
+            log.info("预警通知发送成功：机台={}, 计划日期={}", plan.getMachineCode(), plan.getPlanDate());
+        } catch (Exception e) {
+            log.error("预警通知发送失败：机台={}, 计划日期={}", plan.getMachineCode(), plan.getPlanDate(), e);
+        }
     }
 }
