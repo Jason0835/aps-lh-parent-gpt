@@ -2294,7 +2294,7 @@ export default {
           year: data.year,
           month: data.month,
           productionVersion: data.productionVersion,
-          tempFlag: tempFlag,
+          // tempFlag: tempFlag,
         };
         console.log("调用统计接口",tempFlag,params);
         let res = await statisticsResult(params);
