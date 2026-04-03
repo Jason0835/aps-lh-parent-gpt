@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.entity.config;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("T_CX_KEY_PRODUCT")
 @ApiModel(value = "关键产品配置")
-public class CxKeyProduct implements Serializable {
+public class CxKeyProduct extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -30,35 +31,11 @@ public class CxKeyProduct implements Serializable {
     @TableField("EMBRYO_CODE")
     private String embryoCode;
 
-    @ApiModelProperty(value = "胎胚名称")
-    @TableField("EMBRYO_NAME")
-    private String embryoName;
-
-    @ApiModelProperty(value = "结构编码")
-    @TableField("STRUCTURE_CODE")
-    private String structureCode;
-
     @ApiModelProperty(value = "结构名称")
     @TableField("STRUCTURE_NAME")
     private String structureName;
 
-    @ApiModelProperty(value = "优先级")
-    @TableField("PRIORITY")
-    private Integer priority;
-
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
     private Integer isActive;
-
-    @ApiModelProperty(value = "备注")
-    @TableField("REMARK")
-    private String remark;
-
-    @ApiModelProperty(value = "创建时间")
-    @TableField(value = "CREATE_TIME", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
-
-    @ApiModelProperty(value = "更新时间")
-    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
 }

@@ -4,13 +4,17 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * APS设备保养计划实体
@@ -24,10 +28,6 @@ public class MdmDevMaintenancePlan extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.INPUT)
-    private Long id;
-
     @ApiModelProperty(value = "设备机台")
     @TableField(value = "DEV_CODE")
     private String devCode;
@@ -37,16 +37,16 @@ public class MdmDevMaintenancePlan extends BaseEntity implements Serializable {
     private String precisionType;
 
     @ApiModelProperty(value = "计划时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @TableField(value = "OPER_TIME")
-    private String operTime;
+    private Date operTime;
 
     @ApiModelProperty(value = "实际时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @TableField(value = "FIRST_WASH_TIME")
-    private String firstWashTime;
-
-    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
-    @TableField(value = "DEL_FLAG")
-    private Integer delFlag;
+    private Date firstWashTime;
 
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")

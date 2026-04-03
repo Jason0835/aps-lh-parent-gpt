@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 /**
  * APS结构整车胎面配置
@@ -33,10 +34,6 @@ public class MdmStructureTreadConfig extends BaseEntity implements Serializable 
     @ApiModelProperty(value = "整车胎面条数")
     @TableField(value = "TREAD_COUNT")
     private Integer treadCount;
-
-    @ApiModelProperty(value = "删除标识：0-正常，1-已删除")
-    @TableField(value = "DEL_FLAG")
-    private Integer delFlag;
 
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")

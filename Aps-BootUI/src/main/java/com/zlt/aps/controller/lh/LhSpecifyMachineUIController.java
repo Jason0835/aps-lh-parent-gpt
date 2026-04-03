@@ -12,6 +12,8 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.ILhSpecifyMachineRemoteService;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.service.IMdmMaterialInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -54,6 +56,9 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
 
     @Autowired
     private ILhMachineInfoRemoteService iLhMachineInfoService;
+
+    @Autowired
+    private IMdmMaterialInfoRemoteService iMdmMaterialInfoService;
 
     private final String prefix = "aps/lh/lhSpecifyMachine";
 
@@ -210,6 +215,14 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @ResponseBody
     public AjaxResult getMachineList( LhMachineInfo query) {
         TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
+        return AjaxResult.success(tableDataInfo.getRows());
+    }
+
+    @ApiOperation("获取物料下拉列表")
+    @PostMapping("/getMaterialList")
+    @ResponseBody
+    public AjaxResult getMaterialList( MdmMaterialInfo query) {
+        TableDataInfo tableDataInfo = iMdmMaterialInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }
 }

@@ -3,7 +3,7 @@ package com.zlt.aps.itf.mes.mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
-import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.mp.api.domain.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -82,7 +82,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmDevMaintenancePlan> selectDevMaintenancePlanList(AuxReqSyncDataLogs syncDataLogs);
+    List<DevMaintenancePlan> selectDevMaintenancePlanList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胶囊已使用次数同步数据
@@ -90,7 +90,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmLhRepairCapsule> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
+    List<LhRepairCapsule> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询模具清洗预警计划同步数据
@@ -98,7 +98,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmMouldCleanPlan> selectMouldCleanPlanList(AuxReqSyncDataLogs syncDataLogs);
+    List<MouldCleanPlan> selectMouldCleanPlanList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询结构整车胎面配置同步数据
@@ -106,7 +106,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmStructureTreadConfig> selectStructureTreadConfigList(AuxReqSyncDataLogs syncDataLogs);
+    List<StructureTreadConfig> selectStructureTreadConfigList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询生胎库存同步数据

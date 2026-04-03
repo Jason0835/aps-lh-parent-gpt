@@ -29,6 +29,6 @@ public interface CxMachineStructureCapacityMapper extends BaseMapper<CxMachineSt
      * 根据机台和结构查询产能配置
      */
     CxMachineStructureCapacity selectByMachineAndStructure(
-            @Param("machineCode") String machineCode,
+            @Param("machineCode") String machineCode, 
             @Param("structureCode") String structureCode);
 }

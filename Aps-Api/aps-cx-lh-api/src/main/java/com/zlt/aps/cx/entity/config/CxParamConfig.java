@@ -42,36 +42,15 @@ public class CxParamConfig extends BaseEntity {
     @TableField("PARAM_VALUE")
     private String paramValue;
 
-    @ApiModelProperty(value = "参数类型：STRING-字符串 NUMBER-数字 BOOLEAN-布尔")
-    @TableField("PARAM_TYPE")
-    private String paramType;
-
-    @ApiModelProperty(value = "参数描述")
-    @TableField("PARAM_DESC")
-    private String paramDesc;
-
-    @ApiModelProperty(value = "分组编码")
-    @TableField("GROUP_CODE")
-    private String groupCode;
-
-    @ApiModelProperty(value = "分组名称")
-    @TableField("GROUP_NAME")
-    private String groupName;
-
-    @ApiModelProperty(value = "排序号")
-    @TableField("SORT_ORDER")
-    private Integer sortOrder;
-
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
     private Integer isActive;
 
-    @ApiModelProperty(value = "最后修改时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @TableField(value = "UPDATE_TIME", fill = FieldFill.UPDATE)
-    private Date updateTime;
+    @ApiModelProperty(value = "参数值对应的正则表达式")
+    @TableField("REGULAR_EXPRESSION")
+    private String regularExpression;
 
-    @ApiModelProperty(value = "最后修改人")
-    @TableField(value = "UPDATE_BY", fill = FieldFill.UPDATE)
-    private String updateBy;
+    @ApiModelProperty(value = "参数值根据正则表达式校验是失败后的错误提示")
+    @TableField("ERROR_TIPS")
+    private String errorTips;
 }

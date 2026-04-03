@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * 工厂月生产计划-最终排产计划定稿 Mapper接口
- *
+ * 
  * @author APS Team
  */
 @Mapper
@@ -103,9 +103,9 @@ public interface FactoryMonthPlanProductionFinalResultMapper extends BaseMapper<
             "</if>" +
             "ORDER BY PRODUCTION_SEQUENCE, ID" +
             "</script>")
-    IPage<FactoryMonthPlanProductionFinalResult> selectPageByYearMonth(Page<FactoryMonthPlanProductionFinalResult> page,
-                                                                       @Param("yearMonth") Integer yearMonth,
-                                                                       @Param("factoryCode") String factoryCode);
+    IPage<FactoryMonthPlanProductionFinalResult> selectPageByYearMonth(Page<FactoryMonthPlanProductionFinalResult> page, 
+                                                  @Param("yearMonth") Integer yearMonth, 
+                                                  @Param("factoryCode") String factoryCode);
 
     /**
      * 查询所有物料编码(去重)

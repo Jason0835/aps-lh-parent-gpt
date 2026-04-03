@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmLhRepairCapsuleEntityMapper">
 
-    <resultMap type="com.zlt.aps.mp.api.domain.entity.MdmLhRepairCapsule" id="BaseResultMap">
+    <resultMap type="com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule" id="BaseResultMap">
         <id property="id" column="ID"/>
         <result property="obtainTime" column="OBTAIN_TIME"/>
         <result property="lhCode" column="LH_CODE"/>

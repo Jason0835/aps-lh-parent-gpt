@@ -369,6 +369,7 @@ public class MatchingAdjuestProductionHandler {
             plan.setBeginDay(null);
             plan.setEndDay(null);
             plan.setAdjustDetailId(null);
+            plan.setActualAdjustQty(0);
             this.reCaculateInventorySalesRatio(contextDTO, plan,
                     Collections.singletonMap(demandPlan.getMaterialCode(), demandPlan.getStockQty())); // 计算库销比
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
@@ -415,6 +416,9 @@ public class MatchingAdjuestProductionHandler {
             String materialDesc = needProductPlan.getMaterialDesc();
             scheduleMaterialDesc.add(materialDesc); // 选中的规格加入已排产列表（无论是否能排上，下次轮询均不再处理该规格）
             FactoryMonthPlanFinalAdjustVo plan = mpProdFinalMap.get(materialDesc); // 获取定稿计划
+            if (intValue(plan.getActualAdjustQty()) < 0) { // 减量的SKU不搭配
+                continue;
+            }
             int capacity = plan.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION; // 产能都从final表获取
             boolean isNewPlan = plan.getBeginDay() == null;
             
@@ -428,12 +432,12 @@ public class MatchingAdjuestProductionHandler {
             if (isNewPlan) {
                 safeList.add(plan);
             }
-
+            boolean isAddMould = false;
             // 5、SKU外层循环，反复扫描该SKU搭配期间的每一天，只要一次扫描能搭配上任意一天，则再重新尝试扫描一次，知道无法搭配上后则结束外层循环
             out: do {
                 int startUnAllocationQty = unAllocationQty; // 记录开始扫描前的待搭配量，用于本轮扫描结束后比对是否有
                 // 5.1、确认搭配期间，初始限定在结构调整开始时间 至 SKU收尾的后一天
-                Integer realBeginDay = plan.getMatchBeginDay() != null? plan.getMatchBeginDay(): beginDay; // 本次循环的开始日期
+                Integer realBeginDay = isCheckContinue && plan.getMatchBeginDay() != null? plan.getMatchBeginDay(): beginDay; // 本次循环的开始日期，如果是续作且开始搭配日不为空，则以此为准，否则从接口开始日开始检索
                 Integer realEndDay = this.getRealEndDay(contextDTO, plan, realBeginDay, endDay); // 本次循环的结束日期
                 // 5.2、开始循环检查搭配期间的每一天，符合搭配条件的日期则执行搭配
                 for (int day = realBeginDay; day <= realEndDay; day++) { // 遍历结构排产日，如果锁定日超过开始i日期，从锁定日下一天开始
@@ -468,6 +472,7 @@ public class MatchingAdjuestProductionHandler {
                         producedQty += allocationQty;
                         unAllocationQty -= allocationQty;
                         if (!isCheckContinue) { // 如果是新增逻辑，则直接结束，走续作逻辑
+                            isAddMould = true;
                             break out;
                         } else if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
                             Integer nextEndDay = this.getNextDay(contextDTO, realEndDay, endDay);
@@ -490,7 +495,7 @@ public class MatchingAdjuestProductionHandler {
             if (isNewPlan && plan.getBeginDay() != null) { // 排上的规格添加导列表中
                 mpProdFinalList.add(plan);
             }
-            if (!isCheckContinue) { // 如果是新增逻辑，则直接结束，走续作逻辑
+            if (isAddMould) { // 如果有增模，则直接结束，走续作逻辑
                 break;
             }
         } while (true);

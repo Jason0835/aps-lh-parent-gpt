@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -36,10 +35,6 @@ public class CxScheduleDetail extends BaseEntity {
     @TableField("MAIN_ID")
     private Long mainId;
 
-    @ApiModelProperty(value = "结果ID（同mainId）")
-    @TableField(exist = false)
-    private Long resultId;
-
     @ApiModelProperty(value = "计划日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("SCHEDULE_DATE")
@@ -61,10 +56,6 @@ public class CxScheduleDetail extends BaseEntity {
     @TableField("EMBRYO_CODE")
     private String embryoCode;
 
-    @ApiModelProperty(value = "物料编码（同胎胚代码）")
-    @TableField("MATERIAL_CODE")
-    private String materialCode;
-
     @ApiModelProperty(value = "状态：PLANNED-计划中，COMPLETED-已完成，CANCELLED-已取消")
     @TableField("STATUS")
     private String status;
@@ -73,17 +64,9 @@ public class CxScheduleDetail extends BaseEntity {
     @TableField("PLAN_QTY")
     private Integer planQty;
 
-    @ApiModelProperty(value = "实际数量")
+    @ApiModelProperty(value = "完成数量")
     @TableField("ACTUAL_QTY")
     private Integer actualQty;
-
-    @ApiModelProperty(value = "机台编码")
-    @TableField("MACHINE_CODE")
-    private String machineCode;
-
-    @ApiModelProperty(value = "试制计划ID")
-    @TableField(exist = false)
-    private Long trialPlanId;
 
     @ApiModelProperty(value = "完成率")
     @TableField(exist = false)
@@ -112,22 +95,6 @@ public class CxScheduleDetail extends BaseEntity {
     @ApiModelProperty(value = "库存可供硫化时长(小时)")
     @TableField("STOCK_HOURS_AT_CALC")
     private BigDecimal stockHoursAtCalc;
-
-    @ApiModelProperty(value = "是否收尾：0-否 1-是")
-    @TableField("IS_ENDING")
-    private Integer isEnding;
-
-    @ApiModelProperty(value = "是否试制：0-否 1-是")
-    @TableField("IS_TRIAL")
-    private Integer isTrial;
-
-    @ApiModelProperty(value = "是否精度计划：0-否 1-是")
-    @TableField("IS_PRECISION")
-    private Integer isPrecision;
-
-    @ApiModelProperty(value = "是否续作：0-否 1-是")
-    @TableField("IS_CONTINUE")
-    private Integer isContinue;
 
     @ApiModelProperty(value = "计划开始时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
