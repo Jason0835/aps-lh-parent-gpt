@@ -36,6 +36,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
 
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
@@ -112,7 +113,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
     public List<MonthPlanNoProductionPlan> selectList(MonthPlanNoProductionPlan query) {
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
         builderCondition(wrapper, query);
-        
+
         wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
                 "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
                 "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
@@ -130,26 +131,51 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 "PATTERN");
         wrapper.orderBy(true, true, "STRUCTURE_NAME", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC", "PRO_SIZE");
         wrapper.orderBy(true, false, "UPDATE_TIME");
-        
+
         List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(wrapper);
-        
+
         if (CollectionUtils.isNotEmpty(list) && StringUtils.isNotBlank(query.getProductionVersion())) {
             LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
             resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, query.getProductionVersion());
             Map<String, Integer> mouldingDayResultMap = factoryMouldingDayResultMapper
                     .selectList(resultQueryWrapper).stream().collect(Collectors
                             .toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, FactoryMonthPlanMouldDayResult::getTotalQty, (r1, r2) -> r1));
-            
+
             for (MonthPlanNoProductionPlan item : list) {
                 int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
-                item.setFactProdReqQty(factProdQty);
+                item.setTotalQty((long) factProdQty);
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0L;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0L;
                 long actualOrderUnproduced = heightQty + midQty - factProdQty;
                 item.setActualOrderUnproduced(actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0L);
             }
         }
-        dealList(list);
+        
+        if (CollectionUtils.isNotEmpty(list)) {
+            Locale language = SecurityUtils.getUserLang();
+            for (MonthPlanNoProductionPlan item : list) {
+                String reason = item.getReason();
+                if (StringUtils.isNotBlank(reason)) {
+                    if (reason.contains("|")) {
+                        String[] split = reason.split("\\|");
+                        List<String> reasonList = new ArrayList<>(split.length);
+                        for (String reasonI18n : split) {
+                            String convertValue = JsonI18nConvertUtils.getConvertValue(reasonI18n, language);
+                            reasonList.add(convertValue);
+                        }
+                        item.setReason(reasonList.stream().distinct().collect(Collectors.joining(",")));
+                    } else {
+                        String convertValue = JsonI18nConvertUtils.getConvertValue(reason, language);
+                        item.setReason(convertValue);
+                    }
+                }
+                
+                Long factProdReqQty = item.getFactProdReqQty() == null ? 0L : item.getFactProdReqQty();
+                Long unProductionQty = item.getUnProductionQty() == null ? 0L : item.getUnProductionQty();
+                long totalQty = factProdReqQty - unProductionQty;
+                item.setTotalQty(totalQty < 0 ? 0 : totalQty);
+            }
+        }
         return list;
     }
 
@@ -285,7 +311,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                         .collect(Collectors.toSet());
 
                 for (String structureName : structureNames) {
-                    structureTypeMap.put(structureName, cycleStructNames.contains(structureName)? structureTypeDictMap.get(STRUCTURE_TYPE_CYCL): structureTypeDictMap.get(STRUCTURE_TYPE_COMMON));
+                    structureTypeMap.put(structureName, cycleStructNames.contains(structureName) ? structureTypeDictMap.get(STRUCTURE_TYPE_CYCL) : structureTypeDictMap.get(STRUCTURE_TYPE_COMMON));
                 }
             }
 
@@ -296,7 +322,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                     .distinct()
                     .collect(Collectors.toList());
             List<List<String>> materialCodeSplitList = ScmListUtils.getSplitList(materialCodeList, 1000); // 按每1000行查询，防止超出限制
-            for (List<String> splitList: materialCodeSplitList) {
+            for (List<String> splitList : materialCodeSplitList) {
                 QueryWrapper<MdmMaterialInfo> materialInfoWrapper = new QueryWrapper<>();
                 materialInfoWrapper.in("MATERIAL_CODE", splitList);
                 materialInfoWrapper.isNotNull("PRODUCT_CATEGORY");
@@ -360,14 +386,17 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 listDataMap.put("cycleReserveQty", item.getCycleReserveQty() != null ? item.getCycleReserveQty() : 0);
                 listDataMap.put("conventionReserveQty", item.getConventionReserveQty() != null ? item.getConventionReserveQty() : 0);
                 listDataMap.put("heightLossQty", item.getHeightLossQty() != null ? item.getHeightLossQty() : 0);
+                listDataMap.put("factProdReqQty", item.getFactProdReqQty() != null ? item.getFactProdReqQty() : 0);
                 listDataMap.put("unProductionQty", item.getUnProductionQty() != null ? item.getUnProductionQty() : 0);
+
+                // 实际排产从 t_mp_moulding_day_result 表获取 totalQty
+                int totalQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
+                listDataMap.put("totalQty", totalQty);
 
                 // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0;
-                int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
-                long actualOrderUnproduced = heightQty + midQty - factProdQty;
-                listDataMap.put("factProdReqQty", factProdQty);
+                long actualOrderUnproduced = heightQty + midQty - totalQty;
                 listDataMap.put("actualOrderUnproduced", actualOrderUnproduced >= 0 ? actualOrderUnproduced : 0);
                 // 更新日期
                 if (item.getUpdateTime() != null) {

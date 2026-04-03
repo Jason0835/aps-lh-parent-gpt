@@ -72,12 +72,9 @@ public class MonthPlanNoProductionPlanController extends AbstractDocBizControlle
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MonthPlanNoProductionPlan queryVO) {
-        TableDataInfo tableResult = super.list(queryVO);
-        if(CollectionUtils.isEmpty(tableResult.getRows())) {
-            return tableResult;
-        }
-        this.translationList((List<MonthPlanNoProductionPlan>)tableResult.getRows());
-        return tableResult;
+        List<MonthPlanNoProductionPlan> monthPlanNoProductionPlanList = monthPlanNoProductionPlanService.selectList(queryVO);
+        this.translationList(monthPlanNoProductionPlanList);
+        return getDataTable(monthPlanNoProductionPlanList);
     }
 
     private void translationList(List<MonthPlanNoProductionPlan> list) {
