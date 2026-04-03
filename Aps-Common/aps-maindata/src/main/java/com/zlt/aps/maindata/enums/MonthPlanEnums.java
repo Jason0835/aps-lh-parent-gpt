@@ -56,7 +56,7 @@ public enum MonthPlanEnums {
      */
     SCM_ORDER_MATRAL_QUALITY_STATE("SYS0102006", "从供应链同步的订单物料信息只需要管控质量符合条件的数据"),
     /**
-     *  SYS0103001 最小投产量
+     * SYS0103001 最小投产量
      */
     MIN_PRODUCTION_QTY("SYS0103001", "最小投产量"),
     /**
@@ -200,46 +200,49 @@ public enum MonthPlanEnums {
     /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
-    DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001","单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),
+    DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001", "单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),
     /**
      * SYS0205002 单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205003的值
      */
-    FIRST_NEAR_DEAD_LINE_DAY("SYS0205002","单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205003的值"),
+    FIRST_NEAR_DEAD_LINE_DAY("SYS0205002", "单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205003的值"),
     /**
      * SYS0205003 单位：台，续作Sku排产硫化机台数超过SYS0205002时，需要降到该值
      */
-    FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205003","单位：台，续作Sku排产硫化机台数超过SYS0205002时，需要降到该值"),
+    FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205003", "单位：台，续作Sku排产硫化机台数超过SYS0205002时，需要降到该值"),
     /**
      * SYS0205004 单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205005的值
      */
-    SECOND_NEAR_DEAD_LINE_DAY("SYS0205004","单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205005的值"),
+    SECOND_NEAR_DEAD_LINE_DAY("SYS0205004", "单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205005的值"),
     /**
      * SYS0205005 单位：台，续作Sku排产硫化机台数超过SYS0205004时，需要降到该值
      */
-    SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205005","单位：台，续作Sku排产硫化机台数超过SYS0205004时，需要降到该值"),
+    SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205005", "单位：台，续作Sku排产硫化机台数超过SYS0205004时，需要降到该值"),
     /**
      * SYS0205006 单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205007的值
      */
-    LAST_NEAR_DEAD_LINE_DAY("SYS0205006","单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205007的值"),
+    LAST_NEAR_DEAD_LINE_DAY("SYS0205006", "单位：台，续作Sku排产硫化机台数超过该值时，需要降到SYS0205007的值"),
     /**
      * SYS0205007 单位：台，续作Sku排产硫化机台数超过SYS0205006时，需要降到该值
      */
-    LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205007","单位：台，续作Sku排产硫化机台数超过SYS0205006时，需要降到该值"),
+    LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT("SYS0205007", "单位：台，续作Sku排产硫化机台数超过SYS0205006时，需要降到该值"),
 
     /**
      * SYS0208001 净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能
      */
     NET_REQUIREMENT_DAY_CAPACITY("SYS0208001", "净需求计划日产能，计算区域总产能 = 净需求计划日产能 * 当月天数，作用是重新调整每个区域产能"),
     /**
-     *  SYS0202006 EUDR开始的年周号
+     * SYS0202006 EUDR开始的年周号
      */
-    EUDR_REQUIRE("SYS0202006","EUDR开始的年周号"),
+    EUDR_REQUIRE("SYS0202006", "EUDR开始的年周号"),
 
     /**
-     *  SYS0206006 周程滚动调整日
+     * SYS0206006 周程滚动调整日
      */
-    WEEK_ROLL_ADJUST_DATE("SYS0206006","周程滚动调整日"),
-
+    WEEK_ROLL_ADJUST_DATE("SYS0206006", "周程滚动调整日"),
+    /**
+     * SYS0207001 参与Sku排产竞争的优先级高的Sku列表个数
+     */
+    HEIGHT_PRIORITY_SKU_LIST_COUNT("SYS0207001", "参与Sku排产竞争的优先级高的Sku列表个数"),
     /**
      * SYS0209003 APS通用班制
      */
@@ -253,8 +256,7 @@ public enum MonthPlanEnums {
     /**
      * SYS0209005 参与排产的特殊原材料编码，多个以,分隔
      */
-    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔"),
-    ;
+    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔");
 
     private final String code;
     private final String name;
