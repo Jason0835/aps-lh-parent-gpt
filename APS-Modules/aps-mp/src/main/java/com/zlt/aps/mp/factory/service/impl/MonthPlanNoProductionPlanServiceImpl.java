@@ -112,20 +112,37 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
     public List<MonthPlanNoProductionPlan> selectList(MonthPlanNoProductionPlan query) {
         QueryWrapper<MonthPlanNoProductionPlan> wrapper = new QueryWrapper<>();
         builderCondition(wrapper, query);
+        
+        wrapper.select("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
+                "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
+                "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
+                "PATTERN", "max(STOCK_QTY) as stockQty", "max(AVERAGE_SALE_QTY) as averageSaleQty",
+                "sum(NET_QTY) as netQty", "sum(POSTPONE_NET_QTY) as postponeNetQty",
+                "sum(UN_POSTPONE_NET_QTY) as unPostponeNetQty", "sum(HEIGHT_QTY) as heightQty",
+                "sum(MID_QTY) as midQty", "sum(POSTPONE_QTY) as postponeQty",
+                "sum(CYCLE_RESERVE_QTY) as cycleReserveQty", "sum(CONVENTION_RESERVE_QTY) as conventionReserveQty",
+                "sum(HEIGHT_LOSS_QTY) as heightLossQty", "sum(FACT_PROD_REQ_QTY) as factProdReqQty",
+                "sum(UN_PRODUCTION_QTY) as unProductionQty", "GROUP_CONCAT(distinct reason SEPARATOR '|') as reason",
+                "max(UPDATE_TIME) as UPDATE_TIME");
+        wrapper.groupBy("FACTORY_CODE", "YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCTION_VERSION", "PRODUCT_TYPE_CODE",
+                "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
+                "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
+                "PATTERN");
+        wrapper.orderBy(true, true, "STRUCTURE_NAME", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC", "PRO_SIZE");
+        wrapper.orderBy(true, false, "UPDATE_TIME");
+        
         List<MonthPlanNoProductionPlan> list = monthPlanNoProductionPlanMapper.selectList(wrapper);
-        // 加载月计划排产明细，用于计算实际排产和实单未排产
+        
         if (CollectionUtils.isNotEmpty(list) && StringUtils.isNotBlank(query.getProductionVersion())) {
             LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
             resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, query.getProductionVersion());
             Map<String, Integer> mouldingDayResultMap = factoryMouldingDayResultMapper
                     .selectList(resultQueryWrapper).stream().collect(Collectors
                             .toMap(FactoryMonthPlanMouldDayResult::getMaterialCode, FactoryMonthPlanMouldDayResult::getTotalQty, (r1, r2) -> r1));
-            // 计算实际排产和实单未排产
+            
             for (MonthPlanNoProductionPlan item : list) {
-                // 实际排产
                 int factProdQty = mouldingDayResultMap.getOrDefault(item.getMaterialCode(), 0);
-                item.setTotalQty((long) factProdQty);
-                // 实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
+                item.setFactProdReqQty(factProdQty);
                 long heightQty = item.getHeightQty() != null ? item.getHeightQty() : 0L;
                 long midQty = item.getMidQty() != null ? item.getMidQty() : 0L;
                 long actualOrderUnproduced = heightQty + midQty - factProdQty;

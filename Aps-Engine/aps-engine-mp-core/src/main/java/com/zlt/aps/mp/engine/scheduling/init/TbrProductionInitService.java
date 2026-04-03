@@ -6,6 +6,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.*;
@@ -42,10 +43,14 @@ import java.util.stream.Collectors;
 @Service(value = "tbrProductionInitService")
 public class TbrProductionInitService extends AbstractInitDataLoadService {
 
+    private final CycleGroupDataHandler cycleGroupDataHandler;
+
     public TbrProductionInitService(ProductionMdmDataService dataService,
                                     DpRequireDataService dpRequireDataService,
+                                    CycleGroupDataHandler cycleGroupDataHandler,
                                     MonthProductionDataService monthProductionDataService) {
         super(dataService, dpRequireDataService, monthProductionDataService);
+        this.cycleGroupDataHandler = cycleGroupDataHandler;
     }
 
     /**
@@ -100,7 +105,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         //SKU-日硫化产能
         Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
         //20260403+ 月周期排产清单，检测周期结构不在月周期排产清单中则不排
-        Set<String> monthProductionCycleList = getMonthCycleGroupInfo(productionContext);
+        Set<String> monthProductionCycleList = cycleGroupDataHandler.getMonthCycleGroupInfo(productionContext);
         //赋值施工信息，模具，日硫化产能
         requirePlanList.forEach(requirePlan -> {
             String materialCode = requirePlan.getMaterialCode();

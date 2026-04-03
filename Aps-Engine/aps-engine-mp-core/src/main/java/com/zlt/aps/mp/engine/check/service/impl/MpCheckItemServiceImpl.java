@@ -9,6 +9,7 @@ import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpCheckItemRecord;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
+import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemRecordService;
 import com.zlt.aps.mp.engine.check.service.IMpCheckItemService;
@@ -49,12 +50,16 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
 
     private final IMpCheckItemRecordService iMpCheckItemRecordService;
 
+    private final CycleGroupDataHandler cycleGroupDataHandler;
+
     public MpCheckItemServiceImpl(ProductionMdmDataService dataService,
                                   DpRequireDataService dpRequireDataService,
+                                  CycleGroupDataHandler cycleGroupDataHandler,
                                   MonthProductionDataService monthProductionDataService,
                                   ProductionHistoryHandler productionHistoryHandler,
                                   IMpCheckItemRecordService iMpCheckItemRecordService) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+        this.cycleGroupDataHandler = cycleGroupDataHandler;
         this.iMpCheckItemRecordService = iMpCheckItemRecordService;
     }
 
@@ -255,7 +260,7 @@ public class MpCheckItemServiceImpl extends AbstractDataLoaderService implements
             Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = getProductionMouldInfo(productionContext);
             Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = getProductLhCapacityInfo(productionContext, paramConfiguration.getDayVulcanizationQtyConfiguration());
             //20260403+ 月周期排产清单
-            Set<String> monthProductionCycleList = getMonthCycleGroupInfo(productionContext);
+            Set<String> monthProductionCycleList = cycleGroupDataHandler.getMonthCycleGroupInfo(productionContext);
             requirePlanList.forEach(requirePlan -> {
                 String materialCode = requirePlan.getMaterialCode();
                 String materialDesc = requirePlan.getMaterialDesc();

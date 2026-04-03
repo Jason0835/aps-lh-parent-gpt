@@ -321,7 +321,10 @@ public class HolidayScheduleServiceImpl implements HolidayScheduleService {
             // 找出该胎胚对应的所有硫化任务中最大的specEndTime
             LocalDateTime embryoMaxStopTime = null;
             for (LhScheduleResult result : embryoResults) {
-                LocalDateTime specEndTime = result.getSpecEndTime();
+                LocalDateTime specEndTime = result.getSpecEndTime().toInstant()
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDateTime();
+
                 if (specEndTime != null) {
                     if (embryoMaxStopTime == null || specEndTime.isAfter(embryoMaxStopTime)) {
                         embryoMaxStopTime = specEndTime;

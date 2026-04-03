@@ -49,6 +49,7 @@ import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.MatchingProductionAdjuestVo;
@@ -1148,8 +1149,19 @@ public class MatchingAdjuestProductionHandler {
         boolean isRemaindCapacity = mouldRemaindCapacity > 0; // 是否是补模具产能
         int mouldCavityQty = this.getNewCavityQty(contextDTO, plan, scheduleDay); // 总型腔数量
 //        int typeBlockQty = cavity2Block.getInsertResults().getOrDefault(mouldKey, 0); // 总活块数量
-        Integer oemQty = intValue(dailyCapacityLimitVo.getRemainOemQty());
+        Integer remainOemQty = 0;
         boolean isOem = contextDTO.getOemBrandConfigSet().contains(plan.getBrand());
+        if (isOem) { // oem规格，剩余oem量不足时不搭配
+            Integer oldRemainQty = intValue(dailyCapacityLimitVo.getRemainOemQty());
+            OemTotalCapacityChecker oemTotalCapacityChecker = new OemTotalCapacityChecker(mpProdFinalList, oldRemainQty);
+            if (!oemTotalCapacityChecker.doCheck()) {
+                return 0;
+            }
+            remainOemQty = oldRemainQty - oemTotalCapacityChecker.getTotalPlanQty();
+            if (remainOemQty == 0) {
+                return 0;
+            }
+        }
         
         // 判断当天成型硫化比是否已经满足条件
         List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
@@ -1195,11 +1207,6 @@ public class MatchingAdjuestProductionHandler {
                     unAllocationQty, dailyCapacityLimitMap)) {
                 return 0;
             }
-            // 4、oem规格如果下一天的oem剩余量无法满排，则不搭配
-            Integer firstQty = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
-            if (isOem && oemQty < firstQty + capacity) {
-                return 0;
-            }
         }
         // 取出已有的排产计划
         MatchingProductionAdjuestVo dayProduct = dayProductionList.stream()
@@ -1231,12 +1238,15 @@ public class MatchingAdjuestProductionHandler {
         }
         allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量以及剩余产能
         // 如果是贴牌不能超过贴牌量
-        if (isOem) {
-            allocationQty = Math.min(allocationQty, oemQty); // 分配量不能超过未分配量以及剩余产能
-        }
         if (((dayProduct.getProductionQty() + allocationQty)& 1) != 0) { // 如果原排产量 + 新排产量为奇数，则排产量需要 + 1
             allocationQty ++;
         }
+        
+        // 如果是换模，且是oem规格，如果剩余oem的量不足搭配量，则停止不再搭配
+        if (isChangeMould && isOem && remainOemQty <= allocationQty) {
+            return 0;
+        }
+        
         Integer oldProductionQty = intValue(plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay));
         plan.setFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay, allocationQty + oldProductionQty);
         plan.setTotalQty(intValue(plan.getTotalQty()) + allocationQty);
@@ -1273,7 +1283,7 @@ public class MatchingAdjuestProductionHandler {
         
         // 更新贴牌数量
         if (isOem) {
-            dailyCapacityLimitVo.setRemainOemQty(oemQty - allocationQty); // 扣减贴牌数量
+            dailyCapacityLimitVo.setRemainOemQty(remainOemQty - allocationQty); // 扣减贴牌数量
         }
         
         String scheduleName = isCheckContinue? "补量": "增模";
