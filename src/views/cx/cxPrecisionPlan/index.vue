@@ -242,7 +242,7 @@ export default {
     },
     handleDelete(row) {
       this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
-        const ids = row ? [row.id] : this.selection.map(r => r.id)
+        const ids = row && row.id ? row.id : this.selection.map(r => r.id).join(',')
         this.loading = true
         removeCxPrecisionPlan(ids)
           .then(res => {

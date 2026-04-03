@@ -23,7 +23,7 @@ export function removeCxPrecisionPlan(ids) {
   return request({
     url: '/cx/cxPrecisionPlan/remove',
     method: 'post',
-    data: ids
+    params: { ids: ids }
   })
 }
 
