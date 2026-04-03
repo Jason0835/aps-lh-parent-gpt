@@ -23,6 +23,7 @@
       row-key="id"
       :expand-row-keys="expands"
       @expand-change="handleExpandChange"
+      :max-height="showOutResult?450:'calc(100vh )'"
     >
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">

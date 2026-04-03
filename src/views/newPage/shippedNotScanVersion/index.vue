@@ -149,7 +149,7 @@ export default {
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.colume.updateTime"),
+          label: "更新日期",
           minWidth: 150,
         },
       ];
