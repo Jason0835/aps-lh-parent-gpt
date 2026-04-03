@@ -2,9 +2,9 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.CxMachineStructureCapacity;
-import com.zlt.aps.cx.entity.CxPrecisionPlan;
 
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 
@@ -532,7 +532,7 @@ public class ShiftScheduleService {
         for (CxPrecisionPlan plan : context.getPrecisionPlans()) {
             if (machineCode.equals(plan.getMachineCode())) {
                 if (shiftConfig.getShiftCode().equals(plan.getPlanShift())) {
-                    int precisionHours = plan.getEstimatedHours() != null ? plan.getEstimatedHours() : 4;
+                    int precisionHours = plan.getEstimatedHours() != null ? plan.getEstimatedHours().intValue() : 4;
                     return precisionHours * hourlyCapacity;
                 }
             }

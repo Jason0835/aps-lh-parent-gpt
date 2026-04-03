@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.*;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
