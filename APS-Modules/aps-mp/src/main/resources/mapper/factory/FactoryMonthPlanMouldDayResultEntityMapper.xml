@@ -104,7 +104,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND m.IS_DELETE = 0 
 		    AND m.STRUCTURE_NAME IS NOT NULL 
         <if test="!isAllMaterial">
-            AND m.FACTORY_CODE = r.FACTORY_CODE 
+            AND m.FACTORY_CODE = r.FACTORY_CODE
+            AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE)
         </if>
 		GROUP BY
 		    MM.MIN_PRO_SIZE,
