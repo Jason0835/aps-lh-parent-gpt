@@ -517,6 +517,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         tableMap.put("heightQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightQty"));
         tableMap.put("midQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.midQty"));
         tableMap.put("cycleReserveQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.cycleReserveQty"));
+        tableMap.put("conventionReserveQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.conventionReserveQty"));
         tableMap.put("totalQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.totalQty"));
         tableMap.put("heightProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightProductionQty"));
         tableMap.put("midProductionQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.midProductionQty"));
@@ -663,6 +664,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         listDataMap.put(this.getRealFieldName("heightQty", suffix), exportVo.getHeightQty());
         listDataMap.put(this.getRealFieldName("midQty", suffix), exportVo.getMidQty());
         listDataMap.put(this.getRealFieldName("cycleReserveQty", suffix), exportVo.getCycleReserveQty());
+        listDataMap.put(this.getRealFieldName("conventionReserveQty", suffix), exportVo.getConventionReserveQty());
         listDataMap.put(this.getRealFieldName("totalQty", suffix), exportVo.getTotalQty());
         listDataMap.put(this.getRealFieldName("heightProductionQty", suffix), exportVo.getHeightProductionQty());
         listDataMap.put(this.getRealFieldName("midProductionQty", suffix), exportVo.getMidProductionQty());
@@ -756,6 +758,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             subtotal.setHeightQty(this.safeAdd(subtotal.getHeightQty(), result.getHeightQty()));
             subtotal.setMidQty(this.safeAdd(subtotal.getMidQty(), result.getMidQty()));
             subtotal.setCycleReserveQty(this.safeAdd(subtotal.getCycleReserveQty(), result.getCycleReserveQty()));
+            subtotal.setConventionReserveQty(this.safeAdd(subtotal.getConventionReserveQty(), result.getConventionReserveQty()));
             subtotal.setFactProdReqQty(this.safeAdd(subtotal.getFactProdReqQty(), result.getFactProdReqQty()));
             subtotal.setTotalQty(this.safeAdd(subtotal.getTotalQty(), result.getTotalQty()));
             subtotal.setHeightProductionQty(this.safeAdd(subtotal.getHeightProductionQty(), result.getHeightProductionQty()));

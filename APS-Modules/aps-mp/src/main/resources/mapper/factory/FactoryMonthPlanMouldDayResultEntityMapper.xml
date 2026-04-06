@@ -30,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
 		    sum( d.MID_QTY ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
+		    sum( case when d.IS_SCHECULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) conventionReserveQty,
 		    r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
 		    r.MID_PRODUCTION_QTY,
