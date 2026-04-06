@@ -753,6 +753,7 @@ public class ExcelUtils {
             if (oldStyle != null) { // 原单元格对其方式复制过去
                 cellStyle.setAlignment(oldStyle.getAlignment());
                 cellStyle.setVerticalAlignment(oldStyle.getVerticalAlignment());
+                cellStyle.setDataFormat(oldStyle.getDataFormat());
             }
             
             // 修改字体样式
