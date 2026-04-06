@@ -105,6 +105,17 @@ public class SupplyOrderPoolUIController extends BaseUIController<SupplyOrderPoo
     }
 
     /**
+     * 参与排产
+     */
+    @ApiOperation("参与排产")
+    @RequiresPermissions("monthplan:supplyOrderPool:setSchedule")
+    @PostMapping("/setSchedule")
+    @ResponseBody
+    public AjaxResult setSchedule(SupplyOrderPool supplyOrderPool) {
+        return iSupplyOrderPoolService.setSchedule(supplyOrderPool);
+    }
+
+    /**
      * 新增周期排产储备时候，输入储备数量的时候，需要加一个提示用户无订单库存有多少，月底计划余量有多少
      * @param supplyOrderPool 入参
      * @return AjaxResult

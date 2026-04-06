@@ -1,7 +1,9 @@
 package com.zlt.aps.mp.common.utils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.enums.QualityStateEnum;
 import com.zlt.aps.constant.FactoryConstant;
@@ -135,6 +137,21 @@ public class PrecedentStockUpService {
       log.error("常规备货创建失败", e);
       throw new BusinessException("常规备货创建失败: " + e.getMessage(), e);
     }
+  }
+  
+
+  /**
+   * 常规储备设置参与排产
+   *
+   * @param supplyOrderPool 供应链订单池
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public AjaxResult setSchedule(SupplyOrderPool supplyOrderPool) {
+      LambdaUpdateWrapper<SupplyOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
+      updateWrapper.set(SupplyOrderPool::getIsSchecule, YesOrNoEnum.YES.getCode());
+      updateWrapper.eq(SupplyOrderPool::getId, supplyOrderPool.getId());
+      supplyOrderPoolEntityMapper.update(null, updateWrapper);
+      return AjaxResult.success();
   }
 
   private PrecedentStockUpContext buildContext(SupplyOrderPool supplyOrderPool) {

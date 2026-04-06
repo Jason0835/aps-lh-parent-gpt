@@ -42,6 +42,13 @@ public interface ISupplyOrderPoolRemoteService {
     @PostMapping("/supplyOrderPool/save")
     AjaxResult save(@RequestBody SupplyOrderPool supplyOrderPool);
 
+    /**
+    * 参与排产
+    */
+    @ApiOperation("参与排产")
+    @PostMapping("/supplyOrderPool/setSchedule")
+    AjaxResult setSchedule(@RequestBody SupplyOrderPool supplyOrderPool);
+    
 
     /**
      * 删除

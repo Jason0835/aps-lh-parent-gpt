@@ -181,6 +181,12 @@ public class SupplyOrderPool extends BaseEntity {
     @ApiModelProperty("预测版本号")
     @TableField("PREDICTION_VERSION")
     private String predictionVersion;
+    /**
+     * 是否参与排产
+     */
+    @ApiModelProperty(value = "是否参与排产", name = "isSchecule")
+    @TableField(value = "IS_SCHECULE")
+    private String isSchecule;
 
     /**
      * 月均销量

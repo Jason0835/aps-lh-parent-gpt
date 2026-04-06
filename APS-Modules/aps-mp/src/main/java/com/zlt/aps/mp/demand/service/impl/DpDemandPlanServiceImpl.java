@@ -1160,6 +1160,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setScmPriority(supplyOrder.getOrderType());
         demandPlan.setOrderQty(supplyOrder.getQty()==null? BigDecimal.ZERO.intValue() : supplyOrder.getQty());
         demandPlan.setNetQty(demandPlan.getOrderQty());
+        demandPlan.setIsSchecule(supplyOrder.getIsSchecule());
         return demandPlan;
     }
 

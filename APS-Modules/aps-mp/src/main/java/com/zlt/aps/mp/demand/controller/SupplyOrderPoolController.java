@@ -167,6 +167,20 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         return super.removeByIds(ids);
     }
 
+    /**
+     * 参与排存
+     */
+    @Log(title = "参与排产", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("参与排产")
+    @PostMapping("/setSchedule")
+    public AjaxResult setSchedule(@RequestBody SupplyOrderPool billVO){
+        SupplyOrderPool supplyOrderPool = this.getInfo(billVO.getId());
+        if (SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode().equals(supplyOrderPool.getOrderType())) {
+            precedentStockUpService.setSchedule(supplyOrderPool);
+        }
+        return AjaxResult.success();
+    }
+
 
     /**
      * 获取供应链订单池详细信息
