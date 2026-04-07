@@ -61,3 +61,10 @@ export function cyclicSchedulingTips(query) {
   })
 }
 
+export function schedulingPate(query) {
+  return request({
+    url: '/monthplan/supplyOrderPool/setSchedule',
+    method: 'post',
+    data: query
+  })
+}

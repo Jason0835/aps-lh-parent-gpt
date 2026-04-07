@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="cxStockTable"
+      tableRef="cxPrecisionPlanTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -18,46 +18,46 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cx:cxStock:edit']" @click="handleAdd">
+        <el-button type="primary" plain v-hasPermi="['cx:cxPrecisionPlan:edit']" @click="handleAdd">
           {{ $t('ui.frame.btn.add') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStock:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
+        <el-button v-hasPermi="['cx:cxPrecisionPlan:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
           {{ $t('ui.frame.btn.update') }}
         </el-button>
-        <el-button type="danger" v-hasPermi="['cx:cxStock:remove']" :disabled="selection.length === 0" @click="handleDelete">
+        <el-button type="danger" v-hasPermi="['cx:cxPrecisionPlan:remove']" :disabled="selection.length === 0" @click="handleDelete">
           {{ $t('ui.frame.btn.delete') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStock:import']" @click="$refs.uploadRef.handleImport()">
+        <el-button v-hasPermi="['cx:cxPrecisionPlan:import']" @click="$refs.uploadRef.handleImport()">
           {{ $t('ui.frame.btn.import') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStock:export']" @click="handleExport">
+        <el-button v-hasPermi="['cx:cxPrecisionPlan:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>
       </template>
     </page-table>
-  <tlt-upload-form
-    ref="uploadRef"
-    :updateSupport="true"
-    downloadUrl="/cx/cxStock/importTemplate"
-    uploadUrl="/cx/cxStock/importData"
-    @uploadSuccess="getList"
-    labelWidth="0"
-    :columns="importColumns"
-  />
+    <tlt-upload-form
+      ref="uploadRef"
+      :updateSupport="true"
+      :downloadUrl="importTemplateUrl"
+      :uploadUrl="importUrl"
+      @uploadSuccess="getList"
+      labelWidth="0"
+      :columns="importColumns"
+    />
     <info-dialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listCxStock, removeCxStock } from '@/api/cx/cxStock'
+import { listCxPrecisionPlan, removeCxPrecisionPlan } from '@/api/cx/cxPrecisionPlan'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
 
 export default {
-  name: 'CxStock',
+  name: 'CxPrecisionPlan',
   components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name', 'biz_yes_no'],
+  dicts: ['biz_factory_name', 'class_num_three_plan'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -82,42 +82,36 @@ export default {
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
       search: {},
-      query: {}
+      query: {},
+      importUrl: '/cx/cxPrecisionPlan/importData',
+      importTemplateUrl: '/cx/cxPrecisionPlan/importTemplate'
     }
   },
   computed: {
     searchColumns() {
       return [
         {
-          prop: 'stockDate',
-          label: this.$t('ui.data.column.cxStock.stockDate'),
-          type: 'date',
-          dateType: 'daterange',
-          valueFormat: 'yyyy-MM-dd',
-          startPlaceholder: this.$t('common.startTime'),
-          endPlaceholder: this.$t('common.endTime'),
-          clearable: true
-        },
-        {
-          prop: 'embryoCode',
-          label: this.$t('ui.data.column.cxStock.embryoCode'),
-          placeholder: this.$t('common.rule.input'),
-          type: 'input'
-        },
-        {
           prop: 'factoryCode',
-          label: this.$t('ui.data.column.cxStock.factoryCode'),
+          label: this.$t('ui.data.column.cxPrecisionPlan.factoryCode'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
           clearable: true
         },
         {
-          prop: 'isEndingSku',
-          label: this.$t('ui.data.column.cxStock.isEndingSku'),
-          type: 'select',
-          dictData: this.dict.type.biz_yes_no,
-          filterable: true,
+          prop: 'machineName',
+          label: this.$t('ui.data.column.cxPrecisionPlan.machineName'),
+          placeholder: this.$t('common.rule.input'),
+          type: 'input'
+        },
+        {
+          prop: 'planDate',
+          label: this.$t('ui.data.column.cxPrecisionPlan.planDate'),
+          type: 'date',
+          dateType: 'daterange',
+          valueFormat: 'yyyy-MM-dd',
+          startPlaceholder: this.$t('common.startTime'),
+          endPlaceholder: this.$t('common.endTime'),
           clearable: true
         }
       ]
@@ -129,82 +123,102 @@ export default {
           prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.factoryCode'),
-          minWidth: 140,
+          label: this.$t('ui.data.column.cxPrecisionPlan.factoryCode'),
+          minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           }
         },
         {
-          prop: 'stockDate',
+          prop: 'machineCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.stockDate'),
+          label: this.$t('ui.data.column.cxPrecisionPlan.machineCode'),
+          minWidth: 100
+        },
+        {
+          prop: 'machineName',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.machineName'),
           minWidth: 140
         },
         {
-          prop: 'embryoCode',
+          prop: 'planDate',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.embryoCode'),
-          minWidth: 140
+          label: this.$t('ui.data.column.cxPrecisionPlan.planDate'),
+          minWidth: 100
         },
         {
-          prop: 'stockNum',
+          prop: 'planShift',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.stockNum'),
+          label: this.$t('ui.data.column.cxPrecisionPlan.planShift'),
+          minWidth: 80,
+        formatter: (row, column, value) => {
+          return this.selectDictLabel(this.dict.type.class_num_three_plan, value);
+        }
+        },
+        {
+          prop: 'planStartTime',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.planStartTime'),
+          minWidth: 160
+        },
+        {
+          prop: 'planEndTime',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.planEndTime'),
+          minWidth: 160
+        },
+        {
+          prop: 'estimatedHours',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.estimatedHours'),
+          minWidth: 90
+        },
+        {
+          prop: 'actualDate',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),
           minWidth: 120
         },
         {
-          prop: 'overTimeStock',
+          prop: 'lastPrecisionDate',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.overTimeStock'),
+          label: this.$t('ui.data.column.cxPrecisionPlan.lastPrecisionDate'),
           minWidth: 120
         },
         {
-          prop: 'modifyNum',
+          prop: 'dueDate',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.modifyNum'),
+          label: this.$t('ui.data.column.cxPrecisionPlan.dueDate'),
           minWidth: 120
-        },
-        {
-          prop: 'badNum',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxStock.badNum'),
-          minWidth: 120
-        },
-
-        {
-          prop: 'isEndingSku',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxStock.isEndingSku'),
-          minWidth: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          }
         },
         {
           prop: 'remark',
           halign: 'center',
           label: this.$t('ui.common.column.remark'),
-          minWidth: 160
+          minWidth: 140
         },
         {
           prop: 'option',
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.btn.option'),
-          minWidth: 150,
+          minWidth: 130,
           render: ({ row }) => {
             return (
               <div>
                 <el-button
-                  v-hasPermi={['cx:cxStock:edit']}
+                  v-hasPermi={['cx:cxPrecisionPlan:edit']}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -212,7 +226,7 @@ export default {
                   {this.$t('ui.frame.btn.update')}
                 </el-button>
                 <el-button
-                  v-hasPermi={['cx:cxStock:remove']}
+                  v-hasPermi={['cx:cxPrecisionPlan:remove']}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -233,11 +247,11 @@ export default {
     handleEdit(row) {
       if (row) this.$refs.infoRef.show(row)
     },
-  handleDelete(row) {
-    this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
-      const ids = row && row.id ? row.id : this.selection.map(r => r.id).join(',')
-      this.loading = true
-      removeCxStock(ids)
+    handleDelete(row) {
+      this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
+        const ids = row && row.id ? row.id : this.selection.map(r => r.id).join(',')
+        this.loading = true
+        removeCxPrecisionPlan(ids)
           .then(res => {
             this.$modal.msgSuccess(res.msg)
             this.page.current = 1
@@ -246,19 +260,20 @@ export default {
           .finally(() => (this.loading = false))
       })
     },
-  handleExport() {
-    downloadLink('/cx/cxStock/export', this.formatParams(false))
-  },
+    handleExport() {
+      downloadLink("/cx/cxPrecisionPlan/export", this.formatParams(false));
+    },
     handleSearch(data) {
       this.query = { ...data }
-      if (data.stockDate && data.stockDate.length === 2) {
-        this.query.startTime = data.stockDate[0]
-        this.query.endTime = data.stockDate[1]
+      // 处理计划日期区间
+      if (data.planDate && data.planDate.length === 2) {
+        this.query.planDateBegin = data.planDate[0]
+        this.query.planDateEnd = data.planDate[1]
       } else {
-        this.query.startTime = undefined
-        this.query.endTime = undefined
+        this.query.planDateBegin = undefined
+        this.query.planDateEnd = undefined
       }
-      delete this.query.stockDate
+      delete this.query.planDate
       this.page.current = 1
       this.getList()
     },
@@ -295,7 +310,7 @@ export default {
     async getList() {
       try {
         this.loading = true
-        const res = await listCxStock(this.formatParams())
+        const res = await listCxPrecisionPlan(this.formatParams())
         this.data = res.rows || []
         this.page.total = res.total || 0
       } finally {

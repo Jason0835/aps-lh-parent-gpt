@@ -617,3 +617,14 @@ export default {
   },
 };
 </script>
+<style scoped>
+::v-deep .el-table__fixed,
+::v-deep .el-table__fixed-right {
+  background-color: #fff;
+}
+::v-deep .el-table__fixed-body-wrapper .el-table__body td,
+::v-deep .el-table__fixed-right .el-table__body td {
+  background-color: #fff;
+}
+/* 其他同上，注意替换 */
+</style>

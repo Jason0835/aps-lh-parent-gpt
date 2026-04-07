@@ -23,6 +23,7 @@
       row-key="id"
       :expand-row-keys="expands"
       @expand-change="handleExpandChange"
+      :max-height="showOutResult?450:'calc(100vh )'"
     >
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
@@ -2425,6 +2426,28 @@ export default {
 };
 </script>
 <style lang="scss" scoped>
+::v-deep .el-table__fixed,
+::v-deep .el-table__fixed-right {
+  background-color: #fff;
+}
+// ::v-deep .el-table__fixed-body-wrapper .el-table__body td,
+// ::v-deep .el-table__fixed-right .el-table__body td {
+//   background-color: #fff;
+// }
+.el-table__fixed-body-wrapper .light-green > td,
+.el-table__fixed-right-body-wrapper .light-greenr > td {
+  background-color: #e2efda !important;
+}
+
+.el-table__fixed-body-wrapper .light-blue > td,
+.el-table__fixed-right-body-wrapper .light-blue > td {
+  background-color: #9bc2e6 !important;
+}
+
+.el-table__fixed-body-wrapper .warning-row > td,
+.el-table__fixed-right-body-wrapper .warning-row > td {
+  background-color: #ffcccc !important;
+}
 .more-btn {
   margin: 2px 0;
   width: 100%;
@@ -2439,12 +2462,13 @@ export default {
   display: none;
 }
 ::v-deep .light-green {
-  background: #e2efda;
+  background-color: #e2efda!important;
 }
 ::v-deep .light-blue {
-  background: #9bc2e6;
+  background-color: #9bc2e6!important;
 }
 ::v-deep .warning-row {
-  background: #ffcccc;
+  background-color: #ffcccc!important;
 }
+
 </style>

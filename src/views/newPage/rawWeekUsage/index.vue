@@ -50,7 +50,9 @@ import { downloadLink } from "@/utils/request";
 import {
   listRawWeekUsage,
 } from "@/api/maindata/rawWeekUsage";
-
+import {
+  getMdmProductVersion,
+} from "@/api/maindata/rawMaterialRequirePlan​";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -83,6 +85,7 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      selectList:[]
     };
   },
   computed: {
@@ -98,6 +101,10 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
+        },
+        {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
         },
         {
           prop: "deviationQty",
@@ -165,6 +172,14 @@ export default {
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+        },
+        {
+          prop: "version",
+          label: this.$t("plan.planProduction.planVersion"),
+          type: "select",
+          dictData: this.selectList,
+          clearable: false,
+          filterable: true,
         },
         {
           prop: "materialCode",
@@ -267,6 +282,40 @@ export default {
         this.loading = false;
       }
     },
+    async getVersion(isGet = false) {
+      try {
+        this.loading = true;
+        const params = {
+          ...this.search,
+        ...this.query,
+        };
+        const res = await getMdmProductVersion({
+          factoryCode: params.factoryCode,
+        });
+        let list = [];
+        for (let i = 0; i < res.length; i++) {
+          list.push({
+            label: res[i].version,
+            value: res[i].version,
+          });
+        }
+        this.selectList = list;
+        if (res.length > 0) {
+          this.$set(this.query, "version", res[0].version);
+          this.$set(this.search, "version", res[0].version);
+        } else {
+          this.$set(this.query, "version", "");
+          this.$set(this.search, "version", "");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+        if (isGet) {
+          this.getList();
+        }
+      }
+    },
   },
   created() {
     let defaultParams = {
@@ -278,7 +327,8 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    this.getList();
+    // this.getList();
+    this.getVersion(true);
   },
   activated() {
   },
