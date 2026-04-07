@@ -255,15 +255,19 @@ export default {
           label: this.$t("ui.lh.precision.plan.plan.date"),
           prop: "planDate",
           type: "date",
-          dateType: "date",
+          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
+          startPlaceholder: this.$t("common.startTime"),
+          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.lh.precision.plan.actual.date"),
           prop: "actualDate",
           type: "date",
-          dateType: "date",
+          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
+          startPlaceholder: this.$t("common.startTime"),
+          endPlaceholder: this.$t("common.endTime"),
         },
       ];
     },
@@ -339,7 +343,23 @@ export default {
       });
     },
     handleSearch(data) {
-      this.query = data;
+      this.query = { ...data };
+      if (data.planDate && data.planDate.length === 2) {
+        this.query.planDateStart = data.planDate[0];
+        this.query.planDateEnd = data.planDate[1];
+      } else {
+        this.query.planDateStart = undefined;
+        this.query.planDateEnd = undefined;
+      }
+      if (data.actualDate && data.actualDate.length === 2) {
+        this.query.actualDateStart = data.actualDate[0];
+        this.query.actualDateEnd = data.actualDate[1];
+      } else {
+        this.query.actualDateStart = undefined;
+        this.query.actualDateEnd = undefined;
+      }
+      delete this.query.planDate;
+      delete this.query.actualDate;
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -396,7 +416,8 @@ export default {
     const defaultDate = today.toISOString().split('T')[0];
     let defaultParams = {
       factoryCode: "116",
-      planDate: defaultDate,
+      planDateStart: defaultDate,
+      planDateEnd: defaultDate,
     };
     this.search = {
       ...defaultParams,
