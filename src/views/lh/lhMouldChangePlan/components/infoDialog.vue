@@ -45,6 +45,7 @@
             <el-input v-model="form.orderNo" :placeholder="$t('common.rule.input')" />
           </el-form-item>
         </el-col>
+
         <el-col :span="24">
           <el-form-item :label="$t('ui.data.column.lhMouldChangePlan.planDate')" prop="planDate">
             <el-date-picker
