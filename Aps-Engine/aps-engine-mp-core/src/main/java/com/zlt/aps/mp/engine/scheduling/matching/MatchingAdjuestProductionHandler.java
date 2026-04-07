@@ -49,6 +49,7 @@ import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
@@ -1162,6 +1163,15 @@ public class MatchingAdjuestProductionHandler {
                 return 0;
             }
         }
+        // 计算结构最大剩余产能
+        Integer remainMaxDayProductionQty = dailyCapacityLimitVo.getRemainMaxDayProductionQty();
+        DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,remainMaxDayProductionQty,scheduleDay);
+        dayTotalCapacityChecker.doCheck();
+        Integer realTotalPlanQty = dayTotalCapacityChecker.getTotalPlanQty();
+        Integer realRemainMaxDayProductionQty = remainMaxDayProductionQty > realTotalPlanQty? remainMaxDayProductionQty - realTotalPlanQty: 0;
+        if (realRemainMaxDayProductionQty <= 0) {
+            return 0;
+        }
         
         // 判断当天成型硫化比是否已经满足条件
         List<MatchingProductionAdjuestVo> dayProductionList = dayProductionMap.get(scheduleDay);
@@ -1191,7 +1201,7 @@ public class MatchingAdjuestProductionHandler {
                 isChangeMould = lastDayUsedLhMachines <= todayDayUsedLhMachines; // 昨天的硫化机数量不超过今天的，需要加模具
             }
         }
-
+        
         // 如果需要换模，则还需要满足如下条件才允许上机
         if (isChangeMould) {
             // 1、剩余型腔数不足最低排产模具数
@@ -1237,14 +1247,19 @@ public class MatchingAdjuestProductionHandler {
             allocationQty = Math.min(allocationQty, mouldRemaindCapacity); // 如果当天模具有剩余产能的，优先补满
         }
         allocationQty = Math.min(allocationQty, unAllocationQty); // 分配量不能超过未分配量以及剩余产能
-        // 如果是贴牌不能超过贴牌量
         if (((dayProduct.getProductionQty() + allocationQty)& 1) != 0) { // 如果原排产量 + 新排产量为奇数，则排产量需要 + 1
             allocationQty ++;
         }
-        
         // 如果是换模，且是oem规格，如果剩余oem的量不足搭配量，则停止不再搭配
         if (isChangeMould && isOem && remainOemQty <= allocationQty) {
             return 0;
+        }
+        // 如果是换模，且剩余结构产能不足，则停止不再搭配
+        if (isChangeMould && realRemainMaxDayProductionQty < allocationQty) {
+            return 0;
+        }
+        if (!isChangeMould) { // 非换模，则控制不能超过剩余产能
+            allocationQty = Math.min(realRemainMaxDayProductionQty, allocationQty);
         }
         
         Integer oldProductionQty = intValue(plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay));
