@@ -54,6 +54,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="planDateEnd != null">
                 AND PLAN_DATE &lt;= #{planDateEnd}
             </if>
+            <if test="actualDateStart != null">
+                AND ACTUAL_DATE &gt;= #{actualDateStart}
+            </if>
+            <if test="actualDateEnd != null">
+                AND ACTUAL_DATE &lt;= #{actualDateEnd}
+            </if>
             <if test="completionStatus != null and completionStatus != ''">
                 AND COMPLETION_STATUS = #{completionStatus}
             </if>

@@ -1,8 +1,9 @@
 package com.zlt.aps.lh.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
+import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
 
@@ -11,7 +12,7 @@ import java.util.List;
  *
  * @author APS Team
  */
-public interface ILhPrecisionPlanService extends IService<LhPrecisionPlan> {
+public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
 
     /**
      * 查询硫化精度计划列表
@@ -20,6 +21,14 @@ public interface ILhPrecisionPlanService extends IService<LhPrecisionPlan> {
      * @return 计划列表
      */
     List<LhPrecisionPlan> selectLhPrecisionPlanList(LhPrecisionPlanVo vo);
+
+    /**
+     * 校验唯一性
+     *
+     * @param entity 硫化精度计划实体
+     * @return UserConstants.NOT_UNIQUE 不唯一，UserConstants.UNIQUE 唯一
+     */
+    String checkUnique(LhPrecisionPlan entity);
 
     /**
      * 从MES同步数据生成硫化精度初版计划

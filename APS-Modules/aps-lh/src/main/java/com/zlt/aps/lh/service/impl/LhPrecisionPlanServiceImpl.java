@@ -1,7 +1,11 @@
 package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
 import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
@@ -10,10 +14,16 @@ import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.common.utils.PubUtil;
+import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -31,8 +41,7 @@ import java.util.*;
  */
 @Slf4j
 @Service
-public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMapper, LhPrecisionPlan>
-        implements ILhPrecisionPlanService {
+public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPlan> implements ILhPrecisionPlanService {
 
     private static final String PRECISION_TYPE_LH = "硫化精度";
     private static final String COMPLETION_STATUS_PENDING = "0";
@@ -51,9 +60,123 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
     @Autowired
     private MessageServiceUtils messageServiceUtils;
 
+    @Autowired
+    private LhPrecisionPlanMapper lhPrecisionPlanMapper;
+
     @Override
     public List<LhPrecisionPlan> selectLhPrecisionPlanList(LhPrecisionPlanVo vo) {
-        return baseMapper.selectLhPrecisionPlanList(vo);
+        return lhPrecisionPlanMapper.selectLhPrecisionPlanList(vo);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult importData(List<LhPrecisionPlan> list, boolean updateSupport, Long importLogId) {
+        int successNum = 0;
+        int failureNum = 0;
+        List<LhPrecisionPlan> importList = new ArrayList<>();
+        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+        String machineNotExistMsg = I18nUtil.getMessage("ui.lh.precision.plan.machineNotExist");
+
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            LhPrecisionPlan docEntity = list.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            if (PubUtil.isNotEmpty(validated)) {
+                failureNum++;
+                docEntity.setId(-999L);
+                importErrorLogs.addAll(validated);
+            }
+        }
+
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            LhPrecisionPlan docEntity = list.get(i);
+            if (docEntity.getId() != null && docEntity.getId() == -999L) {
+                continue;
+            }
+
+            if (StringUtil.isBlank(docEntity.getMachineCode())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.lh.precision.plan.machineCodeRequired");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+
+            if (StringUtil.isBlank(docEntity.getPrecisionType())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.lh.precision.plan.precisionTypeRequired");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+
+            if (docEntity.getPlanDate() == null) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.lh.precision.plan.planDateRequired");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+
+            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+                importList.add(docEntity);
+                successNum++;
+            } else {
+                if (updateSupport) {
+                    QueryWrapper<LhPrecisionPlan> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("MACHINE_CODE", docEntity.getMachineCode());
+                    queryWrapper.eq("PRECISION_TYPE", docEntity.getPrecisionType());
+                    queryWrapper.eq("PLAN_DATE", docEntity.getPlanDate());
+                    LhPrecisionPlan existEntity = lhPrecisionPlanMapper.selectOne(queryWrapper);
+                    if (existEntity != null) {
+                        docEntity.setId(existEntity.getId());
+                        importList.add(docEntity);
+                        successNum++;
+                    }
+                } else {
+                    failureNum++;
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                        String.format(uniqueMsg, errorNum), importErrorLogs);
+                }
+            }
+        }
+
+        if (CollectionUtils.isEmpty(importList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        }
+
+        for (LhPrecisionPlan entity : importList) {
+            if (entity.getId() == null) {
+                entity.setIsDelete(0);
+                entity.setWarningStatus(WARNING_STATUS_NO);
+                entity.setIsWarningSent(WARNING_SENT_NO);
+                entity.setCompletionStatus(COMPLETION_STATUS_PENDING);
+            }
+            
+            if (entity.getPlanDate() != null) {
+                LocalDate today = LocalDate.now();
+                entity.setDaysToDue((int) ChronoUnit.DAYS.between(today, entity.getPlanDate()));
+                
+                if (entity.getYear() == null) {
+                    entity.setYear(new BigDecimal(entity.getPlanDate().getYear()));
+                }
+            }
+            
+            if (entity.getId() != null) {
+                lhPrecisionPlanMapper.updateById(entity);
+            } else {
+                lhPrecisionPlanMapper.insert(entity);
+            }
+        }
+
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        } else {
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum + "," + failureNum);
+        }
     }
 
     @Override
@@ -89,7 +212,9 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
             }
 
             if (!plansToSave.isEmpty()) {
-                saveBatch(plansToSave);
+                for (LhPrecisionPlan plan : plansToSave) {
+                    lhPrecisionPlanMapper.insert(plan);
+                }
                 log.info("从MES同步数据生成硫化精度计划完成，共生成{}条", plansToSave.size());
             }
 
@@ -113,7 +238,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
                    .eq(LhPrecisionPlan::getIsDelete, BigDecimal.ZERO)
                    .orderByDesc(LhPrecisionPlan::getActualDate);
 
-            List<LhPrecisionPlan> lastYearPlans = list(wrapper);
+            List<LhPrecisionPlan> lastYearPlans = lhPrecisionPlanMapper.selectList(wrapper);
             log.info("查询到{}年已完成计划{}条", year - 1, lastYearPlans.size());
 
             Map<String, LhPrecisionPlan> machinePlanMap = new HashMap<>();
@@ -129,7 +254,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
                 String machineCode = entry.getKey();
                 LhPrecisionPlan lastPlan = entry.getValue();
 
-                LhPrecisionPlan existingPlan = baseMapper.selectByMachineCodeAndYear(machineCode, year);
+                LhPrecisionPlan existingPlan = lhPrecisionPlanMapper.selectByMachineCodeAndYear(machineCode, year);
                 if (existingPlan != null) {
                     log.debug("机台{}在{}年已有计划，跳过", machineCode, year);
                     continue;
@@ -143,7 +268,9 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
             }
 
             if (!plansToSave.isEmpty()) {
-                saveBatch(plansToSave);
+                for (LhPrecisionPlan plan : plansToSave) {
+                    lhPrecisionPlanMapper.insert(plan);
+                }
                 log.info("自动生成{}年度硫化精度计划完成，共生成{}条", year, plansToSave.size());
             }
 
@@ -160,7 +287,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
         log.info("开始执行30天预警检查");
 
         try {
-            List<LhPrecisionPlan> plans = baseMapper.selectPendingWarningPlans(WARNING_DAYS);
+            List<LhPrecisionPlan> plans = lhPrecisionPlanMapper.selectPendingWarningPlans(WARNING_DAYS);
             log.info("查询到待预警计划{}条", plans.size());
 
             if (plans.isEmpty()) {
@@ -180,7 +307,9 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
                 sendWarning(plan);
             }
 
-            updateBatchById(plans);
+            for (LhPrecisionPlan plan : plans) {
+                lhPrecisionPlanMapper.updateById(plan);
+            }
             log.info("30天预警检查完成，共预警{}条", plans.size());
 
             return plans.size();
@@ -194,7 +323,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
     @Transactional(rollbackFor = Exception.class)
     public int batchUpdateDaysToDue() {
         log.info("开始批量更新到期天数");
-        int count = baseMapper.batchUpdateDaysToDue();
+        int count = lhPrecisionPlanMapper.batchUpdateDaysToDue();
         log.info("批量更新到期天数完成，更新{}条", count);
         return count;
     }
@@ -208,7 +337,7 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
         wrapper.eq(LhPrecisionPlan::getMesSourceId, mesSourceId)
                .eq(LhPrecisionPlan::getIsDelete, BigDecimal.ZERO);
 
-        LhPrecisionPlan plan = getOne(wrapper);
+        LhPrecisionPlan plan = lhPrecisionPlanMapper.selectOne(wrapper);
         if (plan == null) {
             log.warn("未找到MES_SOURCE_ID={}的计划", mesSourceId);
             return false;
@@ -225,19 +354,19 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
         plan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
         plan.setDueDate(actualDateParsed.plusYears(1));
 
-        boolean result = updateById(plan);
-        if (result) {
+        int result = lhPrecisionPlanMapper.updateById(plan);
+        if (result > 0) {
             log.info("更新实际完成时间成功：机台={}, 实际日期={}", plan.getMachineCode(), actualDateParsed);
         }
 
-        return result;
+        return result > 0;
     }
 
     private boolean existsByMesSourceId(Long mesSourceId) {
         LambdaQueryWrapper<LhPrecisionPlan> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(LhPrecisionPlan::getMesSourceId, mesSourceId)
                .eq(LhPrecisionPlan::getIsDelete, BigDecimal.ZERO);
-        return count(wrapper) > 0;
+        return lhPrecisionPlanMapper.selectCount(wrapper) > 0;
     }
 
     private LhPrecisionPlan convertFromMes(MdmDevMaintenancePlan mesPlan) {
@@ -364,5 +493,30 @@ public class LhPrecisionPlanServiceImpl extends ServiceImpl<LhPrecisionPlanMappe
         } catch (Exception e) {
             log.error("预警通知发送失败：机台={}, 计划日期={}", plan.getMachineCode(), plan.getPlanDate(), e);
         }
+    }
+
+    @Override
+    public String getDocTypeCode() {
+        return "LH_PRECISION_PLAN";
+    }
+
+    @Override
+    public String checkUnique(LhPrecisionPlan entity) {
+        Long id = entity.getId();
+        String machineCode = entity.getMachineCode();
+        String precisionType = entity.getPrecisionType();
+        LocalDate planDate = entity.getPlanDate();
+
+        LambdaQueryWrapper<LhPrecisionPlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhPrecisionPlan::getMachineCode, machineCode)
+               .eq(LhPrecisionPlan::getPrecisionType, precisionType)
+               .eq(LhPrecisionPlan::getPlanDate, planDate);
+
+        if (id != null) {
+            wrapper.ne(LhPrecisionPlan::getId, id);
+        }
+
+        Long count = lhPrecisionPlanMapper.selectCount(wrapper);
+        return count > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
 }

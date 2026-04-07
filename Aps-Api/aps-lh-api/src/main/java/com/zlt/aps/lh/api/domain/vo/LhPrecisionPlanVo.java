@@ -41,6 +41,14 @@ public class LhPrecisionPlanVo implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateEnd;
 
+    @ApiModelProperty(value = "实际执行日期-开始")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate actualDateStart;
+
+    @ApiModelProperty(value = "实际执行日期-结束")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate actualDateEnd;
+
     @ApiModelProperty(value = "计划日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDate;
