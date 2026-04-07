@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -35,18 +36,22 @@ public class LhPrecisionPlanVo implements Serializable {
 
     @ApiModelProperty(value = "计划日期-开始")
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateStart;
 
     @ApiModelProperty(value = "计划日期-结束")
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateEnd;
 
     @ApiModelProperty(value = "实际执行日期-开始")
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate actualDateStart;
 
     @ApiModelProperty(value = "实际执行日期-结束")
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate actualDateEnd;
 
     @ApiModelProperty(value = "计划日期")

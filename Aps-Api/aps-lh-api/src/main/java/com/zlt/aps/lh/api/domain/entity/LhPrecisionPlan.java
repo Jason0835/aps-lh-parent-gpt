@@ -7,6 +7,7 @@ import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -117,20 +118,24 @@ public class LhPrecisionPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "计划日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateStart;
 
     @ApiModelProperty(value = "计划日期结束（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateEnd;
 
     @ApiModelProperty(value = "实际日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate actualDateStart;
 
     @ApiModelProperty(value = "实际日期结束（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate actualDateEnd;
 }
