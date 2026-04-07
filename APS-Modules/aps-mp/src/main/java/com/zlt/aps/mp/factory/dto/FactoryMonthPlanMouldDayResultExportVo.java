@@ -43,6 +43,12 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
     private BigDecimal singleTireWeight;
 
     /**
+     * 断面宽
+     */
+    @ApiModelProperty(value = "断面宽", name = "sectionWidth")
+    private String sectionWidth;
+
+    /**
      * 上个月定稿版本
      */
     @ApiModelProperty(value = "上个月定稿版本", name = "lastProductionVersion")

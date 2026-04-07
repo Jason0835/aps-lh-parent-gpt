@@ -21,6 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.PRO_SIZE,
 		    m.SINGLE_TIRE_WEIGHT,
 		    m.PRODUCT_CATEGORY,
+		    m.SECTION_WIDTH,
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
 		    max( d.AVERAGE_SALE_QTY ) AVERAGE_SALE_QTY,
@@ -30,7 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
 		    sum( d.MID_QTY ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
-		    sum( case when d.IS_SCHECULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) conventionReserveQty,
+		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) conventionReserveQty,
 		    r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
 		    r.MID_PRODUCTION_QTY,
@@ -81,7 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    '2' LOCATION_TYPE /*内外销，目前没有地方取，暂时固定外销*/
 		FROM
 		    T_MDM_MATERIAL_INFO m
-            INNER JOIN ( SELECT STRUCTURE_NAME, MIN( PRO_SIZE ) MIN_PRO_SIZE 
+            INNER JOIN ( SELECT STRUCTURE_NAME, MAX( PRO_SIZE ) MIN_PRO_SIZE 
                            FROM T_MDM_MATERIAL_INFO M 
                           WHERE M.FACTORY_CODE = '116' 
                             AND M.IS_DELETE = 0 
@@ -125,6 +126,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.PRO_SIZE,
 		    m.SINGLE_TIRE_WEIGHT,
 		    m.PRODUCT_CATEGORY,
+            m.SECTION_WIDTH,
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
 		    r.INVENTORY_SALES_RATIO,
@@ -179,8 +181,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.PRODUCTION_VERSION
 		ORDER BY
             MM.MIN_PRO_SIZE,
+            SPECIFICATIONS,
             STRUCTURE_NAME,
 		    PRO_SIZE,
+		    SECTION_WIDTH,
 		    MOULD_CAVITY_QTY DESC,
 		    TYPE_BLOCK_QTY DESC,
 		    MAIN_PATTERN 

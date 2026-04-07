@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -158,6 +159,10 @@ public class DpDemandPlanSumController extends AbstractDocBizController<DpDemand
         QueryWrapper<DpDemandPlanSum> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         List<DpDemandPlanSum> list = entityMapper.selectList(wrapper);
+        list.sort(Comparator.comparing(DpDemandPlanSum::getProSize, Comparator.nullsLast(String::compareTo)) // 英寸
+                .thenComparing(Comparator.comparing(DpDemandPlanSum::getSpecifications, Comparator.nullsLast(String::compareTo))) // 规格
+                .thenComparing(Comparator.comparing(DpDemandPlanSum::getStructureName, Comparator.nullsLast(String::compareTo))) // 结构
+        );
         list.forEach(item -> item.setUpdateDate(DateUtil.formatDateTime(item.getUpdateTime())));
         return list;
     }
