@@ -134,16 +134,16 @@ export default {
           label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
           minWidth: 150,
         },
-        {
-          prop: "lineType",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhSpecifyMachine.lineType"),
-          minWidth: 120,
-          formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.LINE_TYPE, value);
-          },
-        },
+        // {
+        //   prop: "lineType",
+        //   align: "center",
+        //   halign: "center",
+        //   label: this.$t("ui.data.column.lhSpecifyMachine.lineType"),
+        //   minWidth: 120,
+        //   formatter: (row, column, value, index) => {
+        //     return this.selectDictLabel(this.dict.type.LINE_TYPE, value);
+        //   },
+        // },
         {
           prop: "jobType",
           align: "center",
@@ -216,12 +216,12 @@ export default {
           label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
           prop: "machineCode",
         },
-        {
-          label: this.$t("ui.data.column.lhSpecifyMachine.lineType"),
-          prop: "lineType",
-          type: "select",
-          dictData: this.dict.type.LINE_TYPE,
-        },
+        // {
+        //   label: this.$t("ui.data.column.lhSpecifyMachine.lineType"),
+        //   prop: "lineType",
+        //   type: "select",
+        //   dictData: this.dict.type.LINE_TYPE,
+        // },
         {
           label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
           prop: "jobType",

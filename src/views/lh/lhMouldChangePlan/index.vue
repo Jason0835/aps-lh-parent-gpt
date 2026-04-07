@@ -39,11 +39,17 @@
           v-hasPermi="['lh:lhMouldChangePlan:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
-        <el-button
-          @click="handleExport"
-          v-hasPermi="['lh:lhMouldChangePlan:export']"
-        >{{ $t("ui.frame.btn.export") }}</el-button>
-      </template>
+         <el-button
+           @click="handleExport"
+           v-hasPermi="['lh:lhMouldChangePlan:export']"
+         >{{ $t("ui.frame.btn.export") }}</el-button>
+         <el-button
+           type="success"
+           v-hasPermi="['lh:lhMouldChangePlan:issue']"
+           @click="handleIssueSchedule"
+           :disabled="selection.length == 0"
+         >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
+       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
@@ -59,7 +65,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -412,22 +418,38 @@ export default {
       }
       return params;
     },
-    async getList() {
-      try {
-        this.loading = true;
-        const data = await listLhMouldChangePlan(this.formatParams());
-        this.data = data.rows;
-        this.page.total = data.total;
-      } catch (error) {
-        console.error(error);
-      } finally {
-        this.loading = false;
-      }
+        async getList() {
+            try {
+                this.loading = true;
+                const data = await listLhMouldChangePlan(this.formatParams());
+                this.data = data.rows;
+                this.page.total = data.total;
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        handleIssueSchedule() {
+            if (!this.selection || this.selection.length === 0) {
+                this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+                return;
+            }
+            this.$confirm(this.$t("ui.data.alert.lhMouldChangePlan.issueConfirm"), {
+                type: "warning",
+            }).then(() => {
+                const ids = this.selection.map((item) => item.id);
+                issueSchedule(ids).then((res) => {
+                    this.$modal.msgSuccess(res.msg);
+                    this.$set(this.page, "current", 1);
+                    this.getList();
+                });
+            });
+        },
     },
-  },
-  activated() {
-    this.getList();
-  },
+    activated() {
+        this.getList();
+    },
 };
 </script>
 <style lang="scss" scoped>

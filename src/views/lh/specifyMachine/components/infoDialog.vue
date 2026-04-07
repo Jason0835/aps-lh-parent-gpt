@@ -78,23 +78,23 @@
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.lineType')" prop="lineType">
-            <el-select
-              v-model="form.lineType"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.LINE_TYPE"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
+<!--        <el-col :span="24">-->
+<!--          <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.lineType')" prop="lineType">-->
+<!--            <el-select-->
+<!--              v-model="form.lineType"-->
+<!--              :placeholder="$t('common.rule.select')"-->
+<!--              clearable-->
+<!--              style="width: 100%"-->
+<!--            >-->
+<!--              <el-option-->
+<!--                v-for="item in parentDict.type.LINE_TYPE"-->
+<!--                :key="item.value"-->
+<!--                :label="item.label"-->
+<!--                :value="item.value"-->
+<!--              />-->
+<!--            </el-select>-->
+<!--          </el-form-item>-->
+<!--        </el-col>-->
         <el-col :span="24">
           <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.jobType')" prop="jobType">
             <el-select
@@ -190,9 +190,9 @@ export default {
     async remoteMachineMethod(query) {
       this.machineLoading = true;
       try {
-        const res = await getLhMachineList({ 
+        const res = await getLhMachineList({
           machineCode: query || '',
-          pageSize: 10 
+          pageSize: 10
         });
         this.machineOptions = res.data || res || [];
       } catch (error) {
@@ -209,9 +209,9 @@ export default {
     async remoteMaterialMethod(query) {
       this.materialLoading = true;
       try {
-        const res = await getMaterialList({ 
+        const res = await getMaterialList({
           materialCode: query || '',
-          pageSize: 10 
+          pageSize: 10
         });
         this.materialOptions = res.data || res || [];
       } catch (error) {

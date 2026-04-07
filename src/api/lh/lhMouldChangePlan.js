@@ -36,3 +36,11 @@ export function getMaterialList(query) {
     params: query
   })
 }
+
+export function issueSchedule(ids) {
+  return request({
+    url: '/lh/lhMouldChangePlan/issueSchedule',
+    method: 'post',
+    params: { ids: ids.join(',') }
+  })
+}

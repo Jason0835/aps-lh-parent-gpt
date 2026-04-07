@@ -2302,10 +2302,10 @@
   "ui.lh.precision.plan.sync.confirm": "是否从MES同步硫化精度计划数据？",
   "ui.lh.precision.plan.auto.generate.confirm": "是否自动生成{year}年度的硫化精度计划？",
   "ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate": "到期日期需大于计划日期",
-  "ui.data.btn.lhMouldChangePlan.issueSchedule": "排程发布",
+  "ui.data.btn.lhMouldChangePlan.issueSchedule": "模具交替计划发布",
   "ui.data.alert.lhMouldChangePlan.issueConfirm": "确认发布？",
   "ui.data.alert.lhMouldChangePlan.noData": "未选中数据",
-  "ui.data.alert.lhMouldChangePlan.hasReleasedData": "排程记录存在发布状态为已发布的数据、不允许此操作",
+  "ui.data.alert.lhMouldChangePlan.hasReleasedData": "模具交替计划存在发布状态为已发布的数据、不允许此操作",
   "ui.data.alert.lhMouldChangePlan.issueSuccess": "发布成功",
   "ui.data.alert.lhMouldChangePlan.issueFail": "发布失败"
 }
