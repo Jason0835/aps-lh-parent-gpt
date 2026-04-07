@@ -189,7 +189,7 @@ public class ExcelUtil<T> {
      * @return 转换后集合
      */
     public List<T> importExcel(InputStream is) throws Exception {
-        return importExcel(StringUtils.EMPTY, is, 0);
+        return importExcel(StringUtils.EMPTY, is, 0, 1, -1);
     }
 
     /**
@@ -199,7 +199,17 @@ public class ExcelUtil<T> {
      * @return 转换后集合
      */
     public List<T> importExcel(InputStream is, Integer headRowNum) throws Exception {
-        return importExcel(StringUtils.EMPTY, is, headRowNum);
+        return importExcel(StringUtils.EMPTY, is, headRowNum, 1, -1);
+    }
+
+    /**
+     * 对excel表单默认第一个索引名转换成list
+     *
+     * @param is 输入流
+     * @return 转换后集合
+     */
+    public List<T> importExcel(InputStream is, Integer headRowNum, Integer headRowCount, Integer secondHeadCellNum) throws Exception {
+        return importExcel(StringUtils.EMPTY, is, headRowNum, headRowCount, secondHeadCellNum);
     }
 
     /**
@@ -207,9 +217,12 @@ public class ExcelUtil<T> {
      *
      * @param sheetName 表格索引名
      * @param is        输入流
+     * @param headRowNum 表头的行号（从0开始）
+     * @param headRowCount 表头占的行数
+     * @param secondHeadCellNum 取二级表头的列号(大于等于都取二级表头)
      * @return 转换后集合
      */
-    public List<T> importExcel(String sheetName, InputStream is, Integer headRowNum) throws Exception {
+    public List<T> importExcel(String sheetName, InputStream is, Integer headRowNum, Integer headRowCount, Integer secondHeadCellNum) throws Exception {
         this.type = Type.IMPORT;
         this.wb = WorkbookFactory.create(is);
         List<T> list = new LinkedList<>();
@@ -234,10 +247,23 @@ public class ExcelUtil<T> {
             Map<String, Integer> cellMap = new HashMap<String, Integer>();
             // 获取表头
             Row heard = sheet.getRow(headRowNum);
+            Row secondRow = sheet.getRow(headRowNum + headRowCount - 1);
             for (int i = 0; i < heard.getPhysicalNumberOfCells(); i++) {
-                Cell cell = heard.getCell(i);
+                Cell cell = null;
+                if (secondHeadCellNum > 0 && i >= secondHeadCellNum) {
+                    if (secondRow != null) {
+                        cell = secondRow.getCell(i);
+                    }
+                } else {
+                    cell = heard.getCell(i);
+                }
                 if (StringUtils.isNotNull(cell)) {
-                    String value = this.getCellValue(heard, i).toString();
+                    String value = "";
+                    if (secondHeadCellNum > 0 && i >= secondHeadCellNum) {
+                        value = this.getCellValue(secondRow, i).toString();
+                    } else {
+                        value = this.getCellValue(heard, i).toString();
+                    }
                     cellMap.put(value, i);
                 } else {
                     cellMap.put(null, i);
@@ -268,7 +294,7 @@ public class ExcelUtil<T> {
                     }
                 }
             }
-            for (int i = headRowNum + 1; i <= rows; i++) {
+            for (int i = headRowNum + headRowCount; i <= rows; i++) {
                 // 从第2行开始取数据,默认第一行是表头.
                 Row row = sheet.getRow(i);
                 // 判断当前行是否是空行

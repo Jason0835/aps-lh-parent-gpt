@@ -1,11 +1,15 @@
 package com.zlt.aps.mp.factory.service;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -65,4 +69,30 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @return
      */
     byte[] getMpStructureAllocationExportByte(MpStructureAllocationExportStatisticsVo list);
+
+    /**
+     * 导入
+     * @param list 列表数据
+     * @param updateSupport 覆盖
+     * @param importLogId 导入日志ID
+     * @param params 表头参数
+     * @param monthPlanVersion 月计划版本
+     * @param productVersion 生产版本
+     * @return 结果
+     */
+    AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
+                                             Map<String, String> factoryMap, Map<String, String> productTypeMap);
+
+    /**
+     * 导入
+     * @param list 列表数据
+     * @param updateSupport 覆盖
+     * @param importLogId 导入日志ID
+     * @param params 表头参数
+     * @param monthPlanVersion 月计划版本
+     * @param productVersion 生产版本
+     * @return 结果
+     */
+    AjaxResult importDataDayResult(List<FactoryMonthPlanMouldDayResult> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
+                                   Map<String, String> factoryMap, Map<String, String> productTypeMap);
 }

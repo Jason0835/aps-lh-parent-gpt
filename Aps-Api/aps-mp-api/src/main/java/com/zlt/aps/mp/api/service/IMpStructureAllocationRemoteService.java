@@ -8,11 +8,7 @@ import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -108,5 +104,12 @@ public interface IMpStructureAllocationRemoteService {
     @ApiOperation("获取日期最接近的上一个结构")
     @PostMapping("/mpStructureAllocation/getPreviousStructure")
     MpStructureAllocation getPreviousStructure(@RequestBody MpStructureAllocation queryVO);
+
+    /**
+     * 导入结构排产
+     */
+    @ApiOperation("导入结构排产")
+    @PostMapping("/mpStructureAllocation/importDataStructureAllocation")
+    AjaxResult importDataStructureAllocation(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
 }

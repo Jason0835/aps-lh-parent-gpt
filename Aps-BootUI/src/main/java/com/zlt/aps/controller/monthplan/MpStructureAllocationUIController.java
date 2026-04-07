@@ -2,6 +2,7 @@ package com.zlt.aps.controller.monthplan;
 
 import cn.hutool.core.date.DateUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -12,43 +13,28 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
+import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
-
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
-import org.apache.commons.io.IOUtils;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.io.IOException;
-import java.io.ByteArrayInputStream;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import javax.servlet.http.HttpServletResponse;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -352,4 +338,26 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         return AjaxResult.success(mpStructureAllocation);
     }
 
+    /**
+     * 导入
+     * @param file 文件
+     * @param updateSupport 是否覆盖
+     * @return 结果
+     * @throws Exception 异常
+     */
+    @PostMapping({"/importDataStructureAllocation"})
+    @ResponseBody
+    @ApiOperation("数据导入")
+    public AjaxResult importDataStructureAllocation(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        AjaxResult ajaxResult = iMpStructureAllocationService.importDataStructureAllocation(context,updateSupport);
+        return ajaxResult;
+    }
 }

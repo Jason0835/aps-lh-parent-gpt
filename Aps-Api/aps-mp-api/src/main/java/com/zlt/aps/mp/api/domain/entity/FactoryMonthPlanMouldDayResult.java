@@ -181,6 +181,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 结构类型 01 周期结构 02 常规结构
      */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.structureType", dictType = "structure_type")
     @ApiModelProperty(value = "结构类型", name = "structureType")
     @TableField(value = "STRUCTURE_TYPE")
     private String structureType;

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import com.zlt.common.utils.StringUtil;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -37,6 +38,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 工厂编号
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mpStructureAllocation.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
@@ -45,6 +47,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 年份
      */
+    @ImportExcelValidated(required = true, min = 0, max = 9999, digits = true)
     @Excel(name = "ui.data.column.mpStructureAllocation.year", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
@@ -53,6 +56,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 月份
      */
+    @ImportExcelValidated(required = true, min = 1, max = 12, digits = true)
     @Excel(name = "ui.data.column.mpStructureAllocation.month", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
@@ -61,6 +65,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 需求计划版本
      */
+    @ImportExcelValidated(required = true, maxLength = 20)
     @Excel(name = "ui.data.column.mpStructureAllocation.monthPlanVersion")
     @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")
     @TableField(value = "MONTH_PLAN_VERSION")
@@ -92,6 +97,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 产品结构
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mpStructureAllocation.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
@@ -178,7 +184,7 @@ public class MpStructureAllocation extends BaseEntity {
 
 
     /**
-     * 交替类型 
+     * 交替类型
      */
     @ApiModelProperty(value = "交替类型", name = "alternatingType")
     @TableField(value = "ALTERNATING_TYPE")

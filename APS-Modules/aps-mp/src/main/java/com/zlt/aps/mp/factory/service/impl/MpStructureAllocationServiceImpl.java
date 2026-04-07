@@ -1,7 +1,9 @@
 package com.zlt.aps.mp.factory.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
@@ -9,45 +11,24 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Sets;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.reflect.ReflectUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
-import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.mapper.FactoryParamMapper;
-import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
-import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
-import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
-import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
-import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.FactoryParam;
-import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
-import com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
-import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
-import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.maindata.mapper.*;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
@@ -59,6 +40,7 @@ import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
@@ -70,23 +52,15 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -124,10 +98,32 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
+    private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     /**
      * 日计划字段名称
      */
     private final static String DAY_FIELD_NAME_FORMAT = "day%s";
+
+    private void cacheImportMachineMap(Long importLogId, Map<String, String> machineMap) {
+        if (importLogId == null || CollUtil.isEmpty(machineMap)) {
+            return;
+        }
+        importMachineMapCache.put(importLogId, new HashMap<>(machineMap));
+    }
+
+    private Map<String, String> getImportMachineMap(Long importLogId) {
+        if (importLogId == null) {
+            return Collections.emptyMap();
+        }
+        return importMachineMapCache.getOrDefault(importLogId, Collections.emptyMap());
+    }
+
+    private void clearImportMachineMap(Long importLogId) {
+        if (importLogId == null) {
+            return;
+        }
+        importMachineMapCache.remove(importLogId);
+    }
 
 
     @Override
@@ -1495,5 +1491,351 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             return fieldName + suffix;
         }
         return fieldName;
+    }
+
+    /**
+     * 导入
+     *
+     * @param list             列表数据
+     * @param updateSupport    覆盖
+     * @param importLogId      导入日志ID
+     * @param params           表头参数
+     * @param monthPlanVersion 月计划版本
+     * @param productVersion   生产版本
+     * @return 结果
+     */
+    @Override
+    public AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
+                                                    Map<String, String> factoryMap, Map<String, String> productTypeMap) {
+        // 1.初始化
+        int successNum = 0;
+        int failureNum = 0;
+        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<MpStructureAllocation> insertList = new ArrayList<>();
+        // 解析的excel表头参数
+        String year = params[0];
+        String month = params[1];
+        String factoryName = params[2];
+
+        //2.国际化初始化
+        String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
+        String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
+        String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+
+        // 过滤合计等数据
+        list = list.stream().filter(item -> StringUtils.isNotBlank(item.getCxMachineCode())).collect(Collectors.toList());
+
+        Map<String, String> machineMap = new HashMap<>();
+        Map<String, MpStructureAllocation> machineLastValidRecordMap = new HashMap<>();
+        Map<String, FactoryMonthPlanProductionFinalResult> lastMonthMachineFinalMap = Collections.emptyMap();
+        Integer importYear = Convert.toInt(year, null);
+        Integer importMonth = Convert.toInt(month, null);
+        String importFactoryCode = factoryMap.get(factoryName);
+        if (importYear != null && importMonth != null && StringUtils.isNotBlank(importFactoryCode)) {
+            lastMonthMachineFinalMap = getLastMonthMachineFinalMap(importFactoryCode, importYear, importMonth);
+        }
+
+        //3.公共校验（非空校验、长度校验等）
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            MpStructureAllocation item = list.get(i);
+
+            item.setDataSource(DataSourceEnum.IMPORT.getCode());
+            item.setMonthPlanVersion(monthPlanVersion);
+            item.setProductionVersion(productVersion);
+            item.setPlanType("01");
+
+            try {
+                item.setYear(Integer.parseInt(year));
+            } catch (NumberFormatException e) {
+                item.setId(-999L);
+                failureNum++;
+                addImportErrorLog(importLogId, errorNum, yearErrorStr, importErrorLogs);
+                continue;
+            }
+            try {
+                item.setMonth(Integer.parseInt(month));
+            } catch (NumberFormatException e) {
+                item.setId(-999L);
+                failureNum++;
+                addImportErrorLog(importLogId, errorNum, monthErrorStr, importErrorLogs);
+                continue;
+            }
+            if (factoryMap.containsKey(factoryName)) {
+                String factoryCode = factoryMap.get(factoryName);
+                item.setFactoryCode(factoryCode);
+            } else {
+                item.setId(-999L);
+                failureNum++;
+                addImportErrorLog(importLogId, errorNum, String.format(noFactoryStr, factoryName), importErrorLogs);
+                continue;
+            }
+
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, item);
+            if (CollUtil.isNotEmpty(validated)) {
+                item.setId(-999L);
+                failureNum++;
+                importErrorLogs.addAll(validated);
+                continue;
+            }
+            // 赋值开始结束日期
+            setBeginDayAndEndDay(item);
+            // 赋值交替类型（仅对校验通过的有效记录）
+            genAlternatingType(item, machineLastValidRecordMap, lastMonthMachineFinalMap);
+//            item.setIsHasSpecialMaterial();
+            insertList.add(item);
+
+            machineMap.put(item.getStructureName(), item.getCxMachineCode());
+        }
+
+        // 过滤id不等于空的数据
+        insertList = insertList.stream().filter(v -> v.getId() == null).collect(Collectors.toList());
+
+        try {
+            successNum = insertList.size();
+            if(CollUtil.isNotEmpty(insertList)){
+                // 插入新记录
+                baseDao.insertBatch(insertList);
+            }
+        } catch (Exception e) {
+            log.error("导入失败", e);
+            successNum = 0;
+            failureNum = list.size();
+            importErrorLogs.clear();
+            addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
+        }
+
+        //返回提示信息及错误集合
+        cacheImportMachineMap(importLogId, machineMap);
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        } else {
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+        }
+    }
+
+    private void setBeginDayAndEndDay(MpStructureAllocation item) {
+        for (int i = 1; i <= 31; i++) {
+            Object fieldValue = ReflectUtils.getFieldValue(item, "day" + i);
+            if (ObjUtil.isNotNull(fieldValue)) {
+                if (item.getBeginDay() == null) {
+                    item.setBeginDay(i);
+                }
+                item.setEndDay(i);
+            }
+        }
+    }
+
+    private void genAlternatingType(MpStructureAllocation item,
+                                    Map<String, MpStructureAllocation> machineLastValidRecordMap,
+                                    Map<String, FactoryMonthPlanProductionFinalResult> lastMonthMachineFinalMap) {
+        if (item == null || StringUtils.isBlank(item.getCxMachineCode())) {
+            return;
+        }
+        String machineCode = item.getCxMachineCode();
+        MpStructureAllocation previousRecord = machineLastValidRecordMap.get(machineCode);
+        if (previousRecord != null) {
+            if (StringUtils.equals(previousRecord.tbrProSize(), item.tbrProSize())) {
+                item.setAlternatingType(AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode());
+            } else {
+                item.setAlternatingType(AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode());
+            }
+            machineLastValidRecordMap.put(machineCode, item);
+            return;
+        }
+
+        FactoryMonthPlanProductionFinalResult lastMonthRecord = lastMonthMachineFinalMap.get(machineCode);
+        if (lastMonthRecord != null) {
+            if (StringUtils.equals(lastMonthRecord.getStructureName(), item.getStructureName())) {
+                item.setAlternatingType(AlternativeTypeEnum.CONTINUE.getCode());
+            } else if (StringUtils.equals(lastMonthRecord.getProSize(), item.tbrProSize())) {
+                item.setAlternatingType(AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode());
+            } else {
+                item.setAlternatingType(AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode());
+            }
+        } else {
+            item.setAlternatingType(AlternativeTypeEnum.CONTINUE.getCode());
+        }
+        machineLastValidRecordMap.put(machineCode, item);
+    }
+
+    private Map<String, FactoryMonthPlanProductionFinalResult> getLastMonthMachineFinalMap(String factoryCode, Integer year, Integer month) {
+        if (StringUtils.isBlank(factoryCode) || year == null || month == null) {
+            return Collections.emptyMap();
+        }
+        java.time.YearMonth currentYearMonth = java.time.YearMonth.of(year, month);
+        java.time.YearMonth previousYearMonth = currentYearMonth.minusMonths(1);
+
+        FactoryMonthPlanProductionFinalResult queryParam = new FactoryMonthPlanProductionFinalResult();
+        queryParam.setFactoryCode(factoryCode);
+        queryParam.setYear(previousYearMonth.getYear());
+        queryParam.setMonth(previousYearMonth.getMonthValue());
+
+        List<FactoryMonthPlanProductionFinalResult> lastMonthFinalList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(queryParam);
+        if (CollUtil.isEmpty(lastMonthFinalList)) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, FactoryMonthPlanProductionFinalResult> machineRecordMap = new HashMap<>();
+        Map<String, Integer> machineLastScheduleDayMap = new HashMap<>();
+        for (FactoryMonthPlanProductionFinalResult record : lastMonthFinalList) {
+            String machineCode = record.getCxMachineCode();
+            if (StringUtils.isBlank(machineCode)) {
+                continue;
+            }
+            int lastScheduleDay = getLastScheduleDay(record);
+            if (lastScheduleDay <= 0) {
+                continue;
+            }
+            Integer currentLastScheduleDay = machineLastScheduleDayMap.get(machineCode);
+            if (currentLastScheduleDay == null || lastScheduleDay >= currentLastScheduleDay) {
+                machineLastScheduleDayMap.put(machineCode, lastScheduleDay);
+                machineRecordMap.put(machineCode, record);
+            }
+        }
+        return machineRecordMap;
+    }
+
+    private int getLastScheduleDay(FactoryMonthPlanProductionFinalResult record) {
+        for (int day = 31; day >= 1; day--) {
+            Object value = record.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, day));
+            Integer dayQty = Convert.toInt(value, 0);
+            if (dayQty != null && dayQty > 0) {
+                return day;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 导入
+     *
+     * @param list             列表数据
+     * @param updateSupport    覆盖
+     * @param importLogId      导入日志ID
+     * @param params           表头参数
+     * @param monthPlanVersion 月计划版本
+     * @param productVersion   生产版本
+     * @return 结果
+     */
+    @Override
+    public AjaxResult importDataDayResult(List<FactoryMonthPlanMouldDayResult> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
+                                          Map<String, String> factoryMap, Map<String, String> productTypeMap) {
+        Map<String, String> machineMap = getImportMachineMap(importLogId);
+        try {
+            //1.初始化
+            int successNum = 0;
+            int failureNum = 0;
+            List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+            List<FactoryMonthPlanMouldDayResult> insertList = new ArrayList<>();
+            // 解析的excel表头参数
+            String year = params[1];
+            String month = params[2];
+            String factoryName = params[0];
+
+            //2.国际化初始化
+            String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
+            String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
+            String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+
+            // 过滤合计等数据
+            list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
+
+            //3.公共校验（非空校验、长度校验等）
+            for (int i = 0; i < list.size(); i++) {
+                int errorNum = i + 2;
+                FactoryMonthPlanMouldDayResult item = list.get(i);
+
+                item.setIsImport(YesOrNoEnum.YES.getCode());
+                item.setMonthPlanVersion(monthPlanVersion);
+                item.setProductionVersion(productVersion);
+                item.setPlanType("01");
+
+                // 赋值开始结束日期
+                setBeginDayAndEndDay(item);
+
+                if (productTypeMap.containsKey(params[3])) {
+                    item.setProductTypeCode(productTypeMap.get(params[3]));
+                }
+                if (StringUtils.isBlank(item.getCxMachineCode()) && StringUtils.isNotBlank(item.getStructureName())) {
+                    String machineCode = machineMap.get(item.getStructureName());
+                    if (StringUtils.isNotBlank(machineCode)) {
+                        item.setCxMachineCode(machineCode);
+                    }
+                }
+
+                try {
+                    item.setYear(Integer.parseInt(year));
+                } catch (NumberFormatException e) {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, yearErrorStr, importErrorLogs);
+                    continue;
+                }
+                try {
+                    item.setMonth(Integer.parseInt(month));
+                } catch (NumberFormatException e) {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, monthErrorStr, importErrorLogs);
+                    continue;
+                }
+                if (factoryMap.containsKey(factoryName)) {
+                    String factoryCode = factoryMap.get(factoryName);
+                    item.setFactoryCode(factoryCode);
+                } else {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, String.format(noFactoryStr, factoryName), importErrorLogs);
+                    continue;
+                }
+
+                List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, item);
+                if (CollUtil.isNotEmpty(validated)) {
+                    item.setId(-999L);
+                    failureNum++;
+                    importErrorLogs.addAll(validated);
+                    continue;
+                }
+                insertList.add(item);
+            }
+
+            // 过滤id不等于空的数据
+            insertList = insertList.stream().filter(v -> v.getId() == null).collect(Collectors.toList());
+
+            try {
+                successNum = insertList.size();
+                if(CollUtil.isNotEmpty(insertList)) {
+                    // 插入新记录
+                    baseDao.insertBatch(insertList);
+                }
+            } catch (Exception e) {
+                log.error("导入失败", e);
+                successNum = 0;
+                failureNum = list.size();
+                importErrorLogs.clear();
+                addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
+            }
+            //返回提示信息及错误集合
+            if (failureNum > 0) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            } else {
+                return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+            }
+        } finally {
+            clearImportMachineMap(importLogId);
+        }
+    }
+
+    private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {
+        for (int i = 1; i <= 31; i++) {
+            Object fieldValue = ReflectUtils.getFieldValue(item, "day" + i);
+            if (ObjUtil.isNotNull(fieldValue)) {
+                if (item.getBeginDay() == null) {
+                    item.setBeginDay(i);
+                }
+                item.setEndDay(i);
+            }
+        }
     }
 }
