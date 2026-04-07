@@ -2284,5 +2284,21 @@
   "ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate": "计划开始时间不能小于计划日期",
   "ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime": "计划结束时间不能小于计划开始时间",
   "ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime": "上次精度日期不能大于等于计划日期",
-  "ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate": "到期日期需大于计划日期"
+  "ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate": "到期日期需大于计划日期",
+  "ui.lh.precision.plan.model.name": "硫化精度计划",
+  "ui.lh.precision.plan.machine.code": "硫化机台",
+  "ui.lh.precision.plan.precision.type": "精度类型",
+  "ui.lh.precision.plan.plan.date": "计划日期",
+  "ui.lh.precision.plan.actual.date": "实际日期",
+  "ui.lh.precision.plan.due.date": "到期日期",
+  "ui.lh.precision.plan.days.to.due": "剩余天数",
+  "ui.lh.precision.plan.last.maintenance.date": "上次保养日期",
+  "ui.lh.precision.plan.completion.status": "完成状态",
+  "ui.lh.precision.plan.year": "计划年度",
+  "ui.lh.precision.plan.warning.status": "预警状态",
+  "ui.lh.precision.plan.warning.date": "预警日期",
+  "ui.lh.precision.plan.data.source": "数据来源",
+  "ui.lh.precision.plan.sync.from.mes": "MES同步",
+  "ui.lh.precision.plan.sync.confirm": "是否从MES同步硫化精度计划数据？",
+  "ui.lh.precision.plan.auto.generate.confirm": "是否自动生成{year}年度的硫化精度计划？"
 }
