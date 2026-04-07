@@ -1,7 +1,6 @@
 <template>
   <basic-container>
     <page-table
-
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -25,7 +24,7 @@
           @click="handleAdd"
           >{{ $t("SCM抓取") }}
         </el-button> -->
-       <el-button
+        <el-button
           type="primary"
           plain
           v-hasPermi="['monthplan:SalesOrderPool:edit']"
@@ -42,14 +41,14 @@
         </el-button>
         <el-button
           type="primary"
-           v-hasPermi="['monthplan:supplyOrderPool:createCycleStockUp']"
-            @click="generateCycle"
+          v-hasPermi="['monthplan:supplyOrderPool:createCycleStockUp']"
+          @click="generateCycle"
           plain
           >{{ $t("ui.data.defectiveStock.createCycleStockUp") }}
         </el-button>
         <el-button
           type="primary"
-           v-hasPermi="['monthplan:supplyOrderPool:createPrecedentStockUp']"
+          v-hasPermi="['monthplan:supplyOrderPool:createPrecedentStockUp']"
           @click="generatePrecedent"
           plain
           >{{ $t("ui.data.defectiveStock.createPrecedentStockUp") }}
@@ -83,6 +82,7 @@ import {
   removeSupplyOrderPool,
   createPrecedentStockUp,
   createCycleStockUp,
+  schedulingPate
 } from "@/api/monthplan/supplyOrderPool";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -94,7 +94,14 @@ export default {
     tltUpload,
     infoDialog,
   },
-  dicts: ["product_category", "biz_product_type", "biz_factory_name",'supply_order_type','biz_stor_type','biz_brand_type'],
+  dicts: [
+    "product_category",
+    "biz_product_type",
+    "biz_factory_name",
+    "supply_order_type",
+    "biz_stor_type",
+    "biz_brand_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -126,7 +133,6 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
 
-
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
@@ -137,12 +143,12 @@ export default {
         {
           prop: "year",
           label: this.$t("ui.data.colume.year"),
-          width:120
+          width: 120,
         },
         {
           prop: "month",
           label: this.$t("ui.data.colume.month"),
-          width:120
+          width: 120,
         },
         {
           prop: "productTypeCode",
@@ -155,9 +161,12 @@ export default {
           prop: "orderType",
           label: this.$t("ui.data.defectiveStock.orderType"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.supply_order_type, value);
+            return this.selectDictLabel(
+              this.dict.type.supply_order_type,
+              value
+            );
           },
-          width:160
+          width: 160,
         },
         {
           prop: "locationType",
@@ -165,8 +174,6 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_stor_type, value);
           },
-
-
         },
         {
           prop: "brand",
@@ -174,17 +181,17 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width:120
+          width: 120,
         },
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          width:120
+          width: 120,
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:400
+          width: 400,
         },
         {
           prop: "productCategory",
@@ -200,7 +207,7 @@ export default {
         {
           prop: "saleAreaName",
           label: this.$t("ui.data.defectiveStock.saleArea"),
-          width:180
+          width: 180,
         },
         {
           prop: "threeAverageQty",
@@ -238,22 +245,32 @@ export default {
         {
           prop: "remark",
           label: this.$t("common.remark"),
-          width:120
+          width: 120,
         },
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
-          width:180
+          width: 180,
         },
         {
           align: "center",
           label: this.$t("common.option"),
           fixed: "right",
-          width:120,
+          width: 120,
           render: ({ row }) => {
             return (
               <div>
-
+                {(row.isSchecule!=1) && (
+                  <el-button
+                    class="minus"
+                    type="success"
+                    size="mini"
+                    v-hasPermi={["monthplan:supplyOrderPool:setSchedule"]}
+                    onClick={() => this.handlePate(row)}
+                  >
+                  参与排产
+                  </el-button>
+                )}
                 <el-button
                   v-hasPermi={["monthplan:supplyOrderPool:remove"]}
                   class="minus"
@@ -272,7 +289,7 @@ export default {
     },
     searchColumns() {
       return [
-      {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
@@ -349,6 +366,17 @@ export default {
         this.$refs.infoRef.show(row);
       }
     },
+    handlePate(row) {
+      this.$confirm(this.$t("确定参与排产"), {
+        type: "warning",
+      }).then(() => {
+        schedulingPate({id:row.id}).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleDelete(rows) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
@@ -368,7 +396,7 @@ export default {
         if (i == this.selection.length - 1) {
           ids = ids + this.selection[i].id;
         } else {
-          ids = ids +  this.selection[i].id + ",";
+          ids = ids + this.selection[i].id + ",";
         }
       }
       this.$confirm(this.$t("common.confirm.delete"), {
@@ -454,9 +482,7 @@ export default {
       try {
         this.loading = true;
 
-        const data = await listSupplyOrderPool(
-          this.formatParams()
-        );
+        const data = await listSupplyOrderPool(this.formatParams());
         console.log(data);
         this.data = data.rows;
         this.page.total = data.total;
@@ -470,8 +496,8 @@ export default {
   created() {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
+    const year = nextMonth.getFullYear();
+    const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
     let defaultParams = {
       factoryCode: "116",
       yearMonth: `${year}-${month}`,
@@ -484,8 +510,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>

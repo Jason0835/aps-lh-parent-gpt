@@ -116,7 +116,7 @@ export default {
         },
         {
           prop: "hasWarning",
-          label: this.$t("ui.data.column.rawMat  erial.hasWarning"),
+          label: this.$t("ui.data.column.rawMaterial.hasWarning"),
 
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
