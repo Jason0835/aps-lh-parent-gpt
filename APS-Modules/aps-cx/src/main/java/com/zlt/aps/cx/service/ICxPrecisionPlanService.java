@@ -30,4 +30,35 @@ public interface ICxPrecisionPlanService extends IDocService<CxPrecisionPlan> {
      * @return 导入结果
      */
     AjaxResult importData(List<CxPrecisionPlan> list, boolean updateSupport, Long importLogId);
+
+    /**
+     * 从MES同步数据生成成型精度初版计划
+     *
+     * @return 生成数量
+     */
+    int generatePlansFromMes();
+
+    /**
+     * 自动生成年度成型精度计划
+     *
+     * @param year 年份
+     * @return 生成数量
+     */
+    int autoGenerateYearlyPlans(Integer year);
+
+    /**
+     * 批量更新到期天数
+     *
+     * @return 更新数量
+     */
+    int batchUpdateDaysToDue();
+
+    /**
+     * MES回传实际完成时间
+     *
+     * @param mesSourceId MES来源ID
+     * @param actualDate  实际日期
+     * @return 是否成功
+     */
+    boolean updateActualDate(Long mesSourceId, String actualDate);
 }

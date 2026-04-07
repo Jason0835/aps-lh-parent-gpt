@@ -27,14 +27,15 @@ import java.util.List;
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：CxPrecisionPlanController.java
  * 描    述：成型精度计划管理 控制层类
- *@author APS Team
- *@date 2026-04-03
- *@version 1.0
  *
+ * @author APS Team
+ * @version 1.0
+ * <p>
  * 修改记录：
- *     修改时间：...
- *     修 改 人：...
- *     修改内容：...
+ * 修改时间：...
+ * 修 改 人：...
+ * 修改内容：...
+ * @date 2026-04-03
  */
 @Slf4j
 @Api(tags = "成型精度计划管理")
@@ -93,6 +94,7 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
 
     /**
      * 根据集合导入成型库存数据
+     *
      * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
@@ -104,6 +106,7 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
     }
+
     /**
      * 导出来型精度计划列表
      */
@@ -159,5 +162,66 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
     @Override
     protected String getOrderBy() {
         return "plan_date desc, factory_code asc, machine_code asc";
+    }
+
+    /**
+     * 从MES同步数据生成成型精度初版计划
+     */
+    @ApiOperation("从MES同步数据生成成型精度初版计划")
+    @PostMapping("/generateFromMes")
+    public AjaxResult generatePlansFromMes() {
+        try {
+            int count = cxPrecisionPlanService.generatePlansFromMes();
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("从MES同步数据生成成型精度计划失败", e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 自动生成年度成型精度计划
+     */
+    @ApiOperation("自动生成年度成型精度计划")
+    @PostMapping("/autoGenerateYearly")
+    public AjaxResult autoGenerateYearlyPlans(@RequestParam("year") Integer year) {
+        try {
+            int count = cxPrecisionPlanService.autoGenerateYearlyPlans(year);
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("自动生成{}年度成型精度计划失败", year, e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 批量更新到期天数
+     */
+    @ApiOperation("批量更新到期天数")
+    @PostMapping("/batchUpdateDaysToDue")
+    public AjaxResult batchUpdateDaysToDue() {
+        try {
+            int count = cxPrecisionPlanService.batchUpdateDaysToDue();
+            return AjaxResult.success("更新成功", count);
+        } catch (Exception e) {
+            log.error("批量更新到期天数失败", e);
+            return AjaxResult.error("更新失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * MES回传实际完成时间
+     */
+    @ApiOperation("MES回传实际完成时间")
+    @PostMapping("/updateActualDate")
+    public AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId,
+                                       @RequestParam("actualDate") String actualDate) {
+        try {
+            boolean result = cxPrecisionPlanService.updateActualDate(mesSourceId, actualDate);
+            return result ? AjaxResult.success("更新成功") : AjaxResult.error("更新失败");
+        } catch (Exception e) {
+            log.error("MES回传实际完成时间失败", e);
+            return AjaxResult.error("更新失败：" + e.getMessage());
+        }
     }
 }

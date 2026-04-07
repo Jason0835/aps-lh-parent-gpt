@@ -88,6 +88,11 @@ public class ZltConstant {
     public final static String PROCEDURE_CODE_FL_SETTING = "3";
 
     /**
+     * 模块code：硫化排程
+     */
+    public final static String PROCEDURE_CODE_LH = "5";
+
+    /**
      * 模块code：月度计划
      */
     public final static String PROCEDURE_CODE_MONTHPLAN = "4";
