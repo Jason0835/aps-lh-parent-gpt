@@ -49,7 +49,8 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
      */
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{id}")
-    public LhPrecisionPlan getLhPrecisionPlanInfo(@PathVariable("id") Long id) {
+    @Override
+    public LhPrecisionPlan getInfo(@PathVariable("id") Long id) {
         return super.getInfo(id);
     }
 

@@ -117,7 +117,7 @@ public class LhPrecisionPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "计划日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate planDateBegin;
+    private LocalDate planDateStart;
 
     @ApiModelProperty(value = "计划日期结束（搜索用）")
     @TableField(exist = false)
@@ -127,7 +127,7 @@ public class LhPrecisionPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "实际日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate actualDateBegin;
+    private LocalDate actualDateStart;
 
     @ApiModelProperty(value = "实际日期结束（搜索用）")
     @TableField(exist = false)
