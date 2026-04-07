@@ -31,7 +31,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
 		    sum( d.MID_QTY ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
-		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) conventionReserveQty,
+		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) CONVENTION_RESERVE_QTY,
 		    r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
 		    r.MID_PRODUCTION_QTY,
@@ -104,9 +104,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.FACTORY_CODE = #{dayResult.factoryCode}
 		    AND m.IS_DELETE = 0 
 		    AND m.STRUCTURE_NAME IS NOT NULL 
+            AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE)
         <if test="!isAllMaterial">
             AND m.FACTORY_CODE = r.FACTORY_CODE
-            AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE)
         </if>
 		GROUP BY
 		    MM.MIN_PRO_SIZE,
