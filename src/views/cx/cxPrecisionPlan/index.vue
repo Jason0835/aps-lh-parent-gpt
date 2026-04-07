@@ -182,6 +182,13 @@ export default {
           minWidth: 90
         },
         {
+          prop: 'actualDate',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),
+          minWidth: 120
+        },
+        {
           prop: 'lastPrecisionDate',
           align: 'center',
           halign: 'center',
