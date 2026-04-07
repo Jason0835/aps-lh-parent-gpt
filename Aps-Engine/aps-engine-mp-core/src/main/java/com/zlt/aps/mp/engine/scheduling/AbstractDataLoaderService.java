@@ -172,7 +172,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
         //2、特殊材料的胎胚配置信息--基于净需求计划版本
         try {
-            specialMaterialInfoByRequireHandler(productionContext);
+            specialMaterialInfoHandler(productionContext);
         } catch (Exception e) {
             log.error("特殊材料的胎胚配置信息处理失败", e);
             addCheckResult(false, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA,
@@ -591,16 +591,16 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
-     * 2.1.2：根据排产信息，获取特殊原材料的配置信息-基于净需求计划 包含：
+     * 2.1.2：根据排产信息，获取特殊原材料的配置信息-基于月计划初始化表 包含：
      * 1、特殊原材料的胎胚
      * 2、特殊原材料的库存及可转化的轮胎条数
      *
      * @param productionContext 排产单位
      */
-    private void specialMaterialInfoByRequireHandler(TbrProductionContext productionContext) {
-        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfoByRequire(productionContext);
-        buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
-    }
+//    private void specialMaterialInfoByRequireHandler(TbrProductionContext productionContext) {
+//        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
+//        buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
+//    }
 
     /**
      * 2.1.3：加载超6个月的库存信息
