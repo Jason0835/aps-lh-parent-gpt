@@ -292,7 +292,7 @@ export default {
         },
         {
           prop: "differenceQty",
-          label: this.$t("ui.data.mouldingDayResult.differenceQty"),
+          label: this.$t("未排产数量"),
           width: 120,
         },
         {
