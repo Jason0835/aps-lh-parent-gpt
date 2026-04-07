@@ -184,9 +184,9 @@ public class SupplyOrderPool extends BaseEntity {
     /**
      * 是否参与排产
      */
-    @ApiModelProperty(value = "是否参与排产", name = "isSchecule")
-    @TableField(value = "IS_SCHECULE")
-    private String isSchecule;
+    @ApiModelProperty(value = "是否参与排产", name = "isSchedule")
+    @TableField(value = "IS_SCHEDULE")
+    private String isSchedule;
 
     /**
      * 月均销量

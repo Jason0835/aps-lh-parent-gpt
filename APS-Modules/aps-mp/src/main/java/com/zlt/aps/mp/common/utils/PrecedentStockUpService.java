@@ -148,7 +148,7 @@ public class PrecedentStockUpService {
   @Transactional(rollbackFor = Exception.class)
   public AjaxResult setSchedule(SupplyOrderPool supplyOrderPool) {
       LambdaUpdateWrapper<SupplyOrderPool> updateWrapper = new LambdaUpdateWrapper<>();
-      updateWrapper.set(SupplyOrderPool::getIsSchecule, YesOrNoEnum.YES.getCode());
+      updateWrapper.set(SupplyOrderPool::getIsSchedule, YesOrNoEnum.YES.getCode());
       updateWrapper.eq(SupplyOrderPool::getId, supplyOrderPool.getId());
       supplyOrderPoolEntityMapper.update(null, updateWrapper);
       return AjaxResult.success();

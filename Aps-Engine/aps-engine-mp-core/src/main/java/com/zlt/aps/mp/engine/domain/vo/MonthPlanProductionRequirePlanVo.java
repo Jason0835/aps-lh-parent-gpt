@@ -339,7 +339,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         }
         Integer sumAddNetQty = Optional.ofNullable(plan.getAddNetQty()).orElse(BigDecimal.ZERO.intValue());
         //20260403+ 常规储备量，如果参与排产则加入到排产净需求中，本身设置为量
-        plan.setIsAddNetQty(require.getIsSchecule());
+        plan.setIsAddNetQty(require.getIsSchedule());
         if (plan.isAddNetQtyByConventionReserve()) {
             //常规储备量加入排产净需求中
             Integer conventionReserveQty = Optional.ofNullable(plan.getConventionReserveQty()).orElse(BigDecimal.ZERO.intValue());
