@@ -9,6 +9,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmMonCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMonCycleSchStruConfService;
+import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -74,6 +75,25 @@ public class MdmMonCycleSchStruConfController extends AbstractDocBizController<M
     @Override
     public AjaxResult save(@RequestBody MdmMonCycleSchStruConf billVO) {
         return super.save(billVO);
+    }
+
+    /**
+     * 新增保存
+     */
+    @Log(title = "ui.data.column.mdmMonCycleSchStruConf.modelName", businessType = BusinessType.INSERT)
+    @ApiOperation("新增保存")
+    @PostMapping("/addSave")
+    public AjaxResult addSave(@RequestBody MdmMonCycleSchStruConf billVO) {
+        return mdmMonCycleSchStruConfService.addSave(billVO);
+    }
+
+    /**
+     * 查询可新增结构列表
+     */
+    @ApiOperation("查询可新增结构列表")
+    @PostMapping("/queryAddStructList")
+    public List<MdmMonCycleSchStruConf> queryAddStructList(@RequestBody MdmCycleSchStruConf queryVO) {
+        return mdmMonCycleSchStruConfService.queryAddStructList(queryVO);
     }
 
     /**

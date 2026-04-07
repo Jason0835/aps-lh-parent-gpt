@@ -8,6 +8,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf;
 import com.zlt.aps.mp.api.service.IMdmMonCycleSchStruConfRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -26,6 +27,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -102,6 +104,30 @@ public class MdmMonCycleSchStruConfUIController extends BaseUIController<MdmMonC
         }
 
         return iMdmMonCycleSchStruConfService.save(mdmMonCycleSchStruConf);
+    }
+
+    /**
+     * 新增保存
+     */
+    @ApiOperation("新增保存")
+    @RequiresPermissions("monthplan:mdmMonCycleSchStruConf:edit")
+    @PostMapping("/addSave")
+    @ResponseBody
+    public AjaxResult addSave(MdmMonCycleSchStruConf mdmMonCycleSchStruConf) {
+        if (UserConstants.NOT_UNIQUE.equals(iMdmMonCycleSchStruConfService.checkUnique(mdmMonCycleSchStruConf))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.mdmMonCycleSchStruConf.notUnique"));
+        }
+        return iMdmMonCycleSchStruConfService.addSave(mdmMonCycleSchStruConf);
+    }
+
+    /**
+     * 查询可新增结构列表
+     */
+    @ApiOperation("查询可新增结构列表")
+    @PostMapping("/queryAddStructList")
+    @ResponseBody
+    public List<MdmMonCycleSchStruConf> queryAddStructList(MdmCycleSchStruConf mdmCycleSchStruConf) {
+        return iMdmMonCycleSchStruConfService.queryAddStructList(mdmCycleSchStruConf);
     }
 
     /**

@@ -4,6 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmMonCycleSchStruConf;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Copyright (c) 2022, All rights reserved。
+ * Copyright (c) 2022, All rights reserved銆?
  * 文件名称：IMdmMonCycleSchStruConfRemoteService.java
  * 描    述：IMdmMonCycleSchStruConfRemoteService月周期排产结构配置前端接口
  *
@@ -20,9 +21,9 @@ import java.util.List;
  * @version 1.0
  * <p>
  * 修改记录：
- * 修改时间：...
+ * 淇敼鏃堕棿锛?..
  * 修 改 人：zlt
- * 修改内容：...
+ * 淇敼鍐呭锛?..
  * @date 2025-12-09
  */
 @FeignClient(contextId = "IMdmMonCycleSchStruConfRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.monthplan:/monthplan}")
@@ -77,4 +78,17 @@ public interface IMdmMonCycleSchStruConfRemoteService {
     @PostMapping("/mdmMonCycleSchStruConf/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 查询可新增结构列表
+     */
+    @ApiOperation("查询可新增结构列表")
+    @PostMapping("/mdmMonCycleSchStruConf/queryAddStructList")
+    List<MdmMonCycleSchStruConf> queryAddStructList(@RequestBody MdmCycleSchStruConf queryVO);
+
+    /**
+     * 新增保存
+     */
+    @ApiOperation("新增保存")
+    @PostMapping("/mdmMonCycleSchStruConf/addSave")
+    AjaxResult addSave(@RequestBody MdmMonCycleSchStruConf mdmMonCycleSchStruConf);
 }
