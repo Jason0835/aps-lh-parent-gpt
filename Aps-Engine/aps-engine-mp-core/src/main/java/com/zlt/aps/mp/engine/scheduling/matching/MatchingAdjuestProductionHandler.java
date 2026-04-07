@@ -1164,11 +1164,8 @@ public class MatchingAdjuestProductionHandler {
             }
         }
         // 计算结构最大剩余产能
-        Integer remainMaxDayProductionQty = dailyCapacityLimitVo.getRemainMaxDayProductionQty();
-        DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,remainMaxDayProductionQty,scheduleDay);
-        dayTotalCapacityChecker.doCheck();
-        Integer realTotalPlanQty = dayTotalCapacityChecker.getTotalPlanQty();
-        Integer realRemainMaxDayProductionQty = remainMaxDayProductionQty > realTotalPlanQty? remainMaxDayProductionQty - realTotalPlanQty: 0;
+        Integer realRemainMaxDayProductionQty = this.getRemainMaxDayProductionQty(scheduleDay, mpProdFinalList,
+                dailyCapacityLimitMap);
         if (realRemainMaxDayProductionQty <= 0) {
             return 0;
         }
@@ -1255,11 +1252,19 @@ public class MatchingAdjuestProductionHandler {
             return 0;
         }
         // 如果是换模，且剩余结构产能不足，则停止不再搭配
-        if (isChangeMould && realRemainMaxDayProductionQty < allocationQty) {
-            return 0;
-        }
-        if (!isChangeMould) { // 非换模，则控制不能超过剩余产能
-            allocationQty = Math.min(realRemainMaxDayProductionQty, allocationQty);
+        if (isChangeMould) {
+            if (realRemainMaxDayProductionQty < allocationQty) { // 当天剩余产能不足，则不排产
+                return 0;
+            }
+            // 如果明天产能也不足，也不排产
+            Integer nextDay = this.getNextDay(contextDTO, scheduleDay, endDay);
+            if (nextDay > 0) {
+                Integer nextRemainMaxDayProductionQty = this.getRemainMaxDayProductionQty(nextDay, mpProdFinalList,
+                        dailyCapacityLimitMap);
+                if (nextRemainMaxDayProductionQty <= 0) {
+                    return 0;
+                }
+            }
         }
         
         Integer oldProductionQty = intValue(plan.getFieldValueByFieldName(FactoryConstant.DAY_FIELD + scheduleDay));
@@ -1296,16 +1301,31 @@ public class MatchingAdjuestProductionHandler {
         Integer newLhMachines = dailyCapacityLimitVo.getUsedLhMachines();
         dailyCapacityLimitVo.setRemainLhMachines(safeAdd(dailyCapacityLimitVo.getRemainChangeMould(), oldLhMachines - newLhMachines)); // 使用机台如果有增加则剩余机台数会减少
         
-        // 更新贴牌数量
-        if (isOem) {
-            dailyCapacityLimitVo.setRemainOemQty(remainOemQty - allocationQty); // 扣减贴牌数量
-        }
-        
         String scheduleName = isCheckContinue? "补量": "增模";
         String logDetail = String.format("结构:%s,【搭配排产】物料编码:%s,排产日:%s,%s,搭配排产量:%s",contextDTO.getStructureName(),plan.getMaterialCode(),scheduleDay,scheduleName,allocationQty);
         log.debug(logDetail);
         contextDTO.getLogDetail().append(logDetail).append(ApsConstant.DIVISION); // 记录日志
         return allocationQty;
+    }
+
+    /**
+     * 获取结构剩余产能
+     * 
+     * @param day                   排产日
+     * @param mpProdFinalList       排产列表
+     * @param dailyCapacityLimitMap 日产能限制
+     * @return
+     */
+    private Integer getRemainMaxDayProductionQty(Integer day, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,
+                                                 Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap) {
+        MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
+        Integer remainMaxDayProductionQty = dailyCapacityLimitVo.getRemainMaxDayProductionQty();
+        DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,
+                remainMaxDayProductionQty, day); // 构建产能检查器
+        dayTotalCapacityChecker.doCheck(); // 执行产能检查
+        Integer realTotalPlanQty = dayTotalCapacityChecker.getTotalPlanQty();
+        // 计算剩余的可用产能
+        return remainMaxDayProductionQty > realTotalPlanQty ? remainMaxDayProductionQty - realTotalPlanQty : 0;
     }
 
     /**
