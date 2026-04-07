@@ -52,6 +52,14 @@
             <groupId>com.zlt.aps.lh</groupId>
             <artifactId>aps-lh-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.cx</groupId>
+            <artifactId>aps-cx-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

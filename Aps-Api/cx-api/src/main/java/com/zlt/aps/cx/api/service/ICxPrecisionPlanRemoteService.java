@@ -89,4 +89,19 @@ public interface ICxPrecisionPlanRemoteService {
     @ApiOperation("自动生成年度成型精度计划")
     @PostMapping("/cxPrecisionPlan/autoGenerateYearly")
     AjaxResult autoGenerateYearlyPlans(@RequestParam("year") Integer year);
+
+    /**
+     * 批量更新到期天数
+     */
+    @ApiOperation("批量更新到期天数")
+    @PostMapping("/cxPrecisionPlan/batchUpdateDaysToDue")
+    AjaxResult batchUpdateDaysToDue();
+
+    /**
+     * MES回传实际完成时间
+     */
+    @ApiOperation("MES回传实际完成时间")
+    @PostMapping("/cxPrecisionPlan/updateActualDate")
+    AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId,
+                                @RequestParam("actualDate") String actualDate);
 }

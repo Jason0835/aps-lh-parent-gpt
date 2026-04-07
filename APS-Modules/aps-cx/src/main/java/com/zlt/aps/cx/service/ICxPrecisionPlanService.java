@@ -45,4 +45,20 @@ public interface ICxPrecisionPlanService extends IDocService<CxPrecisionPlan> {
      * @return 生成数量
      */
     int autoGenerateYearlyPlans(Integer year);
+
+    /**
+     * 批量更新到期天数
+     *
+     * @return 更新数量
+     */
+    int batchUpdateDaysToDue();
+
+    /**
+     * MES回传实际完成时间
+     *
+     * @param mesSourceId MES来源ID
+     * @param actualDate  实际日期
+     * @return 是否成功
+     */
+    boolean updateActualDate(Long mesSourceId, String actualDate);
 }

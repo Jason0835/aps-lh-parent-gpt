@@ -90,6 +90,16 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     @TableField("DUE_DATE")
     private Date dueDate;
 
+    @ApiModelProperty(value = "距离到期日剩余天数")
+    @TableField("DAYS_TO_DUE")
+    private Integer daysToDue;
+
+    @Excel(name = "ui.data.column.cxPrecisionPlan.actualDate", dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty(value = "实际执行日期")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField("ACTUAL_DATE")
+    private Date actualDate;
+
     @Excel(name = "ui.data.column.cxPrecisionPlan.remark")
     @ApiModelProperty(value = "备注")
     @TableField("REMARK")
