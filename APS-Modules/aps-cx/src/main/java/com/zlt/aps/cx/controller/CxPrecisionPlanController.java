@@ -160,4 +160,34 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
     protected String getOrderBy() {
         return "plan_date desc, factory_code asc, machine_code asc";
     }
+
+    /**
+     * 从MES同步数据生成成型精度初版计划
+     */
+    @ApiOperation("从MES同步数据生成成型精度初版计划")
+    @PostMapping("/generateFromMes")
+    public AjaxResult generatePlansFromMes() {
+        try {
+            int count = cxPrecisionPlanService.generatePlansFromMes();
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("从MES同步数据生成成型精度计划失败", e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 自动生成年度成型精度计划
+     */
+    @ApiOperation("自动生成年度成型精度计划")
+    @PostMapping("/autoGenerateYearly")
+    public AjaxResult autoGenerateYearlyPlans(@RequestParam("year") Integer year) {
+        try {
+            int count = cxPrecisionPlanService.autoGenerateYearlyPlans(year);
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("自动生成{}年度成型精度计划失败", year, e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
 }

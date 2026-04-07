@@ -75,4 +75,18 @@ public interface ICxPrecisionPlanRemoteService {
     @ApiOperation("导入数据")
     @PostMapping("/cxPrecisionPlan/importData")
     AjaxResult importData(@RequestBody ImportContext context, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 从MES同步数据生成成型精度初版计划
+     */
+    @ApiOperation("从MES同步数据生成成型精度初版计划")
+    @PostMapping("/cxPrecisionPlan/generateFromMes")
+    AjaxResult generatePlansFromMes();
+
+    /**
+     * 自动生成年度成型精度计划
+     */
+    @ApiOperation("自动生成年度成型精度计划")
+    @PostMapping("/cxPrecisionPlan/autoGenerateYearly")
+    AjaxResult autoGenerateYearlyPlans(@RequestParam("year") Integer year);
 }

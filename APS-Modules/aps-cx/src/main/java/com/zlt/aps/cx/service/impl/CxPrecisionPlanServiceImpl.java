@@ -9,7 +9,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
 import com.zlt.aps.cx.service.ICxPrecisionPlanService;
+import com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -19,17 +21,19 @@ import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * 成型精度计划服务实现类
+ * 鎴愬瀷绮惧害璁″垝鏈嶅姟瀹炵幇绫?
  *
  * @author APS Team
  */
@@ -37,10 +41,17 @@ import java.util.List;
 @Service
 public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPlan> implements ICxPrecisionPlanService {
 
+    /** 精度类型：成型精度 */
+    private static final String PRECISION_TYPE_CX = "成型精度";
+    private static final BigDecimal DEFAULT_ESTIMATED_HOURS = new BigDecimal("4.0");
+    private static final int PLAN_INTERVAL_MONTHS = 2;
+
     @Autowired
     private CxPrecisionPlanMapper cxPrecisionPlanMapper;
     @Autowired
     private MdmMoldingMachineMapper moldingMachineMapper;
+    @Autowired
+    private MdmDevMaintenancePlanEntityMapper mdmDevMaintenancePlanEntityMapper;
 
     @Override
     public String checkUnique(CxPrecisionPlan entity) {
@@ -218,4 +229,169 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         }
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+        public int generatePlansFromMes() {
+        log.info("开始从MES同步数据生成成型精度初版计划");
+
+        List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(
+            new LambdaQueryWrapper<MdmDevMaintenancePlan>()
+                .eq(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
+        );
+
+        if (CollectionUtils.isEmpty(mesPlans)) {
+            log.warn("从MES未查询到成型精度计划数据");
+            return 0;
+        }
+
+        int saveCount = 0;
+        for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+            String machineCode = mesPlan.getDevCode();
+            Date planDate = mesPlan.getOperTime();
+            if (StringUtil.isBlank(machineCode) || planDate == null) {
+                log.debug("MES计划数据不完整：机台={}，计划日={}", machineCode, planDate);
+                continue;
+            }
+
+            if (existsByMachineAndDate(machineCode, planDate)) {
+                log.debug("机台{} 日期{} 已存在计划，跳过", machineCode, planDate);
+                continue;
+            }
+
+            CxPrecisionPlan plan = new CxPrecisionPlan();
+            plan.setMachineCode(machineCode);
+            plan.setFactoryCode(mesPlan.getFactoryCode());
+            plan.setPlanDate(planDate);
+            plan.setLastPrecisionDate(mesPlan.getFirstWashTime());
+            plan.setEstimatedHours(DEFAULT_ESTIMATED_HOURS);
+            plan.setDueDate(addMonths(planDate, PLAN_INTERVAL_MONTHS));
+
+            // 同步设备名称，保证展示一致
+            MdmMoldingMachine machine = findMachine(machineCode, mesPlan.getFactoryCode());
+            if (machine != null) {
+                plan.setMachineName(machine.getMachineName());
+            }
+
+            cxPrecisionPlanMapper.insert(plan);
+            saveCount++;
+            log.info("生成成型精度初版计划成功：机台{}，计划日{}", machineCode, planDate);
+        }
+
+        return saveCount;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+        public int autoGenerateYearlyPlans(Integer year) {
+        log.info("开始自动生成{}年度成型精度计划", year);
+
+        LocalDate currentYearStart = LocalDate.of(year, 1, 1);
+        LocalDate currentYearEnd = LocalDate.of(year, 12, 31);
+        LocalDate lastYearStart = currentYearStart.minusYears(1);
+        LocalDate lastYearEnd = currentYearEnd.minusYears(1);
+
+        List<CxPrecisionPlan> lastYearPlans = cxPrecisionPlanMapper.selectList(
+            new QueryWrapper<CxPrecisionPlan>()
+                .between("PLAN_DATE",
+                    Date.from(lastYearStart.atStartOfDay(ZoneId.systemDefault()).toInstant()),
+                    Date.from(lastYearEnd.atStartOfDay(ZoneId.systemDefault()).toInstant()))
+        );
+
+        if (CollectionUtils.isEmpty(lastYearPlans)) {
+            log.warn("未找到{}年度上一年度的数据支撑生成", year);
+            return 0;
+        }
+
+        // 按机台取最近一条计划
+        Map<String, CxPrecisionPlan> latestByMachine = lastYearPlans.stream()
+            .filter(p -> PubUtil.isNotEmpty(p.getMachineCode()) && p.getPlanDate() != null)
+            .collect(Collectors.toMap(CxPrecisionPlan::getMachineCode, p -> p, (p1, p2) ->
+                p1.getPlanDate().after(p2.getPlanDate()) ? p1 : p2));
+
+        int saveCount = 0;
+        for (Map.Entry<String, CxPrecisionPlan> entry : latestByMachine.entrySet()) {
+            String machineCode = entry.getKey();
+            CxPrecisionPlan lastPlan = entry.getValue();
+
+            LocalDate baseDate = toLocalDate(lastPlan.getPlanDate());
+            if (baseDate == null) {
+                continue;
+            }
+
+            LocalDate newPlanDate = baseDate.plusYears(1);
+            // 跨区按时间对齐年度
+            newPlanDate = newPlanDate.withYear(year);
+
+            if (existsInYear(machineCode, currentYearStart, currentYearEnd)) {
+                log.debug("机台{} 在{}年度已存在计划，跳过", machineCode, year);
+                continue;
+            }
+
+            CxPrecisionPlan plan = new CxPrecisionPlan();
+            plan.setMachineCode(machineCode);
+            plan.setFactoryCode(lastPlan.getFactoryCode());
+            plan.setMachineName(lastPlan.getMachineName());
+            plan.setPlanDate(toDate(newPlanDate));
+            plan.setLastPrecisionDate(lastPlan.getPlanDate());
+            plan.setEstimatedHours(DEFAULT_ESTIMATED_HOURS);
+            plan.setDueDate(addMonths(plan.getPlanDate(), PLAN_INTERVAL_MONTHS));
+
+            cxPrecisionPlanMapper.insert(plan);
+            saveCount++;
+            log.info("自动生成成型精度计划：机台{}，计划日{}", machineCode, plan.getPlanDate());
+        }
+
+        return saveCount;
+    }
+
+    private boolean existsByMachineAndDate(String machineCode, Date planDate) {
+        QueryWrapper<CxPrecisionPlan> wrapper = new QueryWrapper<>();
+        wrapper.eq("MACHINE_CODE", machineCode);
+        wrapper.eq("PLAN_DATE", planDate);
+        return cxPrecisionPlanMapper.selectCount(wrapper) > 0;
+    }
+
+    private boolean existsInYear(String machineCode, LocalDate yearStart, LocalDate yearEnd) {
+        QueryWrapper<CxPrecisionPlan> wrapper = new QueryWrapper<>();
+        wrapper.eq("MACHINE_CODE", machineCode);
+        wrapper.between("PLAN_DATE",
+            Date.from(yearStart.atStartOfDay(ZoneId.systemDefault()).toInstant()),
+            Date.from(yearEnd.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        return cxPrecisionPlanMapper.selectCount(wrapper) > 0;
+    }
+
+    private MdmMoldingMachine findMachine(String machineCode, String factoryCode) {
+        LambdaQueryWrapper<MdmMoldingMachine> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmMoldingMachine::getCxMachineCode, machineCode);
+        if (StringUtil.isNotBlank(factoryCode)) {
+            wrapper.eq(MdmMoldingMachine::getFactoryCode, factoryCode);
+        }
+        wrapper.last("LIMIT 1");
+        return moldingMachineMapper.selectOne(wrapper);
+    }
+
+    private Date addMonths(Date date, int months) {
+        if (date == null) {
+            return null;
+        }
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(date);
+        calendar.add(Calendar.MONTH, months);
+        return calendar.getTime();
+    }
+
+    private LocalDate toLocalDate(Date date) {
+        if (date == null) {
+            return null;
+        }
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private Date toDate(LocalDate localDate) {
+        if (localDate == null) {
+            return null;
+        }
+        return Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    }
 }
+
