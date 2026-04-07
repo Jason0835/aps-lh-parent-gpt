@@ -345,6 +345,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * @return 结果
      * @throws Exception 异常
      */
+    @RequiresPermissions("monthplan:mpStructureAllocation:importDataStructureAllocation")
     @PostMapping({"/importDataStructureAllocation"})
     @ResponseBody
     @ApiOperation("数据导入")
