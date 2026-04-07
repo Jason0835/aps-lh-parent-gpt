@@ -497,6 +497,35 @@ export default {
   flex-direction: column;
   height: 100%;
 }
+
+::v-deep .el-table__fixed,
+::v-deep .el-table__fixed-right {
+  background-color: #fff;
+}
+.el-table__fixed-body-wrapper .light-green > td,
+.el-table__fixed-right-body-wrapper .light-greenr > td {
+  background-color: #e2efda !important;
+}
+
+.el-table__fixed-body-wrapper .light-blue > td,
+.el-table__fixed-right-body-wrapper .light-blue > td {
+  background-color: #9bc2e6 !important;
+}
+
+.el-table__fixed-body-wrapper .warning-row > td,
+.el-table__fixed-right-body-wrapper .warning-row > td {
+  background-color: #ffcccc !important;
+}
+
+.el-table__fixed-body-wrapper .light-yellow > td,
+.el-table__fixed-right-body-wrapper .light-yellow > td {
+  background-color: #FFFFE0 !important;
+}
+
+.el-table__fixed-body-wrapper .deep-yellow > td,
+.el-table__fixed-right-body-wrapper .deep-yellow > td {
+  background-color: #FFCC00 !important;
+}
 ::v-deep .light-green{
     background: #e2efda;
   }
