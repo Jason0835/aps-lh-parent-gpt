@@ -370,7 +370,7 @@ export default {
       this.$confirm(this.$t("确定参与排产"), {
         type: "warning",
       }).then(() => {
-        schedulingPate({SupplyOrderPool:row.id}).then((data) => {
+        schedulingPate({id:row.id}).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
