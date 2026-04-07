@@ -201,6 +201,9 @@ public class CycleStockUpService {
     MpMonthlySaleQty monthlySaleQty = data.getSku2AverageSaleQty().get(order.getMaterialCode());
     order.setSaleArea(null != monthlySaleQty && StringUtils.isNotBlank(monthlySaleQty.getSaleArea())?monthlySaleQty.getSaleArea():StringUtils.EMPTY);
     int turnoverMonth = getTurnoverMonth(order.getStructureName(),data);
+    
+    // 处理周转月数-1，禅道：21390
+    turnoverMonth = turnoverMonth > 0? turnoverMonth - 1: turnoverMonth;
 
     if (null  != monthlySaleQty && null != monthlySaleQty.getAverageSaleQty() && turnoverMonth > 0) {
       int averageSaleQty = monthlySaleQty.getAverageSaleQty();
