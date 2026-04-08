@@ -186,7 +186,6 @@ public class MpWeekRollAdjustEngine {
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
         MdmWorkCalendar workCalendar;
         int remainMaxCapacity, remainLhMachines, remainTotalOemQty, remainChangeMould;
-        int totalOemQty = 0;
         //0-日计划量,1-硫化机台数,2-换模次数
         int[] capacityArr;
         for (Map.Entry<Integer, MpDailyCapacityLimitVo> entry : dailyCapacityLimitVoMap.entrySet()) {
