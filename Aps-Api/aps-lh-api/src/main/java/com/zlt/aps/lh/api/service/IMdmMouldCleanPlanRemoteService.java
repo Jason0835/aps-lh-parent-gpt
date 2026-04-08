@@ -37,4 +37,8 @@ public interface IMdmMouldCleanPlanRemoteService {
     @ApiOperation("导出数据")
     @PostMapping("/mouldCleanPlan/exportData/{fileName}")
     byte[] exportData(@RequestBody MdmMouldCleanPlan queryVO, @PathVariable("fileName") String fileName);
+
+    @ApiOperation("从模具清洗预警同步生成计划")
+    @PostMapping("/mouldCleanPlan/syncFromWarn")
+    AjaxResult syncFromWarn();
 }

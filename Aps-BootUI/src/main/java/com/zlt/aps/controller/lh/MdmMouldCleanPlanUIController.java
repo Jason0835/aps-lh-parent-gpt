@@ -118,4 +118,12 @@ public class MdmMouldCleanPlanUIController extends BaseUIController<MdmMouldClea
         TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }
+
+    @ApiOperation("从模具清洗预警同步生成计划")
+    @RequiresPermissions("lh:mouldCleanPlan:sync")
+    @PostMapping("/syncFromWarn")
+    @ResponseBody
+    public AjaxResult syncFromWarn() {
+        return iMdmMouldCleanPlanService.syncFromWarn();
+    }
 }

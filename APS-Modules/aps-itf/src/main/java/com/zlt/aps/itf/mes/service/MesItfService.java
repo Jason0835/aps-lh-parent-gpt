@@ -176,7 +176,7 @@ public interface MesItfService {
      * @param syncDataLogs 同步参数
      * @return 结果
      */
-    AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs);
+    AjaxResult syncMouldCleanWarn(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步结构整车胎面配置

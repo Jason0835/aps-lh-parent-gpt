@@ -79,8 +79,8 @@ public class MesTask {
      * 同步模具清洗预警计划
      */
     @ApiOperation("同步模具清洗预警计划")
-    public void syncMouldCleanPlan() {
-        iMesItfService.syncMouldCleanPlan(new AuxReqSyncDataLogs());
+    public void syncMouldCleanWarn() {
+        iMesItfService.syncMouldCleanWarn(new AuxReqSyncDataLogs());
     }
 
     /**
