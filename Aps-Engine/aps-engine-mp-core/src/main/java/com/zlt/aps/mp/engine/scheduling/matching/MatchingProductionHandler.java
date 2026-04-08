@@ -155,6 +155,27 @@ public class MatchingProductionHandler {
         this.initChangeMouldUsedQty(productionContext);
         // 初始化结构的每日生产统计
         this.initDayProductionInfo(productionContext);
+//        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap(); // 初始化特殊材料库存
+//        for (FactoryMonthPlanMouldDayResult result: planList) {
+//            ProductionPlanGroupInfo groupInfo = estimateGroupCxAllocationMap.get(result.getStructureName());
+//            if (groupInfo == null) {
+//                continue;
+//            }
+//            if (!groupInfo.isSpecialMaterial()) {
+//                continue;
+//            }
+//            Map<String, BigDecimal> materialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
+//            if (materialInfoMap == null) {
+//                continue;
+//            }
+//            for (Entry<String, BigDecimal> entry: materialInfoMap.entrySet()) {
+//                String materialCode = entry.getKey();
+//                BigDecimal useQty = entry.getValue();
+//                if (useQty == null) {
+//                    continue;
+//                }
+//            }
+//        }
 
         // 调用主流程的入口 -> 实单补量排程算法
         Map<String, Integer> factProdReqMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
@@ -1522,6 +1543,15 @@ public class MatchingProductionHandler {
         }
         return totalProductionQty;
     }
+    
+    /**
+     * 保存特殊材料列表
+     * @param productionContext
+     */
+    public void saveSpecialMaterialResult(TbrProductionContext productionContext) {
+        List<SpecialMaterialResult> specialMaterialList = this.buildSpecialMaterialResultList(productionContext);
+        baseDao.saveBatch(specialMaterialList);
+    }
 
     /**
      * 计算所有模具当天的产能剩余量
@@ -1625,7 +1655,7 @@ public class MatchingProductionHandler {
         List<SpecialMaterialResult> specialMaterialList = this.buildSpecialMaterialResultList(productionContext);
         
         baseDao.saveBatch(statisticsList);
-        baseDao.saveBatch(specialMaterialList);
+//        baseDao.saveBatch(specialMaterialList);
 //        this.updateMatchingProductionLog(productionContext); // 更新排产日志
     }
 
@@ -2234,7 +2264,6 @@ public class MatchingProductionHandler {
         this.fillMouldRelationStructureName(productionContext, requirePlanList); // 补充模具关系中的物料结构名
         this.buildGroupMainPatternInfo(productionContext); // 构建结构+主花纹的模具信息
         productionContext.setContinueStructureMap(this.getContinueStructureMap(this.getContinueInfo(productionContext))); // 设置成型机台续作结构
-
         // 各项已排产统计数据
         productionContext.setAllProductionPlan(requirePlanList.stream()
                 .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity())));
