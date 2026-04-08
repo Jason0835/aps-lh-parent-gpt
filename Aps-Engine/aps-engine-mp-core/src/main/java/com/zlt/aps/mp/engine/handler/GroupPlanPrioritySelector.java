@@ -306,22 +306,22 @@ public class GroupPlanPrioritySelector {
      */
     public int compareSpecialMaterial(ProductionPlanGroupInfo before, ProductionPlanGroupInfo after) {
         //使用特殊原材料种类多的优先
-        Integer beforeTypeCount = before.getUsedSpecialMaterialCount();
-        Integer afterTypeCount = after.getUsedSpecialMaterialCount();
+        Integer beforeTypeCount = Optional.ofNullable(before).map(ProductionPlanGroupInfo::getUsedSpecialMaterialCount).orElse(BigDecimal.ZERO.intValue());
+        Integer afterTypeCount = Optional.ofNullable(after).map(ProductionPlanGroupInfo::getUsedSpecialMaterialCount).orElse(BigDecimal.ZERO.intValue());
         //倒序
         int result = afterTypeCount.compareTo(beforeTypeCount);
         if (result != BigDecimal.ZERO.intValue()) {
             return result;
         }
         //Sku个数多的先
-        Integer beforeSkuCount = Optional.ofNullable(before.getSpecialMaterialsCount()).orElse(BigDecimal.ZERO.intValue());
-        Integer afterSkuCount = Optional.ofNullable(after.getSpecialMaterialsCount()).orElse(BigDecimal.ZERO.intValue());
+        Integer beforeSkuCount = Optional.ofNullable(before).map(ProductionPlanGroupInfo::getSpecialMaterialsCount).orElse(BigDecimal.ZERO.intValue());
+        Integer afterSkuCount = Optional.ofNullable(after).map(ProductionPlanGroupInfo::getSpecialMaterialsCount).orElse(BigDecimal.ZERO.intValue());
         result = afterSkuCount.compareTo(beforeSkuCount);
         if (result != BigDecimal.ZERO.intValue()) {
             return result;
         }
-        Integer beforeNeedDays = Optional.ofNullable(before.getRemainingNeedAllocationDays()).orElse(BigDecimal.ZERO.intValue());
-        Integer afterNeedDays = Optional.ofNullable(after.getRemainingNeedAllocationDays()).orElse(BigDecimal.ZERO.intValue());
+        Integer beforeNeedDays = Optional.ofNullable(before).map(ProductionPlanGroupInfo::getRemainingNeedAllocationDays).orElse(BigDecimal.ZERO.intValue());
+        Integer afterNeedDays = Optional.ofNullable(after).map(ProductionPlanGroupInfo::getRemainingNeedAllocationDays).orElse(BigDecimal.ZERO.intValue());
         result = beforeNeedDays.compareTo(afterNeedDays);
         return result;
     }
