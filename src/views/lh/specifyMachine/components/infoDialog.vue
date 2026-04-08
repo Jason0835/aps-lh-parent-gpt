@@ -8,130 +8,37 @@
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <el-form
+    <info-form
+      class="form-item-height"
       ref="form"
-      :model="form"
+      :form="form"
       :rules="rules"
+      :columns="columns"
       label-position="right"
       label-width="120px"
       v-loading="loading"
     >
-      <el-row>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.factoryCode')" prop="factoryCode">
-            <el-select
-              v-model="form.factoryCode"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.biz_factory_name"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.specCode')" prop="specCode">
-            <el-select
-              v-model="form.specCode"
-              :placeholder="$t('common.rule.select')"
-              filterable
-              remote
-              :remote-method="remoteMaterialMethod"
-              :loading="materialLoading"
-              clearable
-              style="width: 100%"
-              @focus="handleMaterialFocus"
-            >
-              <el-option
-                v-for="item in materialOptions"
-                :key="item.materialCode"
-                :label="item.materialCode"
-                :value="item.materialCode"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.machineCode')" prop="machineCode">
-            <el-select
-              v-model="form.machineCode"
-              :placeholder="$t('common.rule.select')"
-              filterable
-              remote
-              :remote-method="remoteMachineMethod"
-              :loading="machineLoading"
-              clearable
-              style="width: 100%"
-              @focus="handleMachineFocus"
-            >
-              <el-option
-                v-for="item in machineOptions"
-                :key="item.machineCode"
-                :label="item.machineCode"
-                :value="item.machineCode"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-<!--        <el-col :span="24">-->
-<!--          <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.lineType')" prop="lineType">-->
-<!--            <el-select-->
-<!--              v-model="form.lineType"-->
-<!--              :placeholder="$t('common.rule.select')"-->
-<!--              clearable-->
-<!--              style="width: 100%"-->
-<!--            >-->
-<!--              <el-option-->
-<!--                v-for="item in parentDict.type.LINE_TYPE"-->
-<!--                :key="item.value"-->
-<!--                :label="item.label"-->
-<!--                :value="item.value"-->
-<!--              />-->
-<!--            </el-select>-->
-<!--          </el-form-item>-->
-<!--        </el-col>-->
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.lhSpecifyMachine.jobType')" prop="jobType">
-            <el-select
-              v-model="form.jobType"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.JOB_TYPE"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.common.column.remark')" prop="remark">
-            <el-input v-model="form.remark" type="textarea" :rows="3" :placeholder="$t('common.rule.input')" />
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
+    </info-form>
     <template slot="footer">
-      <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        $t("common.button.confirm")
+        this.$t("common.button.confirm")
       }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import { editLhSpecifyMachine, getLhMachineList, getMaterialList } from "@/api/lh/lhSpecifyMachine";
+import {
+  editLhSpecifyMachine,
+  getLhMachineList,
+  getMaterialList,
+} from "@/api/lh/lhSpecifyMachine";
+
+import infoForm from "@/views/components/infoForm.vue";
 
 export default {
+  components: { infoForm },
   inject: ["parentDict"],
   data() {
     return {
@@ -143,7 +50,7 @@ export default {
       form: {},
       machineOptions: [],
       materialOptions: [],
-       rules: {
+      rules: {
         factoryCode: [
           {
             required: true,
@@ -172,12 +79,66 @@ export default {
     title: function () {
       return this.$t("ui.data.column.lhSpecifyMachine.modelName");
     },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "specCode",
+          label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
+          type: "select",
+          dictData: this.materialOptions,
+          props: {
+            label: "materialCode",
+            value: "materialCode",
+          },
+          filterable: true,
+          remote: true,
+          remoteMethod: this.remoteMaterialMethod,
+          loading: this.materialLoading,
+          onFocus: this.handleMaterialFocus,
+        },
+        {
+          prop: "machineCode",
+          label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
+          type: "select",
+          dictData: this.machineOptions,
+          props: {
+            label: "machineCode",
+            value: "machineCode",
+          },
+          filterable: true,
+          remote: true,
+          remoteMethod: this.remoteMachineMethod,
+          loading: this.machineLoading,
+          onFocus: this.handleMachineFocus,
+        },
+        {
+          prop: "jobType",
+          label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
+          type: "select",
+          dictData: this.parentDict.type.JOB_TYPE,
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.common.column.remark"),
+          type: "textarea",
+          rows: 3,
+          maxlength: 300,
+        },
+      ];
+    },
   },
   methods: {
-    async save() {
+    async save(params) {
       try {
         this.loading = true;
-        const res = await editLhSpecifyMachine(this.form);
+
+        const res = await editLhSpecifyMachine(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -191,8 +152,8 @@ export default {
       this.machineLoading = true;
       try {
         const res = await getLhMachineList({
-          machineCode: query || '',
-          pageSize: 10
+          machineCode: query || "",
+          pageSize: 10,
         });
         this.machineOptions = res.data || res || [];
       } catch (error) {
@@ -203,15 +164,15 @@ export default {
     },
     handleMachineFocus() {
       if (this.machineOptions.length === 0) {
-        this.remoteMachineMethod('');
+        this.remoteMachineMethod("");
       }
     },
     async remoteMaterialMethod(query) {
       this.materialLoading = true;
       try {
         const res = await getMaterialList({
-          materialCode: query || '',
-          pageSize: 10
+          materialCode: query || "",
+          pageSize: 10,
         });
         this.materialOptions = res.data || res || [];
       } catch (error) {
@@ -222,7 +183,7 @@ export default {
     },
     handleMaterialFocus() {
       if (this.materialOptions.length === 0) {
-        this.remoteMaterialMethod('');
+        this.remoteMaterialMethod("");
       }
     },
     show(data) {
@@ -255,18 +216,12 @@ export default {
       this.form = {};
       this.machineOptions = [];
       this.materialOptions = [];
-      if (this.$refs.form) {
-        this.$refs.form.resetFields();
-      }
+      this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.validate((valid) => {
-        if (valid) {
-          this.save();
-        }
-      });
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

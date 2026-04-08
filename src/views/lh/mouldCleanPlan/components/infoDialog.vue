@@ -8,120 +8,21 @@
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <el-form
+    <info-form
+      class="form-item-height"
       ref="form"
-      :model="form"
+      :form="form"
       :rules="rules"
+      :columns="columns"
       label-position="right"
       label-width="120px"
       v-loading="loading"
     >
-      <el-row>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.factoryCode')" prop="factoryCode">
-            <el-select
-              v-model="form.factoryCode"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.biz_factory_name"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-<!--        <el-col :span="24">-->
-<!--          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.brand')" prop="brand">-->
-<!--            <el-select-->
-<!--              v-model="form.brand"-->
-<!--              :placeholder="$t('common.rule.select')"-->
-<!--              clearable-->
-<!--              style="width: 100%"-->
-<!--            >-->
-<!--              <el-option-->
-<!--                v-for="item in parentDict.type.biz_brand_type"-->
-<!--                :key="item.value"-->
-<!--                :label="item.label"-->
-<!--                :value="item.value"-->
-<!--              />-->
-<!--            </el-select>-->
-<!--          </el-form-item>-->
-<!--        </el-col>-->
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.lhCode')" prop="lhCode">
-            <el-select
-              v-model="form.lhCode"
-              :placeholder="$t('common.rule.select')"
-              filterable
-              clearable
-              style="width: 100%"
-              @focus="handleMachineFocus"
-              :loading="machineLoading"
-            >
-              <el-option
-                v-for="item in machineOptions"
-                :key="item.machineCode"
-                :label="item.machineCode"
-                :value="item.machineCode"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.operTime')" prop="operTime">
-            <el-date-picker
-              v-model="form.operTime"
-              type="date"
-              placeholder="选择日期"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.firstWashTime')" prop="firstWashTime">
-            <el-date-picker
-              v-model="form.firstWashTime"
-              type="date"
-              placeholder="选择日期"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mouldCleanPlan.secondWashTime')" prop="secondWashTime">
-            <el-date-picker
-              v-model="form.secondWashTime"
-              type="date"
-              placeholder="选择日期"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
+    </info-form>
     <template slot="footer">
-      <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        $t("common.button.confirm")
+        this.$t("common.button.confirm")
       }}</el-button>
     </template>
   </el-dialog>
@@ -130,7 +31,10 @@
 <script>
 import { editMouldCleanPlan, getMachineList } from "@/api/lh/mouldCleanPlan";
 
+import infoForm from "@/views/components/infoForm.vue";
+
 export default {
+  components: { infoForm },
   inject: ["parentDict"],
   data() {
     return {
@@ -171,6 +75,47 @@ export default {
         ? this.$t("common.button.edit")
         : this.$t("common.button.add");
     },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "lhCode",
+          label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
+          type: "select",
+          dictData: this.machineOptions,
+          props: {
+            label: "machineCode",
+            value: "machineCode",
+          },
+          filterable: true,
+          loading: this.machineLoading,
+          onFocus: this.handleMachineFocus,
+        },
+        {
+          prop: "operTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          prop: "firstWashTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.firstWashTime"),
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          prop: "secondWashTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.secondWashTime"),
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
+      ];
+    },
   },
   methods: {
     async loadMachineList() {
@@ -192,10 +137,11 @@ export default {
         this.loadMachineList();
       }
     },
-    async save() {
+    async save(params) {
       try {
         this.loading = true;
-        const res = await editMouldCleanPlan(this.form);
+
+        const res = await editMouldCleanPlan(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -205,6 +151,7 @@ export default {
         this.loading = false;
       }
     },
+
     show(data) {
       this.visible = true;
       this.machineOptions = [];
@@ -228,18 +175,12 @@ export default {
     hide() {
       this.form = {};
       this.machineOptions = [];
-      if (this.$refs.form) {
-        this.$refs.form.resetFields();
-      }
+      this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.validate((valid) => {
-        if (valid) {
-          this.save();
-        }
-      });
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

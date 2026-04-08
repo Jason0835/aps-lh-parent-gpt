@@ -8,107 +8,35 @@
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <el-form
+    <info-form
+      class="form-item-height cx-stock-form"
       ref="form"
-      :model="form"
+      :form="form"
       :rules="rules"
+      :columns="columns"
       label-position="right"
       label-width="120px"
       v-loading="loading"
     >
-      <el-row>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.factoryCode')" prop="factoryCode">
-            <el-select
-              v-model="form.factoryCode"
-              filterable
-              clearable
-              :placeholder="$t('common.rule.select')"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in dict.type.biz_factory_name"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.stockDate')" prop="stockDate">
-            <el-date-picker
-              v-model="form.stockDate"
-              type="date"
-              :placeholder="$t('ui.frame.placeholder.selectDate')"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.embryoCode')" prop="embryoCode">
-            <el-input v-model="form.embryoCode" :placeholder="$t('common.rule.input')" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.stockNum')" prop="stockNum">
-            <el-input-number v-model="form.stockNum" :min="0" :precision="2" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.overTimeStock')" prop="overTimeStock">
-            <el-input-number v-model="form.overTimeStock" :min="0" :precision="2" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.modifyNum')" prop="modifyNum">
-            <el-input-number v-model="form.modifyNum" :min="-999999" :precision="2" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.badNum')" prop="badNum">
-            <el-input-number v-model="form.badNum" :min="0" :precision="2" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.cxStock.isEndingSku')" prop="isEndingSku">
-            <el-select
-              v-model="form.isEndingSku"
-              filterable
-              clearable
-              :placeholder="$t('common.rule.select')"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in dict.type.biz_yes_no"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.common.column.remark')" prop="remark">
-            <el-input type="textarea" v-model="form.remark" :rows="3" :placeholder="$t('common.rule.input')" />
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
+    </info-form>
     <template slot="footer">
-      <el-button @click="hide">{{ $t('common.button.cancel') }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{ $t('common.button.confirm') }}</el-button>
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
+        this.$t("common.button.confirm")
+      }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import { saveCxStock } from '@/api/cx/cxStock'
+import { saveCxStock } from "@/api/cx/cxStock";
+
+import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  name: 'InfoDialog',
-  inject: ['parentDict'],
+  name: "InfoDialog",
+  components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       visible: false,
@@ -117,58 +45,137 @@ export default {
       dict: this.parentDict,
       form: {},
       rules: {
-        stockDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
-        embryoCode: [{ required: true, message: this.$t('common.rule.input'), trigger: 'blur' }],
-        stockNum: [{ required: true, message: this.$t('common.rule.input'), trigger: 'blur' }]
-      }
-    }
+        stockDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        embryoCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+        stockNum: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+      },
+    };
   },
   computed: {
     title() {
-      return this.$t('ui.data.column.cxStock.modelName')
-    }
+      return this.$t("ui.data.column.cxStock.modelName");
+    },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.cxStock.factoryCode"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          prop: "stockDate",
+          label: this.$t("ui.data.column.cxStock.stockDate"),
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          prop: "embryoCode",
+          label: this.$t("ui.data.column.cxStock.embryoCode"),
+          maxlength: 64,
+        },
+        {
+          prop: "stockNum",
+          label: this.$t("ui.data.column.cxStock.stockNum"),
+          type: "number",
+          min: 0,
+          precision: 2,
+        },
+        {
+          prop: "overTimeStock",
+          label: this.$t("ui.data.column.cxStock.overTimeStock"),
+          type: "number",
+          min: 0,
+          precision: 2,
+        },
+        {
+          prop: "modifyNum",
+          label: this.$t("ui.data.column.cxStock.modifyNum"),
+          type: "number",
+          min: -999999,
+          precision: 2,
+        },
+        {
+          prop: "badNum",
+          label: this.$t("ui.data.column.cxStock.badNum"),
+          type: "number",
+          min: 0,
+          precision: 2,
+        },
+        {
+          prop: "isEndingSku",
+          label: this.$t("ui.data.column.cxStock.isEndingSku"),
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+          filterable: true,
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.common.column.remark"),
+          type: "textarea",
+          rows: 3,
+          maxlength: 300,
+        },
+      ];
+    },
   },
   methods: {
     show(row) {
-      this.visible = true
+      this.visible = true;
       if (row) {
-        this.isEdit = true
-        this.form = { ...row }
+        this.isEdit = true;
+        this.form = { ...row };
       } else {
-        this.isEdit = false
+        this.isEdit = false;
         this.form = {
-          isEndingSku: '0'
-        }
+          isEndingSku: "0",
+        };
       }
     },
     hide() {
-      this.visible = false
-      this.form = {}
-      if (this.$refs.form) {
-        this.$refs.form.resetFields()
-      }
+      this.visible = false;
+      this.form = {};
+      this.$refs.form && this.$refs.form.triggerResetForm();
     },
     handleConfirm() {
-      this.$refs.form.validate(valid => {
-        if (!valid) return
-        this.loading = true
-        saveCxStock(this.form)
-          .then(res => {
-            this.$modal.msgSuccess(res.msg)
-            this.$emit('success')
-            this.hide()
-          })
-          .finally(() => {
-            this.loading = false
-          })
-      })
-    }
-  }
-}
+      this.$refs.form.triggerConfirm(this.save);
+    },
+    async save(payload) {
+      try {
+        this.loading = true;
+        const res = await saveCxStock(payload);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+};
 </script>
 
-<style lang="scss" scoped>
-.el-form-item {
+<style scoped>
+::v-deep .cx-stock-form .el-form-item {
   margin-bottom: 25px;
 }
 </style>
