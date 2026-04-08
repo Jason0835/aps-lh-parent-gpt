@@ -10,6 +10,7 @@ import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.enums.ProductionPlanType;
@@ -177,8 +178,9 @@ public class SupplyOrderPoolController extends AbstractDocBizController<SupplyOr
         SupplyOrderPool supplyOrderPool = this.getInfo(billVO.getId());
         if (SupplyOrderTypeEnum.PRECEDENT_STOCK.getCode().equals(supplyOrderPool.getOrderType())) {
             precedentStockUpService.setSchedule(supplyOrderPool);
+            return AjaxResult.success();
         }
-        return AjaxResult.success();
+        return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.supplyOrderPool.setSchedule.OrderTypeError"));
     }
 
 
