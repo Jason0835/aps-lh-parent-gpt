@@ -10,6 +10,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
+import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.UrgencyTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
@@ -131,8 +132,10 @@ public class MpWeekRollAdjustEngine {
                 beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notBeginDay"),
                         x.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
-            if (x.getConventionProductionQty() >0) {
+            if (isConvertionProd(x) && x.getConventionProductionQty() >0) {
                 splitMatchQtyByDay(contextDTO,x.getConventionProductionQty(), lockNextDay,x);
+            }else if (x.getCycleProductionQty() >0){
+                splitMatchQtyByDay(contextDTO,x.getCycleProductionQty(), lockNextDay,x);
             }
         });
         if (!StringUtil.isEmptyWithTrim(beginDaySb.toString())){
@@ -170,6 +173,14 @@ public class MpWeekRollAdjustEngine {
 
     }
 
+    /**
+     * 判断是否常规性结构
+     * @param mpFinalVo
+     * @return
+     */
+    private boolean isConvertionProd(FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        return ProductionGroupTypeEnum.CONVENTION.getGroupType().equals(mpFinalVo.getStructureType());
+    }
     /**
      * 初始化日产信息（包括日最大排产量、开停产标识、日产比例、最大硫化机台数、OEM排产量）
      * @param contextDTO
@@ -526,8 +537,10 @@ public class MpWeekRollAdjustEngine {
         contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
         //4、拆出搭配量，用于快速判断是否搭配
         mpProdFinalList.stream().forEach(x->{
-            if (x.getConventionProductionQty() >0) {
+            if (isConvertionProd(x) && x.getConventionProductionQty() >0) {
                 splitMatchQtyByDay(contextDTO,x.getConventionProductionQty(), lockNextDay,x);
+            }else if (x.getCycleProductionQty() >0){
+                splitMatchQtyByDay(contextDTO,x.getCycleProductionQty(), lockNextDay,x);
             }
         });
 
@@ -1241,8 +1254,10 @@ public class MpWeekRollAdjustEngine {
             }
 
             //4、重置一下搭配排产量标识
-            if (mpFinalVo.getConventionProductionQty()>0){
+            if (isConvertionProd(mpFinalVo) && mpFinalVo.getConventionProductionQty() >0) {
                 splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
+            }else if (mpFinalVo.getCycleProductionQty() >0){
+                splitMatchQtyByDay(contextDTO,mpFinalVo.getCycleProductionQty(), lockNextDay,mpFinalVo);
             }
             //5.重置开始日\结束日\汇总值
             resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
@@ -1304,13 +1319,17 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
         //提示：物料编码:%s,新上机日:%s,模拟排产结果:{排产计划量(含搭配):%s,已排:%s,剩余未排:%s}！
         addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty-remainPlanQty,remainPlanQty));
-        if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
+        Integer curServeProductionQty = isConvertionProd(mpFinalVo) ? mpFinalVo.getConventionProductionQty() : mpFinalVo.getCycleProductionQty();
+        if (remainPlanQty > curServeProductionQty){
             // 若剩余量 > 搭配量，说明实单还有剩余
             // 去掉搭配量，将实单量排产
-            int newRemainPlanQty = newPlanQty - mpFinalVo.getConventionProductionQty();
-            int oriConventionProductionQty = mpFinalVo.getConventionProductionQty();
+            int newRemainPlanQty = newPlanQty - curServeProductionQty;
             // 本身搭配被挤掉，置0
-            mpFinalVo.setConventionProductionQty(0);
+            if (isConvertionProd(mpFinalVo)){
+                mpFinalVo.setConventionProductionQty(0);
+            }else{
+                mpFinalVo.setCycleProductionQty(0);
+            }
             //重置开始日\结束日\汇总值
             resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
             int oriTotalQty = mpFinalVo.getTotalQty();
@@ -1320,18 +1339,24 @@ public class MpWeekRollAdjustEngine {
             deductMatchOtherSku(contextDTO, lockNextDay,newEndDay,newRemainPlanQty,mpFinalVo, mpProdFinalList);
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-结束！", contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             //提示：在机的物料编码:%s,排产日:%s,模拟后的剩余未排量:%s,原搭配量:%s,挤搭配前的剩余计划量(扣原搭配量):%s,实际挤占量:%s！
-            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction"),mpFinalVo.getMaterialCode(),newOnLineDay,remainPlanQty,oriConventionProductionQty,newRemainPlanQty,oriTotalQty - mpFinalVo.getTotalQty()));
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction"),mpFinalVo.getMaterialCode(),newOnLineDay,remainPlanQty,curServeProductionQty,newRemainPlanQty,oriTotalQty - mpFinalVo.getTotalQty()));
         }else {
             //提示：在机的物料编码:%s,排产日:%s,计划调整量(含搭配):%s,实际调整量:%s,剩余调整量:%s,原搭配量:%s,剩余搭配量:%s！
-            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction2"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty - remainPlanQty,remainPlanQty,mpFinalVo.getConventionProductionQty(),remainPlanQty));
-            if (mpFinalVo.getConventionProductionQty() >= remainPlanQty){
-                mpFinalVo.setConventionProductionQty(remainPlanQty);
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction2"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty - remainPlanQty,remainPlanQty,curServeProductionQty,remainPlanQty));
+            if (curServeProductionQty >= remainPlanQty){
+                if (isConvertionProd(mpFinalVo)){
+                    mpFinalVo.setConventionProductionQty(remainPlanQty);
+                }else{
+                    mpFinalVo.setCycleProductionQty(remainPlanQty);
+                }
             }
         }
 
         //2.5、重置一下搭配排产量标识
-        if (mpFinalVo.getConventionProductionQty()>0){
+        if (isConvertionProd(mpFinalVo) && mpFinalVo.getConventionProductionQty() >0) {
             splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
+        }else if (mpFinalVo.getCycleProductionQty() >0){
+            splitMatchQtyByDay(contextDTO,mpFinalVo.getCycleProductionQty(), lockNextDay,mpFinalVo);
         }
         //3.重置开始日\结束日\汇总值
         resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
@@ -1562,13 +1587,17 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】--增模排产,物料编码:%s,结束！还有剩余排产计划量:%s", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),remainPlanQty)).append(ApsConstant.DIVISION);
         //提示：物料编码:%s,新上机日:%s,模拟排产结果:{排产计划量(含搭配):%s,已排:%s,剩余未排:%s}！
         addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.simulateResult"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty-remainPlanQty,remainPlanQty));
-        if (remainPlanQty > mpFinalVo.getConventionProductionQty()){
+        Integer curServeProductionQty = isConvertionProd(mpFinalVo) ? mpFinalVo.getConventionProductionQty() : mpFinalVo.getCycleProductionQty();
+        if (remainPlanQty > curServeProductionQty){
             // 若剩余量 > 搭配量，说明实单还有剩余
             // 去掉搭配量，将实单量排产
-            int newRemainPlanQty = newPlanQty - mpFinalVo.getConventionProductionQty();
-            int oriConventionProductionQty = mpFinalVo.getConventionProductionQty();
+            int newRemainPlanQty = newPlanQty - curServeProductionQty;
             // 本身搭配被挤掉，置0
-            mpFinalVo.setConventionProductionQty(0);
+            if (isConvertionProd(mpFinalVo)){
+                mpFinalVo.setConventionProductionQty(0);
+            }else{
+                mpFinalVo.setCycleProductionQty(0);
+            }
             //重置开始日\结束日\汇总值
             resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
             int oriTotalQty = mpFinalVo.getTotalQty();
@@ -1578,19 +1607,24 @@ public class MpWeekRollAdjustEngine {
             deductMatchOtherSku(contextDTO,lockNextDay,newEndDay,newRemainPlanQty,mpFinalVo,mpProdFinalList);
             contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,扣减其他SKU的搭配-结束！",contextDTO.getStructureName(), mpFinalVo.getMaterialCode())).append(ApsConstant.DIVISION);
             //提示：在机的物料编码:%s,排产日:%s,模拟后的剩余未排量:%s,原搭配量:%s,挤搭配前的剩余计划量(扣原搭配量):%s,实际挤占量:%s！
-            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction"),mpFinalVo.getMaterialCode(),newOnLineDay,remainPlanQty,oriConventionProductionQty,newRemainPlanQty,oriTotalQty - mpFinalVo.getTotalQty()));
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction"),mpFinalVo.getMaterialCode(),newOnLineDay,remainPlanQty,curServeProductionQty,newRemainPlanQty,oriTotalQty - mpFinalVo.getTotalQty()));
         }else {
             //提示：在机的物料编码:%s,排产日:%s,计划调整量(含搭配):%s,实际调整量:%s,剩余调整量:%s,原搭配量:%s,剩余搭配量:%s！
-            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction2"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty - remainPlanQty,remainPlanQty,mpFinalVo.getConventionProductionQty(),remainPlanQty));
-            if (mpFinalVo.getConventionProductionQty() >= remainPlanQty){
-                mpFinalVo.setConventionProductionQty(remainPlanQty);
+            addAdjustProcLog(contextDTO,mpFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.online.realProduction2"),mpFinalVo.getMaterialCode(),newOnLineDay,newPlanQty,newPlanQty - remainPlanQty,remainPlanQty,curServeProductionQty,remainPlanQty));
+            if (curServeProductionQty >= remainPlanQty){
+                if (isConvertionProd(mpFinalVo)){
+                    mpFinalVo.setConventionProductionQty(remainPlanQty);
+                }else{
+                    mpFinalVo.setCycleProductionQty(remainPlanQty);
+                }
             }
         }
         //2.5、重置一下搭配排产量标识
-        if (mpFinalVo.getConventionProductionQty()>0){
+        if (isConvertionProd(mpFinalVo) && mpFinalVo.getConventionProductionQty() >0) {
             splitMatchQtyByDay(contextDTO,mpFinalVo.getConventionProductionQty(), lockNextDay,mpFinalVo);
+        }else if (mpFinalVo.getCycleProductionQty() >0){
+            splitMatchQtyByDay(contextDTO,mpFinalVo.getCycleProductionQty(), lockNextDay,mpFinalVo);
         }
-
         //3、重置开始日\结束日\汇总值
         resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
 
@@ -1695,28 +1729,37 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         FactoryMonthPlanFinalAdjustVo optimalFinalVo,bakMpFinalVo;
-        int remainPlanQty,deductMatchQty,oriMatchQty;
+        int remainPlanQty,deductMatchQty;
+        Integer curServeProductionQty;
         while (newOtherFinalList.size() >0 ){
             // 2.从多个SKU中，匹配其他最优的定稿SKU记录
             optimalFinalVo = getOptimalOtherSku(curFinalVo, newOtherFinalList);
-            oriMatchQty = optimalFinalVo.getConventionProductionQty();
+            curServeProductionQty = isConvertionProd(optimalFinalVo) ? optimalFinalVo.getConventionProductionQty() : optimalFinalVo.getCycleProductionQty();
             // 3.清空搭配日计划 及扣减搭配总量
             bakMpFinalVo = new FactoryMonthPlanFinalAdjustVo();
             BeanUtils.copyProperties(curFinalVo,bakMpFinalVo);
             clearMpFinalDayValue(contextDTO,endDay,curFinalVo);
             int clearDayValue = clearMpFinalDayValue(contextDTO,endDay,optimalFinalVo);
-            if (optimalFinalVo.getConventionProductionQty()>= clearDayValue){
+            if (curServeProductionQty >= clearDayValue){
                 //若搭配量比清空的值大，即能覆盖，那减少的搭配量 = 清空的值
                 deductMatchQty = clearDayValue;
-                optimalFinalVo.setConventionProductionQty(optimalFinalVo.getConventionProductionQty() - clearDayValue);
+                if (isConvertionProd(optimalFinalVo)){
+                    optimalFinalVo.setConventionProductionQty(optimalFinalVo.getConventionProductionQty() - clearDayValue);
+                }else{
+                    optimalFinalVo.setCycleProductionQty(optimalFinalVo.getCycleProductionQty() - clearDayValue);
+                }
             }else {
                 //若搭配量比清空的值小，即不能覆盖，那减少的搭配量 = 搭配量
-                deductMatchQty = optimalFinalVo.getConventionProductionQty();
-                optimalFinalVo.setConventionProductionQty(0);
+                deductMatchQty = curServeProductionQty;
+                if (isConvertionProd(optimalFinalVo)){
+                    optimalFinalVo.setConventionProductionQty(0);
+                }else{
+                    optimalFinalVo.setCycleProductionQty(0);
+                }
             }
             //重置开始日\结束日\汇总值
             resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),optimalFinalVo);
-            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,总搭配量:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),oriMatchQty,deductMatchQty)).append(ApsConstant.DIVISION);
+            contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,已匹配到最优的有搭配量的物料编码:%s,总搭配量:%s,减少搭配量:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,optimalFinalVo.getMaterialCode(),curServeProductionQty,deductMatchQty)).append(ApsConstant.DIVISION);
             // 4.增模模拟排产
             contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产%s日,模拟排产-开始！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay)).append(ApsConstant.DIVISION);
             remainPlanQty = incMouldProduction(mpProdFinalList, contextDTO, endDay, planQty, curFinalVo,bakMpFinalVo);
@@ -1750,10 +1793,18 @@ public class MpWeekRollAdjustEngine {
                                                                   List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
         List<FactoryMonthPlanFinalAdjustVo> newOtherFinalList = new ArrayList<>();
         for (FactoryMonthPlanFinalAdjustVo mpFinalVo: mpProdFinalList){
-            if (mpFinalVo.getConventionProductionQty() == null ||
-                    mpFinalVo.getConventionProductionQty() <= 0){
-                continue;
+            if (isConvertionProd(mpFinalVo)){
+                if (mpFinalVo.getConventionProductionQty() == null ||
+                        mpFinalVo.getConventionProductionQty() <= 0){
+                    continue;
+                }
+            }else{
+                if (mpFinalVo.getCycleProductionQty() == null ||
+                        mpFinalVo.getCycleProductionQty() <= 0){
+                    continue;
+                }
             }
+
             if (mpFinalVo.getMaterialCode().equals(curFinalVo.getMaterialCode())){
                 // 略过当前SKU
                 continue;
@@ -1777,7 +1828,8 @@ public class MpWeekRollAdjustEngine {
         FactoryMonthPlanFinalAdjustVo sameSpec2PatternVo = null;
         FactoryMonthPlanFinalAdjustVo sameEmbryo2MainPatternVo = null;
         FactoryMonthPlanFinalAdjustVo minMatchQtyVo = null;
-        int minMatchQty = newOtherFinalList.get(0).getConventionProductionQty();
+        FactoryMonthPlanFinalAdjustVo firstMpFinalVo = newOtherFinalList.get(0);
+        int minMatchQty = isConvertionProd(firstMpFinalVo) ? firstMpFinalVo.getConventionProductionQty():firstMpFinalVo.getCycleProductionQty();
         for (FactoryMonthPlanFinalAdjustVo tFinalVo: newOtherFinalList){
             //若有多个SKU，优先匹配同规格同花纹、同胎胚同模具的SKU，其次匹配搭配量少的SKU
             //同规格同花纹：定稿表.规格相同 AND 定稿表.花纹相同
@@ -1790,9 +1842,10 @@ public class MpWeekRollAdjustEngine {
                     curFinalVo.getMainPattern().equals(tFinalVo.getMainPattern())){
                 sameEmbryo2MainPatternVo = tFinalVo;
             }
-            if (minMatchQty >= tFinalVo.getConventionProductionQty() ){
+            Integer curServeProductionQty = isConvertionProd(tFinalVo) ? tFinalVo.getConventionProductionQty():tFinalVo.getCycleProductionQty();
+            if (minMatchQty >= curServeProductionQty ){
                 minMatchQtyVo = tFinalVo;
-                minMatchQty = tFinalVo.getConventionProductionQty();
+                minMatchQty = curServeProductionQty;
             }
         }
         if (sameSpec2PatternVo != null){
@@ -2343,7 +2396,7 @@ public class MpWeekRollAdjustEngine {
         //实单：待调整量+ 锁定日之后的每日排产量
         iRealQty +=  adjustStructInVo.getConfirmAdjustQty();
         //实单+搭配量
-        return  iRealQty + mpFinalVo.getConventionProductionQty();
+        return  iRealQty + (isConvertionProd(mpFinalVo) ? mpFinalVo.getConventionProductionQty():mpFinalVo.getCycleProductionQty());
     }
 
     /**
@@ -2374,7 +2427,7 @@ public class MpWeekRollAdjustEngine {
         //实单：待调整量+ 锁定日之后的每日排产量
         iRealQty +=  adjustStructOutVo.getConfirmAdjustQty();
         //实单+搭配量
-        return  iRealQty + mpFinalVo.getConventionProductionQty();
+        return  iRealQty + (isConvertionProd(mpFinalVo) ? mpFinalVo.getConventionProductionQty():mpFinalVo.getCycleProductionQty());
     }
 
     /**
