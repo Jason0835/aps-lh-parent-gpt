@@ -101,6 +101,7 @@ export default {
     "supply_order_type",
     "biz_stor_type",
     "biz_brand_type",
+    "is_schedule",
   ],
   provide() {
     return {
@@ -163,6 +164,17 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.dict.type.supply_order_type,
+              value
+            );
+          },
+          width: 160,
+        },
+        {
+          prop: "isSchedule",
+          label: this.$t("是否参与排产"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(
+              this.dict.type.is_schedule,
               value
             );
           },
@@ -260,7 +272,7 @@ export default {
           render: ({ row }) => {
             return (
               <div>
-                {(row.isSchecule!=1) && (
+                {(row.orderType==4) && (
                   <el-button
                     class="minus"
                     type="success"
@@ -268,7 +280,7 @@ export default {
                     v-hasPermi={["monthplan:supplyOrderPool:setSchedule"]}
                     onClick={() => this.handlePate(row)}
                   >
-                  参与排产
+                  {row.isSchedule==1?'取消参与排产':'参与排产'}
                   </el-button>
                 )}
                 <el-button
@@ -367,7 +379,7 @@ export default {
       }
     },
     handlePate(row) {
-      this.$confirm(this.$t("确定参与排产"), {
+      this.$confirm(row.isSchedule==1?this.$t("确定取消参与排产"):this.$t("确定参与排产"), {
         type: "warning",
       }).then(() => {
         schedulingPate({id:row.id}).then((data) => {

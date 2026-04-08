@@ -473,7 +473,9 @@ export default {
                     placeholder="请输入内容"
                     onInput={(value) => {
                       // 移除小数点和小数部分
-                      row.confirmAdjustQty = value.replace(/\./g, "");
+                      const matched = value.match(/^-?\d*/);
+                      row.confirmAdjustQty = matched ? matched[0] : '';
+                      {/* row.confirmAdjustQty = value.replace(/\./g, ""); */}
                     }}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
@@ -521,15 +523,15 @@ export default {
             prop: "actualAdjustQty",
             label: this.$t("实际调整"),
             width: 120,
-            // render: ({ row }) => {
-            //   return (
-            //     <div
-            //       style={{ background: row.actualAdjustQty ? "yellow" : "" }}
-            //     >
-            //       {row.actualAdjustQty}
-            //     </div>
-            //   );
-            // },
+            render: ({ row }) => {
+              return (
+                <div
+                  style={{ background: row.actualAdjustQty ? "yellow" : "" }}
+                >
+                  {row.actualAdjustQty}
+                </div>
+              );
+            },
           },
           // {
           //   prop: "adjustmentReason",
@@ -839,7 +841,9 @@ export default {
                       placeholder="请输入内容"
                       onInput={(value) => {
                         // 移除小数点和小数部分
-                        row.confirmAdjustQty = value.replace(/\./g, "");
+                        const matched = value.match(/^-?\d*/);
+                        row.confirmAdjustQty = matched ? matched[0] : '';
+                        {/* row.confirmAdjustQty = value.replace(/\./g, ""); */}
                       }}
                       onBlur={(e) => {
                         e.preventDefault(); // 如果需要阻止默认行为
@@ -1842,7 +1846,7 @@ export default {
 
     //结构外自动调整
     async handOutResult() {
-      this.loadText = this.$t("正在加载中，请稍候");
+      this.loadText = this.$t("正在自动调整中，请稍候");
       for (let i = 0; i < this.data.length; i++) {
         if (
           this.data[i].confirmAdjustQty &&

@@ -34,11 +34,11 @@
           @click="handleDelete(selection)"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         > -->
-        <!-- <el-button
-          v-hasPermi="['monthplan:productionMonthPlanInit:import']"
+        <el-button
+          v-hasPermi="['monthplan:mpStructureAllocation:importDataStructureAllocation']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
-        > -->
+        >
         <el-button
           @click="handleExport"
           v-hasPermi="['monthplan:productionMonthPlanInit:export']"
@@ -47,12 +47,12 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <!-- <tlt-upload
+    <tlt-upload
       ref="tltUpload"
-      downloadUrl="/demand/productionMonthPlanInit/importTemplate"
-      uploadUrl="/demand/productionMonthPlanInit/importData"
+      downloadUrl=""
+      uploadUrl="/monthplan/mpStructureAllocation/importDataStructureAllocation"
       @uploadSuccess="getList"
-    /> -->
+    />
     <!-- <infoDialog ref="infoRef" @success="getList" /> -->
   </basic-container>
 </template>
@@ -69,14 +69,14 @@ import {
   editProductionMonthPlanInit,
 } from "@/api/monthplan/productionMonthPlanInit.js";
 //components
-// import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 // import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "ProductionMonthPlanInit",
   components: {
-    // tltUpload,
+    tltUpload,
     // infoDialog,
   },
   dicts: [

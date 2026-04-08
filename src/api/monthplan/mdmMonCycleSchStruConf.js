@@ -20,3 +20,18 @@ export function saveMonCycleSchStruConf(query) {
     data: query
   })
 }
+export function getStructList(query) {
+  return request({
+    url: '/monthplan/mdmMonCycleSchStruConf/queryAddStructList',
+    method: 'post',
+    data: query
+  })
+}
+
+export function addSave(query) {
+  return request({
+    url: '/monthplan/mdmMonCycleSchStruConf/addSave',
+    method: 'post',
+    data: query
+  })
+}

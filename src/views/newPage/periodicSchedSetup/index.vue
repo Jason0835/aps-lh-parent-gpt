@@ -19,13 +19,13 @@
       :selectArea="false"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           type="primary"
           plain
-          v-hasPermi="['monthplan:ProductMoldingLimit:add']"
+          v-hasPermi="['monthplan:mdmMonCycleSchStruConf:edit']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
-        > -->
+        >
         <el-button
           type="danger"
           v-hasPermi="['monthplan:mdmMonCycleSchStruConf:remove']"
@@ -172,6 +172,14 @@ export default {
           render: ({ row }) => {
             return (
               <div>
+                  <el-button
+                v-hasPermi={["monthplan:mdmMonCycleSchStruConf:edit"]}
+                  class="minus"
+                  type="success"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.update")}
+                </el-button>
                 <el-button
                   class="minus"
                   type="danger"
@@ -180,14 +188,7 @@ export default {
                 >
                   {this.$t("ui.frame.btn.delete")}
                 </el-button>
-                <el-button
-                v-hasPermi={["monthplan:mdmMonCycleSchStruConf:edit"]}
-                  class="minus"
-                  type="success"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t("ui.frame.btn.update")}
-                </el-button>
+
               </div>
             );
           },
