@@ -56,8 +56,6 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
-    @Autowired
-    private SyncDataLogsService syncDataLogsService;
 
     @Autowired
     private RedisService redisService;
@@ -300,7 +298,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         // 1. 加锁防止多次下发
         Long[] idArray = ids.toArray(new Long[0]);
         String lockKey = "lhMouldChangePlan:issue:lock" + Arrays.toString(idArray);
-        if (redisService.getCacheObject(lockKey)) {
+        if (redisService.getCacheObject(lockKey)!=null) {
             return AjaxResult.success();
         }
         try {
