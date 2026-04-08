@@ -176,7 +176,7 @@ public class ProductionPlanGroupInfo {
     private Boolean oemJoinStructurePriority;
 
     /**
-     *  OEM品牌集合
+     * OEM品牌集合
      */
     private Set<String> oemBrandSet;
 
@@ -575,7 +575,7 @@ public class ProductionPlanGroupInfo {
      * 结构延长一天收尾的处理
      * 将剩余分配天数 -1
      */
-    public void timeExtensionOneDayConclusion(){
+    public void timeExtensionOneDayConclusion() {
         if (null == leftOverNeedAllocationDays) {
             return;
         }
@@ -780,24 +780,9 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
             return;
         }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Set<Integer> stopDayInfo = productionContext.getStopDays();
-        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        Integer preClosingDay = preSelected.getClosingDay();
-        Integer preEndDay = preSelected.getEndDay();
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        //20260327 修正根据materialDesc重新构建前Sku信息
-        BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findBeforeSkuProductionInfoByAddSku(context, addSkuInfo, this, preClosingDay);
-        TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(context, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
-        preSelected.updateBeforeSkuInfo(lhBeforeSkuInfo);
-        BeforeSkuProductionInfo mouldSkuInfo = ChangeMouldInfo.buildBeforeSkuProductionInfoByMould(productionContext, preClosingDay, selectedMould);
-        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo(), mouldSkuInfo);
-        boolean isChangeMould = changeMouldInfo.isChangeMould();
-        //隔天换模
-        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
-            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
-        }
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
+        //得到有效排产范围：考虑模壳、胶囊卡盘、模具分配比例等
+        MouldProductionDayLimitHelper limitHelper = getProductionDayLimitInfo(context, addSkuInfo, preSelected, selectedMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
@@ -810,6 +795,28 @@ public class ProductionPlanGroupInfo {
         Integer newClosingDay = sortList.get(BigDecimal.ZERO.intValue());
         Integer newEndDay = sortList.get(size - BigDecimal.ONE.intValue());
         preSelected.updateProductionDateRange(newClosingDay, newEndDay);
+    }
+
+    /**
+     * 获取排产限制信息
+     * 得到有效排产日范围集合
+     *
+     * @param context       排产上下文
+     * @param addSkuInfo    排产的Sku信息
+     * @param preSelected   收尾硫化组信息
+     * @param selectedMould 选中的模具
+     * @return
+     */
+    public Set<Integer> getMouldProductionLimitInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected, List<ProductionMouldInfoVo> selectedMould) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == preSelected) {
+            return Collections.emptySet();
+        }
+        MouldProductionDayLimitHelper limitHelper = getProductionDayLimitInfo(context, addSkuInfo, preSelected, selectedMould);
+        Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
+        if (CollectionUtils.isEmpty(effectiveRangeSet)) {
+            return Collections.emptySet();
+        }
+        return effectiveRangeSet;
     }
 
     /**
@@ -1127,7 +1134,7 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(hasHeightProductionList)) {
             return BigDecimal.ZERO.intValue();
         }
-        if (!oemJoinStructurePriority){
+        if (!oemJoinStructurePriority) {
             // OEM不参与结构优先级竞争
             hasHeightProductionList = hasHeightProductionList.stream().filter(heightProductionPlan -> !oemBrandSet.contains(heightProductionPlan.getBrand())).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(hasHeightProductionList)) {
@@ -2428,6 +2435,36 @@ public class ProductionPlanGroupInfo {
             return Collections.emptySet();
         }
         return effectiveDaySet;
+    }
+
+    /**
+     * 获取排产限制信息
+     * 得到有效排产日范围集合
+     *
+     * @param context       排产上下文
+     * @param addSkuInfo    排产的Sku信息
+     * @param preSelected   收尾硫化组信息
+     * @param selectedMould 选中的模具
+     * @return
+     */
+    private MouldProductionDayLimitHelper getProductionDayLimitInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, EarliestConclusionLhGroupHelper preSelected, List<ProductionMouldInfoVo> selectedMould) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<Integer> stopDayInfo = productionContext.getStopDays();
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        Integer preClosingDay = preSelected.getClosingDay();
+        Integer preEndDay = preSelected.getEndDay();
+        //20260327 修正根据materialDesc重新构建前Sku信息
+        BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findBeforeSkuProductionInfoByAddSku(context, addSkuInfo, this, preClosingDay);
+        TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(context, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
+        preSelected.updateBeforeSkuInfo(lhBeforeSkuInfo);
+        BeforeSkuProductionInfo mouldSkuInfo = ChangeMouldInfo.buildBeforeSkuProductionInfoByMould(productionContext, preClosingDay, selectedMould);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo(), mouldSkuInfo);
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
+        return LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
     }
 
     /**

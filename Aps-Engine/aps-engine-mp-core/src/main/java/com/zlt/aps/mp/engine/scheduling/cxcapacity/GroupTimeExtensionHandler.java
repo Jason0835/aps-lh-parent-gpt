@@ -98,7 +98,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
          */
         productionContinueBySingleGroup(cxAddSkuProductionHandler, ProductionStageEnum.SIMULATE_STAGE, productionContext, groupName, cxContinueInfo, allGroupPlanInfo);
         //新增Sku
-        cxAddSkuProductionHandler.productionAddSkuBySingleGroup(context, groupPlan, groupName, cxContinueInfo, continueCxMachineAllocation, handledDayInfo);
+        cxAddSkuProductionHandler.productionAddSkuBySingleGroup(context, ProductionStageEnum.SIMULATE_STAGE, groupPlan, groupName, cxContinueInfo, continueCxMachineAllocation, handledDayInfo);
     }
 
     /**
