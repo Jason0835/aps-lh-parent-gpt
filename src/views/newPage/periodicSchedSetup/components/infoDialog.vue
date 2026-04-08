@@ -30,11 +30,13 @@
 
 <script>
 import { mapState } from "vuex";
-import { saveMonCycleSchStruConf } from "@/api/monthplan/mdmMonCycleSchStruConf";
+import {
+  saveMonCycleSchStruConf,
+  getStructList,
+  addSave
+} from "@/api/monthplan/mdmMonCycleSchStruConf";
 
 import infoForm from "@/views/components/infoForm.vue";
-import DictData from "@/components/DictData";
-import { min } from "lodash";
 
 export default {
   components: { infoForm },
@@ -51,9 +53,7 @@ export default {
 
       // 检查是否只包含数字
       if (!/^\d+$/.test(strValue)) {
-        return callback(
-          new Error(this.$t("common.rule.noPoint"))
-        );
+        return callback(new Error(this.$t("common.rule.noPoint")));
       }
 
       // 转换为数字
@@ -75,7 +75,7 @@ export default {
       editType: null,
       form: {},
       rules: {
-        工厂: [
+        factoryCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -108,10 +108,17 @@ export default {
             trigger: ["change"],
           },
         ],
-        最低硫化机台数: [
+        structureName: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        yearMonth: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
@@ -130,6 +137,7 @@ export default {
           },
         ],
       },
+      selectList:[]
     };
   },
   computed: {
@@ -148,47 +156,96 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
-          disabled: true,
+          disabled: this.isEdit,
+          listeners: {
+            change: this.yearMonthChange,
+          },
         },
         {
-          prop: "year",
-          label: this.$t("ui.data.colume.year"),
-          disabled: true,
+          prop: "yearMonth",
+          label: this.$t("ui.data.colume.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          disabled: this.isEdit,
+          listeners: {
+            change: this.yearMonthChange,
+          },
         },
-        {
-          prop: "month",
-          label: this.$t("ui.data.colume.month"),
-          disabled: true,
-        },
+        // {
+        //   prop: "year",
+        //   label: this.$t("ui.data.colume.year"),
+        //   disabled: true,
+        // },
+        // {
+        //   prop: "month",
+        //   label: this.$t("ui.data.colume.month"),
+        //   disabled: true,
+        // },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          disabled: true,
+          disabled: this.isEdit,
+          type: "select",
+          dictData: this.selectList,
+          filterable: true,
         },
         {
           prop: "turnoverMonth",
           label: this.$t("ui.data.column.curingPlan.turnoverMonth"),
           type: "number",
           min: 0,
-          max:999999
+          max: 999999,
         },
         {
           prop: "minVulcanizingMachine",
           label: this.$t("ui.data.column.curingPlan.minVulcanizingMachine"),
           type: "number",
           min: 0,
-          max:999999
+          max: 999999,
         },
       ];
     },
   },
   methods: {
+    async yearMonthChange() {
+      try {
+        const [year, month] = this.form.yearMonth.split("-");
+
+        const res = await getStructList({
+          factoryCode: this.form.factoryCode,
+          year:year,
+          month: month,
+        });
+        let list=[]
+        for (let i = 0; i < res.length; i++) {
+          list.push({
+            label: res[i].structureName,
+            value: res[i].structureName,
+          });
+
+        }
+        this.selectList=list
+
+        console.log(res)
+      } catch (error) {
+        console.log(error);
+      }
+    },
     // api
     async save(params) {
       try {
         this.loading = true;
+        const [year, month] = params.yearMonth.split("-");
+        params.year = year;
+        params.month = month;
+        let res
+        if(this.isEdit){
+          res = await saveMonCycleSchStruConf(params);
+        }else{
+          res = await addSave(params);
+        }
 
-        const res = await saveMonCycleSchStruConf(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -207,11 +264,19 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          yearMonth: `${data.year}-${
+            data.month < 10 ? "0" + data.month : data.month
+          }`,
         };
       } else {
+        const now = new Date();
+        const year = now.getFullYear(); // 2024
+        const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
         this.form = {
-          factoryCode: "",
+          factoryCode: "116",
+          yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
         };
+        this.yearMonthChange()
       }
     },
     hide() {
