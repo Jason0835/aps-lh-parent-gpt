@@ -34,11 +34,11 @@
           @click="handleDelete(selection)"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         > -->
-        <el-button
+        <!-- <el-button
           v-hasPermi="['monthplan:mpStructureAllocation:importDataStructureAllocation']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
-        >
+        > -->
         <el-button
           @click="handleExport"
           v-hasPermi="['monthplan:productionMonthPlanInit:export']"

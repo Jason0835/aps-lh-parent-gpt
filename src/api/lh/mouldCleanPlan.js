@@ -28,6 +28,13 @@ export function getMachineList(query) {
   return request({
     url: '/lh/mouldCleanPlan/getMachineList',
     method: 'post',
-    params: query
+    data: query
+  })
+}
+
+export function syncFromWarn() {
+  return request({
+    url: '/lh/mouldCleanPlan/syncFromWarn',
+    method: 'post'
   })
 }

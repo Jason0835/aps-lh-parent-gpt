@@ -19,26 +19,6 @@
     >
       <template slot="header">
         <el-button
-          type="primary"
-          plain
-          v-hasPermi="['lh:mouldCleanPlan:edit']"
-          @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['lh:mouldCleanPlan:edit']"
-          @click="handleBatchEdit"
-          :disabled="selection.length !== 1"
-          >{{ $t("ui.frame.btn.update") }}</el-button
-        >
-        <el-button
-          type="danger"
-           v-hasPermi="['lh:mouldCleanPlan:remove']"
-          :disabled="selection.length == 0"
-          @click="handleDeleteAll"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
-        <el-button
           v-hasPermi="['lh:mouldCleanPlan:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
@@ -49,8 +29,16 @@
           v-hasPermi="['lh:mouldCleanPlan:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        
+        <el-button
+          type="success"
+          v-hasPermi="['lh:mouldCleanPlan:sync']"
+          @click="handleSyncFromWarn"
+          >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
+        >
       </template>
     </page-table>
+
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
@@ -60,9 +48,11 @@
       labelWidth="0"
       :columns="importColumns"
     ></tlt-upload-form>
+
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
+
 <script>
 //lib
 //utils
@@ -70,22 +60,21 @@ import { downloadLink } from "@/utils/request";
 
 import {
   listMouldCleanPlan,
-  removeMouldCleanPlan
+  removeMouldCleanPlan,
+  syncFromWarn
 } from "@/api/lh/mouldCleanPlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
-//components
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
+//components
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "MdmMouldCleanPlan",
   components: {
-    tltUpload,
     infoDialog,
     TltUploadForm
   },
-  dicts: ["biz_factory_name", "lh_machine"],
+  dicts: ["biz_factory_name", "lh_machine", "MOULD_CLEAN_TYPE"],
   provide() {
     return {
       parentDict: this.dict,
@@ -141,21 +130,20 @@ export default {
           width: 180
         },
         {
-          prop: "operTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
+          prop: "cleanTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.cleanTime"),
         },
         {
-          prop: "firstWashTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.firstWashTime"),
+          prop: "cleanType",
+          label: this.$t("ui.data.column.mouldCleanPlan.cleanType"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.MOULD_CLEAN_TYPE, value);
+          },
         },
         {
-          prop: "secondWashTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.secondWashTime"),
-        },
-        {
-          prop: "updateTime",
-          width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          prop: "remark",
+          label: this.$t("ui.data.column.mouldCleanPlan.remark"),
+          showOverflowTooltip: true
         },
 
         {
@@ -192,25 +180,25 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("common.factory"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-        },
-        {
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
           prop: "lhCode",
           type: "select",
           dictData: this.dict.type.lh_machine,
           filterable: true,
         },
-        // {
-        //   label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
-        //   prop: "operTime",
-        //   type: "date",
-        //   dateType: "daterange",
-        //   valueFormat: "yyyy-MM-dd",
-        // },
+        {
+          label: this.$t("ui.data.column.mouldCleanPlan.cleanTime"),
+          prop: "cleanTime",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.mouldCleanPlan.cleanType"),
+          prop: "cleanType",
+          type: "select",
+          dictData: this.dict.type.MOULD_CLEAN_TYPE,
+        },
       ];
     },
   },
@@ -230,8 +218,24 @@ export default {
         this.handleEdit(this.selection[0]);
       }
     },
+
+    handleSyncFromWarn() {
+      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), this.$t("common.hint.hint"), {
+        confirmButtonText: this.$t("common.button.confirm"),
+        cancelButtonText: this.$t("common.button.cancel"),
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const res = await syncFromWarn();
+          this.$modal.msgSuccess(res.msg);
+          this.getList();
+        } catch (error) {
+          console.error(error);
+        }
+      });
+    },
+
     handleDeleteAll() {
-      console.log(this.selection);
       let ids = "";
       for (let i = 0; i < this.selection.length; i++) {
         if (i == this.selection.length - 1) {
@@ -264,15 +268,15 @@ export default {
     },
 
     handleSearch(data) {
-      this.query = data;
-      if (data.operTime && data.operTime.length === 2) {
-        this.query.operTimeBegin = data.operTime[0];
-        this.query.operTimeEnd = data.operTime[1];
-        delete this.query.operTime;
+      this.query = { ...data };
+      if (data.cleanTime && data.cleanTime.length === 2) {
+        this.query.cleanTimeBegin = data.cleanTime[0];
+        this.query.cleanTimeEnd = data.cleanTime[1];
       } else {
-        delete this.query.operTimeBegin;
-        delete this.query.operTimeEnd;
+        this.query.cleanTimeBegin = undefined;
+        this.query.cleanTimeEnd = undefined;
       }
+      delete this.query.cleanTime;
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -332,9 +336,7 @@ export default {
     },
   },
   created() {
-    let defaultParams = {
-      factoryCode: "116",
-    };
+    let defaultParams = {};
     this.search = {
       ...defaultParams,
     };
@@ -348,6 +350,7 @@ export default {
   },
 };
 </script>
+
 <style lang="scss" scoped>
 .more-btn {
   margin: 2px 0;

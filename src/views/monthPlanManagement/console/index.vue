@@ -79,7 +79,7 @@
           >{{ $t("ui.frame.btn.delete") }}</el-button
         > -->
         <el-button
-          v-hasPermi="['monthplan:monthSaleOrderPlan:import']"
+          v-hasPermi="['monthplan:mpStructureAllocation:importDataStructureAllocation']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
@@ -93,8 +93,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/monthplan/mouldingDayResult/importTemplate"
-      uploadUrl="/monthplan/mouldingDayResult/importData"
+      downloadUrl=""
+      uploadUrl="/monthplan/mpStructureAllocation/importDataStructureAllocation"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />

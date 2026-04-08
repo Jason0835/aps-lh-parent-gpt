@@ -59,7 +59,14 @@ export default {
             trigger: "change",
           },
         ],
-        operTime: [
+        cleanTime: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        cleanType: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -97,22 +104,23 @@ export default {
           onFocus: this.handleMachineFocus,
         },
         {
-          prop: "operTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.operTime"),
+          prop: "cleanTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.cleanTime"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
-          prop: "firstWashTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.firstWashTime"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
+          prop: "cleanType",
+          label: this.$t("ui.data.column.mouldCleanPlan.cleanType"),
+          type: "select",
+          dictData: this.parentDict.type.MOULD_CLEAN_TYPE,
         },
         {
-          prop: "secondWashTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.secondWashTime"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
+          prop: "remark",
+          label: this.$t("ui.data.column.mouldCleanPlan.remark"),
+          type: "textarea",
+          maxlength: 360,
+          showWordLimit: true,
         },
       ];
     },
@@ -167,9 +175,7 @@ export default {
           ];
         }
       } else {
-        this.form = {
-          factoryCode: "116",
-        };
+        this.form = {};
       }
     },
     hide() {
