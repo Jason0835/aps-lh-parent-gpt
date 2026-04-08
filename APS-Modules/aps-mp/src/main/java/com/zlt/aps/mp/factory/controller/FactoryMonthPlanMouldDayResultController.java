@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.factory.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -13,7 +14,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.ApsNumberUtils;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
@@ -33,6 +37,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -56,6 +62,8 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     @Autowired
     private IFactoryMonthPlanMouldDayResultService factoryMonthPlanMouldDayResultService;
 
+    @Autowired
+    private DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
 
     @Autowired
     private FactoryMonthPlanMouldDayResultEntityMapper entityMapper;
@@ -72,7 +80,31 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     public TableDataInfo list(@RequestBody FactoryMonthPlanMouldDayResult queryVO) {
         TableDataInfo tableDataInfo = super.list(queryVO);
         calculateDayVulcanizationQty(tableDataInfo.getRows());
+        // 禅道：21394，从需求计划重算净需求，未排查量
+        this.calculateDemandQty(tableDataInfo, queryVO);
         return tableDataInfo;
+    }
+
+    /**
+     * 从需求计划重算净需求，未排查量
+     * @param tableDataInfo
+     */
+    private void calculateDemandQty(TableDataInfo tableDataInfo, FactoryMonthPlanMouldDayResult queryVO) {
+        List<?> rows = tableDataInfo.getRows();
+        LambdaQueryWrapper<DpDemandPlan> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DpDemandPlan::getMonthPlanVersion, queryVO.getMonthPlanVersion());
+        Map<String, Integer> demandPlanMap = dpDemandPlanEntityMapper.selectList(queryWrapper).stream()
+                .collect(Collectors.toMap(DpDemandPlan::getMaterialCode, DpDemandPlan::getNetQty,
+                        (q1, q2) -> ApsNumberUtils.safeAdd(q1, q2)));
+        for (Object item: rows) {
+            FactoryMonthPlanMouldDayResult result = (FactoryMonthPlanMouldDayResult)item;
+            String materialCode = result.getMaterialCode();
+            Integer netQty = demandPlanMap.getOrDefault(materialCode, 0);
+            Integer totalQty = ApsNumberUtils.intValue(result.getTotalQty());
+            Integer diffQty = netQty > totalQty? netQty - totalQty: 0;
+            result.setFactProdReqQty(netQty);
+            result.setDifferenceQty(diffQty);
+        }
     }
 
     /**
