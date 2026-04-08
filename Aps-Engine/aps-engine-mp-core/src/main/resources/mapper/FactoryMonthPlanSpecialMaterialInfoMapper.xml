@@ -79,6 +79,7 @@
 		    AND SMS.MONTH = #{month,jdbcType=DECIMAL} 
 		    AND SMS.STANDARD_LENGTH > 0 
 		    AND SMS.STOCK > 0 
+		    AND SMS.PACKAGE_NUM > 0
 		    AND NOT EXISTS (
 			    SELECT
 			        0 

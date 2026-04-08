@@ -17,6 +17,7 @@ import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.SpecialMaterialResult;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
@@ -26,6 +27,7 @@ import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
+import com.zlt.aps.mp.factory.mapper.SpecialMaterialResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.sysdef.domain.SysDocType;
 
@@ -74,6 +76,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private MpStructureAllocationMapper mpStructureAllocationMapper;
     @Autowired
     private MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
+    @Autowired
+    private SpecialMaterialResultEntityMapper specialMaterialResultEntityMapper;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
@@ -477,6 +481,39 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 将处理好的数据添加到excelDataList
             excelDataList.add(listData);
         }
+        
+        // 加载特殊材料排产结果
+        LambdaQueryWrapper<SpecialMaterialResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(SpecialMaterialResult::getFactoryCode, queryResult.getFactoryCode());
+        queryWrapper.eq(SpecialMaterialResult::getProductionVersion, queryResult.getProductionVersion());
+        List<SpecialMaterialResult> specialMaterialResultList = specialMaterialResultEntityMapper.selectList(queryWrapper);
+        List<Map<String, Object>> listData = new ArrayList<>();
+        Map<String, List<SpecialMaterialResult>> specialMaterialResultMap = specialMaterialResultList.stream().collect(Collectors.groupingBy(SpecialMaterialResult::getMaterialDesc));
+        int seq = 1;
+        for (Entry<String, List<SpecialMaterialResult>> entry: specialMaterialResultMap.entrySet()) {
+            String materiDesc = entry.getKey();
+            Map<String, Object> listDataMap = new HashMap<>(1);
+            String format = "%s%s：%s";
+            String itemFormat = "%s批%s米";
+            String seqStr = String.valueOf((char)(seq + 9311));
+            StringBuilder builder = new StringBuilder();
+            for (SpecialMaterialResult result: entry.getValue()) {
+                Long totalQty = result.getTotalQty();
+                Long standardlenLong = result.getStandardLength();
+                Integer batchNum = BigDecimalUtils.div(totalQty, standardlenLong, 0).intValue();
+                String itemStr = String.format(itemFormat, batchNum, standardlenLong);
+                if (builder.length() > 0) {
+                    builder.append(" + ");
+                }
+                builder.append(itemStr);
+            }
+            String resultStr = String.format(format, seqStr, materiDesc, builder);
+            listDataMap.put("specialMaterialResult", resultStr);
+            listData.add(listDataMap);
+            seq ++;
+        }
+        excelDataList.add(listData);
+        tableMap.put("specialMaterialResult", "说明：本次排产特殊材料用量汇总：");
 
         // 将单元格样式放入context
         if (PubUtil.isNotEmpty(cellStyleList)) {
