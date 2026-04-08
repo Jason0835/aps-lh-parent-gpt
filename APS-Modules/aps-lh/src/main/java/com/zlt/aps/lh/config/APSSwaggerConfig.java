@@ -1,4 +1,4 @@
-package com.zlt.aps.config;
+package com.zlt.aps.lh.config;
 
 import com.ruoyi.common.utils.StringUtils;
 import org.springframework.context.annotation.Bean;

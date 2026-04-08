@@ -1,4 +1,4 @@
-package com.zlt.aps.lh.handle;
+package com.zlt.aps.lh.handler;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.sync.handle.SyncDataHandle;

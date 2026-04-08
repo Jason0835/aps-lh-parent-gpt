@@ -171,66 +171,66 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <foreach collection="ids" item="id" open="(" close=")" separator=",">#{id}</foreach>
     </insert>
 
-    <select id="getLhGanttData" resultType="com.zlt.aps.lh.api.domain.vo.LhGanttVo">
-        select *
-        from (select c.id,
-                     c.schedule_Date,
-                     c.lh_machine_code,
-                     c.spec_desc,
-                     c.spec_code,
-                     c.embryo_code,
-                     (
-                         case
-                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (
-                                 case
-                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (
-                                         case
-                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (
-                                                 case
-                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then null
-                                                     else CLASS4_START_TIME end
-                                                 )
-                                             else CLASS3_START_TIME end
-                                         )
-                                     else CLASS2_START_TIME end
-                                 )
-                             else CLASS1_START_TIME end
-                         )
-                                                                                                                as startDate,
-                     (
-                         case
-                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (
-                                 case
-                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (
-                                         case
-                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (
-                                                 case
-                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then null
-                                                     else CLASS4_END_TIME end
-                                                 )
-                                             else CLASS3_END_TIME end
-                                         )
-                                     else CLASS2_END_TIME end
-                                 )
-                             else CLASS1_END_TIME end
-                         )                                                                                      as endDate,
-                     IFNULL(class1_plan_qty, 0) + IFNULL(class2_plan_qty, 0) + IFNULL(class3_plan_qty, 0) +
-                     IFNULL(class4_plan_qty, 0) + IFNULL(class5_plan_qty, 0) +
-                     IFNULL(class6_plan_qty, 0)                                                                 as planQty,
-                     IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +
-                     IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +
-                     IFNULL(CLASS6_FINISH_QTY, 0)                                                               as finishQty
-              from T_LH_SCHEDULE_RESULT c
-              where 1 = 1
-                and c.IS_DELETE = '0'
-                and c.spec_desc is not null
-                and c.embryo_code is not null
-                and c.schedule_date = #{scheduleDate}) t
-        where planQty > 0
-          AND startDate is not null
-          AND endDate is not null
-        order by lh_machine_code, startDate
-    </select>
+<!--    <select id="getLhGanttData" resultType="com.zlt.aps.lh.api.domain.vo.LhGanttVo">-->
+<!--        select *-->
+<!--        from (select c.id,-->
+<!--                     c.schedule_Date,-->
+<!--                     c.lh_machine_code,-->
+<!--                     c.spec_desc,-->
+<!--                     c.spec_code,-->
+<!--                     c.embryo_code,-->
+<!--                     (-->
+<!--                         case-->
+<!--                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (-->
+<!--                                 case-->
+<!--                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (-->
+<!--                                         case-->
+<!--                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (-->
+<!--                                                 case-->
+<!--                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then null-->
+<!--                                                     else CLASS4_START_TIME end-->
+<!--                                                 )-->
+<!--                                             else CLASS3_START_TIME end-->
+<!--                                         )-->
+<!--                                     else CLASS2_START_TIME end-->
+<!--                                 )-->
+<!--                             else CLASS1_START_TIME end-->
+<!--                         )-->
+<!--                                                                                                                as startDate,-->
+<!--                     (-->
+<!--                         case-->
+<!--                             when IFNULL(CLASS1_PLAN_QTY, 0) = 0 then (-->
+<!--                                 case-->
+<!--                                     when IFNULL(CLASS2_PLAN_QTY, 0) = 0 then (-->
+<!--                                         case-->
+<!--                                             when IFNULL(CLASS3_PLAN_QTY, 0) = 0 then (-->
+<!--                                                 case-->
+<!--                                                     when IFNULL(CLASS4_PLAN_QTY, 0) = 0 then null-->
+<!--                                                     else CLASS4_END_TIME end-->
+<!--                                                 )-->
+<!--                                             else CLASS3_END_TIME end-->
+<!--                                         )-->
+<!--                                     else CLASS2_END_TIME end-->
+<!--                                 )-->
+<!--                             else CLASS1_END_TIME end-->
+<!--                         )                                                                                      as endDate,-->
+<!--                     IFNULL(class1_plan_qty, 0) + IFNULL(class2_plan_qty, 0) + IFNULL(class3_plan_qty, 0) +-->
+<!--                     IFNULL(class4_plan_qty, 0) + IFNULL(class5_plan_qty, 0) +-->
+<!--                     IFNULL(class6_plan_qty, 0)                                                                 as planQty,-->
+<!--                     IFNULL(CLASS1_FINISH_QTY, 0) + IFNULL(CLASS2_FINISH_QTY, 0) + IFNULL(CLASS3_FINISH_QTY, 0) +-->
+<!--                     IFNULL(CLASS4_FINISH_QTY, 0) + IFNULL(CLASS5_FINISH_QTY, 0) +-->
+<!--                     IFNULL(CLASS6_FINISH_QTY, 0)                                                               as finishQty-->
+<!--              from T_LH_SCHEDULE_RESULT c-->
+<!--              where 1 = 1-->
+<!--                and c.IS_DELETE = '0'-->
+<!--                and c.spec_desc is not null-->
+<!--                and c.embryo_code is not null-->
+<!--                and c.schedule_date = #{scheduleDate}) t-->
+<!--        where planQty > 0-->
+<!--          AND startDate is not null-->
+<!--          AND endDate is not null-->
+<!--        order by lh_machine_code, startDate-->
+<!--    </select>-->
     <select id="selectLhScheduleResultTotal"
             resultType="com.zlt.aps.mp.api.domain.vo.LhScheduleResultTotalVo">
         select SPEC_CODE,
