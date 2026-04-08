@@ -500,8 +500,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             for (SpecialMaterialResult result: entry.getValue()) {
                 Long totalQty = result.getTotalQty();
                 Long standardlenLong = result.getStandardLength();
-                Integer batchNum = BigDecimalUtils.div(totalQty, standardlenLong, 0).intValue();
-                String itemStr = String.format(itemFormat, batchNum, standardlenLong);
+                Long oriStandardlenLong = result.getOriStandardLength();
+                Integer batchNum = BigDecimalUtils.div(totalQty, standardlenLong, 2).setScale(0, RoundingMode.UP).intValue();
+                String itemStr = String.format(itemFormat, batchNum, oriStandardlenLong);
                 if (builder.length() > 0) {
                     builder.append(" + ");
                 }

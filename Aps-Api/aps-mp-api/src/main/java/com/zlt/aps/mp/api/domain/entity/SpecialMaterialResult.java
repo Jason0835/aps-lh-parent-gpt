@@ -75,9 +75,16 @@ public class SpecialMaterialResult extends BaseEntity {
     private Long totalQty;
 
     /**
-     * 标准长
+     * 标准长（计算值）
      */
     @ApiModelProperty(value = "标准长", name = "standardLength")
     @TableField(value = "STANDARD_LENGTH")
     private Long standardLength;
+
+    /**
+     * 标准长原值
+     */
+    @ApiModelProperty(value = "标准长原值", name = "standardLengthName")
+    @TableField(value = "ORI_STANDARD_LENGTH")
+    private Long oriStandardLength;
 }

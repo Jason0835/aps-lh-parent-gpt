@@ -155,37 +155,58 @@ public class MatchingProductionHandler {
         this.initChangeMouldUsedQty(productionContext);
         // 初始化结构的每日生产统计
         this.initDayProductionInfo(productionContext);
-//        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap(); // 初始化特殊材料库存
-//        for (FactoryMonthPlanMouldDayResult result: planList) {
-//            ProductionPlanGroupInfo groupInfo = estimateGroupCxAllocationMap.get(result.getStructureName());
-//            if (groupInfo == null) {
-//                continue;
-//            }
-//            if (!groupInfo.isSpecialMaterial()) {
-//                continue;
-//            }
-//            Map<String, BigDecimal> materialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
-//            if (materialInfoMap == null) {
-//                continue;
-//            }
-//            for (Entry<String, BigDecimal> entry: materialInfoMap.entrySet()) {
-//                String materialCode = entry.getKey();
-//                BigDecimal useQty = entry.getValue();
-//                if (useQty == null) {
-//                    continue;
-//                }
-//            }
-//        }
+        // 初始化特殊材料库存已占用数据
+        this.initSpecialMaterialInfo(productionContext, planList, estimateGroupCxAllocationMap);
 
-        // 调用主流程的入口 -> 实单补量排程算法
-        Map<String, Integer> factProdReqMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
-                cxContinueInfoMap, true);
-        // 调用主流程的入口 -> 搭配排程算法（储备）
-        Map<String, Integer> matchingQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
-                cxContinueInfoMap, false);
+//        // 调用主流程的入口 -> 实单补量排程算法
+//        Map<String, Integer> factProdReqMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
+//                cxContinueInfoMap, true);
+//        // 调用主流程的入口 -> 搭配排程算法（储备）
+//        Map<String, Integer> matchingQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
+//                cxContinueInfoMap, false);
 
         // 构建排产结果并保存
-        this.saveMouldProductionResult(productionContext, planList, detailLogList, factProdReqMap, matchingQtyMap);
+        this.saveMouldProductionResult(productionContext, planList, detailLogList, null, null);
+    }
+
+    /**
+     * 初始化特殊材料库存已占用数据
+     * @param productionContext
+     * @param planList
+     * @param estimateGroupCxAllocationMap
+     */
+    private void initSpecialMaterialInfo(TbrProductionContext productionContext,
+                                         List<FactoryMonthPlanMouldDayResult> planList,
+                                         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
+        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap(); // 初始化特殊材料库存
+        for (FactoryMonthPlanMouldDayResult result: planList) {
+            ProductionPlanGroupInfo groupInfo = estimateGroupCxAllocationMap.get(result.getStructureName());
+            if (groupInfo == null) {
+                continue;
+            }
+            if (!groupInfo.isSpecialMaterial()) {
+                continue;
+            }
+            Map<String, BigDecimal> materialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
+            if (materialInfoMap == null) {
+                continue;
+            }
+            for (Entry<String, BigDecimal> entry: materialInfoMap.entrySet()) {
+                String materialCode = entry.getKey();
+                BigDecimal useQty = entry.getValue();
+                if (useQty == null) {
+                    continue;
+                }
+                Map<Long, SpecialMaterialInfoVo> stockMap = specialMaterialInfoMap.get(materialCode);
+                if (stockMap == null) {
+                    continue;
+                }
+                SpecialMaterialInfoVo stockInfo = stockMap.values().iterator().next();
+                Long oldQty = stockInfo.getSumSkuAllocateQty();
+                Long newQty = BigDecimalUtils.multiply(result.getTotalQty(), useQty).longValue();
+                stockInfo.setSumSkuAllocateQty(safeAdd(newQty, oldQty));
+            }
+        }
     }
     
     /**
@@ -1652,10 +1673,9 @@ public class MatchingProductionHandler {
         // 保存统计信息以及特殊材料排产记录
         List<MpMonthPlanStatistics> statisticsList = this.buildProductionStatisticsList(productionContext); // 排产统计信息
         log.info(productionContext.getTempLogBuilder().toString());
-        List<SpecialMaterialResult> specialMaterialList = this.buildSpecialMaterialResultList(productionContext);
         
         baseDao.saveBatch(statisticsList);
-//        baseDao.saveBatch(specialMaterialList);
+        this.saveSpecialMaterialResult(productionContext);
 //        this.updateMatchingProductionLog(productionContext); // 更新排产日志
     }
 
@@ -1669,6 +1689,13 @@ public class MatchingProductionHandler {
         List<SpecialMaterialResult> specialMaterialList = new ArrayList<>();
         for (Map<Long, SpecialMaterialInfoVo> stockMap: specialMaterialInfoMap.values()) {
             for (SpecialMaterialInfoVo stock: stockMap.values()) {
+                Long totalQty = longValue(stock.getSumSkuAllocateQty());
+                if (totalQty <= 0) {
+                    continue;
+                }
+                if (StringUtils.isEmpty(stock.getMaterialDesc())) {
+                    continue;
+                }
                 SpecialMaterialResult result = new SpecialMaterialResult();
                 result.setFactoryCode(productionContext.getFactoryCode());
                 result.setMonthPlanVersion(productionContext.getMonthPlanVersion());
@@ -1676,7 +1703,9 @@ public class MatchingProductionHandler {
                 result.setMaterialCode(stock.getMaterialCode());
                 result.setMaterialDesc(stock.getMaterialDesc());
                 result.setStandardLength(stock.getStandardLength());
-                result.setTotalQty(stock.getSumSkuAllocateQty());
+                result.setOriStandardLength(stock.getOriStandardLength());
+                result.setTotalQty(totalQty);
+                specialMaterialList.add(result);
             }
         }
         return specialMaterialList;
