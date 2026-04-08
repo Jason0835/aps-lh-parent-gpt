@@ -1675,7 +1675,7 @@ public class MatchingProductionHandler {
         log.info(productionContext.getTempLogBuilder().toString());
         
         baseDao.saveBatch(statisticsList);
-        this.saveSpecialMaterialResult(productionContext);
+//        this.saveSpecialMaterialResult(productionContext);
 //        this.updateMatchingProductionLog(productionContext); // 更新排产日志
     }
 
