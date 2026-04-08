@@ -1892,6 +1892,7 @@ public class MpWeekRollAdjustEngine {
             //已有排产标识，防止中间断开
             //按硫化机维度，记录前日排产量
             incMouldContext.setBeforeProductionQty(0);
+            incMouldContext.setBeforeProductionPosition(0);
             //按硫化机维度，记录已排产天数
             incMouldContext.setUsedProductionDays(0);
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,尝试增模具数:%s！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould)).append(ApsConstant.DIVISION);
@@ -2023,6 +2024,7 @@ public class MpWeekRollAdjustEngine {
                 incMouldContext.setBFirstAddMould(false);
                 if (mpFinalVo.getFieldValueByFieldName(dayField) !=null && (Integer) mpFinalVo.getFieldValueByFieldName(dayField) !=0){
                     incMouldContext.setBeforeProductionQty(dayVulcanizationQty);
+                    incMouldContext.setBeforeProductionPosition(i);
                     incMouldContext.setUsedProductionDays(incMouldContext.getUsedProductionDays() + 1);
                 }
             }
@@ -2072,12 +2074,13 @@ public class MpWeekRollAdjustEngine {
                 YesOrNoEnum.YES.getCode().equals(contextDTO.getDailyCapacityLimitVoMap().get(currentDay).getDayOpenCloseFlag())){
             // 若只有排产1天，则将前日的值还原
             int beforeProductionQty = incMouldContext.getBeforeProductionQty();
-            int preDay = getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),currentDay -1);
-            String preDayField = FactoryConstant.DAY_FIELD + preDay;
+            //int preDay = getPreDayCloseDay(contextDTO.getDailyCapacityLimitVoMap(),currentDay -1);
+            String preDayField = FactoryConstant.DAY_FIELD + incMouldContext.getBeforeProductionPosition();
             int preDayValue = (Integer) mpFinalVo.getFieldValueByFieldName(preDayField) - incMouldContext.getBeforeProductionQty();
             mpFinalVo.setFieldValueByFieldName(preDayField,preDayValue==0 ? null : preDayValue);
             contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,排产日:%s,单机台已排产天数: %s, 还原值:%s, 前日还原后的排产量: %s！", contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),currentDay,incMouldContext.getUsedProductionDays(),beforeProductionQty,preDayValue)).append(ApsConstant.DIVISION);
             incMouldContext.setBeforeProductionQty(0);
+            incMouldContext.setBeforeProductionPosition(0);
             incMouldContext.setBFirstAddMould(true);
             return beforeProductionQty;
         }
