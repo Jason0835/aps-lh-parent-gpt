@@ -155,16 +155,58 @@ public class MatchingProductionHandler {
         this.initChangeMouldUsedQty(productionContext);
         // 初始化结构的每日生产统计
         this.initDayProductionInfo(productionContext);
+        // 初始化特殊材料库存已占用数据
+        this.initSpecialMaterialInfo(productionContext, planList, estimateGroupCxAllocationMap);
 
-        // 调用主流程的入口 -> 实单补量排程算法
-        Map<String, Integer> factProdReqMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
-                cxContinueInfoMap, true);
-        // 调用主流程的入口 -> 搭配排程算法（储备）
-        Map<String, Integer> matchingQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
-                cxContinueInfoMap, false);
+//        // 调用主流程的入口 -> 实单补量排程算法
+//        Map<String, Integer> factProdReqMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
+//                cxContinueInfoMap, true);
+//        // 调用主流程的入口 -> 搭配排程算法（储备）
+//        Map<String, Integer> matchingQtyMap = this.matchingProduction(productionContext, estimateGroupCxAllocationMap,
+//                cxContinueInfoMap, false);
 
         // 构建排产结果并保存
-        this.saveMouldProductionResult(productionContext, planList, detailLogList, factProdReqMap, matchingQtyMap);
+        this.saveMouldProductionResult(productionContext, planList, detailLogList, null, null);
+    }
+
+    /**
+     * 初始化特殊材料库存已占用数据
+     * @param productionContext
+     * @param planList
+     * @param estimateGroupCxAllocationMap
+     */
+    private void initSpecialMaterialInfo(TbrProductionContext productionContext,
+                                         List<FactoryMonthPlanMouldDayResult> planList,
+                                         Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap) {
+        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap(); // 初始化特殊材料库存
+        for (FactoryMonthPlanMouldDayResult result: planList) {
+            ProductionPlanGroupInfo groupInfo = estimateGroupCxAllocationMap.get(result.getStructureName());
+            if (groupInfo == null) {
+                continue;
+            }
+            if (!groupInfo.isSpecialMaterial()) {
+                continue;
+            }
+            Map<String, BigDecimal> materialInfoMap = groupInfo.getEmbryoSpecialMaterialInfoMap();
+            if (materialInfoMap == null) {
+                continue;
+            }
+            for (Entry<String, BigDecimal> entry: materialInfoMap.entrySet()) {
+                String materialCode = entry.getKey();
+                BigDecimal useQty = entry.getValue();
+                if (useQty == null) {
+                    continue;
+                }
+                Map<Long, SpecialMaterialInfoVo> stockMap = specialMaterialInfoMap.get(materialCode);
+                if (stockMap == null) {
+                    continue;
+                }
+                SpecialMaterialInfoVo stockInfo = stockMap.values().iterator().next();
+                Long oldQty = stockInfo.getSumSkuAllocateQty();
+                Long newQty = BigDecimalUtils.multiply(result.getTotalQty(), useQty).longValue();
+                stockInfo.setSumSkuAllocateQty(safeAdd(newQty, oldQty));
+            }
+        }
     }
     
     /**
@@ -1220,7 +1262,9 @@ public class MatchingProductionHandler {
             DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit(); // 每日产能限制
             Set<Integer> oemBrandSet = changeMouldLimitHandler.getEnableOemBrandProductionRange(productionContext,
                     firstPlan); // 获取是否还有可排产日，如果没有了就说明已经达到上限
-            return !CollectionUtils.isEmpty(oemBrandSet);
+            if (CollectionUtils.isEmpty(oemBrandSet)) {
+                return false;
+            }
 
         }
         // 4、检查是否二次上机
@@ -1520,6 +1564,15 @@ public class MatchingProductionHandler {
         }
         return totalProductionQty;
     }
+    
+    /**
+     * 保存特殊材料列表
+     * @param productionContext
+     */
+    public void saveSpecialMaterialResult(TbrProductionContext productionContext) {
+        List<SpecialMaterialResult> specialMaterialList = this.buildSpecialMaterialResultList(productionContext);
+        baseDao.saveBatch(specialMaterialList);
+    }
 
     /**
      * 计算所有模具当天的产能剩余量
@@ -1597,31 +1650,65 @@ public class MatchingProductionHandler {
                                           List<FactoryMonthPlanMouldDayResult> resultList,
                                           List<FactoryMonthPlanMouldDayDetail> detailList,
                                           Map<String, Integer> factProdReqMap, Map<String, Integer> matchingQtyMap) {
-        if (CollectionUtils.isEmpty(matchingQtyMap) && CollectionUtils.isEmpty(factProdReqMap)) {
-            return;
+        // 保存搭配调整后的排产记录
+        if (!CollectionUtils.isEmpty(matchingQtyMap) || !CollectionUtils.isEmpty(factProdReqMap)) {
+            // 1、从上下文取出排产结果
+            List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler
+                    .getMouldProductionResult(productionContext).stream()
+                    .filter(detail -> matchingQtyMap.containsKey(detail.getMaterialDesc())
+                            || factProdReqMap.containsKey(detail.getMaterialDesc())) // 只过滤出本次涉及排产的规格
+                    .collect(Collectors.toList());
+            List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler
+                    .getSummaryBySkuResult(detailLogList, productionContext);
+            if (!CollectionUtils.isEmpty(dayResultList)) {
+                // 2、构建待保存的排产结果
+                List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(productionContext,
+                        dayResultList, resultList, factProdReqMap, matchingQtyMap);
+                List<FactoryMonthPlanMouldDayDetail> detailResultList = this.buildDetailResultList(detailLogList, detailList,
+                        productionContext, factProdReqMap, matchingQtyMap);
+                baseDao.saveBatch(detailResultList);
+                baseDao.saveBatch(mouldResultList);
+            }
         }
-        // 1、从上下文取出排产结果
-        List<FactoryMonthPlanMouldDayDetail> detailLogList = MouldProductionResultHandler
-                .getMouldProductionResult(productionContext).stream()
-                .filter(detail -> matchingQtyMap.containsKey(detail.getMaterialDesc())
-                        || factProdReqMap.containsKey(detail.getMaterialDesc())) // 只过滤出本次涉及排产的规格
-                .collect(Collectors.toList());
-        List<FactoryMonthPlanMouldDayResult> dayResultList = MouldProductionResultHandler
-                .getSummaryBySkuResult(detailLogList, productionContext);
-        if (CollectionUtils.isEmpty(dayResultList)) {
-            return;
-        }
-        // 2、构建待保存的排产结果
-        List<FactoryMonthPlanMouldDayResult> mouldResultList = this.buildMouldResultList(productionContext,
-                dayResultList, resultList, factProdReqMap, matchingQtyMap);
-        List<FactoryMonthPlanMouldDayDetail> detailResultList = this.buildDetailResultList(detailLogList, detailList,
-                productionContext, factProdReqMap, matchingQtyMap);
+        // 保存统计信息以及特殊材料排产记录
         List<MpMonthPlanStatistics> statisticsList = this.buildProductionStatisticsList(productionContext); // 排产统计信息
         log.info(productionContext.getTempLogBuilder().toString());
-        baseDao.saveBatch(detailResultList);
-        baseDao.saveBatch(mouldResultList);
+        
         baseDao.saveBatch(statisticsList);
+//        this.saveSpecialMaterialResult(productionContext);
 //        this.updateMatchingProductionLog(productionContext); // 更新排产日志
+    }
+
+    /**
+     * 构建特殊材料排产记录
+     * @param productionContext 上下文
+     * @return
+     */
+    private List<SpecialMaterialResult> buildSpecialMaterialResultList(TbrProductionContext productionContext) {
+        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap();
+        List<SpecialMaterialResult> specialMaterialList = new ArrayList<>();
+        for (Map<Long, SpecialMaterialInfoVo> stockMap: specialMaterialInfoMap.values()) {
+            for (SpecialMaterialInfoVo stock: stockMap.values()) {
+                Long totalQty = longValue(stock.getSumSkuAllocateQty());
+                if (totalQty <= 0) {
+                    continue;
+                }
+                if (StringUtils.isEmpty(stock.getMaterialDesc())) {
+                    continue;
+                }
+                SpecialMaterialResult result = new SpecialMaterialResult();
+                result.setFactoryCode(productionContext.getFactoryCode());
+                result.setMonthPlanVersion(productionContext.getMonthPlanVersion());
+                result.setProductionVersion(productionContext.getProductionVersion());
+                result.setMaterialCode(stock.getMaterialCode());
+                result.setMaterialDesc(stock.getMaterialDesc());
+                result.setStandardLength(stock.getStandardLength());
+                result.setOriStandardLength(stock.getOriStandardLength());
+                result.setTotalQty(totalQty);
+                specialMaterialList.add(result);
+            }
+        }
+        return specialMaterialList;
     }
 
     /**
@@ -2206,7 +2293,6 @@ public class MatchingProductionHandler {
         this.fillMouldRelationStructureName(productionContext, requirePlanList); // 补充模具关系中的物料结构名
         this.buildGroupMainPatternInfo(productionContext); // 构建结构+主花纹的模具信息
         productionContext.setContinueStructureMap(this.getContinueStructureMap(this.getContinueInfo(productionContext))); // 设置成型机台续作结构
-
         // 各项已排产统计数据
         productionContext.setAllProductionPlan(requirePlanList.stream()
                 .collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMonthPlanId, Function.identity())));

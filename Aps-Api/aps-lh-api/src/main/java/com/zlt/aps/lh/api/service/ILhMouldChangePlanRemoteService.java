@@ -76,4 +76,11 @@ public interface ILhMouldChangePlanRemoteService {
     @PostMapping("/lhMouldChangePlan/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 排程发布
+     */
+    @ApiOperation("排程发布")
+    @PostMapping("/lhMouldChangePlan/issueSchedule")
+    AjaxResult issueSchedule(@RequestBody List<Long> ids);
+
 }

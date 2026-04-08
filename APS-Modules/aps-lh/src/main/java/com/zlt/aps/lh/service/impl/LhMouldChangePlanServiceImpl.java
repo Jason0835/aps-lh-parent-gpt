@@ -7,13 +7,17 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
+import com.zlt.aps.common.SyncDataLogsService;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -23,6 +27,7 @@ import com.zlt.common.utils.PubUtil;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +55,13 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+
+
+    @Autowired
+    private RedisService redisService;
+
+    @Autowired
+    private IMesItfService mesItfService;
 
     @Override
     public String[] getQueryFormulas() {
@@ -272,5 +284,80 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "lhResultBatchNo", "orderNo", "planDate", "lhMachineCode", "beforeMaterialCode", "afterMaterialCode");
+    }
+
+    /**
+     * 排程发布
+     */
+    @Override
+    public AjaxResult issueSchedule(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+        }
+
+        // 1. 加锁防止多次下发
+        Long[] idArray = ids.toArray(new Long[0]);
+        String lockKey = "lhMouldChangePlan:issue:lock" + Arrays.toString(idArray);
+        if (redisService.getCacheObject(lockKey)!=null) {
+            return AjaxResult.success();
+        }
+        try {
+            redisService.setCacheObject(lockKey,"1");
+            // 2. 查询选中记录
+            QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
+            wrapper.in("ID", ids);
+            List<LhMouldChangePlan> planList = lhMouldChangePlanMapper.selectList(wrapper);
+            if (CollectionUtils.isEmpty(planList)) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.noData"));
+            }
+
+            // 3. 校验是否存在已发布的数据
+            List<LhMouldChangePlan> releasedList = planList.stream()
+                    .filter(item -> ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(releasedList)) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasReleasedData"));
+            }
+
+            // 4. 转换为MdmMoldAlterPlan
+            List<MdmMoldAlterPlan> moldAlterPlanList = new ArrayList<>();
+            for (LhMouldChangePlan plan : planList) {
+                MdmMoldAlterPlan moldAlterPlan = new MdmMoldAlterPlan();
+                BeanUtils.copyProperties(plan, moldAlterPlan);
+                moldAlterPlan.setLhBatchNo(plan.getLhResultBatchNo());
+                moldAlterPlan.setLeftRightMold(plan.getLeftRightMould());
+                moldAlterPlan.setMaterialCode(plan.getBeforeMaterialCode());
+                moldAlterPlan.setSpecDesc(plan.getBeforeMaterialDesc());
+                moldAlterPlan.setPlanMaterialCode(plan.getAfterMaterialCode());
+                moldAlterPlan.setPlanSpecDesc(plan.getAfterMaterialDesc());
+                moldAlterPlan.setChangeMoldType(plan.getChangeMouldType());
+                moldAlterPlan.setMoldNo(plan.getMouldCode());
+                moldAlterPlan.setScheduleDate(plan.getScheduleDate());
+                moldAlterPlanList.add(moldAlterPlan);
+            }
+
+            // 5. 调用MES接口下发
+            try {
+                AjaxResult result = mesItfService.issueMoldAlterPlan(moldAlterPlanList);
+                if (AjaxResult.Type.ERROR.value() != Integer.parseInt(result.get(AjaxResult.CODE_TAG).toString())) {
+                    // 6. 更新发布状态为已发布
+                    for (LhMouldChangePlan plan : planList) {
+                        plan.setIsRelease(ApsConstant.IS_RELEASE);
+                    }
+                    this.baseDao.updateBatch(planList);
+                    return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.issueSuccess"));
+                } else {
+                    return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.issueFail"));
+                }
+            } catch (Exception e) {
+                log.error("排程发布失败", e);
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.issueFail"));
+            }
+        }catch (Exception e){
+            redisService.deleteObject(lockKey);
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.issueFail"));
+        } finally {
+            redisService.deleteObject(lockKey);
+        }
     }
 }

@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -24,6 +26,8 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.commons.collections4.CollectionUtils;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -82,6 +86,22 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     @DeleteMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids){
+        if (CollectionUtils.isNotEmpty(ids)) {
+            QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
+            wrapper.in("ID", ids);
+            wrapper.eq("IS_RELEASE", "1");
+            List<LhMouldChangePlan> releasedList = lhMouldChangePlanMapper.selectList(wrapper);
+            if (CollectionUtils.isNotEmpty(releasedList)) {
+                String details = releasedList.stream()
+                        .map(item -> String.format("%s/%s",
+                                StringUtil.isNotBlank(item.getLhResultBatchNo()) ? item.getLhResultBatchNo() : "-",
+                                StringUtil.isNotBlank(item.getOrderNo()) ? item.getOrderNo() : "-"))
+                        .collect(Collectors.joining("; "));
+                String msg = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.releaseCannotDelete");
+                msg = StringUtils.format(msg, details);
+                return AjaxResult.error(msg);
+            }
+        }
         return super.removeByIds(ids);
     }
 
@@ -139,7 +159,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     /**
-     * 条件拼接 - 所有数据库字段都支持查询
+     * 条件拼接 - 所有数据库字段都支持查�?
      *
      * @param queryWrapper
      * @param queryVO
@@ -186,4 +206,21 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return "plan_date desc, create_time desc";
     }
 
+    /**
+     * 排程发布
+     */
+    @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.PUBLISH)
+    @ApiOperation("排程发布")
+    @PostMapping("/issueSchedule")
+    public AjaxResult issueSchedule(@RequestBody List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+        }
+        return lhMouldChangePlanService.issueSchedule(ids);
+    }
+
 }
+
+
+
+

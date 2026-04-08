@@ -62,7 +62,7 @@
     <select id="getSpecialMaterialStockInfo" resultType="com.zlt.aps.mp.engine.domain.vo.SpecialMaterialStockVo">
 	    SELECT
 		    SMS.MATERIAL_CODE,
-		    SMS.MATERIAL_DESC,
+		    SMR.MATERIAL_DESC,
 		    SMR.QUOTA * MAX( SMS.STOCK / SMS.PACKAGE_NUM ) STANDARD_LENGTH,
 		    STANDARD_LENGTH ORI_STANDARD_LENGTH,
 		    SUM( SMS.STOCK ) STOCK 
@@ -79,6 +79,7 @@
 		    AND SMS.MONTH = #{month,jdbcType=DECIMAL} 
 		    AND SMS.STANDARD_LENGTH > 0 
 		    AND SMS.STOCK > 0 
+		    AND SMS.PACKAGE_NUM > 0
 		    AND NOT EXISTS (
 			    SELECT
 			        0 
@@ -94,7 +95,7 @@
 		    ) 
 		GROUP BY
 		    sms.MATERIAL_CODE,
-		    sms.MATERIAL_DESC,
+		    SMR.MATERIAL_DESC,
 		    smr.quota,
 		    STANDARD_LENGTH
     </select>

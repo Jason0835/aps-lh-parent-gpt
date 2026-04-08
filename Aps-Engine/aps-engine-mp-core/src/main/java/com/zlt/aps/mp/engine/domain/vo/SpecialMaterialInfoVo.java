@@ -27,6 +27,10 @@ public class SpecialMaterialInfoVo implements Serializable {
      */
     private Long standardLength;
     /**
+     * 标准长（原值）
+     */
+    private Long oriStandardLength;
+    /**
      * 库存量
      */
     private Long stock;
@@ -58,6 +62,7 @@ public class SpecialMaterialInfoVo implements Serializable {
         info.setMaterialCode(stockInfo.getMaterialCode());
         info.setMaterialDesc(stockInfo.getMaterialDesc());
         info.setStandardLength(stockInfo.getStandardLength());
+        info.setOriStandardLength(stockInfo.getOriStandardLength());
         info.setStock(stockInfo.getStock());
         info.setSumProductionQty(BigDecimal.ZERO.longValue());
         info.setSumSkuAllocateQty(BigDecimal.ZERO.longValue());

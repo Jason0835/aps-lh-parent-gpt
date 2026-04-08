@@ -224,4 +224,16 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
         TableDataInfo tableDataInfo = iMdmMaterialInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }
+
+    /**
+     * 排程发布
+     */
+    @ApiOperation("排程发布")
+    @RequiresPermissions("lh:lhMouldChangePlan:issue")
+    @PostMapping("/issueSchedule")
+    @ResponseBody
+    public AjaxResult issueSchedule(@RequestParam String ids) {
+        Long[] arr = Convert.toLongArray(ids);
+        return iLhMouldChangePlanService.issueSchedule(Arrays.asList(arr));
+    }
 }
