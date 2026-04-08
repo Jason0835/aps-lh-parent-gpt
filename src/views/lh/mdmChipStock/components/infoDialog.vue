@@ -8,73 +8,37 @@
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <el-form
+    <info-form
+      class="form-item-height"
       ref="form"
-      :model="form"
+      :form="form"
       :rules="rules"
+      :columns="columns"
       label-position="right"
       label-width="120px"
       v-loading="loading"
     >
-      <el-row>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mdmChipStock.factoryCode')" prop="factoryCode">
-            <el-select
-              v-model="form.factoryCode"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              filterable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.biz_factory_name"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-<!--        <el-col :span="24">-->
-<!--          <el-form-item :label="$t('ui.data.column.mdmChipStock.companyCode')" prop="companyCode">-->
-<!--            <el-input v-model="form.companyCode" :placeholder="$t('common.rule.input')" />-->
-<!--          </el-form-item>-->
-<!--        </el-col>-->
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mdmChipStock.chipCode')" prop="chipCode">
-            <el-input v-model="form.chipCode" :placeholder="$t('common.rule.input')" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mdmChipStock.stockNum')" prop="stockNum">
-            <el-input-number v-model="form.stockNum" :placeholder="$t('common.rule.input')" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mdmChipStock.finishQty')" prop="finishQty">
-            <el-input-number v-model="form.finishQty" :placeholder="$t('common.rule.input')" style="width: 100%" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.data.column.mdmChipStock.remark')" prop="remark">
-            <el-input v-model="form.remark" type="textarea" :rows="3" :placeholder="$t('common.rule.input')" />
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
+    </info-form>
     <template slot="footer">
-      <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        $t("common.button.confirm")
+        this.$t("common.button.confirm")
       }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import { editMdmChipStock, getMachineList, checkMdmChipStockUnique, mergeMdmChipStock } from "@/api/lh/mdmChipStock";
+import {
+  checkMdmChipStockUnique,
+  editMdmChipStock,
+  mergeMdmChipStock,
+} from "@/api/lh/mdmChipStock";
+
+import infoForm from "@/views/components/infoForm.vue";
 
 export default {
+  components: { infoForm },
   inject: ["parentDict"],
   data() {
     return {
@@ -113,12 +77,46 @@ export default {
         ? this.$t("common.button.edit")
         : this.$t("common.button.add");
     },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.mdmChipStock.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "chipCode",
+          label: this.$t("ui.data.column.mdmChipStock.chipCode"),
+          maxlength: 32,
+        },
+        {
+          prop: "stockNum",
+          label: this.$t("ui.data.column.mdmChipStock.stockNum"),
+          type: "number",
+        },
+        {
+          prop: "finishQty",
+          label: this.$t("ui.data.column.mdmChipStock.finishQty"),
+          type: "number",
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.data.column.mdmChipStock.remark"),
+          type: "textarea",
+          rows: 3,
+          maxlength: 500,
+        },
+      ];
+    },
   },
   methods: {
-    async save() {
+    // api
+    async save(params) {
       try {
         this.loading = true;
-        const res = await editMdmChipStock(this.form);
+
+        const res = await editMdmChipStock(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -128,39 +126,42 @@ export default {
         this.loading = false;
       }
     },
-    async checkUniqueAndSave() {
+    async merge(params) {
       try {
-        const res = await checkMdmChipStockUnique(this.form);
-        if (res == 0) {
-          // 唯一，直接保存
-          await this.save();
+        this.loading = true;
+
+        const res = await mergeMdmChipStock(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async checkUniqueAndSave(params) {
+      try {
+        const res = await checkMdmChipStockUnique(params);
+        if (res === 0) {
+          await this.save(params);
         } else {
-          // 重复，提示是否合并
-          this.$confirm(this.$t("mdmChipStock.chipCodeExistsConfirmMerge"), {
+          await this.$confirm(this.$t("mdmChipStock.chipCodeExistsConfirmMerge"), {
             type: "warning",
             confirmButtonText: this.$t("common.button.confirm"),
             cancelButtonText: this.$t("common.button.cancel"),
-          }).then(async () => {
-            // 确认合并
-            try {
-              this.loading = true;
-              const mergeRes = await mergeMdmChipStock(this.form);
-              this.$modal.msgSuccess(mergeRes.msg);
-              this.$emit("success");
-              this.hide();
-            } catch (error) {
-              console.log(error);
-            } finally {
-              this.loading = false;
-            }
-          }).catch(() => {
-            // 取消，不操作
           });
+          await this.merge(params);
         }
       } catch (error) {
-        console.log(error);
+        // ignore confirm cancel/close
+        if (error !== "cancel" && error !== "close") {
+          console.log(error);
+        }
       }
     },
+
+    // utils
     show(data) {
       this.visible = true;
       if (data) {
@@ -176,22 +177,13 @@ export default {
     },
     hide() {
       this.form = {};
-      if (this.$refs.form) {
-        this.$refs.form.resetFields();
-      }
+      this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.validate((valid) => {
-        if (valid) {
-          if (this.isEdit) {
-            this.save();
-          } else {
-            this.checkUniqueAndSave();
-          }
-        }
-      });
+      const callback = this.isEdit ? this.save : this.checkUniqueAndSave;
+      this.$refs.form.triggerConfirm(callback);
     },
   },
 };
