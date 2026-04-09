@@ -115,6 +115,10 @@ public class MpMonthlySaleQtyController extends AbstractDocBizController<MpMonth
             BeanUtil.copyProperties(dataCellStyle, yellowCellStyle);
             yellowCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
             yellowCellStyle.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
+            yellowCellStyle.setBorderBottom(BorderStyle.THIN);
+            yellowCellStyle.setBorderTop(BorderStyle.THIN);
+            yellowCellStyle.setBorderLeft(BorderStyle.THIN);
+            yellowCellStyle.setBorderRight(BorderStyle.THIN);
 
             int areaDataSize = areaTableTitleList.size();
 
