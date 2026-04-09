@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
@@ -242,8 +243,8 @@ public interface CoreScheduleAlgorithmService {
         private Integer catchUpQuantity;
         
         // ==================== S5.2 排程分类与余量计算新增字段 ====================
-        /** 硫化任务ID(用于关联 materialStockMap) */
-        private Long id;
+        /** 硫化任务ID（用于关联 materialStockMap） */
+        private Long lhId;
         /** 分配的胎胚库存（按硫化任务ID分配） */
         private Integer allocatedStock;
         /** 待排产量 = (日硫化量 - 库存) × (1 + 损耗率) + 异常平摊 */

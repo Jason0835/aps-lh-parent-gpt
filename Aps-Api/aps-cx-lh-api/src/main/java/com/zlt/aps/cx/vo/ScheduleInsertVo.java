@@ -5,6 +5,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 插单请求VO
@@ -16,7 +17,7 @@ import java.math.BigDecimal;
 public class ScheduleInsertVo {
 
     @ApiModelProperty(value = "排程日期", required = true)
-    private String scheduleDate;
+    private Date scheduleDate;
 
     @ApiModelProperty(value = "机台编码", required = true)
     private String cxMachineCode;

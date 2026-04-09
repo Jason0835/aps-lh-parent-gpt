@@ -1709,7 +1709,7 @@ public class MpWeekRollAdjustEngine {
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,其产能限制信息:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,dailyCapacityLimitVoMap.get(endDay) == null ? "" : dailyCapacityLimitVoMap.get(endDay).toString())).append(ApsConstant.DIVISION);
         //检查: 当前每日硫化机台数\当前每日胎胚种类数 符合性
         //检查：主花纹向下模具数量(/2转成机台数) 符合性
-        int cavityQty = getNewCavityQty(contextDTO,curFinalVo,endDay);
+        /*int cavityQty = getNewCavityQty(contextDTO,curFinalVo,endDay);
         contextDTO.getLogDetail().append(String.format("结构:%s,物料编码:%s,【扣减其他SKU的搭配】,排产日:%s,获取到新的型腔数:%s！",contextDTO.getStructureName(),curFinalVo.getMaterialCode(),endDay,cavityQty)).append(ApsConstant.DIVISION);
         if (!adjustDailyCapacityLimitObj.preCheckCapacitySatisfy(dailyCapacityLimitVo) ||
                 !preCheckMouldSatisfy(dailyCapacityLimitVo,cavityQty)){
@@ -1718,7 +1718,7 @@ public class MpWeekRollAdjustEngine {
             dailyCapacityLimitVo = ObjectUtils.defaultIfNull(dailyCapacityLimitVo, new MpDailyCapacityLimitVo());
             addAdjustProcLog(contextDTO,curFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.deductMatch.checkCapacityLimit"),curFinalVo.getMaterialCode(),endDay, dailyCapacityLimitVo.getUsedLhMachines(),dailyCapacityLimitVo.getUsedEmbryoTypes(),dailyCapacityLimitVo.getPatternUsedLhMachines()));
             return;
-        }
+        }*/
 
         // 1. 获取某日有搭配量的其他SKU定稿列表
         List<FactoryMonthPlanFinalAdjustVo> newOtherFinalList = getMatchFinalListByDay(endDay, curFinalVo, mpProdFinalList);
@@ -1728,7 +1728,7 @@ public class MpWeekRollAdjustEngine {
             addAdjustProcLog(contextDTO,curFinalVo,String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.log.deductMatch.otherSkuNoMatch"),curFinalVo.getMaterialCode(),endDay));
             return;
         }
-        FactoryMonthPlanFinalAdjustVo optimalFinalVo,bakMpFinalVo;
+        FactoryMonthPlanFinalAdjustVo optimalFinalVo,bakOptimalFinalVo,bakMpFinalVo;
         int remainPlanQty,deductMatchQty;
         Integer curServeProductionQty;
         while (newOtherFinalList.size() >0 ){
@@ -1738,6 +1738,9 @@ public class MpWeekRollAdjustEngine {
             // 3.清空搭配日计划 及扣减搭配总量
             bakMpFinalVo = new FactoryMonthPlanFinalAdjustVo();
             BeanUtils.copyProperties(curFinalVo,bakMpFinalVo);
+            bakOptimalFinalVo = new FactoryMonthPlanFinalAdjustVo();
+            BeanUtils.copyProperties(optimalFinalVo,bakOptimalFinalVo);
+
             clearMpFinalDayValue(contextDTO,endDay,curFinalVo);
             int clearDayValue = clearMpFinalDayValue(contextDTO,endDay,optimalFinalVo);
             if (curServeProductionQty >= clearDayValue){
@@ -1751,6 +1754,12 @@ public class MpWeekRollAdjustEngine {
             }else {
                 //若搭配量比清空的值小，即不能覆盖，那减少的搭配量 = 搭配量
                 deductMatchQty = curServeProductionQty;
+                //恢复多清的实单量(从备份中获取原始)
+                String dayField = FactoryConstant.DAY_FIELD + endDay;
+                if (bakOptimalFinalVo.getFieldValueByFieldName(dayField) != null){
+                    int remainRealQty = (Integer) bakOptimalFinalVo.getFieldValueByFieldName(dayField) - deductMatchQty;
+                    optimalFinalVo.setFieldValueByFieldName(dayField,remainRealQty);
+                }
                 if (isConvertionProd(optimalFinalVo)){
                     optimalFinalVo.setConventionProductionQty(0);
                 }else{
@@ -2452,6 +2461,10 @@ public class MpWeekRollAdjustEngine {
                 .sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
 
         int lockNextDay = contextDTO.getLockEndDay() + 1;
+
+        // 重算在机SKU的产能信息
+        reCalcAdjustDailyCapacityLimit(contextDTO,mpProdFinalList,new MpAdjustDailyCapacityLimit());
+
         //2、排实单
         Integer newOnLineDay;
         Iterator<MpAdjustStructureIn> incAdjustFormalIter,incAdjustBatchTrailIter;
@@ -2480,6 +2493,22 @@ public class MpWeekRollAdjustEngine {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+     * @param contextDTO 周程滚动上下文
+     * @param mpProdFinalList 定稿记录列表
+     */
+    protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
+
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        for (int i = contextDTO.getStructureStartDay(); i<= contextDTO.getStructureDeadLine(); i++){
+            if (dailyCapacityLimitVoMap.get(i) == null){
+                continue;
+            }
+            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null);
         }
     }
 
@@ -2709,6 +2738,9 @@ public class MpWeekRollAdjustEngine {
         //1、排序
         incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureOut::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
         int lockNextDay = contextDTO.getLockEndDay() + 1;
+
+        // 重算在机SKU的产能信息
+        reCalcAdjustDailyCapacityLimit(contextDTO,mpProdFinalList,new MpAdjustDailyCapacityLimit());
 
         //2、排实单
         Integer newOnLineDay;
