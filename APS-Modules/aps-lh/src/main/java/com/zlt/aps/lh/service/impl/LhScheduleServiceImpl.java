@@ -12,6 +12,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +28,7 @@ import java.util.List;
  */
 @Slf4j
 @Service
-public class LhScheduleServiceImpl implements ILhScheduleService {
+public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> implements ILhScheduleService {
 
     @Resource
     private IScheduleExecutor scheduleExecutor;
@@ -92,4 +93,10 @@ public class LhScheduleServiceImpl implements ILhScheduleService {
         context.setScheduleDate(LhScheduleTimeUtil.addDays(target, -offsetDays));
         return context;
     }
+
+    @Override
+    public String getDocTypeCode() {
+        return "OUT2046";
+    }
+
 }

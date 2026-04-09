@@ -1,8 +1,6 @@
 package com.zlt.aps.cx.entity.schedule;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -28,11 +26,9 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 硫化排程结果ID（主键）
+     * 主键使用父类 {@link com.ruoyi.common.core.web.domain.BaseEntity#getId()}，
+     * 对应表字段 ID（与 aps-lh-api 中 LhScheduleResult 一致）。不可再声明 @TableId，否则与 BaseEntity 重复。
      */
-    @ApiModelProperty(value = "硫化排程结果ID", name = "lhId")
-    @TableId(value = "LH_ID", type = IdType.AUTO)
-    private Long lhId;
 
     /**
      * 分厂编号
