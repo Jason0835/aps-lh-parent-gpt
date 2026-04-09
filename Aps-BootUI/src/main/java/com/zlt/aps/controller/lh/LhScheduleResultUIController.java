@@ -24,7 +24,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +49,12 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     @Autowired
     private ILhScheduleResultRemoteService iLhScheduleResultRemoteService;
 
+    @ApiOperation("获取详细信息")
+    @GetMapping("/getInfo/{id}")
+    @ResponseBody
+    public AjaxResult getInfo(@PathVariable("id") Long id) {
+        return AjaxResult.success(iLhScheduleResultRemoteService.getInfo(id));
+    }
 
     /**
      * 根据条件查询主表数据

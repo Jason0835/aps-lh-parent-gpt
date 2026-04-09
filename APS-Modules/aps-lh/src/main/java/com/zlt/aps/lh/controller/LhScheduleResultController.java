@@ -134,6 +134,13 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return tableDataInfo;
     }
 
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{billId}")
+    @Override
+    public LhScheduleResult getInfo(@PathVariable("billId") Long billId) {
+        return super.getInfo(billId);
+    }
+
 
     /**
      * 编辑

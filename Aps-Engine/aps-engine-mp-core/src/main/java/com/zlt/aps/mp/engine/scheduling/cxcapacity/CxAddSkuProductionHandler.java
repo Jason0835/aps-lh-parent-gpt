@@ -158,7 +158,7 @@ public class CxAddSkuProductionHandler {
         groupPlanInfo.correctProductionDateRange(context, addSkuInfo, lhGroup, doubleMouldList, onLineMachineInfo);
         Integer newStartDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();
-        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, startDay, endDay);
+        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, newStartDay, endDay);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             retrieveNextSku(context, productionStage, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
             return;
