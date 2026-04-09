@@ -26,4 +26,11 @@ public interface MdmSkuConstructionRefEntityMapper extends CommBaseMapper<MdmSku
      * @return 结果
      */
     int updateMainMaterialDescToMaterialInfo(MdmSkuConstructionRef queryVO);
+
+    /**
+     * 更新物料描述到SKU与示方关系
+     * @return 结果
+     */
+    int updateMaterialDesc();
+
 }

@@ -2,6 +2,8 @@ package com.zlt.aps.lh.service;
 
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.bill.common.service.IDocService;
 
 /**
  * 硫化排程主服务接口
@@ -9,7 +11,7 @@ import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
  *
  * @author APS
  */
-public interface ILhScheduleService {
+public interface ILhScheduleService extends IDocService<LhScheduleResult> {
 
     /**
      * 执行自动排程
