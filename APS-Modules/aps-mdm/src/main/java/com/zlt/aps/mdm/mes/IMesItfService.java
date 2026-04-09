@@ -138,8 +138,8 @@ public interface IMesItfService {
      * @return 结果
      */
     @ApiOperation("同步模具清洗预警计划")
-    @PostMapping("/mesItf/syncMouldCleanPlan")
-    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+    @PostMapping("/mesItf/syncMouldCleanWarn")
+    public AjaxResult syncMouldCleanWarn(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 同步成型排程完成量

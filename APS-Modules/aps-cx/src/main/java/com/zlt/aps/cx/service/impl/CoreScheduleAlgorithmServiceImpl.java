@@ -1,20 +1,18 @@
 package com.zlt.aps.cx.service.impl;
 
+
+
 import com.zlt.aps.cx.api.domain.entity.CxStock;
-import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
-// Engine 包 - 核心算法
-import com.zlt.aps.cx.service.engine.ContinueTaskProcessor;
-import com.zlt.aps.cx.service.engine.CoreScheduleAlgorithmService;
-import com.zlt.aps.cx.service.engine.NewTaskProcessor;
-import com.zlt.aps.cx.service.engine.ShiftScheduleService;
-import com.zlt.aps.cx.service.engine.TaskGroupService;
-import com.zlt.aps.cx.service.engine.TrialTaskProcessor;
+import com.zlt.aps.cx.mapper.MdmWorkCalendarMapper;
+import com.zlt.aps.cx.service.engine.*;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,8 +20,6 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -61,9 +57,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final TrialTaskProcessor trialTaskProcessor;
     private final NewTaskProcessor newTaskProcessor;
     private final ShiftScheduleService shiftScheduleService;
+    private final MdmWorkCalendarMapper workCalendarMapper;
 
     /** 默认排程天数 */
     private static final int DEFAULT_SCHEDULE_DAYS = 3;
+
+    /** 排程起始偏移天数：前端传入最后一天，需要往前推2天开始排产 */
+    private static final int SCHEDULE_START_OFFSET_DAYS = 2;
 
     @Override
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
@@ -98,7 +98,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // 设置当前天的上下文
-            LocalDate currentScheduleDate = context.getScheduleDate().plusDays(day - 1);
+            // 前端传入的是最后一天（如2026-03-28），需要往前推2天开始排产（如2026-03-26）
+            LocalDate currentScheduleDate = context.getScheduleDate().minusDays(SCHEDULE_START_OFFSET_DAYS).plusDays(day - 1);
             context.setCurrentScheduleDay(day);
             context.setCurrentScheduleDate(currentScheduleDate);
             context.setCurrentShiftConfigs(dayShifts);
@@ -158,8 +159,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("========== 开始执行第 {} 天排程，日期: {} ==========", day, scheduleDate);
 
         // ==================== 第一步：S5.2 任务分组 ====================
+        // 传入当前天的班次配置，获取对应班次的硫化计划量
         TaskGroupService.TaskGroupResult taskGroup = taskGroupService.groupTasks(
-                context, machineOnlineEmbryoMap, scheduleDate);
+                context, machineOnlineEmbryoMap, scheduleDate, dayShifts);
         log.info("任务分组完成：续作 {} 个，试制 {} 个，新增 {} 个",
                 taskGroup.getContinueTasks().size(),
                 taskGroup.getTrialTasks().size(),
@@ -264,23 +266,28 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
     /**
      * 判断是否为停产日
+     * 按日期查询工作日历，检查dayFlag字段
      */
     private boolean isStopProductionDay(ScheduleContextVo context, LocalDate date) {
-        MdmWorkCalendar workCalendar = context.getWorkCalendar();
+        // 按日期查询工作日历
+        MdmWorkCalendar workCalendar = workCalendarMapper.selectOne(
+                new LambdaQueryWrapper<MdmWorkCalendar>()
+                        .eq(MdmWorkCalendar::getProcCode, "CX")  // 成型工序编码
+                        .eq(MdmWorkCalendar::getProductionDate, java.sql.Date.valueOf(date)));
+
         if (workCalendar != null) {
             // 使用 dayFlag 判断：0-停, 1-开
             String dayFlag = workCalendar.getDayFlag();
+            log.info("日期 {} 工作日历查询结果: dayFlag={}, 判定为{}", date, dayFlag, "0".equals(dayFlag) ? "停产日" : "生产日");
             if ("0".equals(dayFlag)) {
                 return true; // 停产日
             }
+        } else {
+            // 工作日历中没有记录，默认为生产日
+            log.info("日期 {} 无工作日历记录，默认为生产日", date);
         }
 
-        if (context.getCurrentScheduleDate() != null
-                && date.equals(context.getCurrentScheduleDate())
-                && Boolean.TRUE.equals(context.getIsClosingDay())) {
-            return true;
-        }
-
+        // 不再使用 isClosingDay 判断，仅依赖工作日历配置
         return false;
     }
 
@@ -382,14 +389,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     @Override
     public List<DailyEmbryoTask> calculateDailyEmbryoTasks(
             ScheduleContextVo context,
-            Map<String, Set<String>> machineOnlineEmbryoMap) {
+            Map<String, Set<String>> machineOnlineEmbryoMap,
+            List<CxShiftConfig> dayShifts) {
 
         LocalDate scheduleDate = context.getCurrentScheduleDate() != null
                 ? context.getCurrentScheduleDate()
                 : context.getScheduleDate();
 
         TaskGroupService.TaskGroupResult groupResult = taskGroupService.groupTasks(
-                context, machineOnlineEmbryoMap, scheduleDate);
+                context, machineOnlineEmbryoMap, scheduleDate, dayShifts);
 
         List<DailyEmbryoTask> allTasks = new ArrayList<>();
         allTasks.addAll(groupResult.getContinueTasks());
