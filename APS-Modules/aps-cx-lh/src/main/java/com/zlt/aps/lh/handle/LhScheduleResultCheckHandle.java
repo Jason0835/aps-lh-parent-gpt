@@ -1,4 +1,4 @@
-package com.zlt.aps.lh.handle;
+package com.zlt.aps.lh.handler;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;

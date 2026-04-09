@@ -10,20 +10,6 @@ import lombok.Data;
 
 import java.io.Serializable;
 
-/**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：LhSpecifyMachine.java
- * 描    述：硫化定点机台信息对象 t_lh_specify_machine
- *@author zlt
- *@date 2025-02-25
- *@version 1.0
- *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
- */
-
 @ApiModel(value = "硫化定点机台信息对象", description = "硫化定点机台信息对象 ")
 @Data
 @TableName(value = "T_LH_SPECIFY_MACHINE")

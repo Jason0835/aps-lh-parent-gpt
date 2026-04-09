@@ -36,8 +36,8 @@ public interface MdmCxMachineOnlineInfoMapper extends BaseMapper<MdmCxMachineOnl
      */
     @Select("SELECT * FROM T_MDM_CX_MACHINE_ONLINE_INFO " +
             "WHERE (ONLINE_DATE = #{today} OR ONLINE_DATE = #{yesterday}) AND IS_DELETE = 0")
-    List<MdmCxMachineOnlineInfo> selectByDateRange(@Param("today") LocalDate today, 
-                                                    @Param("yesterday") LocalDate yesterday);
+    List<MdmCxMachineOnlineInfo> selectByDateRange(@Param("today") LocalDate today,
+                                                   @Param("yesterday") LocalDate yesterday);
 
     /**
      * 按机台编码查询在机信息

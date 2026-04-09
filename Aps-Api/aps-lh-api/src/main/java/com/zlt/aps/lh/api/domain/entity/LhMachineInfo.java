@@ -14,19 +14,7 @@ import org.apache.ibatis.type.JdbcType;
 import java.io.Serializable;
 import java.math.BigDecimal;
 
-/**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：LhMachineInfo.java
- * 描    述：硫化机台信息对象 t_lh_machine_info
- *@author zlt
- *@date 2025-03-07
- *@version 1.0
- *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
- */
+
 @ApiModel(value = "硫化机台信息对象", description = "硫化机台信息对象")
 @Data
 @TableName(value = "T_LH_MACHINE_INFO")

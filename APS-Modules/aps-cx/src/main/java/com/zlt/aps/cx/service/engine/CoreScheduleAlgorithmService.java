@@ -1,9 +1,10 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.api.domain.entity.CxStock;
-import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -44,11 +45,13 @@ public interface CoreScheduleAlgorithmService {
      *
      * @param context                   排程上下文
      * @param machineOnlineEmbryoMap   机台在产胎胚映射（用于续作判断）
+     * @param dayShifts                当前天的班次配置列表（用于获取对应班次的硫化计划量）
      * @return 日胎胚任务列表
      */
     List<DailyEmbryoTask> calculateDailyEmbryoTasks(
             ScheduleContextVo context,
-            Map<String, Set<String>> machineOnlineEmbryoMap);
+            Map<String, Set<String>> machineOnlineEmbryoMap,
+            List<CxShiftConfig> dayShifts);
 
     /**
      * 第二步：试错分配任务到机台
@@ -201,6 +204,8 @@ public interface CoreScheduleAlgorithmService {
         private String trialNo;
         /** 库存可供时长 */
         private BigDecimal stockHours;
+        /** 库存是否高预警（>18小时） */
+        private Boolean isStockHighWarning;
         /** 硫化机台数 */
         private Integer vulcanizeMachineCount;
         /** 硫化模数 */
@@ -237,10 +242,14 @@ public interface CoreScheduleAlgorithmService {
         private Integer catchUpQuantity;
         
         // ==================== S5.2 排程分类与余量计算新增字段 ====================
-        /** 分配的胎胚库存（按硫化需求占比分配） */
+        /** 硫化任务ID(用于关联 materialStockMap) */
+        private Long id;
+        /** 分配的胎胚库存（按硫化任务ID分配） */
         private Integer allocatedStock;
         /** 待排产量 = (日硫化量 - 库存) × (1 + 损耗率) + 异常平摊 */
         private Integer plannedProduction;
+        /** 需要的车数 = 待排产量 / 胎面整车条数 */
+        private Integer requiredCars;
         
         // ==================== S5.3 开停产处理新增字段 ====================
         /** 开产班次产能（首班只排6小时） */

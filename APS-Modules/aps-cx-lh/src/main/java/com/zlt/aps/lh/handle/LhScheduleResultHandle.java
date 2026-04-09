@@ -1,4 +1,4 @@
-package com.zlt.aps.lh.handle;
+package com.zlt.aps.lh.handler;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;

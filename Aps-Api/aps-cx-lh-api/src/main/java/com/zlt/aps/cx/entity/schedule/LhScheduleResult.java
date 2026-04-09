@@ -1,6 +1,8 @@
 package com.zlt.aps.cx.entity.schedule;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -20,11 +22,10 @@ import java.util.Date;
  */
 @ApiModel(value = "硫化排程结果对象", description = "硫化排程结果表实体对象")
 @Data
-@TableName(value = "T_LH_SCHEDULE_RESULT")
+@TableName(value = "t_lh_schedule_result")
 public class LhScheduleResult extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
-
 
     /**
      * 分厂编号
@@ -722,11 +723,4 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "TOTAL_DAILY_PLAN_QTY")
     private Integer totalDailyPlanQty;
 
-    /**
-     * 删除标识（0未删除；1已删除）
-     */
-    @Excel(name = "ui.data.column.lhScheduleResult.isDelete")
-    @ApiModelProperty(value = "删除标识（0未删除；1已删除）", name = "isDelete")
-    @TableField(value = "IS_DELETE")
-    private Integer isDelete;
 }

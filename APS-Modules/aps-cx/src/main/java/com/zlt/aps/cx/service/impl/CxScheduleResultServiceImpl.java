@@ -1,17 +1,24 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.zlt.aps.cx.vo.ScheduleQueryVo;
-import com.zlt.aps.cx.vo.ScheduleResultVo;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
+import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.enums.ImportErrorTypeEnums;
+import com.zlt.common.utils.ImportExcelValidatedUtils;
+import com.zlt.common.utils.PubUtil;
+import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,8 +28,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -32,237 +38,134 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-public class CxScheduleResultServiceImpl extends ServiceImpl<CxScheduleResultMapper, CxScheduleResult>
+public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleResult> 
         implements CxScheduleResultService {
 
+    @Autowired
+    private CxScheduleResultMapper cxScheduleResultMapper;
+    
     @Autowired
     private CxScheduleDetailService cxScheduleDetailService;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
-        return list(new LambdaQueryWrapper<CxScheduleResult>()
+        return cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
                 .eq(CxScheduleResult::getScheduleDate, scheduleDate.atStartOfDay())
                 .orderByAsc(CxScheduleResult::getCxMachineCode));
     }
 
     @Override
-    public List<CxScheduleResult> listByMachineAndDate(String cxMachineCode, LocalDate scheduleDate) {
-        return list(new LambdaQueryWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getCxMachineCode, cxMachineCode)
-                .eq(CxScheduleResult::getScheduleDate, scheduleDate.atStartOfDay())
-                .orderByAsc(CxScheduleResult::getId));
+    public AjaxResult importData(List<CxScheduleResult> list, boolean updateSupport, Long importLogId) {
+        int successNum = 0;
+        int failureNum = 0;
+        List<CxScheduleResult> importList = new ArrayList<>();
+        List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+
+        // Step1: 数据校验
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            CxScheduleResult docEntity = list.get(i);
+            List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            if (CollectionUtils.isNotEmpty(validated)) {
+                failureNum++;
+                docEntity.setId(-999L);
+                importErrorLogs.addAll(validated);
+            }
+        }
+
+        // Step2: 处理有效数据
+        for (int i = 0; i < list.size(); i++) {
+            int errorNum = i + 2;
+            CxScheduleResult docEntity = list.get(i);
+            if (docEntity.getId() != null && docEntity.getId() == -999L) {
+                continue;
+            }
+
+            // 必填字段校验
+            if (StringUtil.isBlank(docEntity.getCxMachineCode())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxScheduleResult.machineCodeRequired");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+
+            if (docEntity.getScheduleDate() == null) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxScheduleResult.scheduleDateRequired");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+
+            // 唯一性校验
+            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
+                importList.add(docEntity);
+                successNum++;
+            } else {
+                if (updateSupport) {
+                    QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("CX_MACHINE_CODE", docEntity.getCxMachineCode());
+                    queryWrapper.eq("SCHEDULE_DATE", docEntity.getScheduleDate());
+                    queryWrapper.eq("ORDER_NO", docEntity.getOrderNo());
+                    CxScheduleResult existEntity = cxScheduleResultMapper.selectOne(queryWrapper);
+                    if (existEntity != null) {
+                        docEntity.setId(existEntity.getId());
+                        importList.add(docEntity);
+                        successNum++;
+                    }
+                } else {
+                    failureNum++;
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                            String.format(uniqueMsg, errorNum), importErrorLogs);
+                }
+            }
+        }
+
+        if (CollectionUtils.isEmpty(importList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        }
+
+        // Step3: 批量导入
+        for (CxScheduleResult entity : importList) {
+            if (entity.getId() != null) {
+                cxScheduleResultMapper.updateById(entity);
+            } else {
+                cxScheduleResultMapper.insert(entity);
+            }
+        }
+
+        if (failureNum > 0) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        } else {
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+        }
     }
 
     @Override
-    public List<CxScheduleResult> listByEmbryoCode(String embryoCode) {
-        return list(new LambdaQueryWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getEmbryoCode, embryoCode)
-                .orderByDesc(CxScheduleResult::getScheduleDate));
+    public String checkUnique(CxScheduleResult entity) {
+        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), "ID", entity.getFieldValueByFieldName("id"));
+        queryWrapper.eq("CX_MACHINE_CODE", entity.getCxMachineCode());
+        queryWrapper.eq("SCHEDULE_DATE", entity.getScheduleDate());
+        queryWrapper.eq("ORDER_NO", entity.getOrderNo());
+
+        if (cxScheduleResultMapper.selectCount(queryWrapper) > 0) {
+            return UserConstants.NOT_UNIQUE;
+        } else {
+            return UserConstants.UNIQUE;
+        }
     }
 
     @Override
-    public Page<ScheduleResultVo> pageList(ScheduleQueryVo queryDTO) {
-        Page<CxScheduleResult> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
-
-        LambdaQueryWrapper<CxScheduleResult> wrapper = new LambdaQueryWrapper<>();
-
-        // 日期范围
-        if (queryDTO.getStartDate() != null) {
-            wrapper.ge(CxScheduleResult::getScheduleDate, queryDTO.getStartDate().atStartOfDay());
-        }
-        if (queryDTO.getEndDate() != null) {
-            wrapper.le(CxScheduleResult::getScheduleDate, queryDTO.getEndDate().atStartOfDay());
-        }
-
-        // 其他条件
-        if (StringUtils.hasText(queryDTO.getCxMachineCode())) {
-            wrapper.eq(CxScheduleResult::getCxMachineCode, queryDTO.getCxMachineCode());
-        }
-        if (StringUtils.hasText(queryDTO.getEmbryoCode())) {
-            wrapper.eq(CxScheduleResult::getEmbryoCode, queryDTO.getEmbryoCode());
-        }
-        if (StringUtils.hasText(queryDTO.getStructureName())) {
-            wrapper.eq(CxScheduleResult::getStructureName, queryDTO.getStructureName());
-        }
-        if (StringUtils.hasText(queryDTO.getProductionStatus())) {
-            wrapper.eq(CxScheduleResult::getProductionStatus, queryDTO.getProductionStatus());
-        }
-        if (StringUtils.hasText(queryDTO.getIsRelease())) {
-            wrapper.eq(CxScheduleResult::getIsRelease, queryDTO.getIsRelease());
-        }
-
-        wrapper.orderByDesc(CxScheduleResult::getScheduleDate)
-                .orderByAsc(CxScheduleResult::getCxMachineCode);
-
-        Page<CxScheduleResult> resultPage = page(page, wrapper);
-
-        // 转换为DTO
-        Page<ScheduleResultVo> dtoPage = new Page<>(resultPage.getCurrent(), resultPage.getSize(), resultPage.getTotal());
-        dtoPage.setRecords(resultPage.getRecords().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList()));
-
-        return dtoPage;
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("cxMachineCode", "scheduleDate", "orderNo");
     }
 
     @Override
-    public ScheduleResultVo getDetailById(Long id) {
-        CxScheduleResult result = getById(id);
-        if (result == null) {
-            return null;
-        }
-
-        ScheduleResultVo dto = convertToDTO(result);
-
-        // 查询明细
-        List<CxScheduleDetail> details = cxScheduleDetailService.listByMainId(id);
-        dto.setDetails(details.stream().map(this::convertDetailToDTO).collect(Collectors.toList()));
-
-        return dto;
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean updateProductionStatus(Long id, String productionStatus) {
-        return update(new LambdaUpdateWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getId, id)
-                .set(CxScheduleResult::getProductionStatus, productionStatus));
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean releaseSchedule(Long id) {
-        return update(new LambdaUpdateWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getId, id)
-                .set(CxScheduleResult::getIsRelease, "1"));
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean batchReleaseSchedule(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return false;
-        }
-        return update(new LambdaUpdateWrapper<CxScheduleResult>()
-                .in(CxScheduleResult::getId, ids)
-                .set(CxScheduleResult::getIsRelease, "1"));
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean updateShiftPlanQty(Long id, String shiftCode, BigDecimal planQty) {
-        LambdaUpdateWrapper<CxScheduleResult> wrapper = new LambdaUpdateWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getId, id);
-
-        switch (shiftCode) {
-            case "SHIFT1":
-                wrapper.set(CxScheduleResult::getClass1PlanQty, planQty);
-                break;
-            case "SHIFT2":
-                wrapper.set(CxScheduleResult::getClass2PlanQty, planQty);
-                break;
-            case "SHIFT3":
-                wrapper.set(CxScheduleResult::getClass3PlanQty, planQty);
-                break;
-            case "SHIFT4":
-                wrapper.set(CxScheduleResult::getClass4PlanQty, planQty);
-                break;
-            case "SHIFT5":
-                wrapper.set(CxScheduleResult::getClass5PlanQty, planQty);
-                break;
-            case "SHIFT6":
-                wrapper.set(CxScheduleResult::getClass6PlanQty, planQty);
-                break;
-            case "SHIFT7":
-                wrapper.set(CxScheduleResult::getClass7PlanQty, planQty);
-                break;
-            case "SHIFT8":
-                wrapper.set(CxScheduleResult::getClass8PlanQty, planQty);
-                break;
-            default:
-                return false;
-        }
-
-        return update(wrapper);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean updateShiftFinishQty(Long id, String shiftCode, BigDecimal finishQty) {
-        LambdaUpdateWrapper<CxScheduleResult> wrapper = new LambdaUpdateWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getId, id);
-
-        switch (shiftCode) {
-            case "SHIFT1":
-                wrapper.set(CxScheduleResult::getClass1FinishQty, finishQty);
-                break;
-            case "SHIFT2":
-                wrapper.set(CxScheduleResult::getClass2FinishQty, finishQty);
-                break;
-            case "SHIFT3":
-                wrapper.set(CxScheduleResult::getClass3FinishQty, finishQty);
-                break;
-            case "SHIFT4":
-                wrapper.set(CxScheduleResult::getClass4FinishQty, finishQty);
-                break;
-            case "SHIFT5":
-                wrapper.set(CxScheduleResult::getClass5FinishQty, finishQty);
-                break;
-            case "SHIFT6":
-                wrapper.set(CxScheduleResult::getClass6FinishQty, finishQty);
-                break;
-            case "SHIFT7":
-                wrapper.set(CxScheduleResult::getClass7FinishQty, finishQty);
-                break;
-            case "SHIFT8":
-                wrapper.set(CxScheduleResult::getClass8FinishQty, finishQty);
-                break;
-            default:
-                return false;
-        }
-
-        return update(wrapper);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean deleteByScheduleDate(LocalDate scheduleDate) {
-        // 先删除明细
-        List<CxScheduleResult> results = listByScheduleDate(scheduleDate);
-        for (CxScheduleResult result : results) {
-            cxScheduleDetailService.deleteByMainId(result.getId());
-        }
-
-        // 删除主表
-        return remove(new LambdaQueryWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getScheduleDate, scheduleDate.atStartOfDay()));
-    }
-
-    @Override
-    public String generateBatchNo(LocalDate scheduleDate) {
-        String dateStr = scheduleDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String randomStr = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
-        return "CX" + dateStr + randomStr;
-    }
-
-    /**
-     * 转换为DTO
-     */
-    private ScheduleResultVo convertToDTO(CxScheduleResult entity) {
-        ScheduleResultVo dto = new ScheduleResultVo();
-        BeanUtils.copyProperties(entity, dto);
-        if (entity.getScheduleDate() != null) {
-            dto.setScheduleDate(entity.getScheduleDate().toLocalDate());
-        }
-        return dto;
-    }
-
-    /**
-     * 转换明细为DTO
-     */
-    private ScheduleResultVo.ScheduleDetailVo convertDetailToDTO(CxScheduleDetail detail) {
-        ScheduleResultVo.ScheduleDetailVo dto = new ScheduleResultVo.ScheduleDetailVo();
-        BeanUtils.copyProperties(detail, dto);
-        return dto;
+    protected String getDocTypeCode() {
+        return "CX_SCHEDULE_RESULT";
     }
 }

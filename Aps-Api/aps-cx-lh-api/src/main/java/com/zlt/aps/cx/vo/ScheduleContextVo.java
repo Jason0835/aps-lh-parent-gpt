@@ -6,15 +6,16 @@ import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
-import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +56,26 @@ public class ScheduleContextVo {
      * 当前天的班次配置列表（循环执行时使用）
      */
     private List<CxShiftConfig> currentShiftConfigs;
+
+    /**
+     * 所有班次配置列表（按排程天数分组）
+     * 用于核心算法按天获取班次配置
+     */
+    private List<CxShiftConfig> shiftConfigList;
+
+    public List<CxShiftConfig> getShiftConfigList() {
+        return shiftConfigList;
+    }
+
+    public void setShiftConfigList(List<CxShiftConfig> shiftConfigList) {
+        this.shiftConfigList = shiftConfigList;
+    }
+
+    /**
+     * 参数配置映射（按参数编码索引）
+     * 用于校验关键参数是否配置
+     */
+    private Map<String, CxParamConfig> paramConfigMap;
 
     /**
      * 排程模式：NORMAL-正常排程，RE_SCHEDULE-重排程，STRUCTURE_RE_SCHEDULE-结构重排
@@ -122,11 +143,29 @@ public class ScheduleContextVo {
     private List<CxStock> stocks;
 
     /**
+     * 物料库存映射（按物料编码分配库存，共用胎胚按需求比例分配）
+     * Key: 物料编码 (materialCode)
+     * Value: 分配给该物料的库存数量
+     */
+    private Map<String, Integer> materialStockMap;
+
+    /**
      * 结构硫化配比列表
      */
     private List<MdmStructureLhRatio> structureLhRatios;
 
     /**
+     * 结构整车配置列表
+     * 用于获取每个结构的整车胎面条数(TREAD_COUNT)
+     */
+    private List<MdmStructureTreadConfig> structureTreadConfigs;
+
+    /**
+     * 结构整车配置映射（快速查询用）
+     * Key: 结构编码 (structureCode)
+     * Value: 整车胎面条数 (treadCount)
+     */
+    private Map<String, Integer> structureTreadCountMap;    /**
      * 结构班产配置列表（整车条数）
      * 按结构+班次定义的标准产能
      */
@@ -147,11 +186,6 @@ public class ScheduleContextVo {
      * 关键产品编码集合（快速查询用）
      */
     private Set<String> keyProductCodes;
-
-    /**
-     * 排程参数配置
-     */
-    private Map<String, CxParamConfig> paramConfigMap;
 
     /**
      * 预警配置
@@ -222,12 +256,6 @@ public class ScheduleContextVo {
      * 班次配置
      */
     private Map<String, ShiftInfo> shiftConfigs;
-
-    /**
-     * 班次配置列表（从T_CX_SHIFT_CONFIG加载）
-     * 用于排程时获取班次顺序、产能比例等信息
-     */
-    private List<CxShiftConfig> shiftConfigList;
 
     /**
      * 排产天数
@@ -356,19 +384,19 @@ public class ScheduleContextVo {
      * 硫化余量(PLAN_SURPLUS_QTY)已由系统计算好（总计划量 - 硫化真实完成量）
      * 用于计算收尾余量：收尾余量 = 硫化余量 - 胎胚库存
      */
-    private List<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusList;
+    private List<MdmMonthSurplus> monthSurplusList;
 
     /**
      * 月度计划余量映射（物料编码 -> 余量信息）
      * 快速查询用
      */
-    private Map<String, com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusMap;
+    private Map<String, MdmMonthSurplus> monthSurplusMap;
 
     /**
      * SKU排产分类列表
      * 用于判断是否为主销产品（SCHEDULE_TYPE='01'表示主销产品，月均销量>=500条）
      */
-    private List<com.zlt.aps.mp.api.domain.entity.MdmSkuScheduleCategory> skuScheduleCategories;
+    private List<MdmSkuScheduleCategory> skuScheduleCategories;
 
     /**
      * 主销产品编码集合
@@ -407,5 +435,24 @@ public class ScheduleContextVo {
         private Integer endHour;
         private Integer standardHours;
         private Boolean isActive;
+    }
+
+    // ==================== 辅助方法 ====================
+
+    /**
+     * 获取结构胎面整车条数映射
+     *
+     * @return Map<structureName, treadCount>
+     */
+    public Map<String, Integer> getStructureTreadCountMap() {
+        Map<String, Integer> map = new HashMap<>();
+        if (structureShiftCapacities != null) {
+            for (MdmStructureTreadConfig config : structureShiftCapacities) {
+                if (config.getStructureCode() != null && config.getTreadCount() != null) {
+                    map.put(config.getStructureCode(), config.getTreadCount());
+                }
+            }
+        }
+        return map;
     }
 }

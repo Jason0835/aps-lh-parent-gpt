@@ -5,7 +5,7 @@ import com.zlt.aps.cx.controller.CxScheduleResultController;
 import com.zlt.aps.cxlh.cx.api.domain.entity.CxScheduleResultOld;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.controller.LhScheduleResultController;
-import com.zlt.aps.lh.handle.LhSyncDataHandle;
+import com.zlt.aps.lh.handler.LhSyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import org.springframework.beans.factory.annotation.Autowired;
 

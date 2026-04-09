@@ -8,7 +8,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
-import com.zlt.aps.common.SyncDataLogsService;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
