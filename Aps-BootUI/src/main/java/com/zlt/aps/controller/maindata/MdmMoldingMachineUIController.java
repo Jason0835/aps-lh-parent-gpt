@@ -97,6 +97,16 @@ public class MdmMoldingMachineUIController extends BaseUIController<MdmMoldingMa
     }
 
     /**
+     * 查询成型机档案
+     */
+    @ApiOperation("查询机台列表用于下拉数据")
+    @PostMapping("/query")
+    @ResponseBody
+    public AjaxResult query(MdmMoldingMachine mdmMoldingMachine) {
+        return iMdmMoldingMachineService.listMoldingMachine(mdmMoldingMachine);
+    }
+
+    /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
