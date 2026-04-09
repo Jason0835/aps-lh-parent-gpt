@@ -1,7 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
@@ -14,17 +13,11 @@ import com.zlt.aps.mp.engine.logrecorder.TbrSpecialMaterialProductionLogRecorder
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -77,7 +70,7 @@ public class GroupPlanPrioritySelector {
         List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x -> {
             return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
         }).collect(Collectors.toList());
-        if (!CollectionUtils.isEmpty(structurePriorityList)){
+        if (!CollectionUtils.isEmpty(structurePriorityList)) {
             needProductionGroupList = structurePriorityList;
         }
 
@@ -149,7 +142,7 @@ public class GroupPlanPrioritySelector {
                 selected = sameSpecificationList.get(BigDecimal.ZERO.intValue());
                 TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_SPECIFICATIONS_PRIORITY);
                 return selected;
-            }else{
+            } else {
                 //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
                 return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sameSpecificationList);
             }
@@ -163,7 +156,7 @@ public class GroupPlanPrioritySelector {
                 selected = sameProSizeList.get(BigDecimal.ZERO.intValue());
                 TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SAME_PRO_SIZE_PRIORITY);
                 return selected;
-            }else{
+            } else {
                 //3.1、同英寸下 断面宽差值±10 参数
                 sectionWidthList = sameProSizeList.stream().filter(sectionWidthPlan -> sectionWidthPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)).collect(Collectors.toList());
                 if (!CollectionUtils.isEmpty(sectionWidthList)) {
@@ -171,7 +164,7 @@ public class GroupPlanPrioritySelector {
                         selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
                         TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY);
                         return selected;
-                    }else{
+                    } else {
                         //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
                         return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sectionWidthList);
                     }
@@ -189,7 +182,7 @@ public class GroupPlanPrioritySelector {
                 selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
                 TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.SECTION_WIDTH_PRIORITY);
                 return selected;
-            }else{
+            } else {
                 //与前结构含有同规格 有多条，则含有结构优先的-> 结构需求与产能接近 sandy+ 2026.3.26
                 return getScmProductionPlanGroupInfo(context, cxMachineCode, cxMachineTypeCode, sectionWidthList);
             }
@@ -209,9 +202,10 @@ public class GroupPlanPrioritySelector {
 
     /**
      * 在同等层级中，含有多个备选时，先 含有结构优先的 -> 结构需求与产能接近
-     * @param context 排产上下文
-     * @param cxMachineCode 当前需要选择的机台
-     * @param cxMachineTypeCode 当前需要选择的机台机型
+     *
+     * @param context                排产上下文
+     * @param cxMachineCode          当前需要选择的机台
+     * @param cxMachineTypeCode      当前需要选择的机台机型
      * @param sameLevelGroupInfoList 同等层级结构清单
      * @return
      */
@@ -230,12 +224,12 @@ public class GroupPlanPrioritySelector {
             return selected;
         }
         //2. 在供应链高优先级个数多的前4结构清单中，降序，获取结构需求与产能接近的结构 sandy+2026.3.29
-        structurePriorityList.sort( Comparator.comparingInt(ProductionPlanGroupInfo::getHeightPriorityCount).reversed());
+        structurePriorityList.sort(Comparator.comparingInt(ProductionPlanGroupInfo::getHeightPriorityCount).reversed());
         Integer structureBillPreCount = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getStructureBillPreCount();
         Integer subSize = structurePriorityList.size() > structureBillPreCount ? structureBillPreCount : structurePriorityList.size();
-        structurePriorityList = structurePriorityList.subList(0,subSize);
+        structurePriorityList = structurePriorityList.subList(0, subSize);
         //结构需求与产能接近 -> 结构需求更大的
-        structurePriorityList.sort( Comparator.comparingInt(ProductionPlanGroupInfo::getAbsDiffStructureAndMachineDays)
+        structurePriorityList.sort(Comparator.comparingInt(ProductionPlanGroupInfo::getAbsDiffStructureAndMachineDays)
                 .thenComparingInt(ProductionPlanGroupInfo::getRemainingNeedAllocationDays).reversed());
         selected = structurePriorityList.get(BigDecimal.ZERO.intValue());
         TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.NEAR_CAPACITY_PRIORITY);
@@ -291,12 +285,13 @@ public class GroupPlanPrioritySelector {
     public int compareContinueGroup(ProductionPlanGroupInfo before, ProductionPlanGroupInfo after) {
         Boolean beforeIsSpecial = null == before ? false : before.isSpecialMaterial();
         Boolean afterIsSpecial = null == after ? false : after.isSpecialMaterial();
+        //都含有特殊原材料结构
+        if (beforeIsSpecial && afterIsSpecial) {
+            return compareSpecialMaterial(before, after);
+        }
         // Boolean的true比false大，因此需要倒序，优先处理true的
         int result = afterIsSpecial.compareTo(beforeIsSpecial);
-        if (result != BigDecimal.ZERO.intValue()) {
-            return result;
-        }
-        return compareSpecialMaterial(before, after);
+        return result;
     }
 
     /**
@@ -311,22 +306,22 @@ public class GroupPlanPrioritySelector {
      */
     public int compareSpecialMaterial(ProductionPlanGroupInfo before, ProductionPlanGroupInfo after) {
         //使用特殊原材料种类多的优先
-        Integer beforeTypeCount = before.getUsedSpecialMaterialCount();
-        Integer afterTypeCount = after.getUsedSpecialMaterialCount();
+        Integer beforeTypeCount = Optional.ofNullable(before).map(ProductionPlanGroupInfo::getUsedSpecialMaterialCount).orElse(BigDecimal.ZERO.intValue());
+        Integer afterTypeCount = Optional.ofNullable(after).map(ProductionPlanGroupInfo::getUsedSpecialMaterialCount).orElse(BigDecimal.ZERO.intValue());
         //倒序
         int result = afterTypeCount.compareTo(beforeTypeCount);
         if (result != BigDecimal.ZERO.intValue()) {
             return result;
         }
         //Sku个数多的先
-        Integer beforeSkuCount = Optional.ofNullable(before.getSpecialMaterialsCount()).orElse(BigDecimal.ZERO.intValue());
-        Integer afterSkuCount = Optional.ofNullable(after.getSpecialMaterialsCount()).orElse(BigDecimal.ZERO.intValue());
+        Integer beforeSkuCount = Optional.ofNullable(before).map(ProductionPlanGroupInfo::getSpecialMaterialsCount).orElse(BigDecimal.ZERO.intValue());
+        Integer afterSkuCount = Optional.ofNullable(after).map(ProductionPlanGroupInfo::getSpecialMaterialsCount).orElse(BigDecimal.ZERO.intValue());
         result = afterSkuCount.compareTo(beforeSkuCount);
         if (result != BigDecimal.ZERO.intValue()) {
             return result;
         }
-        Integer beforeNeedDays = Optional.ofNullable(before.getRemainingNeedAllocationDays()).orElse(BigDecimal.ZERO.intValue());
-        Integer afterNeedDays = Optional.ofNullable(after.getRemainingNeedAllocationDays()).orElse(BigDecimal.ZERO.intValue());
+        Integer beforeNeedDays = Optional.ofNullable(before).map(ProductionPlanGroupInfo::getRemainingNeedAllocationDays).orElse(BigDecimal.ZERO.intValue());
+        Integer afterNeedDays = Optional.ofNullable(after).map(ProductionPlanGroupInfo::getRemainingNeedAllocationDays).orElse(BigDecimal.ZERO.intValue());
         result = beforeNeedDays.compareTo(afterNeedDays);
         return result;
     }

@@ -9,6 +9,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
 import com.zlt.common.utils.PubUtil;
+
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -113,6 +114,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 其余搭配量
      */
     private Integer otherMatchingQty;
+    
+    /**
+     * 搭配开始日期
+     */
+    private Integer matchBeginDay;
+
+    /**
+     * 搭配结束日期
+     */
+    private Integer matchEndDay;
 
     /**
      * 初始的排产数据设置

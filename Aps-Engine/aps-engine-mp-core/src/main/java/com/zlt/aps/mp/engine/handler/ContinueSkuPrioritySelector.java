@@ -2,11 +2,18 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.ProductionSkuPriorityVo;
+import com.zlt.aps.mp.engine.domain.vo.SkuPriorityInfo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -40,7 +47,7 @@ public class ContinueSkuPrioritySelector {
         }
         Map<Long, MonthPlanProductionRequirePlanVo> matchMap = new HashMap<>();
         continueSkuMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            //获取同规格同花纹或是同生胎同模具的其它sku排产计划9
+            //获取同规格同花纹或是同生胎同模具的其它sku排产计划集合
             Set<String> shareMouldMaterialDescSet = getShareMouldSkuByContinueSku(productionPlanList, cxContinueSkuInfo);
             List<MonthPlanProductionRequirePlanVo> singleMatchList = productionPlanInfo.getContinueListByType(productionStage, continueType, materialDesc, shareMouldMaterialDescSet, cxContinueSkuInfo);
             if (CollectionUtils.isEmpty(singleMatchList)) {
@@ -63,18 +70,12 @@ public class ContinueSkuPrioritySelector {
      * @return
      */
     public static String getHeightPrioritySku(ProductionStageEnum productionStage, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet) {
-        //挑选可排产计划
-        if (CollectionUtils.isEmpty(allSkuList)) {
-            //todo 记录日志
-            return "";
-        }
-        Set<String> rejectSkuSet = Optional.ofNullable(excludeSkuSet).orElse(Collections.emptySet());
-        List<MonthPlanProductionRequirePlanVo> sameMultipleSkuList = allSkuList.stream().filter(single -> !rejectSkuSet.contains(single.getMaterialDesc())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(sameMultipleSkuList)) {
+        List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
+        if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return "";
         }
         //先取得高优先级量最大的
-        Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = sameMultipleSkuList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
+        Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = effectiveSkuList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         Map<String, Integer> productionSkuMap = new HashMap<>();
         skuGroupMap.forEach((skuMaterialDesc, groupPlanList) -> {
             Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(productionStage, groupPlanList);
@@ -88,6 +89,27 @@ public class ContinueSkuPrioritySelector {
         }
         Optional<Map.Entry<String, Integer>> maxEntry = productionSkuMap.entrySet().stream().max(Map.Entry.comparingByValue());
         return maxEntry.get().getKey();
+    }
+
+    /**
+     * 获取有效的可排产Sku列表
+     * 需要剔除已经排产的Sku
+     *
+     * @param allSkuList    所有计划列表
+     * @param excludeSkuSet 需要剔除的Sku列表
+     * @return
+     */
+    private static List<MonthPlanProductionRequirePlanVo> getEffectiveSkuList(List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet) {
+        //挑选可排产计划
+        if (CollectionUtils.isEmpty(allSkuList)) {
+            return Collections.emptyList();
+        }
+        Set<String> rejectSkuSet = Optional.ofNullable(excludeSkuSet).orElse(Collections.emptySet());
+        List<MonthPlanProductionRequirePlanVo> effectiveSkuList = allSkuList.stream().filter(single -> !rejectSkuSet.contains(single.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveSkuList)) {
+            return Collections.emptyList();
+        }
+        return effectiveSkuList;
     }
 
     /**

@@ -50,7 +50,7 @@ public class LhSpecifyMachine  extends BaseEntity implements Serializable {
     private String machineCode;
 
     /** 线路，数据维护在数据字典：0-生产线、1-备用线 */
-    @Excel(name = "ui.data.column.lhSpecifyMachine.lineType", dictType = "LINE_TYPE")
+//    @Excel(name = "ui.data.column.lhSpecifyMachine.lineType", dictType = "LINE_TYPE")
     @ApiModelProperty(value = "线路，数据维护在数据字典：0-生产线、1-备用线", name = "lineType")
     @TableField(value = "LINE_TYPE")
     private String lineType;

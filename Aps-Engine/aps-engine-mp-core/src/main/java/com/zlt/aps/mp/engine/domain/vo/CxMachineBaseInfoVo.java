@@ -799,6 +799,29 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 获取排产限制信息
+     * 得到有效排产日范围集合
+     *
+     * @param context         排产上下文
+     * @param addSkuInfo      排产的Sku信息
+     * @param selectedLhGroup 收尾硫化组信息
+     * @param selectedMould   选中的模具
+     * @return
+     */
+    public Set<Integer> getMouldProductionLimitInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, CxLhProductionHelper selectedLhGroup, Integer endDay, List<ProductionMouldInfoVo> selectedMould) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
+            return Collections.emptySet();
+        }
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku(), selectedLhGroup.getBeforeSku());
+        MouldProductionDayLimitHelper limitHelper = getProductionDayLimitInfo(context, addSkuInfo, changeMouldInfo, selectedLhGroup, endDay, selectedMould);
+        Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
+        if (CollectionUtils.isEmpty(effectiveRangeSet)) {
+            return Collections.emptySet();
+        }
+        return effectiveRangeSet;
+    }
+
+    /**
      * 根据选择的Sku判断其符合胎胚种类数限制及其上机时间点和排产结束日
      *
      * @param context         排产上下文
@@ -812,20 +835,13 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo) || null == selectedLhGroup) {
             return null;
         }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        Integer preClosingDay = selectedLhGroup.getProductionDay();
-        Integer preEndDay = endDay;
-        String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
         ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, selectedLhGroup.getBeforeSku(), selectedLhGroup.getBeforeSku());
         boolean isChangeMould = changeMouldInfo.isChangeMould();
-        //隔天换模
-        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
-            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
-        }
-        MouldProductionDayLimitHelper limitHelper = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
+        MouldProductionDayLimitHelper limitHelper = getProductionDayLimitInfo(context, addSkuInfo, changeMouldInfo, selectedLhGroup, endDay, selectedMould);
+//                LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
+            String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, addSkuInfo.getStructureName(), cxMachineCode, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
             return null;
         }
@@ -841,6 +857,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (!isChangeMould) {
             return newLhGroup;
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         //需要换模-换模次数处理
         DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
         Set<String> mouldCodeSet = selectedMould.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
@@ -1178,6 +1195,31 @@ public class CxMachineBaseInfoVo implements Serializable {
         //todo 20260211 特殊材料分配库存更新
         Integer allocationDay = addAllocationPlan.getAllocationDay();
         productionContext.updateSpecialMaterialInfoMap(productionPlanInfo, allocationDay);
+    }
+
+    /**
+     * 获取排产限制信息
+     * 得到有效排产日范围集合
+     *
+     * @param context         排产上下文
+     * @param addSkuInfo      新增Sku信息
+     * @param changeMouldInfo 换模信息
+     * @param selectedLhGroup 收尾的硫化组信息
+     * @param endDay          结束日
+     * @param selectedMould   选中的模具
+     * @return
+     */
+    private MouldProductionDayLimitHelper getProductionDayLimitInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, ChangeMouldInfo changeMouldInfo, CxLhProductionHelper selectedLhGroup, Integer endDay, List<ProductionMouldInfoVo> selectedMould) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        Integer preClosingDay = selectedLhGroup.getProductionDay();
+        Integer preEndDay = endDay;
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        //隔天换模
+        if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
+            preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
+        }
+        return LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
     }
 
     /**

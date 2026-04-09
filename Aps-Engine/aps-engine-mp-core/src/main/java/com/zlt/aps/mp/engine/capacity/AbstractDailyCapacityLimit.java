@@ -423,12 +423,13 @@ public abstract class AbstractDailyCapacityLimit {
             if (mpFinalVo.getFieldValueByFieldName(day1Field) != null){
                 iCount = (Integer)mpFinalVo.getFieldValueByFieldName(day1Field) / dailyLhQty;
             }
-        }else if (dayPlanQty.equals(dailyLhQty)){
-            //若今日的计划量=单日硫化量 且 取整(昨日计划量/日单台硫化量) > 取整(今日计划量/日单台硫化量)
+        }else {
+            //若今日的计划量 >=单日硫化量 且 取整(昨日计划量/日单台硫化量) > 取整(今日计划量/日单台硫化量)
             //则今日的主花纹收尾台数 = 取整(昨日计划量/日单台硫化量) - 取整(今日计划量/日单台硫化量)
-            if (mpFinalVo.getFieldValueByFieldName(day1Field) != null){
-                preMachines = (Integer)mpFinalVo.getFieldValueByFieldName(day1Field) / dailyLhQty;
-                curMachines = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) / dailyLhQty;
+            Integer preDayValue = (Integer)mpFinalVo.getFieldValueByFieldName(day1Field);
+            if (preDayValue != null && preDayValue > 0){
+                preMachines = (int)Math.ceil((double)preDayValue / dailyLhQty);
+                curMachines = (int)Math.ceil((double)dayPlanQty / dailyLhQty);
                 if (preMachines > curMachines){
                     iCount =  preMachines - curMachines;
                 }

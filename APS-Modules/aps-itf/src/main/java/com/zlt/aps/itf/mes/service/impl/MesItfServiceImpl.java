@@ -31,7 +31,7 @@ import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
-import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
+import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanWarn;
 import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
@@ -1021,7 +1021,7 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public AjaxResult syncMouldCleanPlan(AuxReqSyncDataLogs syncDataLogs) {
+    public AjaxResult syncMouldCleanWarn(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<MouldCleanPlan> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
@@ -1039,16 +1039,16 @@ public class MesItfServiceImpl implements MesItfService {
 
             List<List<MouldCleanPlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
             for (List<MouldCleanPlan> saveList : splitList) {
-                List<MdmMouldCleanPlan> existsList = mouldCleanPlanEntityMapper.selectByUniqueKeyList(
+                List<MdmMouldCleanWarn> existsList = mouldCleanPlanEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
-                            MdmMouldCleanPlan plan = new MdmMouldCleanPlan();
+                            MdmMouldCleanWarn plan = new MdmMouldCleanWarn();
                             plan.setLhCode(item.getLhCode());
                             plan.setFactoryCode(item.getFactoryCode());
                             return plan;
                         }).collect(Collectors.toList())
                 );
 
-                Map<String, MdmMouldCleanPlan> existsMap = new HashMap<>(16);
+                Map<String, MdmMouldCleanWarn> existsMap = new HashMap<>(16);
                 if (CollectionUtils.isNotEmpty(existsList)) {
                     existsMap = existsList.stream()
                             .collect(Collectors.toMap(
@@ -1058,9 +1058,9 @@ public class MesItfServiceImpl implements MesItfService {
                             ));
                 }
 
-                List<MdmMouldCleanPlan> insertOrUpdateList = new ArrayList<>();
+                List<MdmMouldCleanWarn> insertOrUpdateList = new ArrayList<>();
                 for (MouldCleanPlan item : saveList) {
-                    MdmMouldCleanPlan entity = new MdmMouldCleanPlan();
+                    MdmMouldCleanWarn entity = new MdmMouldCleanWarn();
                     entity.setLhCode(item.getLhCode());
                     entity.setFactoryCode(item.getFactoryCode());
                     entity.setCompanyCode(item.getCompanyCode());
@@ -1101,7 +1101,7 @@ public class MesItfServiceImpl implements MesItfService {
 
                     String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
                     if (existsMap.containsKey(mapKey)) {
-                        MdmMouldCleanPlan existsData = existsMap.get(mapKey);
+                        MdmMouldCleanWarn existsData = existsMap.get(mapKey);
                         entity.setId(existsData.getId());
                     }
                     insertOrUpdateList.add(entity);
@@ -1151,10 +1151,10 @@ public class MesItfServiceImpl implements MesItfService {
                     entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
                     entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
                     entity.setBrand(item.getBrand());
-                    entity.setRemark(item.getRemark());
-                    entity.setDataVersion(item.getDataVersion());
-                    entity.setCompanyCode(item.getCompanyCode());
-                    entity.setFactoryCode(item.getFactoryCode());
+//                    entity.setRemark(item.getRemark());
+//                    entity.setDataVersion(item.getDataVersion());
+                    entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+                    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
                     entity.setIsDelete(0);
                     entity.setCreateBy("MES");
                     entity.setUpdateBy("MES");

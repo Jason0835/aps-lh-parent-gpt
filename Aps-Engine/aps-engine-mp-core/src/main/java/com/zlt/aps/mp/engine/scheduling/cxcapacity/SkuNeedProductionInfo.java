@@ -8,6 +8,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -62,5 +63,14 @@ public class SkuNeedProductionInfo implements Serializable {
             return BigDecimal.ZERO.intValue();
         }
         return needProductionList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+    }
+
+    /**
+     * 最大还需排产天数
+     *
+     * @return
+     */
+    public Integer getMaxNeedDays() {
+        return BigDecimal.valueOf(getSumNeedProductionQty()).divide(BigDecimal.valueOf(getDayMaxProductionQty()), BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
     }
 }

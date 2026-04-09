@@ -215,6 +215,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         String userName = SecurityUtils.getUsername();
         String factoryName = getFactoryName(context);
         warningInformationHandler.sendWarningInformation(productionContext, requestAttributes, userName, factoryName);
+//        //14、保存特殊材料列表
+//        matchingProductionHandler.saveSpecialMaterialResult(productionContext);
     }
 
     /**
