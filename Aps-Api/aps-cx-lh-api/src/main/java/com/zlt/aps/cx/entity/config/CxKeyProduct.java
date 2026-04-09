@@ -31,6 +31,12 @@ public class CxKeyProduct extends BaseEntity {
     @ImportValidated(required = true, maxLength = 50)
     private String embryoCode;
 
+    @Excel(name = "ui.data.column.cxKeyProduct.embryoDesc")
+    @ApiModelProperty(value = "胎胚描述")
+    @TableField("EMBRYO_DESC")
+    @ImportValidated(maxLength = 100)
+    private String embryoDesc;
+
     @Excel(name = "ui.data.column.cxKeyProduct.structureName")
     @ApiModelProperty(value = "结构名称")
     @TableField("STRUCTURE_NAME")
