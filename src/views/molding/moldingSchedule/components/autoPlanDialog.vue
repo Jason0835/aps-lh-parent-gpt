@@ -40,6 +40,7 @@ import {
   modelChange,
   modelChangeValidate,
   modelAdjustPlan,
+  generatePlan
 } from "@/api/cx/cxScheduleResult";
 
 export default {
@@ -94,7 +95,7 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.factoryCode"),
+          label: this.$t("工厂"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -107,7 +108,8 @@ export default {
     async save(params) {
       // console.log(params);
       if (this.editType == "1") {
-        this.autoPlan(params);
+        this.generate(params)
+        // this.autoPlan(params);
       } else if (this.editType == "2") {
         this.lhAutoPlan({
           scheduleDate: params.scheduleDate,
@@ -118,6 +120,24 @@ export default {
         });
       } else {
         throw "editType error";
+      }
+    },
+    async generate(params){
+      this.loading = true;
+      try {
+        this.loading = true;
+
+        await generatePlan({
+          ...params,
+          day:'3'
+        });
+        this.loading = false;
+        this.$modal.msgSuccess(result.msg);
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
       }
     },
     async autoPlan(params) {
@@ -258,7 +278,7 @@ export default {
       } else {
         this.form = {
           scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
-          factoryCode: "",
+          factoryCode: "116",
         };
       }
     },

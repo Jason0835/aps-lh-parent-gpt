@@ -19,41 +19,40 @@
       :selectArea="false"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           type="primary"
-          v-hasPermi="['cx:params:add']"
           @click="handleAdd"
+
           >{{ $t("ui.frame.btn.add") }}</el-button
-        > -->
-        <!-- <el-button
+        >
+        <el-button
           type="warning"
-          v-hasPermi="['cx:machine:edit']"
+          :disabled="selection.length == 0"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
-        <!-- <el-button
+        >
+        <el-button
           type="danger"
-          v-hasPermi="['cx:params:remove']"
-          @click="handleDelete(selection)"
+          @click="handleDeleteAll"
+          :disabled="selection.length == 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
-        <!-- <el-button
-          v-hasPermi="['cx:params:import']"
+        >
+        <el-button
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
-        > -->
-        <el-button @click="handleExport" v-hasPermi="['cx:params:export']">{{
+        >
+        <el-button @click="handleExport">{{
           $t("ui.frame.btn.export")
         }}</el-button>
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <!-- <tlt-upload
+    <tlt-upload
       ref="tltUpload"
-      downloadUrl="/cx/params/importTemplate"
-      uploadUrl="/cx/params/importData"
+      downloadUrl="/cx/cxKeyProduct/importTemplate"
+      uploadUrl="/cx/cxKeyProduct/importData"
       @uploadSuccess="getList"
-    /> -->
+    />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -63,19 +62,19 @@
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listMoldingParams, removeMoldingParams } from "@/api/cx/params";
+import { listMoldingParams, removeMoldingParams } from "@/api/cx/keyPoduct";
 //components
-// import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "MoldingParams",
+ name: "KeyProduct",
   components: {
-    // tltUpload,
+    tltUpload,
     infoDialog,
   },
-  dicts: [],
+  dicts: ['biz_yes_no','biz_factory_name'],
   provide() {
     return {
       parentDict: this.dict,
@@ -84,14 +83,7 @@ export default {
   data() {
     return {
       searchColumns: [
-        {
-          label: this.$t("ui.data.column.paramsCode"),
-          prop: "paramCode",
-        },
-        {
-          label: this.$t("ui.data.column.paramsName"),
-          prop: "paramName",
-        },
+
       ],
       loading: false,
       data: [],
@@ -113,37 +105,36 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "paramCode",
-          halign: "center",
-          label: this.$t("ui.data.column.paramsCode"),
+          prop: "structureName",
+          align: "center",
+          label: this.$t("结构"),
           // sortable: "custom",
         },
         {
-          prop: "paramName",
-          halign: "center",
-          label: this.$t("ui.data.column.paramsName"),
-          titleTooltip: true,
-          // sortable: "custom",
+          prop: "embryoCode",
+          align: "center",
+          label: this.$t("胎胚代码"),
         },
         {
-          prop: "paramValue",
-          halign: "center",
-          label: this.$t("ui.data.column.paramsValue"),
-          // sortable: "custom",
+          prop: "embryoDesc",
+          align: "center",
+          label: this.$t("胎胚描述"),
         },
         {
-          prop: "remark",
-          halign: "center",
-          label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          prop: "isActive",
+          align: "center",
+          label: this.$t("是否启用"),
           // sortable: "custom",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
+
         {
           align: "center",
-          halign: "center",
+          align: "center",
           label: this.$t("ui.data.btn.option"),
-          minWidth: 180,
-          width: 180,
+
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -155,13 +146,13 @@ export default {
                 >
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
-                {/* <el-button
+                <el-button
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
                 >
                   {this.$t("ui.frame.btn.delete")}
-                </el-button> */}
+                </el-button>
               </div>
             );
           },
@@ -200,7 +191,26 @@ export default {
           });
       });
     },
-
+    handleDeleteAll() {
+      console.log(this.selection);
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeMoldingParams({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -230,7 +240,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/cx/cxParamConfig/export", this.formatParams(false));
+      downloadLink("/cx/cxKeyProduct/export", this.formatParams(false));
     },
 
     // utils

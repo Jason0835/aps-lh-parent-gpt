@@ -60,9 +60,11 @@
         >
         <el-button
           @click="handleUpdate"
-           :loading="updateLoading"
+          :loading="updateLoading"
           type="primary"
-          v-hasPermi="['monthplan:mdmSkuConstructionRef:updateMainMaterialDesc']"
+          v-hasPermi="[
+            'monthplan:mdmSkuConstructionRef:updateMainMaterialDesc',
+          ]"
           >{{ $t("更新胎胚描述到物料信息") }}</el-button
         >
       </template>
@@ -93,7 +95,9 @@ import moment from "moment";
 import { downloadLink } from "@/utils/request";
 //interface
 import {
-  listMdmProductConstruction,mesCapture,updateMaterial
+  listMdmProductConstruction,
+  mesCapture,
+  updateMaterial,
 } from "@/api/maindata/mdmProductConstruction";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -104,10 +108,10 @@ export default {
   name: "SkuConstruction",
   components: {
     tltUpload,
-    TltUploadForm
+    TltUploadForm,
     // infoDialog,
   },
-  dicts: ["molding_method",'biz_factory_name','biz_yes_no','trial_status'],
+  dicts: ["molding_method", "biz_factory_name", "biz_yes_no", "trial_status"],
   provide() {
     return {
       parentDict: this.dict,
@@ -148,14 +152,13 @@ export default {
       },
       importDefaultValue: {},
       importRules: {},
-      updateLoading:false
+      updateLoading: false,
     };
   },
   computed: {
     columns() {
       let columns = [
-
-         {
+        {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           width: 120,
@@ -174,7 +177,13 @@ export default {
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           width: 180,
         },
-          {
+        {
+          prop: "materialDesc",
+          align: "center",
+          width: 300,
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        },
+        {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           formatter: (row, column, value) => {
@@ -301,23 +310,31 @@ export default {
           label: this.$t("ui.data.column.trialPlan.lhReleaseDate"),
           width: 180,
         },
-
       ];
 
       return columns;
     },
     searchColumns() {
       return [
-
         {
           label: this.$t("common.factory"),
           prop: "factoryCode",
-          type:'select',
+          type: "select",
           dictData: this.dict.type.biz_factory_name,
+        },
+        {
+          prop: "trialStatus",
+          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          type: "select",
+          dictData: this.dict.type.trial_status,
         },
         {
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          prop: "materialDesc",
         },
         // {
         //   label: this.$t("ui.data.column.sizeCapacity.mouldMethod"),
@@ -340,18 +357,18 @@ export default {
   methods: {
     async handleUpdate() {
       try {
-        this.updateLoading=true
+        this.updateLoading = true;
         let res = await updateMaterial();
         this.$modal.msgSuccess(res.msg);
         // this.$set(this.page, "current", 1);
         // this.getList();
-        this.updateLoading=false
+        this.updateLoading = false;
       } catch (err) {
         console.log(err);
-        this.updateLoading=false
+        this.updateLoading = false;
       }
     },
-    async mesCaptureing(){
+    async mesCaptureing() {
       try {
         this.loading = true;
         const res = await mesCapture();
@@ -469,7 +486,6 @@ export default {
     },
     // api
     async getList() {
-
       try {
         this.loading = true;
         const data = await listMdmProductConstruction(this.formatParams());
@@ -495,9 +511,7 @@ export default {
     };
     this.getList();
   },
-  activated() {
-
-  },
+  activated() {},
 };
 </script>
 <style lang="scss" scoped>
