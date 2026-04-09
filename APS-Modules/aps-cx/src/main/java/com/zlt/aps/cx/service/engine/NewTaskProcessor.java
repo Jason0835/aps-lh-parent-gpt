@@ -1,8 +1,8 @@
 package com.zlt.aps.cx.service.engine;
 
-import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
@@ -109,6 +109,7 @@ public class NewTaskProcessor {
                 log.warn("结构 {} 没有可用机台，跳过", structureName);
                 continue;
             }
+            log.info("结构 {} 有 {} 台可用机台", structureName, structureMachines.size());
 
             // 获取续作任务中属于该结构的任务
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> continueTasksForStructure = new ArrayList<>();
@@ -157,6 +158,9 @@ public class NewTaskProcessor {
                 int load = (int) Math.ceil((double) demand / DEFAULT_TRIP_CAPACITY);
                 task.setVulcanizeMachineCount(load);
                 allTasksForStructure.add(task);
+
+                log.debug("新增任务：materialCode={}, demand={}, load={} (DEFAULT_TRIP_CAPACITY={})",
+                        task.getMaterialCode(), demand, load, DEFAULT_TRIP_CAPACITY);
             }
 
             // 构建机台最大硫化机数映射（根据每台机台的机型+结构获取）
@@ -164,6 +168,14 @@ public class NewTaskProcessor {
 
             // 构建机台最大胎胚种类数映射（根据每台机台的机型+结构获取）
             Map<String, Integer> machineMaxEmbryoTypesMap = buildMachineMaxEmbryoTypesMap(structureMachines, structureName, context);
+
+            // 统计总需求
+            int totalDemand = allTasksForStructure.stream()
+                    .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
+                    .sum();
+
+            log.info("结构 {} 开始均衡分配：{} 个任务，{} 台机台，总硫化机台数需求={}",
+                    structureName, allTasksForStructure.size(), structureMachines.size(), totalDemand);
 
             // 使用 BalancingService 均衡分配
             BalancingService.BalancingResult balancingResult = balancingService.balanceEmbryosToMachinesWithMachineCapacity(
@@ -174,6 +186,8 @@ public class NewTaskProcessor {
                     machineMaxEmbryoTypesMap,
                     true,  // 强制保留历史任务
                     context);
+
+            log.info("结构 {} 均衡分配完成", structureName);
 
             // 构建分配结果
             List<CoreScheduleAlgorithmService.MachineAllocationResult> structureResults = 
@@ -239,15 +253,27 @@ public class NewTaskProcessor {
         // 构建 机型_结构 -> 最大硫化机数 映射
         Map<String, Integer> typeStructureMap = new HashMap<>();
         List<MdmStructureLhRatio> ratios = context.getStructureLhRatios();
+        
+        log.info("结构 {} 构建 maxLh 映射，配比数据: {}", structureName, ratios != null ? ratios.size() : "null");
+        
         if (ratios != null) {
+            int matchCount = 0;
             for (MdmStructureLhRatio ratio : ratios) {
                 String key = ratio.getCxMachineTypeCode() + "_" + ratio.getStructureName();
                 if (ratio.getLhMachineMaxQty() != null) {
                     typeStructureMap.put(key, ratio.getLhMachineMaxQty());
+                    // 只记录匹配当前结构的
+                    if (structureName.equals(ratio.getStructureName())) {
+                        log.info("  配比匹配: 机型={}, 结构={}, 硫化机上限={}", 
+                                ratio.getCxMachineTypeCode(), ratio.getStructureName(), ratio.getLhMachineMaxQty());
+                        matchCount++;
+                    }
                 }
             }
+            log.info("结构 {} 从配比表找到 {} 条配置", structureName, matchCount);
         }
 
+        int fallbackCount = 0;
         for (MdmMoldingMachine machine : machines) {
             String machineCode = machine.getCxMachineCode();
             String machineType = machine.getCxMachineTypeCode();
@@ -258,11 +284,16 @@ public class NewTaskProcessor {
             // 如果找不到，使用机台本身的硫化机上限
             if (maxLh == null) {
                 maxLh = machine.getLhMachineMaxQty() != null ? machine.getLhMachineMaxQty() : 10;
+                log.info("  机台 {} 机型 {} 未找到配比，使用默认值 {}", machineCode, machineType, maxLh);
+                fallbackCount++;
             }
 
             result.put(machineCode, maxLh);
         }
 
+        if (fallbackCount > 0) {
+            log.warn("结构 {} 有 {}/{} 台机台未找到配比配置", structureName, fallbackCount, machines.size());
+        }
         return result;
     }
 

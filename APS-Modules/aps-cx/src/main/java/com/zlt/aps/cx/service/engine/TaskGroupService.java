@@ -1,20 +1,19 @@
 package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.api.domain.entity.CxStock;
-import com.zlt.aps.cx.vo.ScheduleContextVo;
-import com.zlt.aps.cx.entity.*;
-import com.zlt.aps.cx.entity.config.CxParamConfig;
+import com.zlt.aps.cx.entity.CxMaterialEnding;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
-import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 任务分组服务
@@ -70,18 +69,16 @@ public class TaskGroupService {
      * @param context                   排程上下文
      * @param machineOnlineEmbryoMap    机台在产胎胚映射
      * @param scheduleDate              排程日期
+     * @param dayShifts                当前天的班次配置列表（用于获取对应班次的硫化计划量）
      * @return 任务分组结果
      */
     public TaskGroupResult groupTasks(
             ScheduleContextVo context,
             Map<String, Set<String>> machineOnlineEmbryoMap,
-            LocalDate scheduleDate) {
+            LocalDate scheduleDate,
+            List<CxShiftConfig> dayShifts) {
 
         TaskGroupResult result = new TaskGroupResult();
-
-        // 构建基础映射
-        Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
-        Map<String, CxStock> stockMap = buildStockMap(context);
 
         // 获取硫化排程结果
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
@@ -89,37 +86,56 @@ public class TaskGroupService {
             log.warn("硫化排程结果为空，无法分组任务");
             return result;
         }
+        log.info("任务分组开始：共 {} 条硫化记录", lhScheduleResults.size());
 
-        // 按胎胚编码分组
-        Map<String, List<LhScheduleResult>> embryoTaskMap = lhScheduleResults.stream()
-                .filter(r -> r.getEmbryoCode() != null)
-                .collect(Collectors.groupingBy(LhScheduleResult::getEmbryoCode));
+        // 调试：打印前3条记录的详情
+        for (int i = 0; i < Math.min(3, lhScheduleResults.size()); i++) {
+            LhScheduleResult r = lhScheduleResults.get(i);
+            log.debug("硫化记录{}: embryoCode={}, materialCode={}, constructionStage={}",
+                    i, r.getEmbryoCode(), r.getMaterialCode(), r.getConstructionStage());
+        }
+
+        // 构建基础映射
+        Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
+        Map<String, CxStock> stockMap = buildStockMap(context);
 
         // 确保机台在产映射非空
         if (machineOnlineEmbryoMap == null) {
             machineOnlineEmbryoMap = new HashMap<>();
         }
 
-        // 遍历每个胎胚任务
-        for (Map.Entry<String, List<LhScheduleResult>> entry : embryoTaskMap.entrySet()) {
-            String embryoCode = entry.getKey();
-            List<LhScheduleResult> lhResults = entry.getValue();
-
-            // 构建基础任务
-            CoreScheduleAlgorithmService.DailyEmbryoTask task = buildBaseTask(
-                    embryoCode, lhResults, materialMap, stockMap, context);
-            if (task == null) {
+        // 直接遍历每条硫化记录，为每条记录创建独立的任务
+        int skippedNullEmbryo = 0;
+        int skippedNullTask = 0;
+        for (LhScheduleResult lhResult : lhScheduleResults) {
+            if (lhResult.getEmbryoCode() == null) {
+                skippedNullEmbryo++;
                 continue;
             }
 
+            // 为每条硫化记录构建独立任务
+            CoreScheduleAlgorithmService.DailyEmbryoTask task = buildSingleTask(
+                    lhResult, materialMap, stockMap, context, dayShifts);
+            if (task == null) {
+                skippedNullTask++;
+                continue;
+            }
+
+            String materialCode = lhResult.getMaterialCode();
+            String embryoCode = lhResult.getEmbryoCode();
+
             // 判断任务类型
             // 1. 续作任务：当前机台在产的胎胚
-            List<String> continueMachineCodes = findContinueMachines(embryoCode, machineOnlineEmbryoMap);
+            // 使用物料编码 + 胎胚编码组合键匹配
+            List<String> continueMachineCodes = findContinueMachines(materialCode, embryoCode, machineOnlineEmbryoMap);
             boolean isContinueTask = !continueMachineCodes.isEmpty();
 
-            // 2. 试制任务
-            boolean isTrialTask = lhResults.stream()
-                    .anyMatch(r -> "1".equals(r.getIsTrial()));
+            // 2. 试制任务：根据施工阶段判断
+            // constructionStage: 01-试制, 02-量试, 03-正式
+            // 01-试制 → 试制任务
+            // 02-量试 → 归入新增任务（不是试制任务）
+            String constructionStage = lhResult.getConstructionStage();
+            boolean isTrialTask = "01".equals(constructionStage);
 
             // 设置任务属性
             task.setIsContinueTask(isContinueTask);
@@ -140,6 +156,10 @@ public class TaskGroupService {
             }
         }
 
+        log.info("任务分组完成：硫化记录{}条，跳过(embryoCode为null):{}，跳过(task为null):{}，续作:{}，试制:{}，新增:{}",
+                lhScheduleResults.size(), skippedNullEmbryo, skippedNullTask,
+                result.getContinueTasks().size(), result.getTrialTasks().size(), result.getNewTasks().size());
+
         return result;
     }
 
@@ -150,9 +170,16 @@ public class TaskGroupService {
         Map<String, MdmMaterialInfo> map = new HashMap<>();
         if (context.getMaterials() != null) {
             for (MdmMaterialInfo material : context.getMaterials()) {
-                map.put(material.getMaterialCode(), material);
+                // 同时用 MATERIAL_CODE 和 EMBRYO_CODE 作为索引
+                if (material.getMaterialCode() != null) {
+                    map.put(material.getMaterialCode(), material);
+                }
+                if (material.getEmbryoCode() != null) {
+                    map.put(material.getEmbryoCode(), material);
+                }
             }
         }
+        log.debug("物料映射构建完成，共 {} 条物料信息", map.size());
         return map;
     }
 
@@ -171,12 +198,17 @@ public class TaskGroupService {
 
     /**
      * 查找续作机台
+     *
+     * <p>使用物料编码 + 胎胚编码组合键匹配：
+     * - 机台在产: mesMaterialCode + embryoSpec (格式: materialCode|embryoCode)
+     * - 硫化任务: materialCode + embryoCode
      */
-    private List<String> findContinueMachines(String embryoCode, Map<String, Set<String>> machineOnlineEmbryoMap) {
-        //todo 因为这里同胎胚可以被不同硫化任务物料共用，并且不同任务分配的机台不同，这里不能简单的比较在机是那些胎胚就安排
+    private List<String> findContinueMachines(String materialCode, String embryoCode, Map<String, Set<String>> machineOnlineEmbryoMap) {
         List<String> machineCodes = new ArrayList<>();
+        // 组合键格式与机台在产映射一致: materialCode|embryoCode
+        String combinedKey = materialCode + "|" + embryoCode;
         for (Map.Entry<String, Set<String>> entry : machineOnlineEmbryoMap.entrySet()) {
-            if (entry.getValue().contains(embryoCode)) {
+            if (entry.getValue().contains(combinedKey)) {
                 machineCodes.add(entry.getKey());
             }
         }
@@ -184,37 +216,59 @@ public class TaskGroupService {
     }
 
     /**
-     * 构建基础任务
+     * 为单条硫化记录构建任务
+     *
+     * <p>每条硫化记录作为独立任务，不再按胎胚合并
+     *
+     * @param lhResult            硫化记录
+     * @param materialMap         物料映射
+     * @param stockMap             库存映射
+     * @param context              排程上下文
+     * @param currentShiftConfigs  当前班次配置列表
      */
-    private CoreScheduleAlgorithmService.DailyEmbryoTask buildBaseTask(
-            String embryoCode,
-            List<LhScheduleResult> lhResults,
+    private CoreScheduleAlgorithmService.DailyEmbryoTask buildSingleTask(
+            LhScheduleResult lhResult,
             Map<String, MdmMaterialInfo> materialMap,
             Map<String, CxStock> stockMap,
-            ScheduleContextVo context) {
+            ScheduleContextVo context,
+            List<CxShiftConfig> currentShiftConfigs) {
 
-        // 计算硫化需求量
-        int totalVulcanizeDemand = lhResults.stream()
-                .mapToInt(r -> r.getDailyPlanQty() != null ? r.getDailyPlanQty() : 0)
-                .sum();
+        String embryoCode = lhResult.getEmbryoCode();
+        String materialCode = lhResult.getMaterialCode();
+        if (embryoCode == null) {
+            log.warn("buildSingleTask跳过：embryoCode为null，materialCode={}", materialCode);
+            return null;
+        }
 
-        // 获取当前库存
-        int currentStock = getCurrentStock(lhResults.get(0), stockMap, embryoCode);
+        // 获取硫化需求量（根据当前班次配置获取对应的CLASS计划量）
+        int vulcanizeDemand = getShiftPlanQty(lhResult, currentShiftConfigs);
 
-        // 获取结构名称
-        String structureName = materialMap.get(lhResults.get(0).getMaterialCode()).getStructureName();
+        if (vulcanizeDemand <= 0) {
+            log.debug("buildSingleTask跳过：硫化需求为0，embryoCode={}, materialCode={}", embryoCode, materialCode);
+            // 不返回null，因为即使需求为0也可能需要排产（比如补库存）
+        }
 
-        // 计算日需求量
-        int dailyDemand = calculateDailyDemand(totalVulcanizeDemand, currentStock, structureName, context);
-
-        // 构建任务
-        CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
-        task.setMaterialCode(embryoCode);
-        task.setVulcanizeDemand(totalVulcanizeDemand);
-        task.setCurrentStock(currentStock);
+        // 获取分配给该硫化任务的库存（按硫化任务维度分配，共用胎胚库存已按比例分配）
+        int currentStock = getAllocatedStock(context, lhResult.getLhId());
 
         // 获取物料信息
         MdmMaterialInfo material = materialMap.get(embryoCode);
+        if (material == null) {
+            log.debug("buildSingleTask跳过：物料信息为空，embryoCode={}", embryoCode);
+        }
+
+        String structureName = material != null ? material.getStructureName() : lhResult.getStructureName();
+
+        // 计算日需求量
+        int dailyDemand = calculateDailyDemand(vulcanizeDemand, currentStock, structureName, context);
+
+        // 构建任务
+        CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
+        task.setLhId(lhResult.getLhId());  // 设置硫化任务ID，用于关联库存分配
+        task.setMaterialCode(embryoCode);
+        task.setVulcanizeDemand(vulcanizeDemand);
+        task.setCurrentStock(currentStock);
+
         if (material != null) {
             task.setMaterialName(material.getMaterialDesc());
             task.setStructureName(material.getStructureName());
@@ -229,14 +283,11 @@ public class TaskGroupService {
         task.setAssignedQuantity(0);
         task.setRemainingQuantity(dailyDemand);
 
-        // 是否主销产品（使用物料编码判断，而不是胎胚编码）
+        // 是否主销产品
         String relatedMaterialCode = task.getRelatedMaterialCode();
-        task.setIsMainProduct(context.getMainProductCodes() != null 
+        task.setIsMainProduct(context.getMainProductCodes() != null
                 && relatedMaterialCode != null
                 && context.getMainProductCodes().contains(relatedMaterialCode));
-
-        // 计算库存时长
-        calculateStockHours(task, lhResults, currentStock);
 
         // 硫化机台数和模数
         CxStock stock = stockMap.get(embryoCode);
@@ -246,6 +297,65 @@ public class TaskGroupService {
         }
 
         return task;
+    }
+
+    /**
+     * 根据班次配置获取硫化记录对应班次的计划量
+     *
+     * <p>硫化有8个班次(CLASS1-CLASS8)，成型分3天排程
+     * 根据当前班次配置的 classField 字段获取对应的硫化班次计划量
+     *
+     * @param lhResult            硫化记录
+     * @param currentShiftConfigs 当前班次配置列表
+     * @return 对应班次的硫化计划量
+     */
+    private int getShiftPlanQty(LhScheduleResult lhResult, List<CxShiftConfig> currentShiftConfigs) {
+        if (currentShiftConfigs == null || currentShiftConfigs.isEmpty()) {
+            // 如果没有班次配置，返回日计划量作为兜底
+            return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+        }
+
+        // 获取班次配置中的 classField (如 CLASS1, CLASS2, ..., CLASS8)
+        // 格式: CLASS1, CLASS2, ..., CLASS8
+        for (CxShiftConfig shiftConfig : currentShiftConfigs) {
+            String classField = shiftConfig.getClassField();
+            if (classField != null && classField.startsWith("CLASS")) {
+                try {
+                    // 提取班次序号，如 CLASS3 -> 3
+                    int classIndex = Integer.parseInt(classField.substring(5));
+                    Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
+                    if (planQty != null && planQty > 0) {
+                        return planQty;
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("无法解析班次字段: {}", classField);
+                }
+            }
+        }
+
+        // 如果没有找到对应班次的计划量，返回日计划量
+        return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+    }
+
+    /**
+     * 根据班次索引获取硫化记录的计划量
+     *
+     * @param lhResult   硫化记录
+     * @param classIndex 班次索引 (1-8)
+     * @return 计划量
+     */
+    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
+        switch (classIndex) {
+            case 1: return lhResult.getClass1PlanQty();
+            case 2: return lhResult.getClass2PlanQty();
+            case 3: return lhResult.getClass3PlanQty();
+            case 4: return lhResult.getClass4PlanQty();
+            case 5: return lhResult.getClass5PlanQty();
+            case 6: return lhResult.getClass6PlanQty();
+            case 7: return lhResult.getClass7PlanQty();
+            case 8: return lhResult.getClass8PlanQty();
+            default: return null;
+        }
     }
 
     /**
@@ -261,15 +371,55 @@ public class TaskGroupService {
     }
 
     /**
+     * 获取分配给该硫化任务的库存
+     *
+     * <p>库存已按硫化任务维度分配，共用胎胚库存按硫化任务需求比例分配
+     * 使用硫化任务的唯一标识 (lhId) 获取分配库存
+     *
+     * @param context 排程上下文
+     * @param lhId    硫化任务ID
+     * @return 分配给该硫化任务的库存数量
+     */
+    private int getAllocatedStock(ScheduleContextVo context, Long lhId) {
+        if (lhId == null) {
+            return 0;
+        }
+        Map<String, Integer> materialStockMap = context.getMaterialStockMap();
+        if (materialStockMap == null) {
+            log.warn("materialStockMap 为空，无法获取分配给硫化任务 {} 的库存", lhId);
+            return 0;
+        }
+        // 使用硫化任务的唯一标识获取库存
+        String taskKey = String.valueOf(lhId);
+        return materialStockMap.getOrDefault(taskKey, 0);
+    }
+
+    /** 库存高预警阈值（小时），可配置 */
+    private static final int STOCK_HIGH_HOURS_THRESHOLD = 18;
+
+    /**
      * 计算库存时长
+     * 
+     * 公式：胎胚预计库存可供硫化时长 = (胎胚实时库存 + 计划量) / 硫化机数 / 单台模数
+     * 
+     * @param task         胎胚任务
+     * @param lhResults    硫化排程结果
+     * @param currentStock 当前胎胚库存
      */
     private void calculateStockHours(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             List<LhScheduleResult> lhResults,
             int currentStock) {
 
-        if (currentStock <= 0) {
+        // 获取计划量（待排产量）
+        int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+        
+        // 预计库存 = 当前库存 + 计划量
+        int expectedStock = currentStock + plannedProduction;
+
+        if (expectedStock <= 0) {
             task.setStockHours(BigDecimal.ZERO);
+            task.setIsStockHighWarning(false);
             return;
         }
 
@@ -280,17 +430,27 @@ public class TaskGroupService {
         if (vulcanizeMachineCount == null || vulcanizeMachineCount == 0 ||
                 vulcanizeMoldCount == null || vulcanizeMoldCount == 0) {
             task.setStockHours(BigDecimal.ZERO);
+            task.setIsStockHighWarning(false);
             return;
         }
 
-        // 库存时长 = 胎胚库存 / (硫化机数 × 单台模数 × 每小时每模产量)
+        // 库存时长 = (当前库存 + 计划量) / (硫化机数 × 单台模数 × 每小时每模产量)
         BigDecimal hourlyOutput = BigDecimal.valueOf(vulcanizeMachineCount)
                 .multiply(BigDecimal.valueOf(vulcanizeMoldCount))
                 .multiply(BigDecimal.valueOf(0.5)); // 假设每模每小时0.5条
 
-        BigDecimal stockHours = BigDecimal.valueOf(currentStock)
+        BigDecimal stockHours = BigDecimal.valueOf(expectedStock)
                 .divide(hourlyOutput, 2, BigDecimal.ROUND_HALF_UP);
         task.setStockHours(stockHours);
+
+        // 库存预警：超过18小时标记为高库存
+        boolean isHighStock = stockHours.compareTo(BigDecimal.valueOf(STOCK_HIGH_HOURS_THRESHOLD)) > 0;
+        task.setIsStockHighWarning(isHighStock);
+        
+        if (isHighStock) {
+            log.info("胎胚 {} 库存水位过高，预计可供硫化 {} 小时，计划量 {} 条", 
+                    task.getMaterialCode(), stockHours, plannedProduction);
+        }
     }
 
     /**
@@ -442,13 +602,19 @@ public class TaskGroupService {
             score += 500;
         }
 
-        // 库存紧张
+        // 库存紧张（低库存时长 = 高优先级）
         if (task.getStockHours() != null) {
             if (task.getStockHours().compareTo(new BigDecimal("4")) < 0) {
                 score += 800;
             } else if (task.getStockHours().compareTo(new BigDecimal("6")) < 0) {
                 score += 400;
             }
+        }
+
+        // 库存高预警（>18小时 = 低优先级，排后面）
+        if (Boolean.TRUE.equals(task.getIsStockHighWarning())) {
+            score -= 500;
+            log.debug("胎胚 {} 库存水位过高，优先级降低500分", task.getMaterialCode());
         }
 
         // 主销产品

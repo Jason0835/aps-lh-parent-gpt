@@ -1,10 +1,9 @@
 package com.zlt.aps.cx.service.engine;
 
-import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.CxMachineStructureCapacity;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
-import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
@@ -369,91 +368,89 @@ public class ContinueTaskProcessor {
             ScheduleContextVo context,
             LocalDate scheduleDate) {
         
-        String embryoCode = task.getMaterialCode();
-        int totalEmbryoStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
-        if (totalEmbryoStock <= 0) {
-            task.setAllocatedStock(0);
-            return;
-        }
-        
-        List<LhScheduleResult> lhResults = context.getLhScheduleResults();
-        if (lhResults == null || lhResults.isEmpty()) {
-            task.setAllocatedStock(totalEmbryoStock);
-            return;
-        }
-        
-        List<LhScheduleResult> sameEmbryoResults = lhResults.stream()
-                .filter(r -> embryoCode.equals(r.getEmbryoCode()))
-                .collect(Collectors.toList());
-        
-        if (sameEmbryoResults.isEmpty()) {
-            task.setAllocatedStock(totalEmbryoStock);
-            return;
-        }
-        
-        int totalDailyVulcanize = sameEmbryoResults.stream()
-                .mapToInt(r -> r.getDailyPlanQty() != null ? r.getDailyPlanQty() : 0)
-                .sum();
-        
-        if (totalDailyVulcanize <= 0) {
-            task.setAllocatedStock(totalEmbryoStock);
-            return;
-        }
-        
-        int currentSkuDailyVulcanize = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
-        
-        int allocatedStock;
-        if (sameEmbryoResults.size() == 1) {
-            allocatedStock = totalEmbryoStock;
-        } else {
-            allocatedStock = (int) ((double) currentSkuDailyVulcanize / totalDailyVulcanize * totalEmbryoStock);
-        }
-        
+        // 库存已在 TaskGroupService.buildSingleTask 中按物料需求比例分配好
+        // 这里直接使用已分配的库存
+        int allocatedStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
         task.setAllocatedStock(allocatedStock);
-        log.debug("胎胚 {} 库存分配：总库存={}, 分配量={}", embryoCode, totalEmbryoStock, allocatedStock);
+        log.debug("胎胚 {} 库存分配：分配量={}", task.getMaterialCode(), allocatedStock);
     }
     
+    /**
+     * 计算待排产量（按车分配）
+     *
+     * <p>计算逻辑：
+     * 1. 获取硫化需求量（vulcanizeDemand）
+     * 2. 获取硫化任务分配的库存（allocatedStock）
+     * 3. 计算需要的计划量 = vulcanizeDemand - 库存
+     * 4. 获取胎面整车条数（treadCount）
+     * 5. 计算需要的车数 = 需要的计划量 / treadCount
+     *
+     * <p>如果是收尾任务，需要考虑成型余量判断是否收尾
+     */
     public void calculatePlannedProduction(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
             LocalDate scheduleDate,
             boolean isOpeningDay) {
-        
-        // 使用 ProductionCalculator 计算计划量
-        // 注意：task.getMaterialCode() 返回的是胎胚编码(embryoCode)
-        // task.getRelatedMaterialCode() 返回的是真正的物料编码(materialCode)
-        String embryoCode = task.getMaterialCode();  // 胎胚编码（用于判断关键产品）
-        String materialCode = task.getRelatedMaterialCode();  // 物料编码（用于判断主销产品）
-        
-        ProductionCalculator.PlanQuantityResult calcResult = productionCalculator.calculateComprehensive(
-                embryoCode,
-                task.getStructureName(),
-                materialCode,
-                null, // 续作任务不是试制
-                null, // 续作任务单独处理收尾
-                context,
-                scheduleDate
-        );
 
-        int plannedProduction = calcResult.getPlanQuantity();
+        // Step 1: 获取硫化需求量和分配的库存
+        int vulcanizeDemand = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+        int allocatedStock = task.getAllocatedStock() != null ? task.getAllocatedStock() : 0;
 
-        // 考虑机台产能限制
-        int machineMaxCapacity = getMachineDailyCapacity(
-                task.getContinueMachineCodes() != null && !task.getContinueMachineCodes().isEmpty() 
-                        ? task.getContinueMachineCodes().get(0) : null, context);
-        
-        int embryoStorageLimit = (int) (getEmbryoStorageLimit(task.getMaterialCode(), context) * EMBRYO_STORAGE_RATIO);
-        
-        plannedProduction = Math.min(plannedProduction, machineMaxCapacity);
-        plannedProduction = Math.min(plannedProduction, embryoStorageLimit);
-        plannedProduction = Math.max(0, plannedProduction);
-        
-        task.setPlannedProduction(plannedProduction);
+        // Step 2: 计算需要的计划量
+        int requiredProduction = Math.max(0, vulcanizeDemand - allocatedStock);
 
-        // 保存班次分配结果
-        if (calcResult.getShiftAllocation() != null) {
-            task.setShiftAllocation(calcResult.getShiftAllocation());
+        // Step 3: 获取胎面整车条数
+        String structureName = task.getStructureName();
+        Map<String, Integer> treadCountMap = context.getStructureTreadCountMap();
+        int treadCount = treadCountMap != null ? treadCountMap.getOrDefault(structureName, 1) : 1;
+
+        // Step 4: 计算需要的车数
+        int requiredCars = 0;
+        if (treadCount > 0) {
+            requiredCars = (int) Math.ceil((double) requiredProduction / treadCount);
         }
+
+        // Step 5: 如果是收尾任务，判断是否需要收尾
+        if (Boolean.TRUE.equals(task.getIsEndingTask())) {
+            requiredCars = calculateEndingCars(task, context, requiredProduction, requiredCars);
+        }
+
+        // Step 6: 设置任务属性
+        task.setPlannedProduction(requiredProduction);
+        task.setRequiredCars(requiredCars);
+
+        log.debug("任务 {} 计划量计算：需求={}，库存={}，需要量={}，胎面条数={}，需要车数={}",
+                task.getMaterialCode(), vulcanizeDemand, allocatedStock, requiredProduction, treadCount, requiredCars);
+    }
+
+    /**
+     * 计算收尾任务需要的车数
+     *
+     * <p>判断逻辑与 ProductionCalculator.handleEndingRemainder 一致：
+     * - 如果成型余量充足，不收尾
+     * - 如果成型余量不足，需要收尾
+     */
+    private int calculateEndingCars(
+            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            ScheduleContextVo context,
+            int requiredProduction,
+            int calculatedCars) {
+
+        String materialCode = task.getRelatedMaterialCode();
+        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
+        Integer formingRemainder = formingRemainderMap != null ? formingRemainderMap.get(materialCode) : 0;
+
+        // 判断是否需要收尾
+        if (formingRemainder != null && formingRemainder > 0) {
+            // 成型余量充足，不需要收尾
+            log.debug("任务 {} 收尾判断：成型余量={}，充足，不收尾", task.getMaterialCode(), formingRemainder);
+            return 0;
+        }
+
+        // 需要收尾，返回计算的车数
+        log.debug("任务 {} 收尾判断：成型余量不足，需要收尾，车数={}", task.getMaterialCode(), calculatedCars);
+        return calculatedCars;
     }
     
     public void handleOpeningClosingDay(
@@ -499,11 +496,17 @@ public class ContinueTaskProcessor {
             ScheduleContextVo context,
             boolean isOpeningDay) {
         
-        if (isOpeningDay) return;
-        if (!Boolean.TRUE.equals(task.getIsEndingTask()) && !Boolean.TRUE.equals(task.getIsNearEnding())) return;
+        if (isOpeningDay) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(task.getIsEndingTask()) && !Boolean.TRUE.equals(task.getIsNearEnding())) {
+            return;
+        }
         
         Integer endingSurplus = task.getEndingSurplusQty();
-        if (endingSurplus == null || endingSurplus <= 0) return;
+        if (endingSurplus == null || endingSurplus <= 0) {
+            return;
+        }
         
         int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
         int allocatedStock = task.getAllocatedStock() != null ? task.getAllocatedStock() : 0;
@@ -557,10 +560,14 @@ public class ContinueTaskProcessor {
             LocalDate scheduleDate) {
 
         Integer formingRemainder = task.getEndingSurplusQty();
-        if (formingRemainder == null || formingRemainder <= 0) return 0;
+        if (formingRemainder == null || formingRemainder <= 0) {
+            return 0;
+        }
 
         LocalDate endingDate = task.getEndingDate();
-        if (endingDate == null) return 0;
+        if (endingDate == null) {
+            return 0;
+        }
 
         int plannedQty = calculatePlannedQuantityToDate(task.getMaterialCode(), scheduleDate, endingDate, context);
         int gap = formingRemainder - plannedQty;
@@ -573,7 +580,9 @@ public class ContinueTaskProcessor {
     }
 
     private int convertToTrips(int quantity, int tripCapacity, Boolean isMainProduct) {
-        if (quantity <= 0) return 0;
+        if (quantity <= 0) {
+            return 0;
+        }
         return Boolean.TRUE.equals(isMainProduct) 
                 ? (int) Math.ceil((double) quantity / tripCapacity) 
                 : quantity / tripCapacity;

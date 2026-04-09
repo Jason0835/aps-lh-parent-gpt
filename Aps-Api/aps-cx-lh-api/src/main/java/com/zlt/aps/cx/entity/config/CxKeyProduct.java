@@ -23,10 +23,6 @@ public class CxKeyProduct extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
-
     @ApiModelProperty(value = "胎胚编码")
     @TableField("EMBRYO_CODE")
     private String embryoCode;
