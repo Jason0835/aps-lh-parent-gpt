@@ -3,11 +3,17 @@ package com.zlt.aps.mp.setting.controller;
 import com.alibaba.cloud.commons.lang.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -15,6 +21,7 @@ import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductConstructionEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmProductModelRelationEntityMapper;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
+import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.mp.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.mp.api.domain.dto.ProductMouldRelationConfigurationParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -22,15 +29,20 @@ import com.zlt.aps.mp.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -70,6 +82,12 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
 
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
 
     /**
      * 查询SKU与模具关系列表
@@ -176,7 +194,34 @@ public class MdmProductModelRelationController extends AbstractDocBizController<
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext, updateSupport);
+        Date beginTime = DateUtils.getNowDate();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        ExcelUtil<MdmSkuMouldRel> util = new ExcelUtil<>(this.getTClass());
+        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+        List<MdmSkuMouldRel> list = util.importExcel(is);
+        return this.doImportDataAsync(list, updateSupport, importLog.getId(), importLog, beginTime);
+    }
+
+    public AjaxResult doImportDataAsync(List<MdmSkuMouldRel> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime) {
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+        }
+        if (list.size() > 500) {
+            // 传递请求头信息（主要是语言包），避免主线程执行后清空request，拷贝一个虚拟的request
+            ServletRequestAttributes virtualAttr = RemoteImportExcelUtils.copyRequestHeaderAttribute();
+            mdmProductModelRelationService.importDataAsync(list, updateSupport, importLogId, importLog, beginTime, virtualAttr);
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.common.importTimeOut"));
+        }
+        AjaxResult result = getDocService().importData(list, updateSupport, importLogId);
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(result, this.iImportErrorLogService);
+        return result;
     }
 
     /**

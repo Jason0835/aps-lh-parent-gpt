@@ -1,21 +1,30 @@
 package com.zlt.aps.lh.service;
 
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
-import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
-import com.zlt.bill.common.service.IDocService;
 /**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：ILhUnscheduledResultService.java
- * 描    述：ILhUnscheduledResultService硫化未排结果后端接口
- *@author zlt
- *@date 2025-03-07
- *@version 1.0
+ * 硫化未排产结果服务接口
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
+ * @author APS
  */
-public interface ILhUnscheduledResultService  extends IDocService<LhUnscheduledResult>{
+public interface ILhUnscheduledResultService {
 
+    /**
+     * 根据排程日期和工厂删除未排产结果
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编号
+     * @return 删除记录数
+     */
+    int deleteByDateAndFactory(Date scheduleDate, String factoryCode);
+
+    /**
+     * 批量插入未排产结果
+     *
+     * @param list 未排产结果列表
+     * @return 插入记录数
+     */
+    int insertBatch(List<Map<String, Object>> list);
 }

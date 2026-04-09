@@ -771,7 +771,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
     /**
      * 根据优先级顺序分配生产数量
-     * 顺序：heightLossQty -> cycleReserveLossQty -> midLossQty -> conventionReserveQty -> postponeQty
+     * 顺序：heightLossQty -> midLossQty -> cycleReserveLossQty -> conventionReserveQty -> postponeQty
      */
     public void allocateProductionByPriority() {
         // 初始化所有生产数量为0
@@ -793,20 +793,20 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
             remainingQty -= this.heightProductionQty;
             scmPriorities.add(SAL_PRIORITY_HIGHT);
         }
+        // 2. 分配中优先级
+        if (remainingQty > 0 && this.midLossQty != null && this.midLossQty > 0) {
+            this.midProductionQty = Math.min(remainingQty, this.midLossQty);
+            remainingQty -= this.midProductionQty;
+            scmPriorities.add(SAL_PRIORITY_MID);
+        }
 
-        // 2. 分配周期储备
+        // 3. 分配周期储备
         if (remainingQty > 0 && this.cycleReserveLossQty != null && this.cycleReserveLossQty > 0) {
             this.cycleProductionQty = Math.min(remainingQty, this.cycleReserveLossQty);
             remainingQty -= this.cycleProductionQty;
             scmPriorities.add(SAL_PRIORITY_CYCLE_STOCK_UP);
         }
 
-        // 3. 分配中优先级
-        if (remainingQty > 0 && this.midLossQty != null && this.midLossQty > 0) {
-            this.midProductionQty = Math.min(remainingQty, this.midLossQty);
-            remainingQty -= this.midProductionQty;
-            scmPriorities.add(SAL_PRIORITY_MID);
-        }
 
         // 4. 分配暂缓优先级
         if (!NORMAL_PLAN_TYPE.equals(this.planType)  &&   remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {

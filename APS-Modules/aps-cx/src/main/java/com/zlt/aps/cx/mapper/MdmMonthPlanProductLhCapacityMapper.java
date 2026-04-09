@@ -24,8 +24,8 @@ public interface MdmMonthPlanProductLhCapacityMapper extends BaseMapper<Object> 
      */
     @Select("SELECT FACTORY_CODE AS factoryCode, MATERIAL_CODE AS materialCode, MATERIAL_DESC AS materialDesc, " +
             "MES_CAPACITY AS mesCapacity, STANDARD_CAPACITY AS standardCapacity, APS_CAPACITY AS apsCapacity, " +
-            "VULCANIZATION_TIME AS vulcanizationTime " +
-            "FROM t_mdm_sku_lh_capacity WHERE FACTORY_CODE = #{factoryCode}")
+            "VULCANIZATION_TIME AS vulcanizationTime, PRODUCTION_TIME AS productionTime " +
+            "FROM t_mdm_sku_lh_capacity WHERE FACTORY_CODE = #{factoryCode} AND IS_DELETE = '0'")
     List<MonthPlanProductLhCapacityVo> selectByFactoryCode(
             @Param("factoryCode") String factoryCode);
 }

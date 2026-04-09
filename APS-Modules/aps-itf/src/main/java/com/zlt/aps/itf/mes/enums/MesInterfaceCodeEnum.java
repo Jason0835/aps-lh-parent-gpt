@@ -79,7 +79,7 @@ public enum MesInterfaceCodeEnum {
     /**
      * 模具清洗预警计划同步
      */
-    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanPlan", "模具清洗预警计划同步"),
+    MOULD_CLEAN_PLAN("MOULD_CLEAN_PLAN", "mesItfService", "syncMouldCleanWarn", "模具清洗预警计划同步"),
 
     /**
      * 结构整车胎面配置同步

@@ -382,15 +382,15 @@ public class MesItfController {
      * @param syncDataLogs 参数
      * @return 结果
      */
-    @ApiOperation("同步模具清洗预警计划")
-    @PostMapping("/syncMouldCleanPlan")
+    @ApiOperation("同步模具清洗预警")
+    @PostMapping("/syncMouldCleanWarn")
     @AutoLoginLog
-    public AjaxResult syncMouldCleanPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+    public AjaxResult syncMouldCleanWarn(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
         String factoryCode = syncDataLogs.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
             syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return mesItfService.syncMouldCleanPlan(syncDataLogs);
+        return mesItfService.syncMouldCleanWarn(syncDataLogs);
     }
 
     /**

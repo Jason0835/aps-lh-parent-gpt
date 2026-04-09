@@ -41,17 +41,13 @@ import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -286,53 +282,89 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     @ApiOperation("导入数据")
     @PostMapping("/importDataStructureAllocation")
     public AjaxResult importDataStructureAllocation(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        if (importContext == null || importContext.getFileBytes() == null || importContext.getFileBytes().length == 0) {
+            return AjaxResult.error("导入文件不能为空");
+        }
         Date beginTime = DateUtils.getNowDate();
-        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        byte[] fileBytes = importContext.getFileBytes();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(fileBytes, importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<MpStructureAllocationExportVo> util = new ExcelUtil<>(MpStructureAllocationExportVo.class);
-        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+        DataFormatter dataFormatter = new DataFormatter();
         // 工厂名称字典
-        List<SysDictData> factoryDatas = sysDictDataCacheService.getType("biz_factory_name");
-        Map<String, String> factoryMap = factoryDatas.stream().collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue));
+        List<SysDictData> factoryDatas = Optional.ofNullable(sysDictDataCacheService.getType("biz_factory_name")).orElse(Collections.emptyList());
+        Map<String, String> factoryMap = factoryDatas.stream()
+                .filter(Objects::nonNull)
+                .filter(v -> v.getDictLabel() != null && v.getDictValue() != null)
+                .collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue, (a, b) -> a));
 
-        List<SysDictData> productTypeList = sysDictDataCacheService.getType("biz_product_type");
-        Map<String, String> productTypeMap = productTypeList.stream().collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue));
+        List<SysDictData> productTypeList = Optional.ofNullable(sysDictDataCacheService.getType("biz_product_type")).orElse(Collections.emptyList());
+        Map<String, String> productTypeMap = productTypeList.stream()
+                .filter(Objects::nonNull)
+                .filter(v -> v.getDictLabel() != null && v.getDictValue() != null)
+                .collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue, (a, b) -> a));
 
-        Workbook wb = WorkbookFactory.create(is);
         String sheetName = "结构转产表";
-        Sheet sheet = wb.getSheet(sheetName);
-        // 表头单元格
-        Cell titleCell = sheet.getRow(0).getCell(0);
-        String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
-        String[] params = parseFormat(titleFormat, titleCell.getStringCellValue());
-        // 月计划版本单元格
-        String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ": ";
-        String productionVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.productionVersion") + ": ";
-
-        Cell monthPlanVersionCell = sheet.getRow(0).getCell(26);
-        String monthPlanVersion = monthPlanVersionCell.getStringCellValue().replace(monthPlanVersionLabel, "");
-        // 生产版本单元格
-        Cell productVersionCell = sheet.getRow(0).getCell(34);
-        String productVersion4Cell = productVersionCell.getStringCellValue().replace(productionVersionLabel, "");
-        String productVersion = "I" + DateUtils.dateTimeNow();
-
-        // 表头单元格
         String sheetName4DayResult = "月计划";
-        Sheet sheet4DayResult = wb.getSheet(sheetName4DayResult);
-        Cell titleCell4DayResult = sheet4DayResult.getRow(0).getCell(0);
-        String titleFormat4DayResult = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
-        String[] params4DayResult = parseFormat(titleFormat4DayResult, titleCell4DayResult.getStringCellValue());
+        String[] params;
+        String[] params4DayResult;
+        String monthPlanVersion;
+        String productVersion = "I" + DateUtils.dateTimeNow();
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
+            Sheet sheet = wb.getSheet(sheetName);
+            if (sheet == null || sheet.getRow(0) == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            Cell titleCell = sheet.getRow(0).getCell(0);
+            if (titleCell == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
+            params = parseFormat(titleFormat, dataFormatter.formatCellValue(titleCell));
+            if (params == null || params.length < 4) {
+                return AjaxResult.error("导入模板标题格式不匹配");
+            }
+            String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ": ";
+            Cell monthPlanVersionCell = sheet.getRow(0).getCell(26);
+            if (monthPlanVersionCell == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            monthPlanVersion = dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "");
+            Cell productVersionCell = sheet.getRow(0).getCell(34);
+            if (productVersionCell == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            dataFormatter.formatCellValue(productVersionCell);
+
+            Sheet sheet4DayResult = wb.getSheet(sheetName4DayResult);
+            if (sheet4DayResult == null || sheet4DayResult.getRow(0) == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            Cell titleCell4DayResult = sheet4DayResult.getRow(0).getCell(0);
+            if (titleCell4DayResult == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            String titleFormat4DayResult = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
+            params4DayResult = parseFormat(titleFormat4DayResult, dataFormatter.formatCellValue(titleCell4DayResult));
+            if (params4DayResult == null || params4DayResult.length < 3) {
+                return AjaxResult.error("导入模板标题格式不匹配");
+            }
+        } catch (Exception e) {
+            log.warn("importDataStructureAllocation workbook parse failed", e);
+            return AjaxResult.error("导入文件格式不正确");
+        }
         ExcelUtil<FactoryMonthPlanMouldDayResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
-        List<FactoryMonthPlanMouldDayResult> list4DayResult = util4DayResult.importExcel(sheetName4DayResult, new ByteArrayInputStream(importContext.getFileBytes()), 3, 1, -1);
+        List<FactoryMonthPlanMouldDayResult> list4DayResult = util4DayResult.importExcel(sheetName4DayResult, new ByteArrayInputStream(fileBytes), 3, 1, -1);
 
         // 结构转产导入
-        List<MpStructureAllocationExportVo> list = util.importExcel(sheetName, new ByteArrayInputStream(importContext.getFileBytes()), 2, 2, 10);
+        List<MpStructureAllocationExportVo> list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 10);
         AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, updateSupport, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
 
         // 月计划排产导入
         AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, updateSupport, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap);
 
-        if (!ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value()) && !ajaxResult4DayResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+        if (!Objects.equals(ajaxResult.get(AjaxResult.CODE_TAG), AjaxResult.Type.ERROR.value())
+                && !Objects.equals(ajaxResult4DayResult.get(AjaxResult.CODE_TAG), AjaxResult.Type.ERROR.value())) {
             // 版本关系存到版本表
             MpFactoryProductionVersion version = new MpFactoryProductionVersion();
             if (factoryMap.containsKey(params[2])) {
@@ -341,9 +373,18 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             if (productTypeMap.containsKey(params[3])) {
                 version.setProductTypeCode(productTypeMap.get(params[3]));
             }
-            int year = Integer.parseInt(params[0]);
+            int year;
+            int month;
+            try {
+                year = Integer.parseInt(params[0]);
+                month = Integer.parseInt(params[1]);
+            } catch (NumberFormatException e) {
+                return AjaxResult.error("导入模板标题中的年月格式不正确");
+            }
+            if (month < 1 || month > 12) {
+                return AjaxResult.error("导入模板标题中的月份范围不正确");
+            }
             version.setYear(year);
-            int month = Integer.parseInt(params[1]);
             version.setMonth(month);
             version.setMonthPlanVersion(monthPlanVersion);
             version.setProductionVersion(productVersion);
@@ -362,10 +403,10 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         int errorNum = 0;
         int successNum = 0;
         List<Object> importErrorLogs = new ArrayList<>();
-        String[] resultParam = ajaxResult.get(AjaxResult.MSG_TAG).toString().split(",");
-        successNum += Integer.parseInt(resultParam[1]);
-        if (resultParam.length > 2) {
-            errorNum += Integer.parseInt(resultParam[2]);
+        int[] resultParam = parseImportMsg(ajaxResult);
+        successNum += resultParam[0];
+        if (resultParam[2] > 0) {
+            errorNum += resultParam[1];
 
             List<ImportErrorLog> importErrorLogList = StringUtils.cast(ajaxResult.get(AjaxResult.DATA_TAG));
             if (CollectionUtils.isNotEmpty(importErrorLogList)) {
@@ -373,10 +414,10 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
                 importErrorLogs.addAll(JSONArray.parseArray(listTxt, ImportErrorLog.class));
             }
         }
-        String[] resultParam4DayResult = ajaxResult4DayResult.get(AjaxResult.MSG_TAG).toString().split(",");
-        successNum += Integer.parseInt(resultParam4DayResult[1]);
-        if (resultParam4DayResult.length > 2) {
-            errorNum += Integer.parseInt(resultParam4DayResult[2]);
+        int[] resultParam4DayResult = parseImportMsg(ajaxResult4DayResult);
+        successNum += resultParam4DayResult[0];
+        if (resultParam4DayResult[2] > 0) {
+            errorNum += resultParam4DayResult[1];
 
             List<ImportErrorLog> importErrorLogList = StringUtils.cast(ajaxResult4DayResult.get(AjaxResult.DATA_TAG));
             if (CollectionUtils.isNotEmpty(importErrorLogList)) {
@@ -386,7 +427,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         }
 
         Date endTime = DateUtils.getNowDate();
-        importLog.setRowCount(list.size());
+        importLog.setRowCount(list == null ? 0 : list.size());
         importLog.setBeginTime(beginTime);
         importLog.setEndTime(endTime);
         importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
@@ -397,8 +438,39 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
 
         if (errorNum > 0) {
             return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, errorNum), importErrorLogs);
-        } else {
-            return AjaxResult.success(StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum));
+        }
+        return AjaxResult.success(StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum));
+    }
+
+    private int[] parseImportMsg(AjaxResult ajaxResult) {
+        int[] result = new int[]{0, 0, 0};
+        if (ajaxResult == null) {
+            return result;
+        }
+        Object msgObj = ajaxResult.get(AjaxResult.MSG_TAG);
+        if (msgObj == null) {
+            log.warn("import result msg is null");
+            return result;
+        }
+        String[] msgArr = msgObj.toString().split(",");
+        if (msgArr.length < 2) {
+            log.warn("import result msg format invalid: {}", msgObj);
+            return result;
+        }
+        result[0] = safeParseInt(msgArr[1]);
+        if (msgArr.length > 2) {
+            result[1] = safeParseInt(msgArr[2]);
+            result[2] = 1;
+        }
+        return result;
+    }
+
+    private int safeParseInt(String value) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (Exception e) {
+            log.warn("parse integer failed, value: {}", value);
+            return 0;
         }
     }
 

@@ -9,7 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -50,7 +50,7 @@ public class CxScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "排程日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("SCHEDULE_DATE")
-    private LocalDateTime scheduleDate;
+    private Date scheduleDate;
 
     @ApiModelProperty(value = "成型机台编号")
     @TableField("CX_MACHINE_CODE")

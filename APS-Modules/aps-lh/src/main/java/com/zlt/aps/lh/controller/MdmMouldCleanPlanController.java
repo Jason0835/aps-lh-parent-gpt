@@ -5,15 +5,13 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.maindata.mapper.MdmMouldCleanPlanEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMouldCleanPlanMapper;
 import com.zlt.aps.maindata.service.IMdmMouldCleanPlanService;
 import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanPlan;
-import com.zlt.aps.mdm.api.domain.vo.MdmDeviceMaintenancePlanVo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -21,7 +19,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +37,7 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
     private IMdmMouldCleanPlanService mdmMouldCleanPlanService;
 
     @Resource
-    private MdmMouldCleanPlanEntityMapper mdmMouldCleanPlanEntityMapper;
+    private MdmMouldCleanPlanMapper mdmMouldCleanPlanMapper;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -56,9 +53,6 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         return super.getInfo(billId);
     }
 
-    /**
-     * 保存
-     */
     @Log(title = "ui.data.column.mouldCleanPlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
@@ -71,9 +65,6 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         return result > 0 ? AjaxResult.success() : AjaxResult.error();
     }
 
-    /**
-     * 删除
-     */
     @Log(title = "ui.data.column.mouldCleanPlan.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
@@ -82,14 +73,6 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         return super.removeByIds(ids);
     }
 
-
-    /**
-     * 根据集合导入模具清洗计划数据
-     * @param importContext 导入上下文
-     * @param updateSupport 已存在记录是否更新
-     * @return 结果
-     * @throws Exception 异常
-     */
     @Log(title = "ui.data.column.mouldCleanPlan.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -98,13 +81,10 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         return super.importData(importContext,updateSupport);
     }
 
-
     public AjaxResult doImportData(List list, boolean updateSupport, long importLogId) {
         return mdmMouldCleanPlanService.importData(list, updateSupport, importLogId);
     }
-    /**
-     * 导出列表
-     */
+
     @Log(title = "模具清洗计划", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
@@ -114,11 +94,24 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
         return super.exportData(queryVO, fileName, response);
     }
 
+    @ApiOperation("从模具清洗预警同步生成计划")
+    @Log(title = "ui.data.column.mouldCleanPlan.modelName", businessType = BusinessType.UPDATE)
+    @PostMapping("/syncFromWarn")
+    public AjaxResult syncFromWarn() {
+        try {
+            int count = mdmMouldCleanPlanService.syncFromMouldCleanWarn();
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.operate.success") + "，" + String.format(I18nUtil.getMessage("ui.mould.clean.plan.sync.success"), count));
+        } catch (Exception e) {
+            log.error("从模具清洗预警同步生成计划失败", e);
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.operate.fail"));
+        }
+    }
+
     @Override
     protected List<MdmMouldCleanPlan> listExportData(MdmMouldCleanPlan obj) {
         QueryWrapper<MdmMouldCleanPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return mdmMouldCleanPlanEntityMapper.selectList(wrapper);
+        return mdmMouldCleanPlanMapper.selectList(wrapper);
     }
 
     @Override
@@ -130,14 +123,14 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
     protected void builderCondition(QueryWrapper<MdmMouldCleanPlan> queryWrapper, MdmMouldCleanPlan queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhCode")), "LH_CODE", queryVO.getFieldValueByFieldName("lhCode"));
-        
-        String operTimeBegin = queryVO.getOperTimeBegin();
-        String operTimeEnd = queryVO.getOperTimeEnd();
-        if (PubUtil.isNotEmpty(operTimeBegin)) {
-            queryWrapper.ge("OPER_TIME", DateUtil.beginOfDay(DateUtil.parse(operTimeBegin, "yyyy-MM-dd")));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cleanType")), "CLEAN_TYPE", queryVO.getFieldValueByFieldName("cleanType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataSource")), "DATA_SOURCE", queryVO.getFieldValueByFieldName("dataSource"));
+
+        if (queryVO.getCleanTimeBegin() != null) {
+            queryWrapper.ge("CLEAN_TIME", DateUtil.beginOfDay(queryVO.getCleanTimeBegin()));
         }
-        if (PubUtil.isNotEmpty(operTimeEnd)) {
-            queryWrapper.le("OPER_TIME", DateUtil.endOfDay(DateUtil.parse(operTimeEnd, "yyyy-MM-dd")));
+        if (queryVO.getCleanTimeEnd() != null) {
+            queryWrapper.le("CLEAN_TIME", DateUtil.endOfDay(queryVO.getCleanTimeEnd()));
         }
     }
 
@@ -148,6 +141,6 @@ public class MdmMouldCleanPlanController extends AbstractDocBizController<MdmMou
 
     @Override
     protected String getOrderBy() {
-        return "OPER_TIME desc, id desc";
+        return "CLEAN_TIME desc, id desc";
     }
 }

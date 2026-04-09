@@ -50,4 +50,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 t1.UPDATE_TIME = #{updateTime}
         WHERE t1.IS_DELETE = 0
     </update>
+
+    <update id="updateMaterialDesc">
+        UPDATE T_MDM_SKU_CONSTRUCTION_REF mscr
+            JOIN  T_MDM_MATERIAL_INFO info
+            ON mscr.MATERIAL_CODE = info.MATERIAL_CODE AND info.IS_DELETE = 0
+        SET mscr.MATERIAL_DESC = info.MATERIAL_DESC
+        WHERE mscr.IS_DELETE = 0 AND mscr.MATERIAL_DESC IS NULL
+    </update>
 </mapper>

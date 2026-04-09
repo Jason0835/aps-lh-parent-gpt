@@ -13,16 +13,15 @@ import lombok.EqualsAndHashCode;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * APS模具清洗预警计划
+ * APS模具清洗计划
  *
  * @author zlt
  * @since 2025/12/25
  */
-@ApiModel(value = "APS模具清洗预警计划", description = "APS模具清洗预警计划")
+@ApiModel(value = "APS模具清洗计划", description = "APS模具清洗计划")
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("T_MDM_MOULD_CLEAN_PLAN")
@@ -37,7 +36,6 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     private String factoryCode;
 
     @ApiModelProperty(value = "分公司编码")
-//    @Excel(name = "ui.data.column.mouldCleanPlan.companyCode")
     @TableField(value = "COMPANY_CODE")
     private String companyCode;
 
@@ -47,39 +45,34 @@ public class MdmMouldCleanPlan extends BaseEntity implements Serializable {
     @TableField(value = "LH_CODE")
     private String lhCode;
 
-    @ApiModelProperty(value = "上机时间")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanPlan.operTime", width = 30)
+    @ApiModelProperty(value = "清洗日期")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.mouldCleanPlan.cleanTime", width = 30)
     @ImportExcelValidated(required = true)
-    @TableField(value = "OPER_TIME")
-    private Date operTime;
+    @TableField(value = "CLEAN_TIME")
+    private Date cleanTime;
 
-    @ApiModelProperty(value = "首次清洗时间")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanPlan.firstWashTime", width = 30)
-    @TableField(value = "FIRST_WASH_TIME")
-    private Date firstWashTime;
-
-    @ApiModelProperty(value = "二次清洗时间")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanPlan.secondWashTime", width = 30)
+    @ApiModelProperty(value = "清洗类型")
+    @Excel(name = "ui.data.column.mouldCleanPlan.cleanType", dictType = "MOULD_CLEAN_TYPE")
     @ImportExcelValidated(required = true)
-    @TableField(value = "SECOND_WASH_TIME")
-    private Date secondWashTime;
+    @TableField(value = "CLEAN_TYPE")
+    private String cleanType;
+
+    @ApiModelProperty(value = "数据来源")
+    @Excel(name = "ui.data.column.mouldCleanPlan.dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
 
     @ApiModelProperty(value = "版本号")
-//    @Excel(name = "ui.data.column.mouldCleanPlan.dataVersion")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
 
-    @ApiModelProperty(value = "上机时间开始")
+    @ApiModelProperty(value = "清洗日期开始")
     @TableField(exist = false)
-    private String operTimeBegin;
+    private Date cleanTimeBegin;
 
-    @ApiModelProperty(value = "上机时间结束")
+    @ApiModelProperty(value = "清洗日期结束")
     @TableField(exist = false)
-    private String operTimeEnd;
+    private Date cleanTimeEnd;
 }
