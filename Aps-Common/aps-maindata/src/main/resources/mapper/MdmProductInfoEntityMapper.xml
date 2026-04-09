@@ -175,7 +175,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
            AND tmpi.FACTORY_CODE = #{factoryCode}
         </if>
         <if test="materialCode != null and materialCode != ''">
-            AND tmpi.MATERIAL_CODE = #{materialCode}
+            AND tmpi.MATERIAL_CODE like CONCAT('%', CONCAT(#{materialCode}, '%'))
         </if>
         <if test="materialDesc != null and materialDesc != ''">
             AND tmpi.MATERIAL_DESC = #{materialDesc}

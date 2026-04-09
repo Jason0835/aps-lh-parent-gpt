@@ -8,9 +8,12 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.springframework.stereotype.Component;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -51,6 +54,8 @@ public class HtmlDecodeAspect {
         }
         return handleResult;
     }
+
+    private final String findSuperObjectPrefix = "com.zlt.aps";
 
     @Before("execution(* com.zlt.aps.controller..*.export*(..))")
     public void beforeExport(JoinPoint joinPoint) throws Throwable {
@@ -120,7 +125,7 @@ public class HtmlDecodeAspect {
             return param;
         }
 
-        Field[] fields = clazz.getDeclaredFields();
+        List<Field> fields = getAllFields(clazz);
         for (Field field : fields) {
             if (Modifier.isStatic(field.getModifiers())
                     || Modifier.isFinal(field.getModifiers())
@@ -144,6 +149,11 @@ public class HtmlDecodeAspect {
     private String escapeHtml(String input) {
         if (input == null) {
             return null;
+        }
+        try {
+            input = URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
         StringBuilder sb = new StringBuilder(input.length());
         for (int i = 0; i < input.length(); i++) {
@@ -283,6 +293,19 @@ public class HtmlDecodeAspect {
             i++;
         }
         return sb.toString();
+    }
+
+    private List<Field> getAllFields(Class<?> clazz) {
+        List<Field> allFields = new ArrayList<>();
+        Class<?> current = clazz;
+        String name = current.getName();
+        if (name.startsWith(findSuperObjectPrefix)) {
+            while (current != null && current != Object.class) {
+                allFields.addAll(Arrays.asList(current.getDeclaredFields()));
+                current = current.getSuperclass();
+            }
+        }
+        return allFields;
     }
 
     private boolean isPrimitiveLike(Class<?> clazz) {
