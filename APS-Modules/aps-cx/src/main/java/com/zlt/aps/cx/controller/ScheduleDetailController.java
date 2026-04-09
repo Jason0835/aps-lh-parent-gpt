@@ -21,7 +21,7 @@ import java.util.List;
 @Slf4j
 @Api(tags = "排程明细管理")
 @RestController
-@RequestMapping("/schedule/detail")
+@RequestMapping("/cxScheduleDetail")
 public class ScheduleDetailController {
 
     @Autowired
