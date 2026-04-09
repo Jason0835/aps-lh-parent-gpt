@@ -1,36 +1,26 @@
 package com.zlt.aps.controller.cx;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.constant.UserConstants;
-import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.service.ICxScheduleDetailRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.Arrays;
+import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：CxScheduleDetailUIController.java
- * 描    述：成型排程明细 UI控制层类
+ * 描    述：成型排程明细 UI控制层类（子表）
  * @author APS Team
  * @date 2026-04-09
  * @version 1.0
@@ -44,7 +34,7 @@ import java.util.Arrays;
 @Api(tags = "成型排程明细管理")
 @Controller
 @RequestMapping("/cx/cxScheduleDetail")
-public class CxScheduleDetailUIController extends BaseUIController<CxScheduleDetail> {
+public class CxScheduleDetailUIController {
 
     @Autowired
     private ICxScheduleDetailRemoteService iCxScheduleDetailService;
@@ -61,139 +51,109 @@ public class CxScheduleDetailUIController extends BaseUIController<CxScheduleDet
     }
 
     /**
-     * 跳转至新增页面
+     * 根据主表ID查询明细列表
      */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("cxScheduleDetail", new CxScheduleDetail());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("cxScheduleDetail", iCxScheduleDetailService.getInfo(id));
-        return prefix + "/edit";
-    }
-
-    /**
-     * 根据条件查询主表数据
-     */
-    @ApiOperation("根据条件查询主表数据")
+    @ApiOperation("根据主表ID查询明细列表")
     @RequiresPermissions("cx:cxScheduleDetail:list")
-    @PostMapping("/list")
+    @GetMapping("/listByMainId/{mainId}")
     @ResponseBody
-    public TableDataInfo list(CxScheduleDetail cxScheduleDetail) {
-        return iCxScheduleDetailService.list(cxScheduleDetail);
+    public AjaxResult listByMainId(@PathVariable("mainId") Long mainId) {
+        return iCxScheduleDetailService.listByMainId(mainId);
     }
 
     /**
-     * 修改或新增
+     * 根据机台和日期查询明细
      */
-    @ApiOperation("修改或新增")
+    @ApiOperation("根据机台和日期查询明细")
+    @RequiresPermissions("cx:cxScheduleDetail:list")
+    @GetMapping("/listByMachineAndDate")
+    @ResponseBody
+    public AjaxResult listByMachineAndDate(
+            @RequestParam("cxMachineCode") String cxMachineCode,
+            @RequestParam("scheduleDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate scheduleDate) {
+        return iCxScheduleDetailService.listByMachineAndDate(cxMachineCode, scheduleDate);
+    }
+
+    /**
+     * 根据班次查询明细
+     */
+    @ApiOperation("根据班次查询明细")
+    @RequiresPermissions("cx:cxScheduleDetail:list")
+    @GetMapping("/listByShift")
+    @ResponseBody
+    public AjaxResult listByShift(
+            @RequestParam("mainId") Long mainId,
+            @RequestParam("shiftCode") String shiftCode) {
+        return iCxScheduleDetailService.listByShift(mainId, shiftCode);
+    }
+
+    /**
+     * 根据ID获取详细信息
+     */
+    @ApiOperation("获取详细信息")
+    @RequiresPermissions("cx:cxScheduleDetail:view")
+    @GetMapping("/{detailId}")
+    @ResponseBody
+    public AjaxResult getById(@PathVariable("detailId") Long detailId) {
+        return iCxScheduleDetailService.getById(detailId);
+    }
+
+    /**
+     * 更新完成量
+     */
+    @ApiOperation("更新完成量")
     @RequiresPermissions("cx:cxScheduleDetail:edit")
-    @PostMapping("/save")
+    @PutMapping("/updateCompletedQty")
     @ResponseBody
-    public AjaxResult save(CxScheduleDetail cxScheduleDetail) {
-        if (UserConstants.NOT_UNIQUE.equals(iCxScheduleDetailService.checkUnique(cxScheduleDetail))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.cxScheduleDetail.notUnique"));
-        }
-
-        return iCxScheduleDetailService.save(cxScheduleDetail);
+    public AjaxResult updateCompletedQty(
+            @RequestParam("detailId") Long detailId,
+            @RequestParam("completedQuantity") Integer completedQuantity) {
+        return iCxScheduleDetailService.updateCompletedQty(detailId, completedQuantity);
     }
 
     /**
-     * 删除成型排程明细
+     * 更新车次状态
      */
-    @ApiOperation("删除,id不为空")
+    @ApiOperation("更新车次状态")
+    @RequiresPermissions("cx:cxScheduleDetail:edit")
+    @PutMapping("/updateTripStatus")
+    @ResponseBody
+    public AjaxResult updateTripStatus(
+            @RequestParam("detailId") Long detailId,
+            @RequestParam("tripStatus") String tripStatus) {
+        return iCxScheduleDetailService.updateTripStatus(detailId, tripStatus);
+    }
+
+    /**
+     * 修改排程明细
+     */
+    @ApiOperation("修改排程明细")
+    @RequiresPermissions("cx:cxScheduleDetail:edit")
+    @PutMapping("/update")
+    @ResponseBody
+    public AjaxResult update(@RequestBody CxScheduleDetail detail) {
+        return iCxScheduleDetailService.update(detail);
+    }
+
+    /**
+     * 删除排程明细（单个）
+     */
+    @ApiOperation("删除排程明细")
     @RequiresPermissions("cx:cxScheduleDetail:remove")
-    @PostMapping("/remove")
+    @DeleteMapping("/remove/{detailId}")
     @ResponseBody
-    public AjaxResult remove(@RequestParam String ids) {
-        Long[] arr = Convert.toLongArray(ids);
-        return iCxScheduleDetailService.removeByIds(Arrays.asList(arr));
+    public AjaxResult remove(@PathVariable("detailId") Long detailId) {
+        return iCxScheduleDetailService.remove(detailId);
     }
 
     /**
-     * 校验成型排程明细唯一性
+     * 批量删除排程明细
      */
-    @ApiOperation("校验唯一性")
-    @PostMapping("/checkUnique")
+    @ApiOperation("批量删除排程明细")
+    @RequiresPermissions("cx:cxScheduleDetail:remove")
+    @DeleteMapping("/batchRemove")
     @ResponseBody
-    public String checkUnique(CxScheduleDetail cxScheduleDetail) {
-        return iCxScheduleDetailService.checkUnique(cxScheduleDetail);
-    }
-
-    /**
-     * 导出模板文件的文件名，派生类重写名称。
-     * @return
-     */
-    @Override
-    public String getExportTemplateFileName(){
-        return this.getFunctionName();
-    }
-
-    /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
-    @Override
-    public String getProcedureCode() {
-        return "0";
-    }
-
-    /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
-    @Override
-    public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.cxScheduleDetail.modelName");
-    }
-
-    /**
-     * 重写导入模板的生成逻辑
-     */
-    @ApiOperation("下载导入模板")
-    @Override
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = this.getExportTemplateFileName();
-        ExcelUtil<CxScheduleDetail> util = new ExcelUtil<>(CxScheduleDetail.class);
-        util.exportExcel(response, null, fileName, fileName);
-        return AjaxResult.success();
-    }
-
-    @ApiOperation("数据导出")
-    @GetMapping({"/export"})
-    @ResponseBody
-    @Override
-    public void export(HttpServletResponse response, CxScheduleDetail entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iCxScheduleDetailService.exportData(entity,fileName);
-        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
-        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
-        IOUtils.copy(in, response.getOutputStream());
-        response.flushBuffer();
-    }
-
-    @PostMapping({"/importData"})
-    @ResponseBody
-    @ApiOperation("数据导入")
-    @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
-        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
-
-        ImportContext context = new ImportContext();
-        context.setImportFilePath(this.importFilePath);
-        context.setFunctionName(this.getFunctionName());
-        context.setProcedureCode(this.getProcedureCode());
-        context.setOriFileName(file.getOriginalFilename());
-        context.setFileBytes(data);
-        AjaxResult ajaxResult = iCxScheduleDetailService.importData(context, updateSupport);
-        return ajaxResult;
+    public AjaxResult batchRemove(@RequestBody List<Long> detailIds) {
+        return iCxScheduleDetailService.batchRemove(detailIds);
     }
 }

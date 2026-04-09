@@ -1,10 +1,10 @@
-package com.zlt.aps.cx.api.service;
+package com.zlt.aps.cx.service;
 
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.cx.api.domain.entity.CxKeyProduct;
+import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
