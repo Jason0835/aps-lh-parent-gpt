@@ -116,7 +116,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iCxScheduleResultService.removeByIds( arr);
+        return iCxScheduleResultService.removeByIds(Arrays.asList(arr));
     }
 
     /**
