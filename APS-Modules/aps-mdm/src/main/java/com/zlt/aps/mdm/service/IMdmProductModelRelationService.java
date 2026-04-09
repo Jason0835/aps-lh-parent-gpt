@@ -1,12 +1,15 @@
 package com.zlt.aps.mdm.service;
 
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mdm.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.mdm.api.domain.dto.ProductMouldRelationConfigurationParam;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.vo.ProductMouldInfoVo;
 import com.zlt.bill.common.service.IDocService;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -67,4 +70,15 @@ public interface IMdmProductModelRelationService extends IDocService<MdmSkuMould
      * @return 结果
      */
     AjaxResult updateMainPatternToMaterial(MdmSkuMouldRel queryVO);
+
+    /**
+     * 导入
+     * @param list 列表
+     * @param updateSupport 是否覆盖
+     * @param importLogId 导入日志ID
+     * @param importLog 导入日志
+     * @param beginTime 开始时间
+     * @param attributes 虚拟请求
+     */
+    void importDataAsync(List<MdmSkuMouldRel> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
 }
