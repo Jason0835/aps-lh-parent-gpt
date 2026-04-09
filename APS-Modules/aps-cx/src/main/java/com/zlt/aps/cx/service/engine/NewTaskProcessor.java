@@ -375,7 +375,7 @@ public class NewTaskProcessor {
             for (BalancingService.EmbryoAssignment embryoAssignment : assignment.getEmbryoAssignments()) {
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = embryoAssignment.getTask();
                 if (task != null) {
-                    allocateTaskToMachine(allocation, task, context);
+                    allocateTaskToMachine(allocation, task, embryoAssignment.getAssignedQty(), context);
                 }
             }
 
@@ -475,16 +475,30 @@ public class NewTaskProcessor {
             CoreScheduleAlgorithmService.MachineAllocationResult allocation,
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context) {
+        // 默认不指定分配的硫化机台数，使用task的计划排量或需求排量
+        allocateTaskToMachine(allocation, task, null, context);
+    }
 
-        int quantity = task.getPlannedProduction() != null && task.getPlannedProduction() > 0 
-                ? task.getPlannedProduction() 
-                : task.getDemandQuantity();
+    private void allocateTaskToMachine(
+            CoreScheduleAlgorithmService.MachineAllocationResult allocation,
+            CoreScheduleAlgorithmService.DailyEmbryoTask task,
+            Integer assignedVulcanizeQty,
+            ScheduleContextVo context) {
+
+        // 排量使用任务的 demandQuantity（需求排量），这是根据硫化需求计算出来的
+        // assignedVulcanizeQty 是均衡分配时分配的硫化机台数，仅用于记录
+        int quantity = task.getDemandQuantity() != null ? task.getDemandQuantity() : 0;
+
+        // 调试日志：检查排量来源
+        System.err.println("[allocateTask] materialCode=" + task.getMaterialCode() 
+                + ", demandQuantity=" + quantity 
+                + ", assignedVulcanizeQty=" + assignedVulcanizeQty);
 
         CoreScheduleAlgorithmService.TaskAllocation taskAllocation = new CoreScheduleAlgorithmService.TaskAllocation();
         taskAllocation.setMaterialCode(task.getMaterialCode());
         taskAllocation.setMaterialName(task.getMaterialName());
         taskAllocation.setStructureName(task.getStructureName());
-        taskAllocation.setQuantity(quantity);
+        taskAllocation.setQuantity(quantity);  // 使用 demandQuantity 作为排量
         taskAllocation.setPriority(task.getPriority());
         taskAllocation.setStockHours(task.getStockHours());
         taskAllocation.setIsTrialTask(task.getIsTrialTask());

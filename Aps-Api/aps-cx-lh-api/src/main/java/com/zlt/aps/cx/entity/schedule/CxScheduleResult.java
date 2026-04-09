@@ -48,7 +48,7 @@ public class CxScheduleResult extends ApsBaseEntity {
     private String isRelease;
 
     @ApiModelProperty(value = "排程日期")
-    @JsonFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     @TableField("SCHEDULE_DATE")
     private Date scheduleDate;
 

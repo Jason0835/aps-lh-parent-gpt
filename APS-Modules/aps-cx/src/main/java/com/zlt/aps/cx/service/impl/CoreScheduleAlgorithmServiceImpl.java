@@ -310,7 +310,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         for (MachineAllocationResult allocation : allocations) {
             CxScheduleResult result = new CxScheduleResult();
-            result.setScheduleDate(scheduleDate.atStartOfDay());
+            // 将 LocalDate 转换为 Date（当天零点）
+            Date scheduleDateTime = Date.from(scheduleDate.atStartOfDay(
+                    java.time.ZoneId.systemDefault()).toInstant());
+            result.setScheduleDate(scheduleDateTime);
             result.setCxMachineCode(allocation.getMachineCode());
             result.setCxMachineType(allocation.getMachineType());
             result.setProductNum(new BigDecimal(allocation.getUsedCapacity()));
