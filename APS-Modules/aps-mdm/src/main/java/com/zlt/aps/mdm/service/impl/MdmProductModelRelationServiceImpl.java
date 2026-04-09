@@ -3,23 +3,19 @@ package com.zlt.aps.mdm.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.enums.OperationBusinessEnums;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.common.core.enums.OperationBusinessEnums;
-
 import com.zlt.aps.mdm.api.domain.dto.MouldMonthUseDto;
-import com.zlt.aps.mdm.enums.SystemBaseEnums;
-import com.zlt.aps.mdm.mapper.*;
-import com.zlt.aps.mdm.mes.IMesItfService;
-import com.zlt.aps.mdm.service.IMdmProductModelRelationService;
-import com.zlt.aps.mdm.utils.ScmListUtils;
 import com.zlt.aps.mdm.api.domain.dto.ProductMouldConfigurationParam;
 import com.zlt.aps.mdm.api.domain.dto.ProductMouldRelationConfigurationParam;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
@@ -27,6 +23,14 @@ import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.vo.ProductMouldConfigurationVo;
 import com.zlt.aps.mdm.api.domain.vo.ProductMouldInfoVo;
+import com.zlt.aps.mdm.api.service.IRemoteImportErrorLogService;
+import com.zlt.aps.mdm.api.service.IRemoteImportLogService;
+import com.zlt.aps.mdm.enums.SystemBaseEnums;
+import com.zlt.aps.mdm.mapper.*;
+import com.zlt.aps.mdm.mes.IMesItfService;
+import com.zlt.aps.mdm.service.IMdmProductModelRelationService;
+import com.zlt.aps.mdm.utils.RemoteImportExcelUtils;
+import com.zlt.aps.mdm.utils.ScmListUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.sysdef.domain.SysDocType;
@@ -36,6 +40,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -78,6 +84,12 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
 
     @Autowired
     private IMesItfService iMesItfService;
+
+    @Autowired
+    private IRemoteImportLogService iRemoteImportLogService;
+
+    @Autowired
+    private IRemoteImportErrorLogService iRemoteImportErrorLogService;
 
     @Override
     protected String getDocTypeCode() {
@@ -436,6 +448,24 @@ public class MdmProductModelRelationServiceImpl extends AbstractDocService<MdmSk
         queryVO.setBaseVale(null);
         productInfoEntityMapper.updateMainPatternToMaterial(queryVO);
         return AjaxResult.success();
+    }
+
+    @Override
+    public void importDataAsync(List<MdmSkuMouldRel> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes) {
+        try {
+            RequestContextHolder.setRequestAttributes(attributes, true);
+
+            AjaxResult result = this.importData(list, updateSupport, importLogId);
+            Date endTime = DateUtils.getNowDate();
+            importLog.setRowCount(list.size());
+            importLog.setBeginTime(beginTime);
+            importLog.setEndTime(endTime);
+            importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+            RemoteImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, iRemoteImportLogService);
+            RemoteImportExcelUtils.saveImportErrorLogs(result, iRemoteImportErrorLogService);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 }
 

@@ -242,8 +242,8 @@ public interface CoreScheduleAlgorithmService {
         private Integer catchUpQuantity;
         
         // ==================== S5.2 排程分类与余量计算新增字段 ====================
-        /** 硫化任务ID（用于关联 materialStockMap） */
-        private Long lhId;
+        /** 硫化任务ID(用于关联 materialStockMap) */
+        private Long id;
         /** 分配的胎胚库存（按硫化任务ID分配） */
         private Integer allocatedStock;
         /** 待排产量 = (日硫化量 - 库存) × (1 + 损耗率) + 异常平摊 */

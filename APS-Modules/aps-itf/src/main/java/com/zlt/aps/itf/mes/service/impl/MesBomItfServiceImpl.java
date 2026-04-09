@@ -4,23 +4,18 @@ import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.mapper.MesBomItfMapper;
 import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
-import com.zlt.aps.maindata.mapper.MdmBomInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmConstructionInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
+import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,6 +82,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 				for (List<MdmSkuConstructionRef> saveList : splitList) { // 分批保存，防止长度超出限制
 					baseDao.saveBatch(saveList);
 				}
+				// 更新物料描述到SKU与示方关系表
+				mdmSkuConstructionRefEntityMapper.updateMaterialDesc();
 				// 更新胎胚描述到物料信息
 				MdmSkuConstructionRef queryVO = new MdmSkuConstructionRef();
 				queryVO.setBaseVale(null);
@@ -278,7 +275,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 pathList.addLast(currentNode); // 倒序添加节点
                 currentNode = currentNode.getParent(); // 切换成父节点
             } while (true);
-            
+
             if (pathList.size() <= 1) {
                 continue; // 层架不到1层的，说明Bom数据有问题，跳过
             }
@@ -304,7 +301,7 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 //                        .reduce(BigDecimal.ONE, BigDecimal::multiply);
                 BigDecimal dosage = bom.getDosage(); // 暂时替换成原材料的原始用量，直接乘按现有的数据不正确
                 consumeDetail.setDosage(dosage);
-                
+
                 MdmMaterialConsumeDetail oldDetail = oldDetailMap.get(this.getMapKey(consumeDetail));
                 if (oldDetail != null) {
                     consumeDetail.setId(oldDetail.getId());
@@ -315,11 +312,11 @@ public class MesBomItfServiceImpl implements MesBomItfService {
         if (CollectionUtils.isEmpty(detaiList)) {
             return detaiList;
         }
-        
+
         // 按胎胚号 + 物料号去重
         Map<String, MdmMaterialConsumeDetail> distinctDetailList = detaiList.stream()
                 .collect(Collectors.groupingBy(detail -> this.getMapKey(detail),
-                        Collectors.collectingAndThen(Collectors.toList(), list -> list.get(0))));        
+                        Collectors.collectingAndThen(Collectors.toList(), list -> list.get(0))));
         return new ArrayList<>(distinctDetailList.values());
     }
 
