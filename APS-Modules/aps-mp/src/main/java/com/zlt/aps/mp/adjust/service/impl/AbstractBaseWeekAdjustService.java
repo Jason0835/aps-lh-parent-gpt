@@ -936,7 +936,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
                 // 构建月计划统计结果
                 MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, targetMonthPLanList, YesOrNoEnum.NO.getCode());
-                monthPlanStatisticsList.add(monthPlanStatistics);
+                if (Objects.nonNull(monthPlanStatistics)) {
+                    monthPlanStatisticsList.add(monthPlanStatistics);
+                }
             }
 
         } catch (Exception e) {
@@ -1197,6 +1199,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 新增月度生产计划
             baseDao.insertBatch(insertMonthPlanList);
             log.info("新增月度生产计划成功，共新增:{}条记录", insertMonthPlanList.size());
+            // 添加到月计划上下文
+            contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(insertMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
         } catch (Exception e) {
             log.error("新增月度生产计划批量操作异常", e);
             throw new RuntimeException("新增月度生产计划失败", e);
