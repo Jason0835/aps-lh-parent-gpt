@@ -50,36 +50,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
 
     @Autowired
     private ICxScheduleResultService iCxScheduleResultService;
-    
-    private final String prefix = "aps/cx/cxScheduleResult";
-    
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("cx:cxScheduleResult:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/cxScheduleResult";
-    }
-    
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("cxScheduleResult", new CxScheduleResult());
-        return prefix + "/add";
-    }
-    
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        // TODO: 需要添加 getInfo 方法到 Service
-        // mmap.put("cxScheduleResult", iCxScheduleResultService.getInfo(id));
-        return prefix + "/edit";
-    }
 
     /**
      * 根据条件查询主表数据
