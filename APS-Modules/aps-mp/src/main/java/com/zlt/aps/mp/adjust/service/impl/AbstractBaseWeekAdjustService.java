@@ -1178,8 +1178,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
             setBeginDayAndEndDay(monthPlan);
-            // 将日期字段中值为0的字段设为null
-            handleZeroToNull(monthPlan);
             insertMonthPlanList.add(monthPlan);
         }
 
@@ -1192,6 +1190,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
         deleteMonthPlanList.addAll(insertMonthPlanList);
         deleteMonthPlanList.addAll(adjustResultMonthPlanList);
+
+        // 将日期字段中值为0的字段设为null
+        for (FactoryMonthPlanProductionFinalResult monthPlan : insertMonthPlanList) {
+            handleZeroToNull(monthPlan);
+        }
 
         try {
             // 删除月度生产计划
@@ -2029,8 +2032,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 actualAdjustQty = null;
             }
             monthPlanVo.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
+            // 将日期字段中值为0的字段设为null
+            handleZeroToNull(monthPlanVo);
             monthPlanResult.add(monthPlanVo);
         }
+
 
         try {
             // 更新月度生产计划
