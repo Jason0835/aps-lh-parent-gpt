@@ -61,7 +61,7 @@ import java.util.stream.Collectors;
 @Api(tags = "硫化排程接口")
 @Slf4j
 @RestController
-@RequestMapping("/lhSchedule")
+@RequestMapping("/lhScheduleResult")
 public class LhScheduleResultController extends AbstractDocBizController<LhScheduleResult> {
 
     @Resource
