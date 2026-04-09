@@ -248,8 +248,10 @@ public class TaskGroupService {
             // 不返回null，因为即使需求为0也可能需要排产（比如补库存）
         }
 
-        // 获取分配给该硫化任务的库存(按硫化任务维度分配,共用胎胚库存已按比例分配)
+        // 获取分配给该硫化任务的库存（按硫化任务维度分配，共用胎胚库存已按比例分配）
         int currentStock = getAllocatedStock(context, lhResult.getId());
+        log.info("硫化任务排量: embryoCode={}, vulcanizeDemand={}, currentStock={}", 
+                embryoCode, vulcanizeDemand, currentStock);
 
         // 获取物料信息
         MdmMaterialInfo material = materialMap.get(embryoCode);
@@ -264,7 +266,7 @@ public class TaskGroupService {
 
         // 构建任务
         CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
-        task.setId(lhResult.getId());  // 设置硫化任务ID,用于关联库存分配
+        task.setLhId(lhResult.getId());  // 设置硫化任务ID，用于关联库存分配
         task.setMaterialCode(embryoCode);
         task.setVulcanizeDemand(vulcanizeDemand);
         task.setCurrentStock(currentStock);
@@ -373,24 +375,24 @@ public class TaskGroupService {
     /**
      * 获取分配给该硫化任务的库存
      *
-     * <p>库存已按硫化任务维度分配,共用胎胚库存按硫化任务需求比例分配
-     * 使用硫化任务的唯一标识 (id) 获取分配库存
+     * <p>库存已按硫化任务维度分配，共用胎胚库存按硫化任务需求比例分配
+     * 使用硫化任务的唯一标识 (lhId) 获取分配库存
      *
      * @param context 排程上下文
-     * @param id      硫化任务ID
+     * @param lhId    硫化任务ID
      * @return 分配给该硫化任务的库存数量
      */
-    private int getAllocatedStock(ScheduleContextVo context, Long id) {
-        if (id == null) {
+    private int getAllocatedStock(ScheduleContextVo context, Long lhId) {
+        if (lhId == null) {
             return 0;
         }
         Map<String, Integer> materialStockMap = context.getMaterialStockMap();
         if (materialStockMap == null) {
-            log.warn("materialStockMap 为空,无法获取分配给硫化任务 {} 的库存", id);
+            log.warn("materialStockMap 为空，无法获取分配给硫化任务 {} 的库存", lhId);
             return 0;
         }
         // 使用硫化任务的唯一标识获取库存
-        String taskKey = String.valueOf(id);
+        String taskKey = String.valueOf(lhId);
         return materialStockMap.getOrDefault(taskKey, 0);
     }
 

@@ -11,12 +11,12 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
-import com.zlt.aps.cx.vo.ScheduleAdjustVo;
-import com.zlt.aps.cx.vo.ScheduleGenerateVo;
-import com.zlt.aps.cx.vo.ScheduleInsertVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleAdjustVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleGenerateVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleInsertVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleTransferMachineVo;
+import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
-import com.zlt.aps.cx.vo.ScheduleTransferMachineVo;
-import com.zlt.aps.cx.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -486,10 +486,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         // 判断当前时间，计算可调整的班次
         LocalDateTime now = LocalDateTime.now();
-        LocalDate scheduleDate = record.getScheduleDate().toLocalDate();
+        Date scheduleDate = record.getScheduleDate();
         
         // 如果是当天，需要根据当前时间判断可调整的班次
-        if (scheduleDate.equals(LocalDate.now())) {
+        LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+        if (scheduleLocalDate.equals(LocalDate.now())) {
             int currentHour = now.getHour();
             // 8点前：可调整所有班次
             // 8点后：早班已生产，不可调整；中班可调整
@@ -542,7 +543,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         // 校验唯一性
         QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("SCHEDULE_DATE", DateUtil.parse(vo.getScheduleDate()).toJdkDate());
+        queryWrapper.eq("SCHEDULE_DATE", DateUtil.parse(vo.getScheduleDate()));
         queryWrapper.eq("CX_MACHINE_CODE", vo.getCxMachineCode());
         queryWrapper.eq("EMBRYO_CODE", vo.getEmbryoCode());
         queryWrapper.eq("ORDER_NO", vo.getMaterialCode());
@@ -553,7 +554,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         // 创建新记录
         CxScheduleResult newRecord = new CxScheduleResult();
-        newRecord.setScheduleDate(DateUtil.parse(vo.getScheduleDate()).toLocalDateTime());
+        newRecord.setScheduleDate(DateUtil.parse(vo.getScheduleDate()));
         newRecord.setCxMachineCode(vo.getCxMachineCode());
         newRecord.setCxMachineName(vo.getCxMachineName());
         newRecord.setEmbryoCode(vo.getEmbryoCode());
@@ -670,4 +671,5 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         log.info("转机台成功，记录数：{}", records.size());
         return AjaxResult.success("转机台成功");
     }
+
 }

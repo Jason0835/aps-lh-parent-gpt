@@ -131,6 +131,27 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加 在机结构续作Sku 同规格同花纹/同模具日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s %s 没有找到可排产计划====
+     *
+     * @param context           排程上下文
+     * @param productionStage   排产阶段
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param continueType      排产类型
+     * @return
+     */
+    public static String addNoMatchPlanLog(Context context, ProductionStageEnum productionStage, String groupName, String onLineMachineInfo, ContinueTypeEnum continueType) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s %s-%s 没有找到可排产计划====";
+        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(),
+                context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, productionStage.getStageDesc(), continueType.getDesc());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_SKU_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加在机结构对在产机台排产没有找到可排产硫化分组日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有找到待待硫化组====
      *

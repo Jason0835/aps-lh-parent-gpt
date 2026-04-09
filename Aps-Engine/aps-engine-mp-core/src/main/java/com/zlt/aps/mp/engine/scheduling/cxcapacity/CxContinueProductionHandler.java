@@ -144,13 +144,13 @@ public class CxContinueProductionHandler {
         TbrMouldProductionLogRecorder.addContinueSkuEarliestConclusionLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType, startDay, endDay);
         List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanInfo.getGroupPlanData().stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(productionPlanList)) {
-            //todo 记录日志
+            TbrMouldProductionLogRecorder.addNoMatchPlanLog(context, productionStage, groupName, onLineMachineInfo, continueType);
             return;
         }
         //获取同规格同花纹或是同生胎同模具的其它sku排产计划
         List<MonthPlanProductionRequirePlanVo> matchList = ContinueSkuPrioritySelector.getContinueSkuPlanByType(context, productionStage, productionPlanInfo, continueType, continueSkuMap);
         if (CollectionUtils.isEmpty(matchList)) {
-            //todo
+            TbrMouldProductionLogRecorder.addNoMatchPlanLog(context, productionStage, groupName, onLineMachineInfo, continueType);
             return;
         }
         //挑选下一个同规格同花纹的sku进行排产
@@ -308,7 +308,7 @@ public class CxContinueProductionHandler {
         productionPlanInfo.correctProductionDateRange(productionContext, addSkuInfo, lhGroup, selectedMouldList, onLineMachineInfo);
         Integer newStartDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();
-        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, startDay, endDay);
+        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, newStartDay, endDay);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             excludeSkuSet.add(selectedMaterialDesc);
             return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, matchList, excludeSkuSet, startDay, endDay);

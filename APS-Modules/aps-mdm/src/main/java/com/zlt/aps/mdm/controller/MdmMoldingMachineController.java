@@ -57,6 +57,16 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
         return super.list(queryVO);
     }
 
+    /**
+     * 查询基础数据-成型机列表
+     * @return
+     */
+    @ApiOperation("查询列表")
+    @PostMapping("/listMoldingMachine")
+    public AjaxResult listMoldingMachine(@RequestBody MdmMoldingMachine queryVO){
+        return AjaxResult.success(this.listExportData(queryVO));
+    }
+
     @Override
     protected String getOrderBy() {
         return "create_time, id desc";

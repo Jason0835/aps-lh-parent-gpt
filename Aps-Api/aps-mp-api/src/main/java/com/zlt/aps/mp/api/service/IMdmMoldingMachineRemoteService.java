@@ -35,6 +35,13 @@ public interface IMdmMoldingMachineRemoteService {
     TableDataInfo list(@RequestBody MdmMoldingMachine QueryVO);
 
     /**
+     * 查询列表
+     */
+    @ApiOperation("查询列表")
+    @PostMapping("/mdmMoldingMachine/listMoldingMachine")
+    AjaxResult listMoldingMachine(@RequestBody MdmMoldingMachine QueryVO);
+
+    /**
     * 保存
     */
     @ApiOperation("保存")
