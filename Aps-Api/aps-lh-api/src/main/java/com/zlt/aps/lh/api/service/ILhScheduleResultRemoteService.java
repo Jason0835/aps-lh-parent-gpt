@@ -30,6 +30,10 @@ public interface ILhScheduleResultRemoteService {
     @PostMapping("/lhScheduleResult/list")
     TableDataInfo list(@RequestBody LhScheduleResult queryVO);
 
+    @ApiOperation("获取详细信息")
+    @GetMapping("/lhScheduleResult/{id}")
+    LhScheduleResult getInfo(@PathVariable("id") Long id);
+
     /**
      * 插单查询可用机台列表
      */
