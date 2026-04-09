@@ -13,7 +13,6 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -39,9 +38,8 @@ public class LhScheduleServiceImpl implements ILhScheduleService {
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
 
-    /** 按类型注入，避免与 maindata 的 eventPublisher Bean 名冲突 */
-    @Autowired
-    private ScheduleEventPublisher eventPublisher;
+    @Resource
+    private ScheduleEventPublisher scheduleEventPublisher;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -70,7 +68,7 @@ public class LhScheduleServiceImpl implements ILhScheduleService {
             LhScheduleContext publishContext = new LhScheduleContext();
             publishContext.setBatchNo(batchNo);
             publishContext.setScheduleResultList(results);
-            eventPublisher.publish(ScheduleEvent.published(publishContext));
+            scheduleEventPublisher.publish(ScheduleEvent.published(publishContext));
 
             log.info("排程结果发布成功, 批次号: {}, 发布记录数: {}", batchNo, results.size());
             return LhScheduleResponseDTO.success(batchNo, "发布成功，共发布" + results.size() + "条记录");

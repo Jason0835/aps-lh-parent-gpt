@@ -15,7 +15,6 @@ import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhUnscheduledResultMapper;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -34,9 +33,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class ResultValidationHandler extends AbsScheduleStepHandler {
 
-    /** 按类型注入，避免与 maindata 的 eventPublisher Bean 名冲突 */
-    @Autowired
-    private ScheduleEventPublisher eventPublisher;
+    @Resource
+    private ScheduleEventPublisher scheduleEventPublisher;
 
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
@@ -71,7 +69,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         saveScheduleResults(context);
 
         // S4.6.5 发布排程完成事件（观察者模式）
-        eventPublisher.publish(ScheduleEvent.completed(context));
+        scheduleEventPublisher.publish(ScheduleEvent.completed(context));
     }
 
     /**
