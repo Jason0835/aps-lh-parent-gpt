@@ -23,22 +23,31 @@
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.18.16</version>
-        </dependency>
 
         <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-core</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+
+        <!-- Hutool工具库 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.zlt.aps.mdm</groupId>
             <artifactId>aps-mdm-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
+
+
         <!--   通用模块 DTO     -->
         <dependency>
             <groupId>com.zlt.aps</groupId>
