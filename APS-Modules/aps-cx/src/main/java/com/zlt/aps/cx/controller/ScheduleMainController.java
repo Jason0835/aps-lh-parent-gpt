@@ -1,27 +1,43 @@
 package com.zlt.aps.cx.controller;
 
+import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
+import com.zlt.aps.cx.vo.ScheduleAdjustVo;
 import com.zlt.aps.cx.vo.ScheduleGenerateVo;
+import com.zlt.aps.cx.vo.ScheduleInsertVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
+import com.zlt.aps.cx.vo.ScheduleTransferMachineVo;
+import com.zlt.aps.cx.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,10 +46,11 @@ import java.util.stream.Collectors;
  *
  * @author APS Team
  */
+@Slf4j
 @Api(tags = "排程管理")
 @RestController
-@RequestMapping("/schedule")
-public class ScheduleMainController {
+@RequestMapping("/cxScheduleResult")
+public class ScheduleMainController extends AbstractDocBizController<CxScheduleResult> {
 
     @Autowired
     private ScheduleService scheduleService;
@@ -41,8 +58,80 @@ public class ScheduleMainController {
     @Autowired
     private CxScheduleResultService cxScheduleResultService;
 
+    @Resource
+    private CxScheduleResultMapper cxScheduleResultMapper;
+
     @Autowired
     private IMesItfService mesItfService;
+
+    /**
+     * 查询成型排程结果列表
+     */
+    @ApiOperation("查询列表")
+    @PostMapping("/list")
+    @Override
+    public TableDataInfo list(@RequestBody CxScheduleResult queryVO) {
+        return super.list(queryVO);
+    }
+
+    /**
+     * 保存
+     */
+    @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody CxScheduleResult entity) {
+        return super.save(entity);
+    }
+
+    /**
+     * 删除成型排程结果
+     */
+    @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    /**
+     * 获取成型排程结果详细信息
+     */
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{billId}")
+    @Override
+    public CxScheduleResult getInfo(@PathVariable("billId") Long billId) {
+        return super.getInfo(billId);
+    }
+
+    /**
+     * 根据集合导入成型排程结果数据
+     * @param importContext 导入上下文
+     * @param updateSupport 已存在记录是否更新
+     * @return 结果
+     */
+    @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody com.ruoyi.api.gateway.system.domain.vo.ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    /**
+     * 导出成型排程结果列表
+     */
+    @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
 
     @ApiOperation(value = "生成排程", notes = "根据日期和天数生成排程")
     @PostMapping("/generate")
@@ -324,5 +413,261 @@ public class ScheduleMainController {
         target.setClass3ExampleNo(null);
 
         return target;
+    }
+
+    @Override
+    protected List<CxScheduleResult> listExportData(CxScheduleResult obj) {
+        QueryWrapper<CxScheduleResult> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return cxScheduleResultMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return cxScheduleResultService;
+    }
+
+	@Override
+	protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
+		// 排程日期区间查询（使用 searchValue 传递开始时间，remark 传递结束时间）
+		if (PubUtil.isNotEmpty(queryVO.getSearchValue()) && PubUtil.isNotEmpty(queryVO.getRemark())) {
+            Date beginDay = DateUtil.parse(queryVO.getSearchValue());
+            Date endDay = DateUtil.parse(queryVO.getRemark());
+            endDay = DateUtil.endOfDay(endDay);
+			queryWrapper.between("SCHEDULE_DATE", beginDay, endDay);
+		}
+		// 机台代码模糊查询
+		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
+		// 胎胚代码模糊查询
+		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
+		// 订单号精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
+		// 生产状态精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getProductionStatus()), "PRODUCTION_STATUS", queryVO.getProductionStatus());
+		// 发布状态精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
+	}
+
+    @Override
+    protected String getTypeCode() {
+        return "CX_SCHEDULE_RESULT";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "schedule_date desc, cx_machine_code asc";
+    }
+
+    /**
+     * 【调量】调整各班计划量
+     * 业务规则：
+     * 1. 只能修改当前班次及后续班次，不能修改历史班次
+     * 2. 修改后的计划量不能低于已完成量
+     * 3. 将排程记录的发布状态调整为待发布
+     * 4. 按单据ID数据库物理修改单据数据
+     */
+    @Log(title = "调量", businessType = BusinessType.UPDATE)
+    @ApiOperation("调量")
+    @PostMapping("/adjustQty")
+    public AjaxResult adjustQty(@RequestBody ScheduleAdjustVo vo) {
+        if (vo.getId() == null) {
+            return AjaxResult.error("排程记录ID不能为空");
+        }
+
+        CxScheduleResult record = cxScheduleResultMapper.selectById(vo.getId());
+        if (record == null) {
+            return AjaxResult.error("排程记录不存在");
+        }
+
+        // 判断是否已发布
+        if ("1".equals(record.getIsRelease())) {
+            return AjaxResult.error("已发布的排程记录不允许调量");
+        }
+
+        // 判断当前时间，计算可调整的班次
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate scheduleDate = record.getScheduleDate().toLocalDate();
+        
+        // 如果是当天，需要根据当前时间判断可调整的班次
+        if (scheduleDate.equals(LocalDate.now())) {
+            int currentHour = now.getHour();
+            // 8点前：可调整所有班次
+            // 8点后：早班已生产，不可调整；中班可调整
+            // 16点后：早中班已生产，不可调整
+            if (currentHour >= 16 && vo.getClass2PlanQty() != null) {
+                // 中班计划量校验：不能低于已完成量
+                if (record.getClass2FinishQty() != null && vo.getClass2PlanQty().compareTo(record.getClass2FinishQty()) < 0) {
+                    return AjaxResult.error("中班计划量不能低于已完成量：" + record.getClass2FinishQty());
+                }
+            }
+        }
+
+        // 更新计划量
+        if (vo.getClass1PlanQty() != null) record.setClass1PlanQty(vo.getClass1PlanQty());
+        if (vo.getClass2PlanQty() != null) record.setClass2PlanQty(vo.getClass2PlanQty());
+        if (vo.getClass3PlanQty() != null) record.setClass3PlanQty(vo.getClass3PlanQty());
+        if (vo.getClass4PlanQty() != null) record.setClass4PlanQty(vo.getClass4PlanQty());
+        if (vo.getClass5PlanQty() != null) record.setClass5PlanQty(vo.getClass5PlanQty());
+        if (vo.getClass6PlanQty() != null) record.setClass6PlanQty(vo.getClass6PlanQty());
+        if (vo.getClass7PlanQty() != null) record.setClass7PlanQty(vo.getClass7PlanQty());
+        if (vo.getClass8PlanQty() != null) record.setClass8PlanQty(vo.getClass8PlanQty());
+
+        // 调整为待发布状态
+        record.setIsRelease("0");
+        
+        int rows = cxScheduleResultMapper.updateById(record);
+        if (rows > 0) {
+            log.info("调量成功，记录ID：{}", vo.getId());
+            return AjaxResult.success("调量成功");
+        } else {
+            return AjaxResult.error("调量失败");
+        }
+    }
+
+    /**
+     * 【插单】插入新的排程记录
+     * 业务规则：
+     * 1. 校验唯一性：排程日期 + 机台编号 + 胎胚编号 + 物料编码 + 示方书版本
+     * 2. 校验计划量不能超过成型机台设备最大日产
+     * 3. 将排程记录的发布状态调整为待发布
+     * 4. 批次号 = 成型排程记录批次号
+     */
+    @Log(title = "插单", businessType = BusinessType.INSERT)
+    @ApiOperation("插单")
+    @PostMapping("/insertOrder")
+    public AjaxResult insertOrder(@RequestBody ScheduleInsertVo vo) {
+        if (vo.getScheduleDate() == null || vo.getCxMachineCode() == null || vo.getEmbryoCode() == null) {
+            return AjaxResult.error("排程日期、机台编码、胎胚编码不能为空");
+        }
+
+        // 校验唯一性
+        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("SCHEDULE_DATE", DateUtil.parse(vo.getScheduleDate()).toJdkDate());
+        queryWrapper.eq("CX_MACHINE_CODE", vo.getCxMachineCode());
+        queryWrapper.eq("EMBRYO_CODE", vo.getEmbryoCode());
+        queryWrapper.eq("ORDER_NO", vo.getMaterialCode());
+        Long count = cxScheduleResultMapper.selectCount(queryWrapper);
+        if (count > 0) {
+            return AjaxResult.error("插单失败：该日已存在相同机台、胎胚、物料的排程记录");
+        }
+
+        // 创建新记录
+        CxScheduleResult newRecord = new CxScheduleResult();
+        newRecord.setScheduleDate(DateUtil.parse(vo.getScheduleDate()).toLocalDateTime());
+        newRecord.setCxMachineCode(vo.getCxMachineCode());
+        newRecord.setCxMachineName(vo.getCxMachineName());
+        newRecord.setEmbryoCode(vo.getEmbryoCode());
+        newRecord.setOrderNo(vo.getMaterialCode());
+        newRecord.setSpecDesc(vo.getSpecDesc());
+        newRecord.setClass1PlanQty(vo.getClass1PlanQty());
+        newRecord.setClass2PlanQty(vo.getClass2PlanQty());
+        newRecord.setClass3PlanQty(vo.getClass3PlanQty());
+        newRecord.setClass1Analysis(vo.getClass1Analysis());
+        newRecord.setClass2Analysis(vo.getClass2Analysis());
+        newRecord.setClass3Analysis(vo.getClass3Analysis());
+        
+        // 设置为待发布状态
+        newRecord.setIsRelease("0");
+        newRecord.setProductionStatus("0");
+        
+        int rows = cxScheduleResultMapper.insert(newRecord);
+        if (rows > 0) {
+            log.info("插单成功，记录ID：{}", newRecord.getId());
+            return AjaxResult.success("插单成功");
+        } else {
+            return AjaxResult.error("插单失败");
+        }
+    }
+
+    /**
+     * 【修改】修改备注和原因分析
+     * 业务规则：
+     * 1. 只能更新备注、各个班次原因分析数据
+     * 2. 若已发布：不允许此操作
+     */
+    @Log(title = "修改", businessType = BusinessType.UPDATE)
+    @ApiOperation("修改备注和原因分析")
+    @PostMapping("/updateRemark")
+    public AjaxResult updateRemark(@RequestBody ScheduleUpdateRemarkVo vo) {
+        if (vo.getId() == null) {
+            return AjaxResult.error("排程记录ID不能为空");
+        }
+
+        CxScheduleResult record = cxScheduleResultMapper.selectById(vo.getId());
+        if (record == null) {
+            return AjaxResult.error("排程记录不存在");
+        }
+
+        // 若已发布，不允许修改
+        if ("1".equals(record.getIsRelease())) {
+            return AjaxResult.error("已发布的排程记录不允许修改");
+        }
+
+        // 更新备注和原因分析
+        if (vo.getRemark() != null) record.setRemark(vo.getRemark());
+        if (vo.getClass1Analysis() != null) record.setClass1Analysis(vo.getClass1Analysis());
+        if (vo.getClass2Analysis() != null) record.setClass2Analysis(vo.getClass2Analysis());
+        if (vo.getClass3Analysis() != null) record.setClass3Analysis(vo.getClass3Analysis());
+        if (vo.getClass4Analysis() != null) record.setClass4Analysis(vo.getClass4Analysis());
+        if (vo.getClass5Analysis() != null) record.setClass5Analysis(vo.getClass5Analysis());
+        if (vo.getClass6Analysis() != null) record.setClass6Analysis(vo.getClass6Analysis());
+        if (vo.getClass7Analysis() != null) record.setClass7Analysis(vo.getClass7Analysis());
+        if (vo.getClass8Analysis() != null) record.setClass8Analysis(vo.getClass8Analysis());
+
+        int rows = cxScheduleResultMapper.updateById(record);
+        if (rows > 0) {
+            log.info("修改成功，记录ID：{}", vo.getId());
+            return AjaxResult.success("数据修改成功");
+        } else {
+            return AjaxResult.error("修改失败");
+        }
+    }
+
+    /**
+     * 【转机台】转换机台
+     * 业务规则：
+     * 1. 默认带出所选记录的排程日期、原机台
+     * 2. 选择新机台后自动下拉显示可选机台清单
+     * 3. 检查唯一性：排程日期 + 成型机台 + 胎胚描述
+     * 4. 若已发布：不允许转机台
+     * 5. 更新备注【"原机台：" + 旧机台 + ",转入机台：" + 新机台】
+     */
+    @Log(title = "转机台", businessType = BusinessType.UPDATE)
+    @ApiOperation("转机台")
+    @PostMapping("/transferMachine")
+    public AjaxResult transferMachine(@RequestBody ScheduleTransferMachineVo vo) {
+        if (vo.getIds() == null || vo.getIds().isEmpty()) {
+            return AjaxResult.error("请选择需要转机台的记录");
+        }
+        if (vo.getNewMachineCode() == null) {
+            return AjaxResult.error("新机台编码不能为空");
+        }
+
+        // 检查所有记录是否已发布
+        List<CxScheduleResult> records = cxScheduleResultMapper.selectBatchIds(vo.getIds());
+        for (CxScheduleResult record : records) {
+            if ("1".equals(record.getIsRelease())) {
+                return AjaxResult.error("已发布的排程记录不允许转机台");
+            }
+        }
+
+        // 更新机台信息
+        for (CxScheduleResult record : records) {
+            String oldMachine = record.getCxMachineCode();
+            record.setCxMachineCode(vo.getNewMachineCode());
+            record.setCxMachineName(vo.getNewMachineName());
+            
+            // 更新备注
+            String remark = record.getRemark() != null ? record.getRemark() : "";
+            record.setRemark(remark + "【原机台：" + oldMachine + ",转入机台：" + vo.getNewMachineCode() + "】");
+            
+            // 设置为待发布
+            record.setIsRelease("0");
+            
+            cxScheduleResultMapper.updateById(record);
+        }
+
+        log.info("转机台成功，记录数：{}", records.size());
+        return AjaxResult.success("转机台成功");
     }
 }

@@ -1,17 +1,13 @@
 package com.zlt.aps.cx.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
-import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
-import com.zlt.aps.cx.service.CxScheduleDetailService;
-import com.zlt.aps.cx.service.CxScheduleResultService;
+import com.zlt.aps.cx.entity.config.CxKeyProduct;
+import com.zlt.aps.cx.mapper.CxKeyProductMapper;
+import com.zlt.aps.cx.service.CxKeyProductService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -19,53 +15,37 @@ import com.zlt.common.utils.PubUtil;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
- * 成型排程结果服务实现类
+ * 关键产品配置服务实现类
  *
  * @author APS Team
  */
 @Slf4j
 @Service
-public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleResult> 
-        implements CxScheduleResultService {
+public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> implements CxKeyProductService {
 
     @Autowired
-    private CxScheduleResultMapper cxScheduleResultMapper;
-    
-    @Autowired
-    private CxScheduleDetailService cxScheduleDetailService;
+    private CxKeyProductMapper cxKeyProductMapper;
 
     @Override
-    public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
-        return cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
-                .eq(CxScheduleResult::getScheduleDate, scheduleDate.atStartOfDay())
-                .orderByAsc(CxScheduleResult::getCxMachineCode));
-    }
-
-    @Override
-    public AjaxResult importData(List<CxScheduleResult> list, boolean updateSupport, Long importLogId) {
+    public AjaxResult importData(List<CxKeyProduct> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
-        List<CxScheduleResult> importList = new ArrayList<>();
+        List<CxKeyProduct> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
 
         // Step1: 数据校验
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxKeyProduct docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
             if (CollectionUtils.isNotEmpty(validated)) {
@@ -78,23 +58,15 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // Step2: 处理有效数据
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
-            CxScheduleResult docEntity = list.get(i);
+            CxKeyProduct docEntity = list.get(i);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
 
             // 必填字段校验
-            if (StringUtil.isBlank(docEntity.getCxMachineCode())) {
+            if (StringUtil.isBlank(docEntity.getEmbryoCode())) {
                 failureNum++;
-                String message = I18nUtil.getMessage("ui.data.alert.cxScheduleResult.machineCodeRequired");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum), importErrorLogs);
-                continue;
-            }
-
-            if (docEntity.getScheduleDate() == null) {
-                failureNum++;
-                String message = I18nUtil.getMessage("ui.data.alert.cxScheduleResult.scheduleDateRequired");
+                String message = I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoCodeRequired");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, String.format(message, errorNum), importErrorLogs);
                 continue;
@@ -106,11 +78,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 successNum++;
             } else {
                 if (updateSupport) {
-                    QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("CX_MACHINE_CODE", docEntity.getCxMachineCode());
-                    queryWrapper.eq("SCHEDULE_DATE", docEntity.getScheduleDate());
-                    queryWrapper.eq("ORDER_NO", docEntity.getOrderNo());
-                    CxScheduleResult existEntity = cxScheduleResultMapper.selectOne(queryWrapper);
+                    QueryWrapper<CxKeyProduct> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("EMBRYO_CODE", docEntity.getEmbryoCode());
+                    CxKeyProduct existEntity = cxKeyProductMapper.selectOne(queryWrapper);
                     if (existEntity != null) {
                         docEntity.setId(existEntity.getId());
                         importList.add(docEntity);
@@ -129,11 +99,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         // Step3: 批量导入
-        for (CxScheduleResult entity : importList) {
+        for (CxKeyProduct entity : importList) {
             if (entity.getId() != null) {
-                cxScheduleResultMapper.updateById(entity);
+                cxKeyProductMapper.updateById(entity);
             } else {
-                cxScheduleResultMapper.insert(entity);
+                cxKeyProductMapper.insert(entity);
             }
         }
 
@@ -145,14 +115,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     @Override
-    public String checkUnique(CxScheduleResult entity) {
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+    public String checkUnique(CxKeyProduct entity) {
+        QueryWrapper<CxKeyProduct> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), "ID", entity.getFieldValueByFieldName("id"));
-        queryWrapper.eq("CX_MACHINE_CODE", entity.getCxMachineCode());
-        queryWrapper.eq("SCHEDULE_DATE", entity.getScheduleDate());
-        queryWrapper.eq("ORDER_NO", entity.getOrderNo());
+        queryWrapper.eq("EMBRYO_CODE", entity.getEmbryoCode());
 
-        if (cxScheduleResultMapper.selectCount(queryWrapper) > 0) {
+        if (cxKeyProductMapper.selectCount(queryWrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
         } else {
             return UserConstants.UNIQUE;
@@ -161,11 +129,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("cxMachineCode", "scheduleDate", "orderNo");
+        return Arrays.asList("embryoCode");
     }
 
     @Override
     protected String getDocTypeCode() {
-        return "CX_SCHEDULE_RESULT";
+        return "CX_KEY_PRODUCT";
     }
 }

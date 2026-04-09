@@ -1010,18 +1010,18 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             if (relatedTasks.size() == 1) {
-                // 胎胚只对应一个硫化任务，直接分配全部库存
+                // 胎胚只对应一个硫化任务,直接分配全部库存
                 LhScheduleResult task = relatedTasks.get(0);
-                String taskKey = String.valueOf(task.getLhId());
+                String taskKey = String.valueOf(task.getId());
                 materialStockMap.merge(taskKey, totalStock, Integer::sum);
-                log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
+                log.debug("胎胚 {} 只对应硫化任务 {},分配库存 {}", embryoCode, taskKey, totalStock);
             } else {
-                // 胎胚对应多个硫化任务，按硫化任务需求比例分配
+                // 胎胚对应多个硫化任务,按硫化任务需求比例分配
                 int totalDemand = 0;
                 List<TaskDemand> taskDemands = new ArrayList<>();
                 for (LhScheduleResult lh : relatedTasks) {
                     int demand = getShiftPlanQtyFromLhResult(lh, dayShifts);
-                    taskDemands.add(new TaskDemand(lh.getLhId(), demand));
+                    taskDemands.add(new TaskDemand(lh.getId(), demand));
                     totalDemand += demand;
                 }
 
@@ -1062,14 +1062,14 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 硫化任务需求（内部类）
+     * 硫化任务需求(内部类)
      */
     private static class TaskDemand {
-        String taskKey;    // 硫化任务唯一键：lhId
+        String taskKey;    // 硫化任务唯一键:id
         int demand;
-
-        TaskDemand(Long lhId, int demand) {
-            this.taskKey = String.valueOf(lhId);
+    
+        TaskDemand(Long id, int demand) {
+            this.taskKey = String.valueOf(id);
             this.demand = demand;
         }
     }
