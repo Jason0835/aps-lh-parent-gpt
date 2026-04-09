@@ -46,6 +46,14 @@ public class MdmSkuConstructionRef extends BaseEntity {
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
+    /**
+     * 物料描述
+     */
+    @Excel(name = "ui.data.column.mdmSkuConstructionRef.materialDesc", width = 30, sort = 16)
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
+
     /** MES物料编码 */
 //    @Excel(name = "ui.data.column.mdmSkuConstructionRef.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
