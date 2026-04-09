@@ -17,10 +17,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * 含有<></>转义切面
- *
- * @author Chen
- * @since 2026/1/5
+ * HTML 字符转义/反转义切面。
+ * <p>
+ * 主要职责：
+ * 1. 在 save/edit/export 入参进入 Controller 前，对对象内 String 字段做转义。
+ * 2. 在 list 返回后，对结果对象内 String 字段做反转义。
+ * <p>
+ * 说明：
+ * - 递归处理集合、数组、Map、嵌套对象。
+ * - 使用 visited（IdentityHashMap）避免循环引用导致栈溢出。
  */
 @Slf4j
 @Aspect
@@ -55,6 +60,10 @@ public class HtmlDecodeAspect {
         return handleResult;
     }
 
+    /**
+     * 允许向上遍历父类字段的包名前缀。
+     * 仅当当前类型匹配此前缀时，才会继续收集父类字段。
+     */
     private final String findSuperObjectPrefix = "com.zlt.aps";
 
     @Before("execution(* com.zlt.aps.controller..*.export*(..))")
@@ -72,13 +81,17 @@ public class HtmlDecodeAspect {
     }
 
     /**
-     * 递归处理参数对象，对所有层级的String类型字段执行escapeHtml()
+     * 入参递归转义入口。
+     * 每次调用初始化 visited 集合，用于循环引用去重。
      */
     private Object escapeParamField(Object param) throws IllegalAccessException {
         Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         return escapeParamField(param, visited);
     }
 
+    /**
+     * 递归转义核心实现。
+     */
     private Object escapeParamField(Object param, Set<Object> visited) throws IllegalAccessException {
         if (param == null) {
             return null;
@@ -146,6 +159,9 @@ public class HtmlDecodeAspect {
         return param;
     }
 
+    /**
+     * 先 URLDecode，再执行 HTML 转义。
+     */
     private String escapeHtml(String input) {
         if (input == null) {
             return null;
@@ -182,13 +198,17 @@ public class HtmlDecodeAspect {
     }
 
     /**
-     * 递归处理参数对象，对所有层级的String类型字段执行unescapeHtml()
+     * 出参递归反转义入口。
+     * 每次调用初始化 visited 集合，用于循环引用去重。
      */
     private Object unescapeResultData(Object result) throws IllegalAccessException {
         Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         return unescapeResultData(result, visited);
     }
 
+    /**
+     * 递归反转义核心实现。
+     */
     private Object unescapeResultData(Object result, Set<Object> visited) throws IllegalAccessException {
         if (result == null) {
             return null;
@@ -257,6 +277,9 @@ public class HtmlDecodeAspect {
         return result;
     }
 
+    /**
+     * HTML 反转义。
+     */
     private String unescapeHtml(String input) {
         if (input == null) {
             return null;
@@ -295,6 +318,9 @@ public class HtmlDecodeAspect {
         return sb.toString();
     }
 
+    /**
+     * 获取当前类及父类链（不含 Object）上的所有字段。
+     */
     private List<Field> getAllFields(Class<?> clazz) {
         List<Field> allFields = new ArrayList<>();
         Class<?> current = clazz;
@@ -308,6 +334,9 @@ public class HtmlDecodeAspect {
         return allFields;
     }
 
+    /**
+     * 判定是否为无需递归处理的简单类型。
+     */
     private boolean isPrimitiveLike(Class<?> clazz) {
         return clazz.isPrimitive()
                 || Number.class.isAssignableFrom(clazz)
