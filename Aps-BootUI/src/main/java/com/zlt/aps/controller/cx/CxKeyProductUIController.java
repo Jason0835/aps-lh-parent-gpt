@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.cx.api.domain.entity.CxKeyProduct;
-import com.zlt.aps.cx.api.service.ICxKeyProductRemoteService;
+import com.zlt.aps.cx.entity.config.CxKeyProduct;
+import com.zlt.aps.cx.service.ICxKeyProductRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -26,7 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。

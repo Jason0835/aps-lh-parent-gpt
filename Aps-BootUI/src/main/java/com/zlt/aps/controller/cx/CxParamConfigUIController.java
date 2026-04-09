@@ -8,8 +8,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.cx.api.domain.entity.CxParamConfig;
-import com.zlt.aps.cx.api.service.ICxParamConfigRemoteService;
+
+import com.zlt.aps.cx.entity.config.CxParamConfig;
+import com.zlt.aps.cx.service.ICxParamConfigRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -18,7 +19,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,7 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -51,33 +50,6 @@ public class CxParamConfigUIController extends BaseUIController<CxParamConfig> {
     private ICxParamConfigRemoteService iCxParamConfigService;
 
     private final String prefix = "aps/cx/cxParamConfig";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("cx:cxParamConfig:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/cxParamConfig";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("cxParamConfig", new CxParamConfig());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("cxParamConfig", iCxParamConfigService.getInfo(id));
-        return prefix + "/edit";
-    }
 
     /**
      * 根据条件查询主表数据
