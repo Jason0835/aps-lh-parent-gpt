@@ -1,19 +1,20 @@
 package com.zlt.aps.mdm.service.impl;
 
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.mdm.service.IMdmConstructionInfoService;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mdm.service.IMdmConstructionInfoService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
-import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -57,5 +58,13 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    protected Boolean serviceCheckAndDataHandle(MdmConstructionInfo importDocEntity, List<ImportErrorLog> importErrorLogs, Long importLogId, int errorRowNum, Map<Object, Object> serviceCheckParams) {
+        Boolean result = super.serviceCheckAndDataHandle(importDocEntity, importErrorLogs, importLogId, errorRowNum, serviceCheckParams);
+        importDocEntity.setMaterialCode(importDocEntity.getSpecCode());
+        importDocEntity.setMesMaterialCode(importDocEntity.getSpecCode());
+        return result;
     }
 }

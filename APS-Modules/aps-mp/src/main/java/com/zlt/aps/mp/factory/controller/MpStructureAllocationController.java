@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.factory.controller;
 
 import com.alibaba.fastjson.JSONArray;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
@@ -30,6 +31,7 @@ import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
+import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
@@ -91,6 +93,9 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     private IImportErrorLogService iImportErrorLogService;
 
     private final ISysDictDataCacheService sysDictDataCacheService;
+
+    @Autowired
+    private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
 
     /**
      * 查询排产过程_结构排产列表
@@ -398,6 +403,15 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             version.setProductionEndDate(com.zlt.aps.mp.engine.utils.DateUtils.getDate(yearMonth.atEndOfMonth()));
             version.setIsFinal(YesOrNoEnum.NO.getCode());
             baseDao.save(version);
+            // 21349 把相同需求版本号数据的isSelectedDemand都更新成1
+            LambdaUpdateWrapper<MpFactoryProductionVersion> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(MpFactoryProductionVersion::getYear, year)
+                    .eq(MpFactoryProductionVersion::getMonth, month)
+                    .eq(MpFactoryProductionVersion::getFactoryCode, version.getFactoryCode())
+                    .eq(MpFactoryProductionVersion::getProductTypeCode, version.getProductTypeCode())
+                    .eq(MpFactoryProductionVersion::getMonthPlanVersion, version.getMonthPlanVersion())
+                    .set(MpFactoryProductionVersion::getIsSelectedDemand, YesOrNoEnum.YES.getCode());
+            mpFactoryProductionVersionMapper.update(null, updateWrapper);
         }
         // 处理返回结果，统一
         int errorNum = 0;
