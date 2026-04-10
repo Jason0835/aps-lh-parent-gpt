@@ -6,6 +6,7 @@ import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -77,6 +78,17 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
             return;
         }
         List<MpAdjustStructureIn> mpAdjustStructureInList = (List<MpAdjustStructureIn>) rows;
+        // 主花纹的最大型腔数
+        Map<String, Integer> maxMouldCavityQtyMap = new HashMap<>();
+        for (MpAdjustStructureIn structureIn: mpAdjustStructureInList) {
+            //记录主花纹的最大型腔数
+            Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(structureIn.getMainPattern(), 0);
+            maxMouldCavityQtyMap.put(structureIn.getMainPattern(), Math.max(maxMouldCavityQty, structureIn.getMouldCavityQty()));
+        }
+        mpAdjustStructureInList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
+            s.setMaxMouldCavityQty(maxMouldCavityQtyMap.getOrDefault(s.getMainPattern(), 0));
+        });
+
         Collections.sort(mpAdjustStructureInList, getSortComparator());
 
         // 集合逗号分隔字段升序排序
@@ -96,9 +108,16 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
         // 无施工：权重4
         stageSortWeights.put(ConstructionStageEnum.NO_CONSTRUCTION.getStage(), 4);
         // 一级排序：结构名称升序，空值排最后
-        return Comparator.comparing(MpAdjustStructureIn::getStructureName, Comparator.nullsLast(String::compareTo))
+        return Comparator.comparing(MpAdjustStructureIn::getTbrProSize, Comparator.nullsLast(String::compareTo))
+                .thenComparing(MpAdjustStructureIn::getStructureName,Comparator.nullsLast(String::compareTo))
                 // 二级排序：施工阶段按自定义权重升序（权重小排前）
                 .thenComparing(vo -> stageSortWeights.getOrDefault(vo.getConstructionStage(), 5))
+                // 最大型腔数
+                .thenComparing(MpAdjustStructureIn::getMaxMouldCavityQty, Comparator.reverseOrder())
+                // 主花纹
+                .thenComparing(MpAdjustStructureIn::getMainPattern, Comparator.nullsLast(String::compareTo))
+                // 活块数
+                .thenComparing(MpAdjustStructureIn::getTypeBlockQty, Comparator.reverseOrder())
                 // 三级排序：负数排前 -> 正数次之 -> 0（含null）最后，同组内绝对值从大到小
                 // 负数排前，非负数整体在后
                 .thenComparing(vo -> {

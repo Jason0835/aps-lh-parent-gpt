@@ -1,12 +1,16 @@
 package com.zlt.aps.mp.api.domain.entity;
 
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.utils.StringUtil;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -429,5 +433,25 @@ public class MpAdjustResult extends BaseEntity {
     @TableField(value = "ADJUST_DETAIL_ID")
     private String adjustDetailId;
 
+    /**
+     * 最大的型腔数，用于排序
+     */
+    @TableField(exist = false)
+    private Integer maxMouldCavityQty;
 
+    /**
+     * 从结构信息中解析出英寸
+     *
+     * @return 英寸
+     */
+    public String getTbrProSize() {
+        if (StringUtil.isEmptyWithTrim(structureName)) {
+            return "";
+        }
+        // 正则：R后面跟数字（可能带小数点）
+        Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
+        Matcher matcher = pattern.matcher(structureName);
+        String proSize = matcher.find() ? matcher.group() : "";
+        return proSize;
+    }
 }
