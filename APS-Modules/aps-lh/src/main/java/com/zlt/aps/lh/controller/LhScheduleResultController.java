@@ -22,7 +22,7 @@ import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.service.ILhScheduleService;
-import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -31,6 +31,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -45,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,6 +55,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -223,10 +226,93 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Log(title = "ui.data.column.lhParams.modelName")
     @ApiOperation("插单查询可用机台列表")
     @PostMapping("/getScheduleMachineInfo")
-    public List<LhMachineInfo> getScheduleMachineInfo(@RequestBody LhOrderInsertParamDTO insertParamDTO){
-//        return lhScheduleResultService.getScheduleMachineInfo(insertParamDTO);
-        return Collections.emptyList();
+    public List<LhMachineInfo> getScheduleMachineInfo(@RequestBody LhOrderInsertParamDTO insertParamDTO) {
+        if (Objects.isNull(insertParamDTO)) {
+            return Collections.emptyList();
+        }
+        //        return lhScheduleResultService.getScheduleMachineInfo(insertParamDTO);
+        return buildMockScheduleMachineInfoList(insertParamDTO);
     }
+
+    /**
+     * 构造插单场景下可用硫化机台的联调测试数据（2 条），后续可替换为真实查询。
+     *
+     * @param param 插单查询参数（分厂与物料等用于对齐展示字段）
+     * @return 模拟机台列表
+     */
+    private List<LhMachineInfo> buildMockScheduleMachineInfoList(LhOrderInsertParamDTO param) {
+        String factoryCode = StringUtils.isNotEmpty(param.getFactoryCode())
+                ? param.getFactoryCode()
+                : MOCK_SCHEDULE_MACHINE_FACTORY_DEFAULT;
+
+        List<LhMachineInfo> list = new ArrayList<>(2);
+
+        LhMachineInfo first = new LhMachineInfo();
+        first.setFactoryCode(factoryCode);
+        first.setMachineCode(MOCK_SCHEDULE_MACHINE_CODE_ALL_STEEL);
+        first.setMachineName("全钢液压硫化机-A线");
+        first.setDimension(new BigDecimal("22.5"));
+        first.setDimensionMinimum(new BigDecimal("20.0"));
+        first.setDimensionMaximum(new BigDecimal("24.0"));
+        first.setCentripetalMechanism(MOCK_SCHEDULE_MACHINE_IS_HAVE_YES);
+        first.setClassShift(MOCK_SCHEDULE_MACHINE_CLASS_SHIFT_THREE);
+        first.setMaxMoldNum(MOCK_SCHEDULE_MACHINE_MAX_MOLD_NUM);
+        first.setQuota(MOCK_SCHEDULE_MACHINE_QUOTA_ALL_STEEL);
+        first.setOpenMachineClass(MOCK_SCHEDULE_MACHINE_OPEN_CLASS_MORNING);
+        first.setStatus(MOCK_SCHEDULE_MACHINE_STATUS_ENABLED);
+        first.setMachineType(MOCK_SCHEDULE_MACHINE_TYPE_ALL_STEEL);
+        first.setMachineOrder(10);
+        first.setManufacturer("示例制造A");
+        first.setHotPlateDiameter("1800");
+        first.setMouldSetCode("通用");
+        list.add(first);
+
+        LhMachineInfo second = new LhMachineInfo();
+        second.setFactoryCode(factoryCode);
+        second.setMachineCode(MOCK_SCHEDULE_MACHINE_CODE_HALF_STEEL);
+        second.setMachineName("半钢机械硫化机-B线");
+        second.setDimension(new BigDecimal("17.0"));
+        second.setDimensionMinimum(new BigDecimal("15.0"));
+        second.setDimensionMaximum(new BigDecimal("20.0"));
+        second.setCentripetalMechanism(MOCK_SCHEDULE_MACHINE_IS_HAVE_NO);
+        second.setClassShift(MOCK_SCHEDULE_MACHINE_CLASS_SHIFT_THREE);
+        second.setMaxMoldNum(MOCK_SCHEDULE_MACHINE_MAX_MOLD_NUM);
+        second.setQuota(MOCK_SCHEDULE_MACHINE_QUOTA_HALF_STEEL);
+        second.setOpenMachineClass(MOCK_SCHEDULE_MACHINE_OPEN_CLASS_MIDDLE);
+        second.setStatus(MOCK_SCHEDULE_MACHINE_STATUS_ENABLED);
+        second.setMachineType(MOCK_SCHEDULE_MACHINE_TYPE_HALF_STEEL);
+        second.setMachineOrder(20);
+        second.setManufacturer("示例制造B");
+        second.setHotPlateDiameter("1650");
+        second.setMouldSetCode("通用");
+        list.add(second);
+
+        return list;
+    }
+
+    /** 插单可用机台模拟：请求未带分厂时的默认分厂编码 */
+    private static final String MOCK_SCHEDULE_MACHINE_FACTORY_DEFAULT = "116";
+    /** 插单可用机台模拟：字典 sys_enable_disable 启用 */
+    private static final String MOCK_SCHEDULE_MACHINE_STATUS_ENABLED = "0";
+    /** 插单可用机台模拟：字典 IS_HAVE 有向心机构 */
+    private static final String MOCK_SCHEDULE_MACHINE_IS_HAVE_YES = "1";
+    /** 插单可用机台模拟：字典 IS_HAVE 无向心机构 */
+    private static final String MOCK_SCHEDULE_MACHINE_IS_HAVE_NO = "0";
+    /** 插单可用机台模拟：字典 CLASS_SHIFT 三班制（示例值，以现场字典为准） */
+    private static final String MOCK_SCHEDULE_MACHINE_CLASS_SHIFT_THREE = "1";
+    /** 插单可用机台模拟：字典 CLASS_NUM 早班（示例值） */
+    private static final String MOCK_SCHEDULE_MACHINE_OPEN_CLASS_MORNING = "1";
+    /** 插单可用机台模拟：字典 CLASS_NUM 中班（示例值） */
+    private static final String MOCK_SCHEDULE_MACHINE_OPEN_CLASS_MIDDLE = "2";
+    /** 插单可用机台模拟：字典 LH_MACHINE_TYPE 全钢（示例值） */
+    private static final String MOCK_SCHEDULE_MACHINE_TYPE_ALL_STEEL = "1";
+    /** 插单可用机台模拟：字典 LH_MACHINE_TYPE 半钢（示例值） */
+    private static final String MOCK_SCHEDULE_MACHINE_TYPE_HALF_STEEL = "2";
+    private static final String MOCK_SCHEDULE_MACHINE_CODE_ALL_STEEL = "LH-VUL-001";
+    private static final String MOCK_SCHEDULE_MACHINE_CODE_HALF_STEEL = "LH-VUL-002";
+    private static final int MOCK_SCHEDULE_MACHINE_MAX_MOLD_NUM = 2;
+    private static final int MOCK_SCHEDULE_MACHINE_QUOTA_ALL_STEEL = 120;
+    private static final int MOCK_SCHEDULE_MACHINE_QUOTA_HALF_STEEL = 100;
 
     @Log(title = "ui.data.column.lhParams.modelName")
     @ApiOperation("插单")
