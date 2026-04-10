@@ -1,15 +1,15 @@
 package com.zlt.aps.mdm.api.domain.entity;
 
-import java.math.BigDecimal;
-
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.common.annotation.ImportExcelValidated;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+import java.math.BigDecimal;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -56,6 +56,12 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "SPEC_CODE")
     private String specCode;
 
+    /** 胎胚描述 */
+    @Excel(name = "ui.data.column.mdmConstructionInfo.embryoDesc", sort = 2)
+    @ApiModelProperty(value = "胎胚描述", name = "embryoDesc")
+    @TableField(value = "EMBRYO_DESC")
+    private String embryoDesc;
+
     /** 胎胚代码(代码)施工号 */
     @Excel(name = "ui.data.column.mdmConstructionInfo.constructionCode", sort = 3)
     @ApiModelProperty(value = "胎胚代码(代码)施工号", name = "constructionCode")
@@ -63,7 +69,7 @@ public class MdmConstructionInfo extends BaseEntity {
     private String constructionCode;
 
     /** BOM版本(存储版本号) */
-//    @Excel(name = "ui.data.column.mdmConstructionInfo.constructionVersion")
+    @Excel(name = "ui.data.column.mdmConstructionInfo.constructionVersion")
     @ApiModelProperty(value = "BOM版本(存储版本号)", name = "constructionVersion")
     @TableField(value = "CONSTRUCTION_VERSION")
     private String constructionVersion;

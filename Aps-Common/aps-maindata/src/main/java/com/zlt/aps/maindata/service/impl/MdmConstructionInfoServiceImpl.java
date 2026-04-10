@@ -12,7 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -57,7 +58,7 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
     @Override
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
-        return Collections.emptyList();
+        return new ArrayList<>(Arrays.asList("factoryCode", "constructionCode", "constructionVersion"));
     }
 
     @Override

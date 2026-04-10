@@ -1,30 +1,26 @@
 package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.zlt.aps.mdm.mapper.MdmConstructionInfoEntityMapper;
-import com.zlt.aps.mdm.service.IMdmConstructionInfoService;
-import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
-import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mdm.mapper.MdmConstructionInfoEntityMapper;
+import com.zlt.aps.mdm.service.IMdmConstructionInfoService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -150,7 +146,7 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specCode")), "SPEC_CODE", queryVO.getFieldValueByFieldName("specCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("constructionCode")), "CONSTRUCTION_CODE", queryVO.getFieldValueByFieldName("constructionCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("constructionVersion")), "CONSTRUCTION_VERSION", queryVO.getFieldValueByFieldName("constructionVersion"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("constructionVersion")), "CONSTRUCTION_VERSION", queryVO.getFieldValueByFieldName("constructionVersion"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldMethod")), "MOULD_METHOD", queryVO.getFieldValueByFieldName("mouldMethod"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specifications")), "SPECIFICATIONS", queryVO.getFieldValueByFieldName("specifications"));
@@ -233,6 +229,7 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime")), "HYDRAULIC_PRESSURE_CURING_TIME", queryVO.getFieldValueByFieldName("hydraulicPressureCuringTime"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("moldCavity")), "MOLD_CAVITY", queryVO.getFieldValueByFieldName("moldCavity"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionStage")), "PRODUCTION_STAGE", queryVO.getFieldValueByFieldName("productionStage"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("embryoDesc")), "EMBRYO_DESC", queryVO.getFieldValueByFieldName("embryoDesc"));
     }
 
 
