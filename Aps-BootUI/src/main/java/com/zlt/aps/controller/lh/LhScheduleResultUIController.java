@@ -13,9 +13,11 @@ import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleShiftDateQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -38,6 +40,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -117,10 +120,21 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     /**
-     * 自动排程
+     * 获取排程日期对象列表
      *
      * @return
      */
+    @ApiOperation("排程日期对象列表")
+    @PostMapping("/listScheduleShiftDates")
+    @ResponseBody
+    public AjaxResult listScheduleShiftDates(LhScheduleShiftDateQueryDTO query) {
+        if (query == null) {
+            return AjaxResult.success(Collections.emptyList());
+        }
+        List<LhScheduleShiftDateVO> list = iLhScheduleResultRemoteService.listScheduleShiftDates(query);
+        return AjaxResult.success(list);
+    }
+
     @ApiOperation("硫化自动排程")
     @RequiresPermissions("lh:lhScheduleResult:autoLhScheduleResult")
     @PostMapping("/execute")
