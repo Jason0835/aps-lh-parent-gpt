@@ -30,6 +30,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -64,7 +65,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/lhScheduleResult")
 public class LhScheduleResultController extends AbstractDocBizController<LhScheduleResult> {
 
-    @Resource
+    @Autowired
     private ILhScheduleService lhScheduleService;
 
     /**
@@ -658,13 +659,16 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return lhScheduleService;
     }
 
+
     @Override
     protected String getTypeCode() {
-        return "LH2025213";
+        return "LH_SCHEDULE_RESULT";
     }
 
-
-
+    @Override
+    protected String getOrderBy() {
+        return "schedule_date desc, lh_machine_code asc";
+    }
 
 
 
