@@ -81,6 +81,9 @@ import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
@@ -3531,6 +3534,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 需求计划分组Map
         Map<String, List<DpDemandPlan>> demandPlanMap = convertToDpDemandPlanMap(dpDemandPlanList);
+        BigDecimal inventorySalesRatio = BigDecimal.ZERO;
         // 遍历计算
         for (MpAdjustDetailVo adjust : adjustList) {
             if (StringUtils.isEmpty(adjust.getMaterialCode())) {
@@ -3573,6 +3577,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                         .mapToInt(DpDemandPlan::getConventionReserveQty)
                         .sum();
                 adjust.setConventionReserveQty(Convert.toInt(sum,0));
+
+                //关联带出物料优先、结构优先、库存、月均销量、库销比 sandy+ 2026.4.10
+                adjust.setScmPriority(dpDemandPlan.getScmPriority());
+                adjust.setStructurePriority(dpDemandPlan.getStructurePriority());
+                adjust.setStockQty(dpDemandPlan.getStockQty());
+                adjust.setAverageSaleQty(dpDemandPlan.getAverageSaleQty());
+                if (dpDemandPlan.getAverageSaleQty()>0){
+                    inventorySalesRatio = BigDecimal.valueOf(dpDemandPlan.getStockQty()).divide(BigDecimal.valueOf(dpDemandPlan.getAverageSaleQty()), 1, RoundingMode.HALF_UP);
+                }
+                adjust.setInventorySalesRatio(inventorySalesRatio);
             }
             // 试制量试设置净需求为订单量
             if (ApsConstant.TRUE.equals(adjust.getIsTrial())) {

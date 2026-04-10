@@ -2458,7 +2458,7 @@ public class MpWeekRollAdjustEngine {
         List<MpAdjustStructureIn> incAdjustBatchTrailList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(x.getConstructionStage()))
                 .sorted(Comparator.comparing(MpAdjustStructureIn::getUrgencyType,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
         List<MpAdjustStructureIn> incAdjustFormalList = incrementAdjustList.stream().filter(x->ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(x.getConstructionStage()))
-                .sorted(Comparator.comparing(MpAdjustStructureIn::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+                .sorted(new AdjustStructureInComparator()).collect(Collectors.toList());
 
         int lockNextDay = contextDTO.getLockEndDay() + 1;
 
@@ -2736,7 +2736,7 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         //1、排序
-        incrementAdjustList = incrementAdjustList.stream().sorted(Comparator.comparing(MpAdjustStructureOut::getAdjustPriority,Comparator.nullsLast(Comparator.naturalOrder()))).collect(Collectors.toList());
+        incrementAdjustList = incrementAdjustList.stream().sorted(new AdjustStructureOutComparator()).collect(Collectors.toList());
         int lockNextDay = contextDTO.getLockEndDay() + 1;
 
         // 重算在机SKU的产能信息
@@ -2859,6 +2859,11 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setDayVulcanizationQty(adjustStructInVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructInVo.getCuringTime());
         mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
+        mpFinalVo.setScmPriority(adjustStructInVo.getScmPriority());
+        mpFinalVo.setStructurePriority(adjustStructInVo.getStructurePriority());
+        mpFinalVo.setStockQty(adjustStructInVo.getStockQty());
+        mpFinalVo.setAverageSaleQty(adjustStructInVo.getAverageSaleQty());
+        mpFinalVo.setInventorySalesRatio(adjustStructInVo.getInventorySalesRatio());
         if (contextDTO.getOemBrandConfigSet().contains(mpFinalVo.getBrand())){
             mpFinalVo.setOemFlag(YesOrNoEnum.YES.getCode());
         }else {
@@ -2913,6 +2918,11 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setDayVulcanizationQty(adjustStructOutVo.getDayVulcanizationQty());
         mpFinalVo.setCuringTime(adjustStructOutVo.getCuringTime());
         mpFinalVo.setHasSpecialMaterial(adjustStructOutVo.getHasSpecialMaterial());
+        mpFinalVo.setScmPriority(adjustStructOutVo.getScmPriority());
+        mpFinalVo.setStructurePriority(adjustStructOutVo.getStructurePriority());
+        mpFinalVo.setStockQty(adjustStructOutVo.getStockQty());
+        mpFinalVo.setAverageSaleQty(adjustStructOutVo.getAverageSaleQty());
+        mpFinalVo.setInventorySalesRatio(adjustStructOutVo.getInventorySalesRatio());
         if (contextDTO.getOemBrandConfigSet().contains(mpFinalVo.getBrand())){
             mpFinalVo.setOemFlag(YesOrNoEnum.YES.getCode());
         }else {

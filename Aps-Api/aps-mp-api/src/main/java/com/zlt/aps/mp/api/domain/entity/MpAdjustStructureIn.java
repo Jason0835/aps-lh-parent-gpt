@@ -9,6 +9,8 @@ import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.math.BigDecimal;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpAdjustStructureIn.java
@@ -364,6 +366,40 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "TRIAL_PLAN_ID")
     private String trialPlanId;
 
+    /**
+     * 物料优先
+     */
+    @ApiModelProperty(value = "物料优先")
+    @TableField(value = "SCM_PRIORITY")
+    private String scmPriority;
+
+    /**
+     * 结构优先
+     */
+    @ApiModelProperty(value = "结构优先")
+    @TableField(value = "STRUCTURE_PRIORITY")
+    private String structurePriority;
+
+    /**
+     * 库存量
+     */
+    @ApiModelProperty(value = "库存量")
+    @TableField(value = "STOCK_QTY")
+    private Integer stockQty;
+
+    /**
+     * 月均销量
+     */
+    @ApiModelProperty(value = "月均销量")
+    @TableField(value = "AVERAGE_SALE_QTY")
+    private Integer averageSaleQty;
+
+    /**
+     * 库销比
+     */
+    @ApiModelProperty(value = "库销比")
+    @TableField(value = "INVENTORY_SALES_RATIO")
+    private BigDecimal inventorySalesRatio;
 
     /**
      * 获取分组key
