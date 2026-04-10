@@ -1,11 +1,15 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.date.DatePattern;
+import cn.hutool.core.date.DateUtil;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.engine.rule.IScheduleRuleEngine;
 import com.zlt.aps.lh.engine.decorator.IScheduleExecutor;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
@@ -16,7 +20,10 @@ import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import org.apache.commons.lang3.StringUtils;
+
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -97,6 +104,39 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public String getDocTypeCode() {
         return "OUT2046";
+    }
+
+    @Override
+    public List<LhScheduleShiftDateVO> listScheduleShiftDates(String scheduleDate) {
+        if (StringUtils.isEmpty(scheduleDate)) {
+            log.warn("listScheduleShiftDates: scheduleDate 为空");
+            return new ArrayList<>();
+        }
+        Date end;
+        try {
+            end = DateUtil.beginOfDay(DateUtil.parse(scheduleDate.trim(), DatePattern.NORM_DATE_PATTERN));
+        } catch (Exception e) {
+            log.warn("listScheduleShiftDates: 排程日期解析失败, scheduleDate={}", scheduleDate, e);
+            return new ArrayList<>();
+        }
+        Date start = DateUtil.offsetDay(end, -(LhScheduleConstant.SCHEDULE_DAYS - 1));
+        List<LhScheduleShiftDateVO> result = new ArrayList<>(LhScheduleConstant.);
+        int shiftNo = 1;
+        for (int dayIndex = 0; dayIndex < LhScheduleConstant.SCHEDULE_DAYS; dayIndex++) {
+            int shiftsThisDay = dayIndex == 0
+                    ? LhScheduleConstant.SCHEDULE_SHIFT_DATE_WINDOW_FIRST_DAY_SHIFT_COUNT
+                    : LhScheduleConstant.SCHEDULE_SHIFT_DATE_WINDOW_OTHER_DAY_SHIFT_COUNT;
+            Date current = DateUtil.offsetDay(start, dayIndex);
+            String shiftDateStr = DateUtil.format(current, LhScheduleConstant.SCHEDULE_SHIFT_DATE_DISPLAY_PATTERN);
+            for (int i = 0; i < shiftsThisDay; i++) {
+                LhScheduleShiftDateVO vo = new LhScheduleShiftDateVO();
+                vo.setShift(shiftNo);
+                vo.setShiftDate(shiftDateStr);
+                result.add(vo);
+                shiftNo++;
+            }
+        }
+        return result;
     }
 
 }

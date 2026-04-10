@@ -195,6 +195,15 @@ public final class LhScheduleConstant {
     /** 排程结果实体班次槽位上限（class1～class8） */
     public static final int MAX_SHIFT_SLOT_COUNT = 8;
 
+    /** 排程日期对象列表：窗口内首日班次数（与 8 班模板首日一致） */
+    public static final int SCHEDULE_SHIFT_DATE_WINDOW_FIRST_DAY_SHIFT_COUNT = 2;
+
+    /** 排程日期对象列表：窗口内非首日每日班次数 */
+    public static final int SCHEDULE_SHIFT_DATE_WINDOW_OTHER_DAY_SHIFT_COUNT = 3;
+
+    /** 排程日期对象列表：班次展示日期格式（月/日，如 04/08） */
+    public static final String SCHEDULE_SHIFT_DATE_DISPLAY_PATTERN = "MM/dd";
+
     /**
      * @deprecated 易与「窗口内实际班次数」混淆；请使用 {@link #MAX_SHIFT_SLOT_COUNT} 或当次 {@code List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO>} 长度
      */

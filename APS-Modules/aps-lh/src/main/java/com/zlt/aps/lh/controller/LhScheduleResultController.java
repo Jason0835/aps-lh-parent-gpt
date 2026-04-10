@@ -17,8 +17,10 @@ import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleShiftDateQueryDTO;
 import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
@@ -69,11 +71,20 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     private ILhScheduleService lhScheduleService;
 
     /**
-     * 执行自动排程
+     * 获取排程日期对象列表
      *
-     * @param request 排程请求参数
+     * @param query 排程请求参数
      * @return 排程响应结果
      */
+    @PostMapping("/listScheduleShiftDates")
+    @ApiOperation("排程日期对象列表")
+    public List<LhScheduleShiftDateVO> listScheduleShiftDates(@RequestBody LhScheduleShiftDateQueryDTO query) {
+        if (query == null) {
+            return new ArrayList<>();
+        }
+        return lhScheduleService.listScheduleShiftDates(query.getScheduleDate());
+    }
+
     @PostMapping("/execute")
     @ApiOperation("执行自动排程")
     public LhScheduleResponseDTO executeSchedule(@RequestBody LhScheduleRequestDTO request) {

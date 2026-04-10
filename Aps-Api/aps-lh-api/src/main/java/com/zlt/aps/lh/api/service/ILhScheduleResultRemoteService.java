@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -110,5 +111,15 @@ public interface ILhScheduleResultRemoteService {
      */
     @PostMapping("/lhScheduleResult/publish")
     public AjaxResult publish(@RequestBody LhScheduleResult dto);
+
+    /**
+     * 根据排程结束日获取窗口内 8 个班次的日期展示列表
+     *
+     * @param query 含 scheduleDate（yyyy-MM-dd）
+     * @return 班次 1～8 与对应 MM/dd
+     */
+    @ApiOperation("排程日期对象列表")
+    @PostMapping("/lhScheduleResult/listScheduleShiftDates")
+    List<LhScheduleShiftDateVO> listScheduleShiftDates(@RequestBody LhScheduleShiftDateQueryDTO query);
 
 }
