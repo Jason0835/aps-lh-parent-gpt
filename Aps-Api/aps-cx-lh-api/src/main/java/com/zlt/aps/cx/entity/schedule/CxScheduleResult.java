@@ -2,6 +2,7 @@ package com.zlt.aps.cx.entity.schedule;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -10,11 +11,14 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.util.Date;
-import java.util.List;
 
 /**
- * 成型排程结果表
- * 对应表：T_CX_SCHEDULE_RESULT
+ * 成型排程结果表（单表结构）
+ *
+ * <p>每条记录代表一个成型机台+胎胚在排程周期内的8班次排产计划。
+ * 不再使用主子表结构，所有班次排量直接拍平到 CLASS1~8 字段。
+ *
+ * <p>对应表：T_CX_SCHEDULE_RESULT
  *
  * @author APS Team
  * @since 2.0.0
@@ -22,7 +26,7 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("T_CX_SCHEDULE_RESULT")
-@ApiModel(value = "成型排程结果对象", description = "成型排程结果表")
+@ApiModel(value = "成型排程结果对象", description = "成型排程结果表（单表）")
 public class CxScheduleResult extends ApsBaseEntity {
 
     private static final long serialVersionUID = 1L;
@@ -80,17 +84,32 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("LH_MACHINE_QTY")
     private BigDecimal lhMachineQty;
 
-    @ApiModelProperty(value = "外胎代码")
-    @TableField("SAP_CODE")
-    private String sapCode;
+    /**
+     * 物料编号
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.materialCode")
+    @ApiModelProperty(value = "物料编号", name = "materialCode")
+    @TableField(value = "MATERIAL_CODE")
+    private String materialCode;
 
-    @ApiModelProperty(value = "外胎规格描述")
-    @TableField("SPEC_DESC")
-    private String specDesc;
+    /**
+     * 物料描述
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.materialDesc")
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    @TableField(value = "MATERIAL_DESC")
+    private String materialDesc;
 
     @ApiModelProperty(value = "胎胚代码")
     @TableField("EMBRYO_CODE")
     private String embryoCode;
+    /**
+     * 主物料(胎胚描述)
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚描述)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
 
     @ApiModelProperty(value = "胎胚寸口")
     @TableField("SPEC_DIMENSION")
@@ -111,6 +130,7 @@ public class CxScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "胎胚总计划量")
     @TableField("PRODUCT_NUM")
     private BigDecimal productNum;
+
     // ========== 一班 ==========
     @ApiModelProperty(value = "一班计划数")
     @TableField("CLASS1_PLAN_QTY")
@@ -311,7 +331,6 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS8_RECIPE_NO")
     private String class8RecipeNo;
 
-
     // ========== 其他字段 ==========
     @ApiModelProperty(value = "收尾提示标识：0-提示收尾；1-不需要提示")
     @TableField("MARK_CLOSE_OUT_TIP")
@@ -325,34 +344,15 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("SPECIAL_REQUIREMENTS")
     private String specialRequirements;
 
-    /**
-     * 成型余量
-     */
     @ApiModelProperty(value = "成型余量")
     @TableField("CX_REMAIN_QTY")
     private BigDecimal cxRemainQty;
 
-    /**
-     * 硫化余量
-     */
     @ApiModelProperty(value = "硫化余量")
     @TableField("LH_REMAIN_QTY")
     private BigDecimal lhRemainQty;
 
-    /**
-     * 硫化班产
-     */
     @ApiModelProperty(value = "硫化班产")
     @TableField("LH_CLASS_QTY")
     private BigDecimal lhClassQty;
-
-    // ========== 非数据库字段 ==========
-
-    @ApiModelProperty(value = "排程明细列表")
-    @TableField(exist = false)
-    private List<CxScheduleDetail> details;
-
-    @ApiModelProperty(value = "是否试制")
-    @TableField(exist = false)
-    private Integer isTrial;
 }

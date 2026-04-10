@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service.engine;
 import com.zlt.aps.cx.entity.CxMachineStructureCapacity;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.service.engine.ScheduleDayTypeHelper.DayFlagInfo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
@@ -39,15 +40,22 @@ public class ContinueTaskProcessor {
 
     private final BalancingService balancingService;
     private final ProductionCalculator productionCalculator;
+    private final ScheduleDayTypeHelper scheduleDayTypeHelper;
 
-    /** 开产首班排产时长（小时） */
-    private static final int OPENING_SHIFT_HOURS = 6;
-    
     /** 胎胚库容上限比例 */
     private static final double EMBRYO_STORAGE_RATIO = 0.9;
-    
-    /** 默认整车容量 */
+
+    /** 默认整车容量（条/车） */
     private static final int DEFAULT_TRIP_CAPACITY = 12;
+
+    /** 默认最大硫化机台数 */
+    private static final int DEFAULT_MAX_LH_MACHINE_COUNT = 10;
+
+    /** 默认日产能（条/天），机台未配置时使用 */
+    private static final int DEFAULT_DAILY_CAPACITY = 1200;
+
+    /** 默认机台小时产能（条/小时） */
+    private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
     /** 参数编码：强制保留历史任务 */
     private static final String PARAM_FORCE_KEEP_HISTORY = "FORCE_KEEP_HISTORY_TASK";
@@ -70,8 +78,8 @@ public class ContinueTaskProcessor {
 
         log.info("========== 开始处理续作任务，共 {} 个任务 ==========", continueTasks.size());
 
-        // Step 1: 按结构分组任务
-        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap = 
+        // Step 1: 按结构分组
+        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureTaskMap =
                 groupTasksByStructure(continueTasks);
         log.info("按结构分组完成，共 {} 个结构", structureTaskMap.size());
 
@@ -117,33 +125,8 @@ public class ContinueTaskProcessor {
 
                 for (BalancingService.EmbryoAssignment embryoAssignment : assignment.getEmbryoAssignments()) {
                     CoreScheduleAlgorithmService.DailyEmbryoTask task = embryoAssignment.getTask();
-                    
-                    // S5.3.1 分配胎胚库存
-                    allocateEmbryoStock(task, context, scheduleDate);
-                    
-                    // S5.3.2 计算待排产量
-                    boolean isOpeningDay = Boolean.TRUE.equals(context.getIsOpeningDay()) && day == 1;
-                    calculatePlannedProduction(task, context, scheduleDate, isOpeningDay);
-                    
-                    // S5.3.3 开停产特殊处理
-                    boolean isClosingDay = Boolean.TRUE.equals(context.getIsClosingDay());
-                    handleOpeningClosingDay(task, context, dayShifts, isOpeningDay, isClosingDay);
-                    
-                    // S5.3.4 收尾余量处理
-                    handleEndingRemainder(task, context, isOpeningDay);
-                    
-                    // S5.3.5 计算延误量和补做
-                    if (Boolean.TRUE.equals(task.getIsNearEnding()) && !isOpeningDay) {
-                        int catchUpQty = calculateCatchUpQuantity(task, context, scheduleDate);
-                        if (catchUpQty > 0) {
-                            int tripCapacity = getTripCapacity(task.getStructureName(), context);
-                            int catchUpTrips = convertToTrips(catchUpQty, tripCapacity, task.getIsMainProduct());
-                            task.setCatchUpQuantity(catchUpTrips * tripCapacity);
-                            task.setPlannedProduction(task.getPlannedProduction() + task.getCatchUpQuantity());
-                        }
-                    }
 
-                    // 分配任务到机台
+                    // S5.3.1~S5.3.4 均已在分组阶段计算完成，直接分配任务到机台
                     if (task.getPlannedProduction() != null && task.getPlannedProduction() > 0) {
                         allocateTaskToMachine(allocation, task, context);
                     }
@@ -161,8 +144,13 @@ public class ContinueTaskProcessor {
 
     // ==================== 辅助方法 ====================
 
+    /**
+     * 按结构分组
+     */
     private Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> groupTasksByStructure(
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
+
+        // 先分组
         return tasks.stream()
                 .filter(t -> t.getStructureName() != null)
                 .collect(Collectors.groupingBy(
@@ -260,8 +248,8 @@ public class ContinueTaskProcessor {
 
             // 兜底：使用默认值
             if (maxLh == null) {
-                maxLh = 10;
-                log.debug("机台 {} 机型 {} 结构 {} 未找到配比配置，使用默认值 10",
+                maxLh = DEFAULT_MAX_LH_MACHINE_COUNT;
+                log.debug("机台 {} 机型 {} 结构 {} 未找到配比配置，使用默认值 {}",
                         machineCode, machineType, structureName);
             }
 
@@ -328,7 +316,7 @@ public class ContinueTaskProcessor {
 
             // 兜底：使用默认值
             if (maxTypes == null) {
-                maxTypes = context.getMaxTypesPerMachine() != null ? context.getMaxTypesPerMachine() : 4;
+                maxTypes = context.getMaxTypesPerMachine() != null ? context.getMaxTypesPerMachine() : BalancingService.DEFAULT_MAX_TYPES_PER_MACHINE;
                 log.debug("机台 {} 机型 {} 结构 {} 未找到胎胚种类数配置，使用默认值 {}",
                         machineCode, machineType, structureName, maxTypes);
             }
@@ -356,13 +344,24 @@ public class ContinueTaskProcessor {
         if (context.getAvailableMachines() != null) {
             for (MdmMoldingMachine machine : context.getAvailableMachines()) {
                 if (machine.getCxMachineCode().equals(machineCode)) {
-                    return machine.getMaxDayCapacity() != null ? machine.getMaxDayCapacity() : 1200;
+                    return machine.getMaxDayCapacity() != null ? machine.getMaxDayCapacity() : DEFAULT_DAILY_CAPACITY;
                 }
             }
         }
-        return 1200;
+        return DEFAULT_DAILY_CAPACITY;
     }
 
+    /**
+     * 从任务对象中读取已分配的库存，写入任务的 allocatedStock 字段
+     *
+     * <p>materialStockMap 的库存分配在 TaskGroupService.buildSingleTask 中已完成
+     * （按各硫化任务的需求比例预分配）。此处仅读取 task.getCurrentStock() 并同步到
+     * allocatedStock 字段，供后续 calculatePlannedProduction 使用。
+     *
+     * @param task         任务
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期（未使用，为扩展预留）
+     */
     public void allocateEmbryoStock(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
@@ -376,16 +375,14 @@ public class ContinueTaskProcessor {
     }
     
     /**
-     * 计算待排产量（按车分配）
+     * 计算任务的计划量（条）
      *
-     * <p>计算逻辑：
-     * 1. 获取硫化需求量（vulcanizeDemand）
-     * 2. 获取硫化任务分配的库存（allocatedStock）
-     * 3. 计算需要的计划量 = vulcanizeDemand - 库存
-     * 4. 获取胎面整车条数（treadCount）
-     * 5. 计算需要的车数 = 需要的计划量 / treadCount
+     * <p>硫化需求 − 库存抵扣后，调用 ProductionCalculator 整车取整。
+     * 仅在正常生产日执行，开停产日已在 handleOpeningClosingDay 中处理。
      *
-     * <p>如果是收尾任务，需要考虑成型余量判断是否收尾
+     * @param task         任务
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期
      */
     public void calculatePlannedProduction(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -393,104 +390,116 @@ public class ContinueTaskProcessor {
             LocalDate scheduleDate,
             boolean isOpeningDay) {
 
-        // Step 1: 获取硫化需求量和分配的库存
+        // 停产日已在 handleOpeningClosingDay 中设置 plannedProduction=0，跳过此处
+        if (scheduleDayTypeHelper.isStopDay(scheduleDate)) {
+            return;
+        }
+
+        // 硫化需求 − 库存抵扣 = 待排条数
         int vulcanizeDemand = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
         int allocatedStock = task.getAllocatedStock() != null ? task.getAllocatedStock() : 0;
-
-        // Step 2: 计算需要的计划量
         int requiredProduction = Math.max(0, vulcanizeDemand - allocatedStock);
 
-        // Step 3: 获取胎面整车条数
-        String structureName = task.getStructureName();
-        Map<String, Integer> treadCountMap = context.getStructureTreadCountMap();
-        int treadCount = treadCountMap != null ? treadCountMap.getOrDefault(structureName, 1) : 1;
+        // 整车取整（由 ProductionCalculator 统一管理）
+        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int plannedProduction = productionCalculator.roundToVehicle(requiredProduction, tripCapacity);
+        task.setPlannedProduction(plannedProduction);
 
-        // Step 4: 计算需要的车数
-        int requiredCars = 0;
-        if (treadCount > 0) {
-            requiredCars = (int) Math.ceil((double) requiredProduction / treadCount);
-        }
-
-        // Step 5: 如果是收尾任务，判断是否需要收尾
-        if (Boolean.TRUE.equals(task.getIsEndingTask())) {
-            requiredCars = calculateEndingCars(task, context, requiredProduction, requiredCars);
-        }
-
-        // Step 6: 设置任务属性
-        task.setPlannedProduction(requiredProduction);
-        task.setRequiredCars(requiredCars);
-
-        log.debug("任务 {} 计划量计算：需求={}，库存={}，需要量={}，胎面条数={}，需要车数={}",
-                task.getMaterialCode(), vulcanizeDemand, allocatedStock, requiredProduction, treadCount, requiredCars);
+        log.debug("任务 {} 待排产量：需求={}，库存={}，待排={}，胎面整车={}，计划量={}",
+                task.getMaterialCode(), vulcanizeDemand, allocatedStock,
+                requiredProduction, tripCapacity, plannedProduction);
     }
 
-    /**
-     * 计算收尾任务需要的车数
-     *
-     * <p>判断逻辑与 ProductionCalculator.handleEndingRemainder 一致：
-     * - 如果成型余量充足，不收尾
-     * - 如果成型余量不足，需要收尾
-     */
-    private int calculateEndingCars(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
-            ScheduleContextVo context,
-            int requiredProduction,
-            int calculatedCars) {
-
-        String materialCode = task.getRelatedMaterialCode();
-        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-        Integer formingRemainder = formingRemainderMap != null ? formingRemainderMap.get(materialCode) : 0;
-
-        // 判断是否需要收尾
-        if (formingRemainder != null && formingRemainder > 0) {
-            // 成型余量充足，不需要收尾
-            log.debug("任务 {} 收尾判断：成型余量={}，充足，不收尾", task.getMaterialCode(), formingRemainder);
-            return 0;
-        }
-
-        // 需要收尾，返回计算的车数
-        log.debug("任务 {} 收尾判断：成型余量不足，需要收尾，车数={}", task.getMaterialCode(), calculatedCars);
-        return calculatedCars;
-    }
     
+    /**
+     * 处理开产日和停产日对任务计划量的影响
+     *
+     * <p>判断逻辑：
+     * <ol>
+     *   <li>从当前排产日期往前找最近一个有 dayFlag 标识的日期（MdmWorkCalendar.dayFlag 不为 null）</li>
+     *   <li>若该日期是「停」（dayFlag="0"）→ 往后都是停产</li>
+     *   <li>若该日期是「开」（dayFlag="1"）→ 正常按硫化计划安排</li>
+     * </ol>
+     *
+     * <p>停产日处理：
+     * <ul>
+     *   <li>停产是今天：有量（库存必须为0），安排 = 硫化需要的量（不做整车取整）</li>
+     *   <li>停产不是今天（已停产）：plannedProduction = 0</li>
+     * </ul>
+     *
+     * <p>开产日处理：
+     * <ul>
+     *   <li>开产日有量但不多，严格按硫化计划安排，取整到整车</li>
+     * </ul>
+     *
+     * @param task         任务
+     * @param context      排程上下文
+     * @param dayShifts    当天班次配置（未使用，开产停产处理不需要分班次）
+     */
     public void handleOpeningClosingDay(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
-            List<CxShiftConfig> dayShifts,
-            boolean isOpeningDay,
-            boolean isClosingDay) {
+            List<CxShiftConfig> dayShifts) {
         
-        if (isClosingDay) {
-            task.setPlannedProduction(0);
-            task.setIsClosingDayTask(true);
+        LocalDate scheduleDate = context.getCurrentScheduleDate();
+        
+        // Step 1: 从当前日期往前找最近一个有 dayFlag 标识的日期
+        DayFlagInfo flagInfo = scheduleDayTypeHelper.getDayFlagInfo(scheduleDate);
+        
+        if (flagInfo == null || flagInfo.dayFlag == null) {
+            // 没有找到任何标识，按正常日期处理
             return;
         }
         
-        if (isOpeningDay) {
-            int hourlyCapacity = getMachineHourlyCapacity(
-                    task.getContinueMachineCodes() != null && !task.getContinueMachineCodes().isEmpty()
-                            ? task.getContinueMachineCodes().get(0) : null,
-                    task.getStructureName(), context);
+        if ("0".equals(flagInfo.dayFlag)) {
+            // 最近标识是「停」→ 停产标识日之后都是停产日
+            // 停产标识日当天有量（最后一天生产），只有停产日之后才算停产
+            task.setIsClosingDayTask(true);
             
-            int openingShiftCapacity = hourlyCapacity * OPENING_SHIFT_HOURS;
-            
-            // 关键产品判断：使用胎胚编码（task.getMaterialCode() 返回的是 embryoCode）
-            boolean isKeyProduct = context.getKeyProductCodes() != null 
-                    && context.getKeyProductCodes().contains(task.getMaterialCode());
-            
-            if (isKeyProduct) {
-                task.setIsKeyProductOnOpening(true);
-                task.setOpeningShiftCapacity(0);
-            } else {
-                task.setOpeningShiftCapacity(openingShiftCapacity);
-                int originalPlanned = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
-                task.setPlannedProduction(Math.min(originalPlanned, openingShiftCapacity));
+            if (scheduleDate.isAfter(flagInfo.nearestDate)) {
+                // 停产日之后：无法安排
+                task.setPlannedProduction(0);
+                log.debug("停产日（已停产），不安排：materialCode={}", task.getMaterialCode());
             }
-            
+            // 停产标识日当天：有量，plannedProduction 保持原值
+            // 整车取整由 calculatePlannedProduction 完成
+        } else if ("1".equals(flagInfo.dayFlag)) {
+            // 最近标识是「开」→ 正常按硫化计划安排，取整到整车
             task.setIsOpeningDayTask(true);
+            // 开产日有量但不多，整车取整由 calculatePlannedProduction 完成
+            log.debug("开产日，正常按硫化计划安排：materialCode={}", task.getMaterialCode());
         }
+        // 其他情况（dayFlag 未知）按正常处理，不做干预
     }
     
+    /**
+     * 根据 dayFlag 判断当天是否为开产日
+     *
+     * @param date 当前排产日期
+     * @return true 表示开产日
+     */
+    private boolean isOpeningDayByDayFlag(LocalDate date) {
+        DayFlagInfo flagInfo = scheduleDayTypeHelper.getDayFlagInfo(date);
+        return flagInfo != null && "1".equals(flagInfo.dayFlag);
+    }
+
+    /**
+     * 处理收尾任务的余量约束
+     *
+     * <p>前提：仅对 isEndingTask=true 或 isNearEnding=true 的任务生效
+     * <p>逻辑：
+     * <ol>
+     *   <li>计算剩余需生产量 = 收尾余量 - 已分配库存</li>
+     *   <li>调用 ProductionCalculator 计算收尾计划量（整车取整 + 非主销产品余量≤2条则舍弃）</li>
+     *   <li>若余量被舍弃 → 计划量=0，标记 abandoned</li>
+     *   <li>若主销产品多做了 → 记录 extraInventory</li>
+     *   <li>若本批完成全部收尾 → 标记 isLastEndingBatch</li>
+     * </ol>
+     *
+     * @param task         任务
+     * @param context      排程上下文
+     * @param isOpeningDay 是否开产日（开产日不触发收尾处理）
+     */
     public void handleEndingRemainder(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
@@ -553,40 +562,7 @@ public class ContinueTaskProcessor {
             task.setShiftAllocation(endingResult.getShiftAllocation());
         }
     }
-    
-    public int calculateCatchUpQuantity(
-            CoreScheduleAlgorithmService.DailyEmbryoTask task,
-            ScheduleContextVo context,
-            LocalDate scheduleDate) {
 
-        Integer formingRemainder = task.getEndingSurplusQty();
-        if (formingRemainder == null || formingRemainder <= 0) {
-            return 0;
-        }
-
-        LocalDate endingDate = task.getEndingDate();
-        if (endingDate == null) {
-            return 0;
-        }
-
-        int plannedQty = calculatePlannedQuantityToDate(task.getMaterialCode(), scheduleDate, endingDate, context);
-        int gap = formingRemainder - plannedQty;
-        
-        return gap > 0 ? gap : 0;
-    }
-
-    private int calculatePlannedQuantityToDate(String materialCode, LocalDate startDate, LocalDate endDate, ScheduleContextVo context) {
-        return 0; // TODO
-    }
-
-    private int convertToTrips(int quantity, int tripCapacity, Boolean isMainProduct) {
-        if (quantity <= 0) {
-            return 0;
-        }
-        return Boolean.TRUE.equals(isMainProduct) 
-                ? (int) Math.ceil((double) quantity / tripCapacity) 
-                : quantity / tripCapacity;
-    }
 
     private int getTripCapacity(String structureCode, ScheduleContextVo context) {
         return productionCalculator.getTripCapacity(structureCode, context);
@@ -596,11 +572,11 @@ public class ContinueTaskProcessor {
         if (context.getMachineStructureCapacities() != null && machineCode != null && structureName != null) {
             for (CxMachineStructureCapacity capacity : context.getMachineStructureCapacities()) {
                 if (machineCode.equals(capacity.getCxMachineCode()) && structureName.equals(capacity.getStructureCode())) {
-                    return capacity.getHourlyCapacity() != null ? capacity.getHourlyCapacity() : 50;
+                    return capacity.getHourlyCapacity() != null ? capacity.getHourlyCapacity() : DEFAULT_HOURLY_CAPACITY;
                 }
             }
         }
-        return context.getMachineHourlyCapacity() != null ? context.getMachineHourlyCapacity() : 50;
+        return context.getMachineHourlyCapacity() != null ? context.getMachineHourlyCapacity() : DEFAULT_HOURLY_CAPACITY;
     }
 
     private void allocateTaskToMachine(
@@ -612,8 +588,10 @@ public class ContinueTaskProcessor {
                 ? task.getPlannedProduction() : task.getDemandQuantity();
 
         CoreScheduleAlgorithmService.TaskAllocation taskAllocation = new CoreScheduleAlgorithmService.TaskAllocation();
-        taskAllocation.setMaterialCode(task.getMaterialCode());
-        taskAllocation.setMaterialName(task.getMaterialName());
+        taskAllocation.setEmbryoCode(task.getMaterialCode());
+        taskAllocation.setMaterialCode(task.getRelatedMaterialCode());
+        taskAllocation.setMaterialDesc(task.getMaterialDesc());
+        taskAllocation.setMainMaterialDesc(task.getMainMaterialDesc());
         taskAllocation.setStructureName(task.getStructureName());
         taskAllocation.setQuantity(quantity);
         taskAllocation.setPriority(task.getPriority());
@@ -622,6 +600,7 @@ public class ContinueTaskProcessor {
         taskAllocation.setIsEndingTask(task.getIsEndingTask());
         taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
+        taskAllocation.setLhId(task.getLhId());
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + quantity);

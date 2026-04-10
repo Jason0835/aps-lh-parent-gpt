@@ -53,6 +53,10 @@ public interface ScheduleService {
         private String message;
         private LocalDate scheduleDate;
         private List<CxScheduleResult> results;
+        private List<ValidationDetail> validationErrors;
+        private List<ValidationDetail> validationWarnings;
+
+        public ScheduleResult() {}
 
         public boolean isSuccess() {
             return success;
@@ -85,6 +89,65 @@ public interface ScheduleService {
         public void setResults(List<CxScheduleResult> results) {
             this.results = results;
         }
+
+        public List<ValidationDetail> getValidationErrors() {
+            return validationErrors;
+        }
+
+        public void setValidationErrors(List<ValidationDetail> validationErrors) {
+            this.validationErrors = validationErrors;
+        }
+
+        public List<ValidationDetail> getValidationWarnings() {
+            return validationWarnings;
+        }
+
+        public void setValidationWarnings(List<ValidationDetail> validationWarnings) {
+            this.validationWarnings = validationWarnings;
+        }
+    }
+
+    /**
+     * 校验明细（用于API返回）
+     */
+    class ValidationDetail {
+        private String dataItem;
+        private String message;
+        private String suggestion;
+
+        public ValidationDetail() {}
+
+        public ValidationDetail(String dataItem, String message, String suggestion) {
+            this.dataItem = dataItem;
+            this.message = message;
+            this.suggestion = suggestion;
+        }
+
+        public String getDataItem() { return dataItem; }
+        public void setDataItem(String dataItem) { this.dataItem = dataItem; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public String getSuggestion() { return suggestion; }
+        public void setSuggestion(String suggestion) { this.suggestion = suggestion; }
+    }
+
+    /**
+     * 校验摘要（用于前端展示）
+     */
+    class ValidationSummary {
+        private int errorCount;
+        private int warningCount;
+        private List<ValidationDetail> errors;
+        private List<ValidationDetail> warnings;
+
+        public int getErrorCount() { return errorCount; }
+        public void setErrorCount(int errorCount) { this.errorCount = errorCount; }
+        public int getWarningCount() { return warningCount; }
+        public void setWarningCount(int warningCount) { this.warningCount = warningCount; }
+        public List<ValidationDetail> getErrors() { return errors; }
+        public void setErrors(List<ValidationDetail> errors) { this.errors = errors; }
+        public List<ValidationDetail> getWarnings() { return warnings; }
+        public void setWarnings(List<ValidationDetail> warnings) { this.warnings = warnings; }
     }
 
     /**
