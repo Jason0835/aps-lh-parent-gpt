@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.adjust.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.core.utils.PageUtils;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
@@ -64,6 +65,7 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpAdjustStructureIn queryVO) {
+        PageUtils.clearPage();
         TableDataInfo tableDataInfo = super.list(queryVO);
         sortlList(tableDataInfo.getRows());
         return tableDataInfo;
@@ -114,11 +116,6 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
 
     }
 
-
-    @Override
-    protected String getOrderBy() {
-        return "create_time desc";
-    }
 
     /**
      * 保存
