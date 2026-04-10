@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -32,11 +33,16 @@ public class SkuProductionQtySelector {
      * @param isAllSum             是否都一起排
      * @return
      */
-    public static SkuNeedProductionInfo getNeedProductionQty(List<MonthPlanProductionRequirePlanVo> productionPlanList, String selectedMaterialDesc, boolean isAllSum) {
+    public static SkuNeedProductionInfo getNeedProductionQty(ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> productionPlanList, String selectedMaterialDesc, boolean isAllSum) {
         if (CollectionUtils.isEmpty(productionPlanList) || StringUtils.isBlank(selectedMaterialDesc)) {
             return null;
         }
-        List<MonthPlanProductionRequirePlanVo> selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasThisRoundSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> selectedPlanList;
+        if (ContinueTypeEnum.NO_CONTINUE == continueType) {
+            selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasThisRoundSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+        } else {
+            selectedPlanList = productionPlanList.stream().filter(plan -> plan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
+        }
         if (CollectionUtils.isEmpty(selectedPlanList)) {
             return null;
         }
