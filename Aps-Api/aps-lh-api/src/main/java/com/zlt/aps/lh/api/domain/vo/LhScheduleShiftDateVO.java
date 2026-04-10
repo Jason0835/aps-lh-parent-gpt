@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.api.domain.vo;
 
+import lombok.Data;
+
 import java.io.Serializable;
 
 /**
@@ -7,6 +9,7 @@ import java.io.Serializable;
  *
  * @author APS
  */
+@Data
 public class LhScheduleShiftDateVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -16,20 +19,4 @@ public class LhScheduleShiftDateVO implements Serializable {
 
     /** 班次对应日期展示，格式 MM/dd，如 04/08 */
     private String shiftDate;
-
-    public int getShift() {
-        return shift;
-    }
-
-    public void setShift(int shift) {
-        this.shift = shift;
-    }
-
-    public String getShiftDate() {
-        return shiftDate;
-    }
-
-    public void setShiftDate(String shiftDate) {
-        this.shiftDate = shiftDate;
-    }
 }

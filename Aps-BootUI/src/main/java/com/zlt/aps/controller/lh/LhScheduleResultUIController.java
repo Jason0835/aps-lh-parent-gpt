@@ -127,7 +127,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     @ApiOperation("排程日期对象列表")
     @PostMapping("/listScheduleShiftDates")
     @ResponseBody
-    public AjaxResult listScheduleShiftDates(@RequestBody LhScheduleShiftDateQueryDTO query) {
+    public AjaxResult listScheduleShiftDates(LhScheduleShiftDateQueryDTO query) {
         if (query == null) {
             return AjaxResult.success(Collections.emptyList());
         }

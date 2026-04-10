@@ -1,6 +1,5 @@
 package com.zlt.aps.lh.service.impl;
 
-import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.DateUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -20,12 +19,11 @@ import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import org.apache.commons.lang3.StringUtils;
-
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 硫化排程主服务实现
@@ -107,18 +105,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     @Override
-    public List<LhScheduleShiftDateVO> listScheduleShiftDates(String scheduleDate) {
-        if (StringUtils.isEmpty(scheduleDate)) {
+    public List<LhScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate) {
+        if (Objects.isNull(scheduleDate)) {
             log.warn("listScheduleShiftDates: scheduleDate 为空");
             return new ArrayList<>();
         }
-        Date end;
-        try {
-            end = DateUtil.beginOfDay(DateUtil.parse(scheduleDate.trim(), DatePattern.NORM_DATE_PATTERN));
-        } catch (Exception e) {
-            log.warn("listScheduleShiftDates: 排程日期解析失败, scheduleDate={}", scheduleDate, e);
-            return new ArrayList<>();
-        }
+        Date end = DateUtil.beginOfDay(scheduleDate);
         Date start = DateUtil.offsetDay(end, -(LhScheduleConstant.SCHEDULE_DAYS - 1));
         List<LhScheduleShiftDateVO> result = new ArrayList<>(LhScheduleConstant.MAX_SHIFT_SLOT_COUNT);
         int shiftNo = 1;
