@@ -6,6 +6,7 @@ import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -77,6 +78,10 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
         }
         List<MpAdjustStructureIn> mpAdjustStructureInList = (List<MpAdjustStructureIn>) rows;
         Collections.sort(mpAdjustStructureInList, getSortComparator());
+
+        // 集合逗号分隔字段升序排序
+        CommaFieldSortUtil.sortAndUpdateCommaField(mpAdjustStructureInList, MpAdjustStructureIn::getScheduledMachines, MpAdjustStructureIn::setScheduledMachines);
+
     }
 
     protected Comparator<MpAdjustStructureIn> getSortComparator() {

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +73,9 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
         }
         List<MpAdjustResult> mpAdjustResultList = (List<MpAdjustResult>) rows;
         Collections.sort(mpAdjustResultList, getSortComparator());
+        // 集合逗号分隔字段升序排序
+        CommaFieldSortUtil.sortAndUpdateCommaField(mpAdjustResultList, MpAdjustResult::getCxMachineCode, MpAdjustResult::setCxMachineCode);
+
     }
 
     protected Comparator<MpAdjustResult> getSortComparator() {
