@@ -2651,8 +2651,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
         List<SalesOrderPool> salesOrderPoolList = dataManager.listSalesOrderPools(dataDTO);
 
-        // 排除订单优先级：暂缓订单
-        CollUtil.filter(salesOrderPoolList, pool -> !"5".equals(pool.getScmPriority()));
         contextDTO.setSalesOrderPoolList(salesOrderPoolList);
     }
 
