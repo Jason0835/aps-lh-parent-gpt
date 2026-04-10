@@ -120,7 +120,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return new ArrayList<>();
         }
         Date start = DateUtil.offsetDay(end, -(LhScheduleConstant.SCHEDULE_DAYS - 1));
-        List<LhScheduleShiftDateVO> result = new ArrayList<>(LhScheduleConstant.);
+        List<LhScheduleShiftDateVO> result = new ArrayList<>(LhScheduleConstant.MAX_SHIFT_SLOT_COUNT);
         int shiftNo = 1;
         for (int dayIndex = 0; dayIndex < LhScheduleConstant.SCHEDULE_DAYS; dayIndex++) {
             int shiftsThisDay = dayIndex == 0
