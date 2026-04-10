@@ -132,7 +132,6 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         return super.exportData(queryVO, fileName, response);
     }
 
-
     @ApiOperation(value = "生成排程", notes = "根据日期和天数生成排程")
     @PostMapping("/generate")
     public AjaxResult generateSchedule(@RequestBody ScheduleGenerateVo dto) {
@@ -140,32 +139,32 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.error("排程日期不能为空");
         }
         if (dto.getDays() == null || dto.getDays() < 1) {
-            dto.setDays(1);
+            dto.setDays(3);  // 默认排产3天
         }
-
-        List<Object> allResults = new ArrayList<>();
-        LocalDate currentDate = dto.getScheduleDate();
-
-        for (int i = 0; i < dto.getDays(); i++) {
-            ScheduleRequestVo request = new ScheduleRequestVo();
-            request.setScheduleDate(currentDate);
-            request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
-            request.setFactoryCode(dto.getFactoryCode());
-            request.setScheduleType(dto.getScheduleType());
-            request.setScheduleMode(dto.getScheduleType());
-
-            ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
-
-            if (result.isSuccess()) {
-                allResults.add(result);
-            } else {
-                return AjaxResult.error("排程失败[" + currentDate + "]: " + result.getMessage());
-            }
-
-            currentDate = currentDate.plusDays(1);
+        // 只需要调用一次executeSchedule，days参数表示排产天数
+        ScheduleRequestVo request = new ScheduleRequestVo();
+        request.setScheduleDate(dto.getScheduleDate());  // 最后一天日期
+        request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
+        request.setFactoryCode(dto.getFactoryCode());
+        request.setScheduleType(dto.getScheduleType());
+        request.setScheduleMode(dto.getScheduleType());
+        request.setDays(dto.getDays());  // 传递排产天数
+        ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
+        if (result.isSuccess()) {
+            return AjaxResult.success(result);
+        } else {
+// 校验不通过时，构建校验摘要返回前端
+            ScheduleService.ValidationSummary summary = new ScheduleService.ValidationSummary();
+            summary.setErrorCount(result.getValidationErrors() != null ? result.getValidationErrors().size() : 0);
+            summary.setWarningCount(result.getValidationWarnings() != null ? result.getValidationWarnings().size() : 0);
+            summary.setErrors(result.getValidationErrors());
+            summary.setWarnings(result.getValidationWarnings());
+            return AjaxResult.error(
+                    "排程失败[" + dto.getScheduleDate() + "]: 数据完整性校验不通过，共 "
+                            + summary.getErrorCount() + " 项错误，"
+                            + summary.getWarningCount() + " 项警告",
+                    summary);
         }
-
-        return AjaxResult.success(allResults);
     }
 
     /**
