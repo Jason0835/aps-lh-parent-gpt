@@ -405,15 +405,48 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     public abstract void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO);
 
+    /**
+     * 排序：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * @param contextDTO
+     */
     protected void sortAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
-        List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
-        if (PubUtil.isEmpty(adjustDetailList)) {
+        List<MpAdjustDetailVo> mpAdjustDetailList = contextDTO.getAdjustDetailList();
+        if (PubUtil.isEmpty(mpAdjustDetailList)) {
             return;
         }
-        Collections.sort(adjustDetailList, getSortComparator());
+        // 主花纹的最大型腔数
+        Map<String, Integer> maxMouldCavityQtyMap = new HashMap<>();
+        for (MpAdjustDetailVo adjustDetail: mpAdjustDetailList) {
+            //记录主花纹的最大型腔数
+            Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(adjustDetail.getMainPattern(), 0);
+            maxMouldCavityQtyMap.put(adjustDetail.getMainPattern(), Math.max(maxMouldCavityQty, adjustDetail.getMouldCavityQty()));
+        }
+        mpAdjustDetailList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
+            s.setMaxMouldCavityQty(maxMouldCavityQtyMap.getOrDefault(s.getMainPattern(), 0));
+        });
+
+        Collections.sort(mpAdjustDetailList, getAdjustDetailSortComparator());
     }
 
-    protected Comparator<MpAdjustDetailVo> getSortComparator() {
+    /**
+     * 排序器：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * @return
+     */
+    protected Comparator<MpAdjustDetailVo> getAdjustDetailSortComparator() {
+        // 一级排序：结构名称升序，空值排最后
+        return Comparator.comparing(MpAdjustDetailVo::getTbrProSize, Comparator.nullsLast(String::compareTo))
+                .thenComparing(MpAdjustDetailVo::getStructureName,Comparator.nullsLast(String::compareTo))
+                // 最大型腔数
+                .thenComparing(MpAdjustDetailVo::getMaxMouldCavityQty, Comparator.reverseOrder())
+                // 主花纹
+                .thenComparing(MpAdjustDetailVo::getMainPattern, Comparator.nullsLast(String::compareTo))
+                // 活块数
+                .thenComparing(MpAdjustDetailVo::getTypeBlockQty, Comparator.reverseOrder())
+                // 物料描述
+                .thenComparing(MpAdjustDetailVo::getMaterialDesc, Comparator.nullsLast(String::compareTo));
+    }
+
+   /* protected Comparator<MpAdjustDetailVo> getSortComparator() {
         // 定义施工阶段自定义排序权重：正式(03) -> 试制(01) -> 量试(02) -> 无工艺(00)，空值排最后
         Map<String, Integer> stageSortWeights = new HashMap<>();
         // 正式：权重1
@@ -448,7 +481,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                     return Math.abs(qty);
                 }, Comparator.reverseOrder());
 
-    }
+    }*/
 
     @Override
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {

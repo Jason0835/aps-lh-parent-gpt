@@ -14,9 +14,11 @@ import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.impl.MpWeekAdjustFactory;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
-import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -37,8 +39,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -108,7 +113,6 @@ public class MpWeekRollAdjustController extends BaseController {
         weekAdjustStrategy.generateAdjust(contextDTO);
         log.info("获取调整明细 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
-        // 返回结果处理
         return getDataTable(contextDTO.getAdjustDetailList());
     }
 
@@ -140,10 +144,52 @@ public class MpWeekRollAdjustController extends BaseController {
             weekAdjustStrategy.autoAdjust(contextDTO);
             log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
                     String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
+            // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+            sortAdjustResultList(contextDTO.getAdjustResultList());
             return AjaxResult.success(contextDTO.getAdjustResultList());
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
+    }
+
+    /**
+     * 排序：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * @param mpAdjustResultList
+     */
+    protected void sortAdjustResultList(List<MpAdjustResult> mpAdjustResultList) {
+        if (PubUtil.isEmpty(mpAdjustResultList)) {
+            return;
+        }
+        // 主花纹的最大型腔数
+        Map<String, Integer> maxMouldCavityQtyMap = new HashMap<>();
+        for (MpAdjustResult adjustResult: mpAdjustResultList) {
+            //记录主花纹的最大型腔数
+            Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(adjustResult.getMainPattern(), 0);
+            maxMouldCavityQtyMap.put(adjustResult.getMainPattern(), Math.max(maxMouldCavityQty, adjustResult.getMouldCavityQty()));
+        }
+        mpAdjustResultList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
+            s.setMaxMouldCavityQty(maxMouldCavityQtyMap.getOrDefault(s.getMainPattern(), 0));
+        });
+
+        Collections.sort(mpAdjustResultList, getAdjustResultSortComparator());
+    }
+
+    /**
+     * 排序器：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * @return
+     */
+    protected Comparator<MpAdjustResult> getAdjustResultSortComparator() {
+        // 一级排序：结构名称升序，空值排最后
+        return Comparator.comparing(MpAdjustResult::getTbrProSize, Comparator.nullsLast(String::compareTo))
+                .thenComparing(MpAdjustResult::getStructureName,Comparator.nullsLast(String::compareTo))
+                // 最大型腔数
+                .thenComparing(MpAdjustResult::getMaxMouldCavityQty, Comparator.reverseOrder())
+                // 主花纹
+                .thenComparing(MpAdjustResult::getMainPattern, Comparator.nullsLast(String::compareTo))
+                // 活块数
+                .thenComparing(MpAdjustResult::getTypeBlockQty, Comparator.reverseOrder())
+                // 物料描述
+                .thenComparing(MpAdjustResult::getMaterialDesc, Comparator.nullsLast(String::compareTo));
     }
 
     /**
