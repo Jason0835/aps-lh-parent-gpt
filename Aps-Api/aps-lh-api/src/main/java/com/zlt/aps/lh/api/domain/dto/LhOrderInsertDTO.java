@@ -58,6 +58,7 @@ public class LhOrderInsertDTO implements Serializable {
     @NotNull(message = "排程日期不能为空")
     private Date scheduleDate;
 
+    // ==================== 一班 ====================
     /**
      * 一班计划量
      */
@@ -88,6 +89,7 @@ public class LhOrderInsertDTO implements Serializable {
     @Excel(name = "ui.data.column.lhScheduleResult.class1Analysis")
     private String class1Analysis;
 
+    // ==================== 二班 ====================
     /**
      * 二班计划量
      */
@@ -118,6 +120,7 @@ public class LhOrderInsertDTO implements Serializable {
     @Excel(name = "ui.data.column.lhScheduleResult.class2Analysis")
     private String class2Analysis;
 
+    // ==================== 三班 ====================
     /**
      * 三班计划量
      */
@@ -148,85 +151,142 @@ public class LhOrderInsertDTO implements Serializable {
     @Excel(name = "ui.data.column.lhScheduleResult.class3Analysis")
     private String class3Analysis;
 
+    // ==================== 四班 ====================
     /**
-     * 次日一班计划量
+     * 四班计划量
      */
-    @ApiModelProperty(value = "次日一班计划量", name = "class4PlanQty")
+    @ApiModelProperty(value = "四班计划量", name = "class4PlanQty")
     private Integer class4PlanQty;
 
     /**
-     * 次日一班计划开始时间
+     * 四班计划开始时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "次日一班计划开始时间", name = "class4StartTime")
+    @ApiModelProperty(value = "四班计划开始时间", name = "class4StartTime")
     private Date class4StartTime;
 
     /**
-     * 次日一班计划结束时间
+     * 四班计划结束时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "次日一班计划结束时间", name = "class4EndTime")
+    @ApiModelProperty(value = "四班计划结束时间", name = "class4EndTime")
     private Date class4EndTime;
 
     /**
-     * 次日一班原因分析
+     * 四班原因分析
      */
-    @ApiModelProperty(value = "次日一班原因分析", name = "class4Analysis")
+    @ApiModelProperty(value = "四班原因分析", name = "class4Analysis")
     private String class4Analysis;
 
+    // ==================== 五班 ====================
     /**
-     * 次日二班计划量
+     * 五班计划量
      */
-    @ApiModelProperty(value = "次日二班计划量", name = "class5PlanQty")
+    @ApiModelProperty(value = "五班计划量", name = "class5PlanQty")
     private Integer class5PlanQty;
 
     /**
-     * 次日二班计划开始时间
+     * 五班计划开始时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "次日二班计划开始时间", name = "class5StartTime")
+    @ApiModelProperty(value = "五班计划开始时间", name = "class5StartTime")
     private Date class5StartTime;
 
     /**
-     * 次日二班计划结束时间
+     * 五班计划结束时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "次日二班计划结束时间", name = "class5EndTime")
+    @ApiModelProperty(value = "五班计划结束时间", name = "class5EndTime")
     private Date class5EndTime;
 
     /**
-     * 次日二班原因分析
+     * 五班原因分析
      */
-    @ApiModelProperty(value = "次日二班原因分析", name = "class5Analysis")
+    @ApiModelProperty(value = "五班原因分析", name = "class5Analysis")
     private String class5Analysis;
 
+    // ==================== 六班 ====================
     /**
-     * 次日三班计划量
+     * 六班计划量
      */
-    @ApiModelProperty(value = "次日三班计划量", name = "class6PlanQty")
+    @ApiModelProperty(value = "六班计划量", name = "class6PlanQty")
     private Integer class6PlanQty;
 
     /**
-     * 次日三班计划开始时间
+     * 六班计划开始时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "次日三班计划开始时间", name = "class6StartTime")
+    @ApiModelProperty(value = "六班计划开始时间", name = "class6StartTime")
     private Date class6StartTime;
 
     /**
-     * 次日三班计划结束时间
+     * 六班计划结束时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @ApiModelProperty(value = "次日三班计划结束时间", name = "class6EndTime")
+    @ApiModelProperty(value = "六班计划结束时间", name = "class6EndTime")
     private Date class6EndTime;
 
     /**
-     * 次日三班原因分析
+     * 六班原因分析
      */
-    @ApiModelProperty(value = "次日三班原因分析", name = "class6Analysis")
+    @ApiModelProperty(value = "六班原因分析", name = "class6Analysis")
     private String class6Analysis;
 
+    // ==================== 新增 七班 ====================
+    /**
+     * 七班计划量
+     */
+    @ApiModelProperty(value = "七班计划量", name = "class7PlanQty")
+    private Integer class7PlanQty;
 
+    /**
+     * 七班计划开始时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "七班计划开始时间", name = "class7StartTime")
+    private Date class7StartTime;
+
+    /**
+     * 七班计划结束时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "七班计划结束时间", name = "class7EndTime")
+    private Date class7EndTime;
+
+    /**
+     * 七班原因分析
+     */
+    @ApiModelProperty(value = "七班原因分析", name = "class7Analysis")
+    private String class7Analysis;
+
+    // ==================== 新增 八班 ====================
+    /**
+     * 八班计划量
+     */
+    @ApiModelProperty(value = "八班计划量", name = "class8PlanQty")
+    private Integer class8PlanQty;
+
+    /**
+     * 八班计划开始时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "八班计划开始时间", name = "class8StartTime")
+    private Date class8StartTime;
+
+    /**
+     * 八班计划结束时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "八班计划结束时间", name = "class8EndTime")
+    private Date class8EndTime;
+
+    /**
+     * 八班原因分析
+     */
+    @ApiModelProperty(value = "八班原因分析", name = "class8Analysis")
+    private String class8Analysis;
+
+    // ==================== 其他字段 ====================
     @ApiModelProperty(value = "是否交期")
     private String isDelivery;
 

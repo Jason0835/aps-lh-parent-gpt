@@ -17,7 +17,7 @@ public class LhScheduleResultUpdateDTO implements Serializable {
 
     private static final long serialVersionUID = -1589207140582788030L;
 
-    @ApiModelProperty(value = "id")
+    @ApiModelProperty(value = "id", name = "id")
     private Long id;
 
     @ApiModelProperty(value = "调整类型", name = "operType")
@@ -43,21 +43,33 @@ public class LhScheduleResultUpdateDTO implements Serializable {
     @ApiModelProperty(value = "三班原因分析", name = "class3Analysis")
     private String class3Analysis;
 
-    @ApiModelProperty(value = "次日一班计划量", name = "class4PlanQty")
+    @ApiModelProperty(value = "四班计划量", name = "class4PlanQty")
     private Integer class4PlanQty;
 
-    @ApiModelProperty(value = "次日一班原因分析", name = "class4Analysis")
+    @ApiModelProperty(value = "四班原因分析", name = "class4Analysis")
     private String class4Analysis;
 
-    @ApiModelProperty(value = "次日二班计划量", name = "class5PlanQty")
+    @ApiModelProperty(value = "五班计划量", name = "class5PlanQty")
     private Integer class5PlanQty;
 
-    @ApiModelProperty(value = "次日二班原因分析", name = "class5Analysis")
+    @ApiModelProperty(value = "五班原因分析", name = "class5Analysis")
     private String class5Analysis;
 
-    @ApiModelProperty(value = "次日三班计划量", name = "class6PlanQty")
+    @ApiModelProperty(value = "六班计划量", name = "class6PlanQty")
     private Integer class6PlanQty;
 
-    @ApiModelProperty(value = "次日三班原因分析", name = "class6Analysis")
+    @ApiModelProperty(value = "六班原因分析", name = "class6Analysis")
     private String class6Analysis;
+
+    @ApiModelProperty(value = "七班计划量", name = "class7PlanQty")
+    private Integer class7PlanQty;
+
+    @ApiModelProperty(value = "七班原因分析", name = "class7Analysis")
+    private String class7Analysis;
+
+    @ApiModelProperty(value = "八班计划量", name = "class8PlanQty")
+    private Integer class8PlanQty;
+
+    @ApiModelProperty(value = "八班原因分析", name = "class8Analysis")
+    private String class8Analysis;
 }
