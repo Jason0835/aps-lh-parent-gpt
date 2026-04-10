@@ -102,8 +102,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+      },
+      query: {
+        factoryCode: "116",
+      },
     };
   },
   computed: {
@@ -155,17 +159,10 @@ export default {
           },
         },
         {
-          prop: "createByName",
+          prop: "updateTime",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.createBy"),
-          minWidth: 120,
-        },
-        {
-          prop: "createTime",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.createTime"),
+          label: this.$t("ui.data.column.updateTime"),
           minWidth: 160,
         },
         {
@@ -207,6 +204,7 @@ export default {
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
+          filterable: true,
         },
         {
           label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
@@ -227,6 +225,7 @@ export default {
           prop: "jobType",
           type: "select",
           dictData: this.dict.type.JOB_TYPE,
+          filterable: true,
         },
       ];
     },
@@ -311,6 +310,9 @@ export default {
     },
   },
   activated() {
+    this.search = {
+      factoryCode: "116",
+    };
     this.getList();
   },
 };

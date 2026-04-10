@@ -32,24 +32,22 @@
 import {
   editLhSpecifyMachine,
   getLhMachineList,
-  getMaterialList,
 } from "@/api/lh/lhSpecifyMachine";
 
 import infoForm from "@/views/components/infoForm.vue";
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
       loading: false,
       machineLoading: false,
-      materialLoading: false,
       visible: false,
       isEdit: false,
       form: {},
       machineOptions: [],
-      materialOptions: [],
       rules: {
         factoryCode: [
           {
@@ -86,21 +84,19 @@ export default {
           label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
         },
         {
           prop: "specCode",
           label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
-          type: "select",
-          dictData: this.materialOptions,
-          props: {
-            label: "materialCode",
-            value: "materialCode",
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.specCode}
+                v-model={form.specCode}
+              />
+            );
           },
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteMaterialMethod,
-          loading: this.materialLoading,
-          onFocus: this.handleMaterialFocus,
         },
         {
           prop: "machineCode",
@@ -122,6 +118,7 @@ export default {
           label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
           type: "select",
           dictData: this.parentDict.type.JOB_TYPE,
+          filterable: true,
         },
         {
           prop: "remark",
@@ -167,25 +164,6 @@ export default {
         this.remoteMachineMethod("");
       }
     },
-    async remoteMaterialMethod(query) {
-      this.materialLoading = true;
-      try {
-        const res = await getMaterialList({
-          materialCode: query || "",
-          pageSize: 10,
-        });
-        this.materialOptions = res.data || res || [];
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.materialLoading = false;
-      }
-    },
-    handleMaterialFocus() {
-      if (this.materialOptions.length === 0) {
-        this.remoteMaterialMethod("");
-      }
-    },
     show(data) {
       this.visible = true;
       if (data) {
@@ -199,23 +177,16 @@ export default {
             },
           ];
         }
-        if (data.specCode) {
-          this.materialOptions = [
-            {
-              materialCode: data.specCode,
-            },
-          ];
-        }
       } else {
-        this.form = {};
+        this.form = {
+          factoryCode: "116",
+        };
         this.machineOptions = [];
-        this.materialOptions = [];
       }
     },
     hide() {
       this.form = {};
       this.machineOptions = [];
-      this.materialOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
