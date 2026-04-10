@@ -66,7 +66,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.column.lh.scheduleResult.modelName");
+      return this.$t("转机台");
     },
   },
   methods: {

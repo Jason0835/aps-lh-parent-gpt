@@ -87,6 +87,12 @@ export default {
     },
     columns: function () {
       return [
+      {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
@@ -94,12 +100,7 @@ export default {
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
-        {
-          label: this.$t("工厂"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.parentDict.type.biz_factory_name,
-        },
+
       ];
     },
   },

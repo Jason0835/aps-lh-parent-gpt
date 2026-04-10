@@ -73,12 +73,12 @@ export function lhValidateAutoPlan(query) {
  */
 export function autoPlan(query) {
   return request({
-    url: '/lh/lhScheduleResult/autoLhScheduleResult',
+    url: '/lh/lhScheduleResult​/execute',
     method: 'post',
     data: query,
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    },
+    // headers: {
+    //   'Content-Type': 'application/json;charset=UTF-8'
+    // },
   })
 }
 /**
@@ -91,9 +91,9 @@ export function insertOrder(query) {
     url: '/lh/lhScheduleResult/insertOrder',
     method: 'post',
     data: query,
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    },
+    // headers: {
+    //   'Content-Type': 'application/json;charset=UTF-8'
+    // },
   })
 }
 
@@ -269,5 +269,19 @@ export function getScheduleMachineInfo(query) {
     headers: {
       'Content-Type': 'application/json;charset=UTF-8'
     },
+  })
+}
+
+
+/**
+ * 获取日期
+ * @param {*} query
+ * @returns
+ */
+export function getScheduleDate(query) {
+  return request({
+    url: '/lh/lhScheduleResult/listScheduleShiftDates',
+    method: 'post',
+    data: query
   })
 }

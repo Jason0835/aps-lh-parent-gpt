@@ -27,12 +27,12 @@
           @click="handleAutoPlan"
           >{{ $t("自动排产") }}</el-button
         >
-         <el-button
+        <!-- <el-button
           v-hasPermi="['lh:lhScheduleResult:autoLhScheduleResult']"
           type="warning"
           @click="handleAutoPlan"
           >{{ $t("生成模具交替计划") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['lh:lhScheduleResult:insertOrder']"
           type="warning"
@@ -60,21 +60,26 @@
         <el-button
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
+          @click="handleChangeMachine"
+           :disabled="selection.length == 0"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
         <el-button
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
+          @click="handleChangePlan"
+          :disabled="selection.length == 0"
           >{{ $t("调量") }}</el-button
         >
-        <el-button
+        <!-- <el-button
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
           >{{ $t("文字示方调整") }}</el-button
-        >
+        > -->
         <el-button
-          v-hasPermi="['lh:lhScheduleResult:adjustQuantity']"
           type="primary"
+          :disabled="selection.length === 0"
+          @click="handlePublish"
           >{{ $t("排产发布") }}</el-button
         >
         <el-button
@@ -154,13 +159,13 @@
       :columns="importColumns"
       :rules="importRules"
     />
-    <!-- <tlt-upload
-      ref="tltUploadComplete"
+    <tlt-upload
+      ref="tltUpload"
       title="导入完成量"
-      downloadUrl="/lh/lhScheduleResult/importFinishQtyTemplate"
-      uploadUrl="/lh/lhScheduleResult/importFinishQty"
+      downloadUrl="/lh/lhScheduleResult/importTemplate"
+      uploadUrl="/lh/lhScheduleResult/importData"
       @uploadSuccess="getList"
-    /> -->
+    />
     <AddDialog ref="addDialogRef" @success="handelSuccess" />
     <InfoDialog ref="infoDialogRef" @success="handelSuccess" />
     <AutoPlanDialog ref="autoPlanDialogRef" @success="handleAutoPlanSuccess" />
@@ -170,6 +175,8 @@
     />
     <ChangeReleaseStatusDialog ref="changeReleaseStatusDialogRef" />
     <el-button style="display: none" ref="hidePopoverBtnRef"></el-button>
+    <changePlanDialog ref="changePlanRef" @success="getList" />
+
   </basic-container>
 </template>
 <script>
@@ -183,31 +190,34 @@ import {
   exportScheduleResult,
   publishScheduleResult,
   exportCombine,
+  getScheduleDate,
 } from "@/api/lh/scheduleResult";
 
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
-// import TltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 import AddDialog from "./components/addDialog.vue";
 import TPopover from "@/views/components/tPopover.vue";
 import AutoPlanDialog from "./components/autoPlanDialog.vue";
 import ChangeMachineDialog from "./components/changeMachineDialog.vue";
 import ChangeReleaseStatusDialog from "./components/changeReleaseStatusDialog.vue";
+import changePlanDialog from "./components/changePlanDialog.vue";
+
 export default {
   name: "CuringSchedule",
   components: {
     AutoPlanDialog,
     InfoDialog,
     TltUploadForm,
-    // TltUpload,
+    TltUpload,
     AddDialog,
     TPopover,
     ChangeMachineDialog,
     ChangeReleaseStatusDialog,
+    changePlanDialog
   },
   dicts: [
-    // "sys_yes_no",
-    // "MOLD_CHANGE_TYPE",
+
     "adjust_type",
     "IS_RELEASE",
     "biz_factory_name",
@@ -259,6 +269,40 @@ export default {
         scheduleDate: defaultDate,
       },
       selection: [],
+      dateList:[
+      {
+            "shift": 1,
+            "shiftDate": ""
+        },
+        {
+            "shift": 2,
+            "shiftDate": ""
+        },
+        {
+            "shift": 3,
+            "shiftDate": ""
+        },
+        {
+            "shift": 4,
+            "shiftDate": ""
+        },
+        {
+            "shift": 5,
+            "shiftDate": ""
+        },
+        {
+            "shift": 6,
+            "shiftDate": ""
+        },
+        {
+            "shift": 7,
+            "shiftDate": ""
+        },
+        {
+            "shift": 8,
+            "shiftDate": ""
+        }
+      ]
     };
   },
   computed: {
@@ -266,291 +310,334 @@ export default {
       curingMachines: (state) => state.curing.machines,
     }),
     columns() {
-      // var year = this.query.scheduleDate.split("-")[0];
-      // var month = this.query.scheduleDate.split("-")[1];
-      // var day = this.query.scheduleDate.split("-")[2];
-      // let textDate;
-      // if (this.$i18n.locale === "zh") {
-      //   textDate = month + "月" + day + "日";
-      // } else {
-      //   textDate = year + "-" + month + "-" + day;
-      //   let chinaDateArray = new Date(
-      //     this.query.scheduleDate.replace(/-/g, "/")
-      //   )
-      //     .toDateString()
-      //     .split(" ");
-      //   textDate = `${chinaDateArray[1]} ${chinaDateArray[2]}`;
-      // }
-      // let firstTitle = this.$t("ui.data.column.scheduleResult.lh.baseInfo", [
-      //   textDate,
-      //   0,
-      //   0,
-      //   0,
-      //   0,
-      // ]);
-      // if (this.data.length > 0) {
-      //   var class1PlanQty = 0;
-      //   var class2PlanQty = 0;
-      //   var class3PlanQty = 0;
-      //   var class4PlanQty = 0;
-      //   var class5PlanQty = 0;
-      //   for (let i = 0; i < this.data.length; i++) {
-      //     class1PlanQty = class1PlanQty + Number(this.data[i]["class1PlanQty"]);
-      //     class2PlanQty = class2PlanQty + Number(this.data[i]["class2PlanQty"]);
-      //     class3PlanQty = class3PlanQty + Number(this.data[i]["class3PlanQty"]);
-      //   }
-      //   var totalPlan = class1PlanQty + class2PlanQty + class3PlanQty;
-      //   firstTitle = this.$t("ui.data.column.scheduleResult.firstTitle", [
-      //     textDate,
-      //     class1PlanQty,
-      //     class2PlanQty,
-      //     class3PlanQty,
-      //     totalPlan,
-      //   ]);
-      // }
       let columns = [
         { type: "selection", fixed: "left" },
-        // { type: "index", fixed: "left" },
+
+        {
+          label: this.$t("硫化机台"),
+          prop: "lhMachineCode",
+        },
+        {
+          label: this.$t("物料编码"),
+          prop: "materialCode",
+        },
+        {
+          label: this.$t("物料描述"),
+          prop: "materialDesc",
+        },
+        {
+          label: this.$t("胎胚描述"),
+          prop: "mainMaterialDesc",
+        },
+
+        {
+          label: this.$t("合计余量"),
+          prop: "mouldSurplusQty",
+        },
+        {
+          label: this.$t("胎胚库存"),
+          prop: "embryoStock",
+        },
+        {
+          label: this.$t("硫化班产"),
+          prop: "mouldSurplusQty",
+        },
         // {
-        //   label: this.$t("common.option"),
-        //   prop: "option",
-        //   width: "100px",
-        //   fixed: "left",
-        //   render: ({ row }) => {
-        //     return (
-        //       <div>
-        //         <text-button
-        //           onClick={() => {
-        //             this.handleEdit(row);
-        //           }}
-        //         >
-        //           {this.$t("common.button.modify")}
-        //         </text-button>
-        //       </div>
-        //     );
-        //   },
+        //   label: this.$t("ui.data.column.scheduleResult.baseInfo"),
+        //   visible: true,
+        //   children: [
+        //     {
+        //       label: this.$t("ui.data.column.scheduleResult.isRelease"),
+        //       prop: "isRelease",
+        //       minWidth: 100,
+        //       formatter: (row, column, value, index) => {
+        //         return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
+        //       },
+        //     },
+        //     {
+        //       label: this.$t("批次号"),
+        //       prop: "orderNo",
+        //       width: 160,
+        //     },
+        //     {
+        //       label: this.$t("工单号"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("工厂"),
+        //       prop: "factoryCode",
+        //     },
+
+        //     {
+        //       label: this.$t("月度计划"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("成型产量"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("月计划剩余量"),
+        //       prop: "factoryCode",
+        //     },
+
+        //     {
+        //       label: this.$t("胎胚库存"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("单班硫化量"),
+        //       prop: "factoryCode",
+        //     },
+        //   ],
         // },
         {
-          // label: firstTitle,
-          label: "基本数据",
+          label: this.$t("早班")+this.dateList[0].shiftDate,
           children: [
             {
-              label: this.$t("ui.data.column.scheduleResult.isRelease"),
-              prop: "isRelease",
-              minWidth: 100,
-              //  sortable: "custom",
-              formatter: (row, column, value, index) => {
-                return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
-              },
-            },
-              {
-              label: this.$t("物料编码"),
-              prop: "orderNo",
-              minWidth: 160,
-            },
-              {
-              label: this.$t("物料描述"),
-              prop: "orderNo",
-              minWidth: 160,
-            },
-              {
-              label: this.$t("胎胚描述"),
-              prop: "orderNo",
-              minWidth: 160,
-            },
-              {
-              label: this.$t("硫化机台"),
-              prop: "orderNo",
-              minWidth: 160,
-            },
-              {
-              label: this.$t("左右模"),
-              prop: "orderNo",
-              minWidth: 160,
+              prop: "class1Sort",
+              label: this.$t("顺序"),
             },
             {
-              label: this.$t("硫化时间"),
-              prop: "lhMachineCode",
-              minWidth: 100,
+              prop: "class1PlanQty",
+              label: this.$t("计划"),
             },
             {
-              label: this.$t("硫化班产"),
-              prop: "leftRightMold",
-              minWidth: 100
+              prop: "class1FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class1Analysis",
+              label: this.$t("备注"),
             },
             {
-              label: this.$t("硫化余量"),
-              prop: "orderNo",
-              minWidth: 160,
-            },
-            {
-              label: this.$t("胎胚库存"),
-              prop: "productCode",
-              minWidth: 100
+              prop: "class1RecipeType",
+              label: this.$t("示方类型"),
             },
           ],
         },
         {
-          label: this.$t("T日"),
+          label: this.$t("中班")+this.dateList[1].shiftDate,
           children: [
             {
-              label: this.$t("早班计划量"),
-              prop: "specCode",
-              minWidth: 100,
+              prop: "class2Sort",
+              label: this.$t("顺序"),
             },
             {
-              label: this.$t("早班完成量"),
-              prop: "embryoCode",
-              minWidth: 100
+              prop: "class2PlanQty",
+              label: this.$t("计划"),
             },
             {
-              label: this.$t("早班原因分析"),
-              prop: "embryoStock",
-              minWidth: 100
+              prop: "class2FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class2Analysis",
+              label: this.$t("备注"),
             },
             {
-              label: this.$t("中班计划量"),
-              prop: "specDesc",
-              minWidth: 100
-            },
-            {
-              label: this.$t("中班完成量"),
-              prop: "specDesc",
-              minWidth: 100
-            },
-            {
-              label: this.$t("中班原因分析"),
-              prop: "lhTime",
-              minWidth: 100,
+              prop: "class2RecipeType",
+              label: this.$t("示方类型"),
             },
           ],
         },
         {
-          label: this.$t("T+1日"),
+          label: this.$t("晚班")+this.dateList[2].shiftDate,
           children: [
-             {
-              label: this.$t("夜班计划量"),
-              prop: "singleMoldShiftLhQty",
-              minWidth: 100,
+            {
+              prop: "class3Sort",
+              label: this.$t("顺序"),
             },
             {
-              label: this.$t("夜班完成量"),
-              prop: "singleMoldShiftLhQty",
-              minWidth: 100,
+              prop: "class3PlanQty",
+              label: this.$t("计划"),
             },
             {
-              label: this.$t("夜班原因分析"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
+              prop: "class3FinishQty",
+              label: this.$t("实际"),
             },
-
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
             {
-              label: this.$t("早班计划量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("早班完成量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
+              prop: "class3Analysis",
+              label: this.$t("备注"),
             },
             {
-              label: this.$t("早班原因分析"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
+              prop: "class3RecipeType",
+              label: this.$t("示方类型"),
             },
-
-             {
-              label: this.$t("中班计划量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("中班完成量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("中班原因分析"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            }
           ],
         },
         {
-          label: this.$t("T+2日"),
+          label: this.$t("早班")+this.dateList[3].shiftDate,
           children: [
-
             {
-              label: this.$t("夜班计划量"),
-              prop: "singleMoldShiftLhQty",
-              minWidth: 100,
+              prop: "class4Sort",
+              label: this.$t("顺序"),
             },
             {
-              label: this.$t("夜班完成量"),
-              prop: "singleMoldShiftLhQty",
-              minWidth: 100,
+              prop: "class4PlanQty",
+              label: this.$t("计划"),
             },
             {
-              label: this.$t("夜班原因分析"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
+              prop: "class4FinishQty",
+              label: this.$t("实际"),
             },
-
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
             {
-              label: this.$t("早班计划量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("早班完成量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
+              prop: "class4Analysis",
+              label: this.$t("备注"),
             },
             {
-              label: this.$t("早班原因分析"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
+              prop: "class4RecipeType",
+              label: this.$t("示方类型"),
             },
-
-             {
-              label: this.$t("中班计划量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("中班完成量"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("中班原因分析"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("批次号"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("工单号"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-            {
-              label: this.$t("工厂"),
-              prop: "dailyPlanQty",
-              minWidth: 100,
-            },
-
           ],
-        }
+        },
+        {
+          label: this.$t("中班")+this.dateList[4].shiftDate,
+          children: [
+            {
+              prop: "class5Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class5PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class5FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class5Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class5RecipeType",
+              label: this.$t("示方类型"),
+            },
+          ],
+        },
+        {
+          label: this.$t("晚班")+this.dateList[5].shiftDate,
+          children: [
+            {
+              prop: "class6Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class6PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class6FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class6Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class6RecipeType",
+              label: this.$t("示方类型"),
+            },
+          ],
+        },
+        {
+          label: this.$t("早班")+this.dateList[6].shiftDate,
+          children: [
+            {
+              prop: "class7Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class7PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class7FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class7Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class7RecipeType",
+              label: this.$t("示方类型"),
+            },
+          ],
+        },
+        {
+          label: this.$t("中班")+this.dateList[7].shiftDate,
+          children: [
+            {
+              prop: "class8Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class8PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class8FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class8Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class8RecipeType",
+              label: this.$t("示方类型"),
+            },
+          ],
+        },
+        {
+          prop: "remark",
+          label: this.$t("备注"),
+        },
       ];
       return columns;
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
           prop: "isRelease",
@@ -583,11 +670,27 @@ export default {
           labelKey: "machineCode",
           valueKey: "machineCode",
           filterable: true,
-        }
+        },
       ];
     },
   },
   methods: {
+      // 调量
+      handleChangePlan() {
+      if (this.$refs.changePlanRef) {
+        let row = this.selection[0];
+        this.$refs.changePlanRef.show(row);
+      }
+    },
+    async getDate() {
+      try {
+        let res=await getScheduleDate({
+          scheduleDate: this.query.scheduleDate,
+        });
+        console.log(res);
+        this.dateList=res
+      } catch (error) {}
+    },
     handleAutoPlan() {
       if (this.$refs.autoPlanDialogRef) {
         this.$refs.autoPlanDialogRef.show();
@@ -608,8 +711,9 @@ export default {
         this.$refs.infoDialogRef.show(row);
       }
     },
-    handleChangeMachine(row) {
+    handleChangeMachine() {
       if (this.$refs.changeMachineDialogRef) {
+        let row = this.selection[0];
         this.$refs.changeMachineDialogRef.show(row);
       }
     },
@@ -864,10 +968,17 @@ export default {
         console.error(error);
       } finally {
         this.loading = false;
+        this.getDate()
       }
     },
   },
   created() {
+    //设置默认排程时间
+    let date = moment().add(2, "days").format("YYYY-MM-DD");
+
+    // date = "2023-06-01"; //test
+    this.query.scheduleDate = date;
+    this.search.scheduleDate = date;
     this.$store.dispatch("curing/getMachineList");
   },
   activated() {

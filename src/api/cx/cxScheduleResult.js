@@ -89,11 +89,19 @@ export function validateAdd(query) {
 
 export function cxScheduleResultEdit(query) {
   return request({
-    url: '/cx/cxScheduleResult/insertOrder',
+    url: '/cx/cxScheduleResult/save',
     method: 'post',
     data: query
   })
 }
+export function insertOrder(query) {
+  return request({
+    url: '/cx/cxScheduleResult/adjustQty',
+    method: 'post',
+    data: query
+  })
+}
+
 
 
 

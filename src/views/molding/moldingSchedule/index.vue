@@ -253,15 +253,15 @@ export default {
         },
         {
           label: this.$t("物料编码"),
-          prop: "sapCode",
+          prop: "materialCode",
         },
         {
           label: this.$t("物料描述"),
-          prop: "specDesc",
+          prop: "materialDesc",
         },
         {
           label: this.$t("胎胚描述"),
-          prop: "embryoCodeDesc",
+          prop: "mainMaterialDesc",
         },
         {
           label: this.$t("合计成型余量"),
