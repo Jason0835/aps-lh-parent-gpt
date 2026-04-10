@@ -23,9 +23,9 @@ public class LhSpecifyMachine  extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.result.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
-     /** 规格代码 */
+     /** 物料编码 */
     @Excel(name = "ui.data.column.lhSpecifyMachine.specCode")
-    @ApiModelProperty(value = "规格代码", name = "specCode")
+    @ApiModelProperty(value = "物料编码", name = "specCode")
     @TableField(value = "SPEC_CODE")
     private String specCode;
 
