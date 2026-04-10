@@ -53,6 +53,9 @@
         PackageNum AS PACKAGE_NUM,
         MATERIAL_NAME AS MATERIAL_NAME,
         UNIT AS UNIT,
+        STOCK_NUM AS totalStock,
+        PackageNum1 AS warehouseStock,
+        PackageNum2 AS workshopStock,
         -- DATA_VERSION,
         -- COMPANY_CODE,
         '116' AS FACTORY_CODE

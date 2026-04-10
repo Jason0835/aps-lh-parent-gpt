@@ -108,7 +108,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
     private BigDecimal packageNum;
 
     /**
-     * 原材料仓库数
+     * 原材料仓库数：钢丝库：是指原材料库（钢丝专门有个钢丝库）---陈经理确认
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.warehouseStock")
     @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
@@ -126,7 +126,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
     private Integer midStock;
 
     /**
-     * 车间库库存数
+     * 车间库库存数：原材料中间库：是指车间库---陈经理确认
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.workshopStock")
     @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
@@ -135,7 +135,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
     private Integer workshopStock;
 
     /**
-     * 总库存
+     * 总库存：总库房：是指汇总库存---陈经理确认
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.totalStock")
     @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
