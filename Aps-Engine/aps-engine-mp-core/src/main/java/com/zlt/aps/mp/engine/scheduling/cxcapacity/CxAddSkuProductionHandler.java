@@ -67,9 +67,9 @@ public class CxAddSkuProductionHandler {
         }
         Map<String, ProductionPlanGroupInfo> allGroupPlanMap = productionContext.getGroupProductionInfo();
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        //3.1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+        //1 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
         setRemainLhMachineCount(context, allGroupPlanMap, structureName);
-        //3.2 初始日产能限制信息，用于统计使用
+        //2 初始日产能限制信息，用于统计使用
         groupPlanInfo.initMpDailyCapacityLimit(context);
         //在机结构-在产机台新增Sku排产 首先设置可排产的计划在本轮次可进行排产
         groupPlanInfo.setThisRoundCanProduction();
@@ -77,8 +77,10 @@ public class CxAddSkuProductionHandler {
         productionAddSkuByContinueCxMachine(context, productionStage, groupPlanInfo, new HashSet<>());
         //再次设置可排产的计划在本轮次可进行排产
         groupPlanInfo.setThisRoundCanProduction();
+        //4 重新计算统计产能
+        groupPlanInfo.reCalcMpDailyCapacityLimit(context);
         //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
-        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo);
+        groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo, continueCxMachineAllocation);
 
         //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
 //        markTimeExtensionCxMachine(context, continueCxMachineAllocation);

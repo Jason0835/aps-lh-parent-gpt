@@ -50,10 +50,11 @@ public class GroupPlanBeforeConclusionHandler {
      * 处理结构提前收尾
      * 实单排产量的硫化机台数低于最低硫化配比的硫化机台数，则进行提前收尾
      *
-     * @param context       排产上下文
-     * @param groupPlanInfo 排产分组计划
+     * @param context                     排产上下文
+     * @param groupPlanInfo               排产分组计划
+     * @param continueCxMachineAllocation 在机结构机台分配情况
      */
-    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+    public void handlerBeforeConclusion(Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
         //20260211 需要拉量的特殊结构，不能进行提前收尾处理
         if (!groupPlanInfo.isHasBeforeConclusionHandler()) {
             return;

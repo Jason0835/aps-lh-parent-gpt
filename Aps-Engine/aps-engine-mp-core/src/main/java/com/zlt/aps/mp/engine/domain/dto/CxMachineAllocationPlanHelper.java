@@ -45,6 +45,11 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     private Integer endDay;
 
     /**
+     * 20260410+ 释放优先级：值越小，越晚释放
+     * 场景：只在同分组分配不同机台使用
+     */
+    private Integer releasePriority;
+    /**
      * 续作规格信息
      */
     private Map<String, CxContinueSkuInfoHelper> continueSkuMap;
@@ -279,6 +284,15 @@ public class CxMachineAllocationPlanHelper implements Serializable {
             return BigDecimal.ZERO.intValue();
         }
         return productionPlanInfo.getDayMinCapacityByLhRatio(maxRatio);
+    }
+
+    /**
+     * 设置释放优先级
+     *
+     * @param releasePriority
+     */
+    public void setReleasePriority(int releasePriority) {
+        this.releasePriority = releasePriority;
     }
 
 }

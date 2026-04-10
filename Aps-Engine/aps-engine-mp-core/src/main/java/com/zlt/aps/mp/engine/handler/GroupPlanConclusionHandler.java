@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -72,11 +73,8 @@ public class GroupPlanConclusionHandler {
             GroupPlanConclusionLogRecorder.addNoLhRatioInfoLog(context, groupName);
             return null;
         }
-        //转化成模具数
-        Integer minMouldNumber = minLhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        //获取使用模具数低于minMouldNumber的天数数据
-        List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = dayLimitList.stream().filter(singleDay -> singleDay.isLowMinMouldNumber(minMouldNumber)).collect(Collectors.toList());
+        //获取使用硫化机台数低于实单要求的最低硫化机台数天数集合
+        List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = getForcedConclusionDayInfo(groupPlanInfo, dayProductionLimitInfo);
         if (CollectionUtils.isEmpty(lowMinMouldNumberList)) {
             //记录日志
             GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
@@ -188,8 +186,8 @@ public class GroupPlanConclusionHandler {
         Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
         allCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
-            if(null == cxMachineInfo){
-                return ;
+            if (null == cxMachineInfo) {
+                return;
             }
             MonthPlanStructureLhRatioVo findLhRatio = groupPlanInfo.getLhRatio(cxMachineInfo);
             if (null == findLhRatio) {
@@ -212,5 +210,84 @@ public class GroupPlanConclusionHandler {
         Collections.sort(selectedCxMachineList);
         String selectedCxMachineCode = selectedCxMachineList.get(BigDecimal.ZERO.intValue());
         return allCxMachineInfo.get(selectedCxMachineCode);
+    }
+
+    /**
+     * 从分组计划分配的成型机台中，获取提前收尾，配比大的机台
+     * 场景：在机机构在产机台的排产，故而此时机台都是只有一个结构分配
+     *
+     * @param context        排产上下文
+     * @param groupPlanInfo  分组
+     * @param allocationList 机台分配信息
+     * @return
+     */
+    public CxMachineBaseInfoVo getConclusionCxMachine(Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> allocationList) {
+        if (null == groupPlanInfo || CollectionUtils.isEmpty(allocationList)) {
+            return null;
+        }
+        List<CxMachineAllocationPlanHelper> realAllocationList = allocationList.stream().filter(singleAllocation -> groupPlanInfo.equals(singleAllocation.getProductionPlanInfo())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(realAllocationList)) {
+            return null;
+        }
+        Set<String> allCxMachineCodeSet = groupPlanInfo.getAllocationCxMachineCodeSet();
+        if (CollectionUtils.isEmpty(allCxMachineCodeSet)) {
+            return null;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        realAllocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getReleasePriority, Comparator.reverseOrder()));
+        String selectedCxMachineCode = realAllocationList.get(BigDecimal.ZERO.intValue()).getCxMachineCode();
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(selectedCxMachineCode);
+        if (null == cxMachineInfo) {
+            return null;
+        }
+        MonthPlanStructureLhRatioVo findLhRatio = groupPlanInfo.getLhRatio(cxMachineInfo);
+        if (null == findLhRatio) {
+            return null;
+        }
+        return cxMachineInfo;
+    }
+
+    /**
+     * 获取需要强制收尾的日排产信息
+     * 实单排产硫化机台数低于要求的最低硫化机台数
+     *
+     * @param groupPlanInfo          分组信息
+     * @param dayProductionLimitInfo 日排产信息集合
+     * @return
+     */
+    private List<GroupPlanCxLhCapacityLimitHelper> getForcedConclusionDayInfo(ProductionPlanGroupInfo groupPlanInfo, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo) {
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        //获取使用硫化机台数低于dayMinLhMachineCount的天数数据
+        List<GroupPlanCxLhCapacityLimitHelper> lowMinLhMachineList = dayLimitList.stream().filter(singleDay -> {
+            Integer day = singleDay.getDay();
+            MpDailyCapacityLimitVo dailyCapacityLimit = groupPlanInfo.getDailyCapacityLimitVoMap().get(day);
+            Integer usedLhMachineCount = null == dailyCapacityLimit ? BigDecimal.ZERO.intValue() : Optional.ofNullable(dailyCapacityLimit.getUsedLhMachines()).orElse(BigDecimal.ZERO.intValue());
+            return singleDay.isLowMinLhMachines(usedLhMachineCount);
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(lowMinLhMachineList)) {
+            return Collections.emptyList();
+        }
+        return lowMinLhMachineList;
+    }
+
+    /**
+     * 获取需要强制收尾的日排产信息
+     * 实单排产硫化机台数低于要求的minLhMachineCount最低硫化机台数
+     *
+     * @param minLhMachineCount      最低硫化配比
+     * @param dayProductionLimitInfo 日排产信息集合
+     * @return
+     */
+    private List<GroupPlanCxLhCapacityLimitHelper> getForcedConclusionDayInfo(Integer minLhMachineCount, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo) {
+        //转化成模具数
+        Integer minMouldNumber = minLhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
+        //获取使用模具数低于minMouldNumber的天数数据
+        List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = dayLimitList.stream().filter(singleDay -> singleDay.isLowMinMouldNumber(minMouldNumber)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(lowMinMouldNumberList)) {
+            return Collections.emptyList();
+        }
+        return lowMinMouldNumberList;
     }
 }
