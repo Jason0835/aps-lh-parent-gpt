@@ -45,6 +45,7 @@
             EMBRYO_CODE MES_MATERIAL_CODE,
             EMBRYO_CODE CONSTRUCTION_CODE,
             EMBRYO_CODE SPEC_CODE, -- 2026-1-23 水根说这个字段用物料号
+            EMBRYO_DESC EMBRYO_DESC,
             PATTERN,
             SPEC SPECIFICATIONS,
             FORMING_METHOD MOULD_METHOD,
