@@ -6,6 +6,7 @@ import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
@@ -29,15 +30,22 @@ public class SkuPrioritySelector {
      * 挑选最高优先级的Sku
      * 需要对比进入高优先级Top列表的Sku，
      * 再对比产能覆盖情况
+     * 场景：在机结构在产机台
+     * 1、同规格同花纹->同模具
+     * 2、新增Sku
      *
+     * @param context         排产上下文
      * @param productionStage 排产阶段
+     * @param groupPlanInfo   分组计划
+     * @param lhGroup         收尾硫化组
+     * @param continueType    类型(续作同规格同花纹、同模具)
      * @param allSkuList      可选择Sku计划
      * @param excludeSkuSet   需要剔除的Sku信息
      * @param startDay        开始排产日
      * @param endDay          结束排产日
      * @return
      */
-    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
         List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
@@ -63,7 +71,7 @@ public class SkuPrioritySelector {
         Integer maxLhDays = getLhMaxDays(context, startDay, endDay);
         List<ProductionSkuPriorityVo> selectedSkuPriorityList = new ArrayList<>();
         selectedList.forEach(singlePriority -> {
-            ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, singlePriority, groupPlanInfo, allSkuList, lhGroup, maxLhDays, startDay, endDay);
+            ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, singlePriority, groupPlanInfo, continueType, allSkuList, lhGroup, maxLhDays, startDay, endDay);
             if (null == priority) {
                 return;
             }
@@ -85,7 +93,7 @@ public class SkuPrioritySelector {
 
     /**
      * 20260408+
-     * 只使用在模拟排产阶段
+     * 只使用在模拟排产阶段-新增Sku
      * 挑选最高优先级的Sku
      * 需要对比进入高优先级Top列表的Sku，
      * 再对比产能覆盖情况
@@ -237,8 +245,23 @@ public class SkuPrioritySelector {
             return skuPriorityList;
         }
         //排序：供应链优先 -> 先高优先级(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先) -> 再其他(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先)
-        skuPriorityList.sort(Comparator.comparing(SkuPriorityInfo::isHasSupplyChainPriority, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::isHasHeightPriority, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::isHasMoldCapacityLimit, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::getInventorySaleRatio).thenComparing(SkuPriorityInfo::isLessMinQty, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::getTotalNetRequirement, Comparator.reverseOrder()));
-        return skuPriorityList.subList(BigDecimal.ZERO.intValue(), maxCount);
+        List<SkuPriorityInfo> highestList = new ArrayList<>();
+        for (int count = BigDecimal.ONE.intValue(); count <= maxCount; ) {
+            Set<String> foundSet = CollectionUtils.isEmpty(highestList) ? Collections.emptySet() : highestList.stream().map(SkuPriorityInfo::getSku).collect(Collectors.toSet());
+            List<SkuPriorityInfo> matchList = skuPriorityList.stream().filter(singlePriority -> !foundSet.contains(singlePriority.getSku())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(matchList)) {
+                break;
+            }
+            SkuPriorityInfo highestPriority = getHighestPrioritySku(matchList);
+            if (null != highestPriority) {
+                highestList.add(highestPriority);
+                count = count + BigDecimal.ONE.intValue();
+            }
+        }
+        return highestList;
+//            //排序：供应链优先 -> 先高优先级(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先) -> 再其他(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先)
+//            skuPriorityList.sort(Comparator.comparing(SkuPriorityInfo::isHasSupplyChainPriority, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::isHasHeightPriority, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::isHasMoldCapacityLimit, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::getInventorySaleRatio).thenComparing(SkuPriorityInfo::isLessMinQty, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::getTotalNetRequirement, Comparator.reverseOrder()));
+//        return skuPriorityList.subList(BigDecimal.ZERO.intValue(), maxCount);
     }
 
     /**
@@ -262,11 +285,28 @@ public class SkuPrioritySelector {
     }
 
     /**
+     * 取得优先级最高的一个
+     *
+     * @param findList 需要查找的Sku集合
+     * @return
+     */
+    private static SkuPriorityInfo getHighestPrioritySku(List<SkuPriorityInfo> findList) {
+        //执行嵌套优先级筛选
+        List<SkuPriorityInfo> resultList = applyNestedPriorityFilters(findList);
+        if (!CollectionUtils.isEmpty(resultList) && resultList.size() > BigDecimal.ONE.intValue()) {
+            //如果还有多个SKU，按照净需求降序排序取第一个
+            resultList.sort(Comparator.comparing(SkuPriorityInfo::getTotalNetRequirement, Comparator.reverseOrder()));
+        }
+        return resultList.get(BigDecimal.ZERO.intValue());
+    }
+
+    /**
      * 构建排产Sku列表(Top)单Sku对象
      *
      * @param context        排产上下文
      * @param singlePriority 单Sku优先级信息
      * @param groupPlanInfo  分组计划
+     * @param continueType   类型(同规格同花纹、同模具)
      * @param allSkuList     分组下排产Sku信息
      * @param lhGroup        收尾组信息
      * @param maxLhDays      最大硫化天数
@@ -274,7 +314,7 @@ public class SkuPrioritySelector {
      * @param endDay         排产结束日
      * @return
      */
-    private static ProductionSkuPriorityVo buildProductionSkuPriorityInfo(Context context, SkuPriorityInfo singlePriority, ProductionPlanGroupInfo groupPlanInfo, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, Integer maxLhDays, Integer startDay, Integer endDay) {
+    private static ProductionSkuPriorityVo buildProductionSkuPriorityInfo(Context context, SkuPriorityInfo singlePriority, ProductionPlanGroupInfo groupPlanInfo, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, Integer maxLhDays, Integer startDay, Integer endDay) {
         String materialDesc = singlePriority.getSku();
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(context, materialDesc, startDay, endDay);
@@ -282,7 +322,7 @@ public class SkuPrioritySelector {
             return null;
         }
         //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(allSkuList, materialDesc, true);
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(continueType, allSkuList, materialDesc, true);
         if (null == needProductionInfo) {
             //todo 记录日志
             return null;
@@ -298,6 +338,9 @@ public class SkuPrioritySelector {
 
     /**
      * 构建排产Sku列表(Top)单Sku对象
+     * 场景：
+     * 1、机台反选结构
+     * 2、结构正向选机台
      *
      * @param context        排产上下文
      * @param singlePriority 单Sku优先级信息
@@ -317,7 +360,7 @@ public class SkuPrioritySelector {
             return null;
         }
         //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(allSkuList, materialDesc, true);
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, allSkuList, materialDesc, true);
         if (null == needProductionInfo) {
             //todo 记录日志
             return null;
@@ -339,14 +382,23 @@ public class SkuPrioritySelector {
         List<SkuPriorityInfo> currentList = new ArrayList<>(skuInfos);
 
         // 第1级：供应链优先标记
-        List<SkuPriorityInfo> heightPrioritySkus = filterBySupplyChainPriority(currentList);
+        List<SkuPriorityInfo> supplyChainPrioritySkus = filterBySupplyChainPriority(currentList);
+        if (!CollectionUtils.isEmpty(supplyChainPrioritySkus)) {
+            if (supplyChainPrioritySkus.size() == 1) {
+                return supplyChainPrioritySkus;
+            }
+            currentList = supplyChainPrioritySkus;
+        }
+        // 第2级：高优先级优先标记
+        List<SkuPriorityInfo> heightPrioritySkus = filterByHeightPriority(currentList);
         if (!CollectionUtils.isEmpty(heightPrioritySkus)) {
             if (heightPrioritySkus.size() == 1) {
                 return heightPrioritySkus;
             }
             currentList = heightPrioritySkus;
         }
-        // 第2级：模具产能受限约束
+
+        // 第3级：模具产能受限约束
         List<SkuPriorityInfo> moldCapacityLimitSkus = filterByMoldCapacityLimit(currentList);
         if (!CollectionUtils.isEmpty(moldCapacityLimitSkus)) {
             if (moldCapacityLimitSkus.size() == 1) {
@@ -355,7 +407,7 @@ public class SkuPrioritySelector {
             currentList = moldCapacityLimitSkus;
         }
 
-        // 第3级：库销比约束
+        // 第4级：库销比约束
         List<SkuPriorityInfo> inventorySaleRatioSkus = filterByInventorySaleRatio(currentList);
         if (!CollectionUtils.isEmpty(inventorySaleRatioSkus)) {
             if (inventorySaleRatioSkus.size() == 1) {
@@ -364,7 +416,7 @@ public class SkuPrioritySelector {
             currentList = inventorySaleRatioSkus;
         }
 
-        // 第4级：小于50条约束
+        // 第5级：小于50条约束
         List<SkuPriorityInfo> lessMinQtySkus = filterByLessMinQty(currentList);
         if (!CollectionUtils.isEmpty(lessMinQtySkus)) {
             if (lessMinQtySkus.size() == 1) {
@@ -372,23 +424,54 @@ public class SkuPrioritySelector {
             }
             currentList = lessMinQtySkus;
         }
-        // 第5级：净需求大约束
+        // 第6级：净需求大约束
         return filterByNetRequirement(currentList);
     }
 
     /**
-     * 第5级过滤器：净需求大约束
+     * 第1级过滤器：供应链优先标记
      */
-    private static List<SkuPriorityInfo> filterByNetRequirement(List<SkuPriorityInfo> skuInfos) {
-        // 找出净需求最大的SKU
-        int maxNetRequirement = skuInfos.stream()
-                .mapToInt(SkuPriorityInfo::getTotalNetRequirement)
-                .max()
-                .orElse(Integer.MIN_VALUE);
+    private static List<SkuPriorityInfo> filterBySupplyChainPriority(List<SkuPriorityInfo> skuInfos) {
+        // 找出所有有供应链优先标记的SKU
+        List<SkuPriorityInfo> prioritizedSkus = skuInfos.stream()
+                .filter(SkuPriorityInfo::isHasSupplyChainPriority)
+                .collect(Collectors.toList());
+        // 如果有，返回这些SKU；否则返回所有SKU
+        return prioritizedSkus.isEmpty() ? new ArrayList<>(skuInfos) : prioritizedSkus;
+    }
 
-        // 过滤出净需求等于最大值的SKU
-        return skuInfos.stream()
-                .filter(info -> maxNetRequirement == info.getTotalNetRequirement())
+    /**
+     * 第2级过滤器：高优先级优先标记
+     */
+    private static List<SkuPriorityInfo> filterByHeightPriority(List<SkuPriorityInfo> skuInfos) {
+        // 找出所有有高优先级标记的SKU
+        List<SkuPriorityInfo> prioritizedSkus = skuInfos.stream()
+                .filter(SkuPriorityInfo::isHasHeightPriority)
+                .collect(Collectors.toList());
+        // 如果有，返回这些SKU；否则返回所有SKU
+        return prioritizedSkus.isEmpty() ? new ArrayList<>(skuInfos) : prioritizedSkus;
+    }
+
+    /**
+     * 第3级过滤器：模具产能受限约束
+     */
+    private static List<SkuPriorityInfo> filterByMoldCapacityLimit(List<SkuPriorityInfo> skuInfos) {
+        // 找出所有有模具产能受限的SKU
+        List<SkuPriorityInfo> moldLimitedSkus = skuInfos.stream()
+                .filter(SkuPriorityInfo::isHasMoldCapacityLimit)
+                .collect(Collectors.toList());
+        // 如果没有模具受限的SKU，返回所有SKU
+        if (CollectionUtils.isEmpty(moldLimitedSkus)) {
+            return new ArrayList<>(skuInfos);
+        }
+        // 如果有模具受限的SKU，找出受限净需求量最小的SKU
+        int minMoldLimitedNetRequirement = moldLimitedSkus.stream()
+                .mapToInt(SkuPriorityInfo::getMoldLimitedNetRequirement)
+                .min()
+                .orElse(Integer.MAX_VALUE);
+        // 过滤出受限净需求量等于最小值的SKU
+        return moldLimitedSkus.stream()
+                .filter(info -> minMoldLimitedNetRequirement == info.getMoldLimitedNetRequirement())
                 .collect(Collectors.toList());
     }
 
@@ -405,7 +488,7 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 第3级过滤器：库销比约束
+     * 第5级过滤器：库销比约束
      */
     private static List<SkuPriorityInfo> filterByInventorySaleRatio(List<SkuPriorityInfo> skuInfos) {
         // 找出库销比最小的SKU
@@ -420,41 +503,19 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 第2级过滤器：模具产能受限约束
+     * 第6级过滤器：净需求大约束
      */
-    private static List<SkuPriorityInfo> filterByMoldCapacityLimit(List<SkuPriorityInfo> skuInfos) {
-        // 找出所有有模具产能受限的SKU
-        List<SkuPriorityInfo> moldLimitedSkus = skuInfos.stream()
-                .filter(SkuPriorityInfo::isHasMoldCapacityLimit)
+    private static List<SkuPriorityInfo> filterByNetRequirement(List<SkuPriorityInfo> skuInfos) {
+        // 找出净需求最大的SKU
+        int maxNetRequirement = skuInfos.stream()
+                .mapToInt(SkuPriorityInfo::getTotalNetRequirement)
+                .max()
+                .orElse(Integer.MIN_VALUE);
+
+        // 过滤出净需求等于最大值的SKU
+        return skuInfos.stream()
+                .filter(info -> maxNetRequirement == info.getTotalNetRequirement())
                 .collect(Collectors.toList());
-
-        // 如果没有模具受限的SKU，返回所有SKU
-        if (CollectionUtils.isEmpty(moldLimitedSkus)) {
-            return new ArrayList<>(skuInfos);
-        }
-
-        // 如果有模具受限的SKU，找出受限净需求量最小的SKU
-        int minMoldLimitedNetRequirement = moldLimitedSkus.stream()
-                .mapToInt(SkuPriorityInfo::getMoldLimitedNetRequirement)
-                .min()
-                .orElse(Integer.MAX_VALUE);
-
-        // 过滤出受限净需求量等于最小值的SKU
-        return moldLimitedSkus.stream()
-                .filter(info -> minMoldLimitedNetRequirement == info.getMoldLimitedNetRequirement())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 第1级过滤器：供应链优先标记
-     */
-    private static List<SkuPriorityInfo> filterBySupplyChainPriority(List<SkuPriorityInfo> skuInfos) {
-        // 找出所有有供应链优先标记的SKU
-        List<SkuPriorityInfo> prioritizedSkus = skuInfos.stream()
-                .filter(SkuPriorityInfo::isHasSupplyChainPriority)
-                .collect(Collectors.toList());
-        // 如果有，返回这些SKU；否则返回所有SKU
-        return prioritizedSkus.isEmpty() ? new ArrayList<>(skuInfos) : prioritizedSkus;
     }
 
     /**
@@ -514,9 +575,7 @@ public class SkuPrioritySelector {
         boolean hasHeightPriority = plans.stream().anyMatch(SkuPrioritySelector::hasHeightQtyPriority);
         info.setHasHeightPriority(hasHeightPriority);
 
-        // 2. 模具产能受限情况
-
-        //是否共用模具受限？--最后两副
+        // 2. 模具产能受限情况 是否共用模具受限？--最后两副
         Set<String> limitShareMouldSet = productionContext.getLimitShareMouldOtherSku(info.getSku(), startDay, endDay);
         info.setHasMoldCapacityLimit(!CollectionUtils.isEmpty(limitShareMouldSet));
 

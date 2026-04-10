@@ -60,6 +60,27 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private String oemFlag;
 
     /**
+      * 物料优先
+     */
+    @ApiModelProperty(value = "物料优先")
+    @TableField(exist = false)
+    private String scmPriority;
+
+    /**
+     * 结构优先
+     */
+    @ApiModelProperty(value = "结构优先")
+    @TableField(exist = false)
+    private String structurePriority;
+
+    /**
+     * 库存量
+     */
+    @ApiModelProperty(value = "库存量")
+    @TableField(exist = false)
+    private Integer stockQty;
+
+    /**
      * 搭配量
      */
     private Integer matchQtyDay1;

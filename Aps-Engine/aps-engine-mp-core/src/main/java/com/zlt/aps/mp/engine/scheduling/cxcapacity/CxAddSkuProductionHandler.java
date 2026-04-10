@@ -124,8 +124,8 @@ public class CxAddSkuProductionHandler {
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         //获取优先级最高的Sku信息
-        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
-//        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, groupPlanInfo, lhGroup, leftOverHasProductionList, new HashSet<>(), startDay, endDay);
+//        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
+        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), startDay, endDay);
         TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc);
         if (StringUtils.isBlank(materialDesc)) {
             //20260113 剔除需要排除的收尾时间点
@@ -136,7 +136,7 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(leftOverHasProductionList, materialDesc, true);
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, materialDesc, true);
         if (null == needProductionInfo) {
             //todo 记录日志
             return;
@@ -219,8 +219,8 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //获取优先级最高的Sku信息
-        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, productionPlanList);
-//        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, ProductionStageEnum.SIMULATE_STAGE, cxMachineInfo, cxLhGroup, productionPlanList, new HashSet<>(), startDay, endDay);
+//        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, productionPlanList);
+        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, ProductionStageEnum.SIMULATE_STAGE, cxMachineInfo, cxLhGroup, productionPlanList, new HashSet<>(), startDay, endDay);
         if (StringUtils.isBlank(materialDesc)) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupNoFindSkuLog(context, groupName, cxMachineCode));
@@ -231,7 +231,7 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(productionPlanList, materialDesc, true);
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, productionPlanList, materialDesc, true);
         if (null == needProductionInfo) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoProductionQtyLog(context, groupName, cxMachineCode, materialDesc));
