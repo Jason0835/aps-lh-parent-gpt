@@ -65,7 +65,7 @@ public class MpAdjustStructureInController extends AbstractDocBizController<MpAd
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpAdjustStructureIn queryVO) {
-        PageUtils.clearPage();
+//        PageUtils.clearPage();
         TableDataInfo tableDataInfo = super.list(queryVO);
         sortlList(tableDataInfo.getRows());
         return tableDataInfo;
