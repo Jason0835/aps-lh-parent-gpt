@@ -137,8 +137,7 @@ export default {
           prop: "lhMachineCode",
           type: "select",
           dictData: this.curingMachines,
-          labelKey: "showLabel",
-          valueKey: "machineCode",
+
           filterable: true,
           disabled: this.curingMachines.length === 0,
         },
@@ -332,10 +331,15 @@ export default {
           // specCode: this.form.specCode,
         });
         console.log(res);
-        this.curingMachines = res.map((item) => {
-          item.showLabel = `${item.machineCode}(剩余产能为${item.remainCapacity})`;
-          return item;
-        });
+        let list=[]
+        for(let i=0;i<res.length;i++){
+          list.push({
+            label: res[i].machineCode,
+            value: res[i].machineCode,
+          })
+        }
+        this.curingMachines = list
+        console.log(this.curingMachines);
       } catch (error) {
         console.error(error);
       }

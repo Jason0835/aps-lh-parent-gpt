@@ -91,9 +91,9 @@ export function insertOrder(query) {
     url: '/lh/lhScheduleResult/insertOrder',
     method: 'post',
     data: query,
-    // headers: {
-    //   'Content-Type': 'application/json;charset=UTF-8'
-    // },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
   })
 }
 
@@ -281,6 +281,19 @@ export function getScheduleMachineInfo(query) {
 export function getScheduleDate(query) {
   return request({
     url: '/lh/lhScheduleResult/listScheduleShiftDates',
+    method: 'post',
+    data: query
+  })
+}
+
+/**
+ * 获取日期
+ * @param {*} query
+ * @returns
+ */
+export function adjustTextNo(query) {
+  return request({
+    url: '/lh/lhScheduleResult/adjustTextNo',
     method: 'post',
     data: query
   })

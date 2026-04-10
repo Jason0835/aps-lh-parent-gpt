@@ -61,7 +61,7 @@
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
           @click="handleChangeMachine"
-           :disabled="selection.length == 0"
+          :disabled="selection.length == 0"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
         <el-button
@@ -71,16 +71,19 @@
           :disabled="selection.length == 0"
           >{{ $t("调量") }}</el-button
         >
-        <!-- <el-button
-          v-hasPermi="['lh:lhScheduleResult:changeMachine']"
-          type="primary"
-          >{{ $t("文字示方调整") }}</el-button
-        > -->
+
         <el-button
           type="primary"
           :disabled="selection.length === 0"
           @click="handlePublish"
           >{{ $t("排产发布") }}</el-button
+        >
+        <el-button
+          v-hasPermi="['lh:lhScheduleResult:changeMachine']"
+          type="primary"
+          :disabled="selection.length == 0"
+          @click="getAdjustTextNo"
+          >{{ $t("文字示方调整") }}</el-button
         >
         <el-button
           v-hasPermi="['monthplan:mouldingDayResult:import']"
@@ -176,7 +179,6 @@
     <ChangeReleaseStatusDialog ref="changeReleaseStatusDialogRef" />
     <el-button style="display: none" ref="hidePopoverBtnRef"></el-button>
     <changePlanDialog ref="changePlanRef" @success="getList" />
-
   </basic-container>
 </template>
 <script>
@@ -191,6 +193,7 @@ import {
   publishScheduleResult,
   exportCombine,
   getScheduleDate,
+  adjustTextNo,
 } from "@/api/lh/scheduleResult";
 
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -214,14 +217,9 @@ export default {
     TPopover,
     ChangeMachineDialog,
     ChangeReleaseStatusDialog,
-    changePlanDialog
+    changePlanDialog,
   },
-  dicts: [
-
-    "adjust_type",
-    "IS_RELEASE",
-    "biz_factory_name",
-  ],
+  dicts: ["adjust_type", "IS_RELEASE", "biz_factory_name", "biz_end_type",'biz_construction_stage'],
   provide() {
     return {
       parentDict: this.dict,
@@ -269,40 +267,40 @@ export default {
         scheduleDate: defaultDate,
       },
       selection: [],
-      dateList:[
-      {
-            "shift": 1,
-            "shiftDate": ""
+      dateList: [
+        {
+          shift: 1,
+          shiftDate: "",
         },
         {
-            "shift": 2,
-            "shiftDate": ""
+          shift: 2,
+          shiftDate: "",
         },
         {
-            "shift": 3,
-            "shiftDate": ""
+          shift: 3,
+          shiftDate: "",
         },
         {
-            "shift": 4,
-            "shiftDate": ""
+          shift: 4,
+          shiftDate: "",
         },
         {
-            "shift": 5,
-            "shiftDate": ""
+          shift: 5,
+          shiftDate: "",
         },
         {
-            "shift": 6,
-            "shiftDate": ""
+          shift: 6,
+          shiftDate: "",
         },
         {
-            "shift": 7,
-            "shiftDate": ""
+          shift: 7,
+          shiftDate: "",
         },
         {
-            "shift": 8,
-            "shiftDate": ""
-        }
-      ]
+          shift: 8,
+          shiftDate: "",
+        },
+      ],
     };
   },
   computed: {
@@ -340,7 +338,25 @@ export default {
         },
         {
           label: this.$t("硫化班产"),
-          prop: "mouldSurplusQty",
+          prop: "singleMouldShiftQty",
+        },
+        {
+          label: this.$t("左右模"),
+          prop: "leftRightMould",
+        },
+        {
+          prop: "constructionStage",
+          label: this.$t("示方类型"),
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_construction_stage , value);
+          },
+        },
+        {
+          label: this.$t("类型"),
+          prop: "isEnd",
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
         },
         // {
         //   label: this.$t("ui.data.column.scheduleResult.baseInfo"),
@@ -392,12 +408,12 @@ export default {
         //   ],
         // },
         {
-          label: this.$t("早班")+this.dateList[0].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[0].shiftDate,
           children: [
-            {
-              prop: "class1Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class1Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class1PlanQty",
               label: this.$t("计划"),
@@ -414,19 +430,15 @@ export default {
               prop: "class1Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class1RecipeType",
-              label: this.$t("示方类型"),
-            },
           ],
         },
         {
-          label: this.$t("中班")+this.dateList[1].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[1].shiftDate,
           children: [
-            {
-              prop: "class2Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class2Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class2PlanQty",
               label: this.$t("计划"),
@@ -443,19 +455,16 @@ export default {
               prop: "class2Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class2RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
-          label: this.$t("晚班")+this.dateList[2].shiftDate,
+          label: this.$t("晚班") + " " + this.dateList[2].shiftDate,
           children: [
-            {
-              prop: "class3Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class3Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class3PlanQty",
               label: this.$t("计划"),
@@ -472,19 +481,16 @@ export default {
               prop: "class3Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class3RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
-          label: this.$t("早班")+this.dateList[3].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[3].shiftDate,
           children: [
-            {
-              prop: "class4Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class4Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class4PlanQty",
               label: this.$t("计划"),
@@ -501,19 +507,16 @@ export default {
               prop: "class4Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class4RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
-          label: this.$t("中班")+this.dateList[4].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[4].shiftDate,
           children: [
-            {
-              prop: "class5Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class5Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class5PlanQty",
               label: this.$t("计划"),
@@ -530,19 +533,16 @@ export default {
               prop: "class5Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class5RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
-          label: this.$t("晚班")+this.dateList[5].shiftDate,
+          label: this.$t("晚班") + " " + this.dateList[5].shiftDate,
           children: [
-            {
-              prop: "class6Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class6Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class6PlanQty",
               label: this.$t("计划"),
@@ -559,19 +559,16 @@ export default {
               prop: "class6Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class6RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
-          label: this.$t("早班")+this.dateList[6].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[6].shiftDate,
           children: [
-            {
-              prop: "class7Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class7Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class7PlanQty",
               label: this.$t("计划"),
@@ -588,19 +585,16 @@ export default {
               prop: "class7Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class7RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
-          label: this.$t("中班")+this.dateList[7].shiftDate,
+          label: this.$t("中班") + this.dateList[7].shiftDate,
           children: [
-            {
-              prop: "class8Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class8Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class8PlanQty",
               label: this.$t("计划"),
@@ -617,10 +611,7 @@ export default {
               prop: "class8Analysis",
               label: this.$t("备注"),
             },
-            {
-              prop: "class8RecipeType",
-              label: this.$t("示方类型"),
-            },
+
           ],
         },
         {
@@ -675,8 +666,25 @@ export default {
     },
   },
   methods: {
-      // 调量
-      handleChangePlan() {
+    async getAdjustTextNo() {
+      try {
+        this.loading = true;
+        let row = this.selection[0];
+        const data = await adjustTextNo({
+          id: row.id,
+          factoryCode: row.factoryCode,
+          lhMachineCode: row.lhMachineCode,
+        });
+        this.$modal.msgSuccess(data.msg);
+        this.getList();
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    // 调量
+    handleChangePlan() {
       if (this.$refs.changePlanRef) {
         let row = this.selection[0];
         this.$refs.changePlanRef.show(row);
@@ -684,11 +692,11 @@ export default {
     },
     async getDate() {
       try {
-        let res=await getScheduleDate({
+        let res = await getScheduleDate({
           scheduleDate: this.query.scheduleDate,
         });
         console.log(res);
-        this.dateList=res
+        this.dateList = res;
       } catch (error) {}
     },
     handleAutoPlan() {
@@ -968,7 +976,7 @@ export default {
         console.error(error);
       } finally {
         this.loading = false;
-        this.getDate()
+        this.getDate();
       }
     },
   },
