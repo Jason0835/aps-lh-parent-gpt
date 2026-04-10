@@ -8,7 +8,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
@@ -53,6 +56,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Resource
     private LhMouldChangePlanEntityMapper lhMouldChangePlanMapper;
+    @Resource
+    private OrderNoGenerator orderNoGenerator;
 
     /**
      * 查询模具交替计划列表
@@ -74,6 +79,23 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     public AjaxResult save(@RequestBody LhMouldChangePlan billVO){
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        if (billVO.getId() == null) {
+            billVO.setOrderNo(orderNoGenerator.generateMouldChangeOrderNo(new Date()));
+            billVO.setIsRelease(ApsConstant.NO_RELEASE);
+            billVO.setMouldStatus(ApsConstant.FALSE);
+        } else {
+            LhMouldChangePlan origin = lhMouldChangePlanMapper.selectById(billVO.getId());
+            if (origin != null) {
+                billVO.setOrderNo(origin.getOrderNo());
+                if (ApsConstant.IS_RELEASE.equals(origin.getIsRelease())) {
+                    billVO.setIsRelease(ApsConstant.APS_STRING_4);
+                    billVO.setMouldStatus(ApsConstant.FALSE);
+                } else {
+                    billVO.setIsRelease(origin.getIsRelease());
+                    billVO.setMouldStatus(origin.getMouldStatus());
+                }
+            }
         }
         return super.save(billVO);
     }
@@ -169,7 +191,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLhResultBatchNo()), "LH_RESULT_BATCH_NO", queryVO.getLhResultBatchNo());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getPlanDate()), "PLAN_DATE", queryVO.getPlanDate());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getPlanOrder()), "PLAN_ORDER", queryVO.getPlanOrder());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getLeftRightMould()), "LEFT_RIGHT_MOULD", queryVO.getLeftRightMould());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLhMachineCode()), "LH_MACHINE_CODE", queryVO.getLhMachineCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLhMachineName()), "LH_MACHINE_NAME", queryVO.getLhMachineName());
