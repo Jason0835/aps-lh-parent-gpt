@@ -264,9 +264,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setAvailableMoldQty(source.getLhMachineQty());
 
         // 物料信息
-        target.setMaterialCode(source.getSapCode());
+        target.setMaterialCode(source.getMaterialCode());
         target.setMesMaterialCode(null); // MES物料编码需要另外查询
-        target.setSpecDesc(source.getSpecDesc());
+        target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
         target.setEmbryoSpecDesc(null); // 胎胚物料描述需要另外查询
 
@@ -323,9 +323,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setAvailableMoldQty(source.getLhMachineQty());
 
         // 物料信息
-        target.setMaterialCode(source.getSapCode());
+        target.setMaterialCode(source.getMaterialCode());
         target.setMesMaterialCode(null);
-        target.setSpecDesc(source.getSpecDesc());
+        target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
         target.setEmbryoSpecDesc(null);
 
@@ -382,9 +382,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setAvailableMoldQty(source.getLhMachineQty());
 
         // 物料信息
-        target.setMaterialCode(source.getSapCode());
+        target.setMaterialCode(source.getMaterialCode());
         target.setMesMaterialCode(null);
-        target.setSpecDesc(source.getSpecDesc());
+        target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
         target.setEmbryoSpecDesc(null);
 
@@ -559,7 +559,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         newRecord.setCxMachineName(vo.getCxMachineName());
         newRecord.setEmbryoCode(vo.getEmbryoCode());
         newRecord.setOrderNo(vo.getMaterialCode());
-        newRecord.setSpecDesc(vo.getSpecDesc());
+        newRecord.setMaterialCode(vo.getSpecDesc());
         newRecord.setClass1PlanQty(vo.getClass1PlanQty());
         newRecord.setClass2PlanQty(vo.getClass2PlanQty());
         newRecord.setClass3PlanQty(vo.getClass3PlanQty());

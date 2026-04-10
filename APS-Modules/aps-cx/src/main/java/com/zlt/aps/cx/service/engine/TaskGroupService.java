@@ -4,6 +4,7 @@ import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
@@ -33,6 +34,10 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class TaskGroupService {
+
+    private final ProductionCalculator productionCalculator;
+
+    private final ScheduleDayTypeHelper scheduleDayTypeHelper;
 
     /** 收尾阈值：成型余量低于此值视为紧急收尾 */
     private static final int ENDING_SURPLUS_THRESHOLD = 400;
@@ -88,13 +93,6 @@ public class TaskGroupService {
         }
         log.info("任务分组开始：共 {} 条硫化记录", lhScheduleResults.size());
 
-        // 调试：打印前3条记录的详情
-        for (int i = 0; i < Math.min(3, lhScheduleResults.size()); i++) {
-            LhScheduleResult r = lhScheduleResults.get(i);
-            log.debug("硫化记录{}: embryoCode={}, materialCode={}, constructionStage={}",
-                    i, r.getEmbryoCode(), r.getMaterialCode(), r.getConstructionStage());
-        }
-
         // 构建基础映射
         Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
         Map<String, CxStock> stockMap = buildStockMap(context);
@@ -103,6 +101,9 @@ public class TaskGroupService {
         if (machineOnlineEmbryoMap == null) {
             machineOnlineEmbryoMap = new HashMap<>();
         }
+
+        // 计算开产日标识（分组内所有任务共用）
+        boolean isOpeningDay = scheduleDayTypeHelper.isOpeningDay(scheduleDate);
 
         // 直接遍历每条硫化记录，为每条记录创建独立的任务
         int skippedNullEmbryo = 0;
@@ -133,18 +134,29 @@ public class TaskGroupService {
             // 2. 试制任务：根据施工阶段判断
             // constructionStage: 01-试制, 02-量试, 03-正式
             // 01-试制 → 试制任务
-            // 02-量试 → 归入新增任务（不是试制任务）
+            // 02-量试 → 量试任务（有独立标识，但归入新增任务处理）
             String constructionStage = lhResult.getConstructionStage();
             boolean isTrialTask = "01".equals(constructionStage);
+            boolean isProductionTrial = "02".equals(constructionStage);
 
             // 设置任务属性
             task.setIsContinueTask(isContinueTask);
-            task.setContinueMachineCodes(continueMachineCodes);
             task.setIsTrialTask(isTrialTask);
-            task.setIsFirstTask(!isContinueTask && !isTrialTask);
+            task.setIsProductionTrial(isProductionTrial);
+            task.setContinueMachineCodes(continueMachineCodes);
+            task.setIsFirstTask(!isContinueTask && !isTrialTask && !isProductionTrial);
 
             // 计算收尾相关属性
             calculateEndingInfo(task, context, scheduleDate);
+
+            // S5.3.1 分配胎胚库存
+            allocateEmbryoStock(task, context, scheduleDate);
+            // S5.3.2 计算待排产量
+            calculatePlannedProduction(task, context, scheduleDate, isOpeningDay);
+            // S5.3.3 收尾余量处理
+            handleEndingRemainder(task, context, isOpeningDay);
+            // S5.3.4 开停产特殊处理
+            handleOpeningClosingDay(task, context, dayShifts);
 
             // 分组
             if (isContinueTask) {
@@ -215,6 +227,123 @@ public class TaskGroupService {
         return machineCodes;
     }
 
+    // ==================== S5.3 任务属性计算 ====================
+
+    /**
+     * S5.3.1 分配胎胚库存
+     */
+    private void allocateEmbryoStock(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                     ScheduleContextVo context, LocalDate scheduleDate) {
+        if (task.getCurrentStock() != null && task.getCurrentStock() > 0) {
+            task.setAllocatedStock(task.getCurrentStock());
+        } else {
+            task.setAllocatedStock(0);
+        }
+    }
+
+    /**
+     * S5.3.2 计算待排产量
+     */
+    private void calculatePlannedProduction(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                            ScheduleContextVo context,
+                                            LocalDate scheduleDate,
+                                            boolean isOpeningDay) {
+        int plannedProduction;
+        if (task.getIsEndingTask() != null && task.getIsEndingTask()) {
+            // 收尾任务：按胎胚库存计算，剩余库存全部排产
+            plannedProduction = task.getEndingSurplusQty() != null ? task.getEndingSurplusQty() : 0;
+        } else if (task.getRemainingQuantity() != null) {
+            // 正常任务：取月计划剩余量
+            plannedProduction = task.getRemainingQuantity();
+        } else {
+            plannedProduction = 0;
+        }
+
+        // 开产日：如果胎胚库存在合理范围内（≥24小时库存），则减产
+        if (isOpeningDay) {
+            int tripCapacity = getTripCapacity(task.getStructureName(), context);
+            if (plannedProduction > tripCapacity) {
+                plannedProduction -= tripCapacity;
+            }
+        }
+
+        task.setPlannedProduction(plannedProduction);
+
+        // 根据计划量计算硫化机台数（向上取整）
+        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int vulcanizeMachineCount = productionCalculator.roundToVehicle(plannedProduction, tripCapacity);
+        task.setVulcanizeMachineCount(vulcanizeMachineCount);
+    }
+
+    /**
+     * S5.3.3 收尾余量处理
+     */
+    private void handleEndingRemainder(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                        ScheduleContextVo context,
+                                        boolean isOpeningDay) {
+        if (task.getIsEndingTask() == null || !task.getIsEndingTask()) {
+            return;
+        }
+
+        Integer surplusQty = task.getEndingSurplusQty();
+        if (surplusQty == null || surplusQty <= 0) {
+            return;
+        }
+
+        Integer allocatedStock = task.getAllocatedStock();
+        if (allocatedStock == null) {
+            allocatedStock = 0;
+        }
+
+        // 收尾任务当天可排产量 = min(胎胚库存, 当天计划量)
+        int availableQty = Math.min(allocatedStock, task.getPlannedProduction() != null ? task.getPlannedProduction() : 0);
+
+        if (availableQty > 0) {
+            int tripCapacity = getTripCapacity(task.getStructureName(), context);
+            int cars = productionCalculator.roundToVehicle(availableQty, tripCapacity);
+            task.setPlannedProduction(cars * tripCapacity);
+            task.setEndingSurplusQty(surplusQty - task.getPlannedProduction());
+        }
+    }
+
+    /**
+     * S5.3.4 开停产特殊处理
+     */
+    private void handleOpeningClosingDay(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                         ScheduleContextVo context,
+                                         List<CxShiftConfig> dayShifts) {
+        LocalDate scheduleDate = context.getCurrentScheduleDate();
+
+        // 停产日：当天产量设为0
+        if (scheduleDayTypeHelper.isStopDay(scheduleDate)) {
+            task.setPlannedProduction(0);
+            task.setVulcanizeMachineCount(0);
+            return;
+        }
+
+        // 停产标识日：当天产量按胎胚库存取整
+        if (scheduleDayTypeHelper.isStopFlagDay(scheduleDate)) {
+            Integer allocatedStock = task.getAllocatedStock();
+            if (allocatedStock != null && allocatedStock > 0) {
+                int tripCapacity = getTripCapacity(task.getStructureName(), context);
+                int cars = productionCalculator.roundToVehicle(allocatedStock, tripCapacity);
+                int qty = Math.min(cars * tripCapacity, allocatedStock);
+                task.setPlannedProduction(qty);
+                task.setVulcanizeMachineCount(cars);
+            } else {
+                task.setPlannedProduction(0);
+                task.setVulcanizeMachineCount(0);
+            }
+        }
+    }
+
+    /**
+     * 获取班次换胎产能
+     */
+    private int getTripCapacity(String structureName, ScheduleContextVo context) {
+        return productionCalculator.getTripCapacity(structureName, context);
+    }
+
     /**
      * 为单条硫化记录构建任务
      *
@@ -272,12 +401,14 @@ public class TaskGroupService {
         task.setCurrentStock(currentStock);
 
         if (material != null) {
-            task.setMaterialName(material.getMaterialDesc());
+            task.setMaterialDesc(material.getMaterialDesc());
+            task.setMainMaterialDesc(material.getEmbryoDesc());
             task.setStructureName(material.getStructureName());
             // 设置关联的物料编码（用于判断主销产品）
             task.setRelatedMaterialCode(material.getMaterialCode());
         } else {
-            task.setMaterialName(embryoCode);
+            task.setMaterialDesc(embryoCode);
+            task.setMainMaterialDesc(embryoCode);
             task.setStructureName(structureName);
         }
 
@@ -292,11 +423,13 @@ public class TaskGroupService {
                 && context.getMainProductCodes().contains(relatedMaterialCode));
 
         // 硫化机台数和模数
-        CxStock stock = stockMap.get(embryoCode);
-        if (stock != null) {
-            task.setVulcanizeMachineCount(stock.getVulcanizeMachineCount());
-            task.setVulcanizeMoldCount(stock.getVulcanizeMoldCount());
-        }
+        // 一条LhScheduleResult = 一台硫化机，机台数直接为1
+        // 模数取硫化任务的 mouldQty
+        task.setVulcanizeMachineCount(1);
+        task.setVulcanizeMoldCount(lhResult.getMouldQty() != null ? lhResult.getMouldQty() : 1);
+
+        // 计算库存可供硫化时长（基于当前库存，成型产出未知不做班次动态推算）
+        calculateStockHours(task, lhResult, currentStock, context);
 
         return task;
     }
@@ -313,17 +446,15 @@ public class TaskGroupService {
      */
     private int getShiftPlanQty(LhScheduleResult lhResult, List<CxShiftConfig> currentShiftConfigs) {
         if (currentShiftConfigs == null || currentShiftConfigs.isEmpty()) {
-            // 如果没有班次配置，返回日计划量作为兜底
-            return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+            // 没有班次配置，返回0
+            return 0;
         }
 
         // 获取班次配置中的 classField (如 CLASS1, CLASS2, ..., CLASS8)
-        // 格式: CLASS1, CLASS2, ..., CLASS8
         for (CxShiftConfig shiftConfig : currentShiftConfigs) {
             String classField = shiftConfig.getClassField();
             if (classField != null && classField.startsWith("CLASS")) {
                 try {
-                    // 提取班次序号，如 CLASS3 -> 3
                     int classIndex = Integer.parseInt(classField.substring(5));
                     Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
                     if (planQty != null && planQty > 0) {
@@ -335,8 +466,8 @@ public class TaskGroupService {
             }
         }
 
-        // 如果没有找到对应班次的计划量，返回日计划量
-        return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+        // 取不到就是0
+        return 0;
     }
 
     /**
@@ -361,7 +492,18 @@ public class TaskGroupService {
     }
 
     /**
-     * 获取当前库存
+     * 获取任务可用的当前库存
+     *
+     * <p>优先级：
+     * <ol>
+     *   <li>硫化记录上记录的库存（lhResult.embryoStock）</li>
+     *   <li>CxStock 的有效库存 = stockNum - overTimeStock - badNum + modifyNum</li>
+     * </ol>
+     *
+     * @param lhResult   硫化记录
+     * @param stockMap   embryoCode → CxStock 的映射
+     * @param embryoCode 胎胚编码
+     * @return 当前可用库存数量
      */
     private int getCurrentStock(LhScheduleResult lhResult, Map<String, CxStock> stockMap, String embryoCode) {
         Integer embryoStock = lhResult.getEmbryoStock();
@@ -399,64 +541,105 @@ public class TaskGroupService {
     /** 库存高预警阈值（小时），可配置 */
     private static final int STOCK_HIGH_HOURS_THRESHOLD = 18;
 
+    /** 库存低预警阈值（小时），低于此值优先排产 */
+    private static final BigDecimal STOCK_LOW_HOURS_THRESHOLD = new BigDecimal("4");
+
+    /** 一天的秒数 */
+    private static final int SECONDS_PER_DAY = 24 * 60 * 60;
+
     /**
-     * 计算库存时长
-     * 
-     * 公式：胎胚预计库存可供硫化时长 = (胎胚实时库存 + 计划量) / 硫化机数 / 单台模数
-     * 
+     * 计算库存可供硫化时长
+     *
+     * 任务分组阶段：成型产出未知（本次排程的结果），无法按班次动态推算
+     * 因此只基于当前库存计算初始的库存可供硫化时长
+     *
+     * 公式：
+     *   日硫化量 → 从 MonthPlanProductLhCapacityVo 获取
+     *   单胎单模硫化时长(秒) = 24 × 60 × 60 / 日硫化量
+     *   stockHours = 库存 × 单胎单模硫化时长 / 任务的模数 / 3600 (转为小时)
+     *
      * @param task         胎胚任务
-     * @param lhResults    硫化排程结果
+     * @param lhResult     硫化排程结果
      * @param currentStock 当前胎胚库存
+     * @param context      排程上下文
      */
     private void calculateStockHours(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
-            List<LhScheduleResult> lhResults,
-            int currentStock) {
+            LhScheduleResult lhResult,
+            int currentStock,
+            ScheduleContextVo context) {
 
-        // 获取计划量（待排产量）
-        int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
-        
-        // 预计库存 = 当前库存 + 计划量
-        int expectedStock = currentStock + plannedProduction;
+        // 1. 从 materialLhCapacityMap 获取该物料的日硫化量
+        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = context.getMaterialLhCapacityMap();
+        Integer dailyLhCapacity = null;
+        if (lhCapacityMap != null) {
+            String materialCode = task.getMaterialCode();
+            MonthPlanProductLhCapacityVo capacityVo = lhCapacityMap.get(materialCode);
+            if (capacityVo != null) {
+                if (capacityVo.getDayVulcanizationQty() != null && capacityVo.getDayVulcanizationQty() > 0) {
+                    dailyLhCapacity = capacityVo.getDayVulcanizationQty();
+                } else if (capacityVo.getStandardCapacity() != null && capacityVo.getStandardCapacity() > 0) {
+                    dailyLhCapacity = capacityVo.getStandardCapacity();
+                }
+            }
+        }
 
-        if (expectedStock <= 0) {
+        // 如果取不到日硫化量，尝试从lhResult的硫化时长和模数计算
+        if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
+            if (lhResult != null && lhResult.getLhTime() != null && lhResult.getLhTime() > 0
+                    && lhResult.getMouldQty() != null && lhResult.getMouldQty() > 0) {
+                int lhTimeSeconds = lhResult.getLhTime();
+                int mouldQty = lhResult.getMouldQty();
+                dailyLhCapacity = (SECONDS_PER_DAY / lhTimeSeconds) * mouldQty;
+            }
+        }
+
+        // 仍然取不到，无法计算
+        if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
+            log.warn("无法获取物料 {} 的日硫化量，stockHours 无法计算", task.getMaterialCode());
             task.setStockHours(BigDecimal.ZERO);
             task.setIsStockHighWarning(false);
             return;
         }
 
-        // 获取硫化产能信息
-        Integer vulcanizeMachineCount = task.getVulcanizeMachineCount();
-        Integer vulcanizeMoldCount = task.getVulcanizeMoldCount();
+        // 2. 单胎单模硫化时长(秒) = 24×60×60 / 日硫化量
+        BigDecimal singleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
+                .divide(BigDecimal.valueOf(dailyLhCapacity), 2, BigDecimal.ROUND_HALF_UP);
 
-        if (vulcanizeMachineCount == null || vulcanizeMachineCount == 0 ||
-                vulcanizeMoldCount == null || vulcanizeMoldCount == 0) {
-            task.setStockHours(BigDecimal.ZERO);
-            task.setIsStockHighWarning(false);
-            return;
+        // 3. 任务的模数
+        Integer taskMoldQty = task.getVulcanizeMoldCount();
+        if (taskMoldQty == null || taskMoldQty <= 0) {
+            taskMoldQty = lhResult != null && lhResult.getMouldQty() != null ? lhResult.getMouldQty() : 1;
         }
 
-        // 库存时长 = (当前库存 + 计划量) / (硫化机数 × 单台模数 × 每小时每模产量)
-        BigDecimal hourlyOutput = BigDecimal.valueOf(vulcanizeMachineCount)
-                .multiply(BigDecimal.valueOf(vulcanizeMoldCount))
-                .multiply(BigDecimal.valueOf(0.5)); // 假设每模每小时0.5条
+        // 4. 基于当前库存计算库存可供硫化时长
+        // stockHours = 库存 × 单胎单模硫化时长 / 任务模数 / 3600 (转小时)
+        BigDecimal stockHours = BigDecimal.valueOf(currentStock)
+                .multiply(singleTireMoldSeconds)
+                .divide(BigDecimal.valueOf(taskMoldQty), 2, BigDecimal.ROUND_HALF_UP)
+                .divide(BigDecimal.valueOf(3600), 2, BigDecimal.ROUND_HALF_UP);
 
-        BigDecimal stockHours = BigDecimal.valueOf(expectedStock)
-                .divide(hourlyOutput, 2, BigDecimal.ROUND_HALF_UP);
         task.setStockHours(stockHours);
 
         // 库存预警：超过18小时标记为高库存
         boolean isHighStock = stockHours.compareTo(BigDecimal.valueOf(STOCK_HIGH_HOURS_THRESHOLD)) > 0;
         task.setIsStockHighWarning(isHighStock);
-        
-        if (isHighStock) {
-            log.info("胎胚 {} 库存水位过高，预计可供硫化 {} 小时，计划量 {} 条", 
-                    task.getMaterialCode(), stockHours, plannedProduction);
-        }
+
+        log.debug("物料 {} stockHours计算: 日硫化量={}, 单胎单模时长={}s, 模数={}, 库存={}, 库存可供时长={}h",
+                task.getMaterialCode(), dailyLhCapacity, singleTireMoldSeconds, taskMoldQty, currentStock, stockHours);
     }
 
     /**
      * 计算日需求量
+     *
+     * <p>简化实现：直接返回硫化需求量（排量）。
+     * 更精细的需求拆分（考虑历史排产量、班次分配等）在续作/新增任务处理器中进行。
+     *
+     * @param totalVulcanizeDemand 硫化总需求（排量）
+     * @param currentStock         当前库存（未使用，为扩展预留）
+     * @param structureName        结构名称（未使用，为扩展预留）
+     * @param context              排程上下文（未使用，为扩展预留）
+     * @return 日需求量
      */
     private int calculateDailyDemand(
             int totalVulcanizeDemand,
@@ -606,7 +789,7 @@ public class TaskGroupService {
 
         // 库存紧张（低库存时长 = 高优先级）
         if (task.getStockHours() != null) {
-            if (task.getStockHours().compareTo(new BigDecimal("4")) < 0) {
+            if (task.getStockHours().compareTo(STOCK_LOW_HOURS_THRESHOLD) < 0) {
                 score += 800;
             } else if (task.getStockHours().compareTo(new BigDecimal("6")) < 0) {
                 score += 400;

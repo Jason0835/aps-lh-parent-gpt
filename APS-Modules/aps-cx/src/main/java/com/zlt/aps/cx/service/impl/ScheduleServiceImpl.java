@@ -2,13 +2,11 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
-
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
-import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
@@ -24,7 +22,6 @@ import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -108,7 +105,6 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     private final CxStockMapper stockMapper;
     private final CxScheduleResultMapper scheduleResultMapper;
-    private final CxScheduleDetailMapper scheduleDetailMapper;
     private final CxParamConfigMapper paramConfigMapper;
     private final MdmStructureTreadConfigMapper structureShiftCapacityMapper;
     private final CxKeyProductMapper keyProductMapper;
@@ -138,7 +134,16 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 2. 数据完整性校验
-            validateScheduleData(context, request.getScheduleDate(), request.getFactoryCode());
+            ScheduleDataValidationResult validationResult = validateScheduleData(context, request.getScheduleDate(), request.getFactoryCode());
+
+            if (!validationResult.isPassed()) {
+                result.setMessage("数据完整性校验不通过，共 " + validationResult.getErrorCount() + " 项错误");
+                result.setValidationErrors(convertValidationDetails(validationResult,
+                        ScheduleDataValidationResult.ValidationLevel.ERROR));
+                result.setValidationWarnings(convertValidationDetails(validationResult,
+                        ScheduleDataValidationResult.ValidationLevel.WARN));
+                return result;
+            }
 
             // 3. 执行核心排程算法(流程图S5.2-S5.5)
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
@@ -372,6 +377,10 @@ public class ScheduleServiceImpl implements ScheduleService {
                         .orderByAsc(CxShiftConfig::getDayShiftOrder)
         );
         context.setShiftConfigList(allShiftConfigs);
+        log.info("班次配置加载完成，班次数：{}，示例：{}",
+                allShiftConfigs != null ? allShiftConfigs.size() : 0,
+                allShiftConfigs != null && !allShiftConfigs.isEmpty()
+                        ? allShiftConfigs.get(0).getShiftCode() : "无");
 
         // 按排程天数分组
         Map<Integer, List<CxShiftConfig>> dayShiftMap = allShiftConfigs.stream()
@@ -381,7 +390,10 @@ public class ScheduleServiceImpl implements ScheduleService {
         int scheduleDays = dayShiftMap.isEmpty() ? DEFAULT_SCHEDULE_DAYS
                 : dayShiftMap.keySet().stream().max(Integer::compareTo).orElse(DEFAULT_SCHEDULE_DAYS);
         context.setScheduleDays(scheduleDays);
-        log.info("根据班次配置计算排程天数: {}", scheduleDays);
+        log.info("根据班次配置计算排程天数: {}, 班次分布: {}", scheduleDays,
+                dayShiftMap.entrySet().stream()
+                        .map(e -> e.getKey() + ":" + e.getValue().size() + "个")
+                        .collect(Collectors.joining(", ")));
     }
 
     /**
@@ -710,21 +722,42 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 数据完整性校验
      */
-    private void validateScheduleData(ScheduleContextVo context, LocalDate scheduleDate, String factoryCode) {
+    private ScheduleDataValidationResult validateScheduleData(ScheduleContextVo context, LocalDate scheduleDate, String factoryCode) {
         ScheduleDataValidationResult validationResult = scheduleDataValidator.validate(context, scheduleDate, factoryCode);
 
         if (!validationResult.isPassed()) {
-            String errorMsg = "数据完整性校验不通过，无法进行排程：" + validationResult.generateSummary();
-            log.error(errorMsg);
-            throw new RuntimeException(errorMsg);
+            log.error("数据完整性校验不通过：{}", validationResult.generateSummary());
+            for (ScheduleDataValidationResult.ValidationDetail detail : validationResult.getDetails()) {
+                if (detail.getLevel() == ScheduleDataValidationResult.ValidationLevel.ERROR) {
+                    log.error("  [错误] {} - {} | 建议：{}", detail.getDataItem(), detail.getMessage(), detail.getSuggestion());
+                }
+            }
         }
 
         if (validationResult.getWarnCount() > 0) {
             log.warn("数据完整性校验存在警告，请检查日志：{}", validationResult.generateSummary());
         }
+
+        return validationResult;
     }
 
     // ==================== 私有方法：排程结果相关 ====================
+
+    /**
+     * 将校验明细转换为API返回的ValidationDetail列表
+     */
+    private List<ScheduleService.ValidationDetail> convertValidationDetails(
+            ScheduleDataValidationResult validationResult,
+            ScheduleDataValidationResult.ValidationLevel level) {
+        List<ScheduleService.ValidationDetail> result = new ArrayList<>();
+        for (ScheduleDataValidationResult.ValidationDetail detail : validationResult.getDetails()) {
+            if (detail.getLevel() == level) {
+                result.add(new ScheduleService.ValidationDetail(
+                        detail.getDataItem(), detail.getMessage(), detail.getSuggestion()));
+            }
+        }
+        return result;
+    }
 
     /**
      * 保存排程结果
@@ -740,14 +773,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         for (CxScheduleResult result : results) {
             result.setCreateTime(new Date());
             scheduleResultMapper.insert(result);
-
-            if (!CollectionUtils.isEmpty(result.getDetails())) {
-                for (CxScheduleDetail detail : result.getDetails()) {
-                    detail.setMainId(result.getId());
-                    detail.setCreateTime(new Date());
-                    scheduleDetailMapper.insert(detail);
-                }
-            }
         }
         log.info("保存排程结果 {} 条", results.size());
     }
@@ -1010,13 +1035,13 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             if (relatedTasks.size() == 1) {
-                // 胎胚只对应一个硫化任务,直接分配全部库存
+                // 胎胚只对应一个硫化任务，直接分配全部库存
                 LhScheduleResult task = relatedTasks.get(0);
                 String taskKey = String.valueOf(task.getId());
                 materialStockMap.merge(taskKey, totalStock, Integer::sum);
-                log.debug("胎胚 {} 只对应硫化任务 {},分配库存 {}", embryoCode, taskKey, totalStock);
+                log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
             } else {
-                // 胎胚对应多个硫化任务,按硫化任务需求比例分配
+                // 胎胚对应多个硫化任务，按硫化任务需求比例分配
                 int totalDemand = 0;
                 List<TaskDemand> taskDemands = new ArrayList<>();
                 for (LhScheduleResult lh : relatedTasks) {
@@ -1062,14 +1087,14 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 硫化任务需求(内部类)
+     * 硫化任务需求（内部类）
      */
     private static class TaskDemand {
-        String taskKey;    // 硫化任务唯一键:id
+        String taskKey;    // 硫化任务唯一键：lhId
         int demand;
-    
-        TaskDemand(Long id, int demand) {
-            this.taskKey = String.valueOf(id);
+
+        TaskDemand(Long lhId, int demand) {
+            this.taskKey = String.valueOf(lhId);
             this.demand = demand;
         }
     }

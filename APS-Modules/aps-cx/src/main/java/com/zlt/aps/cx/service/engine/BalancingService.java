@@ -35,6 +35,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BalancingService {
 
+    /** 机台最大胎胚种类数上限（默认4种） */
+    public static final int DEFAULT_MAX_TYPES_PER_MACHINE = 4;
+
     /** 参数编码：强制保留历史任务 */
     private static final String PARAM_FORCE_KEEP_HISTORY = "FORCE_KEEP_HISTORY_TASK";
     
@@ -254,7 +257,7 @@ public class BalancingService {
 
             // 如果找不到，使用默认值
             if (maxTypes == null) {
-                maxTypes = context.getMaxTypesPerMachine() != null ? context.getMaxTypesPerMachine() : 4;
+                maxTypes = context.getMaxTypesPerMachine() != null ? context.getMaxTypesPerMachine() : DEFAULT_MAX_TYPES_PER_MACHINE;
             }
 
             result.put(machineCode, maxTypes);
@@ -327,7 +330,7 @@ public class BalancingService {
 
             // 从映射中获取该机台的最大胎胚种类数
             Integer maxTypes = machineMaxEmbryoTypesMap.get(config.getCxMachineCode());
-            state.setMaxTypes(maxTypes != null ? maxTypes : 4);
+            state.setMaxTypes(maxTypes != null ? maxTypes : DEFAULT_MAX_TYPES_PER_MACHINE);
 
             state.setCurrentLoad(0);
             state.setCurrentTypes(0);
@@ -677,8 +680,16 @@ public class BalancingService {
 
     /**
      * 找出可以分配胎胚的候选机台（支持拆分）
+    /**
+     * 查找可以将胎胚分配到该机台的候选机台列表
      *
-     * <p>改进：只要机台有剩余容量就可以作为候选，不再要求能容纳整个胎胚
+     * <p>候选条件：机台当前负荷 < 最大容量（即还有剩余硫化机台数）
+     * <p>胎胚可以拆分：一个胎胚的硫化机台数可以分配到多台候选机台
+     *
+     * @param embryoCode       胎胚编码
+     * @param machineStates    所有机台状态列表
+     * @param forceKeepHistory 是否强制保留历史胎胚（未使用，为扩展预留）
+     * @return 有剩余容量的机台列表
      */
     private List<MachineState> findCandidateMachinesForSplit(
             String embryoCode,
@@ -735,7 +746,13 @@ public class BalancingService {
     }
 
     /**
-     * 复制当前分配状态
+     * 深拷贝所有机台的分配状态
+     *
+     * <p>用于在 DFS 搜索过程中保存当前最优解。
+     * 每个 MachineState 中的 assignedEmbryos 列表会被完整复制。
+     *
+     * @param machineStates 所有机台状态
+     * @return machineCode → EmbryoAssignment列表 的深拷贝
      */
     private Map<String, List<EmbryoAssignment>> copyAssignments(List<MachineState> machineStates) {
         Map<String, List<EmbryoAssignment>> copy = new LinkedHashMap<>();
@@ -746,7 +763,17 @@ public class BalancingService {
     }
 
     /**
-     * 计算均衡分数（越小越均衡）
+     * 计算当前分配方案的均衡分数
+     *
+     * <p>分数越小越均衡。公式：score = 负荷差额 × 10 + 种类差额 × 100
+     * <ul>
+     *   <li>负荷差额 = max(各机台硫化机台数) − min(各机台硫化机台数)</li>
+     *   <li>种类差额 = max(各机台胎胚种类数) − min(各机台胎胚种类数)</li>
+     * </ul>
+     * 只统计负荷>0 或种类>0 的机台。
+     *
+     * @param machineStates 所有机台状态
+     * @return 均衡分数
      */
     private int calculateBalancingScore(List<MachineState> machineStates) {
         if (machineStates.isEmpty()) {
@@ -772,7 +799,15 @@ public class BalancingService {
     }
 
     /**
-     * 将DFS搜索结果转换为BalancingResult
+     * 将 DFS 最优解的分配映射转换为 BalancingResult 结构
+     *
+     * <p>遍历 assignments 中每台机台及其分配的胎胚列表，
+     * 重建 MachineAssignment 对象，计算该机台的总硫化机台数和总胎胚种类数。
+     *
+     * @param assignments  machineCode → EmbryoAssignment列表
+     * @param machineStates 所有机台状态（用于获取未分配机台的信息）
+     * @param tasks        所有任务（用于获取未分配任务的信息）
+     * @return 转换后的 BalancingResult
      */
     private BalancingResult convertDfsResultToBalancingResult(
             Map<String, List<EmbryoAssignment>> assignments,
