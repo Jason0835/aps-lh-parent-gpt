@@ -102,16 +102,16 @@ export default {
           label: this.$t("ui.data.column.lhRepairCapsule.replaceCapsuleCount2"),
           minWidth: 120,
         },
-        {
-          prop: "brand",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhRepairCapsule.brand"),
-          minWidth: 120,
-          formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.biz_brand_type, value);
-          },
-        },
+        // {
+        //   prop: "brand",
+        //   align: "center",
+        //   halign: "center",
+        //   label: this.$t("ui.data.column.lhRepairCapsule.brand"),
+        //   minWidth: 120,
+        //   formatter: (row, column, value, index) => {
+        //     return this.selectDictLabel(this.dict.type.biz_brand_type, value);
+        //   },
+        // },
       ];
       return columns;
     },
@@ -138,13 +138,13 @@ export default {
           label: this.$t("ui.data.column.lhRepairCapsule.materialCode"),
           prop: "materialCode",
         },
-        {
-          label: this.$t("ui.data.column.lhRepairCapsule.brand"),
-          prop: "brand",
-          type: "select",
-          dictData: this.dict.type.biz_brand_type,
-          filterable: true,
-        },
+        // {
+        //   label: this.$t("ui.data.column.lhRepairCapsule.brand"),
+        //   prop: "brand",
+        //   type: "select",
+        //   dictData: this.dict.type.biz_brand_type,
+        //   filterable: true,
+        // },
       ];
     },
   },
