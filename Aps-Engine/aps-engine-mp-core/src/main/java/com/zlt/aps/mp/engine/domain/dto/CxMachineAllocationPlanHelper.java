@@ -1,15 +1,17 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 成型机台-分配分组计划信息
@@ -183,6 +185,39 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     public String getProductionDuplicateKey() {
         String keyFormat = "%s|*|%s|*|%s";
         return String.format(keyFormat, productionPlanInfo.getGroupName(), startDay, endDay);
+    }
+
+    /**
+     * 获取真正的收尾日
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    public Integer getRealConclusionDay(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineMap)) {
+            return null;
+        }
+        CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return null;
+        }
+        Set<Integer> stopDayInfo = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        if (CollectionUtils.isEmpty(stopDayInfo)) {
+            return endDay;
+        }
+        Integer realConclusionDay = endDay;
+        for (; ; ) {
+            if (realConclusionDay <= startDay) {
+                break;
+            }
+            if (!stopDayInfo.contains(realConclusionDay)) {
+                break;
+            }
+            realConclusionDay = realConclusionDay - BigDecimal.ONE.intValue();
+        }
+        return realConclusionDay;
     }
 
     /**

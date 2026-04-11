@@ -71,7 +71,7 @@ public class GroupPlanBeforeConclusionHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //收尾业务判断
-        GroupConclusionInfoVo groupConclusionInfo = groupPlanConclusionHandler.getConclusionInfoByProductionInfo(context, groupPlanInfo);
+        GroupConclusionInfoVo groupConclusionInfo = groupPlanConclusionHandler.getConclusionInfoByProductionInfo(context, groupPlanInfo, continueCxMachineAllocation);
         if (null == groupConclusionInfo) {
             addBeforeConclusionConditionErrorInfoLog(context, groupName);
             return;

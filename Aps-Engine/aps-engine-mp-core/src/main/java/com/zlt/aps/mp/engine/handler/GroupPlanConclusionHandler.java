@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -21,6 +23,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -50,7 +53,7 @@ public class GroupPlanConclusionHandler {
      * @return conclusionDay ：不再排产，即在此前一日为分组收尾日
      * deductionDaySet 需要清除的排产日信息
      */
-    public GroupConclusionInfoVo getConclusionInfoByProductionInfo(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+    public GroupConclusionInfoVo getConclusionInfoByProductionInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> allAllocationInfo) {
         if (null == groupPlanInfo) {
             return null;
         }
@@ -74,17 +77,37 @@ public class GroupPlanConclusionHandler {
             return null;
         }
         //获取使用硫化机台数低于实单要求的最低硫化机台数天数集合
-        List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = getForcedConclusionDayInfo(groupPlanInfo, dayProductionLimitInfo);
-        if (CollectionUtils.isEmpty(lowMinMouldNumberList)) {
+        List<GroupPlanCxLhCapacityLimitHelper> lowMinLhMachineDayList = getForcedConclusionDayInfo(groupPlanInfo, dayProductionLimitInfo);
+        if (CollectionUtils.isEmpty(lowMinLhMachineDayList)) {
+            //记录日志
+            GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
+            return GroupConclusionInfoVo.buildNoConclusionInfo(minLhMachineCount);
+        }
+        //20260411+ 不间断的收尾时间:获取分配收尾日集合
+        Set<Integer> groupConclusionDaySet = getGroupConclusionDayInfo(context, groupPlanInfo, allAllocationInfo);
+        if (CollectionUtils.isEmpty(groupConclusionDaySet)) {
+            //记录日志
+            GroupPlanConclusionLogRecorder.addNoAllocationInfoLog(context, groupName);
+            return null;
+        }
+        //不间断的收尾时间: 没有分组收尾日，则表示中间限制原因导致
+        if (!hasConclusionDayLowLhMachine(lowMinLhMachineDayList, groupConclusionDaySet)) {
+            //记录日志
+            GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
+            return GroupConclusionInfoVo.buildNoConclusionInfo(minLhMachineCount);
+        }
+        //不间断的收尾时间: 连续收尾日集合
+        List<GroupPlanCxLhCapacityLimitHelper> realLowMinLhMachineDayList = getForcedConclusionDayInfo(context, lowMinLhMachineDayList, allAllocationInfo);
+        if (CollectionUtils.isEmpty(realLowMinLhMachineDayList)) {
             //记录日志
             GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
             return GroupConclusionInfoVo.buildNoConclusionInfo(minLhMachineCount);
         }
         //按日期排序
-        lowMinMouldNumberList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
+        realLowMinLhMachineDayList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
         //取得最小和最大日期
-        Integer conclusionDay = lowMinMouldNumberList.get(BigDecimal.ZERO.intValue()).getDay();
-        Set<Integer> deductionDaySet = lowMinMouldNumberList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        Integer conclusionDay = realLowMinLhMachineDayList.get(BigDecimal.ZERO.intValue()).getDay();
+        Set<Integer> deductionDaySet = realLowMinLhMachineDayList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
         return new GroupConclusionInfoVo(minLhMachineCount, conclusionDay, deductionDaySet);
     }
 
@@ -152,12 +175,19 @@ public class GroupPlanConclusionHandler {
             GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
             return GroupConclusionInfoVo.buildNoConclusionInfo(minLhMachineCount);
         }
+        //20260411+ 不间断的收尾时间
+        List<CxMachineUsedLhInfo> realLowMinLhMachineDayList = getForcedConclusionDayInfo(context, lowMinLhMachineCountList, conclusionRange);
+        if (CollectionUtils.isEmpty(realLowMinLhMachineDayList)) {
+            //记录日志
+            GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
+            return GroupConclusionInfoVo.buildNoConclusionInfo(minLhMachineCount);
+        }
         //按日期排序
-        lowMinLhMachineCountList.sort(Comparator.comparing(CxMachineUsedLhInfo::getProductionDay));
+        realLowMinLhMachineDayList.sort(Comparator.comparing(CxMachineUsedLhInfo::getProductionDay));
         //取得最小日期
-        Integer conclusionDay = lowMinLhMachineCountList.get(BigDecimal.ZERO.intValue()).getProductionDay();
-        Integer deductionDay = lowMinLhMachineCountList.size();
-        Set<Integer> deductionDaySet = lowMinLhMachineCountList.stream().map(CxMachineUsedLhInfo::getProductionDay).collect(Collectors.toSet());
+        Integer conclusionDay = realLowMinLhMachineDayList.get(BigDecimal.ZERO.intValue()).getProductionDay();
+        Integer deductionDay = realLowMinLhMachineDayList.size();
+        Set<Integer> deductionDaySet = realLowMinLhMachineDayList.stream().map(CxMachineUsedLhInfo::getProductionDay).collect(Collectors.toSet());
         GroupConclusionInfoVo groupConclusionInfo = new GroupConclusionInfoVo(minLhMachineCount, conclusionDay, deductionDaySet);
         groupConclusionInfo.addSelectedConclusionCxMachine(cxMachineInfo);
         groupConclusionInfo.updateDeductionDaysByCxMachine(deductionDay);
@@ -249,6 +279,55 @@ public class GroupPlanConclusionHandler {
     }
 
     /**
+     * 根据分配信息，获取结构的收尾日信息
+     *
+     * @param context           排产上下文
+     * @param groupPlanInfo     分组
+     * @param allAllocationInfo 分组分配信息
+     * @return
+     */
+    private Set<Integer> getGroupConclusionDayInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> allAllocationInfo) {
+        if (null == groupPlanInfo || CollectionUtils.isEmpty(allAllocationInfo)) {
+            return Collections.emptySet();
+        }
+        List<CxMachineAllocationPlanHelper> realAllocationList = allAllocationInfo.stream().filter(singleAllocation -> groupPlanInfo.equals(singleAllocation.getProductionPlanInfo())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(realAllocationList)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> groupConclusionDaySet = Sets.newHashSet();
+        realAllocationList.forEach(singleAllocation -> {
+            Integer realConclusionDay = singleAllocation.getRealConclusionDay(context);
+            if (null != realConclusionDay) {
+                groupConclusionDaySet.add(realConclusionDay);
+            }
+        });
+        if (CollectionUtils.isEmpty(groupConclusionDaySet)) {
+            return Collections.emptySet();
+        }
+        return groupConclusionDaySet;
+    }
+
+    /**
+     * 在低于硫化机台数的日期中是否包含结构收尾日
+     *
+     * @param lowMinLhMachineDayList 低于硫化机台数天集合信息
+     * @param groupConclusionDaySet  分组收尾日信息
+     * @return
+     */
+    private boolean hasConclusionDayLowLhMachine(List<GroupPlanCxLhCapacityLimitHelper> lowMinLhMachineDayList, Set<Integer> groupConclusionDaySet) {
+        if (CollectionUtils.isEmpty(lowMinLhMachineDayList) || CollectionUtils.isEmpty(groupConclusionDaySet)) {
+            return false;
+        }
+        for (GroupPlanCxLhCapacityLimitHelper lowMinLhMachineDay : lowMinLhMachineDayList) {
+            Integer day = lowMinLhMachineDay.getDay();
+            if (groupConclusionDaySet.contains(day)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 获取需要强制收尾的日排产信息
      * 实单排产硫化机台数低于要求的最低硫化机台数
      *
@@ -289,5 +368,117 @@ public class GroupPlanConclusionHandler {
             return Collections.emptyList();
         }
         return lowMinMouldNumberList;
+    }
+
+    /**
+     * 获取有效的收尾日集合信息
+     *
+     * @param context                排产上下文
+     * @param lowMinLhMachineDayList 需要收尾的日集合信息
+     * @param allAllocationInfo      所有分配信息集合
+     * @return
+     */
+    private List<GroupPlanCxLhCapacityLimitHelper> getForcedConclusionDayInfo(Context context, List<GroupPlanCxLhCapacityLimitHelper> lowMinLhMachineDayList, List<CxMachineAllocationPlanHelper> allAllocationInfo) {
+        if (CollectionUtils.isEmpty(lowMinLhMachineDayList) || CollectionUtils.isEmpty(allAllocationInfo)) {
+            return Collections.emptyList();
+        }
+        CxMachineAllocationPlanHelper earliest = allAllocationInfo.stream().max(Comparator.comparing(CxMachineAllocationPlanHelper::getReleasePriority)).orElse(null);
+        if (null == earliest) {
+            return Collections.emptyList();
+        }
+        Integer realConclusionDay = earliest.getRealConclusionDay(context);
+        if (null == realConclusionDay) {
+            return Collections.emptyList();
+        }
+        List<GroupPlanCxLhCapacityLimitHelper> realConclusionDayList = lowMinLhMachineDayList.stream().filter(singleDay -> singleDay.getDay() <= realConclusionDay).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(realConclusionDayList)) {
+            return Collections.emptyList();
+        }
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayMap = realConclusionDayList.stream().collect(Collectors.toMap(GroupPlanCxLhCapacityLimitHelper::getDay, Function.identity()));
+        Integer deductionDay = realConclusionDay;
+        List<GroupPlanCxLhCapacityLimitHelper> deductionList = Lists.newArrayList();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(earliest.getCxMachineCode());
+        Set<Integer> stopDays = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        for (; deductionDay >= earliest.getStartDay(); ) {
+            if (stopDays.contains(deductionDay)) {
+                deductionDay = deductionDay - BigDecimal.ONE.intValue();
+                continue;
+            }
+            if (dayMap.containsKey(deductionDay)) {
+                deductionList.add(dayMap.get(deductionDay));
+                deductionDay = deductionDay - BigDecimal.ONE.intValue();
+                continue;
+            }
+            break;
+        }
+        if (CollectionUtils.isEmpty(deductionList)) {
+            return Collections.emptyList();
+        }
+        Set<Integer> replenishmentDay = context.getReplenishmentDay();
+        Set<Integer> deductionDaySet = deductionList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
+        if (deductionDaySet.equals(replenishmentDay)) {
+            return Collections.emptyList();
+        }
+        return deductionList;
+    }
+
+    /**
+     * 获取一段连续需要强制收尾的时间
+     *
+     * @param context                  排产上下文
+     * @param lowMinLhMachineCountList 低于硫化机台数的排产日集合
+     * @param conclusionRange          分配段范围
+     * @return
+     */
+    private List<CxMachineUsedLhInfo> getForcedConclusionDayInfo(Context context, List<CxMachineUsedLhInfo> lowMinLhMachineCountList, CxMachineAllocationPlanHelper conclusionRange) {
+        if (CollectionUtils.isEmpty(lowMinLhMachineCountList) || null == conclusionRange) {
+            return Collections.emptyList();
+        }
+        Integer realConclusionDay = conclusionRange.getRealConclusionDay(context);
+        if (null == realConclusionDay) {
+            return Collections.emptyList();
+        }
+        boolean forcedFlag = false;
+        for (CxMachineUsedLhInfo lowMinLhMachineDay : lowMinLhMachineCountList) {
+            Integer day = lowMinLhMachineDay.getProductionDay();
+            if (realConclusionDay.equals(day)) {
+                forcedFlag = true;
+            }
+        }
+        if (!forcedFlag) {
+            return Collections.emptyList();
+        }
+        List<CxMachineUsedLhInfo> realConclusionDayList = lowMinLhMachineCountList.stream().filter(singleDay -> singleDay.getProductionDay() <= realConclusionDay).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(realConclusionDayList)) {
+            return Collections.emptyList();
+        }
+        Map<Integer, CxMachineUsedLhInfo> deductionDayMap = realConclusionDayList.stream().collect(Collectors.toMap(CxMachineUsedLhInfo::getProductionDay, Function.identity()));
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(conclusionRange.getCxMachineCode());
+        Set<Integer> stopDays = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        Integer deductionDay = realConclusionDay;
+        List<CxMachineUsedLhInfo> deductionList = Lists.newArrayList();
+        for (; deductionDay >= conclusionRange.getStartDay(); ) {
+            if (stopDays.contains(deductionDay)) {
+                deductionDay = deductionDay - BigDecimal.ONE.intValue();
+                continue;
+            }
+            if (deductionDayMap.containsKey(deductionDay)) {
+                deductionList.add(deductionDayMap.get(deductionDay));
+                deductionDay = deductionDay - BigDecimal.ONE.intValue();
+                continue;
+            }
+            break;
+        }
+        if (CollectionUtils.isEmpty(deductionList)) {
+            return Collections.emptyList();
+        }
+        Set<Integer> replenishmentDay = context.getReplenishmentDay();
+        Set<Integer> deductionDaySet = deductionList.stream().map(CxMachineUsedLhInfo::getProductionDay).collect(Collectors.toSet());
+        if (deductionDaySet.equals(replenishmentDay)) {
+            return Collections.emptyList();
+        }
+        return deductionList;
     }
 }

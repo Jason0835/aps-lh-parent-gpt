@@ -302,6 +302,7 @@ public class ProductionCxMachineCalculationHandler {
         Integer productionCount = productionCxMachineCodeSet.size();
         List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
+        Integer wholeCount = needCount.setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
         Integer needWholeCount = needCount.setScale(BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
         CxContinueMachineReleaseHelper initReleaseInfo = new CxContinueMachineReleaseHelper(BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue());
         getContinueMachineRelease(context, initReleaseInfo, needWholeCount, productionCount, groupPlanInfo, groupContinueInfo);
@@ -330,6 +331,7 @@ public class ProductionCxMachineCalculationHandler {
             }
         }
         int releasePriority = BigDecimal.ZERO.intValue();
+        int wholeIndex = BigDecimal.ONE.intValue();
         for (ProductGroupCxCapacityInfo cxCapacityInfo : effectiveList) {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
             Integer remainingDays = cxMachineInfo.getRemainingDays() - minAllocationDays;
@@ -338,6 +340,11 @@ public class ProductionCxMachineCalculationHandler {
             if (allocationDay <= BigDecimal.ZERO.intValue()) {
                 break;
             }
+            //20260411+ 保持整月台数
+            if (wholeCount > BigDecimal.ZERO.intValue() && wholeIndex <= wholeCount) {
+                allocationDay = cxMachineInfo.getMaxProductionDays();
+            }
+            wholeIndex = wholeIndex + BigDecimal.ONE.intValue();
             // 更新特殊材料库存
             productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
