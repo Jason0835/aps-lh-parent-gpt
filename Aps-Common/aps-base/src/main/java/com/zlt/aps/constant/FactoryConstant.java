@@ -17,6 +17,11 @@ public class FactoryConstant {
      * 31
      */
     public final static Integer MONTH_MAX_DAY = 31;
+
+    /**
+     * 模具受限的个数
+     */
+    public final static Integer MOULD_LIMIT_COUNT = 2;
     /**
      * 小时对应的秒数 3600秒
      */

@@ -9,11 +9,14 @@ import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.ThreadPoolManager;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.mp.api.domain.vo.AdjustStructureOrderVo;
+import com.zlt.aps.mp.engine.adjust.AdjustStructureOrderSorter;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
@@ -144,16 +147,19 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         ///List<Future> futureList = new ArrayList<>();
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
         String structureCondi = contextDTO.getStructureName();
-        for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
+        List<AdjustStructureOrderVo> structureOrderVoList = getAdjustStructureOrderList(contextDTO.getMpAdjustStructureInList());
+        for (AdjustStructureOrderVo structureVo : structureOrderVoList){
+        //for (Map.Entry<String, List<MpAdjustStructureIn>> entry : adjustStructInMap.entrySet()) {
+
             if (!StringUtil.isEmptyWithTrim(structureCondi)){
                 //若传进来的结构有称有值，则按此结构调整
-                if (!entry.getKey().equals(structureCondi)){
+                if (!structureVo.getStructureName().equals(structureCondi)){
                     continue;
                 }
             }
 
-            final String currentStructureName = entry.getKey();
-            final List<MpAdjustStructureIn> currentAdjustList = new ArrayList<>(entry.getValue());
+            final String currentStructureName = structureVo.getStructureName();
+            final List<MpAdjustStructureIn> currentAdjustList = new ArrayList<>(adjustStructInMap.get(currentStructureName));
             //Future future = ThreadPoolManager.getInstance().submit(() -> {
                 //2.1 初始结构上下文
                 MpRollAdjustContextDTO copyContextDTO = copyContext(contextDTO,currentStructureName);
@@ -166,10 +172,10 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 }
                 //2.2 执行结构内调整
                 Date startTime = new Date();
-                copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
-                weekRollAdjustEngine.doStructureInForOne(copyContextDTO,entry.getValue(), oneStructMpFinalList);
+                copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,开始时间:%s",currentStructureName, DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
+                weekRollAdjustEngine.doStructureInForOne(copyContextDTO,adjustStructInMap.get(currentStructureName), oneStructMpFinalList);
                 Date endTime = new Date();
-                copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",entry.getKey(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
+                copyContextDTO.getLogDetail().append(String.format("结构:%s,自动调整,结束时间:%s,总耗时:%s毫秒",currentStructureName, DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
                 //2.3.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
@@ -219,6 +225,43 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setSaveMpProdFinalList(newMpFinalList);
         contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
+    }
+
+    /**
+     * 获取结构内调整排序列表
+     * @param mpAdjustStructureInList
+     * @return
+     */
+    private List<AdjustStructureOrderVo> getAdjustStructureOrderList(List<MpAdjustStructureIn> mpAdjustStructureInList){
+        if (PubUtil.isEmpty(mpAdjustStructureInList)){
+            return null;
+        }
+        AdjustStructureOrderVo structureOrderVo;
+        Map<String,AdjustStructureOrderVo> structureOrderMap = new HashMap<>();
+        for (MpAdjustStructureIn structureIn : mpAdjustStructureInList){
+            structureOrderVo = structureOrderMap.get(structureIn.getStructureName());
+            if (structureOrderVo == null){
+                structureOrderVo = new AdjustStructureOrderVo();
+                structureOrderVo.setStructureName(structureIn.getStructureName());
+                structureOrderVo.setHeightPriorityCount(0);
+                structureOrderVo.setMouldLimitCount(0);
+                structureOrderVo.setHasSpecialMaterial(YesOrNoEnum.NO.getCode());
+            }
+            // 统计高优先级的个数
+            if (structureIn.getHeightQty() > 0){
+                structureOrderVo.setHeightPriorityCount(structureOrderVo.getHeightPriorityCount() + 1);
+            }
+            // 统计模具受限的个数
+            if (structureIn.getTypeBlockQty().equals(FactoryConstant.MOULD_LIMIT_COUNT)){
+                structureOrderVo.setMouldLimitCount(structureOrderVo.getMouldLimitCount() + 1);
+            }
+            structureOrderVo.setHasSpecialMaterial(structureIn.getHasSpecialMaterial());
+            structureOrderMap.put(structureIn.getStructureName(),structureOrderVo);
+        }
+        List<AdjustStructureOrderVo> structureOrderVoList = structureOrderMap.values().stream().collect(Collectors.toList());
+        //排序：结构内的高优先级SKU个数多的优先 -> 模具受限的SKU个数多的优先
+        AdjustStructureOrderSorter.sort(structureOrderVoList);
+        return structureOrderVoList;
     }
 
     /**
