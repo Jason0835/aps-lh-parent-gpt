@@ -1,9 +1,8 @@
-package com.zlt.aps.cx.api.domain.entity;
+package com.zlt.aps.mdm.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -15,158 +14,132 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 成型精度计划实体
+ * 成型精度计划实体（MDM侧复用）。
+ * <p>
  * 对应表：T_CX_PRECISION_PLAN
+ * <br/>
+ * 说明：
+ * <ul>
+ *   <li>字段与 cx-api 的 CxPrecisionPlan 保持一致，便于跨模块传递</li>
+ *   <li>包含查询辅助字段（exist=false）供条件检索使用</li>
+ *   <li>保留少量调度兼容字段（planShift/estimatedHours，非数据库列）</li>
+ * </ul>
  */
 @Data
 @TableName("T_CX_PRECISION_PLAN")
-@ApiModel(value = "CxPrecisionPlan", description = "CX precision plan")
+@ApiModel(value = "成型精度计划(MDM)", description = "成型机台精度保养计划")
 public class CxPrecisionPlan extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /** 分厂编码 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "Factory code")
     @TableField("FACTORY_CODE")
     private String factoryCode;
 
     /** 机台编号 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.machineCode")
-    @ApiModelProperty(value = "Machine code")
     @TableField("MACHINE_CODE")
     private String machineCode;
 
     /** 精度类型 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.accuracyType", dictType = "MACHINE_ACCURACY_TYPE")
-    @ApiModelProperty(value = "Precision type")
     @TableField("PRECISION_TYPE")
     private String precisionType;
 
     /** 计划日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "Plan date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("PLAN_DATE")
     private LocalDate planDate;
 
     /** 实际执行日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.actualDate", dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "Actual date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("ACTUAL_DATE")
     private LocalDate actualDate;
 
     /** 到期日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.dueDate", dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "Due date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("DUE_DATE")
     private LocalDate dueDate;
 
-    /** 距离计划日期剩余天数 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.daysToDue")
-    @ApiModelProperty(value = "Days to due")
+    /** 距离到期日剩余天数 */
     @TableField("DAYS_TO_DUE")
     private Integer daysToDue;
 
     /** 上次保养日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.lastMaintenanceDate", dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "Last maintenance date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("LAST_MAINTENANCE_DATE")
     private LocalDate lastMaintenanceDate;
 
-    /** 完成情况：0-未完成，1-已完成 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.completionStatus", dictType = "lh_precision_completion_status")
-    @ApiModelProperty(value = "Completion status")
+    /** 完成状态：0-未完成，1-已完成 */
     @TableField("COMPLETION_STATUS")
     private String completionStatus;
 
     /** 计划年度 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.year")
-    @ApiModelProperty(value = "Year")
     @TableField("YEAR")
     private BigDecimal year;
 
     /** 预警状态：0-未预警，1-已预警 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.warningStatus", dictType = "lh_precision_warning_status")
-    @ApiModelProperty(value = "Warning status")
     @TableField("WARNING_STATUS")
     private String warningStatus;
 
     /** 预警触发日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.warningDate", dateFormat = "yyyy-MM-dd")
-    @ApiModelProperty(value = "Warning date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("WARNING_DATE")
     private LocalDate warningDate;
 
     /** 是否已发送预警：0-未发送，1-已发送 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.isWarningSent", dictType = "lh_precision_warning_sent")
-    @ApiModelProperty(value = "Warning sent")
     @TableField("IS_WARNING_SENT")
     private String isWarningSent;
 
-    /** 数据来源：0-MES，1-系统自动生成 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.dataSource", dictType = "lh_precision_data_source")
-    @ApiModelProperty(value = "Data source")
+    /** 数据来源：0-同步，1-自动生成 */
     @TableField("DATA_SOURCE")
     private String dataSource;
 
     /** MES来源ID */
-    @ApiModelProperty(value = "MES source id")
     @TableField("MES_SOURCE_ID")
     private Long mesSourceId;
 
     /** 分公司编码 */
-    @ApiModelProperty(value = "Company code")
     @TableField("COMPANY_CODE")
     private String companyCode;
 
     /** 备注 */
-    @Excel(name = "ui.common.column.remark")
-    @ApiModelProperty(value = "Remark")
     @TableField("REMARK")
     private String remark;
 
-    /** 周期（展示字段，非数据库列） */
-    @ApiModelProperty(value = "Cycle text")
-    @TableField(exist = false)
-    private String cycleText;
-
-    /** 排程日期（展示字段，非数据库列） */
-    @ApiModelProperty(value = "Schedule date")
-    @TableField(exist = false)
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
-    private LocalDate scheduleDate;
-
+    /** 以下为查询辅助字段（非数据库列） */
     /** 计划日期开始（搜索用） */
-    @ApiModelProperty(value = "Plan date start")
+    @ApiModelProperty(value = "计划日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateStart;
 
     /** 计划日期结束（搜索用） */
-    @ApiModelProperty(value = "Plan date end")
+    @ApiModelProperty(value = "计划日期结束（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate planDateEnd;
 
     /** 实际日期开始（搜索用） */
-    @ApiModelProperty(value = "Actual date start")
+    @ApiModelProperty(value = "实际日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate actualDateStart;
 
     /** 实际日期结束（搜索用） */
-    @ApiModelProperty(value = "Actual date end")
+    @ApiModelProperty(value = "实际日期结束（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate actualDateEnd;
+
+    /** 以下为调度侧兼容字段（非数据库列） */
+    /** 计划班次（调度兼容） */
+    @TableField(exist = false)
+    private String planShift;
+
+    /** 预计时长（小时，调度兼容） */
+    @TableField(exist = false)
+    private BigDecimal estimatedHours;
 }
