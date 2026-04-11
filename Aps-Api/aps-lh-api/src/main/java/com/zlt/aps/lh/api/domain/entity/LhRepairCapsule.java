@@ -22,7 +22,7 @@ import java.util.Date;
 @ApiModel(value = "APS胶囊已使用次数", description = "APS胶囊已使用次数")
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("T_LH_REPAIR_CAPSULE")
+@TableName("t_lh_repair_capsule")
 public class LhRepairCapsule extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
