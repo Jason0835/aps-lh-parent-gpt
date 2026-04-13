@@ -273,6 +273,16 @@ public class DeductMouldScheduler {
         } else {
             //1.3 在收尾日通排产完，则根据规则确定激活机台数
             activeMachines = getActiveMachinesByRule(deductMouldVo, context.getExpectedDays());
+
+            // 动态计算所需机台数 sandy+ 2026.4.13
+            // 若在结构未收尾的情况下，
+            int remainingDays = deductMouldVo.getDeadline() - context.getCurrentDate();
+            int requiredDailyCapacity = (int) Math.ceil((double) deductMouldVo.getRemainingQty() / remainingDays);
+            int neededMachines = (int) Math.ceil((double) requiredDailyCapacity / deductMouldVo.getDailyOutputPerMachine());
+            activeMachines = Math.min(activeMachines, context.getPreDayMachines());
+            if (activeMachines > neededMachines){
+                activeMachines -= 1;
+            }
         }
 
         //2、在收尾日倒数第2天 且前日机台数大于3台，优化激活台数
@@ -326,7 +336,7 @@ public class DeductMouldScheduler {
         // 目前剩余量
         int remainQty = deductMouldVo.getRemainingQty();
 
-        int activeMachines, dailyCapacity, todayOutput, preDayMachines;
+        int activeMachines, dailyCapacity, todayOutput;
         while (remainQty > 0 && currentDate <= deadLineDate) {
             // 根据规则确定激活机台数
             activeMachines = getActiveMachinesByRule(deductMouldVo, expectedDays);
