@@ -59,7 +59,7 @@ public class MdmConstructionInfoController extends AbstractDocBizController<MdmC
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "update_time desc";
     }
 
     /**
