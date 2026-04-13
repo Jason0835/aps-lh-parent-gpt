@@ -25,9 +25,11 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
+import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
@@ -130,6 +132,8 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             queryCondition.setCxMachineCode(queryCondition.getScheduledMachines());
             setProductionVersion(queryCondition);
             List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
+            // 集合逗号分隔字段升序排序
+            CommaFieldSortUtil.sortAndUpdateCommaField(list, MpStructureAllocation::getCxMachineCode, MpStructureAllocation::setCxMachineCode);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();
